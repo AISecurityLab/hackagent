@@ -1089,14 +1089,14 @@ tqdm = ["tqdm"]
 
 [[package]]
 name = "google-adk"
-version = "1.4.1"
+version = "1.7.0"
 description = "Agent Development Kit"
 optional = false
 python-versions = ">=3.9"
 groups = ["dev"]
 files = [
-    {file = "google_adk-1.4.1-py3-none-any.whl", hash = "sha256:f789f27eab16c499719fa66cd9033ab69a34c381368df8e43a3f9bebdcf7e3ac"},
-    {file = "google_adk-1.4.1.tar.gz", hash = "sha256:fc29a3840343fae660447e594d4d4851176ddc970dcaae3082bc97f403e7e832"},
+    {file = "google_adk-1.7.0-py3-none-any.whl", hash = "sha256:924bb7d65771ae6c03e0ab64d4e3a3a4d0fb02682faeb7735c2be302adade94c"},
+    {file = "google_adk-1.7.0.tar.gz", hash = "sha256:1bb86371e794e9ec73e0cc45bca529512862ecb5cd57132e77262b0de3f88dec"},
 ]
 
 [package.dependencies]
@@ -1109,7 +1109,7 @@ google-cloud-aiplatform = {version = ">=1.95.1", extras = ["agent-engines"]}
 google-cloud-secret-manager = ">=2.22.0"
 google-cloud-speech = ">=2.30.0"
 google-cloud-storage = ">=2.18.0,<3.0.0"
-google-genai = ">=1.17.0"
+google-genai = ">=1.21.1"
 graphviz = ">=0.20.2"
 mcp = {version = ">=1.8.0", markers = "python_version >= \"3.10\""}
 opentelemetry-api = ">=1.31.0"
@@ -1122,18 +1122,20 @@ PyYAML = ">=6.0.2"
 requests = ">=2.32.4"
 sqlalchemy = ">=2.0"
 starlette = ">=0.46.2"
+tenacity = ">=8.0.0"
 typing-extensions = ">=4.5,<5"
 tzlocal = ">=5.3"
 uvicorn = ">=0.34.0"
+watchdog = ">=6.0.0"
 websockets = ">=15.0.1"
 
 [package.extras]
-a2a = ["a2a-sdk (>=0.2.7) ; python_version >= \"3.10\""]
+a2a = ["a2a-sdk (>=0.2.11) ; python_version >= \"3.10\""]
 dev = ["flit (>=3.10.0)", "isort (>=6.0.0)", "mypy (>=1.15.0)", "pyink (>=24.10.0)", "pylint (>=2.6.0)"]
 docs = ["autodoc_pydantic", "furo", "myst-parser", "sphinx", "sphinx-autodoc-typehints", "sphinx-rtd-theme"]
-eval = ["google-cloud-aiplatform[evaluation] (>=1.87.0)", "pandas (>=2.2.3)", "tabulate (>=0.9.0)"]
+eval = ["google-cloud-aiplatform[evaluation] (>=1.100.0)", "pandas (>=2.2.3)", "rouge-score (>=0.1.2)", "tabulate (>=0.9.0)"]
 extensions = ["anthropic (>=0.43.0)", "beautifulsoup4 (>=3.2.2)", "crewai[tools] ; python_version >= \"3.10\"", "docker (>=7.0.0)", "langgraph (>=0.2.60)", "litellm (>=1.63.11)", "llama-index-readers-file (>=0.4.0)", "lxml (>=5.3.0)", "toolbox-core (>=0.1.0)"]
-test = ["anthropic (>=0.43.0)", "langchain-community (>=0.3.17)", "langgraph (>=0.2.60)", "litellm (>=1.71.2)", "llama-index-readers-file (>=0.4.0)", "pytest (>=8.3.4)", "pytest-asyncio (>=0.25.0)", "pytest-mock (>=3.14.0)", "pytest-xdist (>=3.6.1)"]
+test = ["anthropic (>=0.43.0)", "langchain-community (>=0.3.17)", "langgraph (>=0.2.60,<=0.4.10)", "litellm (>=1.71.2)", "llama-index-readers-file (>=0.4.0)", "pytest (>=8.3.4)", "pytest-asyncio (>=0.25.0)", "pytest-mock (>=3.14.0)", "pytest-xdist (>=3.6.1)"]
 
 [[package]]
 name = "google-api-core"
@@ -1575,14 +1577,14 @@ testing = ["pytest"]
 
 [[package]]
 name = "google-genai"
-version = "1.20.0"
+version = "1.26.0"
 description = "GenAI Python SDK"
 optional = false
 python-versions = ">=3.9"
 groups = ["dev"]
 files = [
-    {file = "google_genai-1.20.0-py3-none-any.whl", hash = "sha256:ccd61d6ebcb14f5c778b817b8010e3955ae4f6ddfeaabf65f42f6d5e3e5a8125"},
-    {file = "google_genai-1.20.0.tar.gz", hash = "sha256:dccca78f765233844b1bd4f1f7a2237d9a76fe6038cf9aa72c0cd991e3c107b5"},
+    {file = "google_genai-1.26.0-py3-none-any.whl", hash = "sha256:a050de052ee6e68654ba7cdb97028a576ad7108d0ecc9257c69bcc555498e9a2"},
+    {file = "google_genai-1.26.0.tar.gz", hash = "sha256:d7b019ac98ca07888caa6121a953eb65db20f78370d8ae06aec29fb534534dc8"},
 ]
 
 [package.dependencies]
@@ -1591,6 +1593,7 @@ google-auth = ">=2.14.1,<3.0.0"
 httpx = ">=0.28.1,<1.0.0"
 pydantic = ">=2.0.0,<3.0.0"
 requests = ">=2.28.1,<3.0.0"
+tenacity = ">=8.2.3,<9.0.0"
 typing-extensions = ">=4.11.0,<5.0.0"
 websockets = ">=13.0.0,<15.1.0"
 
@@ -4205,6 +4208,22 @@ anyio = ">=3.6.2,<5"
 full = ["httpx (>=0.27.0,<0.29.0)", "itsdangerous", "jinja2", "python-multipart (>=0.0.18)", "pyyaml"]
 
 [[package]]
+name = "tenacity"
+version = "8.5.0"
+description = "Retry code until it succeeds"
+optional = false
+python-versions = ">=3.8"
+groups = ["dev"]
+files = [
+    {file = "tenacity-8.5.0-py3-none-any.whl", hash = "sha256:b594c2a5945830c267ce6b79a166228323ed52718f30302c1359836112346687"},
+    {file = "tenacity-8.5.0.tar.gz", hash = "sha256:8bc6c0c8a09b31e6cad13c47afbed1a567518250a9a171418582ed8d9c20ca78"},
+]
+
+[package.extras]
+doc = ["reno", "sphinx"]
+test = ["pytest", "tornado (>=4.5)", "typeguard"]
+
+[[package]]
 name = "termcolor"
 version = "3.1.0"
 description = "ANSI color formatting for output in terminal"
@@ -4569,7 +4588,7 @@ version = "6.0.0"
 description = "Filesystem events monitoring"
 optional = false
 python-versions = ">=3.9"
-groups = ["docs"]
+groups = ["dev", "docs"]
 files = [
     {file = "watchdog-6.0.0-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:d1cdb490583ebd691c012b3d6dae011000fe42edb7a82ece80965b42abd61f26"},
     {file = "watchdog-6.0.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:bc64ab3bdb6a04d69d4023b29422170b74681784ffb9463ed4870cf2f3e66112"},
@@ -4944,4 +4963,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "4f43b721b4292f1508573d4075c038581ff42b65213a6a0ba4a92b3041566155"
+content-hash = "92fd4c120fa4a4b027a1c1b2e3cf61649f6709cb235fc078e6bc8098dca194e1"
