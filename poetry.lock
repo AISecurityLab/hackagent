@@ -2684,14 +2684,14 @@ voice-helpers = ["numpy (>=2.0.2)", "sounddevice (>=0.5.1)"]
 
 [[package]]
 name = "openapi-python-client"
-version = "0.25.0"
+version = "0.25.3"
 description = "Generate modern Python clients from OpenAPI"
 optional = false
 python-versions = "<4.0,>=3.9"
 groups = ["dev"]
 files = [
-    {file = "openapi_python_client-0.25.0-py3-none-any.whl", hash = "sha256:a346969ae2cadc1b8678854eb5a86b3c9eb221b2054cec5807824e58a4bc31e3"},
-    {file = "openapi_python_client-0.25.0.tar.gz", hash = "sha256:e1b8911f5037bcb20d4a897ddff5689e71ceb7edc35ec3918cfa2967266aa4ec"},
+    {file = "openapi_python_client-0.25.3-py3-none-any.whl", hash = "sha256:008e4c5f3079f312c135b55b142eb9616eafbd739ad6d5f8e95add726d1a02f2"},
+    {file = "openapi_python_client-0.25.3.tar.gz", hash = "sha256:cafc6b5aebd0c55fe7be4d400b24d3b107f7ec64923b8117ef8aa7ceb2a918a4"},
 ]
 
 [package.dependencies]
@@ -2702,7 +2702,7 @@ jinja2 = ">=3.0.0,<4.0.0"
 pydantic = ">=2.10,<3.0.0"
 python-dateutil = ">=2.8.1,<3.0.0"
 ruamel-yaml = ">=0.18.6,<0.19.0"
-ruff = ">=0.2,<0.12"
+ruff = ">=0.2,<0.13"
 shellingham = ">=1.3.2,<2.0.0"
 typer = ">0.6,<0.17"
 typing-extensions = ">=4.8.0,<5.0.0"
