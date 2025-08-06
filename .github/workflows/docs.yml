@@ -81,7 +81,7 @@ jobs:
     needs: build
     steps:
       - name: Download build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: docs-build
           path: docs/build
