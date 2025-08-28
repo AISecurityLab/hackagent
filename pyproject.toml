@@ -28,7 +28,7 @@ pyyaml = "^6.0.0"
 
 [tool.poetry.group.dev.dependencies]
 openapi-python-client = ">=0.24.3,<0.26.0"
-ruff = "^0.11.9"
+ruff = ">=0.11.9,<0.13.0"
 pytest = "^8.3.5"
 pre-commit = "^4.2.0"
 commitizen = "^4.7.1"
