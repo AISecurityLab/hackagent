@@ -1,3 +1,17 @@
+# Copyright 2025 - Vista Labs. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 CLI Utilities
 
@@ -184,8 +198,8 @@ def get_agent_type_enum(agent_type: str):
         "GOOGLE_ADK": AgentTypeEnum.GOOGLE_ADK,
         "GOOGLE-ADK": AgentTypeEnum.GOOGLE_ADK,
         "ADK": AgentTypeEnum.GOOGLE_ADK,
-        "LITELLM": AgentTypeEnum.LITELMM,
-        "LITE_LLM": AgentTypeEnum.LITELMM,
+        "LITELLM": AgentTypeEnum.LITELLM,
+        "LITE_LLM": AgentTypeEnum.LITELLM,
     }
 
     if normalized in type_mapping:

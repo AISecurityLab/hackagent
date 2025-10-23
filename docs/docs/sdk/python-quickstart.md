@@ -2,9 +2,31 @@
 sidebar_position: 1
 ---
 
-# Python SDK Quick Start
+# SDK Quick Start
 
-The HackAgent Python SDK provides a powerful interface for conducting AI security testing programmatically. This guide will get you up and running with the actual SDK implementation.
+The HackAgent SDK provides a powerful interface for conducting AI security testing programmatically. This guide covers installation, configuration, and practical usage examples.
+
+## SDK vs HTTP API
+
+The **HackAgent SDK** wraps the HackAgent platform's HTTP API in easy-to-use classes and methods. When you use the SDK, you're making HTTP requests to the HackAgent platform, but the SDK handles all the low-level details like authentication, request formatting, and response parsing.
+
+**Use the SDK when:**
+- You want to integrate HackAgent into applications
+- You prefer object-oriented interfaces over raw HTTP calls
+- You want built-in error handling and response validation
+
+**Use the HTTP API directly when:**
+- You're working in a different programming language
+- You need maximum control over requests and responses
+- You're building custom integrations
+
+**Use the CLI when:**
+- You want to run security tests from command line or scripts
+- You prefer a simple interface without writing code
+
+For the interactive HTTP API documentation, visit: **[https://hackagent.dev/api/schema/swagger-ui](https://hackagent.dev/api/schema/swagger-ui)**
+
+This guide focuses on the SDK. For CLI usage, see the [CLI Documentation](../cli/README.md).
 
 ## 🚀 Installation
 
@@ -208,7 +230,7 @@ from hackagent.models import AgentTypeEnum
 
 # Available agent types
 AgentTypeEnum.GOOGLE_ADK    # Google Agent Development Kit
-AgentTypeEnum.LITELMM       # LiteLLM (multi-provider LLM interface)
+AgentTypeEnum.LITELLM       # LiteLLM (multi-provider LLM interface)
 AgentTypeEnum.OPENAI_SDK    # OpenAI SDK/API compatible agents
 AgentTypeEnum.OTHER         # Custom or proprietary implementations
 AgentTypeEnum.UNKNOWN       # Unknown/unspecified (default fallback)

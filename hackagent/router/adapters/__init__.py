@@ -16,6 +16,7 @@
 
 from .google_adk import ADKAgentAdapter  # noqa F401
 from .litellm_adapter import LiteLLMAgentAdapter  # noqa F401
+from .openai_adapter import OpenAIAgentAdapter  # noqa F401
 from .base import Agent  # Added re-export
 
-__all__ = ["ADKAgentAdapter", "LiteLLMAgentAdapter", "Agent"]
+__all__ = ["ADKAgentAdapter", "LiteLLMAgentAdapter", "OpenAIAgentAdapter", "Agent"]

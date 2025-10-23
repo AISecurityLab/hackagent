@@ -29,7 +29,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
     ):
         # --- MOCK SETUP ---
         MockAgentMap[AgentTypeEnum.GOOGLE_ADK] = MockADKAdapter
-        MockAgentMap[AgentTypeEnum.LITELMM] = MockLiteLLMAdapter
+        MockAgentMap[AgentTypeEnum.LITELLM] = MockLiteLLMAdapter
 
         MockADKAdapter.__name__ = "ADKAgentAdapter"
         MockLiteLLMAdapter.__name__ = "LiteLLMAgentAdapter"
@@ -150,7 +150,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
     ):
         # --- MOCK SETUP ---
         MockAgentMap[AgentTypeEnum.GOOGLE_ADK] = MockADKAdapter
-        MockAgentMap[AgentTypeEnum.LITELMM] = MockLiteLLMAdapter
+        MockAgentMap[AgentTypeEnum.LITELLM] = MockLiteLLMAdapter
         MockADKAdapter.__name__ = "ADKAgentAdapter"
         MockLiteLLMAdapter.__name__ = "LiteLLMAgentAdapter"
 
@@ -638,7 +638,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
         mock_key_list,
     ):
         # --- MOCK SETUP ---
-        MockAgentMap[AgentTypeEnum.LITELMM] = MockLiteLLMAdapter
+        MockAgentMap[AgentTypeEnum.LITELLM] = MockLiteLLMAdapter
         # Need to map ADK as well, even if not called, as AGENT_TYPE_TO_ADAPTER_MAP is fully replaced
         MockAgentMap[AgentTypeEnum.GOOGLE_ADK] = MockADKAdapter
         MockADKAdapter.__name__ = "ADKAgentAdapter"
@@ -672,7 +672,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
         mock_backend_agent_from_create = MagicMock(spec=BackendAgentModel)
         mock_backend_agent_from_create.id = created_litellm_agent_id
         mock_backend_agent_from_create.name = "TestLiteLLMAgent"
-        mock_backend_agent_from_create.agent_type = AgentTypeEnum.LITELMM
+        mock_backend_agent_from_create.agent_type = AgentTypeEnum.LITELLM
         mock_backend_agent_from_create.endpoint = (
             "http://litellm-router-endpoint.com"  # Endpoint for router registration
         )
@@ -690,7 +690,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
 
         # --- TEST PARAMETERS ---
         agent_name_param = "TestLiteLLMAgent"
-        agent_type_param = AgentTypeEnum.LITELMM
+        agent_type_param = AgentTypeEnum.LITELLM
         # This endpoint is what the AgentRouter uses to register the agent with the backend.
         # The actual LLM endpoint might be within the metadata or adapter_op_config.
         agent_endpoint_param = "http://litellm-router-endpoint.com"

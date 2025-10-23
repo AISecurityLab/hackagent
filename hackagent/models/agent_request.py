@@ -44,7 +44,7 @@ class AgentRequest:
             name (str):
             endpoint (str): The primary API endpoint URL for interacting with the agent.
             organization (UUID):
-            agent_type (Union[Unset, AgentTypeEnum]): * `LITELMM` - LiteLLM
+            agent_type (Union[Unset, AgentTypeEnum]): * `LITELLM` - LiteLLM
                 * `OPENAI_SDK` - OpenAI SDK/API
                 * `GOOGLE_ADK` - Google ADK
                 * `OTHER` - Other/Proprietary

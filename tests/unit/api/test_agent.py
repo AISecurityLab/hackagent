@@ -275,7 +275,7 @@ class TestAgentRetrieveAPI(unittest.TestCase):
         mock_response_content = {
             "id": str(agent_id_to_retrieve),
             "name": "Retrieved Agent",
-            "agent_type": AgentTypeEnum.LITELMM.value,
+            "agent_type": AgentTypeEnum.LITELLM.value,
             "endpoint": "http://example.com/retrieved",
             "organization": str(uuid.uuid4()),
             "organization_detail": {
@@ -378,7 +378,7 @@ class TestAgentUpdateAPI(unittest.TestCase):
         agent_id_to_update = uuid.uuid4()
         agent_update_request_data = AgentRequest(
             name="Updated Test Agent",
-            agent_type=AgentTypeEnum.LITELMM,
+            agent_type=AgentTypeEnum.LITELLM,
             endpoint="http://example.com/updated-litellm",
             organization=uuid.uuid4(),
             metadata=UNSET,
@@ -484,7 +484,7 @@ class TestAgentUpdateAPI(unittest.TestCase):
         agent_id_error = uuid.uuid4()
         agent_update_request_data = AgentRequest(
             name="Update Error False",
-            agent_type=AgentTypeEnum.LITELMM,
+            agent_type=AgentTypeEnum.LITELLM,
             endpoint="err_f",
             organization=uuid.uuid4(),
         )

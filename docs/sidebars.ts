@@ -36,32 +36,32 @@ const sidebars: SidebarsConfig = {
       label: '🔧 SDK Reference',
       items: [
         'sdk/python-quickstart',
-      ],
-    },
-    {
-      type: 'category',
-      label: '🔗 API Reference',
-      link: {
-        type: 'doc',
-        id: 'api-index',
-      },
-      items: [
-        'hackagent/agent',
-        'hackagent/client', 
-        'hackagent/errors',
         {
           type: 'category',
-          label: 'Attacks',
+          label: 'API Reference',
+          link: {
+            type: 'doc',
+            id: 'api-index',
+          },
           items: [
-            'hackagent/attacks/base',
-            'hackagent/attacks/strategies',
-          ],
-        },
-        {
-          type: 'category',
-          label: 'Vulnerabilities',
-          items: [
-            'hackagent/vulnerabilities/prompts',
+            'hackagent/agent',
+            'hackagent/client', 
+            'hackagent/errors',
+            {
+              type: 'category',
+              label: 'Attacks',
+              items: [
+                'hackagent/attacks/base',
+                'hackagent/attacks/strategies',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Vulnerabilities',
+              items: [
+                'hackagent/vulnerabilities/prompts',
+              ],
+            },
           ],
         },
       ],

@@ -3,7 +3,7 @@ from enum import Enum
 
 class AgentTypeEnum(str, Enum):
     GOOGLE_ADK = "GOOGLE_ADK"
-    LITELMM = "LITELMM"
+    LITELLM = "LITELLM"
     OPENAI_SDK = "OPENAI_SDK"
     OTHER = "OTHER"
     UNKNOWN = "UNKNOWN"

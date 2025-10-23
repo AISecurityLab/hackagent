@@ -1,3 +1,17 @@
+# Copyright 2025 - Vista Labs. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 Prefix generation pipeline attack based on the BaseAttack class.
 
@@ -23,7 +37,7 @@ from .AdvPrefix import compute_ce
 from .AdvPrefix import completions
 from .AdvPrefix import evaluation
 from .AdvPrefix import aggregation
-from .AdvPrefix import selection
+from .AdvPrefix.selector import PrefixSelector
 from .AdvPrefix.preprocessing import PrefixPreprocessor, PreprocessConfig
 
 # Models and API clients for backend interaction
@@ -459,9 +473,13 @@ class AdvPrefixAttack(BaseAttack):
             },
             {
                 "name": "Step 9: Select Final Prefixes",
-                "function": selection.execute,
+                "function": PrefixSelector.execute,
                 "step_type_enum": "STEP9_SELECT_PREFIXES",
-                "config_keys": ["n_prefixes_per_goal", "selection_judges"],
+                "config_keys": [
+                    "pasr_weight",
+                    "n_prefixes_per_goal",
+                    "selection_judges",
+                ],
                 "input_df_arg_name": "input_df",
                 "output_filename": "selected_prefixes.csv",
             },

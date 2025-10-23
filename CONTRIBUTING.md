@@ -21,7 +21,7 @@ Following these guidelines helps to communicate that you respect the time of the
 
 ## Code of Conduct
 
-This project and everyone participating in it is governed by the [HackAgent Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code. Please report unacceptable behavior to devs@vista-labs.ai.
+This project and everyone participating in it is governed by the [HackAgent Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code. Please report unacceptable behavior to [ais@ai4i.it](mailto:ais@ai4i.it).
 
 ## Getting Started
 
@@ -80,9 +80,9 @@ Please follow these steps to have your contribution considered by the maintainer
 2.  **Set up the development environment** (see [Development Setup](#development-setup)).
 3.  **Make your changes.**
 4.  **Ensure code quality:**
-    *   Format your code: `poetry run black .` and `poetry run ruff format .`
-    *   Check for linting issues: `poetry run ruff check .`
-    *   Run tests: `poetry run pytest tests/`
+    *   Format your code: `uv run ruff format .`
+    *   Check for linting issues: `uv run ruff check .`
+    *   Run tests: `uv run pytest tests/`
     *   Ensure pre-commit checks pass if you have them installed.
 5.  **Commit your changes** using a descriptive commit message that follows our [Commit Message Guidelines](#git-commit-messages).
     ```bash
@@ -102,21 +102,37 @@ Please follow these steps to have your contribution considered by the maintainer
 
 To set up your environment for local development:
 
-1.  Clone the repository:
+1. Clone the repository:
+
     ```bash
-    git clone https://github.com/vistalabs-org/hackagent.git
+    git clone https://github.com/AISecurityLab/hackagent.git
     cd hackagent
     ```
-2.  Install [Poetry](https://python-poetry.org/docs/#installation).
-3.  Install dependencies, including development dependencies:
+
+2. Install [uv](https://docs.astral.sh/uv/getting-started/installation/):
+
     ```bash
-    poetry install --with dev
+    # On macOS and Linux
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    # On Windows
+    powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+    # Or with pip
+    pip install uv
     ```
-4.  (Optional but Recommended) Install pre-commit hooks:
+
+3. Install dependencies, including development dependencies:
+
     ```bash
-    poetry run pre-commit install --hook-type commit-msg --hook-type pre-commit
+    uv sync --extra dev
     ```
-    *(Note: Add `--hook-type pre-commit` if you add hooks like black/ruff to `.pre-commit-config.yaml` later)*
+
+4. (Optional but Recommended) Install pre-commit hooks:
+
+    ```bash
+    uv run pre-commit install --hook-type commit-msg --hook-type pre-commit
+    ```
 
 ## Styleguides
 

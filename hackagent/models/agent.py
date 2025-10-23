@@ -56,7 +56,7 @@ class Agent:
             owner_detail (Union['UserProfileMinimal', None]):
             created_at (datetime.datetime):
             updated_at (datetime.datetime):
-            agent_type (Union[Unset, AgentTypeEnum]): * `LITELMM` - LiteLLM
+            agent_type (Union[Unset, AgentTypeEnum]): * `LITELLM` - LiteLLM
                 * `OPENAI_SDK` - OpenAI SDK/API
                 * `GOOGLE_ADK` - Google ADK
                 * `OTHER` - Other/Proprietary
