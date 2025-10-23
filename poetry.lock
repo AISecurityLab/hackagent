@@ -1089,17 +1089,18 @@ tqdm = ["tqdm"]
 
 [[package]]
 name = "google-adk"
-version = "1.3.0"
+version = "1.4.1"
 description = "Agent Development Kit"
 optional = false
 python-versions = ">=3.9"
 groups = ["dev"]
 files = [
-    {file = "google_adk-1.3.0-py3-none-any.whl", hash = "sha256:a57f05633bd2d9937b9a73ca4fc4a5c7d9d1e2d28390c8df2be134d7d4b1f79c"},
-    {file = "google_adk-1.3.0.tar.gz", hash = "sha256:3be048cd40fb3a2c2f51ecb61233d78434cab2aba5a58507156c7daf2b9772fa"},
+    {file = "google_adk-1.4.1-py3-none-any.whl", hash = "sha256:f789f27eab16c499719fa66cd9033ab69a34c381368df8e43a3f9bebdcf7e3ac"},
+    {file = "google_adk-1.4.1.tar.gz", hash = "sha256:fc29a3840343fae660447e594d4d4851176ddc970dcaae3082bc97f403e7e832"},
 ]
 
 [package.dependencies]
+anyio = {version = ">=4.9.0", markers = "python_version >= \"3.10\""}
 authlib = ">=1.5.1"
 click = ">=8.1.8"
 fastapi = ">=0.115.0"
@@ -1115,14 +1116,19 @@ opentelemetry-api = ">=1.31.0"
 opentelemetry-exporter-gcp-trace = ">=1.9.0"
 opentelemetry-sdk = ">=1.31.0"
 pydantic = ">=2.0,<3.0.0"
+python-dateutil = ">=2.9.0.post0"
 python-dotenv = ">=1.0.0"
 PyYAML = ">=6.0.2"
+requests = ">=2.32.4"
 sqlalchemy = ">=2.0"
+starlette = ">=0.46.2"
 typing-extensions = ">=4.5,<5"
 tzlocal = ">=5.3"
 uvicorn = ">=0.34.0"
+websockets = ">=15.0.1"
 
 [package.extras]
+a2a = ["a2a-sdk (>=0.2.7) ; python_version >= \"3.10\""]
 dev = ["flit (>=3.10.0)", "isort (>=6.0.0)", "mypy (>=1.15.0)", "pyink (>=24.10.0)", "pylint (>=2.6.0)"]
 docs = ["autodoc_pydantic", "furo", "myst-parser", "sphinx", "sphinx-autodoc-typehints", "sphinx-rtd-theme"]
 eval = ["google-cloud-aiplatform[evaluation] (>=1.87.0)", "pandas (>=2.2.3)", "tabulate (>=0.9.0)"]
@@ -2170,14 +2176,13 @@ referencing = ">=0.31.0"
 
 [[package]]
 name = "litellm"
-version = "1.72.6.post1"
+version = "1.72.6.post2"
 description = "Library to easily interface with LLM API providers"
 optional = false
 python-versions = "!=2.7.*,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,!=3.7.*,>=3.8"
 groups = ["main"]
 files = [
-    {file = "litellm-1.72.6.post1-py3-none-any.whl", hash = "sha256:94abba480b3e1c9f05ed75f908e8fb0d5fe1bd5304868bd435f99fbdfcdb4c88"},
-    {file = "litellm-1.72.6.post1.tar.gz", hash = "sha256:cc03455bfae17c4226e70bc0e8ac7c889fc577b4832fbb6bc5bd8bc5a2ab02f9"},
+    {file = "litellm-1.72.6.post2.tar.gz", hash = "sha256:24dbe0efaeca0712d2e18795a6734d1678af086ed9ea1893721c426fe984398d"},
 ]
 
 [package.dependencies]
@@ -4939,4 +4944,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "2912060df6fa8c7ef0fe4001ddcc052f55208521ac53122540bae7ce40bc9528"
+content-hash = "4f43b721b4292f1508573d4075c038581ff42b65213a6a0ba4a92b3041566155"
