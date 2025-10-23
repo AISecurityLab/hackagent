@@ -76,3 +76,6 @@ exclude_lines = [
 output = "reports/coverage.xml"
 
 [tool.pytest.ini_options]
+markers = [
+    "google_adk: marks tests that require Google ADK server (deselect with '-m \"not google_adk\"')",
+]

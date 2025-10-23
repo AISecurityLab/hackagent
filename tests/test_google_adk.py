@@ -1,6 +1,7 @@
 import logging
 import os
 from urllib.parse import urlparse
+import pytest
 
 from hackagent import HackAgent
 
@@ -13,6 +14,7 @@ dotenv.load_dotenv()
 logger = logging.getLogger(__name__)
 
 
+@pytest.mark.google_adk
 def test_adk_attack_scenario():
     try:
         # Extract port from AGENT_URL environment variable
