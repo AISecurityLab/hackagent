@@ -1,4 +1,4 @@
-# Copyright 2025 - Vista Labs. All rights reserved.
+# Copyright 2025 - AI4I. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ from uuid import UUID
 from hackagent.router.adapters.base import Agent
 from hackagent.router.adapters import ADKAgentAdapter
 from hackagent.router.adapters.litellm_adapter import LiteLLMAgentAdapter
+from hackagent.router.adapters.openai_adapter import OpenAIAgentAdapter
 from hackagent.client import AuthenticatedClient
 from hackagent.models import (
     AgentTypeEnum,
@@ -37,7 +38,7 @@ logger = logging.getLogger(__name__)
 AGENT_TYPE_TO_ADAPTER_MAP: Dict[AgentTypeEnum, Type[Agent]] = {
     AgentTypeEnum.GOOGLE_ADK: ADKAgentAdapter,
     AgentTypeEnum.LITELLM: LiteLLMAgentAdapter,
-    # AgentTypeEnum.OPENAI: OpenAIAgentAdapter, # Example for future
+    AgentTypeEnum.OPENAI_SDK: OpenAIAgentAdapter,
     # Add other agent types and their corresponding adapters here
 }
 
@@ -391,6 +392,38 @@ class AgentRouter:
             ]
             if isinstance(self.backend_agent.metadata, dict):
                 for key in optional_litellm_keys:
+                    if (
+                        key not in adapter_instance_config
+                        and key in self.backend_agent.metadata
+                    ):
+                        adapter_instance_config[key] = self.backend_agent.metadata[key]
+
+        elif agent_type == AgentTypeEnum.OPENAI_SDK:
+            if "name" not in adapter_instance_config:
+                if (
+                    isinstance(self.backend_agent.metadata, dict)
+                    and "name" in self.backend_agent.metadata
+                ):
+                    adapter_instance_config["name"] = self.backend_agent.metadata[
+                        "name"
+                    ]
+                else:
+                    raise ValueError(
+                        f"OpenAI SDK agent '{name}' (ID: {registration_key}) missing "
+                        f"'name' (model string) in adapter_operational_config or backend metadata. "
+                        f"Cannot configure OpenAIAgentAdapter."
+                    )
+
+            optional_openai_keys = [
+                "endpoint",
+                "api_key",
+                "max_tokens",
+                "temperature",
+                "tools",
+                "tool_choice",
+            ]
+            if isinstance(self.backend_agent.metadata, dict):
+                for key in optional_openai_keys:
                     if (
                         key not in adapter_instance_config
                         and key in self.backend_agent.metadata

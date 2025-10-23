@@ -78,16 +78,20 @@ import TabItem from '@theme/TabItem';
 
 HackAgent supports multiple agent frameworks:
 
+- **OpenAI SDK**: Test agents built with OpenAI's official SDK (GPT-4, GPT-3.5, etc.)
 - **Google ADK**: Ensure your ADK agent is running and accessible
 - **LiteLLM**: Set up LiteLLM proxy with your preferred models
-- **OpenAI SDK**: Configure OpenAI API compatible endpoints
 - **Custom APIs**: Any REST API that accepts text input
 
-**Example: Start a Google ADK agent**
+**Examples:**
+
 ```bash
-# Your ADK agent should be running on a specific port
-# Example: http://localhost:8001
-curl http://localhost:8001/health  # Verify it's running
+# Verify Google ADK agent is running
+curl http://localhost:8001/health
+
+# Verify OpenAI API access
+curl https://api.openai.com/v1/models \
+  -H "Authorization: Bearer $OPENAI_API_KEY"
 ```
 
 ### Step 4: Run Your First Security Test
@@ -180,21 +184,60 @@ attack_config = {
 
 ### Different Agent Types
 
+**OpenAI SDK Agent:**
+```python
+agent = HackAgent(
+    name="openai_agent",
+    endpoint="https://api.openai.com/v1",
+    agent_type=AgentTypeEnum.OPENAI_SDK,
+    metadata={
+        "name": "gpt-4",  # Model name
+        "api_key": "OPENAI_API_KEY",  # Environment variable name
+        "temperature": 0.7,
+        "max_tokens": 150,
+        # Optional: Function calling support
+        "tools": [
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_weather",
+                    "description": "Get weather for a location",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "location": {"type": "string"}
+                        }
+                    }
+                }
+            }
+        ],
+        "tool_choice": "auto"
+    },
+)
+```
+
 **LiteLLM Agent:**
 ```python
 agent = HackAgent(
     name="litellm_agent",
     endpoint="http://localhost:8000/v1/chat/completions",
     agent_type=AgentTypeEnum.LITELLM,
+    metadata={
+        "name": "ollama/llama3",
+    },
 )
 ```
 
-**OpenAI SDK Agent:**
+**Azure OpenAI:**
 ```python
 agent = HackAgent(
-    name="openai_agent",
-    endpoint="https://api.openai.com/v1/chat/completions",
+    name="azure_agent",
+    endpoint="https://your-resource.openai.azure.com",
     agent_type=AgentTypeEnum.OPENAI_SDK,
+    metadata={
+        "name": "gpt-4",
+        "api_key": "AZURE_OPENAI_API_KEY",
+    },
 )
 ```
 
