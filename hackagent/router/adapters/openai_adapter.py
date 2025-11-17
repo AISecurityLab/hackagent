@@ -326,7 +326,16 @@ class OpenAIAgentAdapter(Agent):
 
             # Extract the generated text
             message = result["message"]
-            generated_text = message.content if message.content else ""
+            content = message.content if message.content else ""
+
+            # For reasoning models (e.g., o1-preview, o1-mini), check reasoning field
+            if not content and hasattr(message, "reasoning") and message.reasoning:
+                generated_text = message.reasoning
+                self.logger.info(
+                    f"OpenAI extracted text from 'reasoning' field (reasoning model) for '{self.model_name}'"
+                )
+            else:
+                generated_text = content
 
             # Check if there are tool calls
             tool_calls = None

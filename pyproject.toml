@@ -29,6 +29,7 @@ dependencies = [
     "pandas>=2.2.3",
     "click>=8.1.0",
     "pyyaml>=6.0.0",
+    "textual>=1.0.0",
 ]
 
 [project.optional-dependencies]

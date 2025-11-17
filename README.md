@@ -75,12 +75,6 @@ agent = HackAgent(
     name="my_openai_agent",
     endpoint="https://api.openai.com/v1",
     agent_type=AgentTypeEnum.OPENAI_SDK,
-    metadata={
-        "name": "gpt-4",  # Model name
-        "api_key": "OPENAI_API_KEY",  # Environment variable name
-        "temperature": 0.7,
-        "max_tokens": 150,
-    },
 )
 
 # Configure attack
@@ -131,9 +125,6 @@ agent = HackAgent(
     name="litellm_agent",
     endpoint="http://localhost:8000",
     agent_type=AgentTypeEnum.LITELLM,
-    metadata={
-        "name": "ollama/llama3",  # Model string
-    },
 )
 
 # Run security scan

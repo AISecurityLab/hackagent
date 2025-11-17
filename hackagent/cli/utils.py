@@ -1,4 +1,4 @@
-# Copyright 2025 - Vista Labs. All rights reserved.
+# Copyright 2025 - AI4I. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -239,3 +239,29 @@ def create_status_panel(title: str, content: str, status: str = "info") -> Panel
     return Panel(
         Text(content, style=style), title=title, border_style=style, padding=(1, 2)
     )
+
+
+def launch_tui(cli_config, initial_tab: str = "dashboard", initial_data: dict = None):
+    """Launch the TUI application with specified tab and optional initial data
+
+    Args:
+        cli_config: CLI configuration object
+        initial_tab: Which tab to show initially (default: "dashboard")
+        initial_data: Initial data to pre-fill in the tab (default: None)
+    """
+    try:
+        from hackagent.cli.tui import HackAgentTUI
+
+        app = HackAgentTUI(
+            cli_config, initial_tab=initial_tab, initial_data=initial_data
+        )
+        app.run()
+
+    except ImportError:
+        console.print("[bold red]❌ TUI dependencies not installed[/bold red]")
+        console.print("\n[cyan]💡 Install with:[/cyan]")
+        console.print("  uv add textual")
+        raise click.ClickException("TUI dependencies not installed")
+    except Exception as e:
+        console.print(f"[bold red]❌ TUI failed to start: {e}[/bold red]")
+        raise click.ClickException(f"TUI failed to start: {e}")

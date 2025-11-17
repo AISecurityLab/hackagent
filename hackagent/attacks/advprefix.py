@@ -1,4 +1,4 @@
-# Copyright 2025 - Vista Labs. All rights reserved.
+# Copyright 2025 - AI4I. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -85,8 +85,8 @@ class AdvPrefixAttack(BaseAttack):
     def __init__(
         self,
         config: Optional[Dict[str, Any]] = None,
-        client: AuthenticatedClient = None,
-        agent_router: AgentRouter = None,
+        client: Optional[AuthenticatedClient] = None,
+        agent_router: Optional[AgentRouter] = None,
     ):
         """
         Initialize the pipeline with configuration.
@@ -117,7 +117,8 @@ class AdvPrefixAttack(BaseAttack):
         output_dir = current_config.get("output_dir")
         if not output_dir:
             raise ValueError("Configuration missing required key: 'output_dir'")
-        self.run_dir = os.path.join(output_dir, self.run_id)
+        # Use output_dir directly without nesting under run_id to avoid timestamp_UUID/UUID structure
+        self.run_dir = output_dir
         # Add run_id to config if it wasn't there, needed by BaseAttack perhaps
         current_config["run_id"] = self.run_id
         # --- Assign self.run_id here as well ---
@@ -756,7 +757,7 @@ class AdvPrefixAttack(BaseAttack):
         # After the loop
         final_selected_prefixes_df = last_step_output_df
         final_status = StatusEnum.COMPLETED  # Default
-        final_error_message = UNSET  # Default
+        final_error_message: Any = UNSET  # Default - can be UNSET or str
 
         if current_step_failed:  # This means the loop exited due to failure and returned. This part might not be reached.
             # Re-evaluating based on whether loop completed or exited early.

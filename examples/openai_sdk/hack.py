@@ -9,19 +9,11 @@ from hackagent import HackAgent
 from hackagent.models import AgentTypeEnum
 
 # Initialize HackAgent for an OpenAI SDK-based agent
-# Note: You'll need to set your HACKAGENT_API_KEY environment variable
+# Note: You'll need to set your HACKAGENT_API_KEY and OPENAI_API_KEY environment variables
 agent = HackAgent(
     name="openai_agent",
-    # For OpenAI, endpoint can be omitted (uses default) or set to a custom endpoint
     endpoint="https://api.openai.com/v1",
     agent_type=AgentTypeEnum.OPENAI_SDK,
-    # Metadata contains model configuration
-    metadata={
-        "name": "gpt-4",  # Model name
-        "api_key": "OPENAI_API_KEY",  # Environment variable name containing API key
-        "temperature": 0.7,
-        "max_tokens": 150,
-    },
 )
 
 # Configure the attack

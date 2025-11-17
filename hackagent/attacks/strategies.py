@@ -1,4 +1,4 @@
-# Copyright 2025 - Vista Labs. All rights reserved.
+# Copyright 2025 - AI4I. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -628,12 +628,19 @@ class AdvPrefix(AttackStrategy):
         )
 
         # Ensure 'output_dir' is present, defaulting if necessary.
-        # AdvPrefixAttack uses this with its self.run_id to create self.run_dir.
+        # AdvPrefixAttack uses this as the final output directory (no nested run_id subdirectory).
         if "output_dir" not in prepared_config:
-            # Defaulting output_dir based on attack_id if not provided.
-            # Note: AdvPrefixAttack's __init__ also has a similar output_dir join with its self.run_id.
-            # This path is more of a base for where AdvPrefixAttack will create its specific run_id subdir.
-            prepared_config["output_dir"] = f"./logs/runs/{attack_id}"
+            # Create timestamp-based directory structure for better organization
+            # Format: ./logs/runs/YYYY-MM-DD/HH-MM-SS_attack-id-prefix
+            from datetime import datetime
+
+            now = datetime.now()
+            date_dir = now.strftime("%Y-%m-%d")
+            time_prefix = now.strftime("%H-%M-%S")
+            attack_id_short = attack_id[:8] if len(attack_id) > 8 else attack_id
+            prepared_config["output_dir"] = (
+                f"./logs/runs/{date_dir}/{time_prefix}_{attack_id_short}"
+            )
             logger.warning(
                 f"'output_dir' not in attack_config for AdvPrefixAttack, defaulting to {prepared_config['output_dir']}"
             )

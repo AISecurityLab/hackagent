@@ -1,4 +1,4 @@
-# Copyright 2025 - Vista Labs. All rights reserved.
+# Copyright 2025 - AI4I. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -282,7 +282,7 @@ def _generate_prefixes(
                     }
                     headers = {
                         "Content-Type": "application/json",
-                        "Authorization": f"Api-Key {actual_api_key}",  # Auth for local proxy
+                        "Authorization": f"Bearer {actual_api_key}",  # Auth for HackAgent API
                     }
                     generated_part = " [DIRECT_CALL_ERROR]"
                     try:
@@ -303,11 +303,24 @@ def _generate_prefixes(
                             and response_json.get("choices")
                             and len(response_json["choices"]) > 0
                             and response_json["choices"][0].get("message")
-                            and response_json["choices"][0]["message"].get("content")
                         ):
-                            generated_part = response_json["choices"][0]["message"][
-                                "content"
-                            ]
+                            message = response_json["choices"][0]["message"]
+                            content = message.get("content", "")
+
+                            # For reasoning models (e.g., moonshotai/kimi-k2-thinking), check reasoning field
+                            if not content and message.get("reasoning"):
+                                generated_part = message["reasoning"]
+                                logger.info(
+                                    f"Direct call to {generator_endpoint} extracted text from 'reasoning' field (reasoning model)"
+                                )
+                            elif content:
+                                generated_part = content
+                            else:
+                                # No content or reasoning - unexpected
+                                logger.warning(
+                                    f"Direct call to {generator_endpoint} received empty content and no reasoning field. Message: {message}"
+                                )
+                                generated_part = " [EMPTY_RESPONSE]"
                         # Fallback: check for a "text" key, which the local proxy currently returns
                         elif response_json and "text" in response_json:
                             generated_part = response_json["text"]

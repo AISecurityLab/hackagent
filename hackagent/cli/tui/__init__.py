@@ -11,3 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""
+TUI (Terminal User Interface) Module
+
+Full-screen tabbed interface for HackAgent CLI.
+"""
+
+from hackagent.cli.tui.app import HackAgentTUI
+
+__all__ = ["HackAgentTUI"]

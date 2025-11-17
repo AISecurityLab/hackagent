@@ -30,12 +30,6 @@ agent = HackAgent(
     name="my_openai_agent",
     endpoint="https://api.openai.com/v1",
     agent_type=AgentTypeEnum.OPENAI_SDK,
-    metadata={
-        "name": "gpt-4",  # Model name
-        "api_key": "OPENAI_API_KEY",  # Env var name
-        "temperature": 0.7,
-        "max_tokens": 150,
-    },
 )
 
 # Configure the attack
@@ -56,40 +50,11 @@ agent.hack(attack_config=attack_config)
 from hackagent import HackAgent
 from hackagent.models import AgentTypeEnum
 
-# Define tools/functions your agent uses
-tools = [
-    {
-        "type": "function",
-        "function": {
-            "name": "get_weather",
-            "description": "Get current weather for a location",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "location": {
-                        "type": "string",
-                        "description": "City name"
-                    }
-                },
-                "required": ["location"]
-            }
-        }
-    }
-]
-
-# Initialize with function calling enabled
+# Initialize agent for function calling testing
 agent = HackAgent(
     name="weather_agent",
     endpoint="https://api.openai.com/v1",
     agent_type=AgentTypeEnum.OPENAI_SDK,
-    metadata={
-        "name": "gpt-4",
-        "api_key": "OPENAI_API_KEY",
-        "temperature": 0.7,
-        "max_tokens": 150,
-        "tools": tools,
-        "tool_choice": "auto",
-    },
 )
 
 # Test for vulnerabilities in function calling
@@ -113,10 +78,6 @@ agent = HackAgent(
     name="azure_agent",
     endpoint="https://your-resource.openai.azure.com",
     agent_type=AgentTypeEnum.OPENAI_SDK,
-    metadata={
-        "name": "gpt-4",
-        "api_key": "AZURE_OPENAI_API_KEY",
-    },
 )
 
 # Example: Using local LLM with OpenAI-compatible API
@@ -124,23 +85,10 @@ agent = HackAgent(
     name="local_agent",
     endpoint="http://localhost:8000/v1",
     agent_type=AgentTypeEnum.OPENAI_SDK,
-    metadata={
-        "name": "local-model",
-    },
 )
 ```
 
-## Configuration Options
-
-The `metadata` dictionary supports the following OpenAI-specific options:
-
-- `name` (required): Model name (e.g., "gpt-4", "gpt-3.5-turbo")
-- `api_key` (optional): Environment variable name containing the API key
-- `endpoint` (optional): Custom API endpoint
-- `max_tokens` (optional): Maximum tokens to generate
-- `temperature` (optional): Sampling temperature (0-2)
-- `tools` (optional): List of function/tool definitions
-- `tool_choice` (optional): Tool choice strategy ("auto", "none", or specific function)
+**Note:** Make sure to set the appropriate API key environment variable (`AZURE_OPENAI_API_KEY` for Azure, `OPENAI_API_KEY` for OpenAI, etc.).
 
 ## Attack Types
 

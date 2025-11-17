@@ -108,7 +108,7 @@ class HackAgent:
         self.client = AuthenticatedClient(
             base_url=base_url,
             token=resolved_auth_token,
-            prefix="Api-Key",
+            prefix="Bearer",
             raise_on_unexpected_status=raise_on_unexpected_status,
             timeout=timeout,
         )

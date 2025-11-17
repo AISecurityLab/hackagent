@@ -283,7 +283,7 @@ attack_config = {
 echo $HACKAGENT_API_KEY
 
 # Test API connectivity
-curl -H "Authorization: Api-Key $HACKAGENT_API_KEY" \
+curl -H "Authorization: Bearer $HACKAGENT_API_KEY" \
      https://hackagent.dev/api/agents/
 ```
 

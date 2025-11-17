@@ -175,13 +175,29 @@ class LiteLLMAgentAdapter(Agent):
                 # Single call to litellm.completion
                 response = litellm.completion(**litellm_params)
 
-                if (
-                    response
-                    and response.choices
-                    and response.choices[0].message
-                    and response.choices[0].message.content
-                ):
-                    completion_text_suffix = response.choices[0].message.content
+                if response and response.choices and response.choices[0].message:
+                    message = response.choices[0].message
+                    content = message.content if message.content else ""
+
+                    # For reasoning models (e.g., moonshotai/kimi-k2-thinking, o1 models)
+                    # check for reasoning field when content is empty
+                    if (
+                        not content
+                        and hasattr(message, "reasoning")
+                        and message.reasoning
+                    ):
+                        completion_text_suffix = message.reasoning
+                        self.logger.info(
+                            f"LiteLLM extracted text from 'reasoning' field (reasoning model) for '{self.model_name}'"
+                        )
+                    elif content:
+                        completion_text_suffix = content
+                    else:
+                        # No content or reasoning - unexpected
+                        self.logger.warning(
+                            f"LiteLLM received empty content and no reasoning field for model '{self.model_name}' for prompt '{text_prompt[:50]}...'. Message: {message}"
+                        )
+                        completion_text_suffix = " [GENERATION_ERROR: EMPTY_RESPONSE]"
                 else:
                     self.logger.warning(
                         f"LiteLLM received unexpected response structure for model '{self.model_name}' for prompt '{text_prompt[:50]}...'. Response: {response}"

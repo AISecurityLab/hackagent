@@ -1,3 +1,18 @@
+# Copyright 2025 - AI4I. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 import unittest
 from unittest.mock import patch, MagicMock
 import logging
@@ -184,6 +199,7 @@ class TestLiteLLMAgentAdapterHandleRequest(unittest.TestCase):
         mock_choice = MagicMock()
         mock_choice.message = MagicMock()
         mock_choice.message.content = None  # No content
+        mock_choice.message.reasoning = None  # No reasoning either (truly empty)
         mock_response = MagicMock()
         mock_response.choices = [mock_choice]
         mock_litellm_completion.return_value = mock_response
@@ -193,9 +209,29 @@ class TestLiteLLMAgentAdapterHandleRequest(unittest.TestCase):
 
         self.assertEqual(response["status_code"], 500)
         self.assertIn(
-            "LiteLLM generation error: [GENERATION_ERROR: UNEXPECTED_RESPONSE]",
+            "LiteLLM generation error: [GENERATION_ERROR: EMPTY_RESPONSE]",
             response["error_message"],
         )
+
+    @patch("litellm.completion")
+    def test_handle_request_reasoning_model_with_reasoning_field(
+        self, mock_litellm_completion
+    ):
+        """Test that reasoning models (e.g., o1, kimi-k2-thinking) work correctly."""
+        mock_choice = MagicMock()
+        mock_choice.message = MagicMock()
+        mock_choice.message.content = ""  # Empty content (typical for reasoning models)
+        mock_choice.message.reasoning = "This is the reasoning output from the model"
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_litellm_completion.return_value = mock_response
+
+        request_data = {"prompt": self.prompt}
+        response = self.adapter.handle_request(request_data)
+
+        self.assertEqual(response["status_code"], 200)
+        self.assertIn("This is the reasoning output", response["processed_response"])
+        self.assertIsNone(response["error_message"])
 
     @patch("litellm.completion")
     def test_handle_request_empty_completions_list_from_execute(

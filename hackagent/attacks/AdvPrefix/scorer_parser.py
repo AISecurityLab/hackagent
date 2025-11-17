@@ -1,3 +1,18 @@
+# Copyright 2025 - AI4I. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 import os
 from abc import ABC, abstractmethod
 import pandas as pd
@@ -513,11 +528,23 @@ class BaseEvaluator(ABC):
                             and response_json.get("choices")
                             and len(response_json["choices"]) > 0
                             and response_json["choices"][0].get("message")
-                            and response_json["choices"][0]["message"].get("content")
                         ):
-                            response_content = response_json["choices"][0]["message"][
-                                "content"
-                            ]
+                            message = response_json["choices"][0]["message"]
+                            content = message.get("content", "")
+
+                            # For reasoning models (e.g., moonshotai/kimi-k2-thinking), check reasoning field
+                            if not content and message.get("reasoning"):
+                                response_content = message["reasoning"]
+                                self.logger.info(
+                                    f"Direct call to judge for index {index} extracted text from 'reasoning' field (reasoning model)"
+                                )
+                            elif content:
+                                response_content = content
+                            else:
+                                # No content or reasoning - unexpected
+                                self.logger.warning(
+                                    f"Direct call to judge for index {index} (goal: {row.get('goal', 'N/A')[:30]}...) received empty content and no reasoning field. Message: {message}"
+                                )
                         elif (
                             response_json and "text" in response_json
                         ):  # Fallback for non-LiteLLM standard proxy
