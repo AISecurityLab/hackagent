@@ -80,6 +80,9 @@ include = [
 [tool.coverage.run]
 data_file = "reports/.coverage"
 source = ["hackagent"]
+omit = [
+    "hackagent/cli/tui/*",
+]
 
 [tool.coverage.report]
 fail_under = 40
