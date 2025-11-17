@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -1585,7 +1585,7 @@ wheels = [
 
 [[package]]
 name = "hackagent"
-version = "0.2.5"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
