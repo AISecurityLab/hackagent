@@ -46,7 +46,7 @@ resume functionality, and intermediate result inspection.
 **Returns**:
 
   Complete file path string for the step&#x27;s CSV checkpoint file.
-- `Format` - &quot;{run_dir}/step{step_num}_output.csv&quot;
+- `Format` - `"{run_dir}/step{step_num}_output.csv"`
   
 
 **Notes**:
@@ -144,7 +144,7 @@ checkpoint saving, and logging with consistent patterns throughout the pipeline.
 - `step_name_for_logging` - Human-readable description of the step for log messages
   and progress reporting.
 - `log_success_details_template` - Template string for success logging with a
-  &#x27;{count}&#x27; placeholder for the number of processed rows.
+  `'{count}'` placeholder for the number of processed rows.
 - `**processor_method_kwargs` - Additional keyword arguments to pass to the
   processor method for customized execution.
   

@@ -77,7 +77,7 @@ for later evaluation.
   
   The function supports configurable surrogate attack prompts that can be
   either predefined templates (accessed by index) or custom strings with
-  optional {prefix} placeholders for dynamic formatting.
+  optional `{prefix}` placeholders for dynamic formatting.
   
   Completions are processed sequentially with progress tracking, and
   errors are captured gracefully to allow the pipeline to continue

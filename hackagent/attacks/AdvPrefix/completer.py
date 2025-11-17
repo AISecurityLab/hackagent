@@ -61,8 +61,8 @@ class CompletionConfig:
         model_id: A general model identifier (e.g., "claude-2", "gpt-4").
         agent_endpoint: The API endpoint for the agent service.
         agent_metadata: Optional dictionary for agent-specific metadata.
-                          For ADK: e.g., {'adk_app_name': 'my_app'}.
-                          For LiteLLM: e.g., {'name': 'litellm_model_string', 'api_key': 'ENV_VAR_NAME'}.
+                          For ADK: e.g., `{'adk_app_name': 'my_app'}`.
+                          For LiteLLM: e.g., `{'name': 'litellm_model_string', 'api_key': 'ENV_VAR_NAME'}`.
         batch_size: The number of requests to batch if supported by the underlying adapter (currently informational).
         max_new_tokens: The maximum number of new tokens to generate for each completion.
         temperature: The temperature setting for token generation.
@@ -176,7 +176,6 @@ class PrefixCompleter:
             client=self.client,
             name=self.config.agent_name,
             agent_type=self.config.agent_type,
-            organization_id=self.config.organization_id,
             endpoint=self.config.agent_endpoint,
             metadata=self.config.agent_metadata,
             adapter_operational_config=adapter_op_config,
@@ -262,7 +261,7 @@ class PrefixCompleter:
 
         Args:
             df: DataFrame containing adversarial prefixes to complete. Must
-                include 'goal' and either 'prefix' or 'target' columns.
+                include `'goal'` and either `'prefix'` or `'target'` columns.
                 Additional columns are preserved in the output.
 
         Returns:
@@ -277,7 +276,7 @@ class PrefixCompleter:
 
         Raises:
             ValueError: If the input DataFrame is missing required columns
-                ('goal' and 'prefix'/'target').
+                (`'goal'` and `'prefix'`/`'target'`).
 
         Note:
             Progress tracking is provided for completion generation. For ADK

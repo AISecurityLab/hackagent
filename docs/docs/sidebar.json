@@ -4,6 +4,23 @@
       "items": [
         {
           "items": [
+            {
+              "items": [
+                "reference/hackagent/attacks/AdvPrefix/aggregation",
+                "reference/hackagent/attacks/AdvPrefix/completer",
+                "reference/hackagent/attacks/AdvPrefix/completions",
+                "reference/hackagent/attacks/AdvPrefix/compute_ce",
+                "reference/hackagent/attacks/AdvPrefix/evaluation",
+                "reference/hackagent/attacks/AdvPrefix/generate",
+                "reference/hackagent/attacks/AdvPrefix/preprocessing",
+                "reference/hackagent/attacks/AdvPrefix/scorer",
+                "reference/hackagent/attacks/AdvPrefix/scorer_parser",
+                "reference/hackagent/attacks/AdvPrefix/selector",
+                "reference/hackagent/attacks/AdvPrefix/utils"
+              ],
+              "label": "hackagent.attacks.AdvPrefix",
+              "type": "category"
+            },
             "reference/hackagent/attacks/base",
             "reference/hackagent/attacks/strategies"
           ],

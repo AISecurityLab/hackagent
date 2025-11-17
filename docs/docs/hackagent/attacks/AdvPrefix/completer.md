@@ -35,17 +35,17 @@ Configuration for generating completions using an Agent via AgentRouter.
 - `agent_name` - A descriptive name for this agent configuration.
 - `agent_type` - The type of agent (e.g., ADK, LiteLLM) to use.
 - `organization_id` - The organization ID for backend agent registration.
-- `model_id` - A general model identifier (e.g., "claude-2", "gpt-4").
+- `model_id` - A general model identifier (e.g., &quot;claude-2&quot;, &quot;gpt-4&quot;).
 - `agent_endpoint` - The API endpoint for the agent service.
 - `agent_metadata` - Optional dictionary for agent-specific metadata.
   For ADK: e.g., `{'adk_app_name': 'my_app'}`.
   For LiteLLM: e.g., `{'name': 'litellm_model_string', 'api_key': 'ENV_VAR_NAME'}`.
 - `batch_size` - The number of requests to batch if supported by the underlying adapter (currently informational).
 - `max_new_tokens` - The maximum number of new tokens to generate for each completion.
-- `temperature` - The temperature setting for token generation.
-- `n_samples` - The number of completion samples to generate for each input prefix.
-- `surrogate_attack_prompt` - An optional prompt to prepend for surrogate attacks, typically used with LiteLLM agents.
-- `request_timeout` - The timeout in seconds for each completion request.
+- `agent_type`0 - The temperature setting for token generation.
+- `agent_type`1 - The number of completion samples to generate for each input prefix.
+- `agent_type`2 - An optional prompt to prepend for surrogate attacks, typically used with LiteLLM agents.
+- `agent_type`3 - The timeout in seconds for each completion request.
 
 ## PrefixCompleter Objects
 
@@ -172,7 +172,7 @@ The completion process:
 **Arguments**:
 
 - `df` - DataFrame containing adversarial prefixes to complete. Must
-  include &#x27;goal&#x27; and either &#x27;prefix&#x27; or &#x27;target&#x27; columns.
+  include `'goal'` and either `'prefix'` or `'target'` columns.
   Additional columns are preserved in the output.
   
 
@@ -191,7 +191,7 @@ The completion process:
 **Raises**:
 
 - `ValueError` - If the input DataFrame is missing required columns
-  (&#x27;goal&#x27; and &#x27;prefix&#x27;/&#x27;target&#x27;).
+  (`'goal'` and `'prefix'`/`'target'`).
   
 
 **Notes**:

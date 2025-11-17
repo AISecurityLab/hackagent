@@ -210,8 +210,8 @@ def execute(
     Returns:
         A pandas DataFrame with the input data augmented with evaluation results.
         Each judge adds columns with prefixes corresponding to their type:
-        - eval_{judge_type}: Evaluation scores/decisions from the judge
-        - explanation_{judge_type}: Detailed explanations from the judge
+        - `eval_{judge_type}`: Evaluation scores/decisions from the judge
+        - `explanation_{judge_type}`: Detailed explanations from the judge
 
     Note:
         This step supports multiple judge types including:

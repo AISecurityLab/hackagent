@@ -59,7 +59,7 @@ def get_checkpoint_path(run_dir: str, step_num: int) -> str:
 
     Returns:
         Complete file path string for the step's CSV checkpoint file.
-        Format: "{run_dir}/step{step_num}_output.csv"
+        Format: `"{run_dir}/step{step_num}_output.csv"`
 
     Note:
         The standardized naming convention allows for easy identification
@@ -214,7 +214,7 @@ def execute_processor_step(
         step_name_for_logging: Human-readable description of the step for log messages
             and progress reporting.
         log_success_details_template: Template string for success logging with a
-            '{count}' placeholder for the number of processed rows.
+            `'{count}'` placeholder for the number of processed rows.
         **processor_method_kwargs: Additional keyword arguments to pass to the
             processor method for customized execution.
 
