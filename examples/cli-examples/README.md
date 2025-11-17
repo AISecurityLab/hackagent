@@ -6,9 +6,9 @@ This directory contains example configurations and usage patterns for the HackAg
 
 1. **Install HackAgent with CLI support:**
    ```bash
-   pip install hackagent
+   uv pip install hackagent
    # or
-   poetry add hackagent
+   pip install hackagent
    ```
 
 2. **Initialize CLI configuration:**

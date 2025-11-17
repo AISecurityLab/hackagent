@@ -36,22 +36,22 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 <Tabs>
-  <TabItem value="pip" label="pip" default>
+  <TabItem value="uv" label="uv" default>
+    ```bash
+    # Basic installation
+    uv pip install hackagent
+    
+    # With optional dependencies
+    uv pip install hackagent[google-adk,litellm]
+    ```
+  </TabItem>
+  <TabItem value="pip" label="pip">
     ```bash
     # Basic installation
     pip install hackagent
     
     # With optional dependencies
     pip install hackagent[google-adk,litellm]
-    ```
-  </TabItem>
-  <TabItem value="poetry" label="Poetry">
-    ```bash
-    # Basic installation  
-    poetry add hackagent
-    
-    # With optional dependencies
-    poetry add hackagent[google-adk,litellm]
     ```
   </TabItem>
 </Tabs>
@@ -61,14 +61,14 @@ import TabItem from '@theme/TabItem';
 For development or to access the latest features:
 
 <Tabs>
-  <TabItem value="poetry-dev" label="Poetry (Recommended)" default>
+  <TabItem value="uv-dev" label="uv (Recommended)" default>
     ```bash
     # Clone the repository
     git clone https://github.com/vistalabs-org/hackagent.git
     cd hackagent
     
-    # Install with Poetry
-    poetry install
+    # Install with uv
+    uv sync --group dev
     ```
   </TabItem>
   <TabItem value="pip-dev" label="pip">

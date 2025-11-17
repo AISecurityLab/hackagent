@@ -2,7 +2,7 @@
 """
 HackAgent Documentation Generator
 
-Generates API documentation from PyPI versions using Poetry and pydoc-markdown.
+Generates API documentation from PyPI versions using uv and pydoc-markdown.
 """
 
 import argparse
@@ -42,13 +42,13 @@ def get_current_version():
 
         result = subprocess.run(
             [
-                "poetry",
+                "uv",
                 "run",
                 "python",
                 "-c",
                 "import toml; "
                 "data = toml.load('pyproject.toml'); "
-                "print(data['tool']['poetry']['version'])",
+                "print(data['project']['version'])",
             ],
             capture_output=True,
             text=True,
@@ -58,17 +58,17 @@ def get_current_version():
             return result.stdout.strip()
     except Exception as e:
         print(f"Warning: Could not get local version: {e}")
-    return "0.2.4"  # fallback
+    return "0.2.5"  # fallback
 
 
 def check_requirements():
-    """Check if Poetry is installed."""
+    """Check if uv is installed."""
     try:
-        subprocess.run(["poetry", "--version"], capture_output=True, check=True)
+        subprocess.run(["uv", "--version"], capture_output=True, check=True)
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
-        print("❌ Poetry not found. Install with:")
-        print("curl -sSL https://install.python-poetry.org | python3 -")
+        print("❌ uv not found. Install with:")
+        print("curl -LsSf https://astral.sh/uv/install.sh | sh")
         return False
 
 
@@ -169,7 +169,7 @@ def generate_docs(version):
 
     # Install dependencies
     result = run_command(
-        ["poetry", "install", "--with", "docs"],
+        ["uv", "sync", "--group", "docs"],
         cwd=project_root,
         description="Installing dependencies",
         exit_on_error=False,
@@ -180,10 +180,9 @@ def generate_docs(version):
         print("📦 Installing docs dependencies individually...")
         run_command(
             [
-                "poetry",
-                "add",
-                "--group",
-                "docs",
+                "uv",
+                "pip",
+                "install",
                 "pydoc-markdown[docusaurus]",
                 "toml",
                 "packaging",
@@ -208,7 +207,7 @@ def generate_docs(version):
     try:
         # Generate documentation
         run_command(
-            ["poetry", "run", "pydoc-markdown", config_file],
+            ["uv", "run", "pydoc-markdown", config_file],
             cwd=project_root,
             description="Generating documentation",
         )
