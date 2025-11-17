@@ -44,8 +44,8 @@ Configuration for generating completions using an Agent via AgentRouter.
 - `max_new_tokens` - The maximum number of new tokens to generate for each completion.
 - `temperature` - The temperature setting for token generation.
 - `n_samples` - The number of completion samples to generate for each input prefix.
-- `agent_type`0 - An optional prompt to prepend for surrogate attacks, typically used with LiteLLM agents.
-- `agent_type`1 - The timeout in seconds for each completion request.
+- `surrogate_attack_prompt` - An optional prompt to prepend for surrogate attacks, typically used with LiteLLM agents.
+- `request_timeout` - The timeout in seconds for each completion request.
 
 ## PrefixCompleter Objects
 

@@ -12,7 +12,7 @@ Here's a step-by-step guide to get started with HackAgent. Before doing these st
 2. **API Key**: Generate an API key from your dashboard
 3. **Target Agent**: A running AI agent to test (Google ADK, LiteLLM, etc.)
 4. **Development Environment**: Choose your preferred approach:
-   - **SDK**: Python 3.10+ with Poetry or pip (recommended)
+   - **SDK**: Python 3.10+ with uv or pip (recommended)
    - **HTTP API**: Any programming language with HTTP client
    - **CLI**: Command-line interface for quick testing
 
@@ -55,21 +55,21 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 <Tabs>
-  <TabItem value="pip" label="pip" default>
+  <TabItem value="uv" label="uv" default>
     ```bash
-    pip install hackagent
+    uv pip install hackagent
     ```
   </TabItem>
-  <TabItem value="poetry" label="Poetry">
+  <TabItem value="pip" label="pip">
     ```bash
-    poetry add hackagent
+    pip install hackagent
     ```
   </TabItem>
   <TabItem value="dev" label="Development">
     ```bash
     git clone https://github.com/vistalabs-org/hackagent.git
     cd hackagent
-    poetry install
+    uv sync --group dev
     ```
   </TabItem>
 </Tabs>

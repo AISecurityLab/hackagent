@@ -32,24 +32,13 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Setup Poetry
-        uses: abatilo/actions-poetry@v4.0.0
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          poetry-version: '1.8.3'
-
-      - name: Configure Poetry
-        run: |
-          poetry config virtualenvs.create true
-          poetry config virtualenvs.in-project true
-
-      - name: Cache Poetry dependencies
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: poetry-${{ hashFiles('**/poetry.lock') }}
+          enable-cache: true
 
       - name: Install Python dependencies
-        run: poetry install --with docs
+        run: uv sync --group docs
 
       - name: Install Node.js dependencies
         run: |
@@ -57,7 +46,7 @@ jobs:
           npm ci
 
       - name: Generate API documentation
-        run: poetry run python docs/scripts/generate_docs.py --current
+        run: uv run python docs/scripts/generate_docs.py --current
 
       - name: Build documentation
         run: |

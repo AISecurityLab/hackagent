@@ -26,7 +26,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: uv sync --group dev
 
       - name: Check commit messages in PR
         run: uv run cz check --rev-range ${{ github.event.pull_request.base.sha }}..${{ github.sha }}
@@ -48,7 +48,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: uv sync --group dev
 
       - name: Run Ruff Linting
         run: uv run ruff check .
@@ -73,7 +73,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: uv sync --group dev
 
       - name: Run tests with coverage
         run: uv run pytest --cov --cov-report=xml:reports/coverage.xml -m "not google_adk"

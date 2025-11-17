@@ -125,8 +125,10 @@ To set up your environment for local development:
 3. Install dependencies, including development dependencies:
 
     ```bash
-    uv sync --extra dev
+    uv sync --group dev
     ```
+    
+    Note: The `dev` dependencies are defined in `[dependency-groups]`.
 
 4. (Optional but Recommended) Install pre-commit hooks:
 
