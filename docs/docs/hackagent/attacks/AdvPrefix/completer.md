@@ -35,11 +35,11 @@ Configuration for generating completions using an Agent via AgentRouter.
 - `agent_name` - A descriptive name for this agent configuration.
 - `agent_type` - The type of agent (e.g., ADK, LiteLLM) to use.
 - `organization_id` - The organization ID for backend agent registration.
-- `model_id` - A general model identifier (e.g., &quot;claude-2&quot;, &quot;gpt-4&quot;).
+- `model_id` - A general model identifier (e.g., "claude-2", "gpt-4").
 - `agent_endpoint` - The API endpoint for the agent service.
 - `agent_metadata` - Optional dictionary for agent-specific metadata.
-  For ADK: e.g., {&#x27;adk_app_name&#x27;: &#x27;my_app&#x27;}.
-  For LiteLLM: e.g., {&#x27;name&#x27;: &#x27;litellm_model_string&#x27;, &#x27;api_key&#x27;: &#x27;ENV_VAR_NAME&#x27;}.
+  For ADK: e.g., `{'adk_app_name': 'my_app'}`.
+  For LiteLLM: e.g., `{'name': 'litellm_model_string', 'api_key': 'ENV_VAR_NAME'}`.
 - `batch_size` - The number of requests to batch if supported by the underlying adapter (currently informational).
 - `max_new_tokens` - The maximum number of new tokens to generate for each completion.
 - `temperature` - The temperature setting for token generation.
