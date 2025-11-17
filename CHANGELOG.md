@@ -1,3 +1,55 @@
+## v0.3.0 (2025-11-17)
+
+### ✨ Features
+
+- **issue**: Update issue templates
+- **OpenAI-SDK**: Integration of OpenAI-SDK
+- **OpenAI-SDK**: Integration of OpenAI-SDK
+
+### 🐛🚑️ Fixes
+
+- **uv**: Switch from poetry to uv for building the package
+
+### BREAKING CHANGE
+
+- transition from poetry to uv
+
+### bump
+
+- **deps-dev**: bump openapi-python-client from 0.25.0 to 0.27.0
+- **deps-dev**: bump google-adk from 1.4.1 to 1.17.0
+- **deps**: bump click from 8.1.8 to 8.3.0
+- **deps-dev**: bump ruff from 0.11.13 to 0.12.12
+- **deps-dev**: bump google-adk from 1.3.0 to 1.4.1
+- **deps**: bump litellm from 1.72.6.post1 to 1.72.6.post2
+- **deps-dev**: bump packaging from 24.2 to 25.0
+
+### fix
+
+- **docs**: replace HTML entities in completer.md to fix MDX parsing error
+- **docs**: replace HTML entities in completer.md to fix MDX parsing error
+
+### ✅🤡🧪 Tests
+
+- **google-adk**: removing test google-adk
+- **Tests**: add new tests for the cli and fixed a typo
+
+### 💄🚸 UI & UIX
+
+- **adding-tui**: add a tui for an interactive experience with the terminal
+
+### 💚👷 CI & Build
+
+- **Codecov**: Omitting tui from the pyproject
+- **codecov**: testing codecov
+- **Minor**: Minor fix on for codecov
+- **removing-cloudflare**: Removing cloudflare from the deployment
+
+### 📝💡 Documentation
+
+- **Update-the-documentation**: fixing deployment of documentation
+- **Update-the-documentation**: fixing deployment of documentation
+
 ## v0.2.5 (2025-06-20)
 
 ### bump
