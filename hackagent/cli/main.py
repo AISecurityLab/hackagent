@@ -1,3 +1,17 @@
+# Copyright 2025 - AI4I. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 HackAgent CLI Main Entry Point
 
@@ -21,7 +35,7 @@ install(show_locals=True)
 console = Console()
 
 
-@click.group()
+@click.group(invoke_without_command=True)
 @click.option(
     "--config-file", type=click.Path(), help="Configuration file path (JSON/YAML)"
 )
@@ -104,9 +118,9 @@ def cli(ctx, config_file, api_key, base_url, verbose, output_format):
         console.print(f"[bold red]❌ Configuration Error: {e}")
         ctx.exit(1)
 
-    # Display splash screen for main command (no subcommand)
+    # Launch TUI by default if no subcommand is provided
     if ctx.invoked_subcommand is None:
-        _display_welcome()
+        _launch_tui_default(ctx)
 
 
 @cli.command()
@@ -186,7 +200,7 @@ def init(ctx):
         from hackagent.api.key import key_list
 
         client = AuthenticatedClient(
-            base_url=cli_config.base_url, token=cli_config.api_key, prefix="Api-Key"
+            base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
         )
 
         with console.status("[bold green]Testing API connection..."):
@@ -250,6 +264,56 @@ def version(ctx):
 @cli.command()
 @click.pass_context
 @handle_errors
+def tui(ctx):
+    """🖥️ Launch full-screen Terminal User Interface
+
+    Opens an interactive tabbed interface that occupies the whole terminal.
+    Navigate between tabs to manage agents, execute attacks, view results, and configure settings.
+
+    \b
+    Features:
+      • Dashboard - Overview and statistics
+      • Agents - Manage AI agents
+      • Attacks - Execute security attacks
+      • Results - View attack results
+      • Config - Configuration management
+
+    \b
+    Keyboard Shortcuts:
+      q - Quit
+      F5 - Refresh current tab
+      Tab - Navigate between UI elements
+    """
+    cli_config: CLIConfig = ctx.obj["config"]
+
+    try:
+        # Validate configuration before launching TUI
+        cli_config.validate()
+    except ValueError as e:
+        console.print(f"[bold red]❌ Configuration Error: {e}[/bold red]")
+        console.print("\n[cyan]💡 Quick fix:[/cyan]")
+        console.print("  Run '[green]hackagent init[/green]' to set up your API key")
+        ctx.exit(1)
+
+    try:
+        from hackagent.cli.tui import HackAgentTUI
+
+        app = HackAgentTUI(cli_config)
+        app.run()
+
+    except ImportError:
+        console.print("[bold red]❌ TUI dependencies not installed[/bold red]")
+        console.print("\n[cyan]💡 Install with:[/cyan]")
+        console.print("  pip install textual")
+        ctx.exit(1)
+    except Exception as e:
+        console.print(f"[bold red]❌ TUI failed to start: {e}[/bold red]")
+        ctx.exit(1)
+
+
+@cli.command()
+@click.pass_context
+@handle_errors
 def doctor(ctx):
     """🔍 Diagnose common configuration issues
 
@@ -295,7 +359,7 @@ def doctor(ctx):
             from hackagent.api.key import key_list
 
             client = AuthenticatedClient(
-                base_url=cli_config.base_url, token=cli_config.api_key, prefix="Api-Key"
+                base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
             )
 
             with console.status("Testing API connection..."):
@@ -350,6 +414,47 @@ def doctor(ctx):
         console.print("  hackagent --help        # Show all commands")
 
 
+def _launch_tui_default(ctx):
+    """Launch TUI by default when no subcommand is provided"""
+    cli_config: CLIConfig = ctx.obj["config"]
+
+    try:
+        # Try to validate configuration
+        cli_config.validate()
+    except ValueError:
+        # If validation fails, show welcome message instead
+        console.print(
+            "[yellow]⚠️ Configuration not complete. Please set up your API key first.[/yellow]"
+        )
+        console.print()
+        _display_welcome()
+        console.print()
+        console.print(
+            "[cyan]Run '[bold]hackagent init[/bold]' to get started, or '[bold]hackagent --help[/bold]' for more options.[/cyan]"
+        )
+        return
+
+    try:
+        from hackagent.cli.tui import HackAgentTUI
+
+        # Launch TUI
+        app = HackAgentTUI(cli_config)
+        app.run()
+
+    except ImportError:
+        console.print("[bold red]❌ TUI dependencies not installed[/bold red]")
+        console.print("\n[cyan]💡 Install with:[/cyan]")
+        console.print("  uv add textual")
+        console.print("  # or")
+        console.print("  pip install textual")
+        ctx.exit(1)
+    except Exception as e:
+        console.print(f"[bold red]❌ TUI failed to start: {e}[/bold red]")
+        console.print("\n[cyan]You can still use CLI commands:[/cyan]")
+        console.print("  hackagent --help")
+        ctx.exit(1)
+
+
 def _display_welcome():
     """Display welcome message and basic usage info"""
 
@@ -364,9 +469,10 @@ def _display_welcome():
 
 [bold yellow]🚀 Getting Started:[/bold yellow]
   1. Set up your API key:     [cyan]hackagent init[/cyan]
-  2. List available agents:   [cyan]hackagent agent list[/cyan]  
-  3. Run security tests:      [cyan]hackagent attack advprefix --help[/cyan]
-  4. View results:            [cyan]hackagent results list[/cyan]
+  2. Launch full-screen TUI:  [cyan]hackagent[/cyan] (default) or [cyan]hackagent tui[/cyan]
+  3. List available agents:   [cyan]hackagent agent list[/cyan]
+  4. Run security tests:      [cyan]hackagent attack advprefix --help[/cyan]
+  5. View results:            [cyan]hackagent results list[/cyan]
 
 [bold blue]💡 Need help?[/bold blue] Use '[cyan]hackagent --help[/cyan]' or '[cyan]hackagent COMMAND --help[/cyan]'
 [bold blue]🌐 Get your API key at:[/bold blue] [link=https://hackagent.dev]https://hackagent.dev[/link]"""

@@ -1,3 +1,35 @@
+# Copyright 2025 - AI4I. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+Result aggregation module for AdvPrefix attacks.
+
+This module handles the aggregation and consolidation of results from multiple
+stages of the AdvPrefix attack pipeline. It combines data from different
+processing steps and provides unified result formatting.
+
+The module provides functionality for:
+- Merging results from multiple pipeline stages
+- Statistical aggregation and summary calculations
+- Data validation and consistency checking
+- Result formatting for output and reporting
+- Cross-validation of intermediate results
+
+Aggregated results provide a comprehensive view of attack performance and
+enable downstream analysis and selection processes.
+"""
+
 import pandas as pd
 from typing import Dict, Any
 import logging
@@ -15,16 +47,28 @@ GROUP_KEYS = ["goal", "prefix"]
 
 
 def _filter_by_nll(df: pd.DataFrame, max_ce_threshold: float | None) -> pd.DataFrame:
-    """Filters the DataFrame based on the prefix_nll column and a threshold.
+    """
+    Filter DataFrame rows based on cross-entropy (negative log-likelihood) threshold.
+
+    This function removes rows where the prefix_nll (cross-entropy score) exceeds
+    the specified threshold, effectively filtering out prefixes that are unlikely
+    to be effective based on their cross-entropy scores.
 
     Args:
-        df: The input DataFrame.
-        max_ce_threshold: The maximum cross-entropy threshold. Rows with
-                          'prefix_nll' greater than or equal to this will be removed.
-                          If None, no filtering is performed.
+        df: Input DataFrame containing prefix evaluation data.
+            Expected to have a 'prefix_nll' column with cross-entropy scores.
+        max_ce_threshold: Maximum allowed cross-entropy threshold. Rows with
+            prefix_nll values greater than or equal to this threshold will be
+            filtered out. If None, no filtering is performed.
 
     Returns:
-        The filtered DataFrame.
+        A filtered DataFrame with rows where prefix_nll < max_ce_threshold.
+        Returns the original DataFrame if threshold is None or filtering fails.
+
+    Note:
+        Cross-entropy filtering helps remove low-quality prefixes that are
+        unlikely to succeed in adversarial attacks, focusing analysis on
+        the most promising candidates.
     """
     if max_ce_threshold is None:
         return df
@@ -51,18 +95,26 @@ def _filter_by_nll(df: pd.DataFrame, max_ce_threshold: float | None) -> pd.DataF
 def _get_available_judge_agg_cols(
     df: pd.DataFrame, config_judges: list[str]
 ) -> Dict[str, str]:
-    """Identifies available judge aggregation columns in the DataFrame.
+    """
+    Identify available judge evaluation columns in the DataFrame for aggregation.
 
-    Compares columns in the DataFrame against JUDGE_AGG_COLUMN_MAP and logs warnings
-    if expected columns for judges listed in config_judges are missing.
+    This function checks which judge evaluation columns are present in the DataFrame
+    and maps them to their corresponding judge types. It also logs warnings for
+    expected judges that are missing from the results.
 
     Args:
-        df: The input DataFrame to check for judge columns.
-        config_judges: A list of judge types that were expected to be run.
+        df: Input DataFrame to check for judge evaluation columns.
+        config_judges: List of judge types that were expected to be run,
+            used for validation and warning generation.
 
     Returns:
-        A dictionary mapping judge type (str) to its corresponding column name (str)
-        found in the DataFrame.
+        A dictionary mapping judge type (str) to its corresponding evaluation
+        column name (str) found in the DataFrame. Only includes judges that
+        have their evaluation columns present in the data.
+
+    Note:
+        The function uses JUDGE_AGG_COLUMN_MAP to map judge types to their
+        expected column names (e.g., "nuanced" -> "eval_nj").
     """
     available_judges_agg_cols = {}
     for judge_type, col_name in JUDGE_AGG_COLUMN_MAP.items():
@@ -80,18 +132,30 @@ def _build_agg_funcs(
     df: pd.DataFrame,
     available_judges_agg_cols: Dict[str, str],
 ) -> Dict[str, pd.NamedAgg]:
-    """Builds a dictionary of aggregation functions for pandas groupby.agg.
+    """
+    Build aggregation functions dictionary for pandas groupby operations.
 
-    Starts with base aggregation functions and adds specific aggregations (mean, count, size)
-    for available judge columns. Handles numeric conversion and potential errors.
+    This function creates a comprehensive set of aggregation functions by starting
+    with base aggregations and adding judge-specific aggregations (mean, count, size)
+    for each available judge evaluation column.
 
     Args:
-        base_agg_funcs: A dictionary of base aggregation functions (NamedAgg objects).
-        df: The DataFrame to be aggregated (used to check column properties).
-        available_judges_agg_cols: A dictionary mapping judge types to their column names.
+        base_agg_funcs: Dictionary of base aggregation functions (NamedAgg objects)
+            to include in the final aggregation set.
+        df: Input DataFrame used to validate column properties and data types.
+        available_judges_agg_cols: Dictionary mapping judge types to their
+            corresponding evaluation column names in the DataFrame.
 
     Returns:
-        A dictionary of aggregation functions (NamedAgg objects) to be used in .agg().
+        A comprehensive dictionary of aggregation functions (NamedAgg objects)
+        ready for use with pandas groupby.agg(). Includes base aggregations
+        plus mean and count aggregations for numeric judge columns.
+
+    Note:
+        The function handles numeric conversion of judge columns and gracefully
+        handles non-numeric data by providing size aggregations as fallbacks.
+        Mean and count aggregations are only added for columns with valid
+        numeric data after type coercion.
     """
     agg_funcs = base_agg_funcs.copy()
     for judge_type, col_name in available_judges_agg_cols.items():

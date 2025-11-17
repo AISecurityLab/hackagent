@@ -176,7 +176,9 @@ hackagent results list            # View attack results
 - Start with the [Quick Start Guide](./HowTo.md) to get running in 5 minutes
 - Try the **CLI**: `pip install hackagent && hackagent init`
 - Read the [Complete CLI Documentation](./cli/README.md) for all features
-- Follow the [Python SDK Guide](./sdk/python-quickstart.md) for programmatic testing
+- Follow the [SDK Guide](./sdk/python-quickstart.md) for programmatic testing
+- Browse the [SDK API Reference](./api-index.md) for detailed class documentation
+- Explore the [HTTP API](https://hackagent.dev/api/schema/swagger-ui) for direct REST API access
 - Check [Google ADK Integration](./integrations/google-adk.md) for framework-specific setup
 
 ### 🔐 **Security Researchers**

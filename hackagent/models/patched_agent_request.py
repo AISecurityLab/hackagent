@@ -43,7 +43,7 @@ class PatchedAgentRequest:
         Attributes:
             name (Union[Unset, str]):
             endpoint (Union[Unset, str]): The primary API endpoint URL for interacting with the agent.
-            agent_type (Union[Unset, AgentTypeEnum]): * `LITELMM` - LiteLLM
+            agent_type (Union[Unset, AgentTypeEnum]): * `LITELLM` - LiteLLM
                 * `OPENAI_SDK` - OpenAI SDK/API
                 * `GOOGLE_ADK` - Google ADK
                 * `OTHER` - Other/Proprietary

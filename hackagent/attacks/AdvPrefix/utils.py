@@ -1,3 +1,36 @@
+# Copyright 2025 - AI4I. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+Utility functions for AdvPrefix attacks.
+
+This module provides common utility functions and helper methods used across
+the AdvPrefix attack pipeline. It includes shared functionality for data
+processing, file operations, logging, and other support tasks.
+
+The module provides:
+- File I/O utilities for saving and loading intermediate results
+- Data format conversion and validation helpers
+- Logging and debugging utilities
+- String processing and text manipulation functions
+- Configuration parsing and validation helpers
+- Common mathematical and statistical operations
+
+These utilities promote code reuse and maintain consistency across the
+different stages of the AdvPrefix attack pipeline.
+"""
+
 import os
 import pandas as pd
 import logging
@@ -12,7 +45,27 @@ logger = logging.getLogger(__name__)  # Use a logger specific to utils
 
 
 def get_checkpoint_path(run_dir: str, step_num: int) -> str:
-    """Generate the standard path for a step's output checkpoint."""
+    """
+    Generate the standardized file path for a pipeline step's output checkpoint.
+
+    This utility function creates consistent checkpoint file naming and location
+    conventions across all AdvPrefix pipeline steps, facilitating debugging,
+    resume functionality, and intermediate result inspection.
+
+    Args:
+        run_dir: Base directory path for the current attack run where all
+            checkpoints and outputs are stored.
+        step_num: Numerical identifier of the pipeline step (e.g., 1, 2, 3).
+
+    Returns:
+        Complete file path string for the step's CSV checkpoint file.
+        Format: "{run_dir}/step{step_num}_output.csv"
+
+    Note:
+        The standardized naming convention allows for easy identification
+        of pipeline stage outputs and supports automated checkpoint loading
+        and pipeline resumption functionality.
+    """
     filename = f"step{step_num}_output.csv"
     return os.path.join(run_dir, filename)
 
@@ -30,24 +83,39 @@ def call_litellm_completion(
     logger: Optional[logging.Logger] = None,
 ) -> Tuple[Optional[str], Optional[Any], Optional[Exception]]:
     """
-    Wrapper function to call litellm.completion and handle common exceptions.
+    Execute a LiteLLM completion request with comprehensive error handling.
+
+    This wrapper function provides a standardized interface for calling
+    LiteLLM completion API across different pipeline stages. It handles
+    common exceptions and ensures consistent parameter processing and
+    response extraction.
 
     Args:
-        model_id: The model identifier string for LiteLLM.
-        messages: The list of messages for the chat completion.
-        endpoint: The API base URL.
-        api_key: The API key.
-        timeout: Request timeout in seconds.
-        temperature: Sampling temperature.
-        max_tokens: Maximum new tokens to generate.
-        logprobs: Whether to request logprobs (default: False).
-        top_p: Top-p sampling parameter (default: 1.0).
-        logger: Optional logger instance.
+        model_id: Model identifier string for LiteLLM (e.g., "gpt-4", "ollama/llama2").
+        messages: List of message dictionaries for chat completion format.
+            Each dict should have 'role' and 'content' keys.
+        endpoint: Optional API base URL for custom endpoints (e.g., local Ollama).
+        api_key: Optional API key for authenticated services.
+        timeout: Request timeout in seconds to prevent hanging requests.
+        temperature: Sampling temperature for response generation (0.0-2.0).
+        max_tokens: Maximum number of new tokens to generate.
+        logprobs: Whether to request log probabilities in the response.
+        top_p: Top-p sampling parameter for nucleus sampling (0.0-1.0).
+        logger: Optional logger instance for detailed operation tracking.
 
     Returns:
-        A tuple: (content_string, logprobs_object, error_object).
-        - If successful: returns (content, logprobs_data, None). content and logprobs_data may be None depending on the API response.
-        - If error occurs: returns (None, None, error_object).
+        A tuple containing (content, logprobs, error):
+        - content: Generated text content if successful, None on failure
+        - logprobs: Log probability data if requested and available, None otherwise
+        - error: Exception object if an error occurred, None on success
+
+    Note:
+        The function automatically filters out None parameters and handles
+        both LiteLLM-specific exceptions and general errors gracefully.
+        API keys are excluded from debug logging for security.
+
+        The 'drop_params' setting ensures compatibility with models that
+        don't support all parameters.
     """
     litellm.drop_params = True  # Drop unsupported parameters
 
@@ -125,23 +193,44 @@ def execute_processor_step(
     **processor_method_kwargs: Any,
 ) -> pd.DataFrame:
     """
-    Executes a generic step in the pipeline that involves calling a method on a processor object.
-    Now resides in the main utils.py.
+    Execute a generic pipeline step with standardized error handling and checkpointing.
+
+    This utility function provides a unified framework for executing pipeline steps
+    across the AdvPrefix attack process. It handles method invocation, error recovery,
+    checkpoint saving, and logging with consistent patterns throughout the pipeline.
 
     Args:
-        input_df: The input DataFrame.
-        logger: The logger instance passed from the calling context (e.g., AdvPrefixAttack).
-        run_dir: The directory for the current run, for saving checkpoints.
-        processor_instance: The instance of the processor (e.g., PrefixPreprocessor).
-        processor_method_name: The name of the method to call on the processor_instance.
-        step_number: The current step number in the pipeline.
-        step_name_for_logging: A descriptive name for this step for logging purposes.
-        log_success_details_template: A string template for the success log message.
-                                      It should accept a 'count' keyword for len(processed_df).
-        **processor_method_kwargs: Additional keyword arguments to pass to the processor method.
+        input_df: Input DataFrame containing data for processing. Empty DataFrames
+            are handled gracefully by skipping processing.
+        logger: Logger instance from the calling context for consistent log formatting
+            and tracking across the entire pipeline.
+        run_dir: Base directory path for saving step checkpoints and intermediate results.
+        processor_instance: Object instance that contains the processing method to execute.
+            Can be any processor class (e.g., PrefixPreprocessor).
+        processor_method_name: Name of the method to call on the processor instance.
+            Method should accept a DataFrame and return a processed DataFrame.
+        step_number: Numerical identifier for this pipeline step, used for checkpoint
+            naming and progress tracking.
+        step_name_for_logging: Human-readable description of the step for log messages
+            and progress reporting.
+        log_success_details_template: Template string for success logging with a
+            '{count}' placeholder for the number of processed rows.
+        **processor_method_kwargs: Additional keyword arguments to pass to the
+            processor method for customized execution.
 
     Returns:
-        The processed DataFrame, or the original DataFrame if an error occurs or input is empty.
+        Processed DataFrame if successful, or the original input DataFrame if
+        processing fails or input is empty. This ensures pipeline continuity
+        even when individual steps encounter errors.
+
+    Note:
+        The function automatically saves processing results as CSV checkpoints
+        using standardized naming conventions. Error handling is comprehensive
+        to prevent individual step failures from terminating the entire pipeline.
+
+        Method resolution and invocation are handled dynamically, allowing
+        this function to work with any processor class that follows the
+        expected interface pattern.
     """
     logger.info(f"--- Running Step {step_number}: {step_name_for_logging} ---")
 

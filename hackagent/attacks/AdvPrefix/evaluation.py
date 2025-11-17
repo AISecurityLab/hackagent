@@ -1,3 +1,36 @@
+# Copyright 2025 - AI4I. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+Attack success evaluation module.
+
+This module handles the evaluation of generated completions to determine whether
+adversarial attacks were successful. It implements various evaluation strategies
+and metrics to assess the effectiveness of generated adversarial prefixes.
+
+The module provides functionality for:
+- Automated evaluation using judge models
+- Multiple evaluation criteria and scoring methods
+- Batch evaluation for efficiency
+- Integration with various judge model backends
+- Success rate calculation and statistical analysis
+- Customizable evaluation prompts and rubrics
+
+Evaluation results are used to rank and select the most effective adversarial
+prefixes from the generated candidates.
+"""
+
 import logging
 import pandas as pd
 from typing import Dict
@@ -33,7 +66,36 @@ def _run_evaluator_process_wrapper(
     config_dict_serializable: Dict,
     df: pd.DataFrame,
 ):
-    """Static method to run a specific evaluator, suitable for multiprocessing."""
+    """
+    Execute a single evaluator process for attack success evaluation.
+
+    This function runs a specific judge evaluator on the provided DataFrame
+    containing completion data. It's designed to be called in parallel processing
+    scenarios and handles the instantiation, execution, and cleanup of evaluators.
+
+    Args:
+        judge_type: Type of evaluator to run (e.g., "nuanced", "harmbench", "jailbreakbench").
+            Must correspond to a key in the EVALUATOR_MAP.
+        client: Authenticated client for API communications with judge models.
+        config_dict_serializable: Configuration dictionary containing evaluator
+            parameters. Must be serializable for multiprocessing contexts.
+        df: DataFrame containing completion data to evaluate. Expected to have
+            columns: 'goal', 'prefix', 'completion'.
+
+    Returns:
+        A pandas DataFrame containing evaluation results with merge keys and
+        judge-specific columns (e.g., eval scores and explanations), or None
+        if evaluation fails.
+
+    Note:
+        The function filters the configuration to only include parameters
+        expected by EvaluatorConfig dataclass and handles proper cleanup
+        of evaluator instances. Agent type strings are automatically converted
+        to AgentTypeEnum instances.
+
+        Error handling is comprehensive to prevent individual evaluator failures
+        from affecting other concurrent evaluations.
+    """
     process_logger = logging.getLogger(__name__ + f".evaluator_process_{judge_type}")
     process_logger.info(f"Evaluator process started for judge: {judge_type}")
 
@@ -123,7 +185,50 @@ def execute(
     run_dir: str,
     client: AuthenticatedClient,
 ) -> pd.DataFrame:
-    """Evaluate completions using specified judges."""
+    """
+    Execute Step 7 of the AdvPrefix pipeline: Evaluate completion success using judge models.
+
+    This function evaluates the completions generated in previous steps to determine
+    whether the adversarial prefixes successfully elicited harmful or inappropriate
+    responses from the target agent. Multiple judge models can be used simultaneously
+    to provide comprehensive evaluation coverage.
+
+    Args:
+        input_df: DataFrame containing completion data from previous pipeline steps.
+            Expected to have columns: 'goal', 'prefix', 'completion'.
+        config: Configuration dictionary containing evaluation parameters including:
+            - judges: List of judge configurations with evaluator types and settings
+            - batch_size_judge: Batch size for judge model processing
+            - max_new_tokens_eval: Maximum tokens for judge model responses
+            - filter_len: Length filter for evaluation input
+            - judge_request_timeout: Timeout for judge model requests
+            - judge_temperature: Temperature setting for judge models
+        logger: Logger instance for tracking evaluation progress and results.
+        run_dir: Directory path for saving intermediate results and logs.
+        client: Authenticated client for API communications with judge models.
+
+    Returns:
+        A pandas DataFrame with the input data augmented with evaluation results.
+        Each judge adds columns with prefixes corresponding to their type:
+        - eval_{judge_type}: Evaluation scores/decisions from the judge
+        - explanation_{judge_type}: Detailed explanations from the judge
+
+    Note:
+        This step supports multiple judge types including:
+        - "nuanced": Nuanced evaluation with detailed scoring
+        - "harmbench": HarmBench evaluation framework
+        - "jailbreakbench": JailbreakBench evaluation framework
+
+        Judges are executed sequentially to avoid resource conflicts, and failed
+        judges are logged but do not prevent other evaluations from proceeding.
+
+        The function handles automatic judge type inference based on model
+        identifiers if explicit types are not provided in the configuration.
+
+        Each judge configuration can specify its own model endpoint, API keys,
+        and other parameters, allowing for diverse evaluation setups including
+        local and remote judge models.
+    """
     logger.info("Executing Step 7: Evaluating responses")
     original_df = input_df
 
@@ -180,8 +285,8 @@ def execute(
             or f"judge-{judge_type_str}-{judge_identifier.replace('/ ', '-')[:20]}"
         )  # Construct agent name
         judge_agent_type_str = judge_config_item.get(
-            "agent_type", "LITELMM"
-        )  # Default to LITELMM
+            "agent_type", "LITELLM"
+        )  # Default to LITELLM
         judge_agent_endpoint = judge_config_item.get("endpoint")  # e.g. Ollama URL
         judge_agent_metadata = judge_config_item.get(
             "agent_metadata", {}
