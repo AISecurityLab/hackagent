@@ -456,5 +456,226 @@ class TestOpenAIAgentAdapterIntegration(unittest.TestCase):
         self.assertEqual(response["agent_specific_data"]["model_name"], "gpt-4")
 
 
+class TestOpenAIAgentAdapterReasoningModels(unittest.TestCase):
+    """Test reasoning model support (e.g., o1-preview, o1-mini)."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.adapter_id = "openai_reasoning_test"
+        self.config = {
+            "name": "o1-preview",
+            "temperature": 1.0,
+        }
+
+        # Patch at module level
+        self.openai_patch = patch(
+            "hackagent.router.adapters.openai_adapter.OPENAI_AVAILABLE", True
+        )
+        self.openai_class_patch = patch(
+            "hackagent.router.adapters.openai_adapter.OpenAI"
+        )
+
+        self.openai_patch.start()
+        self.mock_openai_class = self.openai_class_patch.start()
+
+        self.mock_client = MagicMock()
+        self.mock_openai_class.return_value = self.mock_client
+
+        self.adapter = OpenAIAgentAdapter(id=self.adapter_id, config=self.config)
+
+    def tearDown(self):
+        """Clean up patches."""
+        self.openai_patch.stop()
+        self.openai_class_patch.stop()
+
+    def test_handle_request_with_reasoning_field(self):
+        """Test that reasoning field is extracted when content is empty."""
+        # Mock a reasoning model response with reasoning field
+        mock_message = MagicMock()
+        mock_message.content = None  # Reasoning models may have no content
+        mock_message.reasoning = "Let me think through this step by step..."
+        mock_message.tool_calls = None
+
+        mock_choice = MagicMock()
+        mock_choice.message = mock_message
+        mock_choice.finish_reason = "stop"
+
+        mock_usage = MagicMock()
+        mock_usage.model_dump.return_value = {
+            "prompt_tokens": 20,
+            "completion_tokens": 50,
+            "total_tokens": 70,
+        }
+
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_response.usage = mock_usage
+        mock_response.model = "o1-preview"
+
+        self.mock_client.chat.completions.create.return_value = mock_response
+
+        request_data = {"prompt": "What is 2+2?"}
+        response = self.adapter.handle_request(request_data)
+
+        # Verify reasoning field was extracted
+        self.assertEqual(response["status_code"], 200)
+        self.assertEqual(
+            response["generated_text"], "Let me think through this step by step..."
+        )
+        self.assertEqual(
+            response["processed_response"], "Let me think through this step by step..."
+        )
+        self.assertEqual(response["agent_specific_data"]["model_name"], "o1-preview")
+
+    def test_handle_request_with_empty_content_and_reasoning(self):
+        """Test extraction when content is empty string but reasoning exists."""
+        mock_message = MagicMock()
+        mock_message.content = ""  # Empty content
+        mock_message.reasoning = "First, I need to analyze the problem..."
+        mock_message.tool_calls = None
+
+        mock_choice = MagicMock()
+        mock_choice.message = mock_message
+        mock_choice.finish_reason = "stop"
+
+        mock_usage = MagicMock()
+        mock_usage.model_dump.return_value = {"total_tokens": 100}
+
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_response.usage = mock_usage
+        mock_response.model = "o1-mini"
+
+        self.mock_client.chat.completions.create.return_value = mock_response
+
+        request_data = {"prompt": "Solve this problem"}
+        response = self.adapter.handle_request(request_data)
+
+        self.assertEqual(response["status_code"], 200)
+        self.assertEqual(
+            response["generated_text"], "First, I need to analyze the problem..."
+        )
+
+    def test_handle_request_without_reasoning_attribute(self):
+        """Test handling when message has no reasoning attribute (non-reasoning model)."""
+        mock_message = MagicMock()
+        mock_message.content = "Regular response"
+        # Don't set reasoning attribute at all
+        mock_message.tool_calls = None
+        # Ensure hasattr returns False
+        del mock_message.reasoning
+
+        mock_choice = MagicMock()
+        mock_choice.message = mock_message
+        mock_choice.finish_reason = "stop"
+
+        mock_usage = MagicMock()
+        mock_usage.model_dump.return_value = {"total_tokens": 50}
+
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_response.usage = mock_usage
+        mock_response.model = "gpt-4"
+
+        self.mock_client.chat.completions.create.return_value = mock_response
+
+        request_data = {"prompt": "Hello"}
+        response = self.adapter.handle_request(request_data)
+
+        # Should use content, not reasoning
+        self.assertEqual(response["status_code"], 200)
+        self.assertEqual(response["generated_text"], "Regular response")
+
+    def test_handle_request_content_takes_precedence_over_reasoning(self):
+        """Test that non-empty content takes precedence over reasoning field."""
+        mock_message = MagicMock()
+        mock_message.content = "This is the actual response"
+        mock_message.reasoning = "This is the reasoning"
+        mock_message.tool_calls = None
+
+        mock_choice = MagicMock()
+        mock_choice.message = mock_message
+        mock_choice.finish_reason = "stop"
+
+        mock_usage = MagicMock()
+        mock_usage.model_dump.return_value = {"total_tokens": 60}
+
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_response.usage = mock_usage
+        mock_response.model = "o1-preview"
+
+        self.mock_client.chat.completions.create.return_value = mock_response
+
+        request_data = {"prompt": "Test"}
+        response = self.adapter.handle_request(request_data)
+
+        # Content should be used, not reasoning
+        self.assertEqual(response["status_code"], 200)
+        self.assertEqual(response["generated_text"], "This is the actual response")
+
+    def test_handle_request_reasoning_with_messages(self):
+        """Test reasoning model with pre-formatted messages."""
+        mock_message = MagicMock()
+        mock_message.content = None
+        mock_message.reasoning = "Analyzing the conversation context..."
+        mock_message.tool_calls = None
+
+        mock_choice = MagicMock()
+        mock_choice.message = mock_message
+        mock_choice.finish_reason = "stop"
+
+        mock_usage = MagicMock()
+        mock_usage.model_dump.return_value = {"total_tokens": 150}
+
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_response.usage = mock_usage
+        mock_response.model = "o1-mini"
+
+        self.mock_client.chat.completions.create.return_value = mock_response
+
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "Help me solve this."},
+        ]
+        request_data = {"messages": messages}
+        response = self.adapter.handle_request(request_data)
+
+        self.assertEqual(response["status_code"], 200)
+        self.assertEqual(
+            response["generated_text"], "Analyzing the conversation context..."
+        )
+        self.assertIsNone(response["error_message"])
+
+    def test_handle_request_reasoning_none_and_content_none(self):
+        """Test when both reasoning and content are None (edge case)."""
+        mock_message = MagicMock()
+        mock_message.content = None
+        mock_message.reasoning = None
+        mock_message.tool_calls = None
+
+        mock_choice = MagicMock()
+        mock_choice.message = mock_message
+        mock_choice.finish_reason = "stop"
+
+        mock_usage = MagicMock()
+        mock_usage.model_dump.return_value = {"total_tokens": 10}
+
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_response.usage = mock_usage
+        mock_response.model = "o1-preview"
+
+        self.mock_client.chat.completions.create.return_value = mock_response
+
+        request_data = {"prompt": "Test"}
+        response = self.adapter.handle_request(request_data)
+
+        # Should return empty string
+        self.assertEqual(response["status_code"], 200)
+        self.assertEqual(response["generated_text"], "")
+
+
 if __name__ == "__main__":
     unittest.main()
