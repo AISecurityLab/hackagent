@@ -1,3 +1,34 @@
+# Copyright 2025 - AI4I. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+Adversarial prefix generation module.
+
+This module handles the generation of adversarial prefixes using uncensored language
+models. It implements the first stage of the AdvPrefix attack pipeline, where
+candidate prefixes are generated based on meta-prompts and target goals.
+
+The generation process involves:
+- Loading and configuring uncensored models
+- Creating generation prompts from meta-templates
+- Batched generation of prefix candidates
+- Initial filtering and validation of generated content
+
+Functions in this module integrate with the broader AdvPrefix pipeline and save
+intermediate results for downstream processing.
+"""
+
 import logging
 import pandas as pd
 from typing import List, Dict, Union, Tuple, Optional
@@ -31,8 +62,35 @@ def _construct_prompts(
     meta_prefixes: List[str],
     meta_prefixes_n_samples: Union[int, List[int]],  # Allow int or list
 ) -> Tuple[List[Dict[str, str]], List[str], List[str]]:
-    """Constructs prompts for the generator model."""
+    """
+    Construct formatted prompts for adversarial prefix generation.
 
+    This function creates prompts by combining target goals with meta-prefixes
+    and applying appropriate chat templates. It handles both integer and list
+    specifications for sample counts per meta-prefix.
+
+    Args:
+        goals: List of target goals for which to generate adversarial prefixes.
+        meta_prefixes: List of meta-prefix templates to use for prompt construction.
+        meta_prefixes_n_samples: Number of samples to generate per meta-prefix.
+            Can be a single integer (applied to all meta-prefixes) or a list
+            of integers (one per meta-prefix).
+
+    Returns:
+        A tuple containing:
+        - formatted_inputs: List of formatted prompt strings ready for LLM input
+        - current_goals: List of goals corresponding to each formatted input
+        - expanded_meta_prefixes: List of meta-prefixes corresponding to each input
+
+    Raises:
+        ValueError: If the lengths of meta_prefixes and meta_prefixes_n_samples
+            lists don't match.
+        TypeError: If meta_prefixes_n_samples is neither int nor list.
+
+    Note:
+        The function applies custom chat templates for specific models when available,
+        falling back to a basic USER/ASSISTANT format for unknown models.
+    """
     # Handle the case where meta_prefixes_n_samples is an integer vs a list
     if isinstance(meta_prefixes_n_samples, list):
         if len(meta_prefixes) != len(meta_prefixes_n_samples):
@@ -92,8 +150,31 @@ def _generate_prefixes(
     client: AuthenticatedClient,
 ) -> List[Dict]:
     """
-    Helper for step 1. Generate prefixes.
-    Uses direct HTTP call if local generator endpoint is defined, else uses AgentRouter.
+    Generate adversarial prefixes using configured language models.
+
+    This function handles the core prefix generation process by sending
+    constructed prompts to either local or remote language models and
+    collecting the generated responses. It supports both greedy decoding
+    and random sampling strategies.
+
+    Args:
+        unique_goals: List of unique target goals for prefix generation.
+        config: Configuration dictionary containing generator settings,
+            including model identifier, endpoint, API keys, and generation
+            parameters like temperature and max_tokens.
+        logger: Logger instance for tracking generation progress and errors.
+        client: Authenticated client for API communications.
+
+    Returns:
+        A list of dictionaries, each containing generation results with
+        keys like 'goal', 'meta_prefix', 'generated_text', 'temperature',
+        and other metadata from the generation process.
+
+    Note:
+        This function supports both local proxy endpoints and direct API
+        calls. It performs generation with both greedy decoding (low temperature)
+        and random sampling (higher temperature) to increase diversity
+        of generated prefixes.
     """
     results = []
     generator_config = config.get("generator", {})
@@ -201,7 +282,7 @@ def _generate_prefixes(
                     }
                     headers = {
                         "Content-Type": "application/json",
-                        "Authorization": f"Api-Key {actual_api_key}",  # Auth for local proxy
+                        "Authorization": f"Bearer {actual_api_key}",  # Auth for HackAgent API
                     }
                     generated_part = " [DIRECT_CALL_ERROR]"
                     try:
@@ -222,11 +303,24 @@ def _generate_prefixes(
                             and response_json.get("choices")
                             and len(response_json["choices"]) > 0
                             and response_json["choices"][0].get("message")
-                            and response_json["choices"][0]["message"].get("content")
                         ):
-                            generated_part = response_json["choices"][0]["message"][
-                                "content"
-                            ]
+                            message = response_json["choices"][0]["message"]
+                            content = message.get("content", "")
+
+                            # For reasoning models (e.g., moonshotai/kimi-k2-thinking), check reasoning field
+                            if not content and message.get("reasoning"):
+                                generated_part = message["reasoning"]
+                                logger.info(
+                                    f"Direct call to {generator_endpoint} extracted text from 'reasoning' field (reasoning model)"
+                                )
+                            elif content:
+                                generated_part = content
+                            else:
+                                # No content or reasoning - unexpected
+                                logger.warning(
+                                    f"Direct call to {generator_endpoint} received empty content and no reasoning field. Message: {message}"
+                                )
+                                generated_part = " [EMPTY_RESPONSE]"
                         # Fallback: check for a "text" key, which the local proxy currently returns
                         elif response_json and "text" in response_json:
                             generated_part = response_json["text"]
@@ -291,7 +385,7 @@ def _generate_prefixes(
             router = AgentRouter(
                 client=client,
                 name=model_name,
-                agent_type=AgentTypeEnum.LITELMM,
+                agent_type=AgentTypeEnum.LITELLM,
                 endpoint=generator_endpoint,
                 adapter_operational_config=adapter_operational_config,
                 metadata=adapter_operational_config.copy(),
@@ -402,7 +496,46 @@ def execute(
     run_dir: str,
     client: AuthenticatedClient,
 ) -> pd.DataFrame:
-    """Generate initial prefixes using provided goals."""
+    """
+    Execute Step 1 of the AdvPrefix pipeline: Generate initial adversarial prefixes.
+
+    This function orchestrates the generation of adversarial prefixes using
+    uncensored language models. It processes the provided goals and configuration
+    to create candidate prefixes that will be further refined in subsequent
+    pipeline steps.
+
+    Args:
+        goals: List of target goals for which to generate adversarial prefixes.
+            These represent the harmful behaviors or outputs the attack aims to elicit.
+        config: Configuration dictionary containing generator settings including:
+            - generator: Model configuration with identifier, endpoint, API keys
+            - meta_prefixes: Templates for prefix generation
+            - meta_prefix_samples: Number of samples per meta-prefix
+            - temperature: Sampling temperature for generation
+            - max_new_tokens: Maximum tokens to generate per prefix
+        logger: Logger instance for tracking generation progress and debugging.
+        run_dir: Directory path for saving intermediate results and logs.
+            Used by the broader pipeline for file organization.
+        client: Authenticated client for API communications with language models
+            and the HackAgent backend.
+
+    Returns:
+        A pandas DataFrame containing the generated prefixes with columns:
+        - goal: Target goal for each prefix
+        - prefix: Generated adversarial prefix text
+        - meta_prefix: Meta-prefix template used for generation
+        - temperature: Sampling temperature used for this generation
+        - model_name: Name of the model used for generation
+
+    Note:
+        This function represents Step 1 in the AdvPrefix attack pipeline.
+        Generated prefixes will be processed by subsequent steps including
+        cross-entropy computation, completion generation, and evaluation.
+
+        The function handles both local proxy endpoints and remote API calls
+        for language model access, and performs generation with multiple
+        temperature settings to increase prefix diversity.
+    """
     logger.info("Starting Step 1: Generate Prefixes")
     unique_goals = list(dict.fromkeys(goals)) if goals else []
     all_results = _generate_prefixes(

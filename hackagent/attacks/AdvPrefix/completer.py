@@ -1,5 +1,35 @@
+# Copyright 2025 - AI4I. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
-Module for getting complete responses from prefixes using target LLM.
+Completion handling module for AdvPrefix attacks.
+
+This module provides utilities and interfaces for handling model completions
+throughout the AdvPrefix attack pipeline. It abstracts the interaction with
+different language model backends and provides consistent completion handling
+across various stages of the attack process.
+
+The module provides functionality for:
+- Model completion generation and collection
+- Response processing and normalization
+- Error handling and retry logic for model interactions
+- Batched completion processing for efficiency
+- Integration with different model backends and APIs
+- Completion validation and quality checking
+
+This module ensures consistent and reliable model interaction across
+the AdvPrefix attack pipeline components.
 """
 
 import pandas as pd
@@ -56,26 +86,58 @@ class CompletionConfig:
 
 
 class PrefixCompleter:
-    """Manages the generation of text completions for a list of prefixes using a target LLM.
+    """
+    Manages text completion generation for adversarial prefixes using target language models.
 
-    This class interfaces with an `AgentRouter` to send requests to a configured agent
-    (e.g., ADK, LiteLLM) and process the responses. It handles expanding input prefixes
-    for multiple samples, making requests, and consolidating results into a pandas DataFrame.
+    This class provides a comprehensive interface for generating completions from
+    adversarial prefixes using various model types through the AgentRouter framework.
+    It handles the complete workflow from prefix expansion to completion generation
+    and result consolidation.
+
+    The completer supports multiple agent types (ADK, LiteLLM) and provides
+    robust error handling, progress tracking, and comprehensive result logging.
+    All interactions are managed through the AgentRouter to ensure consistent
+    API usage across different model backends.
+
+    Key Features:
+    - Automatic prefix expansion for multiple samples per prefix
+    - Configurable completion parameters (temperature, max tokens, etc.)
+    - Comprehensive error handling and recovery
+    - Progress tracking for long-running operations
+    - Detailed result metadata collection
+    - Support for surrogate attack prompts
+
+    Attributes:
+        client: AuthenticatedClient for API communications
+        config: CompletionConfig with all completion parameters
+        logger: Logger instance for operation tracking
+        api_key: API key for LiteLLM models (if applicable)
+        agent_router: AgentRouter instance for model interactions
+        agent_registration_key: Registration key for the configured agent
     """
 
     def __init__(self, client: AuthenticatedClient, config: CompletionConfig):
-        """Initializes the PrefixCompleter.
+        """
+        Initialize the PrefixCompleter with client and configuration.
 
-        Sets up the logger, loads API keys if necessary (for LiteLLM), and initializes
-        the AgentRouter with the provided configuration. The AgentRouter handles the
-        registration of the backend agent and instantiation of the appropriate adapter.
+        Sets up the AgentRouter, handles API key configuration for LiteLLM models,
+        and prepares the completer for generating completions. The initialization
+        process includes agent registration and adapter configuration.
 
         Args:
-            client: An `AuthenticatedClient` instance for API communication.
-            config: A `CompletionConfig` object with settings for the completer and agent.
+            client: AuthenticatedClient instance for API communication with
+                the HackAgent backend and target models.
+            config: CompletionConfig object containing all completion parameters
+                including agent type, model settings, and generation parameters.
 
         Raises:
-            RuntimeError: If the AgentRouter fails to register an agent upon initialization.
+            RuntimeError: If the AgentRouter fails to register an agent during
+                initialization, indicating configuration or connectivity issues.
+
+        Note:
+            For LiteLLM agents, API keys are automatically loaded from environment
+            variables specified in the agent metadata. The initialization process
+            includes comprehensive adapter configuration based on the agent type.
         """
         self.client = client
         self.config = config
@@ -83,7 +145,7 @@ class PrefixCompleter:
         self.api_key: Optional[str] = None
 
         if (
-            self.config.agent_type == AgentTypeEnum.LITELMM
+            self.config.agent_type == AgentTypeEnum.LITELLM
             and self.config.agent_metadata
             and "api_key" in self.config.agent_metadata
         ):
@@ -95,7 +157,7 @@ class PrefixCompleter:
                 )
 
         adapter_op_config: Dict[str, Any] = {}
-        if self.config.agent_type == AgentTypeEnum.LITELMM:
+        if self.config.agent_type == AgentTypeEnum.LITELLM:
             if self.config.agent_metadata and "name" in self.config.agent_metadata:
                 adapter_op_config["name"] = self.config.agent_metadata["name"]
             else:
@@ -134,17 +196,29 @@ class PrefixCompleter:
         )
 
     def expand_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Expands a DataFrame to include multiple rows for each original row, based on `n_samples`.
+        """
+        Expand DataFrame to create multiple samples for each adversarial prefix.
 
-        Each original row is duplicated `n_samples` times. A 'sample_id' column is added
-        to distinguish these duplicates, and a 'completion' column is initialized as an
-        empty string placeholder.
+        This method prepares the input DataFrame for completion generation by
+        creating multiple rows for each original prefix based on the configured
+        number of samples. This allows for statistical analysis of completion
+        variability and improves attack success rate estimation.
 
         Args:
-            df: The input DataFrame, where each row represents a prefix to be completed.
+            df: Input DataFrame containing adversarial prefixes. Each row
+                represents a unique prefix to be expanded for sampling.
 
         Returns:
-            A new DataFrame where each original row is expanded into `n_samples` rows.
+            Expanded DataFrame where each original row is duplicated n_samples
+            times. New columns added:
+            - sample_id: Integer identifier for each sample (0 to n_samples-1)
+            - completion: Empty string placeholder for generated completions
+
+        Note:
+            Progress tracking is provided for the expansion process. The expansion
+            maintains all original columns while adding sample-specific metadata.
+            This structure facilitates parallel processing and result aggregation
+            in downstream pipeline stages.
         """
         expanded_rows = []
         self.logger.info(
@@ -170,26 +244,46 @@ class PrefixCompleter:
         return pd.DataFrame(expanded_rows)
 
     def get_completions(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Generates completions for all prefixes in the input DataFrame.
+        """
+        Generate completions for all adversarial prefixes in the input DataFrame.
 
-        The method first expands the DataFrame for the configured number of samples per prefix.
-        It then iterates through each sample, constructs the appropriate prompt, and sends
-        a request to the configured agent via AgentRouter. Results, including the generated
-        text, request/response details, and any errors, are collected and added as new
-        columns to the expanded DataFrame.
+        This method orchestrates the complete completion generation process,
+        from DataFrame expansion through individual completion requests to
+        result consolidation. It handles different agent types, manages
+        session contexts for ADK agents, and provides comprehensive error
+        handling and result logging.
+
+        The completion process:
+        1. Expand DataFrame for multiple samples per prefix
+        2. Set up agent-specific session context (if required)
+        3. Generate completions for each prefix-sample combination
+        4. Collect comprehensive result metadata
+        5. Return consolidated results with detailed logging information
 
         Args:
-            df: A DataFrame containing 'goal' and 'prefix' (or 'target') columns.
+            df: DataFrame containing adversarial prefixes to complete. Must
+                include 'goal' and either 'prefix' or 'target' columns.
+                Additional columns are preserved in the output.
 
         Returns:
-            A DataFrame with generated completions and associated metadata.
-            New columns include 'generated_text_only', 'request_payload',
-            'response_status_code', 'response_headers', 'response_body_raw',
-            'adk_events_list', and 'completion_error_message'.
+            Expanded DataFrame with generated completions and metadata:
+            - generated_text_only: The actual completion text from the model
+            - request_payload: Request data sent to the agent
+            - response_status_code: HTTP status code from the response
+            - response_headers: Response headers from the agent interaction
+            - response_body_raw: Raw response body for debugging
+            - adk_events_list: ADK-specific event data (for ADK agents)
+            - completion_error_message: Error messages if completion failed
 
         Raises:
-            ValueError: If the input DataFrame does not contain 'prefix' (or 'target')
-                        and 'goal' columns.
+            ValueError: If the input DataFrame is missing required columns
+                ('goal' and 'prefix'/'target').
+
+        Note:
+            Progress tracking is provided for completion generation. For ADK
+            agents, unique session and user IDs are generated to ensure
+            proper session isolation. All errors are captured gracefully
+            to allow batch processing to continue.
         """
         self.logger.info(
             f"Starting completions for {len(df)} unique prefixes with {self.config.n_samples} samples each."
@@ -373,7 +467,7 @@ class PrefixCompleter:
                     request_params["adk_session_id"] = adk_session_id
                 if adk_user_id:
                     request_params["adk_user_id"] = adk_user_id
-            elif self.config.agent_type == AgentTypeEnum.LITELMM:
+            elif self.config.agent_type == AgentTypeEnum.LITELLM:
                 prompt_to_send = (
                     f"{self.config.surrogate_attack_prompt} {goal} {prefix}"
                     if self.config.surrogate_attack_prompt

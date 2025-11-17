@@ -1,3 +1,17 @@
+# Copyright 2025 - AI4I. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 CLI Utilities
 
@@ -184,8 +198,8 @@ def get_agent_type_enum(agent_type: str):
         "GOOGLE_ADK": AgentTypeEnum.GOOGLE_ADK,
         "GOOGLE-ADK": AgentTypeEnum.GOOGLE_ADK,
         "ADK": AgentTypeEnum.GOOGLE_ADK,
-        "LITELLM": AgentTypeEnum.LITELMM,
-        "LITE_LLM": AgentTypeEnum.LITELMM,
+        "LITELLM": AgentTypeEnum.LITELLM,
+        "LITE_LLM": AgentTypeEnum.LITELLM,
     }
 
     if normalized in type_mapping:
@@ -225,3 +239,29 @@ def create_status_panel(title: str, content: str, status: str = "info") -> Panel
     return Panel(
         Text(content, style=style), title=title, border_style=style, padding=(1, 2)
     )
+
+
+def launch_tui(cli_config, initial_tab: str = "dashboard", initial_data: dict = None):
+    """Launch the TUI application with specified tab and optional initial data
+
+    Args:
+        cli_config: CLI configuration object
+        initial_tab: Which tab to show initially (default: "dashboard")
+        initial_data: Initial data to pre-fill in the tab (default: None)
+    """
+    try:
+        from hackagent.cli.tui import HackAgentTUI
+
+        app = HackAgentTUI(
+            cli_config, initial_tab=initial_tab, initial_data=initial_data
+        )
+        app.run()
+
+    except ImportError:
+        console.print("[bold red]❌ TUI dependencies not installed[/bold red]")
+        console.print("\n[cyan]💡 Install with:[/cyan]")
+        console.print("  uv add textual")
+        raise click.ClickException("TUI dependencies not installed")
+    except Exception as e:
+        console.print(f"[bold red]❌ TUI failed to start: {e}[/bold red]")
+        raise click.ClickException(f"TUI failed to start: {e}")

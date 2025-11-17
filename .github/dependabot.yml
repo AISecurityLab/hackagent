@@ -1,8 +1,8 @@
 version: 2
 updates:
-  # Maintain dependencies for Python (Poetry)
-  - package-ecosystem: "pip"
-    directory: "/" # Location of pyproject.toml and poetry.lock
+  # Maintain dependencies for Python (uv)
+  - package-ecosystem: "uv"
+    directory: "/" # Location of pyproject.toml
     schedule:
       interval: "daily"
     target-branch: "main"

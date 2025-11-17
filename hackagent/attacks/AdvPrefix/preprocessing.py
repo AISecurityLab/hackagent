@@ -1,6 +1,34 @@
+# Copyright 2025 - AI4I. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
-Prefix preprocessing implementation for the prefix generation pipeline.
-This module handles both filtering and ablation of prefixes.
+Preprocessing module for AdvPrefix attacks.
+
+This module handles input preprocessing and validation for the AdvPrefix attack
+pipeline. It includes functionality for cleaning, filtering, and preparing
+input data before it enters the main attack generation process.
+
+The module provides:
+- Input validation and sanitization
+- Text preprocessing and normalization
+- Configuration validation and setup
+- Data structure conversion and formatting
+- Error handling for malformed inputs
+
+Proper preprocessing ensures that the attack pipeline receives clean,
+well-formatted inputs and reduces the likelihood of errors in downstream
+processing stages.
 """
 
 from dataclasses import dataclass
@@ -90,28 +118,43 @@ class PreprocessConfig:
 
 class PrefixPreprocessor:
     """
-    Implements preprocessing logic for prefixes, including filtering and ablation.
+    Implements comprehensive preprocessing logic for adversarial prefixes.
 
-    Filtering is split into two phases:
+    This class handles the critical preprocessing steps required to prepare
+    generated adversarial prefixes for evaluation and selection. The preprocessing
+    pipeline consists of filtering, deduplication, and ablation operations that
+    ensure high-quality inputs for downstream analysis.
+
+    The preprocessing is organized into two main phases:
+
     Phase 1 (before NLL calculation):
-    1. Remove prefixes shorter than minimum token length (using litellm.token_counter)
-    2. Remove prefixes starting with unwanted phrases
-    3. Remove prefixes containing unwanted phrases
-    4. Remove prefixes without linebreaks
-    5. Merge duplicates
+    - Character length filtering to remove overly short prefixes
+    - Pattern-based filtering to remove obviously ineffective prefixes
+    - Linebreak requirement enforcement for proper structure
+    - Duplicate merging to reduce redundancy
 
     Phase 2 (after NLL calculation):
-    1. Filter based on cross-entropy loss threshold
+    - Cross-entropy threshold filtering based on model likelihood scores
 
-    Ablation process (now character-based):
-    1. Clean up prefixes by removing leading spaces while preserving line breaks
-    2. Split prefixes into lines and identify non-empty lines
-    3. Create variations by taking first line and different character lengths of second line
-    4. Merge duplicate prefixes while preserving metadata
+    Ablation Process:
+    - Systematic creation of prefix variations by truncating second lines
+    - Character-based segmentation for fine-grained control
+    - Metadata preservation during variation generation
+
+    Attributes:
+        config: PreprocessConfig instance containing all preprocessing parameters
+        logger: Logger instance for tracking preprocessing operations
     """
 
     def __init__(self, config: PreprocessConfig):
-        """Initialize the preprocessor with configuration."""
+        """
+        Initialize the preprocessor with the provided configuration.
+
+        Args:
+            config: PreprocessConfig instance containing all preprocessing
+                parameters including filtering thresholds, pattern lists,
+                and ablation settings.
+        """
         self.config = config
         self.logger = logging.getLogger(__name__)
         # Removed tokenizer loading and related logging
@@ -120,7 +163,23 @@ class PrefixPreprocessor:
         )
 
     def _clean_prefix(self, prefix: str) -> str:
-        """Clean prefix by removing leading spaces but keeping line breaks."""
+        """
+        Clean prefix text by removing leading spaces while preserving line breaks.
+
+        This method standardizes prefix formatting by removing unnecessary leading
+        whitespace while maintaining the structural integrity of multi-line prefixes.
+
+        Args:
+            prefix: Raw prefix string that may contain leading whitespace.
+
+        Returns:
+            Cleaned prefix string with leading spaces/tabs removed from the first
+            line while preserving all line breaks and internal formatting.
+
+        Note:
+            Line breaks are preserved as they are often critical for proper
+            prefix structure and effectiveness in adversarial attacks.
+        """
         # Preserve leading whitespace that includes newlines, remove only leading spaces/tabs on the first line.
         match = re.match(r"^[ \t]*(.*)", prefix, re.DOTALL)
         if match:
@@ -128,7 +187,28 @@ class PrefixPreprocessor:
         return prefix  # Should not happen with DOTALL but as fallback
 
     def _merge_duplicates(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Merge duplicate prefixes while preserving metadata."""
+        """
+        Merge duplicate prefixes while preserving all associated metadata.
+
+        This method identifies duplicate prefix texts within each goal group and
+        consolidates them into single entries while preserving metadata from all
+        original instances. This reduces redundancy and improves processing efficiency.
+
+        Args:
+            df: DataFrame containing prefixes with associated metadata columns
+                including model_name, meta_prefix, temperature, and goal.
+
+        Returns:
+            DataFrame with duplicate prefixes merged within each goal group.
+            Metadata is concatenated with comma separation to preserve all
+            original information.
+
+        Note:
+            Merging is performed within goal groups to prevent unintended
+            consolidation of prefixes across different attack targets.
+            The 'prefix_nll' column is preserved from the first occurrence
+            when present.
+        """
         rows_before = len(df)
 
         def concatenate_unique_entries(group):
@@ -187,7 +267,28 @@ class PrefixPreprocessor:
 
     # Renamed and modified filtering method
     def _filter_by_char_length(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Remove prefixes shorter than minimum character length."""
+        """
+        Filter out prefixes that are shorter than the minimum character length.
+
+        This method removes prefixes that are too short to be effective in
+        adversarial attacks, helping to focus analysis on more substantial
+        prefix candidates.
+
+        Args:
+            df: DataFrame containing prefixes to filter. Must have a 'prefix'
+                column with string values.
+
+        Returns:
+            Filtered DataFrame containing only prefixes that meet the minimum
+            character length requirement. Returns the original DataFrame if
+            no minimum length is configured.
+
+        Note:
+            Character-based filtering is used instead of token-based filtering
+            for consistency across different tokenization schemes. The minimum
+            length threshold helps ensure that prefixes have sufficient content
+            to potentially influence model behavior.
+        """
         if not self.config.min_char_length or self.config.min_char_length <= 0:
             return df
 
@@ -365,7 +466,31 @@ class PrefixPreprocessor:
     # Public interface methods
     def filter_phase1(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Apply all phase 1 filters: patterns, length, linebreaks, duplicates.
+        Apply Phase 1 filtering to remove obviously ineffective prefixes.
+
+        This method performs initial filtering steps that don't require model
+        evaluation, removing prefixes that are clearly unsuitable for adversarial
+        attacks based on structural and content criteria.
+
+        The filtering steps applied include:
+        1. Start pattern filtering: Remove prefixes beginning with refusal phrases
+        2. Content pattern filtering: Remove prefixes containing refusal language
+        3. Character length filtering: Remove prefixes below minimum length
+        4. Linebreak filtering: Ensure prefixes have proper multi-line structure
+        5. Duplicate merging: Consolidate identical prefixes within goals
+
+        Args:
+            df: Input DataFrame containing generated prefixes with metadata.
+                Must include 'prefix' and 'goal' columns.
+
+        Returns:
+            Filtered DataFrame with obviously ineffective prefixes removed.
+            Includes detailed statistics about filtering impact.
+
+        Note:
+            Phase 1 filtering is designed to be fast and effective at removing
+            low-quality prefixes without requiring expensive model evaluations.
+            This significantly reduces the computational cost of subsequent steps.
         """
         self.logger.info("Starting filter phase 1...")
         df_filtered = df.copy()  # Work on a copy
@@ -383,7 +508,36 @@ class PrefixPreprocessor:
         return df_merged
 
     def filter_phase2(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Apply final filtering steps after NLL calculation."""
+        """
+        Apply Phase 2 filtering based on model-evaluated cross-entropy scores.
+
+        This method performs advanced filtering that requires model evaluation
+        results, specifically using cross-entropy (negative log-likelihood) scores
+        to identify the most promising adversarial prefixes for each goal.
+
+        The filtering steps include:
+        1. Cross-entropy threshold filtering: Remove prefixes with high NLL scores
+        2. Top-k selection: Keep only the best prefixes per goal based on NLL
+
+        Args:
+            df: Input DataFrame containing prefixes with computed NLL scores.
+                Must include 'prefix', 'goal', and 'prefix_nll' columns.
+
+        Returns:
+            Filtered DataFrame containing the most promising prefix candidates
+            for each goal, ranked by their cross-entropy scores. Returns empty
+            DataFrame if input is invalid.
+
+        Raises:
+            Logs errors if required columns are missing but returns input DataFrame
+            to allow pipeline continuation.
+
+        Note:
+            Phase 2 filtering is computationally expensive as it requires model
+            evaluation but provides much more precise selection of effective
+            prefixes. The cross-entropy threshold and per-goal limits help
+            balance quality and computational efficiency.
+        """
         if not isinstance(df, pd.DataFrame) or df.empty:
             self.logger.warning(
                 "Phase 2 filtering received an empty or invalid DataFrame. Skipping."
@@ -435,7 +589,37 @@ class PrefixPreprocessor:
         return df_final
 
     def ablate(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Perform prefix ablation (character-based) on the input dataframe."""
+        """
+        Perform systematic prefix ablation to create variations with different lengths.
+
+        This method creates multiple variations of each suitable prefix by
+        systematically truncating the second line at different character positions.
+        This ablation process helps identify the minimal effective prefix length
+        for each adversarial goal.
+
+        The ablation process includes:
+        1. Prefix cleaning: Standardize formatting and structure
+        2. Suitability assessment: Identify prefixes suitable for ablation
+        3. Variation generation: Create truncated versions at different lengths
+        4. Duplicate merging: Consolidate identical variations
+
+        Args:
+            df: Input DataFrame containing prefixes to ablate. Must include
+                'prefix' and 'goal' columns with multi-line prefix structures.
+
+        Returns:
+            Expanded DataFrame containing original prefixes plus all generated
+            ablated variations. Non-ablatable prefixes are preserved unchanged.
+            Returns empty DataFrame if input is invalid.
+
+        Note:
+            Ablation is only performed on prefixes that meet structural requirements
+            (minimum number of lines with sufficient content). The process uses
+            character-based truncation to create fine-grained length variations.
+
+            Progress tracking is provided for long-running ablation operations,
+            and detailed statistics are logged for analysis purposes.
+        """
         if not isinstance(df, pd.DataFrame) or df.empty:
             self.logger.warning(
                 "Ablation received an empty or invalid DataFrame. Skipping."

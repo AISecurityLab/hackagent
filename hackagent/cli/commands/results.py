@@ -1,3 +1,18 @@
+# Copyright 2025 - AI4I. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 """
 Results Commands
 
@@ -10,7 +25,7 @@ from rich.table import Table
 from datetime import datetime
 
 from hackagent.cli.config import CLIConfig
-from hackagent.cli.utils import handle_errors, display_info
+from hackagent.cli.utils import handle_errors, launch_tui
 
 console = Console()
 
@@ -44,83 +59,9 @@ def _show_logo_once():
 @handle_errors
 def list(ctx, limit, status, agent, attack_type):
     """List recent attack results"""
-
     cli_config: CLIConfig = ctx.obj["config"]
     cli_config.validate()
-
-    try:
-        from hackagent.client import AuthenticatedClient
-        from hackagent.api.result import result_list
-
-        client = AuthenticatedClient(
-            base_url=cli_config.base_url, token=cli_config.api_key, prefix="Api-Key"
-        )
-
-        # Build query parameters
-        params = {"limit": limit}
-        if status:
-            params["evaluation_status"] = status.upper()
-
-        with console.status("[bold green]Fetching results..."):
-            response = result_list.sync_detailed(client=client, **params)
-
-        if response.status_code == 200 and response.parsed:
-            results_list = response.parsed.results
-
-            if not results_list:
-                display_info("No results found")
-                return
-
-            # Display results table
-            table = Table(
-                title=f"Attack Results ({len(results_list)})",
-                show_header=True,
-                header_style="bold cyan",
-            )
-            table.add_column("ID", style="dim")
-            table.add_column("Agent", style="cyan")
-            table.add_column("Attack", style="green")
-            table.add_column("Status", style="yellow")
-            table.add_column("Created", style="dim")
-
-            for result in results_list:
-                # Format creation date
-                created = "Unknown"
-                if hasattr(result, "created_at") and result.created_at:
-                    try:
-                        if isinstance(result.created_at, datetime):
-                            created = result.created_at.strftime("%Y-%m-%d %H:%M")
-                        else:
-                            created = str(result.created_at)[:16]
-                    except (AttributeError, ValueError, TypeError):
-                        created = str(result.created_at)[:16]
-
-                # Get status
-                status_display = "Unknown"
-                if hasattr(result, "evaluation_status"):
-                    status_val = result.evaluation_status
-                    if hasattr(status_val, "value"):
-                        status_display = status_val.value
-                    else:
-                        status_display = str(status_val)
-
-                table.add_row(
-                    str(result.id)[:8] + "...",
-                    getattr(result, "agent_name", "Unknown"),
-                    getattr(result, "attack_type", "Unknown"),
-                    status_display,
-                    created,
-                )
-
-            console.print(table)
-
-        else:
-            raise click.ClickException(
-                f"Failed to fetch results: Status {response.status_code}"
-            )
-
-    except Exception as e:
-        raise click.ClickException(f"Failed to list results: {e}")
+    launch_tui(cli_config, initial_tab="results")
 
 
 @results.command()
@@ -138,7 +79,7 @@ def show(ctx, result_id):
         from hackagent.api.result import result_retrieve
 
         client = AuthenticatedClient(
-            base_url=cli_config.base_url, token=cli_config.api_key, prefix="Api-Key"
+            base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
         )
 
         with console.status(f"[bold green]Fetching result {result_id}..."):
@@ -227,7 +168,7 @@ def summary(ctx, status, agent, attack_type, days):
         from hackagent.api.result import result_list
 
         client = AuthenticatedClient(
-            base_url=cli_config.base_url, token=cli_config.api_key, prefix="Api-Key"
+            base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
         )
 
         # Fetch results (using a larger limit for statistics)

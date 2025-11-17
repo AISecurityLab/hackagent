@@ -1,64 +1,87 @@
-[tool.poetry]
+[project]
 name = "hackagent"
 version = "0.2.5"
 description = "HackAgent is an open-source security toolkit to detect vulnerabilities of your AI Agents."
 authors = [
-    "Nicola Franco <nicola@vista-labs.ai>",
-    "Silvio Busonero <silvio@vista-labs.ai>",
+    {name = "AI Security Lab", email = "ais@ai4i.it"}
 ]
 readme = "README.md"
-packages = [{include = "hackagent"}]
-include = [
-    { path = "assets/*" }
+requires-python = ">=3.10"
+license = {text = "Apache-2.0"}
+keywords = ["security", "ai", "agents", "vulnerabilities", "testing"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
 ]
 
-[tool.poetry.scripts]
+dependencies = [
+    "requests>=2.31.0",
+    "pydantic>=2.0",
+    "litellm>=1.69.2",
+    "openai>=1.0.0",
+    "python-dotenv>=1.1.0",
+    "rich>=14.0.0",
+    "pandas>=2.2.3",
+    "click>=8.1.0",
+    "pyyaml>=6.0.0",
+    "textual>=1.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "openapi-python-client>=0.24.3,<0.26.0",
+    "ruff>=0.11.9",
+    "pytest>=8.3.5",
+    "pre-commit>=4.2.0",
+    "commitizen>=4.7.1",
+    "cz-conventional-gitmoji>=0.7.0",
+    "pytest-cov>=6.1.1",
+    "google-adk>=1.4.2",
+    "anyio>=4.3.0",
+    "pytest-asyncio>=0.23.7,<1.1.0",
+]
+docs = [
+    "pydoc-markdown>=4.8.2",
+    "toml>=0.10.2",
+    "packaging>=24,<26",
+    "requests>=2.31.0",
+]
+
+[project.scripts]
 hackagent = "hackagent.cli.main:cli"
-
-[tool.poetry.dependencies]
-python = "^3.10"
-requests = "^2.31.0"
-pydantic = "^2.0"
-litellm = "^1.69.2"
-python-dotenv = "^1.1.0"
-rich = "^14.0.0"
-pandas = "^2.2.3"
-click = "^8.1.0"
-pyyaml = "^6.0.0"
-
-[tool.poetry.group.dev.dependencies]
-openapi-python-client = ">=0.24.3,<0.28.0"
-ruff = "^0.11.9"
-pytest = "^8.3.5"
-pre-commit = "^4.2.0"
-commitizen = "^4.7.1"
-cz-conventional-gitmoji = "^0.7.0"
-pytest-cov = "^6.1.1"
-google-adk = ">=0.5,<1.5"
-anyio = "^4.3.0"
-pytest-asyncio = ">=0.23.7,<1.1.0"
-
-[tool.poetry.group.docs.dependencies]
-pydoc-markdown = {extras = ["docusaurus"], version = "^4.8.2"}
-toml = "^0.10.2"
-packaging = ">=24,<26"
-requests = "^2.31.0"
 
 [tool.commitizen]
 name = "cz_gitmoji"
 tag_format = "v$version"
 version_scheme = "pep440"
-version_provider = "poetry"
+version_provider = "pep621"
 update_changelog_on_bump = true
 major_version_zero = true
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["hackagent"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/hackagent",
+    "/assets",
+]
 
 [tool.coverage.run]
 data_file = "reports/.coverage"
 source = ["hackagent"]
+omit = [
+    "hackagent/cli/tui/*",
+]
 
 [tool.coverage.report]
 fail_under = 40
@@ -76,3 +99,6 @@ exclude_lines = [
 output = "reports/coverage.xml"
 
 [tool.pytest.ini_options]
+markers = [
+    "google_adk: marks tests that require Google ADK server (deselect with '-m \"not google_adk\"')",
+]

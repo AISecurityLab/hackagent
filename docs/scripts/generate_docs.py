@@ -2,7 +2,7 @@
 """
 HackAgent Documentation Generator
 
-Generates API documentation from PyPI versions using Poetry and pydoc-markdown.
+Generates API documentation from PyPI versions using uv and pydoc-markdown.
 """
 
 import argparse
@@ -42,13 +42,13 @@ def get_current_version():
 
         result = subprocess.run(
             [
-                "poetry",
+                "uv",
                 "run",
                 "python",
                 "-c",
                 "import toml; "
                 "data = toml.load('pyproject.toml'); "
-                "print(data['tool']['poetry']['version'])",
+                "print(data['project']['version'])",
             ],
             capture_output=True,
             text=True,
@@ -58,17 +58,17 @@ def get_current_version():
             return result.stdout.strip()
     except Exception as e:
         print(f"Warning: Could not get local version: {e}")
-    return "0.2.4"  # fallback
+    return "0.2.5"  # fallback
 
 
 def check_requirements():
-    """Check if Poetry is installed."""
+    """Check if uv is installed."""
     try:
-        subprocess.run(["poetry", "--version"], capture_output=True, check=True)
+        subprocess.run(["uv", "--version"], capture_output=True, check=True)
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
-        print("❌ Poetry not found. Install with:")
-        print("curl -sSL https://install.python-poetry.org | python3 -")
+        print("❌ uv not found. Install with:")
+        print("curl -LsSf https://astral.sh/uv/install.sh | sh")
         return False
 
 
@@ -85,6 +85,17 @@ loaders:
       - hackagent.router
       - hackagent.attacks.strategies
       - hackagent.attacks.base
+      - hackagent.attacks.AdvPrefix.generate
+      - hackagent.attacks.AdvPrefix.compute_ce
+      - hackagent.attacks.AdvPrefix.completions
+      - hackagent.attacks.AdvPrefix.evaluation
+      - hackagent.attacks.AdvPrefix.aggregation
+      - hackagent.attacks.AdvPrefix.preprocessing
+      - hackagent.attacks.AdvPrefix.utils
+      - hackagent.attacks.AdvPrefix.scorer
+      - hackagent.attacks.AdvPrefix.scorer_parser
+      - hackagent.attacks.AdvPrefix.completer
+      - hackagent.attacks.AdvPrefix.selector
       - hackagent.vulnerabilities.prompts
 
 processors:
@@ -136,7 +147,6 @@ def generate_docs(version):
     # Setup paths - script is in hackagent/docs/scripts/, so project root is 2 levels up
     script_dir = Path(__file__).parent
     project_root = script_dir.parent.parent
-    output_dir = project_root / "docs/api-reference"
     docs_dir = project_root / "docs/docs"
 
     # Verify we're in the right directory (should have pyproject.toml and hackagent/ subdirectory)
@@ -148,14 +158,18 @@ def generate_docs(version):
         print(f"❌ Expected pyproject.toml and hackagent/ directory in {project_root}")
         sys.exit(1)
 
-    # Clean and create output directory
-    if output_dir.exists():
-        shutil.rmtree(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # Clean existing generated documentation
+    api_index_path = docs_dir / "api-index.md"
+    hackagent_dir = docs_dir / "hackagent"
+
+    if api_index_path.exists():
+        api_index_path.unlink()
+    if hackagent_dir.exists():
+        shutil.rmtree(hackagent_dir)
 
     # Install dependencies
     result = run_command(
-        ["poetry", "install", "--with", "docs"],
+        ["uv", "sync", "--group", "docs"],
         cwd=project_root,
         description="Installing dependencies",
         exit_on_error=False,
@@ -166,10 +180,9 @@ def generate_docs(version):
         print("📦 Installing docs dependencies individually...")
         run_command(
             [
-                "poetry",
-                "add",
-                "--group",
-                "docs",
+                "uv",
+                "pip",
+                "install",
                 "pydoc-markdown[docusaurus]",
                 "toml",
                 "packaging",
@@ -189,12 +202,12 @@ def generate_docs(version):
         print(f"📦 Using current hackagent v{version}")
 
     # Create pydoc config
-    config_file = create_pydoc_config(str(output_dir.relative_to(project_root)))
+    config_file = create_pydoc_config(str(docs_dir.relative_to(project_root)))
 
     try:
         # Generate documentation
         run_command(
-            ["poetry", "run", "pydoc-markdown", config_file],
+            ["uv", "run", "pydoc-markdown", config_file],
             cwd=project_root,
             description="Generating documentation",
         )
@@ -204,40 +217,46 @@ def generate_docs(version):
 sidebar_position: 1
 ---
 
-# API Reference v{version}
+# Python SDK API Reference
 
-This documentation was generated from hackagent v{version}.
+This section provides detailed documentation for all classes, methods, and functions in the HackAgent Python SDK. This is auto-generated documentation from the source code docstrings.
+
+## What's Included
+
+- **Core Classes**: `HackAgent`, `Client`, `AuthenticatedClient`
+- **Attack Framework**: Base classes and strategies for implementing security tests
+- **Error Handling**: Exception classes and error handling utilities
+- **Vulnerability Detection**: Tools for identifying security weaknesses
+
+## SDK vs HTTP API
+
+This documentation covers the **Python SDK API** - the classes and methods you use when writing Python code with HackAgent. If you're looking for information about raw HTTP endpoints, those are accessed through the SDK and not documented separately at this time.
+
+For practical usage examples and getting started guides, see the [Python SDK Quickstart](../sdk/python-quickstart.md).
+
+---
+
+*This documentation was auto-generated from hackagent v{version}.*
 
 """
 
-        (output_dir / "index.md").write_text(index_content)
+        (docs_dir / "api-index.md").write_text(index_content)
 
-        # Copy generated files to docs directory for Docusaurus
-        if (output_dir / "reference").exists():
+        # Handle pydoc-markdown's reference subdirectory if it exists
+        reference_dir = docs_dir / "reference"
+        if reference_dir.exists():
             # Move reference files to correct location
-            for item in (output_dir / "reference").iterdir():
+            for item in reference_dir.iterdir():
                 if item.is_file():
-                    shutil.copy2(item, output_dir)
+                    shutil.copy2(item, docs_dir)
                 elif item.is_dir():
-                    if (output_dir / item.name).exists():
-                        shutil.rmtree(output_dir / item.name)
-                    shutil.copytree(item, output_dir / item.name)
-            shutil.rmtree(output_dir / "reference")
+                    target_dir = docs_dir / item.name
+                    if target_dir.exists():
+                        shutil.rmtree(target_dir)
+                    shutil.copytree(item, target_dir)
+            shutil.rmtree(reference_dir)
 
-        # Copy API docs to main docs directory
-        api_index_path = output_dir / "index.md"
-        if api_index_path.exists():
-            shutil.copy2(api_index_path, docs_dir / "api-index.md")
-
-        hackagent_dir = output_dir / "hackagent"
-        if hackagent_dir.exists():
-            docs_hackagent_dir = docs_dir / "hackagent"
-            if docs_hackagent_dir.exists():
-                shutil.rmtree(docs_hackagent_dir)
-            shutil.copytree(hackagent_dir, docs_hackagent_dir)
-
-        print(f"✅ Documentation generated in {output_dir}")
-        print(f"✅ Documentation copied to {docs_dir}")
+        print(f"✅ Documentation generated directly in {docs_dir}")
         print("\n🔧 To view documentation:")
         print("  cd docs && npm start")
 

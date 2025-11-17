@@ -1,3 +1,37 @@
+# Copyright 2025 - AI4I. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+Scoring module for AdvPrefix attacks.
+
+This module implements various scoring mechanisms used to evaluate and rank
+adversarial prefixes throughout the AdvPrefix attack pipeline. It provides
+different scoring strategies based on various criteria such as attack success
+rate, naturalness, and robustness.
+
+The module provides functionality for:
+- Multiple scoring algorithms and strategies
+- Composite scoring with weighted criteria
+- Score normalization and standardization
+- Ranking and sorting based on scores
+- Performance metrics calculation
+- Score-based filtering and selection
+
+Scoring is a critical component for determining the effectiveness and quality
+of generated adversarial prefixes.
+"""
+
 import os
 import logging
 from dataclasses import dataclass
@@ -45,28 +79,93 @@ class LiteLLMAPIScoreConfig(ScorerConfig):
 
 # --- Base Scorer Class (Optional but good practice) ---
 class BaseScorer:
-    """Abstract base class for scorers."""
+    """
+    Abstract base class for adversarial prefix scoring implementations.
+
+    This class defines the common interface for all scorer implementations
+    used in the AdvPrefix attack pipeline. Scorers are responsible for
+    evaluating the quality and effectiveness of generated adversarial prefixes
+    using various metrics such as negative log-likelihood (NLL) scores.
+
+    Attributes:
+        config: ScorerConfig instance containing scorer-specific parameters
+        logger: Logger instance for tracking scoring operations
+    """
 
     def __init__(self, config: ScorerConfig):
+        """
+        Initialize the base scorer with the provided configuration.
+
+        Args:
+            config: ScorerConfig instance containing model identifier,
+                batch size, and other scorer-specific parameters.
+        """
         self.config = config
         self.logger = logging.getLogger(self.__class__.__name__)
 
     def calculate_score(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Calculates scores (e.g., NLL) for prefixes."""
+        """
+        Calculate effectiveness scores for adversarial prefixes.
+
+        This method must be implemented by subclasses to provide specific
+        scoring algorithms for evaluating prefix quality.
+
+        Args:
+            df: DataFrame containing prefixes to score. Must include
+                'goal' and 'prefix' columns.
+
+        Returns:
+            DataFrame with additional scoring columns added.
+
+        Raises:
+            NotImplementedError: This is an abstract method that must be
+                implemented by concrete scorer subclasses.
+        """
         raise NotImplementedError
 
     def __del__(self):
-        """Cleanup resources."""
+        """
+        Clean up resources used by the scorer.
+
+        Subclasses should override this method to properly clean up
+        any resources such as model instances or API connections.
+        """
         pass
 
 
 class LiteLLMAPIScorer(BaseScorer):
     """
-    Calculate an approximate NLL score for prefixes using LiteLLM APIs that support logprobs.
-    Note: This is NOT equivalent to precise CE calculation.
+    Calculate approximate NLL scores for adversarial prefixes using LiteLLM APIs.
+
+    This scorer uses LiteLLM-compatible APIs that support log probabilities to
+    estimate negative log-likelihood scores for generated prefixes. The scores
+    help identify which prefixes are most likely to be effective against
+    target models.
+
+    The scoring process involves:
+    1. Formatting goals as prompts for the scoring model
+    2. Requesting completions with log probability information
+    3. Analyzing log probabilities to compute approximate NLL scores
+    4. Handling API errors and edge cases gracefully
+
+    Note:
+        This provides approximate NLL scores and is NOT equivalent to precise
+        cross-entropy calculation. The accuracy depends on the scoring model's
+        log probability implementation and tokenization alignment.
+
+    Attributes:
+        config: LiteLLMAPIScoreConfig with API-specific parameters
+        api_key: Retrieved API key from environment variables
     """
 
     def __init__(self, config: LiteLLMAPIScoreConfig):
+        """
+        Initialize the LiteLLM API scorer with configuration and API credentials.
+
+        Args:
+            config: LiteLLMAPIScoreConfig containing model identifier, API
+                endpoints, authentication details, and scoring parameters.
+        """
         super().__init__(config)
         self.config: LiteLLMAPIScoreConfig  # Type hint
         self.api_key = None
@@ -82,7 +181,26 @@ class LiteLLMAPIScorer(BaseScorer):
         )
 
     def _estimate_token_count(self, text: str) -> int:
-        """Estimate token count using character count."""
+        """
+        Estimate the token count for a text string using character-based approximation.
+
+        This method provides a rough estimate of how many tokens a text string
+        will contain when processed by the scoring model. The estimation is
+        used to determine appropriate max_tokens settings for API requests.
+
+        Args:
+            text: Input text string to estimate token count for.
+
+        Returns:
+            Estimated number of tokens as an integer. Uses a rough approximation
+            of 4 characters per token plus 1 for safety margin.
+
+        Note:
+            This is a heuristic approximation and may not match the exact
+            tokenization used by the target model. It's designed to provide
+            reasonable estimates for API request sizing rather than precise
+            token counting.
+        """
         # Only use character-based estimation
         # Rough estimate: 4 chars per token (adjust if needed)
         count = (len(text) // 4) + 1
@@ -91,13 +209,36 @@ class LiteLLMAPIScorer(BaseScorer):
 
     def calculate_score(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Calculate approximate NLL score using litellm.completion logprobs via utility.
+        Calculate approximate NLL scores for prefixes using LiteLLM API log probabilities.
+
+        This method processes a DataFrame of adversarial prefixes and computes
+        approximate negative log-likelihood scores by querying the configured
+        model through LiteLLM APIs. The scores help rank prefix effectiveness.
+
+        The scoring process for each prefix:
+        1. Format the goal as a prompt (with optional surrogate attack prompt)
+        2. Estimate required token count for the prefix
+        3. Request completion with log probabilities enabled
+        4. Extract and sum log probabilities for the prefix tokens
+        5. Convert to negative log-likelihood score
 
         Args:
-            df: DataFrame with 'goal' and 'prefix' columns.
+            df: DataFrame containing adversarial prefixes to score. Must include
+                'goal' and 'prefix' columns. Additional columns are preserved.
 
         Returns:
-            DataFrame with additional 'prefix_nll' column (approximate score).
+            DataFrame with an additional 'prefix_nll' column containing the
+            computed NLL scores. Failed computations are assigned infinity
+            (indicating poor quality).
+
+        Note:
+            Progress tracking is provided for long-running scoring operations.
+            API errors are handled gracefully with appropriate logging, and
+            failed scores are set to infinity to ensure they rank poorly.
+
+            The accuracy of scores depends on the model's log probability
+            implementation and how well the tokenization aligns between
+            the scoring model and the eventual target model.
         """
         self.logger.info(
             f"Calculating approximate NLL (LiteLLM) for {len(df)} prefixes using {self.config.model_id}"

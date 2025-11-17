@@ -1,3 +1,17 @@
+# Copyright 2025 - AI4I. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import unittest
 from unittest.mock import patch, MagicMock
 from http import HTTPStatus
@@ -275,7 +289,7 @@ class TestAgentRetrieveAPI(unittest.TestCase):
         mock_response_content = {
             "id": str(agent_id_to_retrieve),
             "name": "Retrieved Agent",
-            "agent_type": AgentTypeEnum.LITELMM.value,
+            "agent_type": AgentTypeEnum.LITELLM.value,
             "endpoint": "http://example.com/retrieved",
             "organization": str(uuid.uuid4()),
             "organization_detail": {
@@ -378,7 +392,7 @@ class TestAgentUpdateAPI(unittest.TestCase):
         agent_id_to_update = uuid.uuid4()
         agent_update_request_data = AgentRequest(
             name="Updated Test Agent",
-            agent_type=AgentTypeEnum.LITELMM,
+            agent_type=AgentTypeEnum.LITELLM,
             endpoint="http://example.com/updated-litellm",
             organization=uuid.uuid4(),
             metadata=UNSET,
@@ -484,7 +498,7 @@ class TestAgentUpdateAPI(unittest.TestCase):
         agent_id_error = uuid.uuid4()
         agent_update_request_data = AgentRequest(
             name="Update Error False",
-            agent_type=AgentTypeEnum.LITELMM,
+            agent_type=AgentTypeEnum.LITELLM,
             endpoint="err_f",
             organization=uuid.uuid4(),
         )
