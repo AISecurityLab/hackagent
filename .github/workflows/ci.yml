@@ -15,21 +15,21 @@ jobs:
         with:
           fetch-depth: 0 # Needed for commit range check
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
-      - name: Set up Poetry
-        uses: abatilo/actions-poetry@v4.0.0
-        with:
-          poetry-version: '1.8.3'
-
       - name: Install dependencies
-        run: poetry install --with dev
+        run: uv sync --extra dev
 
       - name: Check commit messages in PR
-        run: poetry run cz check --rev-range ${{ github.event.pull_request.base.sha }}..${{ github.sha }}
+        run: uv run cz check --rev-range ${{ github.event.pull_request.base.sha }}..${{ github.sha }}
 
   python-checks:
     name: Linting and Formatting
@@ -37,24 +37,24 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
-      - name: Set up Poetry
-        uses: abatilo/actions-poetry@v4.0.0
-        with:
-          poetry-version: '1.8.3'
-
       - name: Install dependencies
-        run: poetry install --with dev
+        run: uv sync --extra dev
 
       - name: Run Ruff Linting
-        run: poetry run ruff check .
+        run: uv run ruff check .
 
       - name: Run Ruff Formatting Check
-        run: poetry run ruff format --check .
+        run: uv run ruff format --check .
 
   test:
     name: Run Tests
@@ -62,24 +62,25 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
-      - name: Set up Poetry
-        uses: abatilo/actions-poetry@v4.0.0
-        with:
-          poetry-version: '1.8.3'
-
       - name: Install dependencies
-        run: poetry install --with dev
+        run: uv sync --extra dev
 
       - name: Run tests with coverage
-        run: poetry run pytest --cov --cov-report=xml:reports/coverage.xml
+        run: uv run pytest --cov --cov-report=xml:reports/coverage.xml -m "not google_adk"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           files: reports/coverage.xml
-          fail_ci_if_error: true 
+          fail_ci_if_error: true

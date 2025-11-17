@@ -1,3 +1,31 @@
+# Copyright 2025 - AI4I. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+Attack strategy implementations using the Strategy pattern.
+
+This module provides different attack strategies that can be executed against victim agents.
+The Strategy pattern allows for dynamic selection and execution of various attack methodologies,
+each with their own specific configurations and execution logic.
+
+The module includes:
+- Abstract base class `AttackStrategy` defining the interface
+- Concrete implementations like `AdvPrefix` for adversarial prefix attacks
+- Helper methods for HTTP response handling and data parsing
+- Integration with the HackAgent backend API for attack execution and result tracking
+"""
+
 import logging
 import abc
 import json  # For ManagedAttackStrategy
@@ -33,9 +61,26 @@ logger = logging.getLogger(__name__)
 
 
 class AttackStrategy(abc.ABC):
-    """Abstract base class for an attack strategy."""
+    """
+    Abstract base class for implementing attack strategies using the Strategy pattern.
+
+    This class provides the foundational interface for all attack strategy implementations.
+    It handles common functionality such as HTTP response processing, data parsing,
+    and interaction with the HackAgent backend API.
+
+    Attributes:
+        hack_agent: Reference to the HackAgent instance that owns this strategy.
+        client: Authenticated client for API communication.
+    """
 
     def __init__(self, hack_agent: "HackAgent"):
+        """
+        Initialize the attack strategy with a reference to the parent HackAgent.
+
+        Args:
+            hack_agent: The HackAgent instance that will use this strategy.
+                Provides access to the authenticated client and agent configuration.
+        """
         self.hack_agent = hack_agent
         self.client = hack_agent.client
 
@@ -48,18 +93,45 @@ class AttackStrategy(abc.ABC):
         max_wait_time_seconds: Optional[int] = None,
         poll_interval_seconds: Optional[int] = None,
     ) -> Any:
-        """Executes the attack strategy."""
+        """
+        Execute the attack strategy with the provided configuration.
+
+        This abstract method must be implemented by all concrete strategy classes
+        to define their specific attack execution logic.
+
+        Args:
+            attack_config: Configuration dictionary containing attack-specific parameters.
+                Must include 'attack_type' and other parameters specific to the strategy.
+            run_config_override: Optional configuration overrides for the attack run.
+                Can be used to modify default run parameters.
+            fail_on_run_error: Whether to raise an exception if the attack run fails.
+                If False, errors may be handled gracefully depending on the strategy.
+            max_wait_time_seconds: Maximum time to wait for attack completion.
+                Not used by all strategies.
+            poll_interval_seconds: Interval for polling attack status.
+                Not used by all strategies.
+
+        Returns:
+            Strategy-specific results. The format varies by implementation but
+            typically includes attack results, success metrics, or result data.
+
+        Raises:
+            NotImplementedError: If not implemented by a concrete strategy class.
+            HackAgentError: For various attack execution failures.
+            ValueError: For invalid configuration parameters.
+        """
         pass
 
     def _decode_response_content(self, response: httpx.Response) -> str:
         """
-        Decodes the HTTP response content to a string.
+        Decode HTTP response content to a UTF-8 string with error handling.
 
         Args:
-            response: The httpx.Response object.
+            response: The httpx.Response object containing the response data.
 
         Returns:
-            The decoded content as a string, or 'N/A' if content is None.
+            The decoded content as a UTF-8 string, or 'N/A' if content is None or empty.
+            Uses 'replace' error handling to avoid decoding exceptions.
         """
         return (
             response.content.decode("utf-8", errors="replace")
@@ -74,19 +146,25 @@ class AttackStrategy(abc.ABC):
         attack_type_for_error_msg: str,
     ) -> Optional[Dict[str, Any]]:
         """
-        Tries to parse JSON data from various parts of an httpx.Response.
-        Handles direct content parsing and checks for pre-parsed attributes.
+        Parse JSON data from an HTTP response with comprehensive error handling.
+
+        This method attempts to parse JSON from response content and falls back
+        to pre-parsed attributes if direct parsing fails. It handles various
+        edge cases and provides detailed error logging.
 
         Args:
-            response: The httpx.Response object.
+            response: The httpx.Response object to parse.
             decoded_content: The already decoded string content of the response.
-            attack_type_for_error_msg: A string describing the attack type, for error messages.
+            attack_type_for_error_msg: Descriptive string for error messages,
+                typically the attack type being processed.
 
         Returns:
-            A dictionary if JSON parsing is successful, None otherwise.
+            A dictionary containing the parsed JSON data if successful,
+            None if parsing fails for non-critical cases.
 
         Raises:
-            HackAgentError: If response status is 201 but JSON parsing fails critically.
+            HackAgentError: If response status is 201 (Created) but JSON parsing
+                fails critically, indicating a server-side issue.
         """
         parsed_data_dict: Optional[Dict[str, Any]] = None
         if response.content:
@@ -133,19 +211,24 @@ class AttackStrategy(abc.ABC):
         attack_type_for_error_msg: str,
     ) -> Dict[str, Any]:
         """
-        Handles different HTTP status codes to retrieve a parsed data dictionary
-        from an attack initiation response.
+        Process an attack initiation response and extract parsed data.
+
+        This method handles different HTTP status codes and ensures that
+        the response contains valid, parseable data for further processing.
+        It provides comprehensive error handling for various failure scenarios.
 
         Args:
-            response: The httpx.Response object.
-            decoded_content: Decoded string content of the response.
-            attack_type_for_error_msg: String describing attack type for errors.
+            response: The httpx.Response object from an attack initiation request.
+            decoded_content: Pre-decoded string content of the response.
+            attack_type_for_error_msg: Descriptive string for error messages.
 
         Returns:
-            The parsed data dictionary.
+            A dictionary containing the parsed response data.
 
         Raises:
-            HackAgentError: If the response indicates failure or data cannot be parsed appropriately for critical statuses.
+            HackAgentError: If the response indicates failure (status >= 300),
+                if a 201 response lacks parseable data, or if unexpected
+                status codes are received without valid data.
         """
         parsed_data_dict = self._parse_json_from_response_data(
             response, decoded_content, attack_type_for_error_msg
@@ -200,8 +283,23 @@ class AttackStrategy(abc.ABC):
         original_content: str,
     ) -> Tuple[str, Optional[str]]:
         """
-        Extracts 'id' (attack_id) and optionally 'associated_run_id' from a parsed data dictionary.
-        Attack_id is considered mandatory.
+        Extract attack ID and optional run ID from a parsed response dictionary.
+
+        This method extracts the mandatory 'id' field (attack_id) and optional
+        'associated_run_id' field from API response data.
+
+        Args:
+            parsed_data_dict: Dictionary containing parsed response data.
+            attack_type_for_error_msg: Descriptive string for error messages.
+            original_content: Original response content string for error reporting.
+
+        Returns:
+            A tuple containing (attack_id, run_id). The attack_id is always a string,
+            while run_id may be None if not present in the response.
+
+        Raises:
+            HackAgentError: If the mandatory attack_id cannot be extracted or
+                is invalid.
         """
         raw_attack_id = parsed_data_dict.get("id")
         attack_id_str = str(raw_attack_id) if raw_attack_id is not None else None
@@ -226,7 +324,25 @@ class AttackStrategy(abc.ABC):
     def extract_attack_and_run_ids_from_initiate_response(
         self, response: httpx.Response, attack_type_for_error_msg: str = "attack"
     ) -> Tuple[str, Optional[str]]:
-        """Orchestrates the extraction of attack_id and optionally associated_run_id from an Attack creation response."""
+        """
+        Orchestrate the extraction of attack and run IDs from an attack creation response.
+
+        This is the main entry point for extracting IDs from API responses. It coordinates
+        the decoding, parsing, and extraction process using the helper methods.
+
+        Args:
+            response: The httpx.Response object from an attack creation API call.
+            attack_type_for_error_msg: Descriptive string for error messages,
+                defaults to "attack".
+
+        Returns:
+            A tuple containing (attack_id, run_id). The attack_id is always present
+            as a string, while run_id may be None if not provided in the response.
+
+        Raises:
+            HackAgentError: If the attack_id cannot be extracted or if the response
+                indicates an error condition.
+        """
         logger.debug(
             f"Attempting to extract Attack/Run IDs for '{attack_type_for_error_msg}' from response (status: {response.status_code})"
         )
@@ -240,14 +356,39 @@ class AttackStrategy(abc.ABC):
 
 
 class AdvPrefix(AttackStrategy):
-    """Strategy for 'advprefix' attacks."""
+    """
+    Strategy implementation for AdvPrefix (Adversarial Prefix) attacks.
+
+    This strategy implements adversarial prefix generation attacks that use
+    uncensored models to generate prefixes that can elicit harmful responses
+    from target models. The attack follows a multi-stage pipeline including
+    prefix generation, cross-entropy computation, completion generation,
+    evaluation, and final selection.
+
+    The strategy integrates with the HackAgent backend to track attack
+    progress and results while executing the local AdvPrefix pipeline.
+    """
 
     def _prepare_and_validate_attack_params(
         self,
         attack_config: Dict[str, Any],
     ) -> List[Any]:
-        """Validates and extracts necessary parameters from attack_config."""
+        """
+        Validate and extract necessary parameters from the attack configuration.
 
+        This method ensures that the attack configuration contains all required
+        parameters for the AdvPrefix attack execution.
+
+        Args:
+            attack_config: Dictionary containing attack configuration parameters.
+                Must include a 'goals' key with a list of target goals.
+
+        Returns:
+            A list of goals extracted from the attack configuration.
+
+        Raises:
+            ValueError: If the 'goals' key is missing or is not a list.
+        """
         goals = attack_config.get("goals")
         if not isinstance(goals, list):
             raise ValueError(
@@ -262,7 +403,25 @@ class AdvPrefix(AttackStrategy):
         organization_id: UUID,
         attack_config: Dict[str, Any],  # Used for summary
     ) -> str:
-        """Creates the Attack record on the server and returns the attack_id."""
+        """
+        Create an Attack record on the HackAgent server.
+
+        This method creates a new attack record in the backend system to track
+        the AdvPrefix attack execution and results.
+
+        Args:
+            victim_agent_id: UUID of the target agent being attacked.
+            organization_id: UUID of the organization running the attack.
+            attack_config: Configuration dictionary for the attack, stored
+                as metadata in the attack record.
+
+        Returns:
+            The string ID of the created attack record.
+
+        Raises:
+            HackAgentError: If the attack record creation fails or if the
+                response cannot be parsed to extract the attack ID.
+        """
         logger.info("Creating Attack record on the server.")
         attack_type = "advprefix"
 
@@ -301,7 +460,25 @@ class AdvPrefix(AttackStrategy):
         victim_agent_id: str,
         run_config_override: Optional[Dict[str, Any]],
     ) -> str:
-        """Explicitly creates a Run record on the server and returns the run_id."""
+        """
+        Create a Run record on the HackAgent server for tracking attack execution.
+
+        This method creates a new run record associated with the attack to track
+        the specific execution instance and its results.
+
+        Args:
+            attack_id: String ID of the attack record this run belongs to.
+            victim_agent_id: String ID of the target agent being attacked.
+            run_config_override: Optional configuration overrides for this
+                specific run instance.
+
+        Returns:
+            The string ID of the created run record.
+
+        Raises:
+            HackAgentError: If the run record creation fails, if the response
+                cannot be parsed, or if the run ID cannot be extracted.
+        """
         logger.info(
             f"Attempting to explicitly create a Run record for Attack ID: {attack_id}"
         )
@@ -406,7 +583,23 @@ class AdvPrefix(AttackStrategy):
         run_id: str,
         attack_id: str,
     ) -> Dict[str, Any]:
-        """Prepares the configuration for the local AdvPrefixAttack."""
+        """
+        Prepare the configuration dictionary for the local AdvPrefixAttack execution.
+
+        This method processes the user-provided attack configuration and adds
+        necessary parameters for the AdvPrefix attack execution, including
+        server-generated IDs and client objects.
+
+        Args:
+            attack_config: Original attack configuration provided by the user.
+            run_id: Server-generated run ID for tracking this execution.
+            attack_id: Server-generated attack ID for this attack instance.
+
+        Returns:
+            A dictionary containing the prepared configuration with all necessary
+            parameters for AdvPrefixAttack execution, including client references
+            and execution metadata.
+        """
         logger.debug(f"Preparing local attack config for Run ID: {run_id}")
         # Deep copy the user-provided attack_config to avoid modifying it directly.
         prepared_config = json.loads(json.dumps(attack_config))
@@ -435,12 +628,19 @@ class AdvPrefix(AttackStrategy):
         )
 
         # Ensure 'output_dir' is present, defaulting if necessary.
-        # AdvPrefixAttack uses this with its self.run_id to create self.run_dir.
+        # AdvPrefixAttack uses this as the final output directory (no nested run_id subdirectory).
         if "output_dir" not in prepared_config:
-            # Defaulting output_dir based on attack_id if not provided.
-            # Note: AdvPrefixAttack's __init__ also has a similar output_dir join with its self.run_id.
-            # This path is more of a base for where AdvPrefixAttack will create its specific run_id subdir.
-            prepared_config["output_dir"] = f"./logs/runs/{attack_id}"
+            # Create timestamp-based directory structure for better organization
+            # Format: ./logs/runs/YYYY-MM-DD/HH-MM-SS_attack-id-prefix
+            from datetime import datetime
+
+            now = datetime.now()
+            date_dir = now.strftime("%Y-%m-%d")
+            time_prefix = now.strftime("%H-%M-%S")
+            attack_id_short = attack_id[:8] if len(attack_id) > 8 else attack_id
+            prepared_config["output_dir"] = (
+                f"./logs/runs/{date_dir}/{time_prefix}_{attack_id_short}"
+            )
             logger.warning(
                 f"'output_dir' not in attack_config for AdvPrefixAttack, defaulting to {prepared_config['output_dir']}"
             )
@@ -454,7 +654,28 @@ class AdvPrefix(AttackStrategy):
         run_id: str,  # Server run_id
         attack_id: str,
     ) -> Optional[pd.DataFrame]:
-        """Executes the AdvPrefixAttack locally."""
+        """
+        Execute the local AdvPrefix attack using the configured pipeline.
+
+        This method instantiates and runs the AdvPrefixAttack with the prepared
+        configuration and target goals. It handles the execution of the complete
+        adversarial prefix generation pipeline.
+
+        Args:
+            attack_config: Attack configuration dictionary containing pipeline parameters.
+            goals: List of target goals for the adversarial prefix generation.
+            run_id: Server-generated run ID for tracking this execution.
+            attack_id: Server-generated attack ID for this attack instance.
+
+        Returns:
+            A pandas DataFrame containing the attack results if successful,
+            None if the attack execution fails.
+
+        Note:
+            This method handles exceptions internally and returns None on failure
+            rather than raising exceptions, allowing the calling code to handle
+            failures gracefully.
+        """
         logger.info(
             f"Executing local prefix attack for Attack ID {attack_id}, Server Run ID {run_id}."
         )
@@ -509,7 +730,25 @@ class AdvPrefix(AttackStrategy):
         run_id: str,
         fail_on_run_error: bool,  # To decide if error during this info step is critical
     ):
-        """Logs information about where local run data (like CSVs for Step10) would be."""
+        """
+        Log information about local run data persistence and file locations.
+
+        This method logs details about where local attack execution data
+        (such as intermediate CSV files) are stored for debugging and
+        result retrieval purposes.
+
+        Args:
+            attack_config: Attack configuration containing output directory settings.
+            attack_id: String ID of the attack record.
+            run_id: String ID of the run record.
+            fail_on_run_error: Whether errors in this step should be treated as
+                critical. Currently unused as this method only logs information.
+
+        Note:
+            This method currently only performs logging operations. If actual
+            file operations were performed, error handling would be more critical
+            based on the fail_on_run_error parameter.
+        """
         # This method currently only logs. If actual operations were done, error handling would be more critical.
         try:
             base_output_dir = attack_config.get(
@@ -539,12 +778,43 @@ class AdvPrefix(AttackStrategy):
         fail_on_run_error: bool,
     ) -> Any:
         """
-        Executes the AdvPrefix attack.
-        This involves:
-        1. Creating an Attack record on the server.
-        2. Creating a Run record on the server associated with the Attack.
-        3. Executing the local AdvPrefix logic (e.g., notebook steps).
-        4. Potentially updating the server Run/Attack with results or status.
+        Execute the complete AdvPrefix attack workflow.
+
+        This method orchestrates the full AdvPrefix attack execution, including
+        server-side record creation, local attack execution, and result processing.
+        It follows a structured workflow:
+
+        1. Create an Attack record on the HackAgent server for tracking
+        2. Create a Run record associated with the Attack for this execution
+        3. Execute the local AdvPrefix pipeline with the target goals
+        4. Log persistence information for results and intermediate data
+
+        Args:
+            attack_config: Configuration dictionary containing attack parameters.
+                Must include 'goals' key with a list of target goals for the attack.
+                May include 'output_dir' and other AdvPrefix pipeline parameters.
+            run_config_override: Optional configuration overrides for this specific
+                run. Can be used to modify default run parameters without affecting
+                the main attack configuration.
+            fail_on_run_error: Whether to raise an exception if the local attack
+                execution fails. If False, the method will return None for failed
+                executions instead of raising an exception.
+
+        Returns:
+            A pandas DataFrame containing the attack results from the local AdvPrefix
+            execution if successful. Returns None if the attack fails and
+            fail_on_run_error is False.
+
+        Raises:
+            HackAgentError: If victim agent ID or organization ID is not available,
+                if server record creation fails, or if local execution fails and
+                fail_on_run_error is True.
+            ValueError: If the 'goals' key is missing from attack_config.
+
+        Note:
+            This method creates server-side records for tracking and audit purposes
+            but the actual attack execution happens locally. Future versions may
+            include server-side result uploading and status updates.
         """
         victim_agent_id: UUID = self.hack_agent.router.backend_agent.id
         organization_id: UUID = self.hack_agent.router.organization_id

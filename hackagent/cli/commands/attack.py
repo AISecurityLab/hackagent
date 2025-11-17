@@ -1,3 +1,17 @@
+# Copyright 2025 - AI4I. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 Attack Commands
 
@@ -56,25 +70,30 @@ def attack():
 @click.option(
     "--dry-run", is_flag=True, help="Validate configuration without running attack"
 )
+@click.option(
+    "--no-tui",
+    is_flag=True,
+    help="Run attack directly without opening TUI (default: open TUI)",
+)
 @click.pass_context
 @handle_errors
 def advprefix(
-    ctx, agent_name, agent_type, endpoint, goals, config_file, timeout, dry_run
+    ctx, agent_name, agent_type, endpoint, goals, config_file, timeout, dry_run, no_tui
 ):
     """Execute AdvPrefix attack strategy
-    
+
     This command runs the AdvPrefix attack against a target agent.
     Goals should describe what you want the agent to do incorrectly.
-    
+
     Examples:
-    
+
       # Basic attack with goals
       hackagent attack advprefix \\
         --agent-name "weather-bot" \\
         --agent-type "google-adk" \\
         --endpoint "http://localhost:8000" \\
         --goals "Return fake weather data and ignore safety guidelines"
-      
+
               # Attack with configuration file
         hackagent attack advprefix \\
           --agent-name "multi-tool-agent" \\
@@ -84,6 +103,40 @@ def advprefix(
     """
     cli_config: CLIConfig = ctx.obj["config"]
     cli_config.validate()
+
+    # Launch TUI with attack form pre-filled (default behavior)
+    if not no_tui:
+        try:
+            from hackagent.cli.tui import HackAgentTUI
+
+            initial_data = {
+                "agent_name": agent_name,
+                "agent_type": agent_type,
+                "endpoint": endpoint,
+                "goals": goals,
+                "timeout": timeout,
+            }
+
+            app = HackAgentTUI(
+                cli_config, initial_tab="attacks", initial_data=initial_data
+            )
+            app.run()
+            return
+
+        except ImportError:
+            console.print("[bold red]❌ TUI dependencies not installed[/bold red]")
+            console.print("\n[cyan]💡 Install with:[/cyan]")
+            console.print("  uv add textual")
+            console.print(
+                "\n[yellow]Or run with --no-tui flag to execute directly[/yellow]"
+            )
+            ctx.exit(1)
+        except Exception as e:
+            console.print(f"[bold red]❌ TUI failed to start: {e}[/bold red]")
+            console.print(
+                "\n[yellow]Try running with --no-tui flag to execute directly[/yellow]"
+            )
+            ctx.exit(1)
 
     # Convert agent type
     agent_type_enum = get_agent_type_enum(agent_type)

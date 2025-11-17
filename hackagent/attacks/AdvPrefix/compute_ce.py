@@ -1,3 +1,35 @@
+# Copyright 2025 - AI4I. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+Cross-entropy computation module for AdvPrefix attacks.
+
+This module handles the calculation of cross-entropy scores for generated prefixes
+using language models. Cross-entropy scoring is used to evaluate the likelihood
+and naturalness of prefix-target combinations, helping to filter and rank
+candidate adversarial prefixes.
+
+The module provides functions for:
+- Computing cross-entropy scores for prefix-goal combinations
+- Batched processing for efficiency
+- Integration with various language model backends
+- Score normalization and comparison utilities
+
+Cross-entropy scores are a key component in the AdvPrefix pipeline for determining
+the most effective adversarial prefixes.
+"""
+
 import logging
 import pandas as pd
 from typing import Dict, Any, List  # Added List
@@ -55,7 +87,50 @@ def execute(
     logger: logging.Logger,
     run_dir: str,
 ) -> pd.DataFrame:
-    """Calculate an 'ADK Acceptability Score' for prefixes using the provided agent_router."""
+    """
+    Execute Step 4 of the AdvPrefix pipeline: Compute cross-entropy acceptability scores.
+
+    This function calculates ADK (Agent Development Kit) acceptability scores for
+    generated prefixes by testing them against the target agent. The scores represent
+    how likely the target agent is to accept and respond to the adversarial prefix
+    without triggering safety mechanisms.
+
+    Args:
+        client: Authenticated client for API communications with the HackAgent backend.
+            May be used for additional API calls beyond the router.
+        agent_router: AgentRouter instance configured for the target agent.
+            Must be configured for a GOOGLE_ADK agent type for this step.
+        input_df: DataFrame containing generated prefixes from previous pipeline steps.
+            Expected to have columns: 'prefix', and optionally 'prefix_nll'.
+        config: Configuration dictionary containing step parameters including:
+            - Request timeout settings
+            - Surrogate attack prompts (if used)
+            - Other ADK-specific configuration options
+        logger: Logger instance for tracking computation progress and debugging.
+        run_dir: Directory path for saving intermediate results and logs.
+
+    Returns:
+        A pandas DataFrame with the input data augmented with new columns:
+        - prefix_nll: Cross-entropy/negative log-likelihood scores
+        - adk_request_payload: Request payloads sent to the ADK agent
+        - adk_response_status: HTTP status codes from ADK responses
+        - adk_response_headers: Response headers from ADK interactions
+        - adk_response_body_raw: Raw response bodies from ADK agent
+        - adk_events_list: Event lists from ADK processing
+        - adk_error_message: Error messages if requests failed
+
+    Raises:
+        ValueError: If agent_router is not provided, not configured for ADK agent type,
+            or lacks required backend_agent configuration.
+
+    Note:
+        This step is specifically designed for Google ADK agents and computes
+        acceptability scores by sending prefixes to the target agent and analyzing
+        the responses for refusal patterns and error conditions.
+
+        The function processes requests sequentially with progress tracking and
+        handles errors gracefully by assigning infinite scores to failed requests.
+    """
     logger.info(
         "Executing Step 4: Computing ADK Acceptability Score (sequentially with passed AgentRouter)"
     )
@@ -232,8 +307,41 @@ def _get_adk_acceptability_via_router(
     original_index: int,
 ) -> Dict[str, Any]:
     """
-    Helper to get ADK acceptability for a single prefix using AgentRouter.
-    Returns a dictionary with score and detailed interaction data.
+    Calculate ADK acceptability score for a single prefix using the AgentRouter.
+
+    This helper function sends a single prefix to the ADK agent via the router
+    and analyzes the response to determine if the agent accepts or refuses the
+    input. The score reflects whether the prefix triggers safety mechanisms.
+
+    Args:
+        router: AgentRouter instance configured for the target ADK agent.
+        agent_reg_key: Registration key for the specific agent instance.
+        prefix_text: The adversarial prefix text to test for acceptability.
+        user_id: User identifier for the ADK session context.
+        session_id: Session identifier for the ADK interaction context.
+        request_timeout: Timeout in seconds for the ADK request.
+        logger_instance: Logger for tracking individual request progress.
+        original_index: Index of this prefix in the original dataset for tracking.
+
+    Returns:
+        A dictionary containing detailed interaction results:
+        - score: Float score (0.0 for accepted, inf for refused/error)
+        - request_payload: The request data sent to the ADK agent
+        - response_status_code: HTTP status code from the ADK response
+        - response_headers: Response headers from the ADK interaction
+        - response_body_raw: Raw response body from the ADK agent
+        - adk_events_list: List of events from ADK processing
+        - error_message: Error message if the request failed
+        - log_message: Informational message for logging
+
+    Note:
+        The function assigns a score of 0.0 if the ADK agent accepts the prefix
+        (responds without refusal keywords) and inf if it refuses or errors occur.
+        Refusal detection is based on predefined keywords that indicate the
+        agent's safety mechanisms have been triggered.
+
+        Empty or invalid prefixes are automatically assigned infinite scores
+        without sending requests to preserve API quotas.
     """
     current_score = float("inf")
     request_payload_sent = None
