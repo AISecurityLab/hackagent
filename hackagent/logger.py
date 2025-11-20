@@ -15,6 +15,7 @@
 
 import logging
 import os
+
 from rich.logging import RichHandler
 
 _rich_handler_configured_for_package = False

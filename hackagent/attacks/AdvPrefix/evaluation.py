@@ -32,18 +32,19 @@ prefixes from the generated candidates.
 """
 
 import logging
-import pandas as pd
-from typing import Dict
 from dataclasses import fields  # Import fields to inspect dataclass
+from typing import Dict
 
-from hackagent.client import AuthenticatedClient
-from hackagent.models import AgentTypeEnum
+import pandas as pd
+
 from hackagent.attacks.AdvPrefix.scorer_parser import (
     EvaluatorConfig,
-    NuancedEvaluator,
     HarmBenchEvaluator,
     JailbreakBenchEvaluator,
+    NuancedEvaluator,
 )
+from hackagent.client import AuthenticatedClient
+from hackagent.models import AgentTypeEnum
 
 EVALUATOR_MAP = {
     "nuanced": NuancedEvaluator,

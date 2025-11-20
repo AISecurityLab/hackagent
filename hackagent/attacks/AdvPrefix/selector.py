@@ -33,11 +33,12 @@ The selector module works in conjunction with the scoring and evaluation
 modules to provide comprehensive prefix optimization capabilities.
 """
 
-import pandas as pd
-import numpy as np
 import logging
-from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+import pandas as pd
 
 
 @dataclass

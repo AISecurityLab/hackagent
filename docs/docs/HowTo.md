@@ -28,7 +28,7 @@ Use the HackAgent SDK for the easiest integration:
 
 ### 🌐 HTTP API
 Use the REST API directly for maximum flexibility:
-- **Interactive Documentation**: [https://hackagent.dev/api/schema/swagger-ui](https://hackagent.dev/api/schema/swagger-ui)
+- **Interactive Documentation**: [https://api.hackagent.dev/schema/swagger-ui](https://api.hackagent.dev/schema/swagger-ui)
 - Compatible with any programming language
 - Full control over requests and responses
 - Ideal for custom integrations
@@ -67,7 +67,7 @@ import TabItem from '@theme/TabItem';
   </TabItem>
   <TabItem value="dev" label="Development">
     ```bash
-    git clone https://github.com/vistalabs-org/hackagent.git
+    git clone https://github.com/AISecurityLab/hackagent.git
     cd hackagent
     uv sync --group dev
     ```
@@ -284,7 +284,7 @@ echo $HACKAGENT_API_KEY
 
 # Test API connectivity
 curl -H "Authorization: Bearer $HACKAGENT_API_KEY" \
-     https://hackagent.dev/api/agents/
+     https://api.hackagent.dev/agents/
 ```
 
 **Agent Connection Issues:**
@@ -310,9 +310,9 @@ logging.getLogger('hackagent').setLevel(logging.DEBUG)
 ### Getting Help
 
 - **Documentation**: [Complete SDK documentation](./sdk/python-quickstart.md)
-- **GitHub Issues**: [Report bugs and request features](https://github.com/vistalabs-org/hackagent/issues)
-- **Community**: [Join discussions](https://github.com/vistalabs-org/hackagent/discussions)
-- **Email Support**: [devs@vista-labs.ai](mailto:devs@vista-labs.ai)
+- **GitHub Issues**: [Report bugs and request features](https://github.com/AISecurityLab/hackagent/issues)
+- **Community**: [Join discussions](https://github.com/AISecurityLab/hackagent/discussions)
+- **Email Support**: [ais@ai4i.it](mailto:ais@ai4i.it)
 
 ## 🔄 Next Steps
 

@@ -32,20 +32,14 @@ Scoring is a critical component for determining the effectiveness and quality
 of generated adversarial prefixes.
 """
 
-import os
 import logging
+import os
 from dataclasses import dataclass
 from typing import Optional
+
 import pandas as pd
-from rich.progress import (
-    Progress,
-    BarColumn,
-    TextColumn,
-    TimeRemainingColumn,
-    MofNCompleteColumn,
-    SpinnerColumn,
-)
-from .utils import call_litellm_completion  # Import the utility
+
+from .utils import call_litellm_completion, create_progress_bar  # Import utilities
 
 # Configure LiteLLM logging (optional)
 # litellm.set_verbose = True
@@ -252,17 +246,9 @@ class LiteLLMAPIScorer(BaseScorer):
             result_df["prefix_nll"] = result_df["prefix_nll"].fillna(float("inf"))
 
         approx_nlls = []
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            MofNCompleteColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.1f}%"),
-            TimeRemainingColumn(),
-        ) as progress_bar:
-            task = progress_bar.add_task(
-                "[cyan]Calculating Approx NLL (LiteLLM)...", total=len(df)
-            )
+        with create_progress_bar(
+            "[cyan]Calculating Approx NLL (LiteLLM)...", total=len(df)
+        ) as (progress_bar, task):
             for index, row in df.iterrows():
                 goal = row["goal"]
                 prefix = row["prefix"]

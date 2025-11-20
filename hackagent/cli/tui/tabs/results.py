@@ -18,11 +18,12 @@ Results Tab
 View and analyze attack results.
 """
 
-from textual.app import ComposeResult
-from textual.containers import Container, Horizontal, VerticalScroll
-from textual.widgets import Static, DataTable, Button, Select, Label
-from textual.binding import Binding
 from datetime import datetime
+
+from textual.app import ComposeResult
+from textual.binding import Binding
+from textual.containers import Container, Horizontal, VerticalScroll
+from textual.widgets import Button, DataTable, Label, Select, Static
 
 from hackagent.cli.config import CLIConfig
 
@@ -158,8 +159,8 @@ class ResultsTab(Container):
     def refresh_data(self) -> None:
         """Refresh results data from API."""
         try:
-            from hackagent.client import AuthenticatedClient
             from hackagent.api.result import result_list
+            from hackagent.client import AuthenticatedClient
 
             # Get filter values
             status_sel = self.query_one("#status-filter", Select).value
@@ -366,9 +367,10 @@ class ResultsTab(Container):
 
         # Fetch full result details from API including run information
         try:
-            from hackagent.client import AuthenticatedClient
-            from hackagent.api.result import result_retrieve
             import httpx
+
+            from hackagent.api.result import result_retrieve
+            from hackagent.client import AuthenticatedClient
 
             client = AuthenticatedClient(
                 base_url=self.cli_config.base_url,

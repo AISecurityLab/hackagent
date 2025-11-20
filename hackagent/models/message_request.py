@@ -4,28 +4,51 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-T = TypeVar("T", bound="GenerateRequestRequestMessagesItem")
+T = TypeVar("T", bound="MessageRequest")
 
 
 @_attrs_define
-class GenerateRequestRequestMessagesItem:
-    """ """
+class MessageRequest:
+    """
+    Attributes:
+        role (str): Role of the message sender (system, user, assistant)
+        content (str): Content of the message
+    """
 
+    role: str
+    content: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        role = self.role
+
+        content = self.content
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
+        field_dict.update(
+            {
+                "role": role,
+                "content": content,
+            }
+        )
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        generate_request_request_messages_item = cls()
+        role = d.pop("role")
 
-        generate_request_request_messages_item.additional_properties = d
-        return generate_request_request_messages_item
+        content = d.pop("content")
+
+        message_request = cls(
+            role=role,
+            content=content,
+        )
+
+        message_request.additional_properties = d
+        return message_request
 
     @property
     def additional_keys(self) -> list[str]:

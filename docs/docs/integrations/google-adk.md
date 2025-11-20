@@ -252,7 +252,7 @@ echo $HACKAGENT_API_KEY
 
 # Test API connectivity
 curl -H "Authorization: Bearer $HACKAGENT_API_KEY" \
-     https://hackagent.dev/api/agents/
+     https://api.hackagent.dev/agents/
 ```
 
 ### Debug Mode
@@ -311,8 +311,8 @@ attack_config = {
 ## 📞 Support
 
 - **ADK Documentation**: [Google ADK Docs](https://google.github.io/adk-docs/)
-- **HackAgent Issues**: [GitHub Issues](https://github.com/vistalabs-org/hackagent/issues)
-- **Email Support**: [devs@vista-labs.ai](mailto:devs@vista-labs.ai)
+- **HackAgent Issues**: [GitHub Issues](https://github.com/AISecurityLab/hackagent/issues)
+- **Email Support**: [ais@ai4i.it](mailto:ais@ai4i.it)
 
 ---
 

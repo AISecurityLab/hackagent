@@ -13,12 +13,14 @@
 # limitations under the License.
 
 
-from hackagent.router.adapters.base import Agent
-from typing import Any, Dict, Tuple, Optional
-import logging
-import requests
 import json
+import logging
+from typing import Any, Dict, Optional, Tuple
+
+import requests
 from requests.structures import CaseInsensitiveDict
+
+from hackagent.router.adapters.base import Agent
 
 # Global logger for this module, can be used by utility functions too
 logger = logging.getLogger(__name__)
@@ -92,7 +94,17 @@ class ADKAgentAdapter(Agent):
         self.endpoint: str = self.config["endpoint"].strip("/")
         self.user_id: str = self.config["user_id"]
         self.request_timeout: int = self.config.get("request_timeout", 120)
+
+        # Generate a unique session ID for this adapter instance
+        # This keeps session state persistent across multiple requests to the same agent
+        import uuid
+
+        self.session_id: str = self.config.get("session_id", str(uuid.uuid4()))
+
         self.logger = logging.getLogger(f"{__name__}.{self.id}")
+        self.logger.info(
+            f"ADKAgentAdapter initialized with session_id: {self.session_id}"
+        )
 
     def _initialize_session(
         self, session_id_to_init: str, initial_state: Optional[dict] = None
@@ -558,15 +570,28 @@ class ADKAgentAdapter(Agent):
 
         Args:
             request_data: A dictionary containing the request data. Must include
-                          a 'prompt' key with the text to send to the agent,
-                          AND a 'session_id' key for ADK interactions (e.g., a run_id).
-                          An optional 'initial_session_state' dict can be provided.
+                          a 'prompt' key with the text to send to the agent.
+                          Optional keys:
+                          - 'session_id': Override the adapter's default session_id (advanced usage)
+                          - 'initial_session_state': Initial state dict for new sessions
+                          - 'adk_session_id': Deprecated, use 'session_id' instead
+                          - 'adk_user_id': Deprecated, adapter manages user_id
 
         Returns:
             A dictionary representing the agent's response or an error.
         """
         prompt_text = request_data.get("prompt")
-        session_id_from_request = request_data.get("session_id")
+
+        # Support both new 'session_id' and legacy 'adk_session_id' for backward compatibility
+        session_id_from_request = request_data.get(
+            "session_id", request_data.get("adk_session_id")
+        )
+
+        # Use adapter's instance session_id if not provided in request
+        session_id_to_use = (
+            session_id_from_request if session_id_from_request else self.session_id
+        )
+
         initial_session_state = request_data.get("initial_session_state")  # Optional
 
         if not prompt_text:
@@ -577,37 +602,29 @@ class ADKAgentAdapter(Agent):
                 raw_request=request_data,
             )
 
-        if not session_id_from_request:
-            self.logger.warning("No 'session_id' found in request_data for ADKAdapter.")
-            return self._build_error_response(
-                error_message="Request data must include a 'session_id' field for ADKAdapter.",
-                status_code=400,
-                raw_request=request_data,
-            )
-
         self.logger.info(
-            f"Handling request for agent {self.id} with prompt: '{prompt_text[:75]}...' (Session: {session_id_from_request})"
+            f"Handling request for agent {self.id} with prompt: '{prompt_text[:75]}...' (Session: {session_id_to_use})"
         )
 
         try:
             # Step 1: Ensure ADK session exists
             self.logger.info(
-                f"Ensuring ADK session '{session_id_from_request}' exists before running turn."
+                f"Ensuring ADK session '{session_id_to_use}' exists before running turn."
             )
             self._create_session_internal(
-                session_id=session_id_from_request, initial_state=initial_session_state
+                session_id=session_id_to_use, initial_state=initial_session_state
             )
             # If _create_session_internal raises, it will be caught by the outer try-except
-            self.logger.info(f"Session '{session_id_from_request}' confirmed/created.")
+            self.logger.info(f"Session '{session_id_to_use}' confirmed/created.")
 
             # Step 2: Process the agent interaction (send to /run)
             interaction_details = self._process_agent_interaction(
-                prompt_text, session_id=session_id_from_request
+                prompt_text, session_id=session_id_to_use
             )
 
             if interaction_details.get("error_message"):
                 self.logger.warning(
-                    f"ADK interaction for agent {self.id} (session {session_id_from_request}) processed with error: "
+                    f"ADK interaction for agent {self.id} (session {session_id_to_use}) processed with error: "
                     f"{interaction_details['error_message']}"
                 )
                 # Pass full interaction_details to enrich the error response
@@ -637,16 +654,16 @@ class ADKAgentAdapter(Agent):
             }
         except AgentInteractionError as aie_session:  # Specific catch for session errors from _create_session_internal
             self.logger.error(
-                f"Failed to ensure ADK session '{session_id_from_request}': {aie_session}"
+                f"Failed to ensure ADK session '{session_id_to_use}': {aie_session}"
             )
             return self._build_error_response(
-                error_message=f"Failed to create/verify ADK session '{session_id_from_request}': {aie_session}",
+                error_message=f"Failed to create/verify ADK session '{session_id_to_use}': {aie_session}",
                 status_code=500,  # Or a more specific code if available from aie_session
                 raw_request=request_data,
             )
         except Exception as e:
             self.logger.exception(
-                f"Unexpected error in handle_request for agent {self.id} (session {session_id_from_request}): {e}"
+                f"Unexpected error in handle_request for agent {self.id} (session {session_id_to_use}): {e}"
             )
             return self._build_error_response(
                 error_message=f"Unexpected adapter error: {type(e).__name__} - {str(e)}",

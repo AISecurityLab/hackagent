@@ -21,8 +21,8 @@
 ![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)
 [![Commitizen](https://img.shields.io/badge/commitizen-friendly-brightgreen.svg)](http://commitizen.github.io/cz-cli/)
 ![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)
-![Test Coverage](https://img.shields.io/codecov/c/github/vistalabs-org/hackagent)
-![CI Status](https://img.shields.io/github/actions/workflow/status/vistalabs-org/hackagent/ci.yml)
+![Test Coverage](https://img.shields.io/codecov/c/github/AISecurityLab/hackagent)
+![CI Status](https://img.shields.io/github/actions/workflow/status/AISecurityLab/hackagent/ci.yml)
 
 
 <br>

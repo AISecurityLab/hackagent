@@ -143,4 +143,4 @@ The adapter handles rate limits gracefully. If you encounter persistent rate lim
 
 - [HackAgent Documentation](https://docs.hackagent.dev)
 - [OpenAI API Documentation](https://platform.openai.com/docs)
-- [HackAgent GitHub Repository](https://github.com/vistalabs-org/hackagent)
+- [HackAgent GitHub Repository](https://github.com/AISecurityLab/hackagent)

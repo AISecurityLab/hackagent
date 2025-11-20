@@ -19,9 +19,9 @@ Manage HackAgent configuration settings.
 """
 
 from textual.app import ComposeResult
-from textual.containers import Container, Vertical, Horizontal, VerticalScroll
-from textual.widgets import Static, Button, Input, Select, Label
 from textual.binding import Binding
+from textual.containers import Container, Horizontal, Vertical, VerticalScroll
+from textual.widgets import Button, Input, Label, Select, Static
 
 from hackagent.cli.config import CLIConfig
 
@@ -67,10 +67,12 @@ class ConfigTab(Container):
 
                 with Vertical(classes="form-group"):
                     yield Label("Base URL:")
-                    yield Input(
-                        placeholder="https://hackagent.dev",
-                        id="base-url",
-                        value=self.cli_config.base_url,
+                    (
+                        Input(
+                            id="base_url",
+                            placeholder="https://api.hackagent.dev",
+                            classes="config-input",
+                        ),
                     )
 
                 with Vertical(classes="form-group"):
@@ -179,8 +181,8 @@ class ConfigTab(Container):
     def _test_connection(self) -> None:
         """Test API connection."""
         try:
-            from hackagent.client import AuthenticatedClient
             from hackagent.api.key import key_list
+            from hackagent.client import AuthenticatedClient
 
             if not self.cli_config.api_key:
                 self.app.show_error("API key is required to test connection")

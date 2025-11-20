@@ -349,5 +349,5 @@ fi
 - **Command Help**: `hackagent COMMAND --help`
 - **General Help**: `hackagent --help`
 - **Documentation**: Visit [https://hackagent.dev/docs](https://hackagent.dev/docs)
-- **Community**: [GitHub Discussions](https://github.com/vistalabs-org/hackagent/discussions)
-- **Support**: [devs@vista-labs.ai](mailto:devs@vista-labs.ai) 
+- **Community**: [GitHub Discussions](https://github.com/AISecurityLab/hackagent/discussions)
+- **Support**: [ais@ai4i.it](mailto:ais@ai4i.it) 

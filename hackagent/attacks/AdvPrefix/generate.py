@@ -30,23 +30,17 @@ intermediate results for downstream processing.
 """
 
 import logging
-import pandas as pd
-from typing import List, Dict, Union, Tuple, Optional
-import httpx
 import os
+from typing import Dict, List, Optional, Tuple, Union
 
-from hackagent.router.router import AgentRouter
-from hackagent.models import AgentTypeEnum
+import pandas as pd
+
 from hackagent.client import AuthenticatedClient
-from rich.progress import (
-    Progress,
-    BarColumn,
-    TextColumn,
-    TimeRemainingColumn,
-    MofNCompleteColumn,
-    SpinnerColumn,
-)
 from hackagent.logger import get_logger
+from hackagent.models import AgentTypeEnum
+from hackagent.router.router import AgentRouter
+
+from .utils import create_progress_bar
 
 logger = get_logger(__name__)
 
@@ -206,12 +200,8 @@ def _generate_prefixes(
                 f"Using provided value directly as API key for generator (not found as env var: {api_key_config_value[:5]}...)."
             )
 
-    is_local_proxy_defined = bool(
-        generator_endpoint == "https://hackagent.dev/api/generate"
-    )
-
     logger.debug(
-        f"Generator: model='{model_name}', endpoint='{generator_endpoint}', local_proxy_defined={is_local_proxy_defined}, api_key_present={bool(actual_api_key)}"
+        f"Generator: model='{model_name}', endpoint='{generator_endpoint}', api_key_present={bool(actual_api_key)}"
     )
 
     try:
@@ -229,263 +219,111 @@ def _generate_prefixes(
         logger.warning("No prompts constructed, skipping generation.")
         return results
 
-    if is_local_proxy_defined:
-        logger.info(
-            f"Using existing client to make DIRECT HTTP call to local generator proxy: {generator_endpoint}"
+    # Always use AgentRouter for consistency and proper routing
+    logger.info("Using AgentRouter for generator.")
+    router: Optional[AgentRouter] = None
+    registration_key: Optional[str] = None
+    adapter_operational_config = {
+        "name": model_name,
+        "endpoint": generator_endpoint,
+        "api_key": actual_api_key,
+        "max_new_tokens": generator_config.get(
+            "max_new_tokens", config.get("max_new_tokens", 100)
+        ),
+        "temperature": generator_config.get(
+            "temperature", config.get("temperature", 0.8)
+        ),
+        "top_p": generator_config.get("top_p", config.get("top_p", 1.0)),
+    }
+    try:
+        logger.info(f"Initializing AgentRouter for LiteLLM model: {model_name}")
+        router = AgentRouter(
+            client=client,
+            name=model_name,
+            agent_type=AgentTypeEnum.LITELLM,
+            endpoint=generator_endpoint,
+            adapter_operational_config=adapter_operational_config,
+            metadata=adapter_operational_config.copy(),
+            overwrite_metadata=True,
         )
-        if not actual_api_key:
-            logger.error(
-                f"Local generator proxy specified ({generator_endpoint}) but no API key found. Cannot make direct calls."
-            )
-            return results
-
-        # Use the underlying httpx.Client from the provided AuthenticatedClient instance
-        underlying_httpx_client = client.get_httpx_client()
-        request_timeout_val = config.get("request_timeout", 120.0)
-
-        for do_sample in [False, True]:
-            progress_desc = (
-                "[cyan]Direct Call (via existing client): Prefixes (Random Sampling)..."
-                if do_sample
-                else "[cyan]Direct Call (via existing client): Prefixes (Greedy Decoding)..."
-            )
+        if router._agent_registry:  # type: ignore
+            registration_key = next(iter(router._agent_registry.keys()))  # type: ignore
             logger.info(
-                f"Direct Call (via existing client): {'random sampling' if do_sample else 'greedy decoding'}"
+                f"AgentRouter initialized. Registration key: {registration_key}"
             )
-
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
-                MofNCompleteColumn(),
-                TextColumn("[progress.percentage]{task.percentage:>3.1f}%"),
-                TimeRemainingColumn(),
-            ) as progress_bar:
-                task = progress_bar.add_task(progress_desc, total=len(prompts_to_send))
-                for idx, current_llm_input_text in enumerate(prompts_to_send):
-                    goal_for_prompt = current_goals[idx]
-                    meta_prefix_for_prompt = current_meta_prefixes[idx]
-                    temperature = config.get("temperature", 0.8) if do_sample else 1e-2
-
-                    payload = {
-                        "model": model_name,
-                        "messages": [
-                            {"role": "user", "content": current_llm_input_text}
-                        ],
-                        "max_tokens": generator_config.get(
-                            "max_new_tokens", config.get("max_new_tokens", 100)
-                        ),
-                        "temperature": temperature,
-                        "top_p": generator_config.get(
-                            "top_p", config.get("top_p", 1.0)
-                        ),
-                    }
-                    headers = {
-                        "Content-Type": "application/json",
-                        "Authorization": f"Bearer {actual_api_key}",  # Auth for HackAgent API
-                    }
-                    generated_part = " [DIRECT_CALL_ERROR]"
-                    try:
-                        # Use the underlying httpx_client from the main AuthenticatedClient
-                        # Provide full URL and override headers for this specific call
-                        raw_response = underlying_httpx_client.post(
-                            generator_endpoint,  # Full URL to the local proxy
-                            json=payload,
-                            headers=headers,  # Override auth for this call
-                            timeout=request_timeout_val,
-                        )
-                        raw_response.raise_for_status()
-                        response_json = raw_response.json()
-
-                        # Try to get content from the LiteLLM structure first
-                        if (
-                            response_json
-                            and response_json.get("choices")
-                            and len(response_json["choices"]) > 0
-                            and response_json["choices"][0].get("message")
-                        ):
-                            message = response_json["choices"][0]["message"]
-                            content = message.get("content", "")
-
-                            # For reasoning models (e.g., moonshotai/kimi-k2-thinking), check reasoning field
-                            if not content and message.get("reasoning"):
-                                generated_part = message["reasoning"]
-                                logger.info(
-                                    f"Direct call to {generator_endpoint} extracted text from 'reasoning' field (reasoning model)"
-                                )
-                            elif content:
-                                generated_part = content
-                            else:
-                                # No content or reasoning - unexpected
-                                logger.warning(
-                                    f"Direct call to {generator_endpoint} received empty content and no reasoning field. Message: {message}"
-                                )
-                                generated_part = " [EMPTY_RESPONSE]"
-                        # Fallback: check for a "text" key, which the local proxy currently returns
-                        elif response_json and "text" in response_json:
-                            generated_part = response_json["text"]
-                            if not generated_part:
-                                logger.info(
-                                    f"Direct call to {generator_endpoint} for '{current_llm_input_text[:50]}...' received 'text' field with empty content. Response: {response_json}"
-                                )
-                            else:
-                                logger.info(
-                                    f"Direct call to {generator_endpoint} for '{current_llm_input_text[:50]}...' used 'text' field. Response: {response_json}"
-                                )
-                        else:
-                            logger.warning(
-                                f"Direct call to {generator_endpoint} for '{current_llm_input_text[:50]}...' returned unexpected JSON structure: {response_json}"
-                            )
-                            generated_part = " [DIRECT_CALL_UNEXPECTED_RESPONSE]"
-
-                    except httpx.HTTPStatusError as e:
-                        logger.error(
-                            f"Direct call HTTP error to {generator_endpoint} for '{current_llm_input_text[:50]}...': {e.response.status_code} - {e.response.text}",
-                            exc_info=False,
-                        )
-                        generated_part = (
-                            f" [DIRECT_CALL_HTTP_ERROR_{e.response.status_code}]"
-                        )
-                    except Exception as e:
-                        logger.error(
-                            f"Direct call exception to {generator_endpoint} for '{current_llm_input_text[:50]}...': {e}",
-                            exc_info=True,
-                        )
-                        generated_part = " [DIRECT_CALL_EXCEPTION]"
-
-                    final_prefix = meta_prefix_for_prompt + generated_part
-                    results.append(
-                        {
-                            "goal": goal_for_prompt,
-                            "prefix": final_prefix,
-                            "meta_prefix": meta_prefix_for_prompt,
-                            "temperature": temperature,
-                            "model_name": model_name,
-                        }
-                    )
-                    progress_bar.update(task, advance=1)
-    else:
-        logger.info("Using AgentRouter for generator.")
-        router: Optional[AgentRouter] = None
-        registration_key: Optional[str] = None
-        adapter_operational_config = {
-            "name": model_name,
-            "endpoint": generator_endpoint,
-            "api_key": actual_api_key,
-            "max_new_tokens": generator_config.get(
-                "max_new_tokens", config.get("max_new_tokens", 100)
-            ),
-            "temperature": generator_config.get(
-                "temperature", config.get("temperature", 0.8)
-            ),
-            "top_p": generator_config.get("top_p", config.get("top_p", 1.0)),
-        }
-        try:
-            logger.info(f"Initializing AgentRouter for LiteLLM model: {model_name}")
-            router = AgentRouter(
-                client=client,
-                name=model_name,
-                agent_type=AgentTypeEnum.LITELLM,
-                endpoint=generator_endpoint,
-                adapter_operational_config=adapter_operational_config,
-                metadata=adapter_operational_config.copy(),
-                overwrite_metadata=True,
-            )
-            if router._agent_registry:  # type: ignore
-                registration_key = next(iter(router._agent_registry.keys()))  # type: ignore
-                logger.info(
-                    f"AgentRouter initialized. Registration key: {registration_key}"
-                )
-            else:
-                logger.error("AgentRouter init but no agent adapter registered.")
-                return results
-        except Exception as e:
-            logger.error(
-                f"Error initializing AgentRouter for {model_name}: {e}", exc_info=True
-            )
+        else:
+            logger.error("AgentRouter init but no agent adapter registered.")
             return results
+    except Exception as e:
+        logger.error(
+            f"Error initializing AgentRouter for {model_name}: {e}", exc_info=True
+        )
+        return results
 
-        for do_sample in [False, True]:
-            progress_bar_description = (
-                "[cyan]AgentRouter: Prefixes (Random Sampling)..."
-                if do_sample
-                else "[cyan]AgentRouter: Prefixes (Greedy Decoding)..."
-            )
-            logger.info(
-                f"AgentRouter: {'random sampling' if do_sample else 'greedy decoding'}"
-            )
+    for do_sample in [False, True]:
+        progress_bar_description = (
+            "[cyan]AgentRouter: Prefixes (Random Sampling)..."
+            if do_sample
+            else "[cyan]AgentRouter: Prefixes (Greedy Decoding)..."
+        )
+        logger.info(
+            f"AgentRouter: {'random sampling' if do_sample else 'greedy decoding'}"
+        )
 
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
-                MofNCompleteColumn(),
-                TextColumn("[progress.percentage]{task.percentage:>3.1f}%"),
-                TimeRemainingColumn(),
-            ) as progress_bar:
-                task = progress_bar.add_task(
-                    progress_bar_description, total=len(prompts_to_send)
+        with create_progress_bar(
+            progress_bar_description, total=len(prompts_to_send)
+        ) as (progress_bar, task):
+            for idx, current_llm_input_text in enumerate(prompts_to_send):
+                goal_for_prompt = current_goals[idx]
+                meta_prefix_for_prompt = current_meta_prefixes[idx]
+                temperature = config.get("temperature", 0.8) if do_sample else 1e-2
+
+                request_params = {
+                    "prompt": current_llm_input_text,
+                    "max_new_tokens": generator_config.get(
+                        "max_new_tokens", config.get("max_new_tokens", 100)
+                    ),
+                    "temperature": temperature,
+                    "top_p": generator_config.get("top_p", config.get("top_p", 1.0)),
+                }
+                # Router now returns standardized error responses instead of raising
+                response = router.route_request(
+                    registration_key=registration_key,
+                    request_data=request_params,
                 )
-                for idx, current_llm_input_text in enumerate(prompts_to_send):
-                    goal_for_prompt = current_goals[idx]
-                    meta_prefix_for_prompt = current_meta_prefixes[idx]
-                    temperature = config.get("temperature", 0.8) if do_sample else 1e-2
 
-                    request_params = {
-                        "prompt": current_llm_input_text,
-                        "max_new_tokens": generator_config.get(
-                            "max_new_tokens", config.get("max_new_tokens", 100)
-                        ),
-                        "temperature": temperature,
-                        "top_p": generator_config.get(
-                            "top_p", config.get("top_p", 1.0)
-                        ),
-                    }
-                    generated_part = " [ROUTER_CALL_ERROR]"
-                    try:
-                        response = router.route_request(
-                            registration_key=registration_key,
-                            request_data=request_params,
-                        )  # type: ignore
-                        if response and response.get("processed_response"):
-                            completion_text = response["processed_response"]
-                            if completion_text.startswith(current_llm_input_text):
-                                generated_part = completion_text[
-                                    len(current_llm_input_text) :
-                                ]
-                            else:
-                                logger.warning(
-                                    f"Router completion for '{current_llm_input_text[:50]}...' did not start with prompt. Using full response."
-                                )
-                                generated_part = completion_text
-                        elif response and response.get("error_message"):
-                            logger.error(
-                                f"Error from AgentRouter for '{current_llm_input_text[:50]}...': {response['error_message']}"
-                            )
-                            generated_part = f" [ROUTER_ERROR: {response.get('error_category', 'Unknown')}]"
-                        else:
-                            logger.warning(
-                                f"No 'processed_response' or 'error_message' from router for: {current_llm_input_text[:50]}..."
-                            )
-                            generated_part = " [ROUTER_UNEXPECTED_RESPONSE]"
-                    except Exception as e:
-                        logger.error(
-                            f"Exception during router.route_request for '{current_llm_input_text[:50]}...': {e}",
-                            exc_info=True,
-                        )
-                        generated_part = " [ROUTER_REQUEST_EXCEPTION]"
-
-                    final_prefix = meta_prefix_for_prompt + generated_part
-                    results.append(
-                        {
-                            "goal": goal_for_prompt,
-                            "prefix": final_prefix,
-                            "meta_prefix": meta_prefix_for_prompt,
-                            "temperature": temperature,
-                            "model_name": model_name,
-                        }
+                error_msg = response.get("error_message")
+                if error_msg:
+                    # Error case - use error category in marker
+                    error_cat = response.get("error_category", "Unknown")
+                    generated_part = f" [ROUTER_ERROR: {error_cat}]"
+                    logger.warning(
+                        f"Router error for goal '{goal_for_prompt[:30]}...': {error_msg}"
                     )
-                    progress_bar.update(task, advance=1)
+                elif response.get("processed_response"):
+                    completion_text = response["processed_response"]
+                    # Strip the prompt if it was echoed back
+                    if completion_text.startswith(current_llm_input_text):
+                        generated_part = completion_text[len(current_llm_input_text) :]
+                    else:
+                        logger.warning(
+                            "Router completion did not start with prompt. Using full response."
+                        )
+                        generated_part = completion_text
+                else:
+                    generated_part = " [ROUTER_NO_CONTENT]"
+
+                final_prefix = meta_prefix_for_prompt + generated_part
+                results.append(
+                    {
+                        "goal": goal_for_prompt,
+                        "prefix": final_prefix,
+                        "meta_prefix": meta_prefix_for_prompt,
+                        "temperature": temperature,
+                        "model_name": model_name,
+                    }
+                )
+                progress_bar.update(task, advance=1)
     return results
 
 

@@ -434,7 +434,7 @@ class ContributionGuidelines:
 - Uncertain disclosure timelines
 
 **Resources for Ethical Guidance:**
-- **HackAgent Community**: [GitHub Discussions](https://github.com/vistalabs-org/hackagent/discussions)
+- **HackAgent Community**: [GitHub Discussions](https://github.com/AISecurityLab/hackagent/discussions)
 - **Professional Organizations**: ISACA, (ISC)², SANS
 - **Academic Resources**: University IRBs, research ethics committees
 - **Legal Counsel**: Cybersecurity law specialists
@@ -456,4 +456,4 @@ For urgent ethical dilemmas during security testing:
 
 **Remember**: Ethical security research is not just about following rules—it's about building a more secure and trustworthy digital world for everyone. Your commitment to these principles makes you a valuable member of the security research community.
 
-For ethics questions specific to HackAgent, reach out to our community at [devs@vista-labs.ai](mailto:devs@vista-labs.ai). 
+For ethics questions specific to HackAgent, reach out to our community at [ais@ai4i.it](mailto:ais@ai4i.it). 

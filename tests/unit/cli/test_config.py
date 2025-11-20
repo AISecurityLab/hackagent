@@ -24,7 +24,7 @@ class TestCLIConfig:
             config = CLIConfig()
 
             assert config.api_key is None
-            assert config.base_url == "https://hackagent.dev"
+            assert config.base_url == "https://api.hackagent.dev"
             assert config.verbose == 0
             assert config.output_format == "table"
 
@@ -45,7 +45,7 @@ class TestCLIConfig:
 
             assert config.api_key == "test-key"
             # Note: base_url is hardcoded and doesn't load from env
-            assert config.base_url == "https://hackagent.dev"
+            assert config.base_url == "https://api.hackagent.dev"
             assert config.output_format == "json"
 
     def test_config_file_loading(self):
@@ -66,7 +66,7 @@ class TestCLIConfig:
 
                 assert config.api_key == "file-key"
                 # Note: base_url is hardcoded and doesn't load from config file
-                assert config.base_url == "https://hackagent.dev"
+                assert config.base_url == "https://api.hackagent.dev"
                 assert config.output_format == "csv"
         finally:
             Path(config_file).unlink()
@@ -345,7 +345,7 @@ output_format: table
 
                     assert config.api_key == "yaml-key"
                     # Note: base_url is hardcoded and doesn't load from config file
-                    assert config.base_url == "https://hackagent.dev"
+                    assert config.base_url == "https://api.hackagent.dev"
                     assert config.output_format == "table"
             except ImportError:
                 # PyYAML not available, should raise appropriate error
@@ -374,7 +374,7 @@ output_format: table
             config = CLIConfig(config_file="/nonexistent/config.json")
 
             # Should use defaults
-            assert config.base_url == "https://hackagent.dev"
+            assert config.base_url == "https://api.hackagent.dev"
             assert config.output_format == "table"
 
     # EDGE CASE TESTS

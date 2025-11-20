@@ -13,24 +13,27 @@
 # limitations under the License.
 
 import logging
-from typing import Any, Dict, Type, Optional, Union
+from typing import Any, Dict, Optional, Type, Union
 from uuid import UUID
 
-from hackagent.router.adapters.base import Agent
-from hackagent.router.adapters import ADKAgentAdapter
-from hackagent.router.adapters.litellm_adapter import LiteLLMAgentAdapter
-from hackagent.router.adapters.openai_adapter import OpenAIAgentAdapter
+from hackagent.api.agent import agent_create, agent_list, agent_partial_update
+from hackagent.api.key import key_list
 from hackagent.client import AuthenticatedClient
 from hackagent.models import (
-    AgentTypeEnum,
     Agent as BackendAgentModel,
+)
+from hackagent.models import (
     AgentRequest,
+    AgentTypeEnum,
     PatchedAgentRequest,
     UserAPIKey,
 )
-from ..types import Unset, UNSET
-from hackagent.api.agent import agent_list, agent_create, agent_partial_update
-from hackagent.api.key import key_list
+from hackagent.router.adapters import ADKAgentAdapter
+from hackagent.router.adapters.base import Agent
+from hackagent.router.adapters.litellm_adapter import LiteLLMAgentAdapter
+from hackagent.router.adapters.openai_adapter import OpenAIAgentAdapter
+
+from ..types import UNSET, Unset
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +42,7 @@ AGENT_TYPE_TO_ADAPTER_MAP: Dict[AgentTypeEnum, Type[Agent]] = {
     AgentTypeEnum.GOOGLE_ADK: ADKAgentAdapter,
     AgentTypeEnum.LITELLM: LiteLLMAgentAdapter,
     AgentTypeEnum.OPENAI_SDK: OpenAIAgentAdapter,
+    AgentTypeEnum.LANGCHAIN: LiteLLMAgentAdapter,  # LangChain agents can use LiteLLM adapter
     # Add other agent types and their corresponding adapters here
 }
 
@@ -859,25 +863,77 @@ class AgentRouter:
         """
         return self._agent_registry.get(registration_key)
 
+    def _build_error_response(
+        self,
+        error_message: str,
+        error_category: str,
+        status_code: int,
+        raw_request: Optional[Dict[str, Any]] = None,
+        registration_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Constructs a standardized error response dictionary for the router.
+
+        This ensures that router-level errors follow the same format as adapter errors,
+        providing consistency across the entire request handling pipeline.
+
+        Args:
+            error_message: The primary error message string.
+            error_category: Category/type of error (e.g., "AgentNotFound", "AdapterException").
+            status_code: The HTTP status code associated with the error.
+            raw_request: The original request data that led to the error.
+            registration_key: The registration key of the agent that failed, if applicable.
+
+        Returns:
+            A dictionary representing a standardized error response compatible with adapter responses.
+        """
+        return {
+            "raw_request": raw_request,
+            "processed_response": None,
+            "generated_text": None,
+            "raw_response_status": status_code,
+            "raw_response_headers": None,
+            "raw_response_body": None,
+            "agent_specific_data": None,
+            "error_message": error_message,
+            "error_category": error_category,
+            "agent_id": registration_key,
+            "adapter_type": "AgentRouter",
+        }
+
     def route_request(
-        self, registration_key: str, request_data: Dict[str, Any]
+        self,
+        registration_key: str,
+        request_data: Dict[str, Any],
+        raise_on_error: bool = False,
     ) -> Dict[str, Any]:
         """
         Routes a request to the appropriate agent adapter and returns its response.
+
+        This method now follows a consistent error handling pattern: it returns standardized
+        error response dictionaries instead of raising exceptions by default. This ensures
+        that all code using the router can handle errors uniformly without try/except blocks.
 
         Args:
             registration_key: The key (backend ID string) used to register the agent,
                 which identifies the target adapter.
             request_data: A dictionary containing the data to be sent to the agent's
                 `handle_request` method.
+            raise_on_error: If True, raises exceptions for errors (legacy behavior).
+                If False (default), returns standardized error response dictionaries.
 
         Returns:
-            A dictionary containing the response from the agent adapter.
+            A dictionary containing either:
+            - The successful response from the agent adapter, or
+            - A standardized error response dictionary with error_message field
 
         Raises:
-            ValueError: If no agent adapter is found for the given `registration_key`.
-            RuntimeError: If the agent adapter's `handle_request` method encounters
-                an error during processing.
+            ValueError: Only if raise_on_error=True and no agent found for registration_key.
+            RuntimeError: Only if raise_on_error=True and agent's handle_request fails.
+
+        Note:
+            When raise_on_error=False (default), this method never raises exceptions,
+            making it safer to use in pipelines where continuity is important.
         """
         logger.debug(
             f"Routing request for agent key: {registration_key}. Request data keys: {list(request_data.keys())}"
@@ -885,8 +941,19 @@ class AgentRouter:
         agent_instance = self.get_agent_instance(registration_key)
 
         if not agent_instance:
-            logger.error(f"Agent not found for key: {registration_key}")
-            raise ValueError(f"Agent not found for key: {registration_key}")
+            error_msg = f"Agent not found for key: {registration_key}"
+            logger.error(error_msg)
+
+            if raise_on_error:
+                raise ValueError(error_msg)
+
+            return self._build_error_response(
+                error_message=error_msg,
+                error_category="AgentNotFound",
+                status_code=404,
+                raw_request=request_data,
+                registration_key=registration_key,
+            )
 
         try:
             response = agent_instance.handle_request(request_data)
@@ -895,10 +962,19 @@ class AgentRouter:
             )
             return response
         except Exception as e:
+            error_msg = f"Agent {registration_key} failed to handle request: {e}"
             logger.error(
                 f"Error handling request for agent {registration_key}: {e}",
                 exc_info=True,
             )
-            raise RuntimeError(
-                f"Agent {registration_key} failed to handle request: {e}"
-            ) from e
+
+            if raise_on_error:
+                raise RuntimeError(error_msg) from e
+
+            return self._build_error_response(
+                error_message=error_msg,
+                error_category="AdapterException",
+                status_code=500,
+                raw_request=request_data,
+                registration_key=registration_key,
+            )

@@ -24,8 +24,7 @@ The configuration is designed to be easily customizable while providing sensible
 defaults for most use cases.
 """
 
-from typing import Dict, Any
-
+from typing import Any, Dict
 
 DEFAULT_PREFIX_GENERATION_CONFIG: Dict[str, Any] = {
     # --- Paths ---
@@ -33,7 +32,7 @@ DEFAULT_PREFIX_GENERATION_CONFIG: Dict[str, Any] = {
     # --- Model Configurations ---
     "generator": {
         "identifier": "hackagent/generate",
-        "endpoint": "https://hackagent.dev/api/generate",
+        "endpoint": "https://api.hackagent.dev/generate",
         "batch_size": 2,
         "max_new_tokens": 50,
         "guided_topk": 50,
@@ -42,14 +41,14 @@ DEFAULT_PREFIX_GENERATION_CONFIG: Dict[str, Any] = {
     "judges": [
         {
             "identifier": "hackagent/judge",
-            "endpoint": "https://hackagent.dev/api/judge",
+            "endpoint": "https://api.hackagent.dev/judge",
             "type": "harmbench",
         }
     ],
     "selection_judges": [
         {
             "identifier": "hackagent/judge",
-            "endpoint": "https://hackagent.dev/api/judge",
+            "endpoint": "https://api.hackagent.dev/judge",
             "type": "harmbench",
         }
     ],

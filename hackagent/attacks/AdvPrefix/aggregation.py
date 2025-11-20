@@ -30,9 +30,10 @@ Aggregated results provide a comprehensive view of attack performance and
 enable downstream analysis and selection processes.
 """
 
-import pandas as pd
-from typing import Dict, Any
 import logging
+from typing import Any, Dict
+
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 

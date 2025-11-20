@@ -219,11 +219,14 @@ class TestADKAgentAdapterHandleRequestValidation(unittest.TestCase):
         self.assertEqual(response["raw_request"], request_data)
 
     def test_handle_request_missing_session_id(self):
+        # Session ID is optional - adapter uses default if not provided
+        # This will fail with 500 when trying to create/verify the session
         request_data = {"prompt": "Hello agent"}
         response = self.adapter.handle_request(request_data)
-        self.assertEqual(response["status_code"], 400)
+        self.assertEqual(response["status_code"], 500)
+        # Check that error message mentions session creation failure
         self.assertIn(
-            "Request data must include a 'session_id' field for ADKAdapter.",
+            "Failed to create/verify ADK session",
             response["error_message"],
         )
         self.assertEqual(response["raw_request"], request_data)

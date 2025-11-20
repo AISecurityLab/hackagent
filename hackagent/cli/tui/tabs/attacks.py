@@ -18,10 +18,12 @@ Attacks Tab
 Execute and manage security attacks.
 """
 
+from typing import Optional
+
 from textual.app import ComposeResult
-from textual.containers import Container, Vertical, Horizontal, VerticalScroll
-from textual.widgets import Static, Button, Input, Select, Label, TextArea, ProgressBar
 from textual.binding import Binding
+from textual.containers import Container, VerticalScroll
+from textual.widgets import Button, Input, Label, ProgressBar, Select, Static, TextArea
 
 from hackagent.cli.config import CLIConfig
 
@@ -36,7 +38,7 @@ class AttacksTab(Container):
         Binding("c", "clear_form", "Clear Form"),
     ]
 
-    def __init__(self, cli_config: CLIConfig, initial_data: dict = None):
+    def __init__(self, cli_config: CLIConfig, initial_data: Optional[dict] = None):
         """Initialize attacks tab.
 
         Args:
@@ -49,73 +51,52 @@ class AttacksTab(Container):
 
     def compose(self) -> ComposeResult:
         """Compose the attacks layout."""
-        with VerticalScroll(classes="attacks-list"):
-            yield Static("[bold cyan]Available Attack Strategies[/bold cyan]")
-
-            yield Static(
-                """[bold]AdvPrefix[/bold]
-Adversarial prefix generation attack using language models.
-Status: [green]✅ Available[/green]""",
-                classes="attack-card",
-            )
-
-            yield Static(
-                """[bold]Prompt Injection[/bold]
-Direct prompt injection attacks.
-Status: [yellow]🚧 Planned[/yellow]""",
-                classes="attack-card",
-            )
-
-            yield Static(
-                """[bold]Jailbreak[/bold]
-Jailbreaking techniques for safety bypassing.
-Status: [yellow]🚧 Planned[/yellow]""",
-                classes="attack-card",
-            )
-
-        with VerticalScroll(classes="attack-form"):
+        with VerticalScroll():
             yield Static("[bold cyan]Attack Configuration[/bold cyan]")
+            yield Static("")  # Spacing
 
-            with Vertical(classes="form-group"):
-                yield Label("Agent Name:")
-                yield Input(placeholder="e.g., weather-bot", id="agent-name")
+            yield Label("Agent Name:")
+            yield Input(placeholder="e.g., weather-bot", id="agent-name")
+            yield Static("")  # Spacing
 
-            with Vertical(classes="form-group"):
-                yield Label("Agent Type:")
-                yield Select(
-                    [("Google ADK", "google-adk"), ("LiteLLM", "litellm")],
-                    id="agent-type",
-                    value="google-adk",
-                )
+            yield Label("Agent Type:")
+            yield Select(
+                [("Google ADK", "google-adk"), ("LiteLLM", "litellm")],
+                id="agent-type",
+                value="google-adk",
+            )
+            yield Static("")  # Spacing
 
-            with Vertical(classes="form-group"):
-                yield Label("Endpoint URL:")
-                yield Input(
-                    placeholder="e.g., http://localhost:8000", id="endpoint-url"
-                )
+            yield Label("Endpoint URL:")
+            yield Input(placeholder="e.g., http://localhost:8000", id="endpoint-url")
+            yield Static("")  # Spacing
 
-            with Vertical(classes="form-group"):
-                yield Label("Attack Strategy:")
-                yield Select(
-                    [("AdvPrefix", "advprefix")],
-                    id="attack-strategy",
-                    value="advprefix",
-                )
+            yield Label("Attack Strategy:")
+            yield Select(
+                [("AdvPrefix", "advprefix")],
+                id="attack-strategy",
+                value="advprefix",
+            )
+            yield Static("")  # Spacing
 
-            with Vertical(classes="form-group"):
-                yield Label("Goals (what you want the agent to do incorrectly):")
-                yield TextArea("Return fake weather data", id="attack-goals")
+            yield Label("Goals (what you want the agent to do incorrectly):")
+            goals_area = TextArea("Return fake weather data", id="attack-goals")
+            goals_area.styles.height = 6
+            yield goals_area
+            yield Static("")  # Spacing
 
-            with Vertical(classes="form-group"):
-                yield Label("Timeout (seconds):")
-                yield Input(value="300", id="timeout")
+            yield Label("Timeout (seconds):")
+            yield Input(value="300", id="timeout")
+            yield Static("")  # Spacing
+            yield Static("")  # Extra spacing before buttons
 
-            with Horizontal(classes="button-group"):
-                yield Button("Execute Attack", id="execute-attack", variant="primary")
-                yield Button("Dry Run", id="dry-run", variant="default")
-                yield Button("Clear", id="clear-form", variant="error")
+            yield Button("Execute Attack", id="execute-attack", variant="primary")
+            yield Button("Dry Run", id="dry-run", variant="default")
+            yield Button("Clear", id="clear-form", variant="error")
 
-        with Vertical(classes="execution-status", id="execution-status-container"):
+            yield Static("")  # Spacing
+            yield Static("")  # Extra spacing after buttons
+
             yield Static(
                 "[dim]Configure attack parameters and click Execute[/dim]",
                 id="execution-status",
@@ -284,11 +265,12 @@ Status: [yellow]🚧 Planned[/yellow]""",
             goals: Attack goals
             timeout: Timeout in seconds
         """
-        import time
-        import sys
         import io
-        import os
         import logging
+        import os
+        import sys
+        import time
+
         from hackagent import HackAgent
         from hackagent.cli.utils import get_agent_type_enum
 

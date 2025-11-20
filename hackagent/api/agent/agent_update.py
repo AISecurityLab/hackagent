@@ -20,12 +20,13 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "put",
-        "url": f"/api/agent/{id}",
+        "url": "/api/agent/{id}".format(
+            id=id,
+        ),
     }
 
-    _body = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
-    _kwargs["json"] = _body
     headers["Content-Type"] = "application/json"
 
     _kwargs["headers"] = headers
@@ -100,8 +101,8 @@ def sync_detailed(
                 owner_detail (UserProfileMinimalSerializer): Read-only nested serializer
                     for the agent's owner's user profile. Displays minimal details.
                     Can be null if the agent has no owner or the owner has no profile.
-                type (CharField): The type of the agent (e.g., GENERIC_ADK, OPENAI_SDK).
-                                  Uses the choices defined in the Agent model's AgentType enum.
+                agent_type (CharField): The type of the agent as a string
+                                  (e.g., LITELLM, OPENAI_SDK, GOOGLE_ADK).
 
             Meta:
                 model (Agent): The model class that this serializer works with.
@@ -177,8 +178,8 @@ def sync(
                 owner_detail (UserProfileMinimalSerializer): Read-only nested serializer
                     for the agent's owner's user profile. Displays minimal details.
                     Can be null if the agent has no owner or the owner has no profile.
-                type (CharField): The type of the agent (e.g., GENERIC_ADK, OPENAI_SDK).
-                                  Uses the choices defined in the Agent model's AgentType enum.
+                agent_type (CharField): The type of the agent as a string
+                                  (e.g., LITELLM, OPENAI_SDK, GOOGLE_ADK).
 
             Meta:
                 model (Agent): The model class that this serializer works with.
@@ -249,8 +250,8 @@ async def asyncio_detailed(
                 owner_detail (UserProfileMinimalSerializer): Read-only nested serializer
                     for the agent's owner's user profile. Displays minimal details.
                     Can be null if the agent has no owner or the owner has no profile.
-                type (CharField): The type of the agent (e.g., GENERIC_ADK, OPENAI_SDK).
-                                  Uses the choices defined in the Agent model's AgentType enum.
+                agent_type (CharField): The type of the agent as a string
+                                  (e.g., LITELLM, OPENAI_SDK, GOOGLE_ADK).
 
             Meta:
                 model (Agent): The model class that this serializer works with.
@@ -324,8 +325,8 @@ async def asyncio(
                 owner_detail (UserProfileMinimalSerializer): Read-only nested serializer
                     for the agent's owner's user profile. Displays minimal details.
                     Can be null if the agent has no owner or the owner has no profile.
-                type (CharField): The type of the agent (e.g., GENERIC_ADK, OPENAI_SDK).
-                                  Uses the choices defined in the Agent model's AgentType enum.
+                agent_type (CharField): The type of the agent as a string
+                                  (e.g., LITELLM, OPENAI_SDK, GOOGLE_ADK).
 
             Meta:
                 model (Agent): The model class that this serializer works with.

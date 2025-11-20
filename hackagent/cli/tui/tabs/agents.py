@@ -18,11 +18,12 @@ Agents Tab
 Manage and view AI agents.
 """
 
-from textual.app import ComposeResult
-from textual.containers import Container, Horizontal
-from textual.widgets import Static, DataTable, Button
-from textual.binding import Binding
 from datetime import datetime
+
+from textual.app import ComposeResult
+from textual.binding import Binding
+from textual.containers import Container, Horizontal
+from textual.widgets import Button, DataTable, Static
 
 from hackagent.cli.config import CLIConfig
 
@@ -120,8 +121,8 @@ class AgentsTab(Container):
     def refresh_data(self) -> None:
         """Refresh agents data from API."""
         try:
-            from hackagent.client import AuthenticatedClient
             from hackagent.api.agent import agent_list
+            from hackagent.client import AuthenticatedClient
 
             # Validate configuration
             if not self.cli_config.api_key:

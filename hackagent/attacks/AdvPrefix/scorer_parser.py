@@ -13,25 +13,18 @@
 # limitations under the License.
 
 
+import logging
 import os
 from abc import ABC, abstractmethod
-import pandas as pd
-import logging
-from typing import Optional, Tuple, Dict, Any, List
 from dataclasses import dataclass, field
-from rich.progress import (
-    Progress,
-    BarColumn,
-    TextColumn,
-    TimeRemainingColumn,
-    MofNCompleteColumn,
-    SpinnerColumn,
-)
-import httpx
+from typing import Any, Dict, List, Optional, Tuple
+
+import pandas as pd
 
 from hackagent.client import AuthenticatedClient
 from hackagent.router.router import AgentRouter, AgentTypeEnum
 
+from .utils import create_progress_bar
 
 # Default judge model configurations
 DEFAULT_JUDGE_MODELS = {
@@ -148,14 +141,9 @@ class BaseEvaluator(ABC):
     setup, and provides standardized interfaces for response evaluation across
     different judge types.
 
-    The class supports multiple evaluation backends:
-    - Local judge proxy for direct HTTP communication
-    - AgentRouter framework for managed agent interactions
-    - Graceful fallback and error handling between methods
-
     Key Features:
-    - Automatic agent registration and configuration
-    - Support for both local and remote judge models
+    - Automatic agent registration and configuration via AgentRouter
+    - Support for both local and remote judge models through unified routing
     - Comprehensive error handling and logging
     - Progress tracking for batch evaluation operations
     - Flexible authentication and API key management
@@ -169,10 +157,7 @@ class BaseEvaluator(ABC):
         client: AuthenticatedClient for API communications
         config: EvaluatorConfig containing all evaluation parameters
         logger: Logger instance for operation tracking
-        underlying_httpx_client: Direct HTTP client for local proxy calls
-        is_local_judge_proxy_defined: Flag indicating local proxy availability
-        actual_api_key: Resolved API key for authentication
-        agent_router: Optional AgentRouter instance for managed interactions
+        agent_router: AgentRouter instance for managed interactions
         agent_registration_key: Registration key for the configured agent
     """
 
@@ -201,134 +186,72 @@ class BaseEvaluator(ABC):
         self.client = client
         self.config = config
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.underlying_httpx_client = self.client.get_httpx_client()
 
-        self.is_local_judge_proxy_defined = False
-        self.actual_api_key: str = client.token
-
-        api_key_config_value = self.config.agent_metadata.get("api_key")
-
-        if api_key_config_value:
-            env_key_value = os.environ.get(api_key_config_value)
-            if env_key_value:
-                self.actual_api_key = env_key_value
-                self.logger.info(
-                    f"Loaded API key for generator from environment variable: {api_key_config_value}"
-                )
-            else:
-                self.actual_api_key = api_key_config_value
-                self.logger.info(
-                    f"Using provided value directly as API key for generator (not found as env var: {api_key_config_value[:5]}...)."
-                )
-
-        print("config.agent_endpoint", self.config.agent_endpoint)
-        is_local_proxy_defined = bool(
-            self.config.agent_endpoint == "https://hackagent.dev/api/judge"
+        # Always use AgentRouter for consistency and proper routing
+        self.logger.info(
+            f"Initializing AgentRouter for judge '{self.config.agent_name}' with model '{self.config.model_id}'."
         )
 
-        if is_local_proxy_defined:
-            self.is_local_judge_proxy_defined = True
-            self.logger.info(
-                f"Local judge proxy detected for '{self.config.agent_name}' at: {self.config.agent_endpoint}"
-            )
+        adapter_op_config = {
+            "name": self.config.model_id,
+            "endpoint": self.config.agent_endpoint,
+            "max_new_tokens": self.config.max_new_tokens_eval,
+            "temperature": self.config.temperature,
+            "request_timeout": self.config.request_timeout,
+        }
 
-            if not self.actual_api_key:
-                self.is_local_judge_proxy_defined = (
-                    False  # Cannot use local proxy without API key
-                )
-                self.logger.warning(
-                    f"Cannot use local judge proxy for '{self.config.agent_name}': API key is missing. Will attempt AgentRouter fallback."
-                )
-
-        self.agent_router: Optional[AgentRouter] = None
-        self.agent_registration_key: Optional[str] = None
-
-        if not (self.is_local_judge_proxy_defined and self.actual_api_key):
-            self.logger.info(
-                f"Attempting to initialize AgentRouter for judge '{self.config.agent_name}' with model '{self.config.model_id}'."
-            )
-            try:
-                adapter_op_config = {
-                    "name": self.config.model_id,
-                    "endpoint": self.config.agent_endpoint,  # This might be a non-local endpoint for the router
-                    "max_new_tokens": self.config.max_new_tokens_eval,
-                    "temperature": self.config.temperature,
-                    "request_timeout": self.config.request_timeout,
-                }
-                # Merge API key and other metadata for AgentRouter if not already used by local proxy
-                if self.config.agent_metadata:
-                    # Prioritize env var for API key if specified for router
-                    if "api_key_env_var" in self.config.agent_metadata:
-                        api_key_env = self.config.agent_metadata["api_key_env_var"]
-                        loaded_api_key = os.environ.get(api_key_env)
-                        if loaded_api_key:
-                            adapter_op_config["api_key"] = loaded_api_key
-                            self.logger.info(
-                                f"AgentRouter for '{self.config.agent_name}' using API key from env var: {api_key_env}"
-                            )
-                        else:
-                            self.logger.warning(
-                                f"Environment variable {api_key_env} for AgentRouter API key for '{self.config.agent_name}' not set."
-                            )
-                    # Fallback to direct api_key if present and not used by local proxy logic
-                    elif "api_key" in self.config.agent_metadata:
-                        adapter_op_config["api_key"] = self.config.agent_metadata[
-                            "api_key"
-                        ]
-                        self.logger.info(
-                            f"AgentRouter for '{self.config.agent_name}' using direct API key from agent_metadata."
-                        )
-
-                    # Update with any other metadata that doesn't conflict
-                    # Be careful not to overwrite already set critical configs like 'name', 'endpoint' unless intended
-                    for key, value in self.config.agent_metadata.items():
-                        if (
-                            key not in adapter_op_config
-                            or adapter_op_config[key] is None
-                        ):  # Prioritize explicitly set params
-                            adapter_op_config[key] = value
-
-                self.logger.debug(
-                    f"Initializing AgentRouter for judge '{self.config.agent_name}' with model '{self.config.model_id}'. Final Adapter op_config: {adapter_op_config}"
-                )
-
-                self.agent_router = AgentRouter(
-                    client=self.client,
-                    name=self.config.agent_name,
-                    agent_type=self.config.agent_type,
-                    endpoint=self.config.agent_endpoint,
-                    metadata=self.config.agent_metadata,  # Pass original metadata for completeness
-                    adapter_operational_config=adapter_op_config,
-                    overwrite_metadata=True,
-                )
-
-                if not self.agent_router._agent_registry:  # type: ignore
-                    raise RuntimeError(
-                        f"AgentRouter did not register any agent for judge '{self.config.agent_name}'."
+        # Merge API key and other metadata for AgentRouter
+        if self.config.agent_metadata:
+            # Prioritize env var for API key if specified
+            if "api_key_env_var" in self.config.agent_metadata:
+                api_key_env = self.config.agent_metadata["api_key_env_var"]
+                loaded_api_key = os.environ.get(api_key_env)
+                if loaded_api_key:
+                    adapter_op_config["api_key"] = loaded_api_key
+                    self.logger.info(
+                        f"AgentRouter for '{self.config.agent_name}' using API key from env var: {api_key_env}"
                     )
-
-                self.agent_registration_key = list(
-                    self.agent_router._agent_registry.keys()  # type: ignore
-                )[0]
+                else:
+                    self.logger.warning(
+                        f"Environment variable {api_key_env} for AgentRouter API key for '{self.config.agent_name}' not set."
+                    )
+            # Fallback to direct api_key if present
+            elif "api_key" in self.config.agent_metadata:
+                adapter_op_config["api_key"] = self.config.agent_metadata["api_key"]
                 self.logger.info(
-                    f"Judge '{self.config.agent_name}' (Model: {self.config.model_id}) initialized with AgentRouter. Registration key: {self.agent_registration_key}"
+                    f"AgentRouter for '{self.config.agent_name}' using direct API key from agent_metadata."
                 )
 
-            except Exception as e:
-                self.logger.error(
-                    f"Failed to initialize AgentRouter for judge '{self.config.agent_name}': {e}",
-                    exc_info=True,
-                )
-                if not (
-                    self.is_local_judge_proxy_defined and self.actual_api_key
-                ):  # Only raise if no usable path
-                    raise RuntimeError(
-                        f"Could not initialize AgentRouter for {self.__class__.__name__} and local proxy not available/functional: {e}"
-                    ) from e
-        else:
-            self.logger.info(
-                f"Using local judge proxy for '{self.config.agent_name}'. AgentRouter was not initialized."
+            # Update with any other metadata that doesn't conflict
+            for key, value in self.config.agent_metadata.items():
+                if key not in adapter_op_config or adapter_op_config[key] is None:
+                    adapter_op_config[key] = value
+
+        self.logger.debug(
+            f"Initializing AgentRouter for judge '{self.config.agent_name}' with model '{self.config.model_id}'. Final Adapter op_config: {adapter_op_config}"
+        )
+
+        self.agent_router = AgentRouter(
+            client=self.client,
+            name=self.config.agent_name,
+            agent_type=self.config.agent_type,
+            endpoint=self.config.agent_endpoint,
+            metadata=self.config.agent_metadata,
+            adapter_operational_config=adapter_op_config,
+            overwrite_metadata=True,
+        )
+
+        if not self.agent_router._agent_registry:  # type: ignore
+            raise RuntimeError(
+                f"AgentRouter did not register any agent for judge '{self.config.agent_name}'."
             )
+
+        self.agent_registration_key = list(
+            self.agent_router._agent_registry.keys()  # type: ignore
+        )[0]
+        self.logger.info(
+            f"Judge '{self.config.agent_name}' (Model: {self.config.model_id}) initialized with AgentRouter. Registration key: {self.agent_registration_key}"
+        )
 
     def _verify_columns(self, df: pd.DataFrame, required_columns: list) -> None:
         """
@@ -426,19 +349,17 @@ class BaseEvaluator(ABC):
         self, rows_to_process: pd.DataFrame, progress_description: str
     ) -> Tuple[List[Any], List[Optional[str]], List[Any]]:
         """
-        Process evaluation rows using either local proxy or AgentRouter backend.
+        Process evaluation rows using AgentRouter backend.
 
         This method handles the core evaluation processing by routing requests
-        through the appropriate backend system. It supports both direct HTTP
-        communication with local judge proxies and managed interactions through
-        the AgentRouter framework.
+        through the AgentRouter framework for consistent and managed interactions
+        with judge models.
 
         The processing workflow:
-        1. Determine the appropriate communication method (proxy vs router)
-        2. Format requests using subclass-specific request builders
-        3. Send requests with progress tracking and error handling
-        4. Parse responses using subclass-specific parsers
-        5. Collect results with comprehensive error recovery
+        1. Format requests using subclass-specific request builders
+        2. Send requests via AgentRouter with progress tracking
+        3. Parse responses using subclass-specific parsers
+        4. Collect results with comprehensive error recovery
 
         Args:
             rows_to_process: DataFrame containing rows that need evaluation.
@@ -454,9 +375,8 @@ class BaseEvaluator(ABC):
             - processed_indices: Original DataFrame indices for result mapping
 
         Note:
-            The method automatically handles different backend types and
-            provides comprehensive error recovery. Failed evaluations are
-            given default scores (0) with descriptive error messages.
+            All evaluations use AgentRouter for consistency. Failed evaluations
+            are given default scores (0) with descriptive error messages.
 
             Progress tracking is provided for long-running evaluation batches,
             and all API errors are logged with sufficient detail for debugging.
@@ -465,200 +385,11 @@ class BaseEvaluator(ABC):
         results_expl: List[Optional[str]] = []
         processed_indices: List[Any] = []
 
-        if self.is_local_judge_proxy_defined and self.actual_api_key:
-            self.logger.info(
-                f"Using direct HTTP call to local judge proxy: {self.config.agent_endpoint} for {self.__class__.__name__}"
-            )
-            request_timeout_val = float(self.config.request_timeout)
-
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
-                MofNCompleteColumn(),
-                TextColumn("[progress.percentage]{task.percentage:>3.1f}%"),
-                TimeRemainingColumn(),
-            ) as progress_bar:
-                task_desc = f"[magenta]Direct Judge ({self.config.model_id}): {progress_description.replace('[cyan]', '').strip()}"
-                task = progress_bar.add_task(task_desc, total=len(rows_to_process))
-
-                for index, row in rows_to_process.iterrows():
-                    current_eval: Any = 0
-                    current_expl: Optional[str] = (
-                        "Evaluation failed or skipped (Direct Call)"
-                    )
-
-                    try:
-                        request_data_params = self._get_request_data_for_row(row)
-
-                        payload = {
-                            "model": self.config.model_id,
-                            "messages": request_data_params["messages"],
-                            "max_tokens": request_data_params.get(
-                                "max_tokens", self.config.max_new_tokens_eval
-                            ),
-                            "temperature": request_data_params.get(
-                                "temperature", self.config.temperature
-                            ),
-                            # Add other relevant LiteLLM params if needed by the judge proxy from request_data_params
-                        }
-                        if "top_p" in request_data_params:
-                            payload["top_p"] = request_data_params["top_p"]
-                        # if "stream" in request_data_params: payload["stream"] = request_data_params["stream"] # Judges usually don't stream
-
-                        headers = {
-                            "Content-Type": "application/json",
-                            "Authorization": f"Api-Key {self.actual_api_key}",
-                        }
-
-                        raw_response = self.underlying_httpx_client.post(
-                            str(
-                                self.config.agent_endpoint
-                            ),  # Ensure endpoint is a string
-                            json=payload,
-                            headers=headers,
-                            timeout=request_timeout_val,
-                        )
-                        raw_response.raise_for_status()
-                        response_json = raw_response.json()
-
-                        response_content: Optional[str] = None
-                        if (
-                            response_json
-                            and response_json.get("choices")
-                            and len(response_json["choices"]) > 0
-                            and response_json["choices"][0].get("message")
-                        ):
-                            message = response_json["choices"][0]["message"]
-                            content = message.get("content", "")
-
-                            # For reasoning models (e.g., moonshotai/kimi-k2-thinking), check reasoning field
-                            if not content and message.get("reasoning"):
-                                response_content = message["reasoning"]
-                                self.logger.info(
-                                    f"Direct call to judge for index {index} extracted text from 'reasoning' field (reasoning model)"
-                                )
-                            elif content:
-                                response_content = content
-                            else:
-                                # No content or reasoning - unexpected
-                                self.logger.warning(
-                                    f"Direct call to judge for index {index} (goal: {row.get('goal', 'N/A')[:30]}...) received empty content and no reasoning field. Message: {message}"
-                                )
-                        elif (
-                            response_json and "text" in response_json
-                        ):  # Fallback for non-LiteLLM standard proxy
-                            response_content = response_json["text"]
-                            if not response_content:
-                                self.logger.info(
-                                    f"Direct call to judge for index {index} (goal: {row.get('goal', 'N/A')[:30]}...) received 'text' field with empty content. Response: {response_json}"
-                                )
-                            else:
-                                self.logger.info(
-                                    f"Direct call to judge for index {index} (goal: {row.get('goal', 'N/A')[:30]}...) used 'text' field. Response: {response_json}"
-                                )
-                        else:
-                            self.logger.warning(
-                                f"Direct call to judge for index {index} (goal: {row.get('goal', 'N/A')[:30]}...) returned unexpected JSON: {response_json}"
-                            )
-                            current_expl = f"Direct Call to {self.config.agent_name}: Unexpected response structure"
-
-                        if response_content is not None:
-                            current_eval, current_expl = self._parse_response_content(
-                                response_content, index
-                            )
-                        # If response_content is None after checks, current_expl will retain its warning.
-
-                    except httpx.HTTPStatusError as e:
-                        error_text = (
-                            e.response.text[:200]
-                            if hasattr(e.response, "text") and e.response.text
-                            else ""
-                        )
-                        current_expl = f"Direct Call HTTP Error {e.response.status_code} to {self.config.agent_name}: {error_text}"
-                        self.logger.error(
-                            f"Direct call HTTP error for index {index} (goal: {row.get('goal', 'N/A')[:30]}...) to {self.config.agent_endpoint}: {e.response.status_code} - {e.response.text}",
-                            exc_info=False,
-                        )
-                    except (
-                        httpx.RequestError
-                    ) as e:  # More specific for network/request issues
-                        current_expl = f"Direct Call Request Error to {self.config.agent_name}: {type(e).__name__}"
-                        self.logger.error(
-                            f"Direct call request error for index {index} (goal: {row.get('goal', 'N/A')[:30]}...) to {self.config.agent_endpoint}: {e}",
-                            exc_info=True,
-                        )
-                    except Exception as e:
-                        current_expl = f"Direct Call Exception in {self.__class__.__name__} for row {index} (goal: {row.get('goal', 'N/A')[:30]}...): {type(e).__name__}"
-                        self.logger.error(
-                            f"Direct call general exception for index {index} (goal: {row.get('goal', 'N/A')[:30]}...) with {self.__class__.__name__}: {e}",
-                            exc_info=True,
-                        )
-                    finally:
-                        results_eval.append(current_eval)
-                        results_expl.append(current_expl)
-                        processed_indices.append(index)
-                        progress_bar.update(task, advance=1)
-
-        elif self.agent_router and self.agent_registration_key:
-            # Original AgentRouter logic
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
-                MofNCompleteColumn(),
-                TextColumn("[progress.percentage]{task.percentage:>3.1f}%"),
-                TimeRemainingColumn(),
-            ) as progress_bar:
-                task_desc = f"[blue]AgentRouter ({self.config.agent_name}): {progress_description.replace('[cyan]', '').strip()}"
-                task = progress_bar.add_task(task_desc, total=len(rows_to_process))
-                for index, row in rows_to_process.iterrows():
-                    current_eval: Any = 0
-                    current_expl: Optional[str] = (
-                        "Evaluation failed or skipped (AgentRouter)"
-                    )
-
-                    try:
-                        request_data = self._get_request_data_for_row(row)
-
-                        adapter_response = self.agent_router.route_request(
-                            registration_key=self.agent_registration_key,
-                            request_data=request_data,
-                        )
-
-                        response_content = adapter_response.get("processed_response")
-                        error_message = adapter_response.get("error_message")
-
-                        if error_message:
-                            current_expl = f"AgentRouter Error ({self.config.agent_name}): {error_message}"
-                            self.logger.warning(
-                                f"{self.__class__.__name__}: AgentRouter Error for index {index} (goal: {row.get('goal', 'N/A')[:30]}...): {error_message}"
-                            )
-                        elif response_content is not None:
-                            current_eval, current_expl = self._parse_response_content(
-                                response_content, index
-                            )
-                        else:
-                            current_expl = f"{self.__class__.__name__} ({self.config.agent_name}): No content from AgentRouter"
-                            self.logger.warning(
-                                f"{self.__class__.__name__}: No content received for index {index} (goal: {row.get('goal', 'N/A')[:30]}...) via AgentRouter ({self.config.agent_name})"
-                            )
-
-                    except Exception as e:
-                        current_expl = f"Exception in {self.__class__.__name__} ({self.config.agent_name}) processing row {index} (goal: {row.get('goal', 'N/A')[:30]}...): {type(e).__name__} - {str(e)[:100]}"
-                        self.logger.error(
-                            f"Exception processing row {index} (goal: {row.get('goal', 'N/A')[:30]}...) with {self.__class__.__name__} ({self.config.agent_name}) via AgentRouter: {e}",
-                            exc_info=True,
-                        )
-                    finally:
-                        results_eval.append(current_eval)
-                        results_expl.append(current_expl)
-                        processed_indices.append(index)
-                        progress_bar.update(task, advance=1)
-        else:
-            # Neither local proxy nor AgentRouter is available/configured
+        # Always use AgentRouter for consistency
+        if not self.agent_router or not self.agent_registration_key:
+            # Critical error - AgentRouter was not initialized properly
             self.logger.error(
-                f"CRITICAL: No evaluation method available for {self.__class__.__name__} ({self.config.agent_name}). Local proxy not functional and AgentRouter not initialized."
+                f"CRITICAL: AgentRouter not available for {self.__class__.__name__} ({self.config.agent_name})."
             )
             for index, row in rows_to_process.iterrows():
                 results_eval.append(0)  # Default error score
@@ -666,9 +397,58 @@ class BaseEvaluator(ABC):
                     f"Configuration Error: No evaluation agent available for {self.config.agent_name}."
                 )
                 processed_indices.append(index)
-                self.logger.error(
-                    f"Skipping evaluation for index {index} (goal: {row.get('goal', 'N/A')[:30]}...) due to missing agent configuration for {self.config.agent_name}."
+            return results_eval, results_expl, processed_indices
+
+        # Process all rows with AgentRouter
+        task_desc = f"[blue]AgentRouter ({self.config.agent_name}): {progress_description.replace('[cyan]', '').strip()}"
+        with create_progress_bar(task_desc, total=len(rows_to_process)) as (
+            progress_bar,
+            task,
+        ):
+            for index, row in rows_to_process.iterrows():
+                current_eval: Any = 0
+                current_expl: Optional[str] = (
+                    "Evaluation failed or skipped (AgentRouter)"
                 )
+
+                try:
+                    request_data = self._get_request_data_for_row(row)
+
+                    # Router now returns standardized error responses instead of raising
+                    response = self.agent_router.route_request(
+                        registration_key=self.agent_registration_key,
+                        request_data=request_data,
+                    )
+
+                    error_msg = response.get("error_message")
+                    response_content = response.get("processed_response")
+
+                    if error_msg:
+                        current_expl = f"{self.__class__.__name__} ({self.config.agent_name}): {error_msg}"
+                        self.logger.warning(
+                            f"{self.__class__.__name__}: Router error for index {index}: {error_msg}"
+                        )
+                    elif response_content is not None:
+                        current_eval, current_expl = self._parse_response_content(
+                            response_content, index
+                        )
+                    else:
+                        current_expl = f"{self.__class__.__name__} ({self.config.agent_name}): No content from router"
+                        self.logger.warning(
+                            f"{self.__class__.__name__}: No content for index {index}"
+                        )
+
+                except Exception as e:
+                    current_expl = f"Exception in {self.__class__.__name__} ({self.config.agent_name}) processing row {index}: {type(e).__name__} - {str(e)[:100]}"
+                    self.logger.error(
+                        f"Exception processing row {index} with {self.__class__.__name__} ({self.config.agent_name}): {e}",
+                        exc_info=True,
+                    )
+                finally:
+                    results_eval.append(current_eval)
+                    results_expl.append(current_expl)
+                    processed_indices.append(index)
+                    progress_bar.update(task, advance=1)
 
         return results_eval, results_expl, processed_indices
 
@@ -747,12 +527,8 @@ Based on these criteria, please provide your classification. You should first br
         super().__init__(client, config)
         if not self.config.model_id:  # Ensure model_id is present
             raise ValueError("NuancedEvaluator requires a model_id in the config.")
-        if not (self.is_local_judge_proxy_defined and self.actual_api_key) and (
-            not self.agent_router or not self.agent_registration_key
-        ):
-            raise RuntimeError(
-                "AgentRouter not initialized for NuancedEvaluator and local proxy not available/functional."
-            )
+        if not self.agent_router or not self.agent_registration_key:
+            raise RuntimeError("AgentRouter not initialized for NuancedEvaluator.")
 
     def _get_request_data_for_row(self, row: pd.Series) -> Dict[str, Any]:
         """
@@ -986,11 +762,9 @@ Answer with either 'safe' or 'unsafe' and nothing else (in particular, never sta
             raise ValueError(
                 "JailbreakBenchEvaluator requires a model_id in the config."
             )
-        if not (self.is_local_judge_proxy_defined and self.actual_api_key) and (
-            not self.agent_router or not self.agent_registration_key
-        ):
+        if not self.agent_router or not self.agent_registration_key:
             raise RuntimeError(
-                "AgentRouter not initialized for JailbreakBenchEvaluator and local proxy not available/functional."
+                "AgentRouter not initialized for JailbreakBenchEvaluator."
             )
 
     def _get_request_data_for_row(self, row: pd.Series) -> Dict[str, Any]:
@@ -1197,9 +971,10 @@ Answer with only "yes" or "no"."""
             )
             # Depending on strictness, could raise ValueError here
             # raise ValueError("HarmBenchEvaluator requires a model_id in the config.")
-        if not (self.is_local_judge_proxy_defined and self.actual_api_key) and (
-            not self.agent_router or not self.agent_registration_key
-        ):
+        # else:
+        # raise ValueError("HarmBenchEvaluator requires a model_id in the config.")
+        if not self.agent_router or not self.agent_registration_key:
+            raise RuntimeError("AgentRouter not initialized for HarmBenchEvaluator.")
             raise RuntimeError(
                 "AgentRouter not initialized for HarmBenchEvaluator and local proxy not available/functional."
             )

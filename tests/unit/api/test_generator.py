@@ -41,7 +41,21 @@ class TestGeneratorAPI(unittest.TestCase):
         )
 
     def test_sync_detailed_success(self):
-        success_payload = {"text": "Success"}  # Expected payload
+        success_payload = {
+            "id": "test-id-123",
+            "object": "chat.completion",
+            "created": 1234567890,
+            "model": "test-model",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": "Success"},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+            "text": "Success",
+        }
         mock_response = httpx.Response(
             HTTPStatus.OK,
             content=json.dumps(success_payload).encode(),  # JSON content
@@ -72,7 +86,7 @@ class TestGeneratorAPI(unittest.TestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.content, json.dumps(success_payload).encode())
         self.assertIsInstance(response.parsed, GenerateSuccessResponse)
-        self.assertEqual(response.parsed.text, success_payload["text"])
+        self.assertEqual(response.parsed["text"], success_payload["text"])
 
     def test_sync_detailed_unexpected_status(self):
         error_payload = {"error": "Error"}  # Expected payload
@@ -143,7 +157,21 @@ class TestGeneratorAPI(unittest.TestCase):
     # Note: Using asyncio.run for simplicity here. For more complex async tests,
     # consider unittest.IsolatedAsyncioTestCase or pytest-asyncio.
     def test_asyncio_detailed_success(self):
-        success_payload = {"text": "Async Success"}  # Expected payload
+        success_payload = {
+            "id": "test-id-456",
+            "object": "chat.completion",
+            "created": 1234567890,
+            "model": "test-model",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": "Async Success"},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+            "text": "Async Success",
+        }
         mock_async_response = MagicMock(spec=httpx.Response)
         mock_async_response.status_code = HTTPStatus.OK
         mock_async_response.content = json.dumps(
@@ -185,7 +213,7 @@ class TestGeneratorAPI(unittest.TestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.content, json.dumps(success_payload).encode())
         self.assertIsInstance(response.parsed, GenerateSuccessResponse)
-        self.assertEqual(response.parsed.text, success_payload["text"])
+        self.assertEqual(response.parsed["text"], success_payload["text"])
 
     def test_asyncio_detailed_unexpected_status(self):
         error_payload = {"error": "Async Error"}  # Expected payload

@@ -32,23 +32,15 @@ determine attack success rates.
 """
 
 import logging
+from typing import Any, Dict, List, Optional  # Added List
+
 import pandas as pd
-import uuid
-from typing import Dict, Any, Optional, List  # Added List
 
 # --- Import AgentRouter and related components ---
-from hackagent.router.router import AgentRouter, AgentTypeEnum
+from hackagent.router.router import AgentRouter
 
-# --- Import Rich progress bar components ---
-from rich.progress import (
-    Progress,
-    BarColumn,
-    TextColumn,
-    TimeRemainingColumn,
-    MofNCompleteColumn,
-    SpinnerColumn,
-)
-
+# --- Import utilities ---
+from .utils import create_progress_bar
 
 # Constants for surrogate prompts
 SURROGATE_ATTACK_PROMPTS = {
@@ -65,8 +57,6 @@ def _get_completion_via_router(
     agent_reg_key: str,
     prefix_text: str,
     surrogate_prompt_template: str,  # The resolved template or suffix string
-    user_id: Optional[str],  # For ADK
-    session_id: Optional[str],  # For ADK
     request_timeout: int,
     max_new_tokens: Optional[int],
     temperature: Optional[float],
@@ -79,8 +69,8 @@ def _get_completion_via_router(
 
     This helper function sends a single adversarial prefix (optionally combined
     with a surrogate attack prompt) to the target agent and collects the generated
-    completion. It handles both ADK and non-ADK agents with appropriate session
-    management and parameter configuration.
+    completion. Session management for ADK agents is handled automatically by the
+    ADKAgentAdapter.
 
     Args:
         agent_router: AgentRouter instance configured for the target agent.
@@ -88,8 +78,6 @@ def _get_completion_via_router(
         prefix_text: The adversarial prefix to use for completion generation.
         surrogate_prompt_template: Template or suffix string to combine with
             the prefix. May contain {prefix} placeholder for formatting.
-        user_id: User identifier for ADK session context (required for ADK agents).
-        session_id: Session identifier for ADK interaction context (required for ADK).
         request_timeout: Timeout in seconds for the completion request.
         max_new_tokens: Maximum number of tokens to generate in the completion.
         temperature: Sampling temperature for completion generation.
@@ -109,8 +97,8 @@ def _get_completion_via_router(
         - log_message: Informational message for logging
 
     Note:
-        For ADK agents, user_id and session_id are required for proper session
-        management. The function handles surrogate prompt formatting with
+        For ADK agents, session management is handled automatically by the
+        ADKAgentAdapter. The function handles surrogate prompt formatting with
         placeholder replacement or simple concatenation based on template format.
 
         Errors are captured in the error_message field rather than raising
@@ -148,15 +136,7 @@ def _get_completion_via_router(
     if n_samples is not None and n_samples > 0:
         request_data["n"] = n_samples  # Common key for number of completions
 
-    # Add ADK specific session/user if applicable
-    is_adk = agent_router.backend_agent.agent_type == AgentTypeEnum.GOOGLE_ADK
-    if is_adk:
-        if not user_id or not session_id:
-            logger_instance.warning(
-                f"ADK victim used in step6 but user_id/session_id not provided for index {original_index}. This might fail."
-            )
-        request_data["user_id"] = user_id
-        request_data["session_id"] = session_id
+    # Session management is now handled by the ADKAgentAdapter (no need to pass session_id/user_id)
 
     # Prepare result structure
     result_dict = {
@@ -170,51 +150,42 @@ def _get_completion_via_router(
         "log_message": None,  # For per-prefix logging by the main loop
     }
 
-    try:
-        adapter_response = agent_router.route_request(
-            registration_key=agent_reg_key, request_data=request_data
-        )
-        # Update result_dict with actuals from adapter_response
-        result_dict["raw_request_payload"] = adapter_response.get(
-            "raw_request", result_dict["raw_request_payload"]
-        )
-        result_dict["raw_response_status"] = adapter_response.get(
-            "raw_response_status"
-        )  # Corrected from status_code
-        result_dict["raw_response_headers"] = adapter_response.get(
-            "raw_response_headers"
-        )
-        result_dict["raw_response_body"] = adapter_response.get("raw_response_body")
-        result_dict["adapter_specific_events"] = adapter_response.get(
-            "agent_specific_data", {}
-        ).get("adk_events_list")  # Adjusted path
-        result_dict["error_message"] = adapter_response.get("error_message")
+    # Router now returns standardized error responses instead of raising
+    response = agent_router.route_request(
+        registration_key=agent_reg_key,
+        request_data=request_data,
+    )
 
-        completion_text = adapter_response.get("generated_text")
+    # Update result_dict with response data
+    result_dict["raw_request_payload"] = (
+        response.get("raw_request") or result_dict["raw_request_payload"]
+    )
+    result_dict["raw_response_status"] = response.get("raw_response_status")
+    result_dict["raw_response_headers"] = response.get("raw_response_headers")
+    result_dict["raw_response_body"] = response.get("raw_response_body")
 
-        if result_dict["error_message"]:
-            result_dict["log_message"] = (
-                f"Adapter error for prefix at original index {original_index}: {result_dict['error_message']}"
-            )
-        elif completion_text is None:
-            result_dict["log_message"] = (
-                f"No completion text from adapter for prefix at original index {original_index}."
-            )
-            if not result_dict["error_message"]:
-                result_dict["error_message"] = "No completion text extracted by adapter"
-        else:
-            result_dict["completion"] = completion_text
-            result_dict["log_message"] = (
-                f"Successfully got completion for prefix at original index {original_index}."
-            )
+    # Extract adapter-specific events if available (e.g., ADK events)
+    agent_specific = response.get("agent_specific_data", {})
+    if agent_specific:
+        result_dict["adapter_specific_events"] = agent_specific.get("adk_events_list")
 
-    except Exception as e:
-        logger_instance.error(
-            f"Exception in _get_completion_via_router for original index {original_index} (session {session_id if is_adk else 'N/A'}): {e}",
-            exc_info=True,
+    error_msg = response.get("error_message")
+    completion_text = response.get("generated_text")
+
+    if error_msg:
+        result_dict["error_message"] = error_msg
+        result_dict["log_message"] = (
+            f"Adapter error for prefix at original index {original_index}: {error_msg}"
         )
-        result_dict["error_message"] = (
-            f"Router/Helper Exception: {type(e).__name__} - {str(e)}"
+    elif completion_text is None:
+        result_dict["error_message"] = "No completion text extracted by adapter"
+        result_dict["log_message"] = (
+            f"No completion text from adapter for prefix at original index {original_index}."
+        )
+    else:
+        result_dict["completion"] = completion_text
+        result_dict["log_message"] = (
+            f"Successfully got completion for prefix at original index {original_index}."
         )
 
     return result_dict
@@ -343,19 +314,7 @@ def execute(
         f"Using passed victim AgentRouter. Name: '{agent_router.backend_agent.name}', Type: {victim_agent_type}, Reg Key: {victim_agent_reg_key}"
     )
 
-    # --- ADK Session/User ID (if applicable) ---
-    step_user_id_adk: Optional[str] = None
-    step_session_id_adk: Optional[str] = None
-    if victim_agent_type == AgentTypeEnum.GOOGLE_ADK:
-        # Using run_id from config to ensure uniqueness for this step's batch within the run
-        run_id_for_session = config.get(
-            "run_id", uuid.uuid4().hex[:8]
-        )  # Fallback if run_id not in config
-        step_user_id_adk = f"hackagent_step6_user_{run_id_for_session}"
-        step_session_id_adk = f"hackagent_step6_session_{run_id_for_session}"
-        logger.info(
-            f"Using ADK user_id: {step_user_id_adk}, session_id: {step_session_id_adk} for completions."
-        )
+    # Session management is now handled by the ADKAgentAdapter (no setup needed here)
 
     # --- Completion Parameters from config ---
     request_timeout = 120
@@ -377,19 +336,10 @@ def execute(
     logger.info(f"Executing {len(input_df)} completion requests sequentially...")
 
     # Create progress bar for agent interactions
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        MofNCompleteColumn(),
-        TextColumn("[progress.percentage]{task.percentage:>3.1f}%"),
-        TimeRemainingColumn(),
-    ) as progress_bar:
-        task = progress_bar.add_task(
-            f"[green]Step 6: Getting completions from {victim_agent_type.value} agent...",
-            total=len(input_df),
-        )
-
+    with create_progress_bar(
+        f"[green]Step 6: Getting completions from {victim_agent_type.value} agent...",
+        total=len(input_df),
+    ) as (progress_bar, task):
         for index, row in input_df.iterrows():
             prefix_text = row["prefix"]
             # 'goal' might not be directly used if surrogate_prompt_template is complex or prefix_text is already combined
@@ -407,8 +357,6 @@ def execute(
                     agent_reg_key=victim_agent_reg_key,
                     prefix_text=prefix_text,
                     surrogate_prompt_template=actual_surrogate_prompt_str,
-                    user_id=step_user_id_adk,
-                    session_id=step_session_id_adk,
                     request_timeout=request_timeout,
                     max_new_tokens=max_new_tokens,
                     temperature=temperature,

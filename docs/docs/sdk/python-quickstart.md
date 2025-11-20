@@ -24,7 +24,7 @@ The **HackAgent SDK** wraps the HackAgent platform's HTTP API in easy-to-use cla
 - You want to run security tests from command line or scripts
 - You prefer a simple interface without writing code
 
-For the interactive HTTP API documentation, visit: **[https://hackagent.dev/api/schema/swagger-ui](https://hackagent.dev/api/schema/swagger-ui)**
+For the interactive HTTP API documentation, visit: **[https://api.hackagent.dev/schema/swagger-ui](https://api.hackagent.dev/schema/swagger-ui)**
 
 This guide focuses on the SDK. For CLI usage, see the [CLI Documentation](../cli/README.md).
 
@@ -64,7 +64,7 @@ For development or to access the latest features:
   <TabItem value="uv-dev" label="uv (Recommended)" default>
     ```bash
     # Clone the repository
-    git clone https://github.com/vistalabs-org/hackagent.git
+    git clone https://github.com/AISecurityLab/hackagent.git
     cd hackagent
     
     # Install with uv
@@ -74,7 +74,7 @@ For development or to access the latest features:
   <TabItem value="pip-dev" label="pip">
     ```bash
     # Clone the repository
-    git clone https://github.com/vistalabs-org/hackagent.git
+    git clone https://github.com/AISecurityLab/hackagent.git
     cd hackagent
     
     # Install in development mode
@@ -349,14 +349,14 @@ DEFAULT_CONFIG = {
     "output_dir": "./logs/runs",
     "generator": {
         "identifier": "hackagent/generate",
-        "endpoint": "https://hackagent.dev/api/generate",
+        "endpoint": "https://api.hackagent.dev/generate",
         "batch_size": 2,
         "max_new_tokens": 50,
         "temperature": 0.7
     },
     "judges": [{
         "identifier": "hackagent/judge",
-        "endpoint": "https://hackagent.dev/api/judge",
+        "endpoint": "https://api.hackagent.dev/judge",
         "type": "harmbench"
     }],
     "min_char_length": 10,
@@ -527,9 +527,9 @@ Explore these advanced topics:
 
 ## 📞 Support
 
-- **GitHub Issues**: [Report bugs and request features](https://github.com/vistalabs-org/hackagent/issues)
-- **Documentation**: [Complete documentation](https://hackagent.dev/docs)
-- **Email Support**: [devs@vista-labs.ai](mailto:devs@vista-labs.ai)
+- **GitHub Issues**: [Report bugs and request features](https://github.com/AISecurityLab/hackagent/issues)
+- **Documentation**: [Complete documentation](https://docs.hackagent.dev)
+- **Email Support**: [ais@ai4i.it](mailto:ais@ai4i.it)
 
 ---
 
