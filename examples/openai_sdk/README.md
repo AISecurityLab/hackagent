@@ -110,7 +110,7 @@ python hack.py
 
 ## Viewing Results
 
-After running the tests, view your results at: [https://hackagent.dev](https://hackagent.dev)
+After running the tests, view your results at: [https://app.hackagent.dev](https://app.hackagent.dev)
 
 ## Best Practices
 

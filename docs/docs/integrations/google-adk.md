@@ -30,7 +30,7 @@ agent = HackAgent(
     name="multi_tool_agent",           # Your ADK app name
     endpoint="http://localhost:8000",   # ADK server endpoint
     agent_type=AgentTypeEnum.GOOGLE_ADK,
-    base_url="https://hackagent.dev"    # HackAgent platform URL
+    base_url="https://api.hackagent.dev"    # HackAgent platform URL
 )
 ```
 
@@ -187,7 +187,7 @@ agent = HackAgent(
 ```bash
 # Required for ADK testing
 export HACKAGENT_API_KEY="your_api_key"
-export HACKAGENT_API_BASE_URL="https://hackagent.dev"
+export HACKAGENT_API_BASE_URL="https://api.hackagent.dev"
 export AGENT_URL="http://localhost:8001"
 
 # Optional: External model endpoints
@@ -281,7 +281,7 @@ agent = HackAgent(
 
 Security test results are automatically uploaded to the HackAgent platform:
 
-1. Visit [hackagent.dev/dashboard](https://hackagent.dev/dashboard)
+1. Visit [app.hackagent.dev](https://app.hackagent.dev)
 2. Navigate to your organization's results
 3. Review detailed attack outcomes and recommendations
 

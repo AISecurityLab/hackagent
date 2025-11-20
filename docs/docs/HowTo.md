@@ -4,11 +4,11 @@ sidebar_position: 2
 
 # How To Use HackAgent
 
-Here's a step-by-step guide to get started with HackAgent. Before doing these steps, ensure you have an account and an API key from [hackagent.dev](https://hackagent.dev).
+Here's a step-by-step guide to get started with HackAgent. Before doing these steps, ensure you have an account and an API key from [app.hackagent.dev](https://app.hackagent.dev).
 
 ## 📋 Prerequisites
 
-1. **HackAgent Account**: Sign up at [hackagent.dev](https://hackagent.dev)
+1. **HackAgent Account**: Sign up at [app.hackagent.dev](https://app.hackagent.dev)
 2. **API Key**: Generate an API key from your dashboard
 3. **Target Agent**: A running AI agent to test (Google ADK, LiteLLM, etc.)
 4. **Development Environment**: Choose your preferred approach:
@@ -145,7 +145,7 @@ print("Security test completed! Check your dashboard for detailed results.")
 
 ### Step 5: Explore the HackAgent Dashboard
 
-1. Navigate to [hackagent.dev/stats](https://hackagent.dev/stats)
+1. Navigate to [app.hackagent.dev](https://app.hackagent.dev)
 2. Select your recent test run
 3. Check the **"Output"** tab to see which prompts were most effective
 4. Review the **"Results"** section for vulnerability analysis

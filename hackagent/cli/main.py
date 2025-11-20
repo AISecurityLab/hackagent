@@ -94,7 +94,7 @@ def cli(ctx, config_file, api_key, base_url, verbose, output_format):
       HACKAGENT_BASE_URL     API base URL (default: https://api.hackagent.dev)
       HACKAGENT_DEBUG        Enable debug mode
     
-    Get your API key at: https://hackagent.dev
+    Get your API key at: https://app.hackagent.dev
     """
     ctx.ensure_object(dict)
 
@@ -157,7 +157,7 @@ def init(ctx):
     # API Key setup
     console.print("[cyan]📋 API Key Configuration[/cyan]")
     console.print(
-        "Get your API key from: [link=https://hackagent.dev]https://hackagent.dev[/link]"
+        "Get your API key from: [link=https://app.hackagent.dev]https://app.hackagent.dev[/link]"
     )
 
     current_key = cli_config.api_key
@@ -258,7 +258,7 @@ def version(ctx):
 
     console.print()
     console.print(
-        "[dim]For more information: [link=https://hackagent.dev]https://hackagent.dev[/link]"
+        "[dim]For more information: [link=https://docs.hackagent.dev]https://docs.hackagent.dev[/link]"
     )
 
 
@@ -476,7 +476,7 @@ def _display_welcome():
   5. View results:            [cyan]hackagent results list[/cyan]
 
 [bold blue]💡 Need help?[/bold blue] Use '[cyan]hackagent --help[/cyan]' or '[cyan]hackagent COMMAND --help[/cyan]'
-[bold blue]🌐 Get your API key at:[/bold blue] [link=https://hackagent.dev]https://hackagent.dev[/link]"""
+[bold blue]🌐 Get your API key at:[/bold blue] [link=https://app.hackagent.dev]https://app.hackagent.dev[/link]"""
 
     panel = Panel(
         welcome_text, title="🔍 HackAgent CLI", border_style="red", padding=(1, 2)

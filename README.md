@@ -8,7 +8,8 @@
 
 <br>
 
-[Web App][https://app.hackagent.dev/] -- [Docs][https://docs.hackagent.dev/] -- [API][https://api.hackagent.dev/schema/redoc]
+[App](https://app.hackagent.dev/) -- [Docs](https://docs.hackagent.dev/) -- [API](https://api.hackagent.dev/schema/redoc)
+
 
 <br>
 

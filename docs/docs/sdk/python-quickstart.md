@@ -95,7 +95,7 @@ from hackagent.models import AgentTypeEnum
 
 ### Get Your API Key
 
-1. Visit [hackagent.dev](https://hackagent.dev)
+1. Visit [app.hackagent.dev](https://app.hackagent.dev)
 2. Sign up or log in to your account
 3. Navigate to **Settings** → **API Keys**
 4. Click **Generate New Key**
@@ -121,7 +121,7 @@ agent = HackAgent(
     name="my_test_agent",
     endpoint="http://localhost:8000",     # Your agent's endpoint
     agent_type=AgentTypeEnum.GOOGLE_ADK,
-    base_url="https://hackagent.dev",     # HackAgent API base URL
+    base_url="https://api.hackagent.dev",     # HackAgent API base URL
     api_key="your_api_key_here"           # Optional: pass directly
 )
 ```
@@ -139,7 +139,7 @@ agent = HackAgent(
     name="multi_tool_agent",
     endpoint="http://localhost:8000",      # Your agent's URL
     agent_type=AgentTypeEnum.GOOGLE_ADK,
-    base_url="https://hackagent.dev"       # HackAgent platform URL
+    base_url="https://api.hackagent.dev"       # HackAgent platform URL
 )
 
 # Configure the attack
@@ -444,7 +444,7 @@ Set up your environment properly:
 ```bash
 # Required environment variables
 export HACKAGENT_API_KEY="your_api_key"
-export HACKAGENT_API_BASE_URL="https://hackagent.dev"
+export HACKAGENT_API_BASE_URL="https://api.hackagent.dev"
 
 # Optional: Agent endpoint
 export AGENT_URL="http://localhost:8001"
@@ -462,7 +462,7 @@ The attack returns structured results that are automatically sent to the HackAge
 results = agent.hack(attack_config=attack_config)
 
 # Results are automatically uploaded to the platform
-# Access your results at https://hackagent.dev/dashboard
+# Access your results at https://app.hackagent.dev
 ```
 
 ## 🧪 Development Setup

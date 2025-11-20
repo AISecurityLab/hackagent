@@ -219,7 +219,7 @@ class ConfigTab(Container):
                 self.cli_config.default_config_path.unlink()
 
             # Reset to defaults
-            self.cli_config.base_url = "https://hackagent.dev"
+            self.cli_config.base_url = "https://api.hackagent.dev"
             self.cli_config.output_format = "table"
             self.cli_config.api_key = None
 

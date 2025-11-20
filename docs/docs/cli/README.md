@@ -68,7 +68,7 @@ hackagent config show
 hackagent config set --api-key YOUR_API_KEY
 
 # Set base URL
-hackagent config set --base-url https://hackagent.dev
+hackagent config set --base-url https://api.hackagent.dev
 
 # Set default output format
 hackagent config set --output-format json
@@ -162,7 +162,7 @@ Default location: `~/.hackagent/config.json`
 ```json
 {
   "api_key": "your-api-key-here",
-  "base_url": "https://hackagent.dev",
+  "base_url": "https://api.hackagent.dev",
   "output_format": "table",
   "verbose": 0
 }
@@ -173,7 +173,7 @@ Default location: `~/.hackagent/config.json`
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `HACKAGENT_API_KEY` | Your API key | `export HACKAGENT_API_KEY=abc123` |
-| `HACKAGENT_BASE_URL` | API base URL | `export HACKAGENT_BASE_URL=https://hackagent.dev` |
+| `HACKAGENT_BASE_URL` | API base URL | `export HACKAGENT_BASE_URL=https://api.hackagent.dev` |
 | `HACKAGENT_OUTPUT_FORMAT` | Default output format | `export HACKAGENT_OUTPUT_FORMAT=json` |
 | `HACKAGENT_DEBUG` | Enable debug mode | `export HACKAGENT_DEBUG=1` |
 
