@@ -46,7 +46,7 @@ def test_get_kwargs(checkout_request_body: CheckoutSessionRequestRequest):
     # We are testing the multipart case as CheckoutSessionRequestRequest has to_multipart.
     kwargs = checkout_create._get_kwargs(body=checkout_request_body)
     assert kwargs["method"] == "post"
-    assert kwargs["url"] == "/api/checkout/"
+    assert kwargs["url"] == "/checkout/"
     assert kwargs["files"] == checkout_request_body.to_multipart()
     assert "multipart/form-data" in kwargs["headers"]["Content-Type"]
 

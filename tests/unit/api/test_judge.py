@@ -75,7 +75,7 @@ class TestJudgeAPI(unittest.TestCase):
 
         self.mock_httpx_client.request.assert_called_once_with(
             method="post",
-            url="/api/judge",
+            url="/judge",
             json=request_body.to_dict(),
             data=request_body.to_dict(),
             files=request_body.to_multipart(),
@@ -112,7 +112,7 @@ class TestJudgeAPI(unittest.TestCase):
         self.assertEqual(response.parsed.error, "Error")  # Check parsed error message
         self.mock_httpx_client.request.assert_called_once_with(
             method="post",
-            url="/api/judge",
+            url="/judge",
             json=request_body.to_dict(),
             data=request_body.to_dict(),
             files=request_body.to_multipart(),
@@ -141,7 +141,7 @@ class TestJudgeAPI(unittest.TestCase):
 
         self.mock_httpx_client.request.assert_called_once_with(
             method="post",
-            url="/api/judge",
+            url="/judge",
             json=request_body.to_dict(),
             data=request_body.to_dict(),
             files=request_body.to_multipart(),
@@ -193,7 +193,7 @@ class TestJudgeAPI(unittest.TestCase):
 
         self.mock_async_httpx_client.request.assert_called_once_with(
             method="post",
-            url="/api/judge",
+            url="/judge",
             json=request_body.to_dict(),
             data=request_body.to_dict(),
             files=request_body.to_multipart(),
@@ -238,7 +238,7 @@ class TestJudgeAPI(unittest.TestCase):
         )  # Check parsed error message
         self.mock_async_httpx_client.request.assert_called_once_with(
             method="post",
-            url="/api/judge",
+            url="/judge",
             json=request_body.to_dict(),
             data=request_body.to_dict(),
             files=request_body.to_multipart(),
@@ -274,7 +274,7 @@ class TestJudgeAPI(unittest.TestCase):
 
         self.mock_async_httpx_client.request.assert_called_once_with(
             method="post",
-            url="/api/judge",
+            url="/judge",
             json=request_body.to_dict(),
             data=request_body.to_dict(),
             files=request_body.to_multipart(),

@@ -112,7 +112,7 @@ class TestAttackListAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "get",
-                "url": "/api/attack",
+                "url": "/attack",
                 "params": {"page": 1},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -222,7 +222,7 @@ class TestAttackCreateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "post",
-                "url": "/api/attack",
+                "url": "/attack",
                 "json": attack_request_data.to_dict(),
                 "headers": {"Content-Type": "application/json"},
             }
@@ -337,7 +337,7 @@ class TestAttackRetrieveAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "get",
-                "url": f"/api/attack/{attack_id_to_retrieve}",
+                "url": f"/attack/{attack_id_to_retrieve}",
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
@@ -457,7 +457,7 @@ class TestAttackUpdateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "put",
-                "url": f"/api/attack/{attack_id_to_update}",
+                "url": f"/attack/{attack_id_to_update}",
                 "json": attack_update_request_data.to_dict(),
                 "headers": {"Content-Type": "application/json"},
             }
@@ -592,7 +592,7 @@ class TestAttackPartialUpdateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "patch",
-                "url": f"/api/attack/{attack_id_to_patch}",
+                "url": f"/attack/{attack_id_to_patch}",
                 "json": attack_patch_request_data.to_dict(),
                 "headers": {"Content-Type": "application/json"},
             }
@@ -678,7 +678,7 @@ class TestAttackDestroyAPI(unittest.TestCase):
 
         expected_kwargs = {
             "method": "delete",
-            "url": f"/api/attack/{attack_id_to_delete}",
+            "url": f"/attack/{attack_id_to_delete}",
         }
         mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 

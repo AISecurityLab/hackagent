@@ -31,7 +31,7 @@ def authenticated_client() -> AuthenticatedClient:
 def test_get_kwargs(authenticated_client: AuthenticatedClient):
     kwargs = apilogs_list._get_kwargs(page=1)
     assert kwargs["method"] == "get"
-    assert kwargs["url"] == "/api/apilogs"
+    assert kwargs["url"] == "/apilogs"
     assert kwargs["params"]["page"] == 1
 
     kwargs_no_page = apilogs_list._get_kwargs()
@@ -68,7 +68,7 @@ def test_sync_detailed_success(authenticated_client: AuthenticatedClient):
         response = apilogs_list.sync_detailed(client=authenticated_client, page=1)
 
     mock_request.assert_called_once_with(
-        method="get", url="/api/apilogs", params={"page": 1}
+        method="get", url="/apilogs", params={"page": 1}
     )
     assert response.status_code == 200
     assert isinstance(response.parsed, PaginatedAPITokenLogList)
@@ -87,7 +87,7 @@ def test_sync_detailed_unexpected_status(authenticated_client: AuthenticatedClie
             apilogs_list.sync_detailed(client=authenticated_client, page=1)
 
     mock_request.assert_called_once_with(
-        method="get", url="/api/apilogs", params={"page": 1}
+        method="get", url="/apilogs", params={"page": 1}
     )
     assert excinfo.value.status_code == 500
     assert excinfo.value.content == b"Internal Server Error"
@@ -105,7 +105,7 @@ def test_sync_detailed_no_raise_unexpected_status(
         response = apilogs_list.sync_detailed(client=authenticated_client, page=1)
 
     mock_request.assert_called_once_with(
-        method="get", url="/api/apilogs", params={"page": 1}
+        method="get", url="/apilogs", params={"page": 1}
     )
     assert response.status_code == 500
     assert response.parsed is None
@@ -165,7 +165,7 @@ async def test_asyncio_detailed_success(authenticated_client: AuthenticatedClien
 
     mock_get_client_method.assert_called_once_with(authenticated_client)
     mock_async_httpx_client.request.assert_called_once_with(
-        method="get", url="/api/apilogs", params={"page": 1}
+        method="get", url="/apilogs", params={"page": 1}
     )
     assert response.status_code == 200
     assert isinstance(response.parsed, PaginatedAPITokenLogList)
@@ -193,7 +193,7 @@ async def test_asyncio_detailed_unexpected_status(
 
     mock_get_client_method.assert_called_once_with(authenticated_client)
     mock_async_httpx_client.request.assert_called_once_with(
-        method="get", url="/api/apilogs", params={"page": 1}
+        method="get", url="/apilogs", params={"page": 1}
     )
     assert excinfo.value.status_code == 500
     assert excinfo.value.content == b"Internal Server Error"
@@ -220,7 +220,7 @@ async def test_asyncio_detailed_no_raise_unexpected_status(
 
     mock_get_client_method.assert_called_once_with(authenticated_client)
     mock_async_httpx_client.request.assert_called_once_with(
-        method="get", url="/api/apilogs", params={"page": 1}
+        method="get", url="/apilogs", params={"page": 1}
     )
     assert response.status_code == 500
     assert response.parsed is None
@@ -251,7 +251,7 @@ async def test_asyncio_success(authenticated_client: AuthenticatedClient):
 def test_retrieve_get_kwargs():
     kwargs = apilogs_retrieve._get_kwargs(id=123)
     assert kwargs["method"] == "get"
-    assert kwargs["url"] == "/api/apilogs/123"
+    assert kwargs["url"] == "/apilogs/123"
 
 
 def test_retrieve_sync_detailed_success(authenticated_client: AuthenticatedClient):
@@ -276,7 +276,7 @@ def test_retrieve_sync_detailed_success(authenticated_client: AuthenticatedClien
     ) as mock_request:
         response = apilogs_retrieve.sync_detailed(client=authenticated_client, id=123)
 
-    mock_request.assert_called_once_with(method="get", url="/api/apilogs/123")
+    mock_request.assert_called_once_with(method="get", url="/apilogs/123")
     assert response.status_code == 200
     assert isinstance(response.parsed, APITokenLog)
     assert response.parsed.id == "test_log_id_sync_retrieve"
@@ -294,7 +294,7 @@ def test_retrieve_sync_detailed_unexpected_status(
         with pytest.raises(UnexpectedStatus) as excinfo:
             apilogs_retrieve.sync_detailed(client=authenticated_client, id=123)
 
-    mock_request.assert_called_once_with(method="get", url="/api/apilogs/123")
+    mock_request.assert_called_once_with(method="get", url="/apilogs/123")
     assert excinfo.value.status_code == 404
     assert excinfo.value.content == b"Not Found"
 
@@ -310,7 +310,7 @@ def test_retrieve_sync_detailed_no_raise_unexpected_status(
     ) as mock_request:
         response = apilogs_retrieve.sync_detailed(client=authenticated_client, id=123)
 
-    mock_request.assert_called_once_with(method="get", url="/api/apilogs/123")
+    mock_request.assert_called_once_with(method="get", url="/apilogs/123")
     assert response.status_code == 404
     assert response.parsed is None
 
@@ -364,7 +364,7 @@ async def test_retrieve_asyncio_detailed_success(
 
     mock_get_client_method.assert_called_once_with(authenticated_client)
     mock_async_httpx_client.request.assert_called_once_with(
-        method="get", url="/api/apilogs/123"
+        method="get", url="/apilogs/123"
     )
     assert response.status_code == 200
     assert isinstance(response.parsed, APITokenLog)
@@ -391,7 +391,7 @@ async def test_retrieve_asyncio_detailed_unexpected_status(
 
     mock_get_client_method.assert_called_once_with(authenticated_client)
     mock_async_httpx_client.request.assert_called_once_with(
-        method="get", url="/api/apilogs/123"
+        method="get", url="/apilogs/123"
     )
     assert excinfo.value.status_code == 401
     assert excinfo.value.content == b"Unauthorized"
@@ -418,7 +418,7 @@ async def test_retrieve_asyncio_detailed_no_raise_unexpected_status(
 
     mock_get_client_method.assert_called_once_with(authenticated_client)
     mock_async_httpx_client.request.assert_called_once_with(
-        method="get", url="/api/apilogs/123"
+        method="get", url="/apilogs/123"
     )
     assert response.status_code == 403
     assert response.parsed is None

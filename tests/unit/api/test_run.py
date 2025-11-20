@@ -163,7 +163,7 @@ class TestRunListAPI(unittest.TestCase):
             }
             actual_call_kwargs = mock_httpx_client.request.call_args.kwargs
             self.assertEqual(actual_call_kwargs["method"], "get")
-            self.assertEqual(actual_call_kwargs["url"], "/api/run")
+            self.assertEqual(actual_call_kwargs["url"], "/run")
             # Filter out UNSET params before comparing, as they are not sent
             sent_params = {
                 k: v for k, v in actual_call_kwargs["params"].items() if v is not UNSET
@@ -281,7 +281,7 @@ class TestRunCreateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "post",
-                "url": "/api/run",
+                "url": "/run",
                 "json": run_request_data.to_dict(),
                 "headers": {"Content-Type": "application/json"},
             }
@@ -427,7 +427,7 @@ class TestRunRetrieveAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "get",
-                "url": f"/api/run/{run_id_to_retrieve}",
+                "url": f"/run/{run_id_to_retrieve}",
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
@@ -587,7 +587,7 @@ class TestRunUpdateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "put",
-                "url": f"/api/run/{run_id_to_update}",
+                "url": f"/run/{run_id_to_update}",
                 "json": run_update_request_data.to_dict(),
                 "headers": {"Content-Type": "application/json"},
             }
@@ -716,7 +716,7 @@ class TestRunPartialUpdateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "patch",
-                "url": f"/api/run/{run_id_to_patch}",
+                "url": f"/run/{run_id_to_patch}",
                 "json": run_patch_request_data.to_dict(),
                 "headers": {"Content-Type": "application/json"},
             }
@@ -806,7 +806,7 @@ class TestRunDestroyAPI(unittest.TestCase):
 
         expected_kwargs = {
             "method": "delete",
-            "url": f"/api/run/{run_id_to_delete}",
+            "url": f"/run/{run_id_to_delete}",
         }
         mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
@@ -957,7 +957,7 @@ class TestRunResultCreateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "post",
-                "url": f"/api/run/{parent_run_id}/result",
+                "url": f"/run/{parent_run_id}/result",
                 "json": result_create_body.to_dict(),
                 "headers": {"Content-Type": "application/json"},
             }
@@ -1062,7 +1062,7 @@ class TestRunRunTestsCreateAPI(unittest.TestCase):
 
         expected_kwargs = {
             "method": "post",
-            "url": "/api/run/run_tests",  # Matches _get_kwargs in the client file
+            "url": "/run/run_tests",  # Matches _get_kwargs in the client file
             "json": run_tests_request_body.to_dict(),
             "headers": {"Content-Type": "application/json"},
         }

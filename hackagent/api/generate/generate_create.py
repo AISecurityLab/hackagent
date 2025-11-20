@@ -23,7 +23,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/generate",
+        "url": "/generate",
     }
 
     if isinstance(body, GenerateRequestRequest):

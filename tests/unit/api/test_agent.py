@@ -103,7 +103,7 @@ class TestAgentListAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "get",
-                "url": "/api/agent",
+                "url": "/agent",
                 "params": {"page": 1},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -212,7 +212,7 @@ class TestAgentCreateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "post",
-                "url": "/api/agent",
+                "url": "/agent",
                 "json": agent_request_data.to_dict(),
                 "headers": {"Content-Type": "application/json"},
             }
@@ -330,7 +330,7 @@ class TestAgentRetrieveAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "get",
-                "url": f"/api/agent/{agent_id_to_retrieve}",
+                "url": f"/agent/{agent_id_to_retrieve}",
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
@@ -449,7 +449,7 @@ class TestAgentUpdateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "put",
-                "url": f"/api/agent/{agent_id_to_update}",
+                "url": f"/agent/{agent_id_to_update}",
                 "json": agent_update_request_data.to_dict(),
                 "headers": {"Content-Type": "application/json"},
             }
@@ -543,7 +543,7 @@ class TestAgentDestroyAPI(unittest.TestCase):
 
         expected_kwargs = {
             "method": "delete",
-            "url": f"/api/agent/{agent_id_to_delete}",
+            "url": f"/agent/{agent_id_to_delete}",
         }
         mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
@@ -656,7 +656,7 @@ class TestAgentPartialUpdateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "patch",
-                "url": f"/api/agent/{agent_id_to_patch}",
+                "url": f"/agent/{agent_id_to_patch}",
                 "json": agent_patch_request_data.to_dict(),
                 "headers": {"Content-Type": "application/json"},
             }

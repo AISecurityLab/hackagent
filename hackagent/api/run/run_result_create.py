@@ -20,7 +20,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/run/{id}/result".format(
+        "url": "/run/{id}/result".format(
             id=id,
         ),
     }

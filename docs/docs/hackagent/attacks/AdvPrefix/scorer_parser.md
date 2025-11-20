@@ -109,14 +109,9 @@ in the AdvPrefix attack pipeline. It handles agent initialization, routing
 setup, and provides standardized interfaces for response evaluation across
 different judge types.
 
-The class supports multiple evaluation backends:
-- Local judge proxy for direct HTTP communication
-- AgentRouter framework for managed agent interactions
-- Graceful fallback and error handling between methods
-
 Key Features:
-- Automatic agent registration and configuration
-- Support for both local and remote judge models
+- Automatic agent registration and configuration via AgentRouter
+- Support for both local and remote judge models through unified routing
 - Comprehensive error handling and logging
 - Progress tracking for batch evaluation operations
 - Flexible authentication and API key management
@@ -131,10 +126,7 @@ Subclasses must implement:
 - `client` - AuthenticatedClient for API communications
 - `config` - EvaluatorConfig containing all evaluation parameters
 - `logger` - Logger instance for operation tracking
-- `underlying_httpx_client` - Direct HTTP client for local proxy calls
-- `is_local_judge_proxy_defined` - Flag indicating local proxy availability
-- `actual_api_key` - Resolved API key for authentication
-- `agent_router` - Optional AgentRouter instance for managed interactions
+- `agent_router` - AgentRouter instance for managed interactions
 - `agent_registration_key` - Registration key for the configured agent
 
 #### \_\_init\_\_

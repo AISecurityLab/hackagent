@@ -81,7 +81,7 @@ def test_create_get_kwargs(organization_request_body: OrganizationRequest):
     # Testing the multipart case as OrganizationRequest has to_multipart.
     kwargs = organization_create._get_kwargs(body=organization_request_body)
     assert kwargs["method"] == "post"
-    assert kwargs["url"] == "/api/organization"
+    assert kwargs["url"] == "/organization"
     assert kwargs["files"] == organization_request_body.to_multipart()
     assert "multipart/form-data" in kwargs["headers"]["Content-Type"]
 
@@ -226,7 +226,7 @@ TEST_ORG_UUID = uuid.uuid4()
 def test_destroy_get_kwargs():
     kwargs = organization_destroy._get_kwargs(id=TEST_ORG_UUID)
     assert kwargs["method"] == "delete"
-    assert kwargs["url"] == f"/api/organization/{TEST_ORG_UUID}"
+    assert kwargs["url"] == f"/organization/{TEST_ORG_UUID}"
 
 
 def test_destroy_parse_response_success(authenticated_client: AuthenticatedClient):
@@ -319,7 +319,7 @@ def paginated_organization_list_response_data(organization_response_data: dict) 
 def test_list_get_kwargs():
     kwargs = organization_list._get_kwargs(page=1)
     assert kwargs["method"] == "get"
-    assert kwargs["url"] == "/api/organization"
+    assert kwargs["url"] == "/organization"
     assert kwargs["params"]["page"] == 1
 
     kwargs_no_page = organization_list._get_kwargs()
@@ -450,7 +450,7 @@ async def test_list_asyncio_success(authenticated_client: AuthenticatedClient):
 def test_me_retrieve_get_kwargs():
     kwargs = organization_me_retrieve._get_kwargs()
     assert kwargs["method"] == "get"
-    assert kwargs["url"] == "/api/organization/me"
+    assert kwargs["url"] == "/organization/me"
 
 
 def test_me_retrieve_parse_response_success(
@@ -606,7 +606,7 @@ def test_partial_update_get_kwargs(
         id=TEST_ORG_UUID, body=patched_organization_request_body
     )
     assert kwargs["method"] == "patch"
-    assert kwargs["url"] == f"/api/organization/{TEST_ORG_UUID}"
+    assert kwargs["url"] == f"/organization/{TEST_ORG_UUID}"
     assert kwargs["files"] == patched_organization_request_body.to_multipart()
     assert "multipart/form-data" in kwargs["headers"]["Content-Type"]
 
@@ -768,7 +768,7 @@ async def test_partial_update_asyncio_success(
 def test_retrieve_get_kwargs_specific_org():
     kwargs = organization_retrieve._get_kwargs(id=TEST_ORG_UUID)
     assert kwargs["method"] == "get"
-    assert kwargs["url"] == f"/api/organization/{TEST_ORG_UUID}"
+    assert kwargs["url"] == f"/organization/{TEST_ORG_UUID}"
 
 
 def test_retrieve_parse_response_success_specific_org(
@@ -940,7 +940,7 @@ def test_update_get_kwargs(organization_request_body: OrganizationRequest):
         id=TEST_ORG_UUID, body=organization_request_body
     )
     assert kwargs["method"] == "put"
-    assert kwargs["url"] == f"/api/organization/{TEST_ORG_UUID}"
+    assert kwargs["url"] == f"/organization/{TEST_ORG_UUID}"
     assert kwargs["files"] == organization_request_body.to_multipart()
     assert "multipart/form-data" in kwargs["headers"]["Content-Type"]
 

@@ -148,7 +148,7 @@ class TestResultListAPI(unittest.TestCase):
             # json_prompt, json_run_organization are not passed, so they'd be UNSET
             actual_call_kwargs = mock_httpx_client.request.call_args.kwargs
             self.assertEqual(actual_call_kwargs["method"], "get")
-            self.assertEqual(actual_call_kwargs["url"], "/api/result")
+            self.assertEqual(actual_call_kwargs["url"], "/result")
             self.assertDictEqual(actual_call_kwargs["params"], expected_params)
 
     @patch("hackagent.api.result.result_list.AuthenticatedClient")
@@ -281,7 +281,7 @@ class TestResultCreateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "post",
-                "url": "/api/result",
+                "url": "/result",
                 "json": result_request_data.to_dict(),
                 "headers": {"Content-Type": "application/json"},
             }
@@ -405,7 +405,7 @@ class TestResultRetrieveAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "get",
-                "url": f"/api/result/{result_id_to_retrieve}",
+                "url": f"/result/{result_id_to_retrieve}",
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
@@ -555,7 +555,7 @@ class TestResultUpdateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "put",
-                "url": f"/api/result/{result_id_to_update}",
+                "url": f"/result/{result_id_to_update}",
                 "json": result_update_request_data.to_dict(),
                 "headers": {"Content-Type": "application/json"},
             }
@@ -710,7 +710,7 @@ class TestResultPartialUpdateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "patch",
-                "url": f"/api/result/{result_id_to_patch}",
+                "url": f"/result/{result_id_to_patch}",
                 "json": result_patch_request_data.to_dict(),
                 "headers": {"Content-Type": "application/json"},
             }
@@ -800,7 +800,7 @@ class TestResultDestroyAPI(unittest.TestCase):
 
         expected_kwargs = {
             "method": "delete",
-            "url": f"/api/result/{result_id_to_delete}",
+            "url": f"/result/{result_id_to_delete}",
         }
         mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
@@ -915,7 +915,7 @@ class TestResultTraceCreateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "post",
-                "url": f"/api/result/{result_id_for_trace}/trace",
+                "url": f"/result/{result_id_for_trace}/trace",
                 "json": trace_request_data.to_dict(),
                 "headers": {"Content-Type": "application/json"},
             }

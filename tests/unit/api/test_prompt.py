@@ -138,7 +138,7 @@ class TestPromptListAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "get",
-                "url": "/api/prompt",
+                "url": "/prompt",
                 "params": {"category": "TestCategory", "page": 1},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -302,7 +302,7 @@ class TestPromptCreateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "post",
-                "url": "/api/prompt",
+                "url": "/prompt",
                 "json": prompt_request_data.to_dict(),
                 "headers": {"Content-Type": "application/json"},
             }
@@ -455,7 +455,7 @@ class TestPromptRetrieveAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "get",
-                "url": f"/api/prompt/{prompt_id_to_retrieve}",
+                "url": f"/prompt/{prompt_id_to_retrieve}",
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
@@ -621,7 +621,7 @@ class TestPromptUpdateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "put",
-                "url": f"/api/prompt/{prompt_id_to_update}",
+                "url": f"/prompt/{prompt_id_to_update}",
                 "json": prompt_update_request_data.to_dict(),
                 "headers": {"Content-Type": "application/json"},
             }
@@ -778,7 +778,7 @@ class TestPromptPartialUpdateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "patch",
-                "url": f"/api/prompt/{prompt_id_to_patch}",
+                "url": f"/prompt/{prompt_id_to_patch}",
                 "json": prompt_patch_request_data.to_dict(),  # Only name and category should be in dict
                 "headers": {"Content-Type": "application/json"},
             }
@@ -867,7 +867,7 @@ class TestPromptDestroyAPI(unittest.TestCase):
 
         expected_kwargs = {
             "method": "delete",
-            "url": f"/api/prompt/{prompt_id_to_delete}",
+            "url": f"/prompt/{prompt_id_to_delete}",
         }
         mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 

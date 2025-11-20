@@ -5,13 +5,21 @@ title: hackagent.errors
 
 Contains shared errors types that can be raised from API functions
 
+## UnexpectedStatus Objects
+
+```python
+class UnexpectedStatus(Exception)
+```
+
+Raised by api functions when the response status an undocumented status and Client.raise_on_unexpected_status is True
+
 ## HackAgentError Objects
 
 ```python
 class HackAgentError(Exception)
 ```
 
-Base exception for all HackAgent library specific errors.
+Base exception class for HackAgent errors
 
 ## ApiError Objects
 
@@ -19,13 +27,5 @@ Base exception for all HackAgent library specific errors.
 class ApiError(HackAgentError)
 ```
 
-Represents an error returned by the API or an issue with API communication.
-
-## UnexpectedStatusError Objects
-
-```python
-class UnexpectedStatusError(ApiError)
-```
-
-Raised when an API response has an unexpected HTTP status code.
+Raised when an API call fails
 

@@ -112,7 +112,7 @@ class TestKeyListAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "get",
-                "url": "/api/key",
+                "url": "/key",
                 "params": {"page": 1},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -262,7 +262,7 @@ class TestKeyCreateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "post",
-                "url": "/api/key",
+                "url": "/key",
                 "json": key_request_data.to_dict(),
                 "headers": {"Content-Type": "application/json"},
             }
@@ -396,7 +396,7 @@ class TestKeyRetrieveAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "get",
-                "url": f"/api/key/{key_prefix_to_retrieve}",
+                "url": f"/key/{key_prefix_to_retrieve}",
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
@@ -470,7 +470,7 @@ class TestKeyDestroyAPI(unittest.TestCase):
 
         expected_kwargs = {
             "method": "delete",
-            "url": f"/api/key/{key_prefix_to_delete}",
+            "url": f"/key/{key_prefix_to_delete}",
         }
         mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
