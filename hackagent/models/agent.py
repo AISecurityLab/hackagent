@@ -1,13 +1,18 @@
 import datetime
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    TypeVar,
+    Union,
+    cast,
+)
 from uuid import UUID
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 from dateutil.parser import isoparse
 
-from ..models.agent_type_enum import AgentTypeEnum
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
@@ -34,8 +39,8 @@ class Agent:
         owner_detail (UserProfileMinimalSerializer): Read-only nested serializer
             for the agent's owner's user profile. Displays minimal details.
             Can be null if the agent has no owner or the owner has no profile.
-        type (CharField): The type of the agent (e.g., GENERIC_ADK, OPENAI_SDK).
-                          Uses the choices defined in the Agent model's AgentType enum.
+        agent_type (CharField): The type of the agent as a string
+                          (e.g., LITELLM, OPENAI_SDK, GOOGLE_ADK).
 
     Meta:
         model (Agent): The model class that this serializer works with.
@@ -56,11 +61,8 @@ class Agent:
             owner_detail (Union['UserProfileMinimal', None]):
             created_at (datetime.datetime):
             updated_at (datetime.datetime):
-            agent_type (Union[Unset, AgentTypeEnum]): * `LITELLM` - LiteLLM
-                * `OPENAI_SDK` - OpenAI SDK/API
-                * `GOOGLE_ADK` - Google ADK
-                * `OTHER` - Other/Proprietary
-                * `UNKNOWN` - Unknown
+            agent_type (Union[Unset, str]): The specific SDK, ADK, or API type the agent is built upon (e.g., OpenAI SDK,
+                Generic ADK).
             description (Union[Unset, str]):
             metadata (Union[Unset, Any]): Optional JSON data providing specific details and configuration. Structure depends
                 heavily on Agent Type. Examples:
@@ -80,7 +82,7 @@ class Agent:
     owner_detail: Union["UserProfileMinimal", None]
     created_at: datetime.datetime
     updated_at: datetime.datetime
-    agent_type: Union[Unset, AgentTypeEnum] = UNSET
+    agent_type: Union[Unset, str] = UNSET
     description: Union[Unset, str] = UNSET
     metadata: Union[Unset, Any] = UNSET
     owner: Union[None, Unset, int] = UNSET
@@ -109,9 +111,7 @@ class Agent:
 
         updated_at = self.updated_at.isoformat()
 
-        agent_type: Union[Unset, str] = UNSET
-        if not isinstance(self.agent_type, Unset):
-            agent_type = self.agent_type.value
+        agent_type = self.agent_type
 
         description = self.description
 
@@ -185,12 +185,7 @@ class Agent:
 
         updated_at = isoparse(d.pop("updated_at"))
 
-        _agent_type = d.pop("agent_type", UNSET)
-        agent_type: Union[Unset, AgentTypeEnum]
-        if isinstance(_agent_type, Unset):
-            agent_type = UNSET
-        else:
-            agent_type = AgentTypeEnum(_agent_type)
+        agent_type = d.pop("agent_type", UNSET)
 
         description = d.pop("description", UNSET)
 

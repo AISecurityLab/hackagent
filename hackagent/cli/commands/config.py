@@ -23,7 +23,7 @@ from rich.console import Console
 from rich.table import Table
 
 from hackagent.cli.config import CLIConfig
-from hackagent.cli.utils import handle_errors, display_success, display_info
+from hackagent.cli.utils import display_info, display_success, handle_errors
 
 console = Console()
 
@@ -99,7 +99,7 @@ def show(ctx):
             api_key_source = "Environment/Default config"
 
     base_url_source = "Default"
-    if cli_config.base_url != "https://hackagent.dev":
+    if cli_config.base_url != "https://api.hackagent.dev":
         if ctx.params.get("base_url"):
             base_url_source = "CLI argument"
         elif cli_config.config_file:
@@ -193,7 +193,7 @@ def validate(ctx):
         console.print("\n[cyan]💡 Quick fixes:")
         console.print("  • Set API key: hackagent config set --api-key YOUR_KEY")
         console.print(
-            "  • Set base URL: hackagent config set --base-url https://hackagent.dev"
+            "  • Set base URL: hackagent config set --base-url https://api.hackagent.dev"
         )
         raise click.ClickException("Configuration validation failed")
     except Exception as e:

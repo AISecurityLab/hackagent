@@ -24,7 +24,7 @@ The **HackAgent SDK** wraps the HackAgent platform's HTTP API in easy-to-use cla
 - You want to run security tests from command line or scripts
 - You prefer a simple interface without writing code
 
-For the interactive HTTP API documentation, visit: **[https://hackagent.dev/api/schema/swagger-ui](https://hackagent.dev/api/schema/swagger-ui)**
+For the interactive HTTP API documentation, visit: **[https://api.hackagent.dev/schema/swagger-ui](https://api.hackagent.dev/schema/swagger-ui)**
 
 This guide focuses on the SDK. For CLI usage, see the [CLI Documentation](../cli/README.md).
 
@@ -64,7 +64,7 @@ For development or to access the latest features:
   <TabItem value="uv-dev" label="uv (Recommended)" default>
     ```bash
     # Clone the repository
-    git clone https://github.com/vistalabs-org/hackagent.git
+    git clone https://github.com/AISecurityLab/hackagent.git
     cd hackagent
     
     # Install with uv
@@ -74,7 +74,7 @@ For development or to access the latest features:
   <TabItem value="pip-dev" label="pip">
     ```bash
     # Clone the repository
-    git clone https://github.com/vistalabs-org/hackagent.git
+    git clone https://github.com/AISecurityLab/hackagent.git
     cd hackagent
     
     # Install in development mode
@@ -95,7 +95,7 @@ from hackagent.models import AgentTypeEnum
 
 ### Get Your API Key
 
-1. Visit [hackagent.dev](https://hackagent.dev)
+1. Visit [app.hackagent.dev](https://app.hackagent.dev)
 2. Sign up or log in to your account
 3. Navigate to **Settings** → **API Keys**
 4. Click **Generate New Key**
@@ -121,7 +121,7 @@ agent = HackAgent(
     name="my_test_agent",
     endpoint="http://localhost:8000",     # Your agent's endpoint
     agent_type=AgentTypeEnum.GOOGLE_ADK,
-    base_url="https://hackagent.dev",     # HackAgent API base URL
+    base_url="https://api.hackagent.dev",     # HackAgent API base URL
     api_key="your_api_key_here"           # Optional: pass directly
 )
 ```
@@ -139,7 +139,7 @@ agent = HackAgent(
     name="multi_tool_agent",
     endpoint="http://localhost:8000",      # Your agent's URL
     agent_type=AgentTypeEnum.GOOGLE_ADK,
-    base_url="https://hackagent.dev"       # HackAgent platform URL
+    base_url="https://api.hackagent.dev"       # HackAgent platform URL
 )
 
 # Configure the attack
@@ -349,14 +349,14 @@ DEFAULT_CONFIG = {
     "output_dir": "./logs/runs",
     "generator": {
         "identifier": "hackagent/generate",
-        "endpoint": "https://hackagent.dev/api/generate",
+        "endpoint": "https://api.hackagent.dev/generate",
         "batch_size": 2,
         "max_new_tokens": 50,
         "temperature": 0.7
     },
     "judges": [{
         "identifier": "hackagent/judge",
-        "endpoint": "https://hackagent.dev/api/judge",
+        "endpoint": "https://api.hackagent.dev/judge",
         "type": "harmbench"
     }],
     "min_char_length": 10,
@@ -444,7 +444,7 @@ Set up your environment properly:
 ```bash
 # Required environment variables
 export HACKAGENT_API_KEY="your_api_key"
-export HACKAGENT_API_BASE_URL="https://hackagent.dev"
+export HACKAGENT_API_BASE_URL="https://api.hackagent.dev"
 
 # Optional: Agent endpoint
 export AGENT_URL="http://localhost:8001"
@@ -462,7 +462,7 @@ The attack returns structured results that are automatically sent to the HackAge
 results = agent.hack(attack_config=attack_config)
 
 # Results are automatically uploaded to the platform
-# Access your results at https://hackagent.dev/dashboard
+# Access your results at https://app.hackagent.dev
 ```
 
 ## 🧪 Development Setup
@@ -527,9 +527,9 @@ Explore these advanced topics:
 
 ## 📞 Support
 
-- **GitHub Issues**: [Report bugs and request features](https://github.com/vistalabs-org/hackagent/issues)
-- **Documentation**: [Complete documentation](https://hackagent.dev/docs)
-- **Email Support**: [devs@vista-labs.ai](mailto:devs@vista-labs.ai)
+- **GitHub Issues**: [Report bugs and request features](https://github.com/AISecurityLab/hackagent/issues)
+- **Documentation**: [Complete documentation](https://docs.hackagent.dev)
+- **Email Support**: [ais@ai4i.it](mailto:ais@ai4i.it)
 
 ---
 

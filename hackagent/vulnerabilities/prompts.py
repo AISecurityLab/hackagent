@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 from typing import Dict, Tuple
 
-import logging
+from hackagent.api.prompt import prompt_create, prompt_list
 from hackagent.client import AuthenticatedClient
-from hackagent.api.prompt import prompt_list, prompt_create
 from hackagent.models.prompt import Prompt
 from hackagent.models.prompt_request import PromptRequest
-
 
 logger = logging.getLogger(__name__)
 

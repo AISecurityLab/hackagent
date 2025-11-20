@@ -31,20 +31,15 @@ well-formatted inputs and reduces the likelihood of errors in downstream
 processing stages.
 """
 
-from dataclasses import dataclass
 import logging
-from typing import List, Dict, Optional
-import pandas as pd
 import re
+from dataclasses import dataclass
+from typing import Dict, List, Optional
+
 import numpy as np
-from rich.progress import (
-    Progress,
-    BarColumn,
-    TextColumn,
-    TimeRemainingColumn,
-    MofNCompleteColumn,
-    SpinnerColumn,
-)
+import pandas as pd
+
+from .utils import create_progress_bar
 
 
 @dataclass
@@ -655,17 +650,9 @@ class PrefixPreprocessor:
 
         new_rows = []
 
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            MofNCompleteColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.1f}%"),
-            TimeRemainingColumn(),
-        ) as progress_bar:
-            task = progress_bar.add_task(
-                "[cyan]Creating ablated prefixes...", total=len(ablatable_df)
-            )
+        with create_progress_bar(
+            "[cyan]Creating ablated prefixes...", total=len(ablatable_df)
+        ) as (progress_bar, task):
             for _, row in ablatable_df.iterrows():
                 new_rows.extend(self._create_ablated_versions(row))
                 progress_bar.update(task, advance=1)

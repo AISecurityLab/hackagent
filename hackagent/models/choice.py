@@ -1,63 +1,72 @@
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    TypeVar,
+)
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from .. import types
+if TYPE_CHECKING:
+    from ..models.choice_message import ChoiceMessage
 
-T = TypeVar("T", bound="CheckoutSessionRequestRequest")
+
+T = TypeVar("T", bound="Choice")
 
 
 @_attrs_define
-class CheckoutSessionRequestRequest:
+class Choice:
     """
     Attributes:
-        credits_to_purchase (int): Number of credits the user wants to purchase.
+        index (int): Index of the choice
+        message (ChoiceMessage):
+        finish_reason (str): Reason for completion (stop, length, etc.)
     """
 
-    credits_to_purchase: int
+    index: int
+    message: "ChoiceMessage"
+    finish_reason: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        credits_to_purchase = self.credits_to_purchase
+        index = self.index
+
+        message = self.message.to_dict()
+
+        finish_reason = self.finish_reason
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
-                "credits_to_purchase": credits_to_purchase,
+                "index": index,
+                "message": message,
+                "finish_reason": finish_reason,
             }
         )
 
         return field_dict
 
-    def to_multipart(self) -> types.RequestFiles:
-        files: types.RequestFiles = []
-
-        files.append(
-            (
-                "credits_to_purchase",
-                (None, str(self.credits_to_purchase).encode(), "text/plain"),
-            )
-        )
-
-        for prop_name, prop in self.additional_properties.items():
-            files.append((prop_name, (None, str(prop).encode(), "text/plain")))
-
-        return files
-
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        d = dict(src_dict)
-        credits_to_purchase = d.pop("credits_to_purchase")
+        from ..models.choice_message import ChoiceMessage
 
-        checkout_session_request_request = cls(
-            credits_to_purchase=credits_to_purchase,
+        d = dict(src_dict)
+        index = d.pop("index")
+
+        message = ChoiceMessage.from_dict(d.pop("message"))
+
+        finish_reason = d.pop("finish_reason")
+
+        choice = cls(
+            index=index,
+            message=message,
+            finish_reason=finish_reason,
         )
 
-        checkout_session_request_request.additional_properties = d
-        return checkout_session_request_request
+        choice.additional_properties = d
+        return choice
 
     @property
     def additional_keys(self) -> list[str]:

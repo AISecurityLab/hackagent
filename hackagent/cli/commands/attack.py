@@ -18,23 +18,23 @@ Attack Commands
 Execute security attacks against AI agents.
 """
 
-import click
 import time
-from typing import Dict, Any
-from rich.console import Console
+from typing import Any, Dict
 
-from rich.table import Table
+import click
+from rich.console import Console
 from rich.panel import Panel
+from rich.table import Table
 
 from hackagent import HackAgent
 from hackagent.cli.config import CLIConfig
 from hackagent.cli.utils import (
+    display_info,
+    display_results_table,
+    display_success,
+    get_agent_type_enum,
     handle_errors,
     load_config_file,
-    display_success,
-    display_info,
-    get_agent_type_enum,
-    display_results_table,
 )
 
 console = Console()
@@ -51,9 +51,9 @@ def attack():
 @click.option("--agent-name", required=True, help="Target agent name")
 @click.option(
     "--agent-type",
-    type=click.Choice(["google-adk", "litellm"]),
-    required=True,
-    help="Agent type",
+    type=str,
+    default="other",
+    help="Agent type (e.g., google-adk, litellm, langchain, openai-sdk, or other)",
 )
 @click.option("--endpoint", required=True, help="Agent endpoint URL")
 @click.option(

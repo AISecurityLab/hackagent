@@ -13,14 +13,19 @@
 # limitations under the License.
 
 
-import os
 import logging
+import os
 from typing import Any, Dict, List, Optional
 
 # Attempt to import openai, but catch ImportError if not installed.
 try:
-    from openai import OpenAI
-    from openai import OpenAIError, APIConnectionError, RateLimitError, APITimeoutError
+    from openai import (
+        APIConnectionError,
+        APITimeoutError,
+        OpenAI,
+        OpenAIError,
+        RateLimitError,
+    )
 
     OPENAI_AVAILABLE = True
 except ImportError:

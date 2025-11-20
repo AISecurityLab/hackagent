@@ -19,43 +19,41 @@ This module implements a complete pipeline for generating, filtering, and select
 using uncensored and target language models, adapted as an attack module.
 """
 
-import os
-import logging
-import pandas as pd
-from typing import List, Dict, Any, Optional
 import copy
-from uuid import UUID
 import json
+import logging
+import os
+from typing import Any, Dict, List, Optional
+from uuid import UUID
 
+import pandas as pd
+
+from hackagent.api.result import (
+    result_partial_update,  # Added for updating Result
+    result_trace_create,
+)
+from hackagent.api.run import run_partial_update, run_result_create
+from hackagent.attacks.AdvPrefix.config import DEFAULT_PREFIX_GENERATION_CONFIG
 from hackagent.client import AuthenticatedClient  # Keep for type hinting
-from hackagent.router.router import AgentRouter  # For type hinting agent_router
-from .base import BaseAttack
-
-# Import step execution functions
-from .AdvPrefix import generate
-from .AdvPrefix import compute_ce
-from .AdvPrefix import completions
-from .AdvPrefix import evaluation
-from .AdvPrefix import aggregation
-from .AdvPrefix.selector import PrefixSelector
-from .AdvPrefix.preprocessing import PrefixPreprocessor, PreprocessConfig
 
 # Models and API clients for backend interaction
 from hackagent.models import (
-    ResultRequest,
-    TraceRequest,
-    PatchedRunRequest,  # Assuming this exists for PATCH /api/runs/{id}/
+    EvaluationStatusEnum,
     PatchedResultRequest,  # Added for updating Result evaluation_status
+    PatchedRunRequest,  # Assuming this exists for PATCH /api/runs/{id}/
+    ResultRequest,
     StatusEnum,
     StepTypeEnum,
-    EvaluationStatusEnum,
+    TraceRequest,
 )
+from hackagent.router.router import AgentRouter  # For type hinting agent_router
 from hackagent.types import UNSET
-from hackagent.api.run import run_result_create
-from hackagent.api.result import result_trace_create
-from hackagent.api.result import result_partial_update  # Added for updating Result
-from hackagent.api.run import run_partial_update
-from hackagent.attacks.AdvPrefix.config import DEFAULT_PREFIX_GENERATION_CONFIG
+
+# Import step execution functions
+from .AdvPrefix import aggregation, completions, compute_ce, evaluation, generate
+from .AdvPrefix.preprocessing import PrefixPreprocessor, PreprocessConfig
+from .AdvPrefix.selector import PrefixSelector
+from .base import BaseAttack
 
 
 # Helper function for deep merging dictionaries

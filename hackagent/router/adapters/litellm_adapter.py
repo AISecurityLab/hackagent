@@ -13,8 +13,8 @@
 # limitations under the License.
 
 
-import os
 import logging
+import os
 from typing import Any, Dict, List, Optional
 
 # Attempt to import litellm, but catch ImportError if not installed.
@@ -22,15 +22,15 @@ try:
     import litellm
     from litellm.exceptions import (
         APIConnectionError,
-        RateLimitError,
-        ServiceUnavailableError,
-        Timeout,
         APIError,
         AuthenticationError,
         BadRequestError,
+        ContextWindowExceededError,
         NotFoundError,
         PermissionDeniedError,
-        ContextWindowExceededError,
+        RateLimitError,
+        ServiceUnavailableError,
+        Timeout,
     )
 
     LITELLM_AVAILABLE = True

@@ -14,10 +14,10 @@
 
 """Main router logic for dispatching requests to appropriate agent adapters."""
 
-from .router import AgentRouter
 from .adapters import (
     ADKAgentAdapter,
 )  # This makes it easy to access adapters via router module
+from .router import AgentRouter
 
 __all__ = [
     "AgentRouter",

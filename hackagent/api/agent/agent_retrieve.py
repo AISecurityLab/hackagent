@@ -15,7 +15,9 @@ def _get_kwargs(
 ) -> dict[str, Any]:
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": f"/api/agent/{id}",
+        "url": "/api/agent/{id}".format(
+            id=id,
+        ),
     }
 
     return _kwargs

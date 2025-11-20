@@ -19,10 +19,11 @@ Results Commands
 View and manage attack results.
 """
 
+from datetime import datetime
+
 import click
 from rich.console import Console
 from rich.table import Table
-from datetime import datetime
 
 from hackagent.cli.config import CLIConfig
 from hackagent.cli.utils import handle_errors, launch_tui
@@ -75,8 +76,8 @@ def show(ctx, result_id):
     cli_config.validate()
 
     try:
-        from hackagent.client import AuthenticatedClient
         from hackagent.api.result import result_retrieve
+        from hackagent.client import AuthenticatedClient
 
         client = AuthenticatedClient(
             base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
@@ -164,8 +165,8 @@ def summary(ctx, status, agent, attack_type, days):
     cli_config.validate()
 
     try:
-        from hackagent.client import AuthenticatedClient
         from hackagent.api.result import result_list
+        from hackagent.client import AuthenticatedClient
 
         client = AuthenticatedClient(
             base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"

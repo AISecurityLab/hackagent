@@ -12,15 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+import logging
+import os
+from pathlib import Path
+from typing import Optional, Union
+
+from dotenv import find_dotenv, load_dotenv
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
-import logging
-import os
-import json
-from pathlib import Path
-from typing import Optional, Union
-from dotenv import load_dotenv, find_dotenv
 
 from hackagent.models import AgentTypeEnum
 

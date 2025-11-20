@@ -18,16 +18,17 @@ HackAgent CLI Main Entry Point
 Main command-line interface for HackAgent security testing toolkit.
 """
 
-import click
 import importlib.util
 import os
-from rich.console import Console
-from rich.traceback import install
-from rich.panel import Panel
 
+import click
+from rich.console import Console
+from rich.panel import Panel
+from rich.traceback import install
+
+from hackagent.cli.commands import agent, attack, config, results
 from hackagent.cli.config import CLIConfig
-from hackagent.cli.commands import config, agent, attack, results
-from hackagent.cli.utils import handle_errors, display_info
+from hackagent.cli.utils import display_info, handle_errors
 
 # Install rich traceback handler for better error display
 install(show_locals=True)
@@ -47,7 +48,7 @@ console = Console()
 @click.option(
     "--base-url",
     envvar="HACKAGENT_BASE_URL",
-    default="https://hackagent.dev",
+    default="https://api.hackagent.dev",
     help="HackAgent API base URL",
 )
 @click.option("--verbose", "-v", count=True, help="Increase verbosity (-v, -vv, -vvv)")
@@ -90,10 +91,10 @@ def cli(ctx, config_file, api_key, base_url, verbose, output_format):
     \b
     Environment Variables:
       HACKAGENT_API_KEY      Your API key
-      HACKAGENT_BASE_URL     API base URL (default: https://hackagent.dev)
+      HACKAGENT_BASE_URL     API base URL (default: https://api.hackagent.dev)
       HACKAGENT_DEBUG        Enable debug mode
     
-    Get your API key at: https://hackagent.dev
+    Get your API key at: https://app.hackagent.dev
     """
     ctx.ensure_object(dict)
 
@@ -156,7 +157,7 @@ def init(ctx):
     # API Key setup
     console.print("[cyan]📋 API Key Configuration[/cyan]")
     console.print(
-        "Get your API key from: [link=https://hackagent.dev]https://hackagent.dev[/link]"
+        "Get your API key from: [link=https://app.hackagent.dev]https://app.hackagent.dev[/link]"
     )
 
     current_key = cli_config.api_key
@@ -170,7 +171,7 @@ def init(ctx):
         api_key = click.prompt("Enter your API key")
 
     # Base URL is always the official endpoint
-    base_url = "https://hackagent.dev"
+    base_url = "https://api.hackagent.dev"
 
     # Output format setup
     console.print("\n[cyan]📊 Output Format Configuration[/cyan]")
@@ -196,8 +197,8 @@ def init(ctx):
         cli_config.validate()
 
         # Test API connection
-        from hackagent.client import AuthenticatedClient
         from hackagent.api.key import key_list
+        from hackagent.client import AuthenticatedClient
 
         client = AuthenticatedClient(
             base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
@@ -257,7 +258,7 @@ def version(ctx):
 
     console.print()
     console.print(
-        "[dim]For more information: [link=https://hackagent.dev]https://hackagent.dev[/link]"
+        "[dim]For more information: [link=https://docs.hackagent.dev]https://docs.hackagent.dev[/link]"
     )
 
 
@@ -355,8 +356,8 @@ def doctor(ctx):
     console.print("\n[cyan]🌐 API Connection")
     if cli_config.api_key:
         try:
-            from hackagent.client import AuthenticatedClient
             from hackagent.api.key import key_list
+            from hackagent.client import AuthenticatedClient
 
             client = AuthenticatedClient(
                 base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
@@ -475,7 +476,7 @@ def _display_welcome():
   5. View results:            [cyan]hackagent results list[/cyan]
 
 [bold blue]💡 Need help?[/bold blue] Use '[cyan]hackagent --help[/cyan]' or '[cyan]hackagent COMMAND --help[/cyan]'
-[bold blue]🌐 Get your API key at:[/bold blue] [link=https://hackagent.dev]https://hackagent.dev[/link]"""
+[bold blue]🌐 Get your API key at:[/bold blue] [link=https://app.hackagent.dev]https://app.hackagent.dev[/link]"""
 
     panel = Panel(
         welcome_text, title="🔍 HackAgent CLI", border_style="red", padding=(1, 2)

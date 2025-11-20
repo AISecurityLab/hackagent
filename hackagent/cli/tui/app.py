@@ -18,18 +18,18 @@ Main TUI Application
 Full-screen tabbed interface for HackAgent.
 """
 
-from textual.app import App, ComposeResult
-from textual.containers import Container
-from textual.widgets import Footer, TabbedContent, TabPane, Static
-from textual.binding import Binding
 from rich.text import Text
+from textual.app import App, ComposeResult
+from textual.binding import Binding
+from textual.containers import Container
+from textual.widgets import Footer, Static, TabbedContent, TabPane
 
 from hackagent.cli.config import CLIConfig
-from hackagent.cli.tui.tabs.dashboard import DashboardTab
 from hackagent.cli.tui.tabs.agents import AgentsTab
 from hackagent.cli.tui.tabs.attacks import AttacksTab
-from hackagent.cli.tui.tabs.results import ResultsTab
 from hackagent.cli.tui.tabs.config import ConfigTab
+from hackagent.cli.tui.tabs.dashboard import DashboardTab
+from hackagent.cli.tui.tabs.results import ResultsTab
 
 
 class HackAgentHeader(Container):

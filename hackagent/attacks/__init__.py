@@ -27,7 +27,7 @@ Available attacks:
 The module integrates with the HackAgent backend for result tracking and reporting.
 """
 
-from .strategies import AttackStrategy, AdvPrefix
+from .strategies import AdvPrefix, AttackStrategy
 
 __all__ = [
     "AttackStrategy",

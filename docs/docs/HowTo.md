@@ -4,11 +4,11 @@ sidebar_position: 2
 
 # How To Use HackAgent
 
-Here's a step-by-step guide to get started with HackAgent. Before doing these steps, ensure you have an account and an API key from [hackagent.dev](https://hackagent.dev).
+Here's a step-by-step guide to get started with HackAgent. Before doing these steps, ensure you have an account and an API key from [app.hackagent.dev](https://app.hackagent.dev).
 
 ## 📋 Prerequisites
 
-1. **HackAgent Account**: Sign up at [hackagent.dev](https://hackagent.dev)
+1. **HackAgent Account**: Sign up at [app.hackagent.dev](https://app.hackagent.dev)
 2. **API Key**: Generate an API key from your dashboard
 3. **Target Agent**: A running AI agent to test (Google ADK, LiteLLM, etc.)
 4. **Development Environment**: Choose your preferred approach:
@@ -28,7 +28,7 @@ Use the HackAgent SDK for the easiest integration:
 
 ### 🌐 HTTP API
 Use the REST API directly for maximum flexibility:
-- **Interactive Documentation**: [https://hackagent.dev/api/schema/swagger-ui](https://hackagent.dev/api/schema/swagger-ui)
+- **Interactive Documentation**: [https://api.hackagent.dev/schema/swagger-ui](https://api.hackagent.dev/schema/swagger-ui)
 - Compatible with any programming language
 - Full control over requests and responses
 - Ideal for custom integrations
@@ -67,7 +67,7 @@ import TabItem from '@theme/TabItem';
   </TabItem>
   <TabItem value="dev" label="Development">
     ```bash
-    git clone https://github.com/vistalabs-org/hackagent.git
+    git clone https://github.com/AISecurityLab/hackagent.git
     cd hackagent
     uv sync --group dev
     ```
@@ -145,7 +145,7 @@ print("Security test completed! Check your dashboard for detailed results.")
 
 ### Step 5: Explore the HackAgent Dashboard
 
-1. Navigate to [hackagent.dev/stats](https://hackagent.dev/stats)
+1. Navigate to [app.hackagent.dev](https://app.hackagent.dev)
 2. Select your recent test run
 3. Check the **"Output"** tab to see which prompts were most effective
 4. Review the **"Results"** section for vulnerability analysis
@@ -284,7 +284,7 @@ echo $HACKAGENT_API_KEY
 
 # Test API connectivity
 curl -H "Authorization: Bearer $HACKAGENT_API_KEY" \
-     https://hackagent.dev/api/agents/
+     https://api.hackagent.dev/agents/
 ```
 
 **Agent Connection Issues:**
@@ -310,9 +310,9 @@ logging.getLogger('hackagent').setLevel(logging.DEBUG)
 ### Getting Help
 
 - **Documentation**: [Complete SDK documentation](./sdk/python-quickstart.md)
-- **GitHub Issues**: [Report bugs and request features](https://github.com/vistalabs-org/hackagent/issues)
-- **Community**: [Join discussions](https://github.com/vistalabs-org/hackagent/discussions)
-- **Email Support**: [devs@vista-labs.ai](mailto:devs@vista-labs.ai)
+- **GitHub Issues**: [Report bugs and request features](https://github.com/AISecurityLab/hackagent/issues)
+- **Community**: [Join discussions](https://github.com/AISecurityLab/hackagent/discussions)
+- **Email Support**: [ais@ai4i.it](mailto:ais@ai4i.it)
 
 ## 🔄 Next Steps
 

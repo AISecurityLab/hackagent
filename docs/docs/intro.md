@@ -178,7 +178,7 @@ hackagent results list            # View attack results
 - Read the [Complete CLI Documentation](./cli/README.md) for all features
 - Follow the [SDK Guide](./sdk/python-quickstart.md) for programmatic testing
 - Browse the [SDK API Reference](./api-index.md) for detailed class documentation
-- Explore the [HTTP API](https://hackagent.dev/api/schema/swagger-ui) for direct REST API access
+- Explore the [HTTP API](https://api.hackagent.dev/schema/swagger-ui) for direct REST API access
 - Check [Google ADK Integration](./integrations/google-adk.md) for framework-specific setup
 
 ### 🔐 **Security Researchers**
@@ -192,7 +192,7 @@ hackagent results list            # View attack results
 - **Enterprise CLI**: [CLI Documentation](./cli/README.md) covers team management and audit logging
 - Review our [Responsible Use](./security/responsible-disclosure.md) framework
 - Understand the platform's security-first approach
-- Contact us at [devs@vista-labs.ai](mailto:devs@vista-labs.ai) for enterprise support
+- Contact us at [ais@ai4i.it](mailto:ais@ai4i.it) for enterprise support
 
 ## 🔐 Responsible Use
 
@@ -265,7 +265,7 @@ We are committed to responsible AI security research:
   </a>
   
   <a 
-    href="https://github.com/vistalabs-org/hackagent" 
+    href="https://github.com/AISecurityLab/hackagent" 
     style={{
       padding: '1rem 2rem',
       backgroundColor: '#424242',
@@ -289,7 +289,7 @@ We are committed to responsible AI security research:
 
 **🐍 Python Developers:** Start with our [5-minute quick start guide](./HowTo.md) or dive into our [Python SDK documentation](./sdk/python-quickstart.md)
 
-**Have questions?** Join our [community discussions](https://github.com/vistalabs-org/hackagent/discussions) or reach out to our team at [devs@vista-labs.ai](mailto:devs@vista-labs.ai).
+**Have questions?** Join our [community discussions](https://github.com/AISecurityLab/hackagent/discussions) or reach out to our team at [ais@ai4i.it](mailto:ais@ai4i.it).
 
 **Building something cool?** We'd love to hear about it! Share your use cases and contribute to making AI systems more secure for everyone.
 

@@ -59,8 +59,8 @@ This section guides you through submitting an enhancement suggestion for HackAge
 
 Unsure where to begin contributing to HackAgent? You can start by looking through `good first issue` and `help wanted` issues:
 
-*   [Good first issues](https://github.com/vistalabs-org/hackagent/labels/good%20first%20issue) - issues which should only require a few lines of code, and a test or two.
-*   [Help wanted issues](https://github.com/vistalabs-org/hackagent/labels/help%20wanted) - issues which should be a bit more involved than `good first issue` issues.
+*   [Good first issues](https://github.com/AISecurityLab/hackagent/labels/good%20first%20issue) - issues which should only require a few lines of code, and a test or two.
+*   [Help wanted issues](https://github.com/AISecurityLab/hackagent/labels/help%20wanted) - issues which should be a bit more involved than `good first issue` issues.
 
 ### Pull Requests
 
@@ -93,7 +93,7 @@ Please follow these steps to have your contribution considered by the maintainer
     ```bash
     git push origin name-of-your-feature-or-fix
     ```
-7.  **Open a Pull Request** to the `main` branch of the `vistalabs-org/hackagent` repository.
+7.  **Open a Pull Request** to the `main` branch of the `AISecurityLab/hackagent` repository.
 8.  **Link to issues:** If your Pull Request addresses an open issue, please link to it in the PR description (e.g., `Closes #123`).
 9.  **Explain your changes:** Provide a clear description of the changes you've made and why.
 10. **Wait for review:** The maintainers will review your Pull Request. Be prepared to make changes based on their feedback.

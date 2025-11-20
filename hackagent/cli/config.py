@@ -19,11 +19,10 @@ Handles configuration loading from environment variables, files, and command lin
 Uses standardized priority order: CLI args > Config file > Environment > Default
 """
 
-import os
 import json
+import os
 from pathlib import Path
 from typing import Optional
-
 
 # Sentinel object to detect if a parameter was explicitly passed
 _UNSET = object()
@@ -44,7 +43,7 @@ class CLIConfig:
         # Store defaults
         self._defaults = {
             "api_key": None,
-            "base_url": "https://hackagent.dev",
+            "base_url": "https://api.hackagent.dev",
             "output_format": "table",
             "verbose": 0,
         }
