@@ -67,12 +67,10 @@ class ConfigTab(Container):
 
                 with Vertical(classes="form-group"):
                     yield Label("Base URL:")
-                    (
-                        Input(
-                            id="base_url",
-                            placeholder="https://api.hackagent.dev",
-                            classes="config-input",
-                        ),
+                    yield Input(
+                        id="base_url",
+                        placeholder="https://api.hackagent.dev",
+                        classes="config-input",
                     )
 
                 with Vertical(classes="form-group"):
@@ -138,7 +136,7 @@ class ConfigTab(Container):
             self.query_one("#api-key", Input).value = self.cli_config.api_key
 
         # Set base URL
-        self.query_one("#base-url", Input).value = self.cli_config.base_url
+        self.query_one("#base_url", Input).value = self.cli_config.base_url
 
         # Set output format
         self.query_one("#output-format", Select).value = self.cli_config.output_format
@@ -159,7 +157,7 @@ class ConfigTab(Container):
         try:
             # Get values from form
             api_key = self.query_one("#api-key", Input).value
-            base_url = self.query_one("#base-url", Input).value
+            base_url = self.query_one("#base_url", Input).value
             output_format = self.query_one("#output-format", Select).value
 
             # Update config
