@@ -20,14 +20,14 @@ Manage HackAgent configuration settings.
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Horizontal, Vertical, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Button, Input, Label, Select, Static
 
 from hackagent.cli.config import CLIConfig
 
 
-class ConfigTab(Container):
-    """Config tab for managing settings."""
+class ConfigTab(VerticalScroll):
+    """Config tab for managing settings with vertical scrolling."""
 
     DEFAULT_CSS = ""
 
@@ -48,70 +48,69 @@ class ConfigTab(Container):
 
     def compose(self) -> ComposeResult:
         """Compose the config layout."""
-        with VerticalScroll():
+        yield Static(
+            "[bold cyan]HackAgent Configuration[/bold cyan]",
+            classes="config-section",
+        )
+
+        with Vertical(classes="config-section"):
+            yield Static("[bold]API Configuration[/bold]")
+
+            with Vertical(classes="form-group"):
+                yield Label("API Key:")
+                yield Input(
+                    placeholder="Your HackAgent API key",
+                    id="api-key",
+                    password=True,
+                )
+
+            with Vertical(classes="form-group"):
+                yield Label("Base URL:")
+                yield Input(
+                    id="base_url",
+                    placeholder="https://api.hackagent.dev",
+                    classes="config-input",
+                )
+
+            with Vertical(classes="form-group"):
+                yield Label("Output Format:")
+                yield Select(
+                    [("Table", "table"), ("JSON", "json"), ("CSV", "csv")],
+                    id="output-format",
+                    value=self.cli_config.output_format,
+                )
+
+        with Vertical(classes="config-section"):
+            yield Static("[bold]Configuration File[/bold]")
+
             yield Static(
-                "[bold cyan]HackAgent Configuration[/bold cyan]",
-                classes="config-section",
+                f"[dim]Location:[/dim] {self.cli_config.default_config_path}",
+                classes="info-box",
+                id="config-file-location",
             )
 
-            with Vertical(classes="config-section"):
-                yield Static("[bold]API Configuration[/bold]")
+            yield Static(
+                "[dim]Status: Checking...[/dim]",
+                classes="status-indicator",
+                id="config-status",
+            )
 
-                with Vertical(classes="form-group"):
-                    yield Label("API Key:")
-                    yield Input(
-                        placeholder="Your HackAgent API key",
-                        id="api-key",
-                        password=True,
-                    )
+        with Horizontal(classes="button-group"):
+            yield Button("Save Configuration", id="save-config", variant="primary")
+            yield Button("Test Connection", id="test-connection", variant="default")
+            yield Button("Reset to Defaults", id="reset-config", variant="error")
+            yield Button("Validate Config", id="validate-config", variant="success")
 
-                with Vertical(classes="form-group"):
-                    yield Label("Base URL:")
-                    yield Input(
-                        id="base_url",
-                        placeholder="https://api.hackagent.dev",
-                        classes="config-input",
-                    )
+        with Vertical(classes="config-section"):
+            yield Static("[bold]System Information[/bold]")
 
-                with Vertical(classes="form-group"):
-                    yield Label("Output Format:")
-                    yield Select(
-                        [("Table", "table"), ("JSON", "json"), ("CSV", "csv")],
-                        id="output-format",
-                        value=self.cli_config.output_format,
-                    )
-
-            with Vertical(classes="config-section"):
-                yield Static("[bold]Configuration File[/bold]")
-
-                yield Static(
-                    f"[dim]Location:[/dim] {self.cli_config.default_config_path}",
-                    classes="info-box",
-                    id="config-file-location",
-                )
-
-                yield Static(
-                    "[dim]Status: Checking...[/dim]",
-                    classes="status-indicator",
-                    id="config-status",
-                )
-
-            with Horizontal(classes="button-group"):
-                yield Button("Save Configuration", id="save-config", variant="primary")
-                yield Button("Test Connection", id="test-connection", variant="default")
-                yield Button("Reset to Defaults", id="reset-config", variant="error")
-                yield Button("Validate Config", id="validate-config", variant="success")
-
-            with Vertical(classes="config-section"):
-                yield Static("[bold]System Information[/bold]")
-
-                yield Static(
-                    f"""[dim]Python Version:[/dim] {self._get_python_version()}
+            yield Static(
+                f"""[dim]Python Version:[/dim] {self._get_python_version()}
 [dim]CLI Version:[/dim] 0.2.5
 [dim]Dependencies:[/dim] {self._check_dependencies()}""",
-                    classes="info-box",
-                    id="system-info",
-                )
+                classes="info-box",
+                id="system-info",
+            )
 
     def on_mount(self) -> None:
         """Called when the tab is mounted."""

@@ -28,7 +28,6 @@ from hackagent.cli.config import CLIConfig
 from hackagent.cli.tui.views.agents import AgentsTab
 from hackagent.cli.tui.views.attacks import AttacksTab
 from hackagent.cli.tui.views.config import ConfigTab
-from hackagent.cli.tui.views.dashboard import DashboardTab
 from hackagent.cli.tui.views.results import ResultsTab
 
 
@@ -166,7 +165,6 @@ class HackAgentTUI(App):
 
     BINDINGS = [
         Binding("q", "quit", "Quit", priority=True),
-        Binding("d", "switch_tab('dashboard')", "Dashboard", show=False),
         Binding("a", "switch_tab('agents')", "Agents", show=False),
         Binding("k", "switch_tab('attacks')", "Attacks", show=False),
         Binding("r", "switch_tab('results')", "Results", show=False),
@@ -177,14 +175,14 @@ class HackAgentTUI(App):
     def __init__(
         self,
         cli_config: CLIConfig,
-        initial_tab: str = "dashboard",
+        initial_tab: str = "agents",
         initial_data: dict = None,
     ):
         """Initialize the TUI application.
 
         Args:
             cli_config: CLI configuration object
-            initial_tab: Which tab to show initially (default: "dashboard")
+            initial_tab: Which tab to show initially (default: "agents")
             initial_data: Initial data to pre-fill in the tab (default: None)
         """
         super().__init__()
@@ -198,9 +196,6 @@ class HackAgentTUI(App):
         yield HackAgentHeader()
 
         with TabbedContent(initial=self.initial_tab):
-            with TabPane("Dashboard", id="dashboard"):
-                yield DashboardTab(self.cli_config)
-
             with TabPane("Agents", id="agents"):
                 yield AgentsTab(self.cli_config)
 

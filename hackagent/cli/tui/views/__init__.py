@@ -22,10 +22,9 @@ Each view represents a different functional area of the interface.
 from hackagent.cli.tui.views.agents import AgentsTab
 from hackagent.cli.tui.views.attacks import AttacksTab
 from hackagent.cli.tui.views.config import ConfigTab
-from hackagent.cli.tui.views.dashboard import DashboardTab
 from hackagent.cli.tui.views.results import ResultsTab
 
-__all__ = ["AgentsTab", "AttacksTab", "ConfigTab", "DashboardTab", "ResultsTab"]
+__all__ = ["AgentsTab", "AttacksTab", "ConfigTab", "ResultsTab"]
 
 """
 TUI Tabs Module
