@@ -14,35 +14,36 @@
 
 
 import unittest
-from unittest.mock import patch, MagicMock
-from http import HTTPStatus
 import uuid
+from http import HTTPStatus
+from unittest.mock import MagicMock, patch
+
 from dateutil.parser import isoparse
 
-from hackagent.models.paginated_run_list import PaginatedRunList
-from hackagent.models.run import Run
-from hackagent.models.result import Result  # For nested results within a Run
-from hackagent.models.status_enum import StatusEnum  # For Run status field
-from hackagent.models.run_list_status import RunListStatus  # For run_list filter
+from hackagent import errors
+from hackagent.api.run import (
+    run_create,
+    run_destroy,
+    run_list,
+    run_partial_update,
+    run_result_create,
+    run_retrieve,
+    run_run_tests_create,
+    run_update,
+)  # Added run_run_tests_create
 from hackagent.models.evaluation_status_enum import (
     EvaluationStatusEnum,
 )  # For nested Result.evaluation_status
-from hackagent.models.run_request import RunRequest  # Added
+from hackagent.models.paginated_run_list import PaginatedRunList
 from hackagent.models.patched_run_request import PatchedRunRequest  # Added
+from hackagent.models.result import Result  # For nested results within a Run
 from hackagent.models.result_request import (
     ResultRequest as RunResultCreateRequest,
 )  # Alias to avoid confusion with main ResultRequest
-from hackagent.api.run import (
-    run_list,
-    run_create,
-    run_retrieve,
-    run_update,
-    run_partial_update,
-    run_destroy,
-    run_result_create,
-    run_run_tests_create,
-)  # Added run_run_tests_create
-from hackagent import errors
+from hackagent.models.run import Run
+from hackagent.models.run_list_status import RunListStatus  # For run_list filter
+from hackagent.models.run_request import RunRequest  # Added
+from hackagent.models.status_enum import StatusEnum  # For Run status field
 from hackagent.types import UNSET
 
 

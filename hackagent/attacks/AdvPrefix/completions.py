@@ -32,15 +32,84 @@ determine attack success rates.
 """
 
 import logging
-from typing import Any, Dict, List, Optional  # Added List
-
-import pandas as pd
+from typing import Any, Dict, List, Optional
 
 # --- Import AgentRouter and related components ---
 from hackagent.router.router import AgentRouter
 
 # --- Import utilities ---
-from .utils import create_progress_bar
+from .utils import (
+    create_progress_bar,
+    handle_empty_input,
+    log_errors,
+    require_agent_router,
+)
+
+# Use hierarchical logger name for TUI handler inheritance
+logger = logging.getLogger("hackagent.attacks.advprefix.completions")
+
+
+def _log_agent_actions(
+    logger_instance: logging.Logger,
+    agent_specific_data: Dict[str, Any],
+    prefix_index: int,
+) -> None:
+    """
+    Log agent actions (tool calls, function calls, ADK events) for visibility.
+
+    Args:
+        logger_instance: Logger to use for output
+        agent_specific_data: Agent-specific data containing tool calls or events
+        prefix_index: Index of the prefix being processed
+    """
+    # Log OpenAI/LiteLLM tool calls
+    tool_calls = agent_specific_data.get("tool_calls")
+    if tool_calls:
+        logger_instance.info(f"🔧 Agent actions for prefix #{prefix_index}:")
+        for i, tool_call in enumerate(tool_calls, 1):
+            function_name = tool_call.get("function", {}).get("name", "unknown")
+            arguments = tool_call.get("function", {}).get("arguments", "{}")
+            logger_instance.info(f"  [{i}] Tool: {function_name}")
+            logger_instance.info(
+                f"      Args: {arguments[:100]}{'...' if len(arguments) > 100 else ''}"
+            )
+
+    # Log Google ADK events
+    adk_events = agent_specific_data.get("adk_events_list")
+    if adk_events:
+        logger_instance.info(f"🤖 ADK Agent actions for prefix #{prefix_index}:")
+        for i, event in enumerate(adk_events, 1):
+            event_type = event.get("type", "unknown")
+
+            if event_type == "tool_call":
+                tool_name = event.get("tool_name", "unknown")
+                tool_input = event.get("tool_input", {})
+                logger_instance.info(f"  [{i}] Tool Call: {tool_name}")
+                logger_instance.info(
+                    f"      Input: {str(tool_input)[:100]}{'...' if len(str(tool_input)) > 100 else ''}"
+                )
+
+            elif event_type == "tool_result":
+                tool_name = event.get("tool_name", "unknown")
+                result = event.get("result", "")
+                logger_instance.info(f"  [{i}] Tool Result: {tool_name}")
+                logger_instance.info(
+                    f"      Output: {str(result)[:100]}{'...' if len(str(result)) > 100 else ''}"
+                )
+
+            elif event_type == "llm_response":
+                content = event.get("content", "")
+                logger_instance.info(
+                    f"  [{i}] LLM Response: {content[:100]}{'...' if len(content) > 100 else ''}"
+                )
+
+            else:
+                logger_instance.info(f"  [{i}] Event: {event_type}")
+                if "content" in event:
+                    logger_instance.info(
+                        f"      Content: {str(event['content'])[:100]}{'...' if len(str(event.get('content', ''))) > 100 else ''}"
+                    )
+
 
 # Constants for surrogate prompts
 SURROGATE_ATTACK_PROMPTS = {
@@ -164,10 +233,13 @@ def _get_completion_via_router(
     result_dict["raw_response_headers"] = response.get("raw_response_headers")
     result_dict["raw_response_body"] = response.get("raw_response_body")
 
-    # Extract adapter-specific events if available (e.g., ADK events)
+    # Extract adapter-specific events if available (e.g., ADK events, tool calls)
     agent_specific = response.get("agent_specific_data", {})
     if agent_specific:
         result_dict["adapter_specific_events"] = agent_specific.get("adk_events_list")
+
+        # Log agent actions for visibility
+        _log_agent_actions(logger, agent_specific, original_index)
 
     error_msg = response.get("error_message")
     completion_text = response.get("generated_text")
@@ -191,48 +263,42 @@ def _get_completion_via_router(
     return result_dict
 
 
+@handle_empty_input("Get Completions", empty_result=[])
+@require_agent_router("Get Completions")
+@log_errors("Get Completions")
 def execute(
-    agent_router: AgentRouter,  # The main router for the victim
-    input_df: pd.DataFrame,
+    agent_router: AgentRouter,
+    input_data: List[Dict],
     config: Dict[str, Any],
     logger: logging.Logger,
-    run_dir: str,
-) -> pd.DataFrame:
+) -> List[Dict]:
     """
-    Execute Step 6 of the AdvPrefix pipeline: Generate completions using adversarial prefixes.
+    Execute the Execution stage of the AdvPrefix pipeline: Generate completions using adversarial prefixes.
 
-    This function takes the filtered adversarial prefixes from previous pipeline steps
+    This function takes the filtered adversarial prefixes from the Generation stage
     and uses them to generate completions from the target agent. It combines prefixes
     with configurable surrogate attack prompts and collects the agent's responses
-    for later evaluation.
+    for evaluation.
 
     Args:
-        agent_router: AgentRouter instance configured for the target agent.
-            Used to send requests and receive completions from the victim agent.
-        input_df: DataFrame containing adversarial prefixes from previous steps.
-            Expected to have columns: 'prefix', and optionally 'goal'.
+        agent_router: AgentRouter instance configured for the target agent (validated by decorator).
+        input_data: List of dictionaries containing adversarial prefixes.
+            Each dict should have key: 'prefix', and optionally 'goal'.
         config: Configuration dictionary containing completion parameters including:
             - surrogate_attack_prompt: Template or suffix to append to prefixes
             - max_new_tokens_completion: Maximum tokens to generate per completion
             - temperature: Sampling temperature for completion generation
-            - n_samples: Number of completion samples per prefix
-            - run_id: Run identifier for session management (ADK agents)
         logger: Logger instance for tracking completion generation progress.
-        run_dir: Directory path for saving intermediate results and logs.
 
     Returns:
-        A pandas DataFrame with the input data augmented with new columns:
+        List of dictionaries with input data augmented with new keys:
         - completion: Generated completion text from the target agent
-        - s6_raw_request_payload: Request payloads sent to the agent
-        - s6_raw_response_status: HTTP status codes from agent responses
-        - s6_raw_response_headers: Response headers from agent interactions
-        - s6_raw_response_body: Raw response bodies from the agent
-        - s6_adapter_specific_events: Agent-specific event data
-        - s6_error_message: Error messages if requests failed
-
-    Raises:
-        ValueError: If agent_router is not provided or lacks required backend_agent
-            configuration.
+        - raw_request_payload: Request payloads sent to the agent
+        - raw_response_status: HTTP status codes from agent responses
+        - raw_response_headers: Response headers from agent interactions
+        - raw_response_body: Raw response bodies from the agent
+        - adapter_specific_events: Agent-specific event data
+        - error_message: Error messages if requests failed
 
     Note:
         This step represents the core interaction phase where adversarial prefixes
@@ -244,28 +310,10 @@ def execute(
         optional `{prefix}` placeholders for dynamic formatting.
 
         Completions are processed sequentially with progress tracking, and
-        errors are captured gracefully to allow the pipeline to continue
-        processing remaining prefixes.
+            errors are captured gracefully to allow the pipeline to continue
+            processing remaining prefixes.
     """
-    logger.info("Executing Step 6: Getting completions (synchronously)")
-
-    if input_df.empty:
-        logger.warning(
-            "Step 6 received an empty DataFrame. Skipping completion generation."
-        )
-        cols_to_init = [
-            "completion",
-            "s6_raw_request_payload",
-            "s6_raw_response_status",
-            "s6_raw_response_headers",
-            "s6_raw_response_body",
-            "s6_adapter_specific_events",
-            "s6_error_message",
-        ]
-        for col in cols_to_init:
-            if col not in input_df.columns:
-                input_df[col] = pd.NA  # Use pd.NA for consistency
-        return input_df
+    # Decorators handle: empty input, agent_router validation, error logging
 
     # --- Determine surrogate prompt string ---
     user_provided_surrogate_prompt_config = config.get("surrogate_attack_prompt")
@@ -276,82 +324,43 @@ def execute(
         and user_provided_surrogate_prompt_config.strip()
     ):
         actual_surrogate_prompt_str = user_provided_surrogate_prompt_config
-        logger.info(
-            f"Using direct surrogate_attack_prompt string: {actual_surrogate_prompt_str}"
-        )
     elif isinstance(user_provided_surrogate_prompt_config, int):
         try:
             actual_surrogate_prompt_str = SURROGATE_ATTACK_PROMPTS[
                 user_provided_surrogate_prompt_config
             ]
-            logger.info(
-                f"Using predefined surrogate_attack_prompt index {user_provided_surrogate_prompt_config}: {actual_surrogate_prompt_str}"
-            )
         except KeyError:
             logger.error(
                 f"Invalid surrogate_attack_prompt index: {user_provided_surrogate_prompt_config}. Defaulting to no suffix."
             )
             actual_surrogate_prompt_str = ""
     else:
-        if (
-            user_provided_surrogate_prompt_config is not None
-        ):  # Log only if it was provided but not recognized
+        if user_provided_surrogate_prompt_config is not None:
             logger.warning(
                 f"Received unexpected type/value for surrogate_attack_prompt: {type(user_provided_surrogate_prompt_config)}, Value: '{user_provided_surrogate_prompt_config}'. Defaulting to no suffix."
             )
         actual_surrogate_prompt_str = ""
 
-    # --- Use the passed agent_router ---
-    if not agent_router or not agent_router.backend_agent:
-        logger.error(
-            "Step 6: Valid agent_router with a backend_agent was not provided."
-        )
-        raise ValueError("Step 6 requires a valid agent_router.")
-
     victim_agent_reg_key = str(agent_router.backend_agent.id)
     victim_agent_type = agent_router.backend_agent.agent_type
-    logger.info(
-        f"Using passed victim AgentRouter. Name: '{agent_router.backend_agent.name}', Type: {victim_agent_type}, Reg Key: {victim_agent_reg_key}"
-    )
-
-    # Session management is now handled by the ADKAgentAdapter (no setup needed here)
 
     # --- Completion Parameters from config ---
     request_timeout = 120
-    max_new_tokens = config.get(
-        "max_new_tokens_completion", 256
-    )  # From top-level config
-    temperature = config.get("temperature", 0.7)  # From top-level config
-    n_samples_per_prefix = config.get(
-        "n_samples", 1
-    )  # From top-level config. Note: router must support this.
-    # If n_samples > 1, current _get_completion_via_router expects adapter to handle it.
-
-    logger.debug(
-        f"Completion params for Step 6: timeout={request_timeout}, max_tokens={max_new_tokens}, temp={temperature}, n_samples={n_samples_per_prefix}"
-    )
+    max_new_tokens = config.get("max_new_tokens_completion", 256)
+    temperature = config.get("temperature", 0.7)
 
     # --- Prepare and run tasks (synchronously) ---
     completion_results_list: List[Dict[str, Any]] = []
-    logger.info(f"Executing {len(input_df)} completion requests sequentially...")
 
     # Create progress bar for agent interactions
     with create_progress_bar(
-        f"[green]Step 6: Getting completions from {victim_agent_type.value} agent...",
-        total=len(input_df),
+        f"[green]Execution: Getting completions from {victim_agent_type} agent...",
+        total=len(input_data),
     ) as (progress_bar, task):
-        for index, row in input_df.iterrows():
-            prefix_text = row["prefix"]
-            # 'goal' might not be directly used if surrogate_prompt_template is complex or prefix_text is already combined
-            # goal_text = row.get("goal", "") # Ensure goal is available if needed by prompt construction
+        for index, record in enumerate(input_data):
+            prefix_text = record.get("prefix", "")
 
             try:
-                # n_samples handling: If n_samples_per_prefix > 1, the _get_completion_via_router (and adapter) needs to support it.
-                # Currently, it makes one call per row in input_df. If input_df is already expanded for samples, this is fine.
-                # If input_df has one row per unique prefix, and n_samples_per_prefix > 1, this loop needs to run n_samples_per_prefix times
-                # or _get_completion_via_router must handle requesting n_samples from the adapter.
-                # Assuming input_df might be pre-expanded or n_samples=1 for this synchronous version for simplicity.
-                # If n_samples > 1 and not pre-expanded, this will only get 1 sample per prefix.
                 result = _get_completion_via_router(
                     agent_router=agent_router,
                     agent_reg_key=victim_agent_reg_key,
@@ -360,7 +369,7 @@ def execute(
                     request_timeout=request_timeout,
                     max_new_tokens=max_new_tokens,
                     temperature=temperature,
-                    n_samples=1,  # Forcing 1 for this simple loop; adapter might take n_samples_per_prefix
+                    n_samples=1,
                     logger_instance=logger,
                     original_index=index,
                 )
@@ -386,40 +395,22 @@ def execute(
             # Update progress bar after each completion
             progress_bar.update(task, advance=1)
 
-    logger.info("All completion requests processed.")
+    # Update results with completion data
+    results = []
+    for i, record in enumerate(input_data):
+        result = record.copy()
+        completion_result = (
+            completion_results_list[i] if i < len(completion_results_list) else {}
+        )
+        result["completion"] = completion_result.get("completion")
+        result["raw_request_payload"] = completion_result.get("raw_request_payload")
+        result["raw_response_status"] = completion_result.get("raw_response_status")
+        result["raw_response_headers"] = completion_result.get("raw_response_headers")
+        result["raw_response_body"] = completion_result.get("raw_response_body")
+        result["adapter_specific_events"] = completion_result.get(
+            "adapter_specific_events"
+        )
+        result["error_message"] = completion_result.get("error_message")
+        results.append(result)
 
-    # Initialize columns for results
-    s6_completions_col = []
-    s6_req_payload_col = []
-    s6_resp_status_col = []
-    s6_resp_headers_col = []
-    s6_resp_body_col = []
-    s6_events_col = []
-    s6_error_col = []
-
-    for result in completion_results_list:
-        s6_completions_col.append(result.get("completion"))
-        s6_req_payload_col.append(result.get("raw_request_payload"))
-        s6_resp_status_col.append(result.get("raw_response_status"))
-        s6_resp_headers_col.append(result.get("raw_response_headers"))
-        s6_resp_body_col.append(result.get("raw_response_body"))
-        s6_events_col.append(result.get("adapter_specific_events"))
-        s6_error_col.append(result.get("error_message"))
-
-    # Assign new columns to the DataFrame
-    output_df = input_df.copy()
-    output_df["completion"] = s6_completions_col
-    output_df["s6_raw_request_payload"] = s6_req_payload_col
-    output_df["s6_raw_response_status"] = s6_resp_status_col
-    output_df["s6_raw_response_headers"] = s6_resp_headers_col
-    output_df["s6_raw_response_body"] = s6_resp_body_col
-    output_df["s6_adapter_specific_events"] = s6_events_col
-    output_df["s6_error_message"] = s6_error_col
-
-    logger.info(
-        f"Step 6 complete. Processed completions for {len(output_df)} prefixes."
-    )
-
-    logger.info("Step 6 complete. CSV will be saved by the main pipeline.")
-
-    return output_df
+    return results

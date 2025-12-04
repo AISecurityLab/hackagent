@@ -1,11 +1,5 @@
 from collections.abc import Mapping
-from typing import (
-    Any,
-    TypeVar,
-    Union,
-    cast,
-)
-from uuid import UUID
+from typing import Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -47,7 +41,6 @@ class AgentRequest:
         Attributes:
             name (str):
             endpoint (str): The primary API endpoint URL for interacting with the agent.
-            organization (UUID):
             agent_type (Union[Unset, str]): The specific SDK, ADK, or API type the agent is built upon (e.g., OpenAI SDK,
                 Generic ADK).
             description (Union[Unset, str]):
@@ -58,16 +51,13 @@ class AgentRequest:
                 helpful assistant.'}
                 - For GOOGLE_ADK: {'project_id': 'my-gcp-project', 'location': 'us-central1'}
                 - General applicable: {'version': '1.2.0', 'custom_headers': {'X-Custom-Header': 'value'}}
-            owner (Union[None, Unset, int]):
     """
 
     name: str
     endpoint: str
-    organization: UUID
     agent_type: Union[Unset, str] = UNSET
     description: Union[Unset, str] = UNSET
     metadata: Union[Unset, Any] = UNSET
-    owner: Union[None, Unset, int] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -75,19 +65,11 @@ class AgentRequest:
 
         endpoint = self.endpoint
 
-        organization = str(self.organization)
-
         agent_type = self.agent_type
 
         description = self.description
 
         metadata = self.metadata
-
-        owner: Union[None, Unset, int]
-        if isinstance(self.owner, Unset):
-            owner = UNSET
-        else:
-            owner = self.owner
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -95,7 +77,6 @@ class AgentRequest:
             {
                 "name": name,
                 "endpoint": endpoint,
-                "organization": organization,
             }
         )
         if agent_type is not UNSET:
@@ -104,8 +85,6 @@ class AgentRequest:
             field_dict["description"] = description
         if metadata is not UNSET:
             field_dict["metadata"] = metadata
-        if owner is not UNSET:
-            field_dict["owner"] = owner
 
         return field_dict
 
@@ -116,31 +95,18 @@ class AgentRequest:
 
         endpoint = d.pop("endpoint")
 
-        organization = UUID(d.pop("organization"))
-
         agent_type = d.pop("agent_type", UNSET)
 
         description = d.pop("description", UNSET)
 
         metadata = d.pop("metadata", UNSET)
 
-        def _parse_owner(data: object) -> Union[None, Unset, int]:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            return cast(Union[None, Unset, int], data)
-
-        owner = _parse_owner(d.pop("owner", UNSET))
-
         agent_request = cls(
             name=name,
             endpoint=endpoint,
-            organization=organization,
             agent_type=agent_type,
             description=description,
             metadata=metadata,
-            owner=owner,
         )
 
         agent_request.additional_properties = d

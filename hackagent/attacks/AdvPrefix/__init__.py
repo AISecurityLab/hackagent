@@ -21,14 +21,15 @@ prefix generation, evaluation, filtering, and selection.
 
 Modules:
 - config: Configuration settings and default parameters
-- generate: Prefix generation using uncensored models
-- compute_ce: Cross-entropy computation and scoring
+- generate: Consolidated module containing prefix generation, preprocessing,
+  and cross-entropy computation functionality (merged from generate.py,
+  preprocessing.py, and compute_ce.py)
 - completions: Target model completion generation
 - evaluation: Attack success evaluation and scoring
-- preprocessing: Input preprocessing and validation
 - aggregation: Result aggregation across multiple runs
-- selection: Final prefix selection based on success metrics
+- selector: Final prefix selection based on success metrics
 - utils: Utility functions and helpers
+- step_decorators: Decorators for step execution handling
 """
 
 import warnings

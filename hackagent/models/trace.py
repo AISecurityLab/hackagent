@@ -1,10 +1,6 @@
 import datetime
 from collections.abc import Mapping
-from typing import (
-    Any,
-    TypeVar,
-    Union,
-)
+from typing import Any, TypeVar, Union
 from uuid import UUID
 
 from attrs import define as _attrs_define

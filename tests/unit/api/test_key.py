@@ -14,16 +14,17 @@
 
 
 import unittest
-from unittest.mock import patch, MagicMock
-from http import HTTPStatus
 import uuid
+from http import HTTPStatus
+from unittest.mock import MagicMock, patch
+
 from dateutil.parser import isoparse
 
+from hackagent import errors
+from hackagent.api.key import key_create, key_destroy, key_list, key_retrieve
 from hackagent.models.paginated_user_api_key_list import PaginatedUserAPIKeyList
 from hackagent.models.user_api_key import UserAPIKey
 from hackagent.models.user_api_key_request import UserAPIKeyRequest
-from hackagent.api.key import key_list, key_create, key_retrieve, key_destroy
-from hackagent import errors
 
 
 class TestKeyListAPI(unittest.TestCase):

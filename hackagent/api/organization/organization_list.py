@@ -59,6 +59,9 @@ def sync_detailed(
 ) -> Response[PaginatedOrganizationList]:
     """Provides access to Organization details for the authenticated user.
 
+    Web-only endpoint - requires Auth0 authentication.
+    Organization management and billing operations require browser context.
+
     Args:
         page (Union[Unset, int]):
 
@@ -88,6 +91,9 @@ def sync(
 ) -> Optional[PaginatedOrganizationList]:
     """Provides access to Organization details for the authenticated user.
 
+    Web-only endpoint - requires Auth0 authentication.
+    Organization management and billing operations require browser context.
+
     Args:
         page (Union[Unset, int]):
 
@@ -111,6 +117,9 @@ async def asyncio_detailed(
     page: Union[Unset, int] = UNSET,
 ) -> Response[PaginatedOrganizationList]:
     """Provides access to Organization details for the authenticated user.
+
+    Web-only endpoint - requires Auth0 authentication.
+    Organization management and billing operations require browser context.
 
     Args:
         page (Union[Unset, int]):
@@ -138,6 +147,9 @@ async def asyncio(
     page: Union[Unset, int] = UNSET,
 ) -> Optional[PaginatedOrganizationList]:
     """Provides access to Organization details for the authenticated user.
+
+    Web-only endpoint - requires Auth0 authentication.
+    Organization management and billing operations require browser context.
 
     Args:
         page (Union[Unset, int]):

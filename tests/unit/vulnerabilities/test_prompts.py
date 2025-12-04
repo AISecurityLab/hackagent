@@ -57,6 +57,7 @@ class TestGetOrCreatePrompt:
                 "prompt_text": "Test text",
                 "category": "test_category",
                 "organization": "87654321-4321-8765-4321-876543218765",
+                "owner": 1,  # Add owner field as int
                 "organization_detail": {
                     "id": "87654321-4321-8765-4321-876543218765",
                     "name": "Test Org",

@@ -15,9 +15,7 @@ def _get_kwargs(
 ) -> dict[str, Any]:
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/result/{id}".format(
-            id=id,
-        ),
+        "url": f"/result/{id}",
     }
 
     return _kwargs
@@ -54,6 +52,10 @@ def sync_detailed(
 ) -> Response[Result]:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
 
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+    Results are typically consumed by SDK for test result retrieval and analysis.
+
     Args:
         id (UUID):
 
@@ -83,6 +85,10 @@ def sync(
 ) -> Optional[Result]:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
 
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+    Results are typically consumed by SDK for test result retrieval and analysis.
+
     Args:
         id (UUID):
 
@@ -106,6 +112,10 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
 ) -> Response[Result]:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
+
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+    Results are typically consumed by SDK for test result retrieval and analysis.
 
     Args:
         id (UUID):
@@ -133,6 +143,10 @@ async def asyncio(
     client: AuthenticatedClient,
 ) -> Optional[Result]:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
+
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+    Results are typically consumed by SDK for test result retrieval and analysis.
 
     Args:
         id (UUID):

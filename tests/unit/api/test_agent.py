@@ -13,31 +13,32 @@
 # limitations under the License.
 
 import unittest
-from unittest.mock import patch, MagicMock
-from http import HTTPStatus
 import uuid  # For generating mock UUIDs
+from http import HTTPStatus
+from unittest.mock import MagicMock, patch
 
-# Assuming these are the correct import paths based on the project structure
-from hackagent.models.paginated_agent_list import PaginatedAgentList
+from hackagent import errors
+from hackagent.api.agent import (
+    agent_create,
+    agent_destroy,
+    agent_list,
+    agent_partial_update,
+    agent_retrieve,
+    agent_update,
+)  # Added agent_partial_update
+from hackagent.router.types import AgentTypeEnum  # For AgentRequest body
 from hackagent.models.agent import (
     Agent,
 )  # For agent_create, agent_retrieve, agent_update
 from hackagent.models.agent_request import (
     AgentRequest,
 )  # For agent_create, agent_update
+
+# Assuming these are the correct import paths based on the project structure
+from hackagent.models.paginated_agent_list import PaginatedAgentList
 from hackagent.models.patched_agent_request import (
     PatchedAgentRequest,
 )  # For agent_partial_update
-from hackagent.models import AgentTypeEnum  # For AgentRequest body
-from hackagent.api.agent import (
-    agent_list,
-    agent_create,
-    agent_retrieve,
-    agent_update,
-    agent_destroy,
-    agent_partial_update,
-)  # Added agent_partial_update
-from hackagent import errors
 from hackagent.types import UNSET  # Alias to avoid conflict, import UNSET
 
 
@@ -160,9 +161,8 @@ class TestAgentCreateAPI(unittest.TestCase):
         agent_id_for_request = uuid.uuid4()
         agent_request_data = AgentRequest(
             name="New Test Agent",
-            agent_type=AgentTypeEnum.GOOGLE_ADK,
+            agent_type=AgentTypeEnum.GOOGLE_ADK.value,
             endpoint="http://example.com/adk",
-            organization=agent_id_for_request,
             metadata=UNSET,
             description=UNSET,
         )
@@ -171,11 +171,11 @@ class TestAgentCreateAPI(unittest.TestCase):
         mock_response_content = {
             "id": str(mock_created_agent_id),
             "name": agent_request_data.name,
-            "agent_type": agent_request_data.agent_type.value,
+            "agent_type": agent_request_data.agent_type,
             "endpoint": agent_request_data.endpoint,
-            "organization": str(agent_request_data.organization),
+            "organization": str(agent_id_for_request),
             "organization_detail": {
-                "id": str(agent_request_data.organization),
+                "id": str(agent_id_for_request),
                 "name": "Test Org Detail",
             },
             "owner": None,
@@ -229,9 +229,8 @@ class TestAgentCreateAPI(unittest.TestCase):
 
         agent_request_data = AgentRequest(
             name="Error Agent",
-            agent_type=AgentTypeEnum.GOOGLE_ADK,
+            agent_type=AgentTypeEnum.GOOGLE_ADK.value,
             endpoint="err",
-            organization=uuid.uuid4(),
         )
 
         mock_httpx_response = MagicMock()
@@ -259,9 +258,8 @@ class TestAgentCreateAPI(unittest.TestCase):
 
         agent_request_data = AgentRequest(
             name="Error Agent False",
-            agent_type=AgentTypeEnum.GOOGLE_ADK,
+            agent_type=AgentTypeEnum.GOOGLE_ADK.value,
             endpoint="err_f",
-            organization=uuid.uuid4(),
         )
 
         mock_httpx_response = MagicMock()
@@ -392,18 +390,17 @@ class TestAgentUpdateAPI(unittest.TestCase):
         agent_id_to_update = uuid.uuid4()
         agent_update_request_data = AgentRequest(
             name="Updated Test Agent",
-            agent_type=AgentTypeEnum.LITELLM,
+            agent_type=AgentTypeEnum.LITELLM.value,
             endpoint="http://example.com/updated-litellm",
-            organization=uuid.uuid4(),
             metadata=UNSET,
             description="Updated description",
         )
 
-        mock_org_id_update = str(agent_update_request_data.organization)
+        mock_org_id_update = str(uuid.uuid4())  # Generate mock org ID for response
         mock_updated_agent_response_content = {
             "id": str(agent_id_to_update),
             "name": agent_update_request_data.name,
-            "agent_type": agent_update_request_data.agent_type.value,
+            "agent_type": agent_update_request_data.agent_type,
             "endpoint": agent_update_request_data.endpoint,
             "organization": mock_org_id_update,
             "organization_detail": {
@@ -465,9 +462,8 @@ class TestAgentUpdateAPI(unittest.TestCase):
         agent_id_not_found = uuid.uuid4()
         agent_update_request_data = AgentRequest(
             name="NonExistent Update",
-            agent_type=AgentTypeEnum.GOOGLE_ADK,
+            agent_type=AgentTypeEnum.GOOGLE_ADK.value,
             endpoint="err",
-            organization=uuid.uuid4(),
         )
 
         mock_httpx_response = MagicMock()
@@ -498,9 +494,8 @@ class TestAgentUpdateAPI(unittest.TestCase):
         agent_id_error = uuid.uuid4()
         agent_update_request_data = AgentRequest(
             name="Update Error False",
-            agent_type=AgentTypeEnum.LITELLM,
+            agent_type=AgentTypeEnum.LITELLM.value,
             endpoint="err_f",
-            organization=uuid.uuid4(),
         )
 
         mock_httpx_response = MagicMock()

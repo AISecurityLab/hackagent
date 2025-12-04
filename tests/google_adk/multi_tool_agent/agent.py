@@ -15,6 +15,7 @@
 
 import datetime
 from zoneinfo import ZoneInfo
+
 from google.adk.agents import Agent
 from google.adk.models.lite_llm import LiteLlm
 
@@ -32,8 +33,7 @@ def get_weather(city: str) -> dict:
         return {
             "status": "success",
             "report": (
-                "The weather in New York is sunny with a temperature of 25 degrees"
-                " Celsius (77 degrees Fahrenheit)."
+                "The weather in New York is sunny with a temperature of 25 degrees Celsius (77 degrees Fahrenheit)."
             ),
         }
     else:

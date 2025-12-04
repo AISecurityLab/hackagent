@@ -1,12 +1,6 @@
 import datetime
 from collections.abc import Mapping
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
 from uuid import UUID
 
 from attrs import define as _attrs_define
@@ -58,6 +52,7 @@ class Agent:
             endpoint (str): The primary API endpoint URL for interacting with the agent.
             organization (UUID):
             organization_detail (OrganizationMinimal):
+            owner (Union[None, int]):
             owner_detail (Union['UserProfileMinimal', None]):
             created_at (datetime.datetime):
             updated_at (datetime.datetime):
@@ -71,7 +66,6 @@ class Agent:
                 helpful assistant.'}
                 - For GOOGLE_ADK: {'project_id': 'my-gcp-project', 'location': 'us-central1'}
                 - General applicable: {'version': '1.2.0', 'custom_headers': {'X-Custom-Header': 'value'}}
-            owner (Union[None, Unset, int]):
     """
 
     id: UUID
@@ -79,13 +73,13 @@ class Agent:
     endpoint: str
     organization: UUID
     organization_detail: "OrganizationMinimal"
+    owner: Union[None, int]
     owner_detail: Union["UserProfileMinimal", None]
     created_at: datetime.datetime
     updated_at: datetime.datetime
     agent_type: Union[Unset, str] = UNSET
     description: Union[Unset, str] = UNSET
     metadata: Union[Unset, Any] = UNSET
-    owner: Union[None, Unset, int] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -100,6 +94,9 @@ class Agent:
         organization = str(self.organization)
 
         organization_detail = self.organization_detail.to_dict()
+
+        owner: Union[None, int]
+        owner = self.owner
 
         owner_detail: Union[None, dict[str, Any]]
         if isinstance(self.owner_detail, UserProfileMinimal):
@@ -117,12 +114,6 @@ class Agent:
 
         metadata = self.metadata
 
-        owner: Union[None, Unset, int]
-        if isinstance(self.owner, Unset):
-            owner = UNSET
-        else:
-            owner = self.owner
-
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -132,6 +123,7 @@ class Agent:
                 "endpoint": endpoint,
                 "organization": organization,
                 "organization_detail": organization_detail,
+                "owner": owner,
                 "owner_detail": owner_detail,
                 "created_at": created_at,
                 "updated_at": updated_at,
@@ -143,8 +135,6 @@ class Agent:
             field_dict["description"] = description
         if metadata is not UNSET:
             field_dict["metadata"] = metadata
-        if owner is not UNSET:
-            field_dict["owner"] = owner
 
         return field_dict
 
@@ -165,6 +155,13 @@ class Agent:
         organization_detail = OrganizationMinimal.from_dict(
             d.pop("organization_detail")
         )
+
+        def _parse_owner(data: object) -> Union[None, int]:
+            if data is None:
+                return data
+            return cast(Union[None, int], data)
+
+        owner = _parse_owner(d.pop("owner"))
 
         def _parse_owner_detail(data: object) -> Union["UserProfileMinimal", None]:
             if data is None:
@@ -191,28 +188,19 @@ class Agent:
 
         metadata = d.pop("metadata", UNSET)
 
-        def _parse_owner(data: object) -> Union[None, Unset, int]:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            return cast(Union[None, Unset, int], data)
-
-        owner = _parse_owner(d.pop("owner", UNSET))
-
         agent = cls(
             id=id,
             name=name,
             endpoint=endpoint,
             organization=organization,
             organization_detail=organization_detail,
+            owner=owner,
             owner_detail=owner_detail,
             created_at=created_at,
             updated_at=updated_at,
             agent_type=agent_type,
             description=description,
             metadata=metadata,
-            owner=owner,
         )
 
         agent.additional_properties = d

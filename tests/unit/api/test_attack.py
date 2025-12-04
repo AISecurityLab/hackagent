@@ -13,25 +13,26 @@
 # limitations under the License.
 
 
-import unittest
-from unittest.mock import patch, MagicMock
-from http import HTTPStatus
-import uuid
 import datetime  # Added for datetime objects
+import unittest
+import uuid
+from http import HTTPStatus
+from unittest.mock import MagicMock, patch
+
+from hackagent import errors
+from hackagent.api.attack import (
+    attack_create,
+    attack_destroy,
+    attack_list,
+    attack_partial_update,
+    attack_retrieve,
+    attack_update,
+)
+from hackagent.models.attack import Attack  # For individual attack items
+from hackagent.models.attack_request import AttackRequest
 
 # Assuming these are the correct import paths based on the project structure
 from hackagent.models.paginated_attack_list import PaginatedAttackList
-from hackagent.models.attack import Attack  # For individual attack items
-from hackagent.api.attack import (
-    attack_list,
-    attack_create,
-    attack_retrieve,
-    attack_update,
-    attack_partial_update,
-    attack_destroy,
-)
-from hackagent import errors
-from hackagent.models.attack_request import AttackRequest
 from hackagent.models.patched_attack_request import (
     PatchedAttackRequest,
 )  # Added PatchedAttackRequest

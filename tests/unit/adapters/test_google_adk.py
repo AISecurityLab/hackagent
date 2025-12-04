@@ -13,9 +13,10 @@
 # limitations under the License.
 
 
-import unittest
-from unittest.mock import patch, MagicMock
 import logging
+import unittest
+from unittest.mock import MagicMock, patch
+
 import requests  # Added for requests.exceptions
 
 from hackagent.router.adapters.google_adk import (

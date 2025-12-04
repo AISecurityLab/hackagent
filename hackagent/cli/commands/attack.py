@@ -53,9 +53,13 @@ def attack():
     "--agent-type",
     type=str,
     default="other",
-    help="Agent type (e.g., google-adk, litellm, langchain, openai-sdk, or other)",
+    help="Agent type (e.g., google-adk, litellm, langchain, openai-sdk, mcp, a2a, or other)",
 )
-@click.option("--endpoint", required=True, help="Agent endpoint URL")
+@click.option(
+    "--endpoint",
+    required=True,
+    help="Agent endpoint URL. For OpenAI-compatible endpoints, provide base URL ending with /v1 (e.g., http://localhost:8000/v1). For LangServe, provide full path (e.g., http://localhost:8000/invoke).",
+)
 @click.option(
     "--goals",
     required=True,

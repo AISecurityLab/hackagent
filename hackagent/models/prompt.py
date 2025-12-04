@@ -1,12 +1,6 @@
 import datetime
 from collections.abc import Mapping
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
 from uuid import UUID
 
 from attrs import define as _attrs_define
@@ -33,6 +27,7 @@ class Prompt:
         prompt_text (str):
         organization (UUID):
         organization_detail (OrganizationMinimal):
+        owner (Union[None, int]):
         owner_detail (Union['UserProfileMinimal', None]):
         created_at (datetime.datetime):
         updated_at (datetime.datetime):
@@ -44,7 +39,6 @@ class Prompt:
             "tool_input": {...}}]
         expected_output_pattern (Union[Unset, str]): Optional regex pattern to match against the final response.
         reference_output (Union[Unset, str]): Optional ideal/reference final output text.
-        owner (Union[None, Unset, int]):
     """
 
     id: UUID
@@ -52,6 +46,7 @@ class Prompt:
     prompt_text: str
     organization: UUID
     organization_detail: "OrganizationMinimal"
+    owner: Union[None, int]
     owner_detail: Union["UserProfileMinimal", None]
     created_at: datetime.datetime
     updated_at: datetime.datetime
@@ -61,7 +56,6 @@ class Prompt:
     expected_tool_calls: Union[Unset, Any] = UNSET
     expected_output_pattern: Union[Unset, str] = UNSET
     reference_output: Union[Unset, str] = UNSET
-    owner: Union[None, Unset, int] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -76,6 +70,9 @@ class Prompt:
         organization = str(self.organization)
 
         organization_detail = self.organization_detail.to_dict()
+
+        owner: Union[None, int]
+        owner = self.owner
 
         owner_detail: Union[None, dict[str, Any]]
         if isinstance(self.owner_detail, UserProfileMinimal):
@@ -99,12 +96,6 @@ class Prompt:
 
         reference_output = self.reference_output
 
-        owner: Union[None, Unset, int]
-        if isinstance(self.owner, Unset):
-            owner = UNSET
-        else:
-            owner = self.owner
-
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -114,6 +105,7 @@ class Prompt:
                 "prompt_text": prompt_text,
                 "organization": organization,
                 "organization_detail": organization_detail,
+                "owner": owner,
                 "owner_detail": owner_detail,
                 "created_at": created_at,
                 "updated_at": updated_at,
@@ -131,8 +123,6 @@ class Prompt:
             field_dict["expected_output_pattern"] = expected_output_pattern
         if reference_output is not UNSET:
             field_dict["reference_output"] = reference_output
-        if owner is not UNSET:
-            field_dict["owner"] = owner
 
         return field_dict
 
@@ -153,6 +143,13 @@ class Prompt:
         organization_detail = OrganizationMinimal.from_dict(
             d.pop("organization_detail")
         )
+
+        def _parse_owner(data: object) -> Union[None, int]:
+            if data is None:
+                return data
+            return cast(Union[None, int], data)
+
+        owner = _parse_owner(d.pop("owner"))
 
         def _parse_owner_detail(data: object) -> Union["UserProfileMinimal", None]:
             if data is None:
@@ -185,21 +182,13 @@ class Prompt:
 
         reference_output = d.pop("reference_output", UNSET)
 
-        def _parse_owner(data: object) -> Union[None, Unset, int]:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            return cast(Union[None, Unset, int], data)
-
-        owner = _parse_owner(d.pop("owner", UNSET))
-
         prompt = cls(
             id=id,
             name=name,
             prompt_text=prompt_text,
             organization=organization,
             organization_detail=organization_detail,
+            owner=owner,
             owner_detail=owner_detail,
             created_at=created_at,
             updated_at=updated_at,
@@ -209,7 +198,6 @@ class Prompt:
             expected_tool_calls=expected_tool_calls,
             expected_output_pattern=expected_output_pattern,
             reference_output=reference_output,
-            owner=owner,
         )
 
         prompt.additional_properties = d

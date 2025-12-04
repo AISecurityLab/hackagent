@@ -93,6 +93,8 @@ class AttackStrategy(abc.ABC):
         fail_on_run_error: bool,
         max_wait_time_seconds: Optional[int] = None,
         poll_interval_seconds: Optional[int] = None,
+        _tui_app: Optional[Any] = None,
+        _tui_log_callback: Optional[Any] = None,
     ) -> Any:
         """
         Execute the attack strategy with the provided configuration.
@@ -111,6 +113,10 @@ class AttackStrategy(abc.ABC):
                 Not used by all strategies.
             poll_interval_seconds: Interval for polling attack status.
                 Not used by all strategies.
+            _tui_app: Optional Textual App instance for TUI logging integration.
+                Internal parameter used when running attacks from the TUI.
+            _tui_log_callback: Optional callback function for TUI log handling.
+                Internal parameter used when running attacks from the TUI.
 
         Returns:
             Strategy-specific results. The format varies by implementation but
@@ -654,6 +660,8 @@ class AdvPrefix(AttackStrategy):
         goals: List[Any],
         run_id: str,  # Server run_id
         attack_id: str,
+        _tui_app: Optional[Any] = None,
+        _tui_log_callback: Optional[Any] = None,
     ) -> Optional[pd.DataFrame]:
         """
         Execute the local AdvPrefix attack using the configured pipeline.
@@ -710,6 +718,22 @@ class AdvPrefix(AttackStrategy):
                 client=adv_prefix_client,
                 agent_router=adv_prefix_router,
             )
+
+            # Attach TUI log handler if TUI context is provided
+            if _tui_app and _tui_log_callback:
+                try:
+                    from hackagent.cli.tui.logger import attach_tui_handler
+
+                    attach_tui_handler(
+                        attack_instance=runner,
+                        app=_tui_app,
+                        callback=_tui_log_callback,
+                    )
+                    logger.info("TUI log handler attached to attack instance")
+                except ImportError:
+                    logger.warning(
+                        "Failed to import TUI logger, logs will not be shown in TUI"
+                    )
 
             # AdvPrefixAttack.run will use its self.run_id, which is initialized from runner_config["run_id"].
             results_df = runner.run(goals=goals)  # No longer pass initial_run_id
@@ -777,6 +801,10 @@ class AdvPrefix(AttackStrategy):
         attack_config: Dict[str, Any],
         run_config_override: Optional[Dict[str, Any]],
         fail_on_run_error: bool,
+        max_wait_time_seconds: Optional[int] = None,
+        poll_interval_seconds: Optional[int] = None,
+        _tui_app: Optional[Any] = None,
+        _tui_log_callback: Optional[Any] = None,
     ) -> Any:
         """
         Execute the complete AdvPrefix attack workflow.
@@ -850,7 +878,12 @@ class AdvPrefix(AttackStrategy):
 
         # Assuming _execute_local_prefix_attack is now synchronous
         local_results_df = self._execute_local_prefix_attack(
-            attack_config=attack_config, goals=goals, run_id=run_id, attack_id=attack_id
+            attack_config=attack_config,
+            goals=goals,
+            run_id=run_id,
+            attack_id=attack_id,
+            _tui_app=_tui_app,
+            _tui_log_callback=_tui_log_callback,
         )
 
         # 4. Log persistence info (which internally might update server records)

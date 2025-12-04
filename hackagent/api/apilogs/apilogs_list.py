@@ -59,6 +59,9 @@ def sync_detailed(
 ) -> Response[PaginatedAPITokenLogList]:
     """Provides read-only access to APITokenLog entries for the user's organization.
 
+    Web-only endpoint - requires Auth0 authentication.
+    Usage logs are intended for web dashboard monitoring.
+
     Args:
         page (Union[Unset, int]):
 
@@ -88,6 +91,9 @@ def sync(
 ) -> Optional[PaginatedAPITokenLogList]:
     """Provides read-only access to APITokenLog entries for the user's organization.
 
+    Web-only endpoint - requires Auth0 authentication.
+    Usage logs are intended for web dashboard monitoring.
+
     Args:
         page (Union[Unset, int]):
 
@@ -111,6 +117,9 @@ async def asyncio_detailed(
     page: Union[Unset, int] = UNSET,
 ) -> Response[PaginatedAPITokenLogList]:
     """Provides read-only access to APITokenLog entries for the user's organization.
+
+    Web-only endpoint - requires Auth0 authentication.
+    Usage logs are intended for web dashboard monitoring.
 
     Args:
         page (Union[Unset, int]):
@@ -138,6 +147,9 @@ async def asyncio(
     page: Union[Unset, int] = UNSET,
 ) -> Optional[PaginatedAPITokenLogList]:
     """Provides read-only access to APITokenLog entries for the user's organization.
+
+    Web-only endpoint - requires Auth0 authentication.
+    Usage logs are intended for web dashboard monitoring.
 
     Args:
         page (Union[Unset, int]):

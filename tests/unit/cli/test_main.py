@@ -2,7 +2,7 @@
 Unit tests for main CLI functionality.
 """
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 # Note: These tests would normally import the CLI, but we'll create mocked versions
 # to avoid dependency issues during testing

@@ -107,6 +107,9 @@ def sync_detailed(
     though the 'model' field will be overridden by the server-configured judge model ID.
     Billing and logging are handled internally.
 
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    This is a core SDK operation for AI-based evaluation in security tests.
+
     Args:
         body (GenerateRequestRequest):
         body (GenerateRequestRequest):
@@ -147,6 +150,9 @@ def sync(
     though the 'model' field will be overridden by the server-configured judge model ID.
     Billing and logging are handled internally.
 
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    This is a core SDK operation for AI-based evaluation in security tests.
+
     Args:
         body (GenerateRequestRequest):
         body (GenerateRequestRequest):
@@ -181,6 +187,9 @@ async def asyncio_detailed(
     The request body should match the AI provider's expected format (e.g. chat completions),
     though the 'model' field will be overridden by the server-configured judge model ID.
     Billing and logging are handled internally.
+
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    This is a core SDK operation for AI-based evaluation in security tests.
 
     Args:
         body (GenerateRequestRequest):
@@ -219,6 +228,9 @@ async def asyncio(
     The request body should match the AI provider's expected format (e.g. chat completions),
     though the 'model' field will be overridden by the server-configured judge model ID.
     Billing and logging are handled internally.
+
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    This is a core SDK operation for AI-based evaluation in security tests.
 
     Args:
         body (GenerateRequestRequest):

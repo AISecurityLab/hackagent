@@ -12,15 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 from httpx import Response
-from unittest.mock import MagicMock, patch, AsyncMock
 
 from hackagent.api.apilogs import apilogs_list, apilogs_retrieve
-from hackagent.models.paginated_api_token_log_list import PaginatedAPITokenLogList
-from hackagent.models.api_token_log import APITokenLog
 from hackagent.client import AuthenticatedClient
 from hackagent.errors import UnexpectedStatus
+from hackagent.models.api_token_log import APITokenLog
+from hackagent.models.paginated_api_token_log_list import PaginatedAPITokenLogList
 
 
 @pytest.fixture

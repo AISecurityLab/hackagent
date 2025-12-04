@@ -13,9 +13,9 @@
 # limitations under the License.
 
 
-import unittest
-from unittest.mock import patch, MagicMock
 import logging
+import unittest
+from unittest.mock import MagicMock, patch
 
 from hackagent.router.adapters.openai_adapter import (
     OpenAIAgentAdapter,

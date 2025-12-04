@@ -90,6 +90,10 @@ def sync_detailed(
 ) -> Response[PaginatedResultList]:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
 
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+    Results are typically consumed by SDK for test result retrieval and analysis.
+
     Args:
         evaluation_status (Union[Unset, ResultListEvaluationStatus]):
         page (Union[Unset, int]):
@@ -131,6 +135,10 @@ def sync(
 ) -> Optional[PaginatedResultList]:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
 
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+    Results are typically consumed by SDK for test result retrieval and analysis.
+
     Args:
         evaluation_status (Union[Unset, ResultListEvaluationStatus]):
         page (Union[Unset, int]):
@@ -166,6 +174,10 @@ async def asyncio_detailed(
     run_organization: Union[Unset, UUID] = UNSET,
 ) -> Response[PaginatedResultList]:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
+
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+    Results are typically consumed by SDK for test result retrieval and analysis.
 
     Args:
         evaluation_status (Union[Unset, ResultListEvaluationStatus]):
@@ -205,6 +217,10 @@ async def asyncio(
     run_organization: Union[Unset, UUID] = UNSET,
 ) -> Optional[PaginatedResultList]:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
+
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+    Results are typically consumed by SDK for test result retrieval and analysis.
 
     Args:
         evaluation_status (Union[Unset, ResultListEvaluationStatus]):

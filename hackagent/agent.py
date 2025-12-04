@@ -19,8 +19,8 @@ from hackagent import utils
 from hackagent.attacks.strategies import AdvPrefix, AttackStrategy
 from hackagent.client import AuthenticatedClient
 from hackagent.errors import HackAgentError
-from hackagent.models import AgentTypeEnum
 from hackagent.router import AgentRouter
+from hackagent.router.types import AgentTypeEnum
 from hackagent.vulnerabilities.prompts import DEFAULT_PROMPTS
 
 logger = logging.getLogger(__name__)
@@ -133,6 +133,8 @@ class HackAgent:
         attack_config: Dict[str, Any],
         run_config_override: Optional[Dict[str, Any]] = None,
         fail_on_run_error: bool = True,
+        _tui_app: Optional[Any] = None,
+        _tui_log_callback: Optional[Any] = None,
     ) -> Any:
         """
         Executes a specified attack strategy against the configured victim agent.
@@ -174,15 +176,14 @@ class HackAgent:
             if not strategy:
                 supported_types = list(self.attack_strategies.keys())
                 raise ValueError(
-                    f"Unsupported attack_type: {attack_type}. "
-                    f"Supported types: {supported_types}."
+                    f"Unsupported attack_type: {attack_type}. Supported types: {supported_types}."
                 )
 
             backend_agent = self.router.backend_agent
 
             logger.info(
                 f"Preparing to attack agent '{backend_agent.name}' "
-                f"(ID: {backend_agent.id}, Type: {backend_agent.agent_type.value}) "
+                f"(ID: {backend_agent.id}, Type: {backend_agent.agent_type}) "
                 f"configured in this HackAgent instance, using strategy '{attack_type}'."
             )
 
@@ -190,6 +191,8 @@ class HackAgent:
                 attack_config=attack_config,
                 run_config_override=run_config_override,
                 fail_on_run_error=fail_on_run_error,
+                _tui_app=_tui_app,
+                _tui_log_callback=_tui_log_callback,
             )
 
         except HackAgentError:

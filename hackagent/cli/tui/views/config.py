@@ -171,10 +171,9 @@ class ConfigTab(Container):
             self.cli_config.save()
 
             self._update_status()
-            self.app.show_success("Configuration saved successfully")
 
-        except Exception as e:
-            self.app.show_error(f"Failed to save configuration: {e}")
+        except Exception:
+            pass
 
     def _test_connection(self) -> None:
         """Test API connection."""
@@ -183,7 +182,6 @@ class ConfigTab(Container):
             from hackagent.client import AuthenticatedClient
 
             if not self.cli_config.api_key:
-                self.app.show_error("API key is required to test connection")
                 return
 
             client = AuthenticatedClient(
@@ -192,25 +190,17 @@ class ConfigTab(Container):
                 prefix="Bearer",
             )
 
-            response = key_list.sync_detailed(client=client)
+            key_list.sync_detailed(client=client)
 
-            if response.status_code == 200:
-                self.app.show_success("API connection successful!")
-            else:
-                self.app.show_error(
-                    f"API connection failed: Status {response.status_code}"
-                )
-
-        except Exception as e:
-            self.app.show_error(f"Connection test failed: {e}")
+        except Exception:
+            pass
 
     def _validate_config(self) -> None:
         """Validate current configuration."""
         try:
             self.cli_config.validate()
-            self.app.show_success("Configuration is valid")
-        except ValueError as e:
-            self.app.show_error(f"Configuration validation failed: {e}")
+        except ValueError:
+            pass
 
     def _reset_config(self) -> None:
         """Reset configuration to defaults."""
@@ -226,12 +216,8 @@ class ConfigTab(Container):
             self._load_config()
             self._update_status()
 
-            self.app.show_warning(
-                "Configuration reset to defaults. Don't forget to set your API key!"
-            )
-
-        except Exception as e:
-            self.app.show_error(f"Failed to reset configuration: {e}")
+        except Exception:
+            pass
 
     def _get_python_version(self) -> str:
         """Get Python version string."""

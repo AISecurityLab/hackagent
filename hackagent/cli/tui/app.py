@@ -25,11 +25,11 @@ from textual.containers import Container
 from textual.widgets import Footer, Static, TabbedContent, TabPane
 
 from hackagent.cli.config import CLIConfig
-from hackagent.cli.tui.tabs.agents import AgentsTab
-from hackagent.cli.tui.tabs.attacks import AttacksTab
-from hackagent.cli.tui.tabs.config import ConfigTab
-from hackagent.cli.tui.tabs.dashboard import DashboardTab
-from hackagent.cli.tui.tabs.results import ResultsTab
+from hackagent.cli.tui.views.agents import AgentsTab
+from hackagent.cli.tui.views.attacks import AttacksTab
+from hackagent.cli.tui.views.config import ConfigTab
+from hackagent.cli.tui.views.dashboard import DashboardTab
+from hackagent.cli.tui.views.results import ResultsTab
 
 
 class HackAgentHeader(Container):
@@ -233,7 +233,6 @@ class HackAgentTUI(App):
             for child in active_pane.children:
                 if hasattr(child, "refresh_data"):
                     child.refresh_data()
-                    self.notify("Data refreshed", severity="information")
                     break
 
     def on_mount(self) -> None:
@@ -243,16 +242,16 @@ class HackAgentTUI(App):
 
     def show_success(self, message: str) -> None:
         """Show success notification with checkmark."""
-        self.notify(f"✅ {message}", severity="information", timeout=3)
+        pass
 
     def show_error(self, message: str) -> None:
         """Show error notification with X mark."""
-        self.notify(f"❌ {message}", severity="error", timeout=5)
+        pass
 
     def show_warning(self, message: str) -> None:
         """Show warning notification with warning sign."""
-        self.notify(f"⚠️ {message}", severity="warning", timeout=4)
+        pass
 
     def show_info(self, message: str) -> None:
         """Show info notification with info icon."""
-        self.notify(f"ℹ️ {message}", severity="information", timeout=3)
+        pass

@@ -2,11 +2,12 @@
 Unit tests for CLI configuration functionality.
 """
 
-import pytest
 import json
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 from hackagent.cli.config import CLIConfig
 
@@ -25,7 +26,7 @@ class TestCLIConfig:
 
             assert config.api_key is None
             assert config.base_url == "https://api.hackagent.dev"
-            assert config.verbose == 0
+            assert config.verbose == 1  # Default is VERBOSITY_WARNING
             assert config.output_format == "table"
 
     def test_env_variable_loading(self):

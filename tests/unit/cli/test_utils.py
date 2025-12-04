@@ -2,29 +2,30 @@
 Unit tests for CLI utilities and helper functions.
 """
 
-import pytest
 import json
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 from rich.console import Console
 
 from hackagent.cli.utils import (
-    handle_errors,
+    console,
+    display_error,
+    display_info,
     display_results_table,
     display_success,
     display_warning,
-    display_error,
-    display_info,
-    console,
+    handle_errors,
 )
 
 # Import the new utils functions for testing
 from hackagent.utils import (
-    resolve_api_token,
     _load_api_key_from_config,
     _load_api_key_from_env,
     resolve_agent_type,
+    resolve_api_token,
 )
 
 
@@ -502,14 +503,14 @@ class TestAgentTypeResolution:
 
     def test_resolve_agent_type_enum_input(self):
         """Test agent type resolution with enum input"""
-        from hackagent.models import AgentTypeEnum
+        from hackagent.router.types import AgentTypeEnum
 
         result = resolve_agent_type(AgentTypeEnum.GOOGLE_ADK)
         assert result == AgentTypeEnum.GOOGLE_ADK
 
     def test_resolve_agent_type_string_input(self):
         """Test agent type resolution with string input"""
-        from hackagent.models import AgentTypeEnum
+        from hackagent.router.types import AgentTypeEnum
 
         # Test various string formats
         test_cases = [
@@ -525,14 +526,14 @@ class TestAgentTypeResolution:
 
     def test_resolve_agent_type_invalid_string(self):
         """Test agent type resolution with invalid string"""
-        from hackagent.models import AgentTypeEnum
+        from hackagent.router.types import AgentTypeEnum
 
         result = resolve_agent_type("invalid-type")
         assert result == AgentTypeEnum.UNKNOWN
 
     def test_resolve_agent_type_invalid_type(self):
         """Test agent type resolution with invalid type"""
-        from hackagent.models import AgentTypeEnum
+        from hackagent.router.types import AgentTypeEnum
 
         result = resolve_agent_type(123)  # Invalid type
         assert result == AgentTypeEnum.UNKNOWN

@@ -13,20 +13,23 @@
 # limitations under the License.
 
 
-import unittest
-from unittest.mock import MagicMock, AsyncMock
-from http import HTTPStatus
-import httpx
 import asyncio  # Import asyncio here
 import json  # Added import
+import unittest
+from http import HTTPStatus
+from unittest.mock import AsyncMock, MagicMock
 
-from hackagent.api.generate.generate_create import sync_detailed, asyncio_detailed
+import httpx
+
+from hackagent.api.generate.generate_create import asyncio_detailed, sync_detailed
 from hackagent.client import AuthenticatedClient
+from hackagent.models import (
+    GenerateErrorResponse,  # Added import
+    GenerateRequestRequest,
+    MessageRequest,
+    GenerateSuccessResponse,  # Added import
+)
 from hackagent.types import Response
-from hackagent.models import GenerateRequestRequest
-from hackagent.models import GenerateRequestRequestMessagesItem
-from hackagent.models import GenerateErrorResponse  # Added import
-from hackagent.models import GenerateSuccessResponse  # Added import
 
 
 class TestGeneratorAPI(unittest.TestCase):
@@ -66,9 +69,7 @@ class TestGeneratorAPI(unittest.TestCase):
         self.mock_httpx_client.request.return_value = mock_response
 
         messages_data = [{"role": "user", "content": "Hello"}]
-        messages_items = [
-            GenerateRequestRequestMessagesItem.from_dict(m) for m in messages_data
-        ]
+        messages_items = [MessageRequest.from_dict(m) for m in messages_data]
         request_body = GenerateRequestRequest(
             model="test-model", messages=messages_items
         )
@@ -100,9 +101,7 @@ class TestGeneratorAPI(unittest.TestCase):
         self.mock_httpx_client.request.return_value = mock_response
 
         messages_data = [{"role": "user", "content": "Hello"}]
-        messages_items = [
-            GenerateRequestRequestMessagesItem.from_dict(m) for m in messages_data
-        ]
+        messages_items = [MessageRequest.from_dict(m) for m in messages_data]
         request_body = GenerateRequestRequest(
             model="test-model", messages=messages_items
         )
@@ -134,9 +133,7 @@ class TestGeneratorAPI(unittest.TestCase):
         self.mock_httpx_client.request.return_value = mock_response
 
         messages_data = [{"role": "user", "content": "Hello"}]
-        messages_items = [
-            GenerateRequestRequestMessagesItem.from_dict(m) for m in messages_data
-        ]
+        messages_items = [MessageRequest.from_dict(m) for m in messages_data]
         request_body = GenerateRequestRequest(
             model="test-model", messages=messages_items
         )
@@ -188,9 +185,7 @@ class TestGeneratorAPI(unittest.TestCase):
 
         # Define request_body in the outer scope
         messages_data = [{"role": "user", "content": "Hello"}]
-        messages_items = [
-            GenerateRequestRequestMessagesItem.from_dict(m) for m in messages_data
-        ]
+        messages_items = [MessageRequest.from_dict(m) for m in messages_data]
         request_body = GenerateRequestRequest(
             model="test-model", messages=messages_items
         )
@@ -229,9 +224,7 @@ class TestGeneratorAPI(unittest.TestCase):
 
         # Define request_body in the outer scope
         messages_data = [{"role": "user", "content": "Hello"}]
-        messages_items = [
-            GenerateRequestRequestMessagesItem.from_dict(m) for m in messages_data
-        ]
+        messages_items = [MessageRequest.from_dict(m) for m in messages_data]
         request_body = GenerateRequestRequest(
             model="test-model", messages=messages_items
         )
@@ -270,9 +263,7 @@ class TestGeneratorAPI(unittest.TestCase):
 
         # Define request_body in the outer scope
         messages_data = [{"role": "user", "content": "Hello"}]
-        messages_items = [
-            GenerateRequestRequestMessagesItem.from_dict(m) for m in messages_data
-        ]
+        messages_items = [MessageRequest.from_dict(m) for m in messages_data]
         request_body = GenerateRequestRequest(
             model="test-model", messages=messages_items
         )

@@ -14,9 +14,7 @@ def _get_kwargs(
 ) -> dict[str, Any]:
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/apilogs/{id}".format(
-            id=id,
-        ),
+        "url": f"/apilogs/{id}",
     }
 
     return _kwargs
@@ -53,6 +51,9 @@ def sync_detailed(
 ) -> Response[APITokenLog]:
     """Provides read-only access to APITokenLog entries for the user's organization.
 
+    Web-only endpoint - requires Auth0 authentication.
+    Usage logs are intended for web dashboard monitoring.
+
     Args:
         id (int):
 
@@ -82,6 +83,9 @@ def sync(
 ) -> Optional[APITokenLog]:
     """Provides read-only access to APITokenLog entries for the user's organization.
 
+    Web-only endpoint - requires Auth0 authentication.
+    Usage logs are intended for web dashboard monitoring.
+
     Args:
         id (int):
 
@@ -105,6 +109,9 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
 ) -> Response[APITokenLog]:
     """Provides read-only access to APITokenLog entries for the user's organization.
+
+    Web-only endpoint - requires Auth0 authentication.
+    Usage logs are intended for web dashboard monitoring.
 
     Args:
         id (int):
@@ -132,6 +139,9 @@ async def asyncio(
     client: AuthenticatedClient,
 ) -> Optional[APITokenLog]:
     """Provides read-only access to APITokenLog entries for the user's organization.
+
+    Web-only endpoint - requires Auth0 authentication.
+    Usage logs are intended for web dashboard monitoring.
 
     Args:
         id (int):

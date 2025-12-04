@@ -13,7 +13,12 @@
 # limitations under the License.
 
 """
-TUI Tabs Module
+TUI Widgets
 
-Individual tab implementations for the HackAgent TUI.
+Reusable Textual widgets for the HackAgent TUI interface.
 """
+
+from hackagent.cli.tui.widgets.actions import AgentActionsViewer
+from hackagent.cli.tui.widgets.logs import AttackLogViewer
+
+__all__ = ["AttackLogViewer", "AgentActionsViewer"]

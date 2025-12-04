@@ -13,11 +13,12 @@
 # limitations under the License.
 
 
-import pytest
-from httpx import Response
-from unittest.mock import MagicMock, patch, AsyncMock
 import datetime
 import uuid
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from httpx import Response
 
 from hackagent.api.organization import (
     organization_create,
@@ -28,13 +29,13 @@ from hackagent.api.organization import (
     organization_retrieve,
     organization_update,
 )
-from hackagent.models.organization_request import OrganizationRequest
-from hackagent.models.organization import Organization
 from hackagent.client import AuthenticatedClient
 from hackagent.errors import UnexpectedStatus
-from hackagent.types import UNSET
+from hackagent.models.organization import Organization
+from hackagent.models.organization_request import OrganizationRequest
 from hackagent.models.paginated_organization_list import PaginatedOrganizationList
 from hackagent.models.patched_organization_request import PatchedOrganizationRequest
+from hackagent.types import UNSET
 
 
 @pytest.fixture

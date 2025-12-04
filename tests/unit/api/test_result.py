@@ -14,31 +14,32 @@
 
 
 import unittest
-from unittest.mock import patch, MagicMock
-from http import HTTPStatus
 import uuid
+from http import HTTPStatus
+from unittest.mock import MagicMock, patch
+
 from dateutil.parser import isoparse
 
-from hackagent.models.paginated_result_list import PaginatedResultList
-from hackagent.models.result import Result
+from hackagent import errors
+from hackagent.api.result import (
+    result_create,
+    result_destroy,
+    result_list,
+    result_partial_update,
+    result_retrieve,
+    result_trace_create,
+    result_update,
+)
 from hackagent.models.evaluation_status_enum import EvaluationStatusEnum
-from hackagent.models.trace import Trace
-from hackagent.models.result_request import ResultRequest
+from hackagent.models.paginated_result_list import PaginatedResultList
 from hackagent.models.patched_result_request import PatchedResultRequest
-from hackagent.models.trace_request import TraceRequest  # For creating traces
+from hackagent.models.result import Result
+from hackagent.models.result_request import ResultRequest
 from hackagent.models.step_type_enum import (
     StepTypeEnum,
 )  # Ensuring this import is present
-from hackagent.api.result import (
-    result_list,
-    result_create,
-    result_retrieve,
-    result_update,
-    result_partial_update,
-    result_destroy,
-    result_trace_create,
-)
-from hackagent import errors
+from hackagent.models.trace import Trace
+from hackagent.models.trace_request import TraceRequest  # For creating traces
 
 
 class TestResultListAPI(unittest.TestCase):

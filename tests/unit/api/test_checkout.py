@@ -13,18 +13,19 @@
 # limitations under the License.
 
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 from httpx import Response
-from unittest.mock import MagicMock, patch, AsyncMock
 
 from hackagent.api.checkout import checkout_create
+from hackagent.client import AuthenticatedClient
+from hackagent.errors import UnexpectedStatus
 from hackagent.models.checkout_session_request_request import (
     CheckoutSessionRequestRequest,
 )
 from hackagent.models.checkout_session_response import CheckoutSessionResponse
 from hackagent.models.generic_error_response import GenericErrorResponse
-from hackagent.client import AuthenticatedClient
-from hackagent.errors import UnexpectedStatus
 
 
 @pytest.fixture

@@ -46,9 +46,7 @@ def get_current_version():
                 "run",
                 "python",
                 "-c",
-                "import toml; "
-                "data = toml.load('pyproject.toml'); "
-                "print(data['project']['version'])",
+                "import toml; data = toml.load('pyproject.toml'); print(data['project']['version'])",
             ],
             capture_output=True,
             text=True,

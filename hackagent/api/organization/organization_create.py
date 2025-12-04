@@ -77,6 +77,9 @@ def sync_detailed(
 ) -> Response[Organization]:
     """Provides access to Organization details for the authenticated user.
 
+    Web-only endpoint - requires Auth0 authentication.
+    Organization management and billing operations require browser context.
+
     Args:
         body (OrganizationRequest):
         body (OrganizationRequest):
@@ -112,6 +115,9 @@ def sync(
 ) -> Optional[Organization]:
     """Provides access to Organization details for the authenticated user.
 
+    Web-only endpoint - requires Auth0 authentication.
+    Organization management and billing operations require browser context.
+
     Args:
         body (OrganizationRequest):
         body (OrganizationRequest):
@@ -141,6 +147,9 @@ async def asyncio_detailed(
     ],
 ) -> Response[Organization]:
     """Provides access to Organization details for the authenticated user.
+
+    Web-only endpoint - requires Auth0 authentication.
+    Organization management and billing operations require browser context.
 
     Args:
         body (OrganizationRequest):
@@ -174,6 +183,9 @@ async def asyncio(
     ],
 ) -> Optional[Organization]:
     """Provides access to Organization details for the authenticated user.
+
+    Web-only endpoint - requires Auth0 authentication.
+    Organization management and billing operations require browser context.
 
     Args:
         body (OrganizationRequest):

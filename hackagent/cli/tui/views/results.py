@@ -139,7 +139,6 @@ class ResultsTab(Container):
         """Handle button press events."""
         if event.button.id == "refresh-results":
             self.refresh_data()
-            self.app.show_success("Results refreshed")
 
     def on_select_changed(self, event: Select.Changed) -> None:
         """Handle select dropdown changes."""
@@ -175,9 +174,6 @@ class ResultsTab(Container):
 
             # Validate configuration
             if not self.cli_config.api_key:
-                self.app.show_error(
-                    "API key not configured. Run 'hackagent init' to set up."
-                )
                 self._show_empty_state("API key not configured")
                 return
 
@@ -212,16 +208,13 @@ class ResultsTab(Container):
                     self._update_table()
                     self._update_summary_stats()
             elif response.status_code == 401:
-                self.app.show_error("Authentication failed. Check your API key.")
                 self._show_empty_state("Authentication failed")
             elif response.status_code == 403:
-                self.app.show_error("Access forbidden. Check your API key permissions.")
                 self._show_empty_state("Access forbidden")
             else:
                 error_msg = f"API error: {response.status_code}"
                 if hasattr(response, "content"):
                     error_msg += f" - {response.content[:200]}"
-                self.app.show_error(error_msg)
                 self._show_empty_state(
                     f"Failed to fetch results: {response.status_code}"
                 )
@@ -239,9 +232,7 @@ class ResultsTab(Container):
                 )
             elif "401" in error_msg or "authentication" in error_msg.lower():
                 self._show_empty_state(
-                    "🔒 Authentication Failed\n\n"
-                    "Your API key is invalid.\n"
-                    "Run: hackagent config set --api-key YOUR_KEY"
+                    "🔒 Authentication Failed\n\nYour API key is invalid.\nRun: hackagent config set --api-key YOUR_KEY"
                 )
             else:
                 self._show_empty_state(

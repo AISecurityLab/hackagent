@@ -13,13 +13,15 @@
 # limitations under the License.
 
 
-import subprocess
-import time
 import os
 import signal
+import subprocess
+import time
 from contextlib import contextmanager
-from hackagent.logger import get_logger
+
 import dotenv
+
+from hackagent.logger import get_logger
 
 dotenv.load_dotenv()
 
@@ -61,10 +63,7 @@ def adk_agent_server(port: int):
             if server_process.poll() is not None:
                 stdout, stderr = server_process.communicate()
                 code = server_process.returncode
-                err_msg = (
-                    f"ADK server exited prematurely. Code: {code}.\n"
-                    f"Stdout: {stdout}\nStderr: {stderr}"
-                )
+                err_msg = f"ADK server exited prematurely. Code: {code}.\nStdout: {stdout}\nStderr: {stderr}"
                 logger.error(err_msg)
                 raise RuntimeError(f"ADK server failed to start. Code: {code}")
 
@@ -110,10 +109,7 @@ def adk_agent_server(port: int):
                 exit_code = server_process.returncode or "N/A"
                 logger.info(f"ADK server stopped. Exit code: {exit_code}")
                 if stdout or stderr:
-                    log_details = (
-                        f"ADK Server (port {port}) Final Output:\n"
-                        f"Stdout: {stdout}\nStderr: {stderr}"
-                    )
+                    log_details = f"ADK Server (port {port}) Final Output:\nStdout: {stdout}\nStderr: {stderr}"
                     logger.debug(log_details)
             except ProcessLookupError:
                 warn_msg = f"ADK server process (port {port}) already stopped."

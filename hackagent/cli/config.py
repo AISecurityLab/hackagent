@@ -27,6 +27,26 @@ from typing import Optional
 # Sentinel object to detect if a parameter was explicitly passed
 _UNSET = object()
 
+# Verbosity level constants (aligned with logging levels)
+VERBOSITY_ERROR = 0  # Only errors
+VERBOSITY_WARNING = 1  # Errors and warnings
+VERBOSITY_INFO = 2  # Errors, warnings, and info
+VERBOSITY_DEBUG = 3  # Everything including debug
+
+VERBOSITY_NAMES = {
+    0: "ERROR",
+    1: "WARNING",
+    2: "INFO",
+    3: "DEBUG",
+}
+
+VERBOSITY_LEVELS = {
+    "error": 0,
+    "warning": 1,
+    "info": 2,
+    "debug": 3,
+}
+
 
 class CLIConfig:
     """CLI configuration management with multiple sources"""
@@ -45,22 +65,27 @@ class CLIConfig:
             "api_key": None,
             "base_url": "https://api.hackagent.dev",
             "output_format": "table",
-            "verbose": 0,
+            "verbose": VERBOSITY_WARNING,  # Default to WARNING level
         }
 
         # Track what was explicitly passed using sentinel values
         self._cli_overrides = set()
 
         # Set attributes and track overrides
+        # Only mark as CLI override if explicitly provided AND not None
         if api_key is not _UNSET:
             self.api_key = api_key
-            self._cli_overrides.add("api_key")
+            # Only treat as CLI override if actually provided (not None from missing env var)
+            if api_key is not None:
+                self._cli_overrides.add("api_key")
         else:
             self.api_key = self._defaults["api_key"]
 
         if base_url is not _UNSET:
             self.base_url = base_url
-            self._cli_overrides.add("base_url")
+            # Only treat as CLI override if actually provided (not None from missing env var)
+            if base_url is not None:
+                self._cli_overrides.add("base_url")
         else:
             self.base_url = self._defaults["base_url"]
 
@@ -72,13 +97,18 @@ class CLIConfig:
 
         if verbose is not _UNSET:
             self.verbose = verbose
-            self._cli_overrides.add("verbose")
+            # Only treat as CLI override if actually provided and > 0
+            # (Click's count option returns 0 when not specified, so 0 means not set)
+            if verbose is not None and verbose > 0:
+                self._cli_overrides.add("verbose")
         else:
             self.verbose = self._defaults["verbose"]
 
         if output_format is not _UNSET:
             self.output_format = output_format
-            self._cli_overrides.add("output_format")
+            # Only treat as CLI override if actually provided (not None from missing env var)
+            if output_format is not None:
+                self._cli_overrides.add("output_format")
         else:
             self.output_format = self._defaults["output_format"]
 
@@ -147,12 +177,16 @@ class CLIConfig:
                 # STANDARDIZED PRIORITY: CLI args > Config file > Env vars > Defaults
                 # Never override CLI arguments, but override defaults and environment will be loaded later
                 for key, value in config_data.items():
-                    if hasattr(self, key) and key != "base_url":
-                        # Never override CLI arguments
-                        if key in self._cli_overrides:
-                            continue
+                    # Skip base_url as it's always from CLI/env
+                    if key == "base_url":
+                        continue
 
-                        # Set config file values (env will be loaded later for None values)
+                    # Never override CLI arguments
+                    if key in self._cli_overrides:
+                        continue
+
+                    # Set config file values (env will be loaded later for None values)
+                    if hasattr(self, key):
                         setattr(self, key, value)
                         # Track that this was set by config file (even if None)
                         self._config_overrides.add(key)
@@ -174,9 +208,9 @@ class CLIConfig:
 
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w") as f:
-            # Don't save None values, verbose level, or base_url (always hardcoded)
+            # Don't save None values or base_url (always hardcoded)
             config_dict = {}
-            for attr in ["api_key", "output_format"]:
+            for attr in ["api_key", "output_format", "verbose"]:
                 value = getattr(self, attr, None)
                 if value is not None:
                     config_dict[attr] = value
@@ -192,6 +226,22 @@ class CLIConfig:
 
         if not self.base_url:
             raise ValueError("Base URL is required")
+
+    def should_show_info(self) -> bool:
+        """Check if INFO level messages should be displayed"""
+        return self.verbose >= VERBOSITY_INFO
+
+    def should_show_warning(self) -> bool:
+        """Check if WARNING level messages should be displayed"""
+        return self.verbose >= VERBOSITY_WARNING
+
+    def should_show_debug(self) -> bool:
+        """Check if DEBUG level messages should be displayed"""
+        return self.verbose >= VERBOSITY_DEBUG
+
+    def get_verbosity_name(self) -> str:
+        """Get the name of the current verbosity level"""
+        return VERBOSITY_NAMES.get(self.verbose, "UNKNOWN")
 
     @property
     def default_config_path(self) -> Path:

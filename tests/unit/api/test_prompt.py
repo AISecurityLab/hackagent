@@ -14,24 +14,25 @@
 
 
 import unittest
-from unittest.mock import patch, MagicMock
-from http import HTTPStatus
 import uuid
+from http import HTTPStatus
+from unittest.mock import MagicMock, patch
+
 from dateutil.parser import isoparse
 
-from hackagent.models.paginated_prompt_list import PaginatedPromptList
-from hackagent.models.prompt import Prompt
-from hackagent.models.prompt_request import PromptRequest
-from hackagent.models.patched_prompt_request import PatchedPromptRequest
+from hackagent import errors
 from hackagent.api.prompt import (
-    prompt_list,
     prompt_create,
+    prompt_destroy,
+    prompt_list,
+    prompt_partial_update,
     prompt_retrieve,
     prompt_update,
-    prompt_partial_update,
-    prompt_destroy,
 )
-from hackagent import errors
+from hackagent.models.paginated_prompt_list import PaginatedPromptList
+from hackagent.models.patched_prompt_request import PatchedPromptRequest
+from hackagent.models.prompt import Prompt
+from hackagent.models.prompt_request import PromptRequest
 
 
 class TestPromptListAPI(unittest.TestCase):
@@ -192,8 +193,6 @@ class TestPromptCreateAPI(unittest.TestCase):
         mock_httpx_client = MagicMock()
         mock_client_instance.get_httpx_client.return_value = mock_httpx_client
 
-        mock_org_id_create = uuid.uuid4()  # For the request body
-
         # These two variables are unused
         # mock_org_detail_data_create = {"id": str(mock_org_id_create), "name": "Prompt Creator Org"}
         # mock_owner_detail_data_create = {"id": mock_owner_id_create, "username": "prompt_creator_user"}
@@ -201,7 +200,6 @@ class TestPromptCreateAPI(unittest.TestCase):
         prompt_request_data = PromptRequest(
             name="New Test Prompt",
             prompt_text="This is the text for the new prompt.",
-            organization=mock_org_id_create,
             category="CreationTest",
             tags=["new", "create"],
             evaluation_criteria="Successfully created.",
@@ -230,7 +228,7 @@ class TestPromptCreateAPI(unittest.TestCase):
             "id": str(mock_created_prompt_id),
             "name": prompt_request_data.name,
             "prompt_text": prompt_request_data.prompt_text,
-            "organization": str(prompt_request_data.organization),
+            "organization": str(mock_org_id_create_resp),  # Organization from response
             "organization_detail": mock_response_org_detail,  # Use resp detail
             "owner_detail": mock_response_owner_detail,  # Use resp detail
             "created_at": created_at_create_str,
@@ -264,9 +262,8 @@ class TestPromptCreateAPI(unittest.TestCase):
             self.assertEqual(
                 response.parsed.prompt_text, prompt_request_data.prompt_text
             )
-            self.assertEqual(
-                response.parsed.organization, prompt_request_data.organization
-            )
+            # PromptRequest doesn't have organization field - it's set by the backend
+            self.assertEqual(response.parsed.organization, mock_org_id_create_resp)
             self.assertEqual(response.parsed.category, prompt_request_data.category)
             self.assertEqual(response.parsed.tags, prompt_request_data.tags)
             self.assertEqual(
@@ -317,9 +314,7 @@ class TestPromptCreateAPI(unittest.TestCase):
         mock_client_instance.get_httpx_client.return_value = mock_httpx_client
         mock_client_instance.raise_on_unexpected_status = True
 
-        prompt_request_data = PromptRequest(
-            name="Error Prompt", prompt_text="text", organization=uuid.uuid4()
-        )
+        prompt_request_data = PromptRequest(name="Error Prompt", prompt_text="text")
 
         mock_httpx_response = MagicMock()
         mock_httpx_response.status_code = 400
@@ -345,8 +340,8 @@ class TestPromptCreateAPI(unittest.TestCase):
         mock_client_instance.raise_on_unexpected_status = False
 
         prompt_request_data = PromptRequest(
-            name="Error False Prompt", prompt_text="text", organization=uuid.uuid4()
-        )  # Added missing org
+            name="Error False Prompt", prompt_text="text"
+        )
 
         mock_httpx_response = MagicMock()
         mock_httpx_response.status_code = 401
@@ -520,7 +515,6 @@ class TestPromptUpdateAPI(unittest.TestCase):
         prompt_update_request_data = PromptRequest(
             name="Updated Test Prompt",
             prompt_text="This is the updated text for the prompt.",
-            organization=mock_org_id_update,  # This field is mandatory in PromptRequest
             category="UpdateTest",
             tags=["updated", "put"],
             evaluation_criteria="Successfully updated.",
@@ -546,7 +540,7 @@ class TestPromptUpdateAPI(unittest.TestCase):
             "id": str(prompt_id_to_update),
             "name": prompt_update_request_data.name,
             "prompt_text": prompt_update_request_data.prompt_text,
-            "organization": str(prompt_update_request_data.organization),
+            "organization": str(mock_org_id_update),  # Organization from response
             "organization_detail": mock_org_detail_data_update_resp,
             "owner_detail": mock_owner_detail_data_update_resp,
             "created_at": original_created_at_str,  # Should be original creation time
@@ -635,9 +629,7 @@ class TestPromptUpdateAPI(unittest.TestCase):
         mock_client_instance.raise_on_unexpected_status = True
 
         prompt_id_not_found = uuid.uuid4()
-        update_data = PromptRequest(
-            name="Upd", prompt_text="t", organization=uuid.uuid4()
-        )  # Dummy data
+        update_data = PromptRequest(name="Upd", prompt_text="t")  # Dummy data
 
         mock_httpx_response = MagicMock()
         mock_httpx_response.status_code = 404
@@ -663,9 +655,7 @@ class TestPromptUpdateAPI(unittest.TestCase):
         mock_client_instance.raise_on_unexpected_status = False
 
         prompt_id_error_update = uuid.uuid4()
-        update_data_error = PromptRequest(
-            name="UpdErr", prompt_text="te", organization=uuid.uuid4()
-        )  # Dummy data
+        update_data_error = PromptRequest(name="UpdErr", prompt_text="te")  # Dummy data
 
         mock_httpx_response = MagicMock()
         mock_httpx_response.status_code = 400  # Bad Request (e.g. validation error)

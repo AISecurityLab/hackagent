@@ -14,9 +14,7 @@ def _get_kwargs(
 ) -> dict[str, Any]:
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/key/{prefix}".format(
-            prefix=prefix,
-        ),
+        "url": f"/key/{prefix}",
     }
 
     return _kwargs
@@ -53,6 +51,9 @@ def sync_detailed(
 ) -> Response[UserAPIKey]:
     """ViewSet for managing User API Keys.
 
+    Web-only endpoint - requires Auth0 authentication.
+    API keys cannot manage other API keys for security reasons.
+
     Args:
         prefix (str):
 
@@ -82,6 +83,9 @@ def sync(
 ) -> Optional[UserAPIKey]:
     """ViewSet for managing User API Keys.
 
+    Web-only endpoint - requires Auth0 authentication.
+    API keys cannot manage other API keys for security reasons.
+
     Args:
         prefix (str):
 
@@ -105,6 +109,9 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
 ) -> Response[UserAPIKey]:
     """ViewSet for managing User API Keys.
+
+    Web-only endpoint - requires Auth0 authentication.
+    API keys cannot manage other API keys for security reasons.
 
     Args:
         prefix (str):
@@ -132,6 +139,9 @@ async def asyncio(
     client: AuthenticatedClient,
 ) -> Optional[UserAPIKey]:
     """ViewSet for managing User API Keys.
+
+    Web-only endpoint - requires Auth0 authentication.
+    API keys cannot manage other API keys for security reasons.
 
     Args:
         prefix (str):
