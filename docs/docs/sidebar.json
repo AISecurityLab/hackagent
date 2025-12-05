@@ -7,7 +7,6 @@
             {
               "items": [
                 "reference/hackagent/attacks/AdvPrefix/aggregation",
-                "reference/hackagent/attacks/AdvPrefix/completer",
                 "reference/hackagent/attacks/AdvPrefix/completions",
                 "reference/hackagent/attacks/AdvPrefix/compute_ce",
                 "reference/hackagent/attacks/AdvPrefix/evaluation",

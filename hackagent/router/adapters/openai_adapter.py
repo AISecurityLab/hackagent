@@ -86,9 +86,10 @@ class OpenAIAgentAdapter(Agent):
                           - 'tool_choice' (optional): Controls which tools the model can call.
         """
         super().__init__(id, config)
+        # Use hierarchical logger name for TUI handler inheritance
         self.logger = logging.getLogger(
-            f"{__name__}.{self.id}"
-        )  # Instance-specific logger
+            f"hackagent.router.adapters.OpenAIAgentAdapter.{self.id}"
+        )
 
         if not OPENAI_AVAILABLE:
             msg = (
@@ -99,10 +100,7 @@ class OpenAIAgentAdapter(Agent):
             raise OpenAIConfigurationError(msg)
 
         if "name" not in self.config:
-            msg = (
-                f"Missing required configuration key 'name' (for model string) for "
-                f"OpenAIAgentAdapter: {self.id}"
-            )
+            msg = f"Missing required configuration key 'name' (for model string) for OpenAIAgentAdapter: {self.id}"
             self.logger.error(msg)
             raise OpenAIConfigurationError(msg)
 

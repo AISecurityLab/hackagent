@@ -189,7 +189,7 @@ def confirm_action(message: str, default: bool = False) -> bool:
 
 def get_agent_type_enum(agent_type: str):
     """Convert string agent type to AgentTypeEnum"""
-    from hackagent.models import AgentTypeEnum
+    from hackagent.router.types import AgentTypeEnum
 
     # Normalize the input
     normalized = agent_type.upper().replace("-", "_").replace(" ", "_")
@@ -206,7 +206,8 @@ def get_agent_type_enum(agent_type: str):
         "OPENAI_SDK": AgentTypeEnum.OPENAI_SDK,
         "OPENAI-SDK": AgentTypeEnum.OPENAI_SDK,
         "OPENAI": AgentTypeEnum.OPENAI_SDK,
-        "OTHER": AgentTypeEnum.OTHER,
+        "OTHER": AgentTypeEnum.UNKNOWN,
+        "UNKNOWN": AgentTypeEnum.UNKNOWN,
     }
 
     if normalized in type_mapping:
@@ -215,11 +216,11 @@ def get_agent_type_enum(agent_type: str):
     try:
         return AgentTypeEnum(normalized)
     except ValueError:
-        # If the type is not recognized, fallback to OTHER
+        # If the type is not recognized, fallback to UNKNOWN
         console.print(
-            f"[yellow]⚠️ Agent type '{agent_type}' not recognized, using 'OTHER'[/yellow]"
+            f"[yellow]⚠️ Agent type '{agent_type}' not recognized, using 'UNKNOWN'[/yellow]"
         )
-        return AgentTypeEnum.OTHER
+        return AgentTypeEnum.UNKNOWN
 
 
 def format_duration(seconds: float) -> str:

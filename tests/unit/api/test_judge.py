@@ -13,20 +13,23 @@
 # limitations under the License.
 
 
-import unittest
-from unittest.mock import MagicMock, AsyncMock
-from http import HTTPStatus
-import httpx
 import asyncio
 import json
+import unittest
+from http import HTTPStatus
+from unittest.mock import AsyncMock, MagicMock
 
-from hackagent.api.judge.judge_create import sync_detailed, asyncio_detailed
+import httpx
+
+from hackagent.api.judge.judge_create import asyncio_detailed, sync_detailed
 from hackagent.client import AuthenticatedClient
+from hackagent.models import (
+    GenerateErrorResponse,
+    GenerateRequestRequest,
+    MessageRequest,
+    GenerateSuccessResponse,
+)
 from hackagent.types import Response
-from hackagent.models import GenerateRequestRequest
-from hackagent.models import GenerateRequestRequestMessagesItem
-from hackagent.models import GenerateErrorResponse
-from hackagent.models import GenerateSuccessResponse
 
 
 class TestJudgeAPI(unittest.TestCase):
@@ -65,9 +68,7 @@ class TestJudgeAPI(unittest.TestCase):
         self.mock_httpx_client.request.return_value = mock_response
 
         messages_data = [{"role": "user", "content": "Hello"}]
-        messages_items = [
-            GenerateRequestRequestMessagesItem.from_dict(m) for m in messages_data
-        ]
+        messages_items = [MessageRequest.from_dict(m) for m in messages_data]
         request_body = GenerateRequestRequest(
             model="test-model", messages=messages_items
         )
@@ -75,7 +76,7 @@ class TestJudgeAPI(unittest.TestCase):
 
         self.mock_httpx_client.request.assert_called_once_with(
             method="post",
-            url="/api/judge",
+            url="/judge",
             json=request_body.to_dict(),
             data=request_body.to_dict(),
             files=request_body.to_multipart(),
@@ -98,9 +99,7 @@ class TestJudgeAPI(unittest.TestCase):
         self.mock_httpx_client.request.return_value = mock_response
 
         messages_data = [{"role": "user", "content": "Hello"}]
-        messages_items = [
-            GenerateRequestRequestMessagesItem.from_dict(m) for m in messages_data
-        ]
+        messages_items = [MessageRequest.from_dict(m) for m in messages_data]
         request_body = GenerateRequestRequest(
             model="test-model", messages=messages_items
         )
@@ -112,7 +111,7 @@ class TestJudgeAPI(unittest.TestCase):
         self.assertEqual(response.parsed.error, "Error")  # Check parsed error message
         self.mock_httpx_client.request.assert_called_once_with(
             method="post",
-            url="/api/judge",
+            url="/judge",
             json=request_body.to_dict(),
             data=request_body.to_dict(),
             files=request_body.to_multipart(),
@@ -131,9 +130,7 @@ class TestJudgeAPI(unittest.TestCase):
         self.mock_httpx_client.request.return_value = mock_response
 
         messages_data = [{"role": "user", "content": "Hello"}]
-        messages_items = [
-            GenerateRequestRequestMessagesItem.from_dict(m) for m in messages_data
-        ]
+        messages_items = [MessageRequest.from_dict(m) for m in messages_data]
         request_body = GenerateRequestRequest(
             model="test-model", messages=messages_items
         )
@@ -141,7 +138,7 @@ class TestJudgeAPI(unittest.TestCase):
 
         self.mock_httpx_client.request.assert_called_once_with(
             method="post",
-            url="/api/judge",
+            url="/judge",
             json=request_body.to_dict(),
             data=request_body.to_dict(),
             files=request_body.to_multipart(),
@@ -179,9 +176,7 @@ class TestJudgeAPI(unittest.TestCase):
 
         # Define request_body in the outer scope
         messages_data = [{"role": "user", "content": "Hello"}]
-        messages_items = [
-            GenerateRequestRequestMessagesItem.from_dict(m) for m in messages_data
-        ]
+        messages_items = [MessageRequest.from_dict(m) for m in messages_data]
         request_body = GenerateRequestRequest(
             model="test-model", messages=messages_items
         )
@@ -193,7 +188,7 @@ class TestJudgeAPI(unittest.TestCase):
 
         self.mock_async_httpx_client.request.assert_called_once_with(
             method="post",
-            url="/api/judge",
+            url="/judge",
             json=request_body.to_dict(),
             data=request_body.to_dict(),
             files=request_body.to_multipart(),
@@ -219,9 +214,7 @@ class TestJudgeAPI(unittest.TestCase):
 
         # Define request_body in the outer scope
         messages_data = [{"role": "user", "content": "Hello"}]
-        messages_items = [
-            GenerateRequestRequestMessagesItem.from_dict(m) for m in messages_data
-        ]
+        messages_items = [MessageRequest.from_dict(m) for m in messages_data]
         request_body = GenerateRequestRequest(
             model="test-model", messages=messages_items
         )
@@ -238,7 +231,7 @@ class TestJudgeAPI(unittest.TestCase):
         )  # Check parsed error message
         self.mock_async_httpx_client.request.assert_called_once_with(
             method="post",
-            url="/api/judge",
+            url="/judge",
             json=request_body.to_dict(),
             data=request_body.to_dict(),
             files=request_body.to_multipart(),
@@ -260,9 +253,7 @@ class TestJudgeAPI(unittest.TestCase):
 
         # Define request_body in the outer scope
         messages_data = [{"role": "user", "content": "Hello"}]
-        messages_items = [
-            GenerateRequestRequestMessagesItem.from_dict(m) for m in messages_data
-        ]
+        messages_items = [MessageRequest.from_dict(m) for m in messages_data]
         request_body = GenerateRequestRequest(
             model="test-model", messages=messages_items
         )
@@ -274,7 +265,7 @@ class TestJudgeAPI(unittest.TestCase):
 
         self.mock_async_httpx_client.request.assert_called_once_with(
             method="post",
-            url="/api/judge",
+            url="/judge",
             json=request_body.to_dict(),
             data=request_body.to_dict(),
             files=request_body.to_multipart(),

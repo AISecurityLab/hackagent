@@ -14,9 +14,7 @@ def _get_kwargs(
 ) -> dict[str, Any]:
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": "/api/user/{id}".format(
-            id=id,
-        ),
+        "url": f"/user/{id}",
     }
 
     return _kwargs
@@ -52,6 +50,9 @@ def sync_detailed(
     """Provides access to the UserProfile for the authenticated user.
     Allows updating fields like the linked user's first_name, last_name, email.
 
+    Web-only endpoint - requires Auth0 authentication.
+    User profile management requires OAuth context and is not for SDK use.
+
     Args:
         id (UUID):
 
@@ -81,6 +82,9 @@ async def asyncio_detailed(
 ) -> Response[Any]:
     """Provides access to the UserProfile for the authenticated user.
     Allows updating fields like the linked user's first_name, last_name, email.
+
+    Web-only endpoint - requires Auth0 authentication.
+    User profile management requires OAuth context and is not for SDK use.
 
     Args:
         id (UUID):

@@ -14,31 +14,32 @@
 
 
 import unittest
-from unittest.mock import patch, MagicMock
-from http import HTTPStatus
 import uuid
+from http import HTTPStatus
+from unittest.mock import MagicMock, patch
+
 from dateutil.parser import isoparse
 
-from hackagent.models.paginated_result_list import PaginatedResultList
-from hackagent.models.result import Result
+from hackagent import errors
+from hackagent.api.result import (
+    result_create,
+    result_destroy,
+    result_list,
+    result_partial_update,
+    result_retrieve,
+    result_trace_create,
+    result_update,
+)
 from hackagent.models.evaluation_status_enum import EvaluationStatusEnum
-from hackagent.models.trace import Trace
-from hackagent.models.result_request import ResultRequest
+from hackagent.models.paginated_result_list import PaginatedResultList
 from hackagent.models.patched_result_request import PatchedResultRequest
-from hackagent.models.trace_request import TraceRequest  # For creating traces
+from hackagent.models.result import Result
+from hackagent.models.result_request import ResultRequest
 from hackagent.models.step_type_enum import (
     StepTypeEnum,
 )  # Ensuring this import is present
-from hackagent.api.result import (
-    result_list,
-    result_create,
-    result_retrieve,
-    result_update,
-    result_partial_update,
-    result_destroy,
-    result_trace_create,
-)
-from hackagent import errors
+from hackagent.models.trace import Trace
+from hackagent.models.trace_request import TraceRequest  # For creating traces
 
 
 class TestResultListAPI(unittest.TestCase):
@@ -148,7 +149,7 @@ class TestResultListAPI(unittest.TestCase):
             # json_prompt, json_run_organization are not passed, so they'd be UNSET
             actual_call_kwargs = mock_httpx_client.request.call_args.kwargs
             self.assertEqual(actual_call_kwargs["method"], "get")
-            self.assertEqual(actual_call_kwargs["url"], "/api/result")
+            self.assertEqual(actual_call_kwargs["url"], "/result")
             self.assertDictEqual(actual_call_kwargs["params"], expected_params)
 
     @patch("hackagent.api.result.result_list.AuthenticatedClient")
@@ -281,7 +282,7 @@ class TestResultCreateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "post",
-                "url": "/api/result",
+                "url": "/result",
                 "json": result_request_data.to_dict(),
                 "headers": {"Content-Type": "application/json"},
             }
@@ -405,7 +406,7 @@ class TestResultRetrieveAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "get",
-                "url": f"/api/result/{result_id_to_retrieve}",
+                "url": f"/result/{result_id_to_retrieve}",
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
@@ -555,7 +556,7 @@ class TestResultUpdateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "put",
-                "url": f"/api/result/{result_id_to_update}",
+                "url": f"/result/{result_id_to_update}",
                 "json": result_update_request_data.to_dict(),
                 "headers": {"Content-Type": "application/json"},
             }
@@ -710,7 +711,7 @@ class TestResultPartialUpdateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "patch",
-                "url": f"/api/result/{result_id_to_patch}",
+                "url": f"/result/{result_id_to_patch}",
                 "json": result_patch_request_data.to_dict(),
                 "headers": {"Content-Type": "application/json"},
             }
@@ -800,7 +801,7 @@ class TestResultDestroyAPI(unittest.TestCase):
 
         expected_kwargs = {
             "method": "delete",
-            "url": f"/api/result/{result_id_to_delete}",
+            "url": f"/result/{result_id_to_delete}",
         }
         mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
@@ -915,7 +916,7 @@ class TestResultTraceCreateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "post",
-                "url": f"/api/result/{result_id_for_trace}/trace",
+                "url": f"/result/{result_id_for_trace}/trace",
                 "json": trace_request_data.to_dict(),
                 "headers": {"Content-Type": "application/json"},
             }

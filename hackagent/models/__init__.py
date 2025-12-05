@@ -2,7 +2,6 @@
 
 from .agent import Agent
 from .agent_request import AgentRequest
-from .agent_type_enum import AgentTypeEnum
 from .api_token_log import APITokenLog
 from .attack import Attack
 from .attack_request import AttackRequest
@@ -54,13 +53,9 @@ from .user_profile import UserProfile
 from .user_profile_minimal import UserProfileMinimal
 from .user_profile_request import UserProfileRequest
 
-# Alias for backward compatibility
-GenerateRequestRequestMessagesItem = MessageRequest
-
 __all__ = (
     "Agent",
     "AgentRequest",
-    "AgentTypeEnum",
     "APITokenLog",
     "Attack",
     "AttackRequest",
@@ -71,7 +66,6 @@ __all__ = (
     "EvaluationStatusEnum",
     "GenerateErrorResponse",
     "GenerateRequestRequest",
-    "GenerateRequestRequestMessagesItem",
     "GenerateSuccessResponse",
     "GenericErrorResponse",
     "MessageRequest",

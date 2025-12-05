@@ -46,9 +46,7 @@ def get_current_version():
                 "run",
                 "python",
                 "-c",
-                "import toml; "
-                "data = toml.load('pyproject.toml'); "
-                "print(data['project']['version'])",
+                "import toml; data = toml.load('pyproject.toml'); print(data['project']['version'])",
             ],
             capture_output=True,
             text=True,
@@ -94,7 +92,6 @@ loaders:
       - hackagent.attacks.AdvPrefix.utils
       - hackagent.attacks.AdvPrefix.scorer
       - hackagent.attacks.AdvPrefix.scorer_parser
-      - hackagent.attacks.AdvPrefix.completer
       - hackagent.attacks.AdvPrefix.selector
       - hackagent.vulnerabilities.prompts
 
@@ -109,7 +106,6 @@ renderer:
   type: docusaurus
   docs_base_path: {output_dir}
   sidebar_top_level_label: "🔗 API Reference"
-  sidebar_top_level_module: null
 """
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as f:

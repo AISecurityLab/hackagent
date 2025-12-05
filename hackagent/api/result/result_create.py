@@ -18,7 +18,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/result",
+        "url": "/result",
     }
 
     _kwargs["json"] = body.to_dict()
@@ -60,6 +60,10 @@ def sync_detailed(
 ) -> Response[Result]:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
 
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+    Results are typically consumed by SDK for test result retrieval and analysis.
+
     Args:
         body (ResultRequest): Serializer for the Result model, often nested in RunSerializer.
 
@@ -89,6 +93,10 @@ def sync(
 ) -> Optional[Result]:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
 
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+    Results are typically consumed by SDK for test result retrieval and analysis.
+
     Args:
         body (ResultRequest): Serializer for the Result model, often nested in RunSerializer.
 
@@ -112,6 +120,10 @@ async def asyncio_detailed(
     body: ResultRequest,
 ) -> Response[Result]:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
+
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+    Results are typically consumed by SDK for test result retrieval and analysis.
 
     Args:
         body (ResultRequest): Serializer for the Result model, often nested in RunSerializer.
@@ -139,6 +151,10 @@ async def asyncio(
     body: ResultRequest,
 ) -> Optional[Result]:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
+
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+    Results are typically consumed by SDK for test result retrieval and analysis.
 
     Args:
         body (ResultRequest): Serializer for the Result model, often nested in RunSerializer.

@@ -22,7 +22,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "put",
-        "url": "/api/user/me",
+        "url": "/user/me",
     }
 
     if isinstance(body, UserProfileRequest):

@@ -21,5 +21,5 @@ For practical usage examples and getting started guides, see the [Python SDK Qui
 
 ---
 
-*This documentation was auto-generated from hackagent vlocal.*
+*This documentation was auto-generated from hackagent v0.3.0.*
 

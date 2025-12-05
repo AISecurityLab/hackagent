@@ -24,6 +24,55 @@ different stages of the AdvPrefix attack pipeline.
 
 Use a logger specific to utils
 
+#### create\_progress\_bar
+
+```python
+@contextmanager
+def create_progress_bar(description: str, total: int)
+```
+
+Create a standardized progress bar for AdvPrefix pipeline steps.
+
+This context manager provides a consistent progress bar configuration
+across all pipeline stages, eliminating code duplication and ensuring
+uniform progress reporting UX throughout the attack execution.
+
+The progress bar includes:
+- Spinner animation for visual feedback
+- Task description with formatting support
+- Visual progress bar
+- Completion counter (M of N complete)
+- Percentage complete
+- Estimated time remaining
+
+**Arguments**:
+
+- `description` - Human-readable description of the task being tracked.
+  Supports Rich markup formatting (e.g., &quot;[cyan]Processing...[/cyan]&quot;).
+- `total` - Total number of items/iterations to process for completion tracking.
+  
+
+**Yields**:
+
+  Tuple of (progress_bar, task_id):
+  - progress_bar: Progress instance for manual control if needed
+  - task_id: Task identifier for progress updates via progress_bar.update(task_id)
+  
+
+**Example**:
+
+  &gt;&gt;&gt; with create_progress_bar(&quot;[cyan]Processing prefixes...&quot;, len(data)) as (progress, task):
+  ...     for item in data:
+  ...         # Process item
+  ...         progress.update(task, advance=1)
+  
+
+**Notes**:
+
+  The progress bar automatically starts and stops when entering/exiting
+  the context manager. All pipeline steps should use this utility for
+  consistent progress reporting.
+
 #### get\_checkpoint\_path
 
 ```python
@@ -73,6 +122,14 @@ def call_litellm_completion(
 ```
 
 Execute a LiteLLM completion request with comprehensive error handling.
+
+NOTE: This function exists for specialized use cases requiring log probabilities,
+which are not currently supported by the LiteLLMAgentAdapter. The scorer.py module
+needs logprobs for NLL (negative log-likelihood) score calculations.
+
+TECHNICAL DEBT: Once the LiteLLMAgentAdapter supports logprobs parameter, this
+function should be removed and scorer.py should use the AgentRouter like all
+other pipeline steps.
 
 This wrapper function provides a standardized interface for calling
 LiteLLM completion API across different pipeline stages. It handles

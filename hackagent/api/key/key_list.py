@@ -21,7 +21,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/key",
+        "url": "/key",
         "params": params,
     }
 
@@ -59,6 +59,9 @@ def sync_detailed(
 ) -> Response[PaginatedUserAPIKeyList]:
     """ViewSet for managing User API Keys.
 
+    Web-only endpoint - requires Auth0 authentication.
+    API keys cannot manage other API keys for security reasons.
+
     Args:
         page (Union[Unset, int]):
 
@@ -88,6 +91,9 @@ def sync(
 ) -> Optional[PaginatedUserAPIKeyList]:
     """ViewSet for managing User API Keys.
 
+    Web-only endpoint - requires Auth0 authentication.
+    API keys cannot manage other API keys for security reasons.
+
     Args:
         page (Union[Unset, int]):
 
@@ -111,6 +117,9 @@ async def asyncio_detailed(
     page: Union[Unset, int] = UNSET,
 ) -> Response[PaginatedUserAPIKeyList]:
     """ViewSet for managing User API Keys.
+
+    Web-only endpoint - requires Auth0 authentication.
+    API keys cannot manage other API keys for security reasons.
 
     Args:
         page (Union[Unset, int]):
@@ -138,6 +147,9 @@ async def asyncio(
     page: Union[Unset, int] = UNSET,
 ) -> Optional[PaginatedUserAPIKeyList]:
     """ViewSet for managing User API Keys.
+
+    Web-only endpoint - requires Auth0 authentication.
+    API keys cannot manage other API keys for security reasons.
 
     Args:
         page (Union[Unset, int]):

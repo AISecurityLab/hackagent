@@ -23,7 +23,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/generate",
+        "url": "/generate",
     }
 
     if isinstance(body, GenerateRequestRequest):
@@ -107,6 +107,9 @@ def sync_detailed(
     though the 'model' field will be overridden by the server-configured generator model ID.
     Billing and logging are handled internally.
 
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    This is a core SDK operation for AI model generation in security tests.
+
     Args:
         body (GenerateRequestRequest):
         body (GenerateRequestRequest):
@@ -147,6 +150,9 @@ def sync(
     though the 'model' field will be overridden by the server-configured generator model ID.
     Billing and logging are handled internally.
 
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    This is a core SDK operation for AI model generation in security tests.
+
     Args:
         body (GenerateRequestRequest):
         body (GenerateRequestRequest):
@@ -181,6 +187,9 @@ async def asyncio_detailed(
     The request body should match the AI provider's chat completions (or similar) format,
     though the 'model' field will be overridden by the server-configured generator model ID.
     Billing and logging are handled internally.
+
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    This is a core SDK operation for AI model generation in security tests.
 
     Args:
         body (GenerateRequestRequest):
@@ -219,6 +228,9 @@ async def asyncio(
     The request body should match the AI provider's chat completions (or similar) format,
     though the 'model' field will be overridden by the server-configured generator model ID.
     Billing and logging are handled internally.
+
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    This is a core SDK operation for AI model generation in security tests.
 
     Args:
         body (GenerateRequestRequest):

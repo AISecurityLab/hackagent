@@ -181,19 +181,34 @@ def init(ctx):
         default=cli_config.output_format,
     )
 
+    # Verbosity level setup
+    console.print("\n[cyan]🔊 Verbosity Level Configuration[/cyan]")
+    console.print("0 = ERROR (only errors)")
+    console.print("1 = WARNING (errors + warnings) [default]")
+    console.print("2 = INFO (errors + warnings + info)")
+    console.print("3 = DEBUG (all messages)")
+    verbose_level = click.prompt(
+        "Default verbosity level",
+        type=int,
+        default=cli_config.verbose,
+    )
+    if not 0 <= verbose_level <= 3:
+        console.print("[yellow]⚠️ Invalid verbosity level, using 1 (WARNING)[/yellow]")
+        verbose_level = 1
+
     # Save configuration
     cli_config.api_key = api_key
     cli_config.base_url = base_url
     cli_config.output_format = output_format
+    cli_config.verbose = verbose_level
 
     try:
         cli_config.save()
-        console.print(
-            f"\n[bold green]✅ Configuration saved to: {cli_config.default_config_path}[/bold green]"
-        )
+        console.print("\n[bold green]✅ Configuration saved[/bold green]")
 
         # Test the configuration
-        console.print("\n[cyan]🔍 Testing configuration...[/cyan]")
+        if cli_config.should_show_info():
+            console.print("\n[cyan]🔍 Testing configuration...[/cyan]")
         cli_config.validate()
 
         # Test API connection
@@ -204,15 +219,20 @@ def init(ctx):
             base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
         )
 
-        with console.status("[bold green]Testing API connection..."):
+        if cli_config.should_show_info():
+            with console.status("[bold green]Testing API connection..."):
+                response = key_list.sync_detailed(client=client)
+        else:
             response = key_list.sync_detailed(client=client)
 
         if response.status_code == 200:
-            console.print("[bold green]✅ API connection successful![/bold green]")
-            console.print("\n[bold cyan]💡 You're ready to start! Try:[/bold cyan]")
-            console.print("  [green]hackagent agent list[/green]")
-            console.print("  [green]hackagent attack list[/green]")
-            console.print("  [green]hackagent --help[/green]")
+            console.print(
+                "[bold green]✅ Setup complete! API connection verified.[/bold green]"
+            )
+            if cli_config.should_show_info():
+                console.print("\n[bold cyan]💡 Next steps:[/bold cyan]")
+                console.print("  [green]hackagent attack advprefix --help[/green]")
+                console.print("  [green]hackagent agent list[/green]")
         else:
             console.print(
                 f"[yellow]⚠️ API connection issue (Status: {response.status_code})[/yellow]"
@@ -356,7 +376,7 @@ def doctor(ctx):
     console.print("\n[cyan]🌐 API Connection")
     if cli_config.api_key:
         try:
-            from hackagent.api.key import key_list
+            from hackagent.api.agent import agent_list
             from hackagent.client import AuthenticatedClient
 
             client = AuthenticatedClient(
@@ -364,7 +384,7 @@ def doctor(ctx):
             )
 
             with console.status("Testing API connection..."):
-                response = key_list.sync_detailed(client=client)
+                response = agent_list.sync_detailed(client=client)
 
             if response.status_code == 200:
                 console.print("[green]✅ API connection successful")

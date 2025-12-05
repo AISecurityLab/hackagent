@@ -20,9 +20,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "patch",
-        "url": "/api/result/{id}".format(
-            id=id,
-        ),
+        "url": f"/result/{id}",
     }
 
     _kwargs["json"] = body.to_dict()
@@ -65,6 +63,10 @@ def sync_detailed(
 ) -> Response[Result]:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
 
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+    Results are typically consumed by SDK for test result retrieval and analysis.
+
     Args:
         id (UUID):
         body (PatchedResultRequest): Serializer for the Result model, often nested in
@@ -98,6 +100,10 @@ def sync(
 ) -> Optional[Result]:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
 
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+    Results are typically consumed by SDK for test result retrieval and analysis.
+
     Args:
         id (UUID):
         body (PatchedResultRequest): Serializer for the Result model, often nested in
@@ -125,6 +131,10 @@ async def asyncio_detailed(
     body: PatchedResultRequest,
 ) -> Response[Result]:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
+
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+    Results are typically consumed by SDK for test result retrieval and analysis.
 
     Args:
         id (UUID):
@@ -156,6 +166,10 @@ async def asyncio(
     body: PatchedResultRequest,
 ) -> Optional[Result]:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
+
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+    Results are typically consumed by SDK for test result retrieval and analysis.
 
     Args:
         id (UUID):

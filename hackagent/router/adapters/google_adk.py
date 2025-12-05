@@ -84,10 +84,7 @@ class ADKAgentAdapter(Agent):
         required_keys = ["name", "endpoint", "user_id"]
         for key in required_keys:
             if key not in self.config:
-                msg = (
-                    f"Missing required configuration key '{key}' for "
-                    f"ADKAgentAdapter: {self.id}"
-                )
+                msg = f"Missing required configuration key '{key}' for ADKAgentAdapter: {self.id}"
                 raise AgentConfigurationError(msg)
 
         self.name: str = self.config["name"]
@@ -101,7 +98,10 @@ class ADKAgentAdapter(Agent):
 
         self.session_id: str = self.config.get("session_id", str(uuid.uuid4()))
 
-        self.logger = logging.getLogger(f"{__name__}.{self.id}")
+        # Use hierarchical logger name for TUI handler inheritance
+        self.logger = logging.getLogger(
+            f"hackagent.router.adapters.ADKAgentAdapter.{self.id}"
+        )
         self.logger.info(
             f"ADKAgentAdapter initialized with session_id: {self.session_id}"
         )
@@ -151,10 +151,7 @@ class ADKAgentAdapter(Agent):
             AgentInteractionError: If the HTTP request fails or the server returns
                                    an unexpected error status.
         """
-        target_url = (
-            f"{self.endpoint}/apps/{self.name}/users/"
-            f"{self.user_id}/sessions/{session_id}"
-        )
+        target_url = f"{self.endpoint}/apps/{self.name}/users/{self.user_id}/sessions/{session_id}"
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
         payload = initial_state or {}
         self.logger.info(f"Attempting to create ADK session: {target_url}")
@@ -181,8 +178,7 @@ class ADKAgentAdapter(Agent):
                 # Condition 1: HTTP 409 Conflict (standard "already exists")
                 if status_code == 409:
                     self.logger.warning(
-                        f"ADK session {session_id} already exists (HTTP 409). "
-                        f"Proceeding."
+                        f"ADK session {session_id} already exists (HTTP 409). Proceeding."
                     )
                     return True
 
@@ -211,10 +207,7 @@ class ADKAgentAdapter(Agent):
                         if "original_response_text" in locals()
                         else "[Could not read body during logging]"
                     )
-                    err_msg_detail_extended = (
-                        f": {http_err} - Status {current_status_for_exc} - "
-                        f"Body: {body_for_log}"
-                    )
+                    err_msg_detail_extended = f": {http_err} - Status {current_status_for_exc} - Body: {body_for_log}"
                 except Exception as e_resp_attrs:
                     self.logger.warning(
                         f"Could not get all attributes from error response for session {session_id}: {e_resp_attrs}"
@@ -278,9 +271,18 @@ class ADKAgentAdapter(Agent):
                                    exception occurs.
         """
         try:
+            # Log agent interaction for TUI visibility
+            self.logger.info(f"🌐 Sending request to agent endpoint: {url}")
+            if "message" in payload:
+                msg_preview = str(payload["message"])[:100]
+                self.logger.debug(f"   Message preview: {msg_preview}...")
+
             response = requests.post(
                 url, headers=headers, json=payload, timeout=self.request_timeout
             )
+
+            # Log response status
+            self.logger.info(f"✅ Agent responded with status {response.status_code}")
             self.logger.debug(
                 f"Request to {url} completed with status {response.status_code}"
             )
@@ -339,8 +341,7 @@ class ADKAgentAdapter(Agent):
             events = response.json()
             if not isinstance(events, list):
                 self.logger.warning(
-                    f"ADK response was not a JSON list. Type: {type(events)}. "
-                    f"Body: {response_body_str[:500]}"
+                    f"ADK response was not a JSON list. Type: {type(events)}. Body: {response_body_str[:500]}"
                 )
                 if isinstance(events, dict) and "detail" in events:
                     detail_message = events["detail"]
@@ -351,8 +352,7 @@ class ADKAgentAdapter(Agent):
                         f"ADK returned detail message: {detail_message}"
                     )
                 self.logger.warning(
-                    f"ADK response not a JSON list or recognized detail. "
-                    f"Body: {response_body_str[:500]}"
+                    f"ADK response not a JSON list or recognized detail. Body: {response_body_str[:500]}"
                 )
                 raise ResponseParsingError(
                     "ADK response format unrecognized (not a list)."
@@ -437,8 +437,7 @@ class ADKAgentAdapter(Agent):
             ValueError,
         ) as parse_err:  # Catch ValueError too for broader JSON issues
             self.logger.warning(
-                f"Failed to parse ADK JSON from {response.url}: {parse_err}. "
-                f"Body: {response_body_str[:500]}"
+                f"Failed to parse ADK JSON from {response.url}: {parse_err}. Body: {response_body_str[:500]}"
             )
             raise ResponseParsingError(f"JSON parse failed: {parse_err}") from parse_err
 

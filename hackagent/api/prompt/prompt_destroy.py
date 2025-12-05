@@ -14,9 +14,7 @@ def _get_kwargs(
 ) -> dict[str, Any]:
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": "/api/prompt/{id}".format(
-            id=id,
-        ),
+        "url": f"/prompt/{id}",
     }
 
     return _kwargs
@@ -51,6 +49,9 @@ def sync_detailed(
 ) -> Response[Any]:
     """ViewSet for managing Prompt instances.
 
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+
     Args:
         id (UUID):
 
@@ -79,6 +80,9 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
 ) -> Response[Any]:
     """ViewSet for managing Prompt instances.
+
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
 
     Args:
         id (UUID):

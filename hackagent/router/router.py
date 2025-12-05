@@ -17,25 +17,24 @@ from typing import Any, Dict, Optional, Type, Union
 from uuid import UUID
 
 from hackagent.api.agent import agent_create, agent_list, agent_partial_update
-from hackagent.api.key import key_list
 from hackagent.client import AuthenticatedClient
 from hackagent.models import (
     Agent as BackendAgentModel,
 )
 from hackagent.models import (
     AgentRequest,
-    AgentTypeEnum,
     PatchedAgentRequest,
-    UserAPIKey,
 )
 from hackagent.router.adapters import ADKAgentAdapter
 from hackagent.router.adapters.base import Agent
 from hackagent.router.adapters.litellm_adapter import LiteLLMAgentAdapter
 from hackagent.router.adapters.openai_adapter import OpenAIAgentAdapter
+from hackagent.router.types import AgentTypeEnum
 
 from ..types import UNSET, Unset
 
-logger = logging.getLogger(__name__)
+# Use explicit hierarchical logger name for clarity
+logger = logging.getLogger("hackagent.router")
 
 # --- Agent Type to Adapter Mapping ---
 AGENT_TYPE_TO_ADAPTER_MAP: Dict[AgentTypeEnum, Type[Agent]] = {
@@ -79,70 +78,69 @@ class AgentRouter:
         """
         Fetches the organization ID (UUID) associated with the API key.
 
-        This method lists API keys accessible by the current client's token,
-        finds the key matching the token's prefix, and extracts its associated
-        organization ID. The organization ID must be a UUID.
+        This method lists agents accessible by the current client's token and
+        extracts the organization ID from any agent. All agents for a given API key
+        belong to the same organization, so we can use any agent's organization field.
+
+        Note: We use the /agent endpoint instead of /key because /key is Auth0-only
+        for security reasons (prevents API keys from managing other API keys).
 
         Returns:
             The UUID of the organization.
 
         Raises:
-            RuntimeError: If the organization ID cannot be determined (e.g., no matching
-                API key, key has no organization, organization is not a UUID, or API call fails).
+            RuntimeError: If the organization ID cannot be determined (e.g., no agents
+                exist, organization field missing, or API call fails).
         """
         try:
             logger.debug(
-                "AgentRouter: Attempting to retrieve Organization ID by listing API keys..."
+                "AgentRouter: Attempting to retrieve Organization ID by listing agents..."
             )
-            keys_response = key_list.sync_detailed(client=self.client)
+            agents_response = agent_list.sync_detailed(client=self.client)
 
             if (
-                keys_response.status_code == 200
-                and keys_response.parsed
-                and keys_response.parsed.results
+                agents_response.status_code == 200
+                and agents_response.parsed
+                and agents_response.parsed.results
             ):
-                current_token = self.client.token
-                key_results: list[UserAPIKey] = keys_response.parsed.results
-                for key_obj in key_results:
-                    if current_token.startswith(key_obj.prefix):
-                        if hasattr(key_obj, "organization") and isinstance(
-                            key_obj.organization, UUID
-                        ):
-                            logger.info(
-                                f"AgentRouter: Successfully determined Organization ID: {key_obj.organization} from key prefix '{key_obj.prefix}'."
-                            )
-                            return key_obj.organization
-                        else:
-                            org_type = (
-                                type(key_obj.organization).__name__
-                                if hasattr(key_obj, "organization")
-                                else "Missing"
-                            )
-                            logger.warning(
-                                f"AgentRouter: Key prefix '{key_obj.prefix}' matched, but 'organization' is not UUID (type: {org_type}). Skipping for Org ID."
-                            )
+                first_agent = agents_response.parsed.results[0]
+                if hasattr(first_agent, "organization") and isinstance(
+                    first_agent.organization, UUID
+                ):
+                    logger.info(
+                        f"AgentRouter: Successfully determined Organization ID: {first_agent.organization} from agent '{first_agent.name}'."
+                    )
+                    return first_agent.organization
+                else:
+                    org_type = (
+                        type(first_agent.organization).__name__
+                        if hasattr(first_agent, "organization")
+                        else "Missing"
+                    )
+                    logger.error(
+                        f"AgentRouter: Agent '{first_agent.name}' has invalid organization field (type: {org_type})."
+                    )
+                    raise RuntimeError(
+                        f"AgentRouter: Could not determine Organization ID (invalid type: {org_type})."
+                    )
+            elif agents_response.parsed and not agents_response.parsed.results:
                 logger.error(
-                    f"AgentRouter: No API key found with a valid Organization (UUID) for token prefix '{current_token[:8]}...'."
+                    "AgentRouter: No agents found. Cannot determine Organization ID."
                 )
                 raise RuntimeError(
-                    "AgentRouter: Could not determine Organization ID (UUID) from API keys."
-                )
-            elif keys_response.parsed and not keys_response.parsed.results:
-                logger.error(
-                    "AgentRouter: API key list empty. Cannot find Organization ID."
-                )
-                raise RuntimeError(
-                    "AgentRouter: API key list empty for Organization ID retrieval."
+                    "AgentRouter: No agents exist for Organization ID retrieval. Create an agent first."
                 )
             else:
                 content = (
-                    keys_response.content.decode() if keys_response.content else "N/A"
+                    agents_response.content.decode()
+                    if agents_response.content
+                    else "N/A"
                 )
                 logger.error(
-                    f"AgentRouter: Failed to list keys for Org ID. Status: {keys_response.status_code}, Body: {content}"
+                    f"AgentRouter: Failed to list agents for Org ID. Status: {agents_response.status_code}, Body: {content}"
                 )
                 raise RuntimeError(
-                    f"AgentRouter: API key list failed for Organization ID (status {keys_response.status_code})."
+                    f"AgentRouter: Agent list failed for Organization ID (status {agents_response.status_code})."
                 )
         except RuntimeError:
             raise
@@ -156,67 +154,66 @@ class AgentRouter:
         """
         Fetches the user ID associated with the API key and returns it as a string.
 
-        Similar to `_fetch_organization_id`, this method inspects API keys to find
-        the one matching the current client's token. It then extracts the user ID,
-        which is expected to be an integer, and converts it to a string.
+        This method lists agents accessible by the current client's token and
+        extracts the owner (user ID) from any agent. All agents for a given API key
+        belong to the same user, so we can use any agent's owner field.
+
+        Note: We use the /agent endpoint instead of /key because /key is Auth0-only
+        for security reasons (prevents API keys from managing other API keys).
 
         Returns:
             The string representation of the user ID.
 
         Raises:
-            RuntimeError: If the user ID cannot be determined (e.g., no matching API
-                key, key has no user ID, user ID is not an integer, or API call fails).
+            RuntimeError: If the user ID cannot be determined (e.g., no agents
+                exist, owner field missing/null, or API call fails).
         """
         try:
             logger.debug(
-                "AgentRouter: Attempting to retrieve User ID by listing API keys..."
+                "AgentRouter: Attempting to retrieve User ID by listing agents..."
             )
-            keys_response = key_list.sync_detailed(client=self.client)
+            agents_response = agent_list.sync_detailed(client=self.client)
 
             if (
-                keys_response.status_code == 200
-                and keys_response.parsed
-                and keys_response.parsed.results
+                agents_response.status_code == 200
+                and agents_response.parsed
+                and agents_response.parsed.results
             ):
-                current_token = self.client.token
-                key_results: list[UserAPIKey] = keys_response.parsed.results
-                for key_obj in key_results:
-                    if current_token.startswith(key_obj.prefix):
-                        if hasattr(key_obj, "user") and isinstance(key_obj.user, int):
-                            user_id_as_str = str(key_obj.user)
-                            logger.info(
-                                f"AgentRouter: Successfully determined User ID (str): {user_id_as_str} from key prefix '{key_obj.prefix}'."
-                            )
-                            return user_id_as_str
-                        else:
-                            user_type = (
-                                type(key_obj.user).__name__
-                                if hasattr(key_obj, "user")
-                                else "Missing"
-                            )
-                            logger.warning(
-                                f"AgentRouter: Key prefix '{key_obj.prefix}' matched, but 'user' is not int (type: {user_type}). Skipping for User ID."
-                            )
-                logger.error(
-                    f"AgentRouter: No API key found with a valid User (int) for token prefix '{current_token[:8]}...'."
-                )
+                first_agent = agents_response.parsed.results[0]
+                if hasattr(first_agent, "owner") and isinstance(first_agent.owner, int):
+                    user_id_as_str = str(first_agent.owner)
+                    logger.info(
+                        f"AgentRouter: Successfully determined User ID (str): {user_id_as_str} from agent '{first_agent.name}'."
+                    )
+                    return user_id_as_str
+                else:
+                    owner_type = (
+                        type(first_agent.owner).__name__
+                        if hasattr(first_agent, "owner")
+                        else "Missing"
+                    )
+                    logger.error(
+                        f"AgentRouter: Agent '{first_agent.name}' has invalid owner field (type: {owner_type})."
+                    )
+                    raise RuntimeError(
+                        f"AgentRouter: Could not determine User ID (invalid type: {owner_type})."
+                    )
+            elif agents_response.parsed and not agents_response.parsed.results:
+                logger.error("AgentRouter: No agents found. Cannot determine User ID.")
                 raise RuntimeError(
-                    "AgentRouter: Could not determine User ID (int) from API keys."
-                )
-            elif keys_response.parsed and not keys_response.parsed.results:
-                logger.error("AgentRouter: API key list empty. Cannot find User ID.")
-                raise RuntimeError(
-                    "AgentRouter: API key list empty for User ID retrieval."
+                    "AgentRouter: No agents exist for User ID retrieval. Create an agent first."
                 )
             else:
                 content = (
-                    keys_response.content.decode() if keys_response.content else "N/A"
+                    agents_response.content.decode()
+                    if agents_response.content
+                    else "N/A"
                 )
                 logger.error(
-                    f"AgentRouter: Failed to list keys for User ID. Status: {keys_response.status_code}, Body: {content}"
+                    f"AgentRouter: Failed to list agents for User ID. Status: {agents_response.status_code}, Body: {content}"
                 )
                 raise RuntimeError(
-                    f"AgentRouter: API key list failed for User ID (status {keys_response.status_code})."
+                    f"AgentRouter: Agent list failed for User ID (status {agents_response.status_code})."
                 )
         except RuntimeError:
             raise
@@ -285,8 +282,7 @@ class AgentRouter:
 
         if agent_type not in AGENT_TYPE_TO_ADAPTER_MAP:
             raise ValueError(
-                f"Unsupported agent type: {agent_type}. "
-                f"Supported types: {list(AGENT_TYPE_TO_ADAPTER_MAP.keys())}"
+                f"Unsupported agent type: {agent_type}. Supported types: {list(AGENT_TYPE_TO_ADAPTER_MAP.keys())}"
             )
 
         actual_metadata = metadata.copy() if metadata is not None else {}
@@ -371,7 +367,7 @@ class AgentRouter:
                 )
                 adapter_instance_config["user_id"] = self.user_id_str
 
-        elif agent_type == AgentTypeEnum.LITELLM:
+        elif agent_type in [AgentTypeEnum.LITELLM, AgentTypeEnum.LANGCHAIN]:
             if "name" not in adapter_instance_config:
                 if (
                     isinstance(self.backend_agent.metadata, dict)
@@ -381,14 +377,20 @@ class AgentRouter:
                         "name"
                     ]
                 else:
-                    raise ValueError(
-                        f"LiteLLM agent '{name}' (ID: {registration_key}) missing "
-                        f"'name' (model string) in adapter_operational_config or backend metadata. "
-                        f"Cannot configure LiteLLMAgentAdapter."
+                    logger.warning(
+                        f"Agent '{name}' (Type: {agent_type.value}) missing 'name' (model string) in metadata. "
+                        f"Defaulting to agent name '{self.backend_agent.name}'."
                     )
+                    adapter_instance_config["name"] = self.backend_agent.name
+
+            # Always use backend agent's endpoint if not already in config
+            if (
+                "endpoint" not in adapter_instance_config
+                and self.backend_agent.endpoint
+            ):
+                adapter_instance_config["endpoint"] = self.backend_agent.endpoint
 
             optional_litellm_keys = [
-                "endpoint",
                 "api_key",
                 "max_new_tokens",
                 "temperature",
@@ -401,6 +403,11 @@ class AgentRouter:
                         and key in self.backend_agent.metadata
                     ):
                         adapter_instance_config[key] = self.backend_agent.metadata[key]
+
+            # For hackagent/* models, pass the HackAgent API key for authentication
+            model_name = adapter_instance_config.get("name", "")
+            if model_name.startswith("hackagent/"):
+                adapter_instance_config["hackagent_api_key"] = self.client.token
 
         elif agent_type == AgentTypeEnum.OPENAI_SDK:
             if "name" not in adapter_instance_config:
@@ -418,8 +425,14 @@ class AgentRouter:
                         f"Cannot configure OpenAIAgentAdapter."
                     )
 
+            # Always use backend agent's endpoint if not already in config
+            if (
+                "endpoint" not in adapter_instance_config
+                and self.backend_agent.endpoint
+            ):
+                adapter_instance_config["endpoint"] = self.backend_agent.endpoint
+
             optional_openai_keys = [
-                "endpoint",
                 "api_key",
                 "max_tokens",
                 "temperature",
@@ -452,8 +465,7 @@ class AgentRouter:
             )
         except Exception as e:
             logger.error(
-                f"Failed to instantiate adapter for agent '{name}' "
-                f"(Backend ID: {registration_key}): {e}",
+                f"Failed to instantiate adapter for agent '{name}' (Backend ID: {registration_key}): {e}",
                 exc_info=True,
             )
             raise ValueError(
@@ -463,31 +475,27 @@ class AgentRouter:
     def _find_existing_agent(
         self,
         name: str,
-        agent_type: AgentTypeEnum,
     ) -> Optional[BackendAgentModel]:
         """
-        Finds an existing agent in the backend by its name, type, and organization.
+        Finds an existing agent in the backend by its name and organization.
 
         This method paginates through the list of all agents accessible via the
-        client's API key. It matches agents based on the provided `name`,
-        `agent_type`, and the `self.organization_id` (UUID) of the router instance.
+        client's API key. It matches agents based on the provided `name`
+        and the `self.organization_id` (UUID) of the router instance.
         The organization ID match is crucial for ensuring the correct agent is
         identified in a multi-tenant environment.
 
         The method checks both `agent_model.organization` (expected to be a UUID)
         and falls back to `agent_model.organization_detail.id` if necessary.
-        For agent type, it checks `agent_model.agent_type` (which can be an enum
-        or string) and also `agent_model.type` as a fallback.
 
         Args:
             name: The name of the agent to find.
-            agent_type: The `AgentTypeEnum` of the agent to find.
 
         Returns:
             A `BackendAgentModel` instance if a matching agent is found, otherwise `None`.
         """
         logger.debug(
-            f"SYNC_DEBUG: Entered _find_existing_agent for Name='{name}', Type='{agent_type.value}', OrgID='{self.organization_id}' (UUID)"
+            f"SYNC_DEBUG: Entered _find_existing_agent for Name='{name}', OrgID='{self.organization_id}' (UUID)"
         )
 
         current_page: Union[Unset, int] = UNSET
@@ -559,29 +567,6 @@ class AgentRouter:
                             f"SYNC_DEBUG: agent_model.organization is an int ('{agent_model.organization}') for agent '{agent_model.name}'. Schema mismatch with expected UUID ('{self.organization_id}')."
                         )
 
-                    type_matches = False
-                    current_agent_type_val = None
-                    if (
-                        hasattr(agent_model, "agent_type")
-                        and agent_model.agent_type is not None
-                        and not isinstance(agent_model.agent_type, Unset)
-                    ):
-                        if isinstance(agent_model.agent_type, AgentTypeEnum):
-                            current_agent_type_val = agent_model.agent_type.value
-                        elif isinstance(agent_model.agent_type, str):
-                            current_agent_type_val = agent_model.agent_type
-                    elif hasattr(agent_model, "type") and agent_model.type is not None:
-                        if isinstance(agent_model.type, AgentTypeEnum):
-                            current_agent_type_val = agent_model.type.value
-                        elif isinstance(agent_model.type, str):
-                            current_agent_type_val = agent_model.type
-
-                    if (
-                        current_agent_type_val is not None
-                        and current_agent_type_val == agent_type.value
-                    ):
-                        type_matches = True
-
                     if not name_matches:
                         logger.debug(
                             f"SYNC_DEBUG: Agent ID '{agent_model.id}' ('{agent_model.name}') failed name match (expected '{name}')"
@@ -590,14 +575,10 @@ class AgentRouter:
                         logger.debug(
                             f"SYNC_DEBUG: Agent ID '{agent_model.id}' ('{agent_model.name}') failed organization match (expected UUID '{self.organization_id}', found '{getattr(agent_model, 'organization', 'N/A')}' or detail '{getattr(agent_model.organization_detail, 'id', 'N/A') if hasattr(agent_model, 'organization_detail') else 'N/A'}')"
                         )
-                    elif not type_matches:
-                        logger.debug(
-                            f"SYNC_DEBUG: Agent ID '{agent_model.id}' ('{agent_model.name}') failed type match (expected '{agent_type.value}', found '{current_agent_type_val}')"
-                        )
 
-                    if name_matches and org_matches and type_matches:
+                    if name_matches and org_matches:
                         logger.info(
-                            f"SYNC_DEBUG: Found existing backend agent '{name}' (Type: {agent_type.value}, OrgID: {self.organization_id}) "
+                            f"SYNC_DEBUG: Found existing backend agent '{name}' (OrgID: {self.organization_id}) "
                             f"with ID {agent_model.id} on page {current_page if not isinstance(current_page, Unset) else 'initial'}. Processed {agents_processed_count} agents total so far."
                         )
                         return agent_model
@@ -654,48 +635,41 @@ class AgentRouter:
                 return None
 
         logger.debug(
-            f"SYNC_DEBUG: No existing backend agent found matching Name='{name}', Type='{agent_type.value}', OrgID='{self.organization_id}' after searching all pages."
+            f"SYNC_DEBUG: No existing backend agent found matching Name='{name}', OrgID='{self.organization_id}' after searching all pages."
         )
         return None
 
-    def _update_agent_metadata(
-        self, agent_id: UUID, metadata_to_update: Dict[str, Any]
-    ) -> BackendAgentModel:
+    def _update_agent(self, agent_id: UUID, **kwargs) -> BackendAgentModel:
         """
-        Updates the metadata of an existing agent in the backend.
+        Updates an existing agent in the backend.
 
         Args:
             agent_id: The UUID of the agent to update.
-            metadata_to_update: A dictionary containing the metadata fields and their
-                new values. This will replace the existing metadata.
-
-        Returns:
-            The updated `BackendAgentModel` instance.
-
-        Raises:
-            RuntimeError: If the API call to update metadata fails.
+            **kwargs: Fields to update (e.g., metadata, agent_type).
         """
-        logger.info(f"Attempting to update metadata for backend agent ID: {agent_id}")
-        patch_body = PatchedAgentRequest(metadata=metadata_to_update)
+        logger.info(
+            f"Attempting to update backend agent ID: {agent_id} with fields: {list(kwargs.keys())}"
+        )
+        patch_body = PatchedAgentRequest(**kwargs)
         try:
             update_response = agent_partial_update.sync_detailed(
                 client=self.client, id=agent_id, body=patch_body
             )
             if update_response.status_code == 200 and update_response.parsed:
-                logger.info(
-                    f"Successfully updated metadata for backend agent ID: {agent_id}."
-                )
+                logger.info(f"Successfully updated backend agent ID: {agent_id}.")
                 return update_response.parsed
             else:
                 err_msg = (
-                    f"Failed to update metadata for backend agent ID: {agent_id}. "
+                    f"Failed to update backend agent ID: {agent_id}. "
                     f"Status: {update_response.status_code}, "
                     f"Body: {update_response.content.decode() if update_response.content else 'N/A'}"
                 )
                 logger.error(err_msg)
                 raise RuntimeError(err_msg)
         except Exception as e:
-            err_msg_ex = f"Exception during backend agent metadata update for ID: {agent_id}: {e}"
+            err_msg_ex = (
+                f"Exception during backend agent update for ID: {agent_id}: {e}"
+            )
             logger.error(err_msg_ex, exc_info=True)
             raise RuntimeError(err_msg_ex) from e
 
@@ -732,10 +706,9 @@ class AgentRouter:
         agent_req_body = AgentRequest(
             name=name,
             endpoint=endpoint,
-            agent_type=agent_type,
+            agent_type=agent_type.value,
             metadata=metadata,
             description=description,
-            organization=self.organization_id,
         )
 
         try:
@@ -744,8 +717,7 @@ class AgentRouter:
             )
             if create_response.status_code == 201 and create_response.parsed:
                 logger.info(
-                    f"Created backend agent '{name}' (Type: {agent_type.value}) "
-                    f"with ID {create_response.parsed.id}."
+                    f"Created backend agent '{name}' (Type: {agent_type.value}) with ID {create_response.parsed.id}."
                 )
                 return create_response.parsed
             else:
@@ -803,10 +775,13 @@ class AgentRouter:
             f"Ensuring backend agent presence: Name='{name}', Type='{agent_type.value}', OrgID='{self.organization_id}' (UUID)"
         )
 
-        existing_agent = self._find_existing_agent(name=name, agent_type=agent_type)
+        existing_agent = self._find_existing_agent(name=name)
 
         if existing_agent:
-            needs_metadata_update = False
+            needs_update = False
+            patch_kwargs: Dict[str, Any] = {}
+
+            # Check metadata
             current_metadata = (
                 existing_agent.metadata
                 if isinstance(existing_agent.metadata, dict)
@@ -817,26 +792,40 @@ class AgentRouter:
             for key, value_for_backend in metadata_for_backend.items():
                 if current_metadata.get(key) != value_for_backend:
                     metadata_to_patch[key] = value_for_backend
-                    needs_metadata_update = True
+                    needs_update = True
 
-            if needs_metadata_update and update_metadata_if_exists:
+            if metadata_to_patch:
+                final_metadata = current_metadata.copy()
+                final_metadata.update(metadata_to_patch)
+                patch_kwargs["metadata"] = final_metadata
+
+            # Check agent_type
+            current_type_val = None
+            if isinstance(existing_agent.agent_type, AgentTypeEnum):
+                current_type_val = existing_agent.agent_type.value
+            elif isinstance(existing_agent.agent_type, str):
+                current_type_val = existing_agent.agent_type
+
+            if current_type_val != agent_type.value:
                 logger.info(
-                    f"Backend agent '{name}' exists and metadata needs update. Proceeding with update."
+                    f"Backend agent '{name}' exists but type differs. Current: '{current_type_val}', Requested: '{agent_type.value}'. Will update."
                 )
-                final_patch_payload = current_metadata.copy()
-                final_patch_payload.update(metadata_to_patch)
+                patch_kwargs["agent_type"] = agent_type.value
+                needs_update = True
 
-                return self._update_agent_metadata(
-                    agent_id=existing_agent.id, metadata_to_update=final_patch_payload
+            if needs_update and update_metadata_if_exists:
+                logger.info(
+                    f"Backend agent '{name}' exists and needs update. Proceeding with update."
                 )
+                return self._update_agent(agent_id=existing_agent.id, **patch_kwargs)
             else:
-                if needs_metadata_update and not update_metadata_if_exists:
+                if needs_update and not update_metadata_if_exists:
                     logger.info(
-                        f"Backend agent '{name}' exists and metadata differs, but update_metadata_if_exists is False. Skipping update."
+                        f"Backend agent '{name}' exists and differs, but update_metadata_if_exists is False. Skipping update."
                     )
                 else:
                     logger.info(
-                        f"Backend agent '{name}' exists and metadata is current or update is skipped."
+                        f"Backend agent '{name}' exists and is current or update is skipped."
                     )
                 return existing_agent
 

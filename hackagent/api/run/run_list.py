@@ -54,7 +54,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/run",
+        "url": "/run",
         "params": params,
     }
 
@@ -100,6 +100,10 @@ def sync_detailed(
     Primarily for listing/retrieving runs.
     Creation of server-side runs is handled by custom actions.
     Runs initiated from Attack definitions are created via AttackViewSet.
+
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+    This is a core SDK operation for executing and monitoring security tests.
 
     Args:
         agent (Union[Unset, UUID]):
@@ -151,6 +155,10 @@ def sync(
     Creation of server-side runs is handled by custom actions.
     Runs initiated from Attack definitions are created via AttackViewSet.
 
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+    This is a core SDK operation for executing and monitoring security tests.
+
     Args:
         agent (Union[Unset, UUID]):
         attack (Union[Unset, UUID]):
@@ -195,6 +203,10 @@ async def asyncio_detailed(
     Primarily for listing/retrieving runs.
     Creation of server-side runs is handled by custom actions.
     Runs initiated from Attack definitions are created via AttackViewSet.
+
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+    This is a core SDK operation for executing and monitoring security tests.
 
     Args:
         agent (Union[Unset, UUID]):
@@ -243,6 +255,10 @@ async def asyncio(
     Primarily for listing/retrieving runs.
     Creation of server-side runs is handled by custom actions.
     Runs initiated from Attack definitions are created via AttackViewSet.
+
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+    This is a core SDK operation for executing and monitoring security tests.
 
     Args:
         agent (Union[Unset, UUID]):
