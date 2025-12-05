@@ -1,3 +1,21 @@
+## v0.3.1 (2025-12-05)
+
+### 🐛🚑️ Fixes
+
+- **TUI**: fixing the tui experience
+- **dashboard**: removing dashboard from the tui
+- **TUI**: fixing the TUI errors and improving the logs tracking
+
+### ✅🤡🧪 Tests
+
+- **API**: fixing API testing
+- **Transition-to-API-url**: Trasition to API url api.hackagent.dev from the hackagent.dev/api
+
+### 🎨🏗️ Style & Architecture
+
+- **README**: Adding the app and api to the README file
+- **Banner**: New banner
+
 ## v0.3.0 (2025-11-17)
 
 ### ✨ Features

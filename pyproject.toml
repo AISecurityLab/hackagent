@@ -1,6 +1,6 @@
 [project]
 name = "hackagent"
-version = "0.3.0"
+version = "0.3.1"
 description = "HackAgent is an open-source security toolkit to detect vulnerabilities of your AI Agents."
 authors = [
     {name = "AI Security Lab", email = "ais@ai4i.it"}
