@@ -18,6 +18,8 @@ Main TUI Application
 Full-screen tabbed interface for HackAgent.
 """
 
+from typing import Any
+
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -158,6 +160,40 @@ class HackAgentTUI(App):
     DataTable > .datatable--cursor {
         background: #5b0000;
     }
+
+    /* Results tab specific styles - horizontal split 20-80 */
+    ResultsTab #results-left-panel {
+        border-right: solid #ff0000;
+        background: $panel;
+    }
+
+    ResultsTab #results-right-panel {
+        background: $panel;
+    }
+
+    ResultsTab #results-title {
+        height: 3;
+        width: 100%;
+        text-align: center;
+        background: #8b0000;
+        color: #ffffff;
+        padding: 1;
+    }
+
+    ResultsTab #details-title {
+        height: 3;
+        width: 100%;
+        text-align: center;
+        background: #8b0000;
+        color: #ffffff;
+        padding: 1;
+    }
+
+    ResultsTab .toolbar {
+        height: 3;
+        width: 100%;
+        padding: 0 1;
+    }
     """
 
     TITLE = "🔴 HACKAGENT 🔴 - AI Security Testing Toolkit"
@@ -176,7 +212,7 @@ class HackAgentTUI(App):
         self,
         cli_config: CLIConfig,
         initial_tab: str = "agents",
-        initial_data: dict = None,
+        initial_data: dict[Any, Any] | None = None,
     ):
         """Initialize the TUI application.
 

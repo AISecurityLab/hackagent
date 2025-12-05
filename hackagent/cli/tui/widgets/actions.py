@@ -314,9 +314,9 @@ class AgentActionsViewer(Container):
 
         separator = "═" * 80
         if step_number > 0:
-            header = f"\n[bold white on blue] STEP {step_number}: {step_name} [/bold white on blue]"
+            header = f"\n[bold bright_cyan]▌ STEP {step_number}: {step_name} [/bold bright_cyan]"
         else:
-            header = f"\n[bold white on blue] {step_name} [/bold white on blue]"
+            header = f"\n[bold bright_cyan]▌ {step_name} [/bold bright_cyan]"
 
         actions_widget.write(f"\n[bold blue]{separator}[/bold blue]")
         actions_widget.write(header)

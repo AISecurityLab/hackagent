@@ -396,41 +396,12 @@ class AttacksTab(Container):
         from hackagent.cli.tui.logger import TUILogHandler
 
         # Handler for log messages
-        tui_log_handler = TUILogHandler(log_viewer.add_log, self.app.call_from_thread)
-        tui_log_handler.setLevel(logging.INFO)
-        hackagent_logger.addHandler(tui_log_handler)
-
-        # Handler for action extraction - filter logs to show agent actions
-        def add_action_log(message: str, level: str = "INFO"):
-            """Filter and add interesting logs to the actions viewer."""
-            # Only show logs that indicate actual agent actions
-            action_keywords = [
-                "🌐 Querying model",
-                "✅ Model responded",
-                "Handling request",
-                "Tool Call:",
-                "Tool Result:",
-                "🔧 Agent actions",
-                "🤖 ADK Agent",
-                "Sending request to agent",
-                "Agent responded",
-                "LLM Response:",
-                "function call",
-                "calling tool",
-            ]
-
-            # Check if this log contains an action keyword
-            if any(keyword in message for keyword in action_keywords):
-                # Add to actions viewer as a simple log entry
-                actions_viewer.add_info_message(message)
-
-        tui_actions_handler = TUILogHandler(
-            add_action_log,
-            self.app.call_from_thread,
+        tui_log_handler = TUILogHandler(
+            app=self.app,
+            callback=log_viewer.add_log,
+            level=logging.INFO,
         )
-        tui_actions_handler.setLevel(logging.INFO)
-        hackagent_logger.addHandler(tui_actions_handler)
-
+        hackagent_logger.addHandler(tui_log_handler)
         hackagent_logger.setLevel(logging.INFO)
 
         # Suppress other noisy loggers
@@ -552,6 +523,10 @@ class AttacksTab(Container):
                 sys.stdout = original_stdout
                 sys.stderr = original_stderr
 
+                # Remove TUI handler from all loggers
+                if tui_log_handler in hackagent_logger.handlers:
+                    hackagent_logger.removeHandler(tui_log_handler)
+
                 # Restore logging configuration
                 hackagent_logger.setLevel(saved_level)
                 for handler in saved_handlers:
@@ -588,12 +563,32 @@ class AttacksTab(Container):
 [dim]Results have been saved to the HackAgent platform.[/dim]""",
             )
 
-            pass
-
         except Exception as e:
-            # Restore stdout/stderr on error
+            # Display error
+            self.app.call_from_thread(progress_bar.update, progress=0)
+            self.app.call_from_thread(
+                status_widget.update,
+                f"""[bold red]❌ Attack Failed[/bold red]
+
+[bold]Agent:[/bold] {agent_name}
+[bold]Error:[/bold] {str(e)}
+
+[red]Attack execution encountered an error.[/red]
+[dim]Please check your configuration and try again.[/dim]
+[dim]Ensure the agent endpoint is accessible and API key is valid.[/dim]""",
+            )
+
+        finally:
+            # Always restore stdout/stderr and clean up handlers
             sys.stdout = original_stdout
             sys.stderr = original_stderr
+
+            # Remove TUI handler from all loggers
+            try:
+                if tui_log_handler in hackagent_logger.handlers:
+                    hackagent_logger.removeHandler(tui_log_handler)
+            except Exception:
+                pass  # Handler cleanup errors shouldn't fail silently
 
             # Restore logging configuration
             hackagent_logger.setLevel(saved_level)
@@ -610,20 +605,6 @@ class AttacksTab(Container):
                 del os.environ["FORCE_COLOR"]
             if "NO_COLOR" in os.environ:
                 del os.environ["NO_COLOR"]
-
-            # Display error
-            self.app.call_from_thread(progress_bar.update, progress=0)
-            self.app.call_from_thread(
-                status_widget.update,
-                f"""[bold red]❌ Attack Failed[/bold red]
-
-[bold]Agent:[/bold] {agent_name}
-[bold]Error:[/bold] {str(e)}
-
-[red]Attack execution encountered an error.[/red]
-[dim]Please check your configuration and try again.[/dim]
-[dim]Ensure the agent endpoint is accessible and API key is valid.[/dim]""",
-            )
 
     def _clear_form(self) -> None:
         """Clear all form fields."""
