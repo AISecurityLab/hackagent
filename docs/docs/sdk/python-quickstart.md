@@ -38,20 +38,12 @@ import TabItem from '@theme/TabItem';
 <Tabs>
   <TabItem value="uv" label="uv" default>
     ```bash
-    # Basic installation
     uv pip install hackagent
-    
-    # With optional dependencies
-    uv pip install hackagent[google-adk,litellm]
     ```
   </TabItem>
   <TabItem value="pip" label="pip">
     ```bash
-    # Basic installation
     pip install hackagent
-    
-    # With optional dependencies
-    pip install hackagent[google-adk,litellm]
     ```
   </TabItem>
 </Tabs>
@@ -87,8 +79,7 @@ For development or to access the latest features:
 
 ```python
 # Core imports
-from hackagent import HackAgent
-from hackagent.models import AgentTypeEnum
+from hackagent import HackAgent, AgentTypeEnum
 ```
 
 ## 🔑 Authentication Setup
@@ -131,15 +122,14 @@ agent = HackAgent(
 ### Your First Security Test
 
 ```python
-from hackagent import HackAgent
-from hackagent.models import AgentTypeEnum
+from hackagent import HackAgent, AgentTypeEnum
 
 # Initialize the HackAgent client
 agent = HackAgent(
     name="multi_tool_agent",
-    endpoint="http://localhost:8000",      # Your agent's URL
+    endpoint="http://localhost:8000",
     agent_type=AgentTypeEnum.GOOGLE_ADK,
-    base_url="https://api.hackagent.dev"       # HackAgent platform URL
+    base_url="https://api.hackagent.dev"
 )
 
 # Configure the attack
@@ -179,15 +169,14 @@ Here's the actual working example from the test suite:
 
 ```python
 import os
-from hackagent import HackAgent
-from hackagent.models import AgentTypeEnum
+from hackagent import HackAgent, AgentTypeEnum
 
 def test_adk_attack_scenario():
     # Initialize HackAgent client
     agent = HackAgent(
         name="multi_tool_agent",
-        base_url=os.getenv("HACKAGENT_API_BASE_URL"),
-        endpoint=os.getenv("AGENT_URL"),  # e.g., "http://localhost:8001"
+        base_url=os.getenv("HACKAGENT_BASE_URL", "https://api.hackagent.dev"),
+        endpoint=os.getenv("AGENT_URL"),
         agent_type=AgentTypeEnum.GOOGLE_ADK,
     )
 
@@ -223,17 +212,17 @@ def test_adk_attack_scenario():
 
 ### Supported Agent Types
 
-The SDK supports these agent types (from the actual `AgentTypeEnum`):
-
 ```python
-from hackagent.models import AgentTypeEnum
+from hackagent import AgentTypeEnum
 
 # Available agent types
 AgentTypeEnum.GOOGLE_ADK    # Google Agent Development Kit
-AgentTypeEnum.LITELLM       # LiteLLM (multi-provider LLM interface)
-AgentTypeEnum.OPENAI_SDK    # OpenAI SDK/API compatible agents
-AgentTypeEnum.OTHER         # Custom or proprietary implementations
-AgentTypeEnum.UNKNOWN       # Unknown/unspecified (default fallback)
+AgentTypeEnum.LITELLM       # LiteLLM multi-provider interface
+AgentTypeEnum.OPENAI_SDK    # OpenAI-compatible endpoints
+AgentTypeEnum.LANGCHAIN     # LangChain (uses LiteLLM adapter)
+AgentTypeEnum.MCP           # Model Context Protocol
+AgentTypeEnum.A2A           # Agent-to-Agent protocol
+AgentTypeEnum.UNKNOWN       # Unknown/fallback type
 ```
 
 ### Google ADK Configuration

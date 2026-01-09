@@ -67,6 +67,24 @@ Run the interactive CLI to start testing your AI agents:
 hackagent
 ```
 
+Or use the SDK:
+
+```python
+from hackagent import HackAgent, AgentTypeEnum
+
+agent = HackAgent(
+    name="my_agent",
+    endpoint="http://localhost:8000",
+    agent_type=AgentTypeEnum.GOOGLE_ADK
+)
+
+results = agent.hack(attack_config={
+    "attack_type": "advprefix",
+    "goals": ["Test goal"],
+    # ... generator and judges config
+})
+```
+
 Obtain your credentials at [https://app.hackagent.dev](https://app.hackagent.dev)
 
 For detailed examples and advanced usage, visit our [documentation](https://docs.hackagent.dev).
