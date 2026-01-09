@@ -51,8 +51,7 @@ graph TD
 ### Simple Configuration
 
 ```python
-from hackagent import HackAgent
-from hackagent.models import AgentTypeEnum
+from hackagent import HackAgent, AgentTypeEnum
 
 # Initialize HackAgent
 agent = HackAgent(
