@@ -194,10 +194,10 @@ class TestCLIConfig:
                 # Mock home directory to point to our temp dir
                 mock_home.return_value = Path(temp_dir).parent
 
-                # Create the .hackagent directory structure
-                hackagent_dir = Path(temp_dir).parent / ".hackagent"
-                hackagent_dir.mkdir(exist_ok=True)
-                (hackagent_dir / "config.json").write_text(json.dumps(config_data))
+                # Create the .config/hackagent directory structure
+                config_dir = Path(temp_dir).parent / ".config" / "hackagent"
+                config_dir.mkdir(parents=True, exist_ok=True)
+                (config_dir / "config.json").write_text(json.dumps(config_data))
 
                 config = CLIConfig()
 
@@ -319,7 +319,7 @@ class TestCLIConfig:
         with patch.dict("os.environ", {}, clear=True):
             config = CLIConfig()
 
-            expected_path = Path.home() / ".hackagent" / "config.json"
+            expected_path = Path.home() / ".config" / "hackagent" / "config.json"
             assert config.default_config_path == expected_path
 
     def test_yaml_config_loading(self):

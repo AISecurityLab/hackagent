@@ -40,7 +40,7 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from hackagent.attacks.AdvPrefix.evaluators import (
+from hackagent.attacks.techniques.advprefix.evaluators import (
     HarmBenchEvaluator,
     JailbreakBenchEvaluator,
     NuancedEvaluator,

@@ -243,10 +243,10 @@ class TestStandardizedAPITokenResolution:
             with patch("pathlib.Path.home") as mock_home:
                 mock_home.return_value = Path(temp_dir)
 
-                # Create .hackagent directory and config file
-                hackagent_dir = Path(temp_dir) / ".hackagent"
-                hackagent_dir.mkdir()
-                config_file = hackagent_dir / "config.json"
+                # Create .config/hackagent directory and config file
+                config_dir = Path(temp_dir) / ".config" / "hackagent"
+                config_dir.mkdir(parents=True)
+                config_file = config_dir / "config.json"
 
                 with open(config_file, "w") as f:
                     json.dump(config_data, f)
@@ -392,10 +392,10 @@ output_format: table
             with patch("pathlib.Path.home") as mock_home:
                 mock_home.return_value = Path(temp_dir)
 
-                # Create .hackagent directory and config file
-                hackagent_dir = Path(temp_dir) / ".hackagent"
-                hackagent_dir.mkdir()
-                config_file = hackagent_dir / "config.json"
+                # Create .config/hackagent directory and config file
+                config_dir = Path(temp_dir) / ".config" / "hackagent"
+                config_dir.mkdir(parents=True)
+                config_file = config_dir / "config.json"
 
                 with open(config_file, "w") as f:
                     json.dump(config_data, f)

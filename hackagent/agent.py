@@ -16,7 +16,11 @@ import logging
 from typing import Any, Dict, Optional, Union
 
 from hackagent import utils
-from hackagent.attacks.strategies import AdvPrefix, AttackStrategy
+from hackagent.attacks.registry import (
+    AdvPrefixOrchestrator,
+    PAIROrchestrator,
+    TemplateBasedOrchestrator,
+)
 from hackagent.client import AuthenticatedClient
 from hackagent.errors import HackAgentError
 from hackagent.router import AgentRouter
@@ -124,8 +128,10 @@ class HackAgent:
             endpoint=endpoint,
         )
 
-        self.attack_strategies: Dict[str, AttackStrategy] = {
-            "advprefix": AdvPrefix(hack_agent=self),
+        self.attack_strategies = {
+            "advprefix": AdvPrefixOrchestrator(hack_agent=self),
+            "template_based": TemplateBasedOrchestrator(hack_agent=self),
+            "pair": PAIROrchestrator(hack_agent=self),
         }
 
     def hack(
