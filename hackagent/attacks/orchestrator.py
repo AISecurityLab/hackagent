@@ -239,7 +239,7 @@ class AttackOrchestrator:
         return {
             "config": {**attack_config, **(run_config_override or {})},
             "client": self.client,
-            "agent_router": self.hack_agent.agent_router,
+            "agent_router": self.hack_agent.router,
         }
 
     def _execute_local_attack(
@@ -314,8 +314,8 @@ class AttackOrchestrator:
         attack_params = self._prepare_attack_params(attack_config)
 
         # 2. Create Attack record
-        victim_agent_id = self.hack_agent.agent_id
-        organization_id = self.hack_agent.organization_id
+        victim_agent_id = self.hack_agent.router.backend_agent.id
+        organization_id = self.hack_agent.router.organization_id
 
         attack_id = self._create_server_attack_record(
             attack_type=self.attack_type,

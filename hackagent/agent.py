@@ -67,6 +67,8 @@ class HackAgent:
         raise_on_unexpected_status: bool = False,
         timeout: Optional[float] = None,
         env_file_path: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        adapter_operational_config: Optional[Dict[str, Any]] = None,
     ):
         """
         Initializes the HackAgent client and prepares it for interaction.
@@ -109,6 +111,10 @@ class HackAgent:
             direct_api_key_param=api_key, env_file_path=env_file_path
         )
 
+        # Use default base_url if not provided
+        if base_url is None:
+            base_url = "https://api.hackagent.dev"
+
         self.client = AuthenticatedClient(
             base_url=base_url,
             token=resolved_auth_token,
@@ -126,6 +132,8 @@ class HackAgent:
             name=name,
             agent_type=processed_agent_type,
             endpoint=endpoint,
+            metadata=metadata,
+            adapter_operational_config=adapter_operational_config,
         )
 
         self.attack_strategies = {
