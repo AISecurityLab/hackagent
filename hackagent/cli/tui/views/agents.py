@@ -30,6 +30,27 @@ from hackagent.cli.config import CLIConfig
 from hackagent.cli.tui.base import BaseTab
 
 
+def _escape(value: Any) -> str:
+    """Escape a value for safe Rich markup rendering.
+
+    Args:
+        value: Any value to escape
+
+    Returns:
+        String with Rich markup characters escaped
+
+    Note:
+        We escape ALL square brackets, not just tag-like patterns,
+        because Rich's markup parser can get confused by unescaped
+        brackets in certain contexts (e.g., JSON arrays inside colored text).
+    """
+    if value is None:
+        return ""
+    # Escape ALL square brackets to prevent any markup interpretation issues
+    text = str(value)
+    return text.replace("[", "\\[").replace("]", "\\]")
+
+
 class AgentsTab(BaseTab):
     """Agents tab for managing AI agents."""
 
@@ -438,7 +459,17 @@ class AgentsTab(BaseTab):
         status_icon = "🟢" if (hasattr(agent, "endpoint") and agent.endpoint) else "⚪"
         status_text = "Active" if status_icon == "🟢" else "Inactive"
 
-        # Build details view with better formatting
+        # Build details view with better formatting - escape user content
+        agent_name = _escape(agent.name) if agent.name else "[dim]Unnamed[/dim]"
+        agent_endpoint = (
+            _escape(agent.endpoint) if agent.endpoint else "[dim]Not specified[/dim]"
+        )
+        agent_description = (
+            _escape(agent.description)
+            if agent.description
+            else "[dim]No description provided[/dim]"
+        )
+
         details = f"""╭─ [bold cyan]🤖 Agent Details[/bold cyan] ─────────────────────────────────────╮
 
 {status_icon} [bold yellow]Status:[/bold yellow] {status_text}
@@ -449,25 +480,25 @@ class AgentsTab(BaseTab):
      {agent.id}
   
   [bold]📛 Name:[/bold]
-     {agent.name or "[dim]Unnamed[/dim]"}
+     {agent_name}
   
   [bold]🏷️  Type:[/bold]
-     {agent_type}
+     {_escape(agent_type)}
   
   [bold]📅 Created:[/bold]
-     {created}
+     {_escape(created)}
 
 [bold cyan]━━━ Configuration ━━━[/bold cyan]
 
   [bold]🌐 Endpoint:[/bold]
-     {agent.endpoint or "[dim]Not specified[/dim]"}
+     {agent_endpoint}
   
   [bold]📝 Description:[/bold]
-     {agent.description or "[dim]No description provided[/dim]"}
+     {agent_description}
 """
 
         if hasattr(agent, "organization") and agent.organization:
-            details += f"\n  [bold]🏢 Organization:[/bold]\n     {agent.organization}\n"
+            details += f"\n  [bold]🏢 Organization:[/bold]\n     {_escape(agent.organization)}\n"
 
         # Add metadata section if available
         if hasattr(agent, "metadata") and agent.metadata:
@@ -476,9 +507,9 @@ class AgentsTab(BaseTab):
                 import json
 
                 metadata_str = json.dumps(agent.metadata, indent=2)
-                details += f"  {metadata_str}\n"
+                details += f"  {_escape(metadata_str)}\n"
             except Exception:
-                details += f"  {str(agent.metadata)}\n"
+                details += f"  {_escape(str(agent.metadata))}\n"
 
         details += "\n╰────────────────────────────────────────────────────────────╯\n"
         details += (

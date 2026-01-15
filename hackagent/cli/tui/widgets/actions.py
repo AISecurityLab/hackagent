@@ -27,6 +27,27 @@ from textual.containers import Container
 from textual.widgets import Button, RichLog, Static
 
 
+def _escape(value: Any) -> str:
+    """Escape a value for safe Rich markup rendering.
+
+    Args:
+        value: Any value to escape
+
+    Returns:
+        String with Rich markup characters escaped
+
+    Note:
+        We escape ALL square brackets, not just tag-like patterns,
+        because Rich's markup parser can get confused by unescaped
+        brackets in certain contexts (e.g., JSON arrays inside colored text).
+    """
+    if value is None:
+        return ""
+    # Escape ALL square brackets to prevent any markup interpretation issues
+    text = str(value)
+    return text.replace("[", "\\[").replace("]", "\\]")
+
+
 class AgentActionsViewer(Container):
     """
     A container widget for displaying agent actions (tool calls, HTTP requests, etc.)
@@ -139,7 +160,7 @@ class AgentActionsViewer(Container):
     def add_info_message(self, message: str) -> None:
         """Add an informational message to the viewer."""
         actions_widget = self.query_one("#actions-display", RichLog)
-        actions_widget.write(f"[dim italic]{message}[/dim italic]")
+        actions_widget.write(f"[dim italic]{_escape(message)}[/dim italic]")
 
     def add_http_request(
         self,
@@ -167,14 +188,16 @@ class AgentActionsViewer(Container):
         # Header
         actions_widget.write(f"\n[bold yellow]{'─' * 80}[/bold yellow]")
         actions_widget.write(
-            f"[bold cyan]{prefix}HTTP {method}[/bold cyan] [blue]{url}[/blue]"
+            f"[bold cyan]{prefix}HTTP {_escape(method)}[/bold cyan] [blue]{_escape(url)}[/blue]"
         )
 
         # Headers
         if headers:
             actions_widget.write("[dim]Headers:[/dim]")
             for key, value in list(headers.items())[:3]:  # Show first 3 headers
-                actions_widget.write(f"  [green]{key}:[/green] {value}")
+                actions_widget.write(
+                    f"  [green]{_escape(key)}:[/green] {_escape(value)}"
+                )
             if len(headers) > 3:
                 actions_widget.write(f"  [dim]... and {len(headers) - 3} more[/dim]")
 
@@ -185,7 +208,7 @@ class AgentActionsViewer(Container):
             # Truncate if too long
             if len(payload_str) > 500:
                 payload_str = payload_str[:500] + "\n  ..."
-            actions_widget.write(f"[yellow]{payload_str}[/yellow]")
+            actions_widget.write(f"[yellow]{_escape(payload_str)}[/yellow]")
 
         actions_widget.write(f"[bold yellow]{'─' * 80}[/bold yellow]\n")
         self.update_action_count(self._action_count)
@@ -214,7 +237,7 @@ class AgentActionsViewer(Container):
         # Header
         actions_widget.write(f"\n[bold magenta]{'─' * 80}[/bold magenta]")
         actions_widget.write(
-            f"[bold green]{prefix}🔧 TOOL CALL:[/bold green] [bold cyan]{tool_name}[/bold cyan]"
+            f"[bold green]{prefix}🔧 TOOL CALL:[/bold green] [bold cyan]{_escape(tool_name)}[/bold cyan]"
         )
 
         # Arguments
@@ -223,7 +246,7 @@ class AgentActionsViewer(Container):
             args_str = json.dumps(arguments, indent=2)
             if len(args_str) > 400:
                 args_str = args_str[:400] + "\n  ..."
-            actions_widget.write(f"[yellow]{args_str}[/yellow]")
+            actions_widget.write(f"[yellow]{_escape(args_str)}[/yellow]")
 
         # Result
         if result:
@@ -231,7 +254,7 @@ class AgentActionsViewer(Container):
             result_preview = str(result)[:300]
             if len(str(result)) > 300:
                 result_preview += "..."
-            actions_widget.write(f"[green]{result_preview}[/green]")
+            actions_widget.write(f"[green]{_escape(result_preview)}[/green]")
 
         actions_widget.write(f"[bold magenta]{'─' * 80}[/bold magenta]\n")
         self.update_action_count(self._action_count)
@@ -262,24 +285,24 @@ class AgentActionsViewer(Container):
             tool_name = event_data.get("tool_name", "unknown")
             tool_input = event_data.get("tool_input", {})
             actions_widget.write(
-                f"[bold green]{prefix}🤖 ADK TOOL CALL:[/bold green] [bold cyan]{tool_name}[/bold cyan]"
+                f"[bold green]{prefix}🤖 ADK TOOL CALL:[/bold green] [bold cyan]{_escape(tool_name)}[/bold cyan]"
             )
             if tool_input:
                 input_str = json.dumps(tool_input, indent=2)
                 if len(input_str) > 400:
                     input_str = input_str[:400] + "\n  ..."
-                actions_widget.write(f"[yellow]{input_str}[/yellow]")
+                actions_widget.write(f"[yellow]{_escape(input_str)}[/yellow]")
 
         elif event_type == "tool_result":
             tool_name = event_data.get("tool_name", "unknown")
             result = event_data.get("result", "")
             actions_widget.write(
-                f"[bold green]{prefix}📤 ADK TOOL RESULT:[/bold green] [bold cyan]{tool_name}[/bold cyan]"
+                f"[bold green]{prefix}📤 ADK TOOL RESULT:[/bold green] [bold cyan]{_escape(tool_name)}[/bold cyan]"
             )
             result_preview = str(result)[:300]
             if len(str(result)) > 300:
                 result_preview += "..."
-            actions_widget.write(f"[green]{result_preview}[/green]")
+            actions_widget.write(f"[green]{_escape(result_preview)}[/green]")
 
         elif event_type == "llm_response":
             content = event_data.get("content", "")
@@ -289,15 +312,15 @@ class AgentActionsViewer(Container):
             content_preview = str(content)[:400]
             if len(str(content)) > 400:
                 content_preview += "..."
-            actions_widget.write(f"[cyan]{content_preview}[/cyan]")
+            actions_widget.write(f"[cyan]{_escape(content_preview)}[/cyan]")
 
         else:
             actions_widget.write(
-                f"[bold green]{prefix}📋 ADK EVENT:[/bold green] [cyan]{event_type}[/cyan]"
+                f"[bold green]{prefix}📋 ADK EVENT:[/bold green] [cyan]{_escape(event_type)}[/cyan]"
             )
             if "content" in event_data:
                 content_preview = str(event_data["content"])[:300]
-                actions_widget.write(f"[dim]{content_preview}[/dim]")
+                actions_widget.write(f"[dim]{_escape(content_preview)}[/dim]")
 
         actions_widget.write(f"[bold blue]{'─' * 80}[/bold blue]\n")
         self.update_action_count(self._action_count)
@@ -314,9 +337,9 @@ class AgentActionsViewer(Container):
 
         separator = "═" * 80
         if step_number > 0:
-            header = f"\n[bold bright_cyan]▌ STEP {step_number}: {step_name} [/bold bright_cyan]"
+            header = f"\n[bold bright_cyan]▌ STEP {step_number}: {_escape(step_name)} [/bold bright_cyan]"
         else:
-            header = f"\n[bold bright_cyan]▌ {step_name} [/bold bright_cyan]"
+            header = f"\n[bold bright_cyan]▌ {_escape(step_name)} [/bold bright_cyan]"
 
         actions_widget.write(f"\n[bold blue]{separator}[/bold blue]")
         actions_widget.write(header)

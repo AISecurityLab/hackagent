@@ -18,12 +18,35 @@ Dashboard Tab
 Overview and statistics for HackAgent.
 """
 
+from typing import Any
+
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Static
 
 from hackagent.cli.config import CLIConfig
 from hackagent.cli.tui.base import BaseTab
+
+
+def _escape(value: Any) -> str:
+    """Escape a value for safe Rich markup rendering.
+
+    Args:
+        value: Any value to escape
+
+    Returns:
+        String with Rich markup characters escaped
+
+    Note:
+        We escape ALL square brackets, not just tag-like patterns,
+        because Rich's markup parser can get confused by unescaped
+        brackets in certain contexts (e.g., JSON arrays inside colored text).
+    """
+    if value is None:
+        return ""
+    # Escape ALL square brackets to prevent any markup interpretation issues
+    text = str(value)
+    return text.replace("[", "\\[").replace("]", "\\]")
 
 
 class DashboardTab(BaseTab):
@@ -247,7 +270,9 @@ class DashboardTab(BaseTab):
             # Show error in activity log if update fails
             try:
                 activity_log = self.query_one("#activity-log", Static)
-                activity_log.update(f"[red]Error updating stats: {str(e)}[/red]")
+                activity_log.update(
+                    f"[red]Error updating stats: {_escape(str(e))}[/red]"
+                )
             except Exception:
                 pass
 
@@ -261,7 +286,7 @@ class DashboardTab(BaseTab):
         activity_log = self.query_one("#activity-log", Static)
         log_lines = []
 
-        # Add recent agents with icons
+        # Add recent agents with icons - escape user content
         if agents:
             log_lines.append("[bold cyan]🤖 Recent Agents:[/bold cyan]")
             for i, agent in enumerate(agents[:3], 1):
@@ -270,12 +295,13 @@ class DashboardTab(BaseTab):
                     if hasattr(agent.agent_type, "value")
                     else agent.agent_type
                 )
+                agent_name = _escape(agent.name) if agent.name else "Unnamed"
                 log_lines.append(
-                    f"  {i}. [cyan]{agent.name or 'Unnamed'}[/cyan] [dim]({agent_type})[/dim]"
+                    f"  {i}. [cyan]{agent_name}[/cyan] [dim]({_escape(agent_type)})[/dim]"
                 )
             log_lines.append("")
 
-        # Add recent results with status colors
+        # Add recent results with status colors - escape user content
         if results:
             log_lines.append("[bold green]📋 Recent Results:[/bold green]")
             for i, result in enumerate(results[:5], 1):
@@ -298,7 +324,7 @@ class DashboardTab(BaseTab):
 
                 attack_type = getattr(result, "attack_type", "Unknown")
                 log_lines.append(
-                    f"  {i}. [yellow]{attack_type}[/yellow] → [{status_color}]{status}[/{status_color}]"
+                    f"  {i}. [yellow]{_escape(attack_type)}[/yellow] → [{status_color}]{_escape(status)}[/{status_color}]"
                 )
 
         if not log_lines:

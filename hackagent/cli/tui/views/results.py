@@ -19,6 +19,7 @@ View and analyze attack results.
 """
 
 from datetime import datetime
+import datetime as dt_module
 from dateutil import tz
 import json
 from typing import Any
@@ -30,6 +31,29 @@ from textual.containers import Container, Horizontal, VerticalScroll
 from textual.widgets import Button, DataTable, Label, Select, Static
 
 from hackagent.cli.config import CLIConfig
+
+
+def _escape(value: Any) -> str:
+    """Escape a value for safe Rich markup rendering.
+
+    Args:
+        value: Any value to escape
+
+    Returns:
+        String with Rich markup characters escaped
+
+    Note:
+        We escape ALL square brackets, not just tag-like patterns,
+        because Rich's markup parser can get confused by unescaped
+        brackets in certain contexts (e.g., JSON arrays inside colored text).
+    """
+    if value is None:
+        return ""
+    # Escape ALL square brackets to prevent any markup interpretation issues
+    # Rich's escape() only escapes tag-like patterns, but single brackets
+    # can still cause issues in nested color contexts
+    text = str(value)
+    return text.replace("[", "\\[").replace("]", "\\]")
 
 
 class ResultsTab(Container):
@@ -57,7 +81,18 @@ class ResultsTab(Container):
     BINDINGS = [
         Binding("enter", "view_result", "View Details"),
         Binding("s", "show_summary", "Summary"),
+        Binding("pageup", "prev_page", "Previous Page", show=False),
+        Binding("pagedown", "next_page", "Next Page", show=False),
+        Binding("[", "prev_page", "Previous Page"),
+        Binding("]", "next_page", "Next Page"),
     ]
+
+    # Maximum number of results to display in detail view to prevent UI freeze
+    MAX_RESULTS_DISPLAY = 10
+    # Maximum number of traces per result to display
+    MAX_TRACES_PER_RESULT = 5
+    # Maximum content length for truncation
+    MAX_CONTENT_LENGTH = 500
 
     def __init__(self, cli_config: CLIConfig):
         """Initialize results tab.
@@ -69,6 +104,7 @@ class ResultsTab(Container):
         self.cli_config = cli_config
         self.results_data: list[Any] = []
         self.selected_result: Any = None
+        self._detail_page: int = 0  # Current page for result details pagination
 
     def compose(self) -> ComposeResult:
         """Compose the results layout with horizontal split."""
@@ -143,7 +179,7 @@ class ResultsTab(Container):
             try:
                 details_widget = self.query_one("#result-details", Static)
                 details_widget.update(
-                    f"[red]Failed to load data: {str(e)}[/red]\n\n[dim]Press 🔄 Refresh button or F5 to retry[/dim]"
+                    f"[red]Failed to load data: {_escape(str(e))}[/red]\n\n[dim]Press 🔄 Refresh button or F5 to retry[/dim]"
                 )
             except Exception:
                 pass
@@ -170,6 +206,27 @@ class ResultsTab(Container):
 
         if row_index < len(self.results_data):
             self.selected_result = self.results_data[row_index]
+            self._detail_page = 0  # Reset page when selecting new result
+            self._show_result_details()
+
+    def action_next_page(self) -> None:
+        """Navigate to next page of results details."""
+        if not self.selected_result:
+            return
+        run = self.selected_result
+        if hasattr(run, "results") and run.results:
+            total_results = len(run.results)
+            total_pages = (
+                total_results + self.MAX_RESULTS_DISPLAY - 1
+            ) // self.MAX_RESULTS_DISPLAY
+            if self._detail_page < total_pages - 1:
+                self._detail_page += 1
+                self._show_result_details()
+
+    def action_prev_page(self) -> None:
+        """Navigate to previous page of results details."""
+        if self._detail_page > 0:
+            self._detail_page -= 1
             self._show_result_details()
 
     def refresh_data(self) -> None:
@@ -275,7 +332,7 @@ class ResultsTab(Container):
         # Show message in details area
         details_widget = self.query_one("#result-details", Static)
         details_widget.update(
-            f"[yellow]{message}[/yellow]\n\n[dim]💡 Tip: Press F5 or click 🔄 Refresh to retry[/dim]"
+            f"[yellow]{_escape(message)}[/yellow]\n\n[dim]💡 Tip: Press F5 or click 🔄 Refresh to retry[/dim]"
         )
 
     def _update_table(self) -> None:
@@ -294,18 +351,19 @@ class ResultsTab(Container):
                     else:
                         status_display = str(status_val)
 
-                    # Color code based on status
+                    # Color code based on status - escape user content
                     status_upper = status_display.upper()
+                    escaped_status = _escape(status_display)
                     if status_upper == "COMPLETED":
-                        status_display = f"[green]✅ {status_display}[/green]"
+                        status_display = f"[green]✅ {escaped_status}[/green]"
                     elif status_upper == "RUNNING":
-                        status_display = f"[cyan]🔄 {status_display}[/cyan]"
+                        status_display = f"[cyan]🔄 {escaped_status}[/cyan]"
                     elif status_upper == "FAILED":
-                        status_display = f"[red]❌ {status_display}[/red]"
+                        status_display = f"[red]❌ {escaped_status}[/red]"
                     elif status_upper == "PENDING":
-                        status_display = f"[yellow]⏳ {status_display}[/yellow]"
+                        status_display = f"[yellow]⏳ {escaped_status}[/yellow]"
                     else:
-                        status_display = f"❓ {status_display}"
+                        status_display = f"❓ {escaped_status}"
 
                 # Get agent name - directly available in Run model
                 agent_name = run.agent_name if hasattr(run, "agent_name") else "Unknown"
@@ -335,7 +393,7 @@ class ResultsTab(Container):
                 table.add_row(
                     str(run.id)[:8] + "...",
                     status_display,
-                    agent_name,
+                    _escape(agent_name),
                     created_time,
                     results_display,
                 )
@@ -345,8 +403,8 @@ class ResultsTab(Container):
             details_widget.update(
                 f"[green]✅ Loaded {len(self.results_data)} run(s)[/green]\n\n"
                 f"[dim]💡 Click any row to view full details including:\n"
-                f"   • Agent: {self.results_data[0].agent_name if self.results_data else 'N/A'}\n"
-                f"   • Organization: {self.results_data[0].organization_name if self.results_data else 'N/A'}\n"
+                f"   • Agent: {_escape(self.results_data[0].agent_name) if self.results_data else 'N/A'}\n"
+                f"   • Organization: {_escape(self.results_data[0].organization_name) if self.results_data else 'N/A'}\n"
                 f"   • Run configuration\n"
                 f"   • All result evaluations\n"
                 f"   • Execution traces & logs[/dim]"
@@ -355,7 +413,9 @@ class ResultsTab(Container):
         except Exception as e:
             # If table update fails, show error
             details_widget = self.query_one("#result-details", Static)
-            details_widget.update(f"[red]❌ Error updating table: {str(e)}[/red]")
+            details_widget.update(
+                f"[red]❌ Error updating table: {_escape(str(e))}[/red]"
+            )
 
     def _parse_agent_actions(self, logs_str: str) -> list[dict[str, Any]]:
         """Parse agent actions from log strings.
@@ -443,6 +503,9 @@ class ResultsTab(Container):
         run = self.selected_result  # This is a Run object now
         details_widget = self.query_one("#result-details", Static)
 
+        # Show loading indicator immediately for responsive UI
+        details_widget.update("[cyan]⏳ Loading run details...[/cyan]")
+
         # Fetch full run details from API including all results and traces
         try:
             import httpx
@@ -469,7 +532,7 @@ class ResultsTab(Container):
         except Exception as e:
             # If fetch fails, continue with cached run but show warning
             details_widget.update(
-                f"[yellow]⚠️ Could not fetch full details: {str(e)}[/yellow]\n\n[dim]Showing cached data...[/dim]"
+                f"[yellow]⚠️ Could not fetch full details: {_escape(str(e))}[/yellow]\n\n[dim]Showing cached data...[/dim]"
             )
             return
 
@@ -553,12 +616,12 @@ class ResultsTab(Container):
 
 [bold bright_cyan]▌ Overview[/bold bright_cyan]
   🆔 [bold]Run ID:[/bold] [dim]{run.id}[/dim]
-  🤖 [bold]Agent:[/bold] [bright_cyan]{run.agent_name}[/bright_cyan]
-  🏢 [bold]Organization:[/bold] [bright_cyan]{run.organization_name}[/bright_cyan]
-  👤 [bold]Owner:[/bold] {run.owner_username or "N/A"}
-  {status_icon} [bold]Status:[/bold] [bright_{status_color}]{status_display}[/bright_{status_color}]
+  🤖 [bold]Agent:[/bold] [bright_cyan]{_escape(run.agent_name)}[/bright_cyan]
+  🏢 [bold]Organization:[/bold] [bright_cyan]{_escape(run.organization_name)}[/bright_cyan]
+  👤 [bold]Owner:[/bold] {_escape(run.owner_username) or "N/A"}
+  {status_icon} [bold]Status:[/bold] [bright_{status_color}]{_escape(status_display)}[/bright_{status_color}]
   📊 [bold]Results:[/bold] [bright_yellow]{results_count}[/bright_yellow]
-  📅 [bold]Created:[/bold] {created}
+  📅 [bold]Created:[/bold] {_escape(created)}
 
 [bold bright_green]▌ Evaluation Summary[/bold bright_green]
   ✅ [bold]Successful Jailbreaks:[/bold] [bright_green]{eval_summary["SUCCESSFUL_JAILBREAK"]}[/bright_green]
@@ -575,30 +638,47 @@ class ResultsTab(Container):
             try:
                 if isinstance(run.run_config, dict):
                     run_config_str = json.dumps(run.run_config, indent=2)
-                    # Color-code for readability
+                    # Color-code for readability - escape all content
                     lines = run_config_str.split("\n")
                     for line in lines:
                         if ":" in line and '"' in line:
                             key_part, value_part = line.split(":", 1)
-                            details += f"[bright_yellow]{key_part}[/bright_yellow]:[bright_white]{value_part}[/bright_white]\n"
+                            details += f"[bright_yellow]{_escape(key_part)}[/bright_yellow]:[bright_white]{_escape(value_part)}[/bright_white]\n"
                         else:
-                            details += f"{line}\n"
+                            details += f"{_escape(line)}\n"
                 else:
-                    details += f"{str(run.run_config)}\n"
+                    details += f"{_escape(run.run_config)}\n"
             except Exception:
-                details += f"{str(run.run_config)}\n"
+                details += f"{_escape(run.run_config)}\n"
 
         # Add run notes if available
         if hasattr(run, "run_notes") and run.run_notes:
-            details += f"\n[bold bright_magenta]▌ Notes[/bold bright_magenta]\n{run.run_notes}\n"
+            details += f"\n[bold bright_magenta]▌ Notes[/bold bright_magenta]\n{_escape(run.run_notes)}\n"
 
-        # Show all results with their traces and logs
+        # Show results with pagination to prevent UI freeze
         if hasattr(run, "results") and run.results:
+            total_results = len(run.results)
+            start_idx = self._detail_page * self.MAX_RESULTS_DISPLAY
+            end_idx = min(start_idx + self.MAX_RESULTS_DISPLAY, total_results)
+
+            # Paginated results slice
+            paginated_results = run.results[start_idx:end_idx]
+            total_pages = (
+                total_results + self.MAX_RESULTS_DISPLAY - 1
+            ) // self.MAX_RESULTS_DISPLAY
+            current_page = self._detail_page + 1
+
             details += "\n[bold bright_white]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold bright_white]\n"
-            details += f"[bold bright_white]  RESULTS & TRACES ({len(run.results)})[/bold bright_white]\n"
+            details += f"[bold bright_white]  RESULTS & TRACES ({total_results} total)[/bold bright_white]\n"
+
+            # Show pagination info if there are multiple pages
+            if total_pages > 1:
+                details += f"[bold bright_yellow]  📄 Page {current_page}/{total_pages} (showing {start_idx + 1}-{end_idx})[/bold bright_yellow]\n"
+                details += "[dim]  Use Page Up/Down or scroll to navigate[/dim]\n"
+
             details += "[bold bright_white]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold bright_white]\n\n"
 
-            for idx, result in enumerate(run.results, 1):
+            for idx, result in enumerate(paginated_results, start_idx + 1):
                 # Result header
                 eval_status = "N/A"
                 if hasattr(result, "evaluation_status"):
@@ -630,10 +710,10 @@ class ResultsTab(Container):
 
                 details += f"\n[bold bright_cyan]▌ Result #{idx}[/bold bright_cyan]\n"
                 details += f"  🆔 [bold]ID:[/bold] [dim]{result.id}[/dim]\n"
-                details += f"  {status_icon} [bold]Evaluation:[/bold] [bright_{status_color}]{eval_status}[/bright_{status_color}]\n"
+                details += f"  {status_icon} [bold]Evaluation:[/bold] [bright_{status_color}]{_escape(eval_status)}[/bright_{status_color}]\n"
 
                 if hasattr(result, "prompt_name") and result.prompt_name:
-                    details += f"  📝 [bold]Prompt:[/bold] [bright_cyan]{result.prompt_name}[/bright_cyan]\n"
+                    details += f"  📝 [bold]Prompt:[/bold] [bright_cyan]{_escape(result.prompt_name)}[/bright_cyan]\n"
 
                 if hasattr(result, "latency_ms") and result.latency_ms:
                     details += f"  ⏱️  [bold]Latency:[/bold] [bright_magenta]{result.latency_ms}ms[/bright_magenta]\n"
@@ -646,21 +726,29 @@ class ResultsTab(Container):
 
                 # Show evaluation notes if any
                 if hasattr(result, "evaluation_notes") and result.evaluation_notes:
-                    details += f"  💬 [bold]Notes:[/bold] {result.evaluation_notes}\n"
+                    details += (
+                        f"  💬 [bold]Notes:[/bold] {_escape(result.evaluation_notes)}\n"
+                    )
 
                 # Show evaluation metrics if any
                 if hasattr(result, "evaluation_metrics") and result.evaluation_metrics:
                     details += "  📊 [bold]Metrics:[/bold]\n"
                     try:
                         if isinstance(result.evaluation_metrics, dict):
-                            for key, value in result.evaluation_metrics.items():
-                                details += f"     • {key}: [bright_cyan]{value}[/bright_cyan]\n"
+                            for key, value in list(result.evaluation_metrics.items())[
+                                :5
+                            ]:  # Limit metrics shown
+                                details += f"     • {_escape(key)}: [bright_cyan]{_escape(value)}[/bright_cyan]\n"
+                            if len(result.evaluation_metrics) > 5:
+                                details += f"     [dim]... {len(result.evaluation_metrics) - 5} more metrics[/dim]\n"
                         else:
-                            details += f"     {str(result.evaluation_metrics)}\n"
+                            details += f"     {_escape(str(result.evaluation_metrics)[:200])}\n"
                     except Exception:
-                        details += f"     {str(result.evaluation_metrics)}\n"
+                        details += (
+                            f"     {_escape(str(result.evaluation_metrics)[:200])}\n"
+                        )
 
-                # Show request payload if available
+                # Show request payload if available (truncated for performance)
                 if hasattr(result, "request_payload") and result.request_payload:
                     details += (
                         "\n  [bold bright_cyan]📤 Request Payload:[/bold bright_cyan]\n"
@@ -669,32 +757,36 @@ class ResultsTab(Container):
                         if isinstance(result.request_payload, dict):
                             payload_str = json.dumps(result.request_payload, indent=2)
                             lines = payload_str.split("\n")
-                            for line in lines[:30]:  # Show more lines
+                            for line in lines[:15]:  # Reduced from 30 for performance
                                 if ":" in line and '"' in line:
                                     key_part, value_part = line.split(":", 1)
-                                    details += f"     [yellow]{key_part}:[/yellow][bright_white]{value_part}[/bright_white]\n"
+                                    details += f"     [yellow]{_escape(key_part)}:[/yellow][bright_white]{_escape(value_part[:100])}[/bright_white]\n"
                                 else:
-                                    details += f"     {line}\n"
-                            if len(lines) > 30:
-                                details += f"     [dim]... ({len(lines) - 30} more lines)[/dim]\n"
+                                    details += f"     {_escape(line[:100])}\n"
+                            if len(lines) > 15:
+                                details += f"     [dim]... ({len(lines) - 15} more lines)[/dim]\n"
                         else:
-                            details += f"     {str(result.request_payload)[:500]}\n"
+                            details += (
+                                f"     {_escape(str(result.request_payload)[:300])}\n"
+                            )
                     except Exception:
-                        details += f"     {str(result.request_payload)[:500]}\n"
+                        details += (
+                            f"     {_escape(str(result.request_payload)[:500])}\n"
+                        )
 
-                # Show response body if available
+                # Show response body if available (truncated for performance)
                 if hasattr(result, "response_body") and result.response_body:
                     details += (
                         "\n  [bold bright_green]📥 Response Body:[/bold bright_green]\n"
                     )
                     response_lines = str(result.response_body).split("\n")
-                    for line in response_lines[:30]:  # Show more lines
+                    for line in response_lines[:15]:  # Reduced from 30 for performance
                         if line.strip():
-                            details += f"     {line}\n"
-                    if len(response_lines) > 30:
-                        details += f"     [dim]... ({len(response_lines) - 30} more lines)[/dim]\n"
+                            details += f"     {_escape(line[:150])}\n"
+                    if len(response_lines) > 15:
+                        details += f"     [dim]... ({len(response_lines) - 15} more lines)[/dim]\n"
 
-                # Show traces for this result - organized by type
+                # Show traces for this result - organized by type (with limit to prevent freeze)
                 if hasattr(result, "traces") and result.traces:
                     # Sort traces by sequence number to show chronological order
                     sorted_traces = sorted(
@@ -702,11 +794,18 @@ class ResultsTab(Container):
                         key=lambda t: t.sequence if hasattr(t, "sequence") else 0,
                     )
 
-                    details += "\n[bold bright_magenta]▌ 🔍 EXECUTION TRACES ({} steps)[/bold bright_magenta]\n\n".format(
-                        len(sorted_traces)
+                    total_traces = len(sorted_traces)
+                    # Limit traces displayed per result to prevent UI freeze
+                    display_traces = sorted_traces[: self.MAX_TRACES_PER_RESULT]
+
+                    details += "\n[bold bright_magenta]▌ 🔍 EXECUTION TRACES ({} steps{})[/bold bright_magenta]\n\n".format(
+                        total_traces,
+                        f" - showing first {self.MAX_TRACES_PER_RESULT}"
+                        if total_traces > self.MAX_TRACES_PER_RESULT
+                        else "",
                     )
 
-                    for trace in sorted_traces:
+                    for trace in display_traces:
                         # Get step type with proper field name
                         step_type = "OTHER"
                         step_icon = "📋"
@@ -760,11 +859,9 @@ class ResultsTab(Container):
                                 trace_time = str(trace.timestamp)[:12]
 
                         # Format the trace header
-                        details += f"[{step_color}]╭───[/] [bold {step_color}]Step {seq}[/bold {step_color}] [{step_color}]{step_icon} {step_type}[/]\n"
+                        details += f"[{step_color}]╭───[/] [bold {step_color}]Step {seq}[/bold {step_color}] [{step_color}]{step_icon} {_escape(step_type)}[/]\n"
                         if trace_time:
-                            details += (
-                                f"[{step_color}]│[/] [dim]⏰ {trace_time}[/dim]\n"
-                            )
+                            details += f"[{step_color}]│[/] [dim]⏰ {_escape(trace_time)}[/dim]\n"
 
                         # Get and format content
                         if hasattr(trace, "content") and trace.content:
@@ -791,7 +888,7 @@ class ResultsTab(Container):
                                             tool_name = content_obj.get(
                                                 "name"
                                             ) or content_obj.get("tool")
-                                            details += f"[{step_color}]│[/] [bold bright_cyan]Tool:[/bold bright_cyan] [bright_white]{tool_name}[/bright_white]\n"
+                                            details += f"[{step_color}]│[/] [bold bright_cyan]Tool:[/bold bright_cyan] [bright_white]{_escape(tool_name)}[/bright_white]\n"
                                         if (
                                             "arguments" in content_obj
                                             or "input" in content_obj
@@ -809,11 +906,9 @@ class ResultsTab(Container):
                                                 :20
                                             ]:  # Show more lines
                                                 if ":" in line and '"' in line:
-                                                    details += f"[{step_color}]│[/]   [yellow]{line}[/yellow]\n"
+                                                    details += f"[{step_color}]│[/]   [yellow]{_escape(line)}[/yellow]\n"
                                                 else:
-                                                    details += (
-                                                        f"[{step_color}]│[/]   {line}\n"
-                                                    )
+                                                    details += f"[{step_color}]│[/]   {_escape(line)}\n"
 
                                     elif step_type == "TOOL_RESPONSE" and isinstance(
                                         content_obj, dict
@@ -833,11 +928,9 @@ class ResultsTab(Container):
                                             details += f"[{step_color}]│[/] [bold bright_green]Result:[/bold bright_green]\n"
                                             for line in result_str.split("\n")[:20]:
                                                 if ":" in line and '"' in line:
-                                                    details += f"[{step_color}]│[/]   [bright_green]{line}[/bright_green]\n"
+                                                    details += f"[{step_color}]│[/]   [bright_green]{_escape(line)}[/bright_green]\n"
                                                 else:
-                                                    details += (
-                                                        f"[{step_color}]│[/]   {line}\n"
-                                                    )
+                                                    details += f"[{step_color}]│[/]   {_escape(line)}\n"
 
                                     elif step_type == "AGENT_THOUGHT":
                                         # Show thinking/reasoning
@@ -849,7 +942,7 @@ class ResultsTab(Container):
                                         details += f"[{step_color}]│[/] [bold bright_magenta]Thought:[/bold bright_magenta]\n"
                                         for line in thought_text.split("\n")[:10]:
                                             if line.strip():
-                                                details += f"[{step_color}]│[/]   {line[:200]}\n"
+                                                details += f"[{step_color}]│[/]   {_escape(line[:200])}\n"
 
                                     elif step_type == "AGENT_RESPONSE_CHUNK":
                                         # Show agent response
@@ -861,7 +954,7 @@ class ResultsTab(Container):
                                         details += f"[{step_color}]│[/] [bold bright_white]Response:[/bold bright_white]\n"
                                         for line in response_text.split("\n")[:15]:
                                             if line.strip():
-                                                details += f"[{step_color}]│[/]   {line[:200]}\n"
+                                                details += f"[{step_color}]│[/]   {_escape(line[:200])}\n"
 
                                     else:
                                         # Generic JSON display
@@ -870,11 +963,9 @@ class ResultsTab(Container):
                                         lines = content_str.split("\n")
                                         for line in lines[:20]:
                                             if ":" in line and '"' in line:
-                                                details += f"[{step_color}]│[/]   [yellow]{line}[/yellow]\n"
+                                                details += f"[{step_color}]│[/]   [yellow]{_escape(line)}[/yellow]\n"
                                             else:
-                                                details += (
-                                                    f"[{step_color}]│[/]   {line}\n"
-                                                )
+                                                details += f"[{step_color}]│[/]   {_escape(line)}\n"
                                         if len(lines) > 20:
                                             details += f"[{step_color}]│[/]   [dim]... ({len(lines) - 20} more lines)[/dim]\n"
                                 else:
@@ -882,9 +973,7 @@ class ResultsTab(Container):
                                     content_str = str(content)
                                     for line in content_str.split("\n")[:15]:
                                         if line.strip():
-                                            details += (
-                                                f"[{step_color}]│[/]   {line[:200]}\n"
-                                            )
+                                            details += f"[{step_color}]│[/]   {_escape(line[:200])}\n"
 
                             except (json.JSONDecodeError, TypeError):
                                 # Not JSON, show as plain text
@@ -893,13 +982,15 @@ class ResultsTab(Container):
                                 details += f"[{step_color}]│[/] [bold]Content:[/bold]\n"
                                 for line in lines[:15]:
                                     if line.strip():
-                                        details += (
-                                            f"[{step_color}]│[/]   {line[:200]}\n"
-                                        )
+                                        details += f"[{step_color}]│[/]   {_escape(line[:200])}\n"
                                 if len(lines) > 15:
                                     details += f"[{step_color}]│[/]   [dim]... ({len(lines) - 15} more lines)[/dim]\n"
 
                         details += f"[{step_color}]╰───────────────────────────────────────────────[/]\n\n"
+
+                    # Show message if traces were truncated
+                    if total_traces > self.MAX_TRACES_PER_RESULT:
+                        details += f"[dim]  ... {total_traces - self.MAX_TRACES_PER_RESULT} more traces not shown. Export to JSON for full details.[/dim]\n"
 
                 details += "\n"
 
@@ -915,7 +1006,7 @@ class ResultsTab(Container):
                 run_age = None
                 if hasattr(run, "timestamp") and run.timestamp:
                     try:
-                        now = dt.datetime.now(tz.UTC)
+                        now = dt_module.datetime.now(tz.UTC)
                         run_timestamp = (
                             run.timestamp
                             if run.timestamp.tzinfo
@@ -969,7 +1060,9 @@ class ResultsTab(Container):
                 details += "[dim]The run encountered errors before results could be created.[/dim]\n"
                 details += "[dim]Check the run notes above for error details.[/dim]\n"
             else:
-                details += f"[bold yellow]Status: {status_display}[/bold yellow]\n\n"
+                details += (
+                    f"[bold yellow]Status: {_escape(status_display)}[/bold yellow]\n\n"
+                )
                 details += (
                     "[dim]No results have been recorded for this run yet.[/dim]\n"
                 )
@@ -993,31 +1086,35 @@ class ResultsTab(Container):
                     for idx, action in enumerate(actions, 1):
                         if action["type"] == "http_request":
                             details += f"[bold yellow]━━━ Action {idx}: HTTP Request ━━━[/bold yellow]\n"
-                            details += f"  🌐 [bold cyan]{action['method']}[/bold cyan] [blue]{action['url']}[/blue]\n"
+                            details += f"  🌐 [bold cyan]{_escape(action['method'])}[/bold cyan] [blue]{_escape(action['url'])}[/blue]\n"
                             details += f"  [dim]Line: {action['line_num']}[/dim]\n\n"
 
                         elif action["type"] == "tool_call":
                             details += f"[bold green]━━━ Action {idx}: Tool Call ━━━[/bold green]\n"
-                            details += (
-                                f"  🔧 [bold cyan]{action['tool_name']}[/bold cyan]\n"
-                            )
+                            details += f"  🔧 [bold cyan]{_escape(action['tool_name'])}[/bold cyan]\n"
                             if action.get("arguments"):
-                                details += f"  [yellow]{action['arguments']}[/yellow]\n"
+                                details += f"  [yellow]{_escape(action['arguments'])}[/yellow]\n"
                             details += f"  [dim]Line: {action['line_num']}[/dim]\n\n"
 
                         elif action["type"] == "adk_tool_call":
                             details += f"[bold blue]━━━ Action {idx}: ADK Tool Call ━━━[/bold blue]\n"
-                            details += f"  🤖 [cyan]{action['content']}[/cyan]\n"
+                            details += (
+                                f"  🤖 [cyan]{_escape(action['content'])}[/cyan]\n"
+                            )
                             details += f"  [dim]Line: {action['line_num']}[/dim]\n\n"
 
                         elif action["type"] == "adk_tool_result":
                             details += f"[bold blue]━━━ Action {idx}: ADK Tool Result ━━━[/bold blue]\n"
-                            details += f"  📤 [green]{action['content']}[/green]\n"
+                            details += (
+                                f"  📤 [green]{_escape(action['content'])}[/green]\n"
+                            )
                             details += f"  [dim]Line: {action['line_num']}[/dim]\n\n"
 
                         elif action["type"] == "llm_query":
                             details += f"[bold magenta]━━━ Action {idx}: LLM Query ━━━[/bold magenta]\n"
-                            details += f"  🧠 [cyan]Model: {action['model']}[/cyan]\n"
+                            details += (
+                                f"  🧠 [cyan]Model: {_escape(action['model'])}[/cyan]\n"
+                            )
                             details += f"  [dim]Line: {action['line_num']}[/dim]\n\n"
 
                 # Show Full Execution Logs
@@ -1042,6 +1139,8 @@ class ResultsTab(Container):
 
                     # Add line numbers for context
                     line_prefix = f"[dim]{line_num:4d}[/dim] "
+                    # Escape line content to prevent markup errors
+                    escaped_line = _escape(line)
 
                     # Enhanced color coding with more patterns
                     if (
@@ -1049,39 +1148,45 @@ class ResultsTab(Container):
                         or "FAIL" in line.upper()
                         or "❌" in line
                     ):
-                        details += f"{line_prefix}[bold red]❌ {line}[/bold red]\n"
-                    elif "CRITICAL" in line.upper():
-                        details += f"{line_prefix}[bold red on white]🔥 {line}[/bold red on white]\n"
-                    elif "WARN" in line.upper() or "WARNING" in line.upper():
                         details += (
-                            f"{line_prefix}[bold yellow]⚠️  {line}[/bold yellow]\n"
+                            f"{line_prefix}[bold red]❌ {escaped_line}[/bold red]\n"
                         )
+                    elif "CRITICAL" in line.upper():
+                        details += f"{line_prefix}[bold red on white]🔥 {escaped_line}[/bold red on white]\n"
+                    elif "WARN" in line.upper() or "WARNING" in line.upper():
+                        details += f"{line_prefix}[bold yellow]⚠️  {escaped_line}[/bold yellow]\n"
                     elif (
                         "SUCCESS" in line.upper()
                         or "COMPLETE" in line.upper()
                         or "✅" in line
                     ):
-                        details += f"{line_prefix}[bold green]✅ {line}[/bold green]\n"
-                    elif "HTTP" in line.upper() or "🌐" in line:
-                        details += f"{line_prefix}[bold cyan]🌐 {line}[/bold cyan]\n"
-                    elif "Tool" in line or "Function" in line or "🔧" in line:
-                        details += f"{line_prefix}[bold green]🔧 {line}[/bold green]\n"
-                    elif "ADK" in line or "🤖" in line:
-                        details += f"{line_prefix}[bold blue]🤖 {line}[/bold blue]\n"
-                    elif "LLM" in line or "model" in line.lower():
                         details += (
-                            f"{line_prefix}[bold magenta]🧠 {line}[/bold magenta]\n"
+                            f"{line_prefix}[bold green]✅ {escaped_line}[/bold green]\n"
                         )
+                    elif "HTTP" in line.upper() or "🌐" in line:
+                        details += (
+                            f"{line_prefix}[bold cyan]🌐 {escaped_line}[/bold cyan]\n"
+                        )
+                    elif "Tool" in line or "Function" in line or "🔧" in line:
+                        details += (
+                            f"{line_prefix}[bold green]🔧 {escaped_line}[/bold green]\n"
+                        )
+                    elif "ADK" in line or "🤖" in line:
+                        details += (
+                            f"{line_prefix}[bold blue]🤖 {escaped_line}[/bold blue]\n"
+                        )
+                    elif "LLM" in line or "model" in line.lower():
+                        details += f"{line_prefix}[bold magenta]🧠 {escaped_line}[/bold magenta]\n"
                     elif "INFO" in line.upper() or "START" in line.upper():
-                        details += f"{line_prefix}[cyan]ℹ️  {line}[/cyan]\n"
+                        details += f"{line_prefix}[cyan]ℹ️  {escaped_line}[/cyan]\n"
                     elif "DEBUG" in line.upper():
-                        details += f"{line_prefix}[dim]🔍 {line}[/dim]\n"
+                        details += f"{line_prefix}[dim]🔍 {escaped_line}[/dim]\n"
                     elif line.startswith(">") or line.startswith("+"):
-                        details += f"{line_prefix}[green]{line}[/green]\n"
+                        details += f"{line_prefix}[green]{escaped_line}[/green]\n"
                     elif line.startswith("<") or line.startswith("-"):
-                        details += f"{line_prefix}[red]{line}[/red]\n"
+                        details += f"{line_prefix}[red]{escaped_line}[/red]\n"
                     else:
-                        details += f"{line_prefix}[dim]{line}[/dim]\n"
+                        details += f"{line_prefix}[dim]{escaped_line}[/dim]\n"
 
         details += (
             "\n\n[bold cyan]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold cyan]\n"

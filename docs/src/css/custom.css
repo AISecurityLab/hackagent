@@ -28,3 +28,114 @@
   --ifm-color-primary-lightest: #4fddbf;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
 }
+
+/* Hero banner styling */
+.hero-banner {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+/* Feature card hover effects */
+.feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+
+/* CTA button hover effects */
+a[style*="backgroundColor"]:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Terminal GIF container */
+.terminal-demo {
+  text-align: center;
+  margin: 2rem 0;
+}
+
+.terminal-demo img {
+  max-width: 100%;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--ifm-color-emphasis-300);
+}
+
+/* Badge container */
+.badge-container {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+
+/* Navigation cards */
+.nav-card {
+  padding: 1rem;
+  border-radius: 8px;
+  background: var(--ifm-background-surface-color);
+  border: 2px solid var(--ifm-color-primary);
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.nav-card:hover {
+  background: var(--ifm-color-primary);
+  color: white;
+  transform: translateY(-2px);
+}
+
+/* Responsible use cards */
+.do-card {
+  padding: 1rem;
+  border-radius: 8px;
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+}
+
+.dont-card {
+  padding: 1rem;
+  border-radius: 8px;
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+}
+
+[data-theme='dark'] .do-card {
+  background: rgba(40, 167, 69, 0.2);
+  border-color: rgba(40, 167, 69, 0.4);
+}
+
+[data-theme='dark'] .do-card strong,
+[data-theme='dark'] .do-card li {
+  color: #75d69c;
+}
+
+[data-theme='dark'] .dont-card {
+  background: rgba(220, 53, 69, 0.2);
+  border-color: rgba(220, 53, 69, 0.4);
+}
+
+[data-theme='dark'] .dont-card strong,
+[data-theme='dark'] .dont-card li {
+  color: #f5a3ab;
+}
+
+/* Improve code block styling */
+.prism-code {
+  border-radius: 8px;
+}
+
+/* Table improvements */
+table {
+  width: 100%;
+}
+
+table th {
+  background: var(--ifm-color-emphasis-100);
+}
+
+[data-theme='dark'] table th {
+  background: var(--ifm-color-emphasis-200);
+}
+

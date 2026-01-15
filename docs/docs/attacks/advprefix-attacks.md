@@ -1,3 +1,7 @@
+---
+sidebar_position: 2
+---
+
 # AdvPrefix Attacks
 
 AdvPrefix is HackAgent's most sophisticated attack technique, implementing a multi-step pipeline for generating optimized adversarial prefixes that can bypass AI safety mechanisms. This attack type is based on cutting-edge research and provides highly effective jailbreaking capabilities.
@@ -371,7 +375,7 @@ AdvPrefix attacks may exhibit these patterns:
 
 - **[Python SDK Guide](../sdk/python-quickstart.md)** - Complete SDK documentation
 - **[Google ADK Integration](../integrations/google-adk.md)** - Framework-specific testing
-- **[Getting Started Tutorial](../tutorial-basics/AdvPrefix.md)** - Basic AdvPrefix tutorial
+- **[Attack Tutorial](../tutorial-basics/attack-tutorial.md)** - Getting started with attacks
 - **[Security Guidelines](../security/responsible-disclosure.md)** - Responsible testing practices
 
 ---
