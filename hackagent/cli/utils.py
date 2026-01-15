@@ -19,18 +19,19 @@ Common utilities for the HackAgent CLI including error handling,
 formatting, and helper functions.
 """
 
-import click
 import functools
 import json
 from pathlib import Path
 from typing import Any, Dict
-from rich.console import Console
-from rich.table import Table
-from rich.traceback import Traceback
-from rich.panel import Panel
-from rich.text import Text
 
-from hackagent.errors import HackAgentError, ApiError
+import click
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
+from rich.traceback import Traceback
+
+from hackagent.errors import ApiError, HackAgentError
 
 console = Console()
 
@@ -188,7 +189,7 @@ def confirm_action(message: str, default: bool = False) -> bool:
 
 def get_agent_type_enum(agent_type: str):
     """Convert string agent type to AgentTypeEnum"""
-    from hackagent.models import AgentTypeEnum
+    from hackagent.router.types import AgentTypeEnum
 
     # Normalize the input
     normalized = agent_type.upper().replace("-", "_").replace(" ", "_")
@@ -198,8 +199,15 @@ def get_agent_type_enum(agent_type: str):
         "GOOGLE_ADK": AgentTypeEnum.GOOGLE_ADK,
         "GOOGLE-ADK": AgentTypeEnum.GOOGLE_ADK,
         "ADK": AgentTypeEnum.GOOGLE_ADK,
+        "LANGCHAIN": AgentTypeEnum.LANGCHAIN,
+        "LANG_CHAIN": AgentTypeEnum.LANGCHAIN,
         "LITELLM": AgentTypeEnum.LITELLM,
         "LITE_LLM": AgentTypeEnum.LITELLM,
+        "OPENAI_SDK": AgentTypeEnum.OPENAI_SDK,
+        "OPENAI-SDK": AgentTypeEnum.OPENAI_SDK,
+        "OPENAI": AgentTypeEnum.OPENAI_SDK,
+        "OTHER": AgentTypeEnum.UNKNOWN,
+        "UNKNOWN": AgentTypeEnum.UNKNOWN,
     }
 
     if normalized in type_mapping:
@@ -208,10 +216,11 @@ def get_agent_type_enum(agent_type: str):
     try:
         return AgentTypeEnum(normalized)
     except ValueError:
-        available_types = [e.value.lower().replace("_", "-") for e in AgentTypeEnum]
-        raise click.ClickException(
-            f"Invalid agent type: {agent_type}. Available types: {', '.join(available_types)}"
+        # If the type is not recognized, fallback to UNKNOWN
+        console.print(
+            f"[yellow]⚠️ Agent type '{agent_type}' not recognized, using 'UNKNOWN'[/yellow]"
         )
+        return AgentTypeEnum.UNKNOWN
 
 
 def format_duration(seconds: float) -> str:

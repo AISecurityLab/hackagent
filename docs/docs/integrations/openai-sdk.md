@@ -9,7 +9,7 @@ OpenAI SDK is the official Python library for interacting with OpenAI's API, inc
 1. **OpenAI API Key**: Get your API key from [platform.openai.com](https://platform.openai.com)
 2. **HackAgent SDK**: Install with `pip install hackagent`
 3. **OpenAI SDK**: Automatically installed with HackAgent
-4. **HackAgent API Key**: Get from [hackagent.dev](https://hackagent.dev)
+4. **HackAgent API Key**: Get from [app.hackagent.dev](https://app.hackagent.dev)
 
 ### Environment Variables
 
@@ -209,7 +209,7 @@ except Exception as e:
 
 ## 🔄 Next Steps
 
-1. Review results on your [HackAgent Dashboard](https://hackagent.dev/stats)
+1. Review results on your [HackAgent Dashboard](https://app.hackagent.dev)
 2. Try different models and configurations
 3. Test with custom attack goals specific to your use case
 4. Implement fixes and re-test

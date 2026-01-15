@@ -22,23 +22,20 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/user",
+        "url": "/user",
     }
 
     if isinstance(body, UserProfileRequest):
-        _json_body = body.to_dict()
+        _kwargs["json"] = body.to_dict()
 
-        _kwargs["json"] = _json_body
         headers["Content-Type"] = "application/json"
     if isinstance(body, UserProfileRequest):
-        _data_body = body.to_dict()
+        _kwargs["data"] = body.to_dict()
 
-        _kwargs["data"] = _data_body
         headers["Content-Type"] = "application/x-www-form-urlencoded"
     if isinstance(body, UserProfileRequest):
-        _files_body = body.to_multipart()
+        _kwargs["files"] = body.to_multipart()
 
-        _kwargs["files"] = _files_body
         headers["Content-Type"] = "multipart/form-data"
 
     _kwargs["headers"] = headers
@@ -81,6 +78,9 @@ def sync_detailed(
     """Provides access to the UserProfile for the authenticated user.
     Allows updating fields like the linked user's first_name, last_name, email.
 
+    Web-only endpoint - requires Auth0 authentication.
+    User profile management requires OAuth context and is not for SDK use.
+
     Args:
         body (UserProfileRequest):
         body (UserProfileRequest):
@@ -117,6 +117,9 @@ def sync(
     """Provides access to the UserProfile for the authenticated user.
     Allows updating fields like the linked user's first_name, last_name, email.
 
+    Web-only endpoint - requires Auth0 authentication.
+    User profile management requires OAuth context and is not for SDK use.
+
     Args:
         body (UserProfileRequest):
         body (UserProfileRequest):
@@ -147,6 +150,9 @@ async def asyncio_detailed(
 ) -> Response[UserProfile]:
     """Provides access to the UserProfile for the authenticated user.
     Allows updating fields like the linked user's first_name, last_name, email.
+
+    Web-only endpoint - requires Auth0 authentication.
+    User profile management requires OAuth context and is not for SDK use.
 
     Args:
         body (UserProfileRequest):
@@ -181,6 +187,9 @@ async def asyncio(
 ) -> Optional[UserProfile]:
     """Provides access to the UserProfile for the authenticated user.
     Allows updating fields like the linked user's first_name, last_name, email.
+
+    Web-only endpoint - requires Auth0 authentication.
+    User profile management requires OAuth context and is not for SDK use.
 
     Args:
         body (UserProfileRequest):

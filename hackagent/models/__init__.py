@@ -2,18 +2,19 @@
 
 from .agent import Agent
 from .agent_request import AgentRequest
-from .agent_type_enum import AgentTypeEnum
 from .api_token_log import APITokenLog
 from .attack import Attack
 from .attack_request import AttackRequest
 from .checkout_session_request_request import CheckoutSessionRequestRequest
 from .checkout_session_response import CheckoutSessionResponse
+from .choice import Choice
+from .choice_message import ChoiceMessage
 from .evaluation_status_enum import EvaluationStatusEnum
 from .generate_error_response import GenerateErrorResponse
 from .generate_request_request import GenerateRequestRequest
-from .generate_request_request_messages_item import GenerateRequestRequestMessagesItem
 from .generate_success_response import GenerateSuccessResponse
 from .generic_error_response import GenericErrorResponse
+from .message_request import MessageRequest
 from .organization import Organization
 from .organization_minimal import OrganizationMinimal
 from .organization_request import OrganizationRequest
@@ -45,6 +46,7 @@ from .status_enum import StatusEnum
 from .step_type_enum import StepTypeEnum
 from .trace import Trace
 from .trace_request import TraceRequest
+from .usage import Usage
 from .user_api_key import UserAPIKey
 from .user_api_key_request import UserAPIKeyRequest
 from .user_profile import UserProfile
@@ -54,18 +56,19 @@ from .user_profile_request import UserProfileRequest
 __all__ = (
     "Agent",
     "AgentRequest",
-    "AgentTypeEnum",
     "APITokenLog",
     "Attack",
     "AttackRequest",
     "CheckoutSessionRequestRequest",
     "CheckoutSessionResponse",
+    "Choice",
+    "ChoiceMessage",
     "EvaluationStatusEnum",
     "GenerateErrorResponse",
     "GenerateRequestRequest",
-    "GenerateRequestRequestMessagesItem",
     "GenerateSuccessResponse",
     "GenericErrorResponse",
+    "MessageRequest",
     "Organization",
     "OrganizationMinimal",
     "OrganizationRequest",
@@ -97,6 +100,7 @@ __all__ = (
     "StepTypeEnum",
     "Trace",
     "TraceRequest",
+    "Usage",
     "UserAPIKey",
     "UserAPIKeyRequest",
     "UserProfile",

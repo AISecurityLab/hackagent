@@ -13,20 +13,23 @@
 # limitations under the License.
 
 
-import unittest
-from unittest.mock import MagicMock, AsyncMock
-from http import HTTPStatus
-import httpx
 import asyncio  # Import asyncio here
 import json  # Added import
+import unittest
+from http import HTTPStatus
+from unittest.mock import AsyncMock, MagicMock
 
-from hackagent.api.generate.generate_create import sync_detailed, asyncio_detailed
+import httpx
+
+from hackagent.api.generate.generate_create import asyncio_detailed, sync_detailed
 from hackagent.client import AuthenticatedClient
+from hackagent.models import (
+    GenerateErrorResponse,  # Added import
+    GenerateRequestRequest,
+    MessageRequest,
+    GenerateSuccessResponse,  # Added import
+)
 from hackagent.types import Response
-from hackagent.models import GenerateRequestRequest
-from hackagent.models import GenerateRequestRequestMessagesItem
-from hackagent.models import GenerateErrorResponse  # Added import
-from hackagent.models import GenerateSuccessResponse  # Added import
 
 
 class TestGeneratorAPI(unittest.TestCase):
@@ -41,7 +44,21 @@ class TestGeneratorAPI(unittest.TestCase):
         )
 
     def test_sync_detailed_success(self):
-        success_payload = {"text": "Success"}  # Expected payload
+        success_payload = {
+            "id": "test-id-123",
+            "object": "chat.completion",
+            "created": 1234567890,
+            "model": "test-model",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": "Success"},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+            "text": "Success",
+        }
         mock_response = httpx.Response(
             HTTPStatus.OK,
             content=json.dumps(success_payload).encode(),  # JSON content
@@ -52,9 +69,7 @@ class TestGeneratorAPI(unittest.TestCase):
         self.mock_httpx_client.request.return_value = mock_response
 
         messages_data = [{"role": "user", "content": "Hello"}]
-        messages_items = [
-            GenerateRequestRequestMessagesItem.from_dict(m) for m in messages_data
-        ]
+        messages_items = [MessageRequest.from_dict(m) for m in messages_data]
         request_body = GenerateRequestRequest(
             model="test-model", messages=messages_items
         )
@@ -62,7 +77,7 @@ class TestGeneratorAPI(unittest.TestCase):
 
         self.mock_httpx_client.request.assert_called_once_with(
             method="post",
-            url="/api/generate",
+            url="/generate",
             json=request_body.to_dict(),
             data=request_body.to_dict(),
             files=request_body.to_multipart(),
@@ -72,7 +87,7 @@ class TestGeneratorAPI(unittest.TestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.content, json.dumps(success_payload).encode())
         self.assertIsInstance(response.parsed, GenerateSuccessResponse)
-        self.assertEqual(response.parsed.text, success_payload["text"])
+        self.assertEqual(response.parsed["text"], success_payload["text"])
 
     def test_sync_detailed_unexpected_status(self):
         error_payload = {"error": "Error"}  # Expected payload
@@ -86,9 +101,7 @@ class TestGeneratorAPI(unittest.TestCase):
         self.mock_httpx_client.request.return_value = mock_response
 
         messages_data = [{"role": "user", "content": "Hello"}]
-        messages_items = [
-            GenerateRequestRequestMessagesItem.from_dict(m) for m in messages_data
-        ]
+        messages_items = [MessageRequest.from_dict(m) for m in messages_data]
         request_body = GenerateRequestRequest(
             model="test-model", messages=messages_items
         )
@@ -100,7 +113,7 @@ class TestGeneratorAPI(unittest.TestCase):
         self.assertEqual(response.parsed.error, "Error")  # Check parsed error message
         self.mock_httpx_client.request.assert_called_once_with(
             method="post",
-            url="/api/generate",
+            url="/generate",
             json=request_body.to_dict(),
             data=request_body.to_dict(),
             files=request_body.to_multipart(),
@@ -120,9 +133,7 @@ class TestGeneratorAPI(unittest.TestCase):
         self.mock_httpx_client.request.return_value = mock_response
 
         messages_data = [{"role": "user", "content": "Hello"}]
-        messages_items = [
-            GenerateRequestRequestMessagesItem.from_dict(m) for m in messages_data
-        ]
+        messages_items = [MessageRequest.from_dict(m) for m in messages_data]
         request_body = GenerateRequestRequest(
             model="test-model", messages=messages_items
         )
@@ -130,7 +141,7 @@ class TestGeneratorAPI(unittest.TestCase):
 
         self.mock_httpx_client.request.assert_called_once_with(
             method="post",
-            url="/api/generate",
+            url="/generate",
             json=request_body.to_dict(),
             data=request_body.to_dict(),
             files=request_body.to_multipart(),
@@ -143,7 +154,21 @@ class TestGeneratorAPI(unittest.TestCase):
     # Note: Using asyncio.run for simplicity here. For more complex async tests,
     # consider unittest.IsolatedAsyncioTestCase or pytest-asyncio.
     def test_asyncio_detailed_success(self):
-        success_payload = {"text": "Async Success"}  # Expected payload
+        success_payload = {
+            "id": "test-id-456",
+            "object": "chat.completion",
+            "created": 1234567890,
+            "model": "test-model",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": "Async Success"},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+            "text": "Async Success",
+        }
         mock_async_response = MagicMock(spec=httpx.Response)
         mock_async_response.status_code = HTTPStatus.OK
         mock_async_response.content = json.dumps(
@@ -160,9 +185,7 @@ class TestGeneratorAPI(unittest.TestCase):
 
         # Define request_body in the outer scope
         messages_data = [{"role": "user", "content": "Hello"}]
-        messages_items = [
-            GenerateRequestRequestMessagesItem.from_dict(m) for m in messages_data
-        ]
+        messages_items = [MessageRequest.from_dict(m) for m in messages_data]
         request_body = GenerateRequestRequest(
             model="test-model", messages=messages_items
         )
@@ -175,7 +198,7 @@ class TestGeneratorAPI(unittest.TestCase):
 
         self.mock_async_httpx_client.request.assert_called_once_with(
             method="post",
-            url="/api/generate",
+            url="/generate",
             json=request_body.to_dict(),
             data=request_body.to_dict(),
             files=request_body.to_multipart(),
@@ -185,7 +208,7 @@ class TestGeneratorAPI(unittest.TestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.content, json.dumps(success_payload).encode())
         self.assertIsInstance(response.parsed, GenerateSuccessResponse)
-        self.assertEqual(response.parsed.text, success_payload["text"])
+        self.assertEqual(response.parsed["text"], success_payload["text"])
 
     def test_asyncio_detailed_unexpected_status(self):
         error_payload = {"error": "Async Error"}  # Expected payload
@@ -201,9 +224,7 @@ class TestGeneratorAPI(unittest.TestCase):
 
         # Define request_body in the outer scope
         messages_data = [{"role": "user", "content": "Hello"}]
-        messages_items = [
-            GenerateRequestRequestMessagesItem.from_dict(m) for m in messages_data
-        ]
+        messages_items = [MessageRequest.from_dict(m) for m in messages_data]
         request_body = GenerateRequestRequest(
             model="test-model", messages=messages_items
         )
@@ -215,7 +236,7 @@ class TestGeneratorAPI(unittest.TestCase):
 
         self.mock_async_httpx_client.request.assert_called_once_with(
             method="post",
-            url="/api/generate",
+            url="/generate",
             json=request_body.to_dict(),
             data=request_body.to_dict(),
             files=request_body.to_multipart(),
@@ -242,9 +263,7 @@ class TestGeneratorAPI(unittest.TestCase):
 
         # Define request_body in the outer scope
         messages_data = [{"role": "user", "content": "Hello"}]
-        messages_items = [
-            GenerateRequestRequestMessagesItem.from_dict(m) for m in messages_data
-        ]
+        messages_items = [MessageRequest.from_dict(m) for m in messages_data]
         request_body = GenerateRequestRequest(
             model="test-model", messages=messages_items
         )
@@ -256,7 +275,7 @@ class TestGeneratorAPI(unittest.TestCase):
 
         self.mock_async_httpx_client.request.assert_called_once_with(
             method="post",
-            url="/api/generate",
+            url="/generate",
             json=request_body.to_dict(),
             data=request_body.to_dict(),
             files=request_body.to_multipart(),

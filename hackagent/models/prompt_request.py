@@ -1,6 +1,5 @@
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union, cast
-from uuid import UUID
+from typing import Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -17,7 +16,6 @@ class PromptRequest:
     Attributes:
         name (str):
         prompt_text (str):
-        organization (UUID):
         category (Union[Unset, str]): Primary category for grouping prompts (e.g., Evasion, Harmful Content).
         tags (Union[Unset, Any]): Optional JSON list of tags for classification (e.g., ["PII", "Malware"])
         evaluation_criteria (Union[Unset, str]): Description of how success/failure should be judged for this specific
@@ -26,27 +24,22 @@ class PromptRequest:
             "tool_input": {...}}]
         expected_output_pattern (Union[Unset, str]): Optional regex pattern to match against the final response.
         reference_output (Union[Unset, str]): Optional ideal/reference final output text.
-        owner (Union[None, Unset, int]):
     """
 
     name: str
     prompt_text: str
-    organization: UUID
     category: Union[Unset, str] = UNSET
     tags: Union[Unset, Any] = UNSET
     evaluation_criteria: Union[Unset, str] = UNSET
     expected_tool_calls: Union[Unset, Any] = UNSET
     expected_output_pattern: Union[Unset, str] = UNSET
     reference_output: Union[Unset, str] = UNSET
-    owner: Union[None, Unset, int] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         name = self.name
 
         prompt_text = self.prompt_text
-
-        organization = str(self.organization)
 
         category = self.category
 
@@ -60,19 +53,12 @@ class PromptRequest:
 
         reference_output = self.reference_output
 
-        owner: Union[None, Unset, int]
-        if isinstance(self.owner, Unset):
-            owner = UNSET
-        else:
-            owner = self.owner
-
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
                 "name": name,
                 "prompt_text": prompt_text,
-                "organization": organization,
             }
         )
         if category is not UNSET:
@@ -87,8 +73,6 @@ class PromptRequest:
             field_dict["expected_output_pattern"] = expected_output_pattern
         if reference_output is not UNSET:
             field_dict["reference_output"] = reference_output
-        if owner is not UNSET:
-            field_dict["owner"] = owner
 
         return field_dict
 
@@ -98,8 +82,6 @@ class PromptRequest:
         name = d.pop("name")
 
         prompt_text = d.pop("prompt_text")
-
-        organization = UUID(d.pop("organization"))
 
         category = d.pop("category", UNSET)
 
@@ -113,26 +95,15 @@ class PromptRequest:
 
         reference_output = d.pop("reference_output", UNSET)
 
-        def _parse_owner(data: object) -> Union[None, Unset, int]:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            return cast(Union[None, Unset, int], data)
-
-        owner = _parse_owner(d.pop("owner", UNSET))
-
         prompt_request = cls(
             name=name,
             prompt_text=prompt_text,
-            organization=organization,
             category=category,
             tags=tags,
             evaluation_criteria=evaluation_criteria,
             expected_tool_calls=expected_tool_calls,
             expected_output_pattern=expected_output_pattern,
             reference_output=reference_output,
-            owner=owner,
         )
 
         prompt_request.additional_properties = d

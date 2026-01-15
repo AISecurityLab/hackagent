@@ -1,6 +1,5 @@
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union, cast
-from uuid import UUID
+from typing import Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -25,8 +24,6 @@ class PatchedPromptRequest:
             "tool_input": {...}}]
         expected_output_pattern (Union[Unset, str]): Optional regex pattern to match against the final response.
         reference_output (Union[Unset, str]): Optional ideal/reference final output text.
-        organization (Union[Unset, UUID]):
-        owner (Union[None, Unset, int]):
     """
 
     name: Union[Unset, str] = UNSET
@@ -37,8 +34,6 @@ class PatchedPromptRequest:
     expected_tool_calls: Union[Unset, Any] = UNSET
     expected_output_pattern: Union[Unset, str] = UNSET
     reference_output: Union[Unset, str] = UNSET
-    organization: Union[Unset, UUID] = UNSET
-    owner: Union[None, Unset, int] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -57,16 +52,6 @@ class PatchedPromptRequest:
         expected_output_pattern = self.expected_output_pattern
 
         reference_output = self.reference_output
-
-        organization: Union[Unset, str] = UNSET
-        if not isinstance(self.organization, Unset):
-            organization = str(self.organization)
-
-        owner: Union[None, Unset, int]
-        if isinstance(self.owner, Unset):
-            owner = UNSET
-        else:
-            owner = self.owner
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -87,10 +72,6 @@ class PatchedPromptRequest:
             field_dict["expected_output_pattern"] = expected_output_pattern
         if reference_output is not UNSET:
             field_dict["reference_output"] = reference_output
-        if organization is not UNSET:
-            field_dict["organization"] = organization
-        if owner is not UNSET:
-            field_dict["owner"] = owner
 
         return field_dict
 
@@ -113,22 +94,6 @@ class PatchedPromptRequest:
 
         reference_output = d.pop("reference_output", UNSET)
 
-        _organization = d.pop("organization", UNSET)
-        organization: Union[Unset, UUID]
-        if isinstance(_organization, Unset):
-            organization = UNSET
-        else:
-            organization = UUID(_organization)
-
-        def _parse_owner(data: object) -> Union[None, Unset, int]:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            return cast(Union[None, Unset, int], data)
-
-        owner = _parse_owner(d.pop("owner", UNSET))
-
         patched_prompt_request = cls(
             name=name,
             prompt_text=prompt_text,
@@ -138,8 +103,6 @@ class PatchedPromptRequest:
             expected_tool_calls=expected_tool_calls,
             expected_output_pattern=expected_output_pattern,
             reference_output=reference_output,
-            organization=organization,
-            owner=owner,
         )
 
         patched_prompt_request.additional_properties = d

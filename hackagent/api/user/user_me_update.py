@@ -22,23 +22,20 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "put",
-        "url": "/api/user/me",
+        "url": "/user/me",
     }
 
     if isinstance(body, UserProfileRequest):
-        _json_body = body.to_dict()
+        _kwargs["json"] = body.to_dict()
 
-        _kwargs["json"] = _json_body
         headers["Content-Type"] = "application/json"
     if isinstance(body, UserProfileRequest):
-        _data_body = body.to_dict()
+        _kwargs["data"] = body.to_dict()
 
-        _kwargs["data"] = _data_body
         headers["Content-Type"] = "application/x-www-form-urlencoded"
     if isinstance(body, UserProfileRequest):
-        _files_body = body.to_multipart()
+        _kwargs["files"] = body.to_multipart()
 
-        _kwargs["files"] = _files_body
         headers["Content-Type"] = "multipart/form-data"
 
     _kwargs["headers"] = headers

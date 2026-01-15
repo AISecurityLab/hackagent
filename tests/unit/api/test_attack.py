@@ -13,25 +13,26 @@
 # limitations under the License.
 
 
-import unittest
-from unittest.mock import patch, MagicMock
-from http import HTTPStatus
-import uuid
 import datetime  # Added for datetime objects
+import unittest
+import uuid
+from http import HTTPStatus
+from unittest.mock import MagicMock, patch
+
+from hackagent import errors
+from hackagent.api.attack import (
+    attack_create,
+    attack_destroy,
+    attack_list,
+    attack_partial_update,
+    attack_retrieve,
+    attack_update,
+)
+from hackagent.models.attack import Attack  # For individual attack items
+from hackagent.models.attack_request import AttackRequest
 
 # Assuming these are the correct import paths based on the project structure
 from hackagent.models.paginated_attack_list import PaginatedAttackList
-from hackagent.models.attack import Attack  # For individual attack items
-from hackagent.api.attack import (
-    attack_list,
-    attack_create,
-    attack_retrieve,
-    attack_update,
-    attack_partial_update,
-    attack_destroy,
-)
-from hackagent import errors
-from hackagent.models.attack_request import AttackRequest
 from hackagent.models.patched_attack_request import (
     PatchedAttackRequest,
 )  # Added PatchedAttackRequest
@@ -112,7 +113,7 @@ class TestAttackListAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "get",
-                "url": "/api/attack",
+                "url": "/attack",
                 "params": {"page": 1},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -222,7 +223,7 @@ class TestAttackCreateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "post",
-                "url": "/api/attack",
+                "url": "/attack",
                 "json": attack_request_data.to_dict(),
                 "headers": {"Content-Type": "application/json"},
             }
@@ -337,7 +338,7 @@ class TestAttackRetrieveAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "get",
-                "url": f"/api/attack/{attack_id_to_retrieve}",
+                "url": f"/attack/{attack_id_to_retrieve}",
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
@@ -457,7 +458,7 @@ class TestAttackUpdateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "put",
-                "url": f"/api/attack/{attack_id_to_update}",
+                "url": f"/attack/{attack_id_to_update}",
                 "json": attack_update_request_data.to_dict(),
                 "headers": {"Content-Type": "application/json"},
             }
@@ -592,7 +593,7 @@ class TestAttackPartialUpdateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "patch",
-                "url": f"/api/attack/{attack_id_to_patch}",
+                "url": f"/attack/{attack_id_to_patch}",
                 "json": attack_patch_request_data.to_dict(),
                 "headers": {"Content-Type": "application/json"},
             }
@@ -678,7 +679,7 @@ class TestAttackDestroyAPI(unittest.TestCase):
 
         expected_kwargs = {
             "method": "delete",
-            "url": f"/api/attack/{attack_id_to_delete}",
+            "url": f"/attack/{attack_id_to_delete}",
         }
         mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 

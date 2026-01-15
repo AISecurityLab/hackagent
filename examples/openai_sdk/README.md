@@ -110,7 +110,7 @@ python hack.py
 
 ## Viewing Results
 
-After running the tests, view your results at: [https://hackagent.dev](https://hackagent.dev)
+After running the tests, view your results at: [https://app.hackagent.dev](https://app.hackagent.dev)
 
 ## Best Practices
 
@@ -143,4 +143,4 @@ The adapter handles rate limits gracefully. If you encounter persistent rate lim
 
 - [HackAgent Documentation](https://docs.hackagent.dev)
 - [OpenAI API Documentation](https://platform.openai.com/docs)
-- [HackAgent GitHub Repository](https://github.com/vistalabs-org/hackagent)
+- [HackAgent GitHub Repository](https://github.com/AISecurityLab/hackagent)

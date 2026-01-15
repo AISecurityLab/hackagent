@@ -20,12 +20,11 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "put",
-        "url": f"/api/prompt/{id}",
+        "url": f"/prompt/{id}",
     }
 
-    _body = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
-    _kwargs["json"] = _body
     headers["Content-Type"] = "application/json"
 
     _kwargs["headers"] = headers
@@ -64,6 +63,9 @@ def sync_detailed(
 ) -> Response[Prompt]:
     """ViewSet for managing Prompt instances.
 
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+
     Args:
         id (UUID):
         body (PromptRequest): Serializer for the Prompt model.
@@ -96,6 +98,9 @@ def sync(
 ) -> Optional[Prompt]:
     """ViewSet for managing Prompt instances.
 
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+
     Args:
         id (UUID):
         body (PromptRequest): Serializer for the Prompt model.
@@ -122,6 +127,9 @@ async def asyncio_detailed(
     body: PromptRequest,
 ) -> Response[Prompt]:
     """ViewSet for managing Prompt instances.
+
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
 
     Args:
         id (UUID):
@@ -152,6 +160,9 @@ async def asyncio(
     body: PromptRequest,
 ) -> Optional[Prompt]:
     """ViewSet for managing Prompt instances.
+
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
 
     Args:
         id (UUID):

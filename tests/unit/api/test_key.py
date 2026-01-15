@@ -14,16 +14,17 @@
 
 
 import unittest
-from unittest.mock import patch, MagicMock
-from http import HTTPStatus
 import uuid
+from http import HTTPStatus
+from unittest.mock import MagicMock, patch
+
 from dateutil.parser import isoparse
 
+from hackagent import errors
+from hackagent.api.key import key_create, key_destroy, key_list, key_retrieve
 from hackagent.models.paginated_user_api_key_list import PaginatedUserAPIKeyList
 from hackagent.models.user_api_key import UserAPIKey
 from hackagent.models.user_api_key_request import UserAPIKeyRequest
-from hackagent.api.key import key_list, key_create, key_retrieve, key_destroy
-from hackagent import errors
 
 
 class TestKeyListAPI(unittest.TestCase):
@@ -112,7 +113,7 @@ class TestKeyListAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "get",
-                "url": "/api/key",
+                "url": "/key",
                 "params": {"page": 1},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -262,7 +263,7 @@ class TestKeyCreateAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "post",
-                "url": "/api/key",
+                "url": "/key",
                 "json": key_request_data.to_dict(),
                 "headers": {"Content-Type": "application/json"},
             }
@@ -396,7 +397,7 @@ class TestKeyRetrieveAPI(unittest.TestCase):
 
             expected_kwargs = {
                 "method": "get",
-                "url": f"/api/key/{key_prefix_to_retrieve}",
+                "url": f"/key/{key_prefix_to_retrieve}",
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
@@ -470,7 +471,7 @@ class TestKeyDestroyAPI(unittest.TestCase):
 
         expected_kwargs = {
             "method": "delete",
-            "url": f"/api/key/{key_prefix_to_delete}",
+            "url": f"/key/{key_prefix_to_delete}",
         }
         mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 

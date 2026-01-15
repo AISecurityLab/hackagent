@@ -2,11 +2,12 @@
 Unit tests for CLI configuration functionality.
 """
 
-import pytest
 import json
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 from hackagent.cli.config import CLIConfig
 
@@ -24,8 +25,8 @@ class TestCLIConfig:
             config = CLIConfig()
 
             assert config.api_key is None
-            assert config.base_url == "https://hackagent.dev"
-            assert config.verbose == 0
+            assert config.base_url == "https://api.hackagent.dev"
+            assert config.verbose == 1  # Default is VERBOSITY_WARNING
             assert config.output_format == "table"
 
     def test_env_variable_loading(self):
@@ -45,7 +46,7 @@ class TestCLIConfig:
 
             assert config.api_key == "test-key"
             # Note: base_url is hardcoded and doesn't load from env
-            assert config.base_url == "https://hackagent.dev"
+            assert config.base_url == "https://api.hackagent.dev"
             assert config.output_format == "json"
 
     def test_config_file_loading(self):
@@ -66,7 +67,7 @@ class TestCLIConfig:
 
                 assert config.api_key == "file-key"
                 # Note: base_url is hardcoded and doesn't load from config file
-                assert config.base_url == "https://hackagent.dev"
+                assert config.base_url == "https://api.hackagent.dev"
                 assert config.output_format == "csv"
         finally:
             Path(config_file).unlink()
@@ -193,10 +194,10 @@ class TestCLIConfig:
                 # Mock home directory to point to our temp dir
                 mock_home.return_value = Path(temp_dir).parent
 
-                # Create the .hackagent directory structure
-                hackagent_dir = Path(temp_dir).parent / ".hackagent"
-                hackagent_dir.mkdir(exist_ok=True)
-                (hackagent_dir / "config.json").write_text(json.dumps(config_data))
+                # Create the .config/hackagent directory structure
+                config_dir = Path(temp_dir).parent / ".config" / "hackagent"
+                config_dir.mkdir(parents=True, exist_ok=True)
+                (config_dir / "config.json").write_text(json.dumps(config_data))
 
                 config = CLIConfig()
 
@@ -318,7 +319,7 @@ class TestCLIConfig:
         with patch.dict("os.environ", {}, clear=True):
             config = CLIConfig()
 
-            expected_path = Path.home() / ".hackagent" / "config.json"
+            expected_path = Path.home() / ".config" / "hackagent" / "config.json"
             assert config.default_config_path == expected_path
 
     def test_yaml_config_loading(self):
@@ -345,7 +346,7 @@ output_format: table
 
                     assert config.api_key == "yaml-key"
                     # Note: base_url is hardcoded and doesn't load from config file
-                    assert config.base_url == "https://hackagent.dev"
+                    assert config.base_url == "https://api.hackagent.dev"
                     assert config.output_format == "table"
             except ImportError:
                 # PyYAML not available, should raise appropriate error
@@ -374,7 +375,7 @@ output_format: table
             config = CLIConfig(config_file="/nonexistent/config.json")
 
             # Should use defaults
-            assert config.base_url == "https://hackagent.dev"
+            assert config.base_url == "https://api.hackagent.dev"
             assert config.output_format == "table"
 
     # EDGE CASE TESTS
