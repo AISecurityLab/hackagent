@@ -4,6 +4,7 @@ from typing import Any, TypeVar, Union
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from .. import types
 from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="UserProfileRequest")
@@ -42,38 +43,26 @@ class UserProfileRequest:
 
         return field_dict
 
-    def to_multipart(self) -> dict[str, Any]:
-        email = (
-            self.email
-            if isinstance(self.email, Unset)
-            else (None, str(self.email).encode(), "text/plain")
-        )
+    def to_multipart(self) -> types.RequestFiles:
+        files: types.RequestFiles = []
 
-        first_name = (
-            self.first_name
-            if isinstance(self.first_name, Unset)
-            else (None, str(self.first_name).encode(), "text/plain")
-        )
+        if not isinstance(self.email, Unset):
+            files.append(("email", (None, str(self.email).encode(), "text/plain")))
 
-        last_name = (
-            self.last_name
-            if isinstance(self.last_name, Unset)
-            else (None, str(self.last_name).encode(), "text/plain")
-        )
+        if not isinstance(self.first_name, Unset):
+            files.append(
+                ("first_name", (None, str(self.first_name).encode(), "text/plain"))
+            )
 
-        field_dict: dict[str, Any] = {}
+        if not isinstance(self.last_name, Unset):
+            files.append(
+                ("last_name", (None, str(self.last_name).encode(), "text/plain"))
+            )
+
         for prop_name, prop in self.additional_properties.items():
-            field_dict[prop_name] = (None, str(prop).encode(), "text/plain")
+            files.append((prop_name, (None, str(prop).encode(), "text/plain")))
 
-        field_dict.update({})
-        if email is not UNSET:
-            field_dict["email"] = email
-        if first_name is not UNSET:
-            field_dict["first_name"] = first_name
-        if last_name is not UNSET:
-            field_dict["last_name"] = last_name
-
-        return field_dict
+        return files
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:

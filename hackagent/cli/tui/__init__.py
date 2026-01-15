@@ -13,9 +13,17 @@
 # limitations under the License.
 
 """
-TUI (Terminal User Interface) Module
+Terminal User Interface (TUI)
 
-Full-screen tabbed interface for HackAgent CLI.
+Full-featured terminal interface for HackAgent with tabbed navigation,
+real-time attack monitoring, and interactive configuration.
+
+Structure:
+    - app.py: Main TUI application class
+    - base.py: Base widgets and utilities
+    - logger.py: TUI logging handler for attack execution logs
+    - views/: Tab views (dashboard, agents, attacks, results, config)
+    - widgets/: Reusable UI components (log viewer, etc.)
 """
 
 from hackagent.cli.tui.app import HackAgentTUI

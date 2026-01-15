@@ -13,18 +13,19 @@
 # limitations under the License.
 
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 from httpx import Response
-from unittest.mock import MagicMock, patch, AsyncMock
 
 from hackagent.api.checkout import checkout_create
+from hackagent.client import AuthenticatedClient
+from hackagent.errors import UnexpectedStatus
 from hackagent.models.checkout_session_request_request import (
     CheckoutSessionRequestRequest,
 )
 from hackagent.models.checkout_session_response import CheckoutSessionResponse
 from hackagent.models.generic_error_response import GenericErrorResponse
-from hackagent.client import AuthenticatedClient
-from hackagent.errors import UnexpectedStatus
 
 
 @pytest.fixture
@@ -46,7 +47,7 @@ def test_get_kwargs(checkout_request_body: CheckoutSessionRequestRequest):
     # We are testing the multipart case as CheckoutSessionRequestRequest has to_multipart.
     kwargs = checkout_create._get_kwargs(body=checkout_request_body)
     assert kwargs["method"] == "post"
-    assert kwargs["url"] == "/api/checkout/"
+    assert kwargs["url"] == "/checkout/"
     assert kwargs["files"] == checkout_request_body.to_multipart()
     assert "multipart/form-data" in kwargs["headers"]["Content-Type"]
 

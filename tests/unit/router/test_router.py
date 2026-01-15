@@ -1,16 +1,17 @@
 import unittest
-from unittest.mock import patch, MagicMock
 import uuid
+from unittest.mock import MagicMock, patch
+
+from hackagent.client import AuthenticatedClient
+from hackagent.models import Agent as BackendAgentModel
 
 # Assuming AgentTypeEnum and other necessary enums/models are accessible
 # We might need to adjust imports based on the actual structure of hackagent.models
-from hackagent.models import AgentTypeEnum, Agent as BackendAgentModel, UserAPIKey
+from hackagent.router.types import AgentTypeEnum
 from hackagent.router.router import AgentRouter
-from hackagent.client import AuthenticatedClient
 
 
 class TestAgentRouterInitialization(unittest.TestCase):
-    @patch("hackagent.router.router.key_list")
     @patch("hackagent.router.router.agent_list")
     @patch("hackagent.router.router.agent_create")
     @patch("hackagent.router.router.agent_partial_update")
@@ -25,7 +26,6 @@ class TestAgentRouterInitialization(unittest.TestCase):
         mock_agent_partial_update,
         mock_agent_create,
         mock_agent_list,
-        mock_key_list,
     ):
         # --- MOCK SETUP ---
         MockAgentMap[AgentTypeEnum.GOOGLE_ADK] = MockADKAdapter
@@ -39,23 +39,30 @@ class TestAgentRouterInitialization(unittest.TestCase):
 
         mock_org_id = uuid.uuid4()
         mock_user_id = 123
-        mock_api_key_obj = MagicMock(spec=UserAPIKey)
-        mock_api_key_obj.prefix = "test_token_prefix_"
-        mock_api_key_obj.organization = mock_org_id
-        mock_api_key_obj.user = mock_user_id
 
-        mock_key_list_response = MagicMock()
-        mock_key_list_response.status_code = 200
-        mock_key_list_response.parsed = MagicMock()
-        mock_key_list_response.parsed.results = [mock_api_key_obj]
-        mock_key_list.sync_detailed.return_value = mock_key_list_response
+        # Mock an initial agent for org/user ID fetching
+        mock_initial_agent = MagicMock(spec=BackendAgentModel)
+        mock_initial_agent.organization = mock_org_id
+        mock_initial_agent.owner = mock_user_id
+        mock_initial_agent.name = "existing_agent_for_org_user"
 
-        mock_agent_list_response = MagicMock()
-        mock_agent_list_response.status_code = 200
-        mock_agent_list_response.parsed = MagicMock()
-        mock_agent_list_response.parsed.results = []
-        mock_agent_list_response.parsed.next_ = None
-        mock_agent_list.sync_detailed.return_value = mock_agent_list_response
+        # First two calls to agent_list are for fetching org and user IDs
+        # Third call is for finding existing agent (which returns empty)
+        mock_agent_list_responses = [
+            # First call: _fetch_organization_id
+            MagicMock(
+                status_code=200,
+                parsed=MagicMock(results=[mock_initial_agent], next_=None),
+            ),
+            # Second call: _fetch_user_id_str
+            MagicMock(
+                status_code=200,
+                parsed=MagicMock(results=[mock_initial_agent], next_=None),
+            ),
+            # Third call: _find_existing_agent
+            MagicMock(status_code=200, parsed=MagicMock(results=[], next_=None)),
+        ]
+        mock_agent_list.sync_detailed.side_effect = mock_agent_list_responses
 
         mock_created_agent_id = uuid.uuid4()
         mock_backend_agent_from_create = MagicMock(spec=BackendAgentModel)
@@ -90,8 +97,8 @@ class TestAgentRouterInitialization(unittest.TestCase):
         )
 
         # --- ASSERTIONS ---
-        self.assertEqual(mock_key_list.sync_detailed.call_count, 2)
-        mock_agent_list.sync_detailed.assert_called_once()
+        # agent_list called 3 times: org ID, user ID, find existing agent
+        self.assertEqual(mock_agent_list.sync_detailed.call_count, 3)
         mock_agent_create.sync_detailed.assert_called_once()
         create_call_args_kwargs = mock_agent_create.sync_detailed.call_args[1]
         self.assertEqual(create_call_args_kwargs["client"], mock_client)
@@ -100,7 +107,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
         self.assertEqual(agent_request_body.agent_type, agent_type)
         self.assertEqual(agent_request_body.endpoint, agent_endpoint)
         self.assertEqual(agent_request_body.metadata, agent_metadata)
-        self.assertEqual(agent_request_body.organization, mock_org_id)
+        # Note: organization is set by backend based on authenticated user, not in requestuser, not in request
 
         mock_agent_partial_update.sync_detailed.assert_not_called()
 
@@ -131,7 +138,6 @@ class TestAgentRouterInitialization(unittest.TestCase):
             mock_adk_adapter_instance_created,
         )
 
-    @patch("hackagent.router.router.key_list")
     @patch("hackagent.router.router.agent_list")
     @patch("hackagent.router.router.agent_create")
     @patch("hackagent.router.router.agent_partial_update")
@@ -146,7 +152,6 @@ class TestAgentRouterInitialization(unittest.TestCase):
         mock_agent_partial_update,
         mock_agent_create,
         mock_agent_list,
-        mock_key_list,
     ):
         # --- MOCK SETUP ---
         MockAgentMap[AgentTypeEnum.GOOGLE_ADK] = MockADKAdapter
@@ -159,16 +164,6 @@ class TestAgentRouterInitialization(unittest.TestCase):
 
         mock_org_id = uuid.uuid4()
         mock_user_id = 456
-        mock_api_key_obj = MagicMock(spec=UserAPIKey)
-        mock_api_key_obj.prefix = "test_token_prefix_existing_"
-        mock_api_key_obj.organization = mock_org_id
-        mock_api_key_obj.user = mock_user_id
-
-        mock_key_list_response = MagicMock()
-        mock_key_list_response.status_code = 200
-        mock_key_list_response.parsed = MagicMock()
-        mock_key_list_response.parsed.results = [mock_api_key_obj]
-        mock_key_list.sync_detailed.return_value = mock_key_list_response
 
         agent_name = "ExistingADKAgent"
         agent_type = AgentTypeEnum.GOOGLE_ADK
@@ -185,6 +180,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
         existing_agent_mock.name = agent_name
         existing_agent_mock.agent_type = agent_type
         existing_agent_mock.organization = mock_org_id
+        existing_agent_mock.owner = mock_user_id  # Must be int for _fetch_user_id_str
         existing_agent_mock.endpoint = "http://old-endpoint.com"
         existing_agent_mock.metadata = {
             "old_key": "old_value",
@@ -225,8 +221,8 @@ class TestAgentRouterInitialization(unittest.TestCase):
         )
 
         # --- ASSERTIONS ---
-        self.assertEqual(mock_key_list.sync_detailed.call_count, 2)
-        mock_agent_list.sync_detailed.assert_called_once()
+        # agent_list called 3 times: org ID, user ID, find existing agent
+        self.assertEqual(mock_agent_list.sync_detailed.call_count, 3)
         mock_agent_create.sync_detailed.assert_not_called()
         mock_agent_partial_update.sync_detailed.assert_called_once()
 
@@ -272,7 +268,6 @@ class TestAgentRouterInitialization(unittest.TestCase):
             mock_adk_adapter_instance_created,
         )
 
-    @patch("hackagent.router.router.key_list")
     @patch("hackagent.router.router.agent_list")
     @patch("hackagent.router.router.agent_create")
     @patch("hackagent.router.router.agent_partial_update")
@@ -287,7 +282,6 @@ class TestAgentRouterInitialization(unittest.TestCase):
         mock_agent_partial_update,
         mock_agent_create,
         mock_agent_list,
-        mock_key_list,
     ):
         # --- MOCK SETUP ---
         MockAgentMap[AgentTypeEnum.GOOGLE_ADK] = MockADKAdapter
@@ -300,16 +294,6 @@ class TestAgentRouterInitialization(unittest.TestCase):
 
         mock_org_id = uuid.uuid4()
         mock_user_id = 789
-        mock_api_key_obj = MagicMock(spec=UserAPIKey)
-        mock_api_key_obj.prefix = "test_token_metadata_m_"
-        mock_api_key_obj.organization = mock_org_id
-        mock_api_key_obj.user = mock_user_id
-
-        mock_key_list_response = MagicMock()
-        mock_key_list_response.status_code = 200
-        mock_key_list_response.parsed = MagicMock()
-        mock_key_list_response.parsed.results = [mock_api_key_obj]
-        mock_key_list.sync_detailed.return_value = mock_key_list_response
 
         agent_name = "ADKAgentMetaMatch"
         agent_type = AgentTypeEnum.GOOGLE_ADK
@@ -326,6 +310,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
         existing_agent_mock.name = agent_name
         existing_agent_mock.agent_type = agent_type
         existing_agent_mock.organization = mock_org_id
+        existing_agent_mock.owner = mock_user_id  # Must be int for _fetch_user_id_str
         existing_agent_mock.endpoint = (
             current_endpoint  # Matches what router init receives
         )
@@ -348,15 +333,14 @@ class TestAgentRouterInitialization(unittest.TestCase):
             endpoint=current_endpoint,  # Same as existing
             metadata=current_metadata,  # Same as existing
             adapter_operational_config=adapter_op_config,
-            overwrite_metadata=True,  # overwrite_metadata is True
+            overwrite_metadata=False,  # Key: Overwrite is False
         )
 
         # --- ASSERTIONS ---
-        self.assertEqual(mock_key_list.sync_detailed.call_count, 2)
-        mock_agent_list.sync_detailed.assert_called_once()
+        # agent_list called 3 times: org ID, user ID, find existing agent
+        self.assertEqual(mock_agent_list.sync_detailed.call_count, 3)
 
-        mock_agent_create.sync_detailed.assert_not_called()  # Should NOT create
-        mock_agent_partial_update.sync_detailed.assert_not_called()  # Should NOT update
+        mock_agent_create.sync_detailed.assert_not_called()  # Should NOT createT update
 
         MockADKAdapter.assert_called_once()
         mock_adk_adapter_instance_created = MockADKAdapter.return_value
@@ -388,7 +372,6 @@ class TestAgentRouterInitialization(unittest.TestCase):
             mock_adk_adapter_instance_created,
         )
 
-    @patch("hackagent.router.router.key_list")
     @patch("hackagent.router.router.agent_list")
     @patch("hackagent.router.router.agent_create")
     @patch("hackagent.router.router.agent_partial_update")
@@ -403,7 +386,6 @@ class TestAgentRouterInitialization(unittest.TestCase):
         mock_agent_partial_update,
         mock_agent_create,
         mock_agent_list,
-        mock_key_list,
     ):
         # --- MOCK SETUP ---
         MockAgentMap[AgentTypeEnum.GOOGLE_ADK] = MockADKAdapter
@@ -415,18 +397,6 @@ class TestAgentRouterInitialization(unittest.TestCase):
 
         mock_org_id = uuid.uuid4()
         mock_user_id = 101112
-        mock_api_key_obj = MagicMock(spec=UserAPIKey)
-        mock_api_key_obj.prefix = "test_token_meta_match_ow_false_"
-        mock_api_key_obj.organization = mock_org_id
-        mock_api_key_obj.user = mock_user_id
-        # Update client token to match prefix
-        mock_client.token = mock_api_key_obj.prefix + "some_suffix"
-
-        mock_key_list_response = MagicMock()
-        mock_key_list_response.status_code = 200
-        mock_key_list_response.parsed = MagicMock()
-        mock_key_list_response.parsed.results = [mock_api_key_obj]
-        mock_key_list.sync_detailed.return_value = mock_key_list_response
 
         agent_name = "ADKAgentMetaMatchOverwriteFalse"
         agent_type = AgentTypeEnum.GOOGLE_ADK
@@ -440,6 +410,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
         existing_agent_mock.name = agent_name
         existing_agent_mock.agent_type = agent_type
         existing_agent_mock.organization = mock_org_id
+        existing_agent_mock.owner = mock_user_id  # Must be int for _fetch_user_id_str
         existing_agent_mock.endpoint = current_endpoint
         existing_agent_mock.metadata = current_metadata
 
@@ -462,8 +433,8 @@ class TestAgentRouterInitialization(unittest.TestCase):
         )
 
         # --- ASSERTIONS ---
-        self.assertEqual(mock_key_list.sync_detailed.call_count, 2)
-        mock_agent_list.sync_detailed.assert_called_once()
+        # agent_list called 3 times: org ID, user ID, find existing agent
+        self.assertEqual(mock_agent_list.sync_detailed.call_count, 3)
 
         mock_agent_create.sync_detailed.assert_not_called()
         mock_agent_partial_update.sync_detailed.assert_not_called()  # Should NOT update
@@ -496,7 +467,6 @@ class TestAgentRouterInitialization(unittest.TestCase):
             mock_adk_adapter_instance_created,
         )
 
-    @patch("hackagent.router.router.key_list")
     @patch("hackagent.router.router.agent_list")
     @patch("hackagent.router.router.agent_create")
     @patch("hackagent.router.router.agent_partial_update")
@@ -511,7 +481,6 @@ class TestAgentRouterInitialization(unittest.TestCase):
         mock_agent_partial_update,
         mock_agent_create,
         mock_agent_list,
-        mock_key_list,
     ):
         # --- MOCK SETUP ---
         MockAgentMap[AgentTypeEnum.GOOGLE_ADK] = MockADKAdapter
@@ -519,19 +488,9 @@ class TestAgentRouterInitialization(unittest.TestCase):
         MockLiteLLMAdapter.__name__ = "LiteLLMAgentAdapter"
 
         mock_client = MagicMock(spec=AuthenticatedClient)
+        mock_client.token = "test_token_diff_meta_ow_false"
         mock_org_id = uuid.uuid4()
         mock_user_id = 654
-        mock_api_key_obj = MagicMock(spec=UserAPIKey)
-        mock_api_key_obj.prefix = "test_token_meta_diff_ow_false_"
-        mock_api_key_obj.organization = mock_org_id
-        mock_api_key_obj.user = mock_user_id
-        mock_client.token = mock_api_key_obj.prefix + "suffix"
-
-        mock_key_list_response = MagicMock()
-        mock_key_list_response.status_code = 200
-        mock_key_list_response.parsed = MagicMock()
-        mock_key_list_response.parsed.results = [mock_api_key_obj]
-        mock_key_list.sync_detailed.return_value = mock_key_list_response
 
         agent_name = "ExistingADKAgentDiffMetaOverwriteFalse"
         agent_type = AgentTypeEnum.GOOGLE_ADK
@@ -548,6 +507,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
         existing_agent_mock.name = agent_name
         existing_agent_mock.agent_type = agent_type
         existing_agent_mock.organization = mock_org_id
+        existing_agent_mock.owner = mock_user_id  # Must be int for _fetch_user_id_str
         existing_agent_mock.endpoint = (
             "http://old-backend-endpoint.com"  # Different from router_init_endpoint
         )
@@ -556,12 +516,28 @@ class TestAgentRouterInitialization(unittest.TestCase):
             "common_key": "backend_version",
         }  # Different
 
-        mock_agent_list_response = MagicMock()
-        mock_agent_list_response.status_code = 200
-        mock_agent_list_response.parsed = MagicMock()
-        mock_agent_list_response.parsed.results = [existing_agent_mock]
-        mock_agent_list_response.parsed.next_ = None
-        mock_agent_list.sync_detailed.return_value = mock_agent_list_response
+        # Mock an initial agent for org/user ID fetching
+        mock_initial_agent = MagicMock(spec=BackendAgentModel)
+        mock_initial_agent.organization = mock_org_id
+        mock_initial_agent.owner = mock_user_id
+        mock_initial_agent.name = "initial_agent_for_ids"
+
+        # agent_list called 3 times: org ID fetch, user ID fetch, find existing agent
+        mock_agent_list_responses = [
+            MagicMock(
+                status_code=200,
+                parsed=MagicMock(results=[mock_initial_agent], next_=None),
+            ),
+            MagicMock(
+                status_code=200,
+                parsed=MagicMock(results=[mock_initial_agent], next_=None),
+            ),
+            MagicMock(
+                status_code=200,
+                parsed=MagicMock(results=[existing_agent_mock], next_=None),
+            ),
+        ]
+        mock_agent_list.sync_detailed.side_effect = mock_agent_list_responses
 
         # --- EXECUTE ---
         router = AgentRouter(
@@ -575,8 +551,8 @@ class TestAgentRouterInitialization(unittest.TestCase):
         )
 
         # --- ASSERTIONS ---
-        self.assertEqual(mock_key_list.sync_detailed.call_count, 2)
-        mock_agent_list.sync_detailed.assert_called_once()
+        # agent_list called 3 times: org ID, user ID, find existing agent
+        self.assertEqual(mock_agent_list.sync_detailed.call_count, 3)
 
         mock_agent_create.sync_detailed.assert_not_called()  # Should NOT create
         mock_agent_partial_update.sync_detailed.assert_not_called()  # Should NOT update
@@ -620,7 +596,6 @@ class TestAgentRouterInitialization(unittest.TestCase):
             mock_adk_adapter_instance_created,
         )
 
-    @patch("hackagent.router.router.key_list")
     @patch("hackagent.router.router.agent_list")
     @patch("hackagent.router.router.agent_create")
     @patch("hackagent.router.router.agent_partial_update")
@@ -635,7 +610,6 @@ class TestAgentRouterInitialization(unittest.TestCase):
         mock_agent_partial_update,
         mock_agent_create,
         mock_agent_list,
-        mock_key_list,
     ):
         # --- MOCK SETUP ---
         MockAgentMap[AgentTypeEnum.LITELLM] = MockLiteLLMAdapter
@@ -645,27 +619,34 @@ class TestAgentRouterInitialization(unittest.TestCase):
         MockLiteLLMAdapter.__name__ = "LiteLLMAgentAdapter"
 
         mock_client = MagicMock(spec=AuthenticatedClient)
+        mock_client.token = "test_token_litellm_create"
         mock_org_id = uuid.uuid4()
         mock_user_id = 789
-        mock_api_key_obj = MagicMock(spec=UserAPIKey)
-        mock_api_key_obj.prefix = "test_token_litellm_create_"
-        mock_api_key_obj.organization = mock_org_id
-        mock_api_key_obj.user = mock_user_id
-        mock_client.token = mock_api_key_obj.prefix + "suffix"
-
-        mock_key_list_response = MagicMock()
-        mock_key_list_response.status_code = 200
-        mock_key_list_response.parsed = MagicMock()
-        mock_key_list_response.parsed.results = [mock_api_key_obj]
-        mock_key_list.sync_detailed.return_value = mock_key_list_response
 
         # Mock agent_list to return no existing agents
-        mock_agent_list_response = MagicMock()
-        mock_agent_list_response.status_code = 200
-        mock_agent_list_response.parsed = MagicMock()
-        mock_agent_list_response.parsed.results = []
-        mock_agent_list_response.parsed.next_ = None
-        mock_agent_list.sync_detailed.return_value = mock_agent_list_response
+        # Mock an initial agent for org/user ID fetching
+        mock_initial_agent = MagicMock(spec=BackendAgentModel)
+        mock_initial_agent.organization = mock_org_id
+        mock_initial_agent.owner = mock_user_id
+        mock_initial_agent.name = "existing_agent_for_org_user"
+
+        # First two calls to agent_list are for fetching org and user IDs
+        # Third call is for finding existing agent (which returns empty)
+        mock_agent_list_responses = [
+            # First call: _fetch_organization_id
+            MagicMock(
+                status_code=200,
+                parsed=MagicMock(results=[mock_initial_agent], next_=None),
+            ),
+            # Second call: _fetch_user_id_str
+            MagicMock(
+                status_code=200,
+                parsed=MagicMock(results=[mock_initial_agent], next_=None),
+            ),
+            # Third call: _find_existing_agent
+            MagicMock(status_code=200, parsed=MagicMock(results=[], next_=None)),
+        ]
+        mock_agent_list.sync_detailed.side_effect = mock_agent_list_responses
 
         # Mock agent_create response
         created_litellm_agent_id = uuid.uuid4()
@@ -713,8 +694,8 @@ class TestAgentRouterInitialization(unittest.TestCase):
         )
 
         # --- ASSERTIONS ---
-        self.assertEqual(mock_key_list.sync_detailed.call_count, 2)
-        mock_agent_list.sync_detailed.assert_called_once()
+        # agent_list called 3 times: org ID, user ID, find existing agent
+        self.assertEqual(mock_agent_list.sync_detailed.call_count, 3)
         mock_agent_create.sync_detailed.assert_called_once()
 
         create_call_args_kwargs = mock_agent_create.sync_detailed.call_args[1]
@@ -723,7 +704,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
         self.assertEqual(agent_request_body.agent_type, agent_type_param)
         self.assertEqual(agent_request_body.endpoint, agent_endpoint_param)
         self.assertEqual(agent_request_body.metadata, agent_metadata_param)
-        self.assertEqual(agent_request_body.organization, mock_org_id)
+        # AgentRequest doesn't have organization field - it's managed by backend
 
         mock_agent_partial_update.sync_detailed.assert_not_called()
         MockADKAdapter.assert_not_called()  # ADK Adapter should not be called
@@ -740,6 +721,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
         actual_adapter_config = adapter_constructor_kwargs["config"]
         expected_final_adapter_config = {
             "name": "gpt-3.5-turbo",  # From metadata (mock_backend_agent_from_create.metadata["name"])
+            "endpoint": "http://litellm-router-endpoint.com",  # From backend_agent.endpoint
             "api_key": "env_var_for_llm_key",  # From adapter_op_config_param
             "temperature": 0.8,  # From adapter_op_config_param
             # "some_other_meta": "val" # Apparently not included from metadata in the final config
@@ -752,6 +734,187 @@ class TestAgentRouterInitialization(unittest.TestCase):
         self.assertEqual(
             router._agent_registry[expected_registry_key], mock_litellm_adapter_instance
         )
+
+
+class TestAgentRouterRouteWithTracking(unittest.TestCase):
+    """Test route_with_tracking method."""
+
+    @patch("hackagent.router.router.agent_list")
+    @patch("hackagent.router.router.agent_create")
+    @patch("hackagent.router.router.LiteLLMAgentAdapter", autospec=True)
+    @patch("hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
+    def setUp(
+        self,
+        MockAgentMap,
+        MockLiteLLMAdapter,
+        mock_agent_create,
+        mock_agent_list,
+    ):
+        """Set up router with mocked dependencies."""
+        MockAgentMap[AgentTypeEnum.LITELLM] = MockLiteLLMAdapter
+        MockLiteLLMAdapter.__name__ = "LiteLLMAgentAdapter"
+
+        self.mock_client = MagicMock(spec=AuthenticatedClient)
+        self.mock_client.token = "test_token_prefix_12345"
+
+        mock_org_id = uuid.uuid4()
+        mock_user_id = 123
+
+        mock_initial_agent = MagicMock(spec=BackendAgentModel)
+        mock_initial_agent.organization = mock_org_id
+        mock_initial_agent.owner = mock_user_id
+
+        mock_agent_list_responses = [
+            MagicMock(
+                status_code=200,
+                parsed=MagicMock(results=[mock_initial_agent], next_=None),
+            ),
+            MagicMock(
+                status_code=200,
+                parsed=MagicMock(results=[mock_initial_agent], next_=None),
+            ),
+            MagicMock(status_code=200, parsed=MagicMock(results=[], next_=None)),
+        ]
+        mock_agent_list.sync_detailed.side_effect = mock_agent_list_responses
+
+        self.mock_agent_id = uuid.uuid4()
+        mock_backend_agent = MagicMock(spec=BackendAgentModel)
+        mock_backend_agent.id = self.mock_agent_id
+        mock_backend_agent.name = "TestAgent"
+        mock_backend_agent.agent_type = AgentTypeEnum.LITELLM
+        mock_backend_agent.endpoint = "http://test.com"
+        mock_backend_agent.metadata = {"name": "test-model"}
+        mock_backend_agent.organization = mock_org_id
+
+        mock_agent_create_response = MagicMock()
+        mock_agent_create_response.status_code = 201
+        mock_agent_create_response.parsed = mock_backend_agent
+        mock_agent_create.sync_detailed.return_value = mock_agent_create_response
+
+        # Mock the adapter
+        self.mock_adapter = MagicMock()
+        MockLiteLLMAdapter.return_value = self.mock_adapter
+
+        self.router = AgentRouter(
+            client=self.mock_client,
+            name="TestAgent",
+            agent_type=AgentTypeEnum.LITELLM,
+            endpoint="http://test.com",
+            metadata={"name": "test-model"},
+        )
+
+    @patch("hackagent.api.run.run_result_create.sync_detailed")
+    def test_route_with_tracking_creates_result(self, mock_result_create):
+        """Test that route_with_tracking creates a Result record."""
+        # Setup adapter response
+        self.mock_adapter.handle_request.return_value = {"response": "test response"}
+
+        # Setup result create response
+        mock_result_response = MagicMock()
+        mock_result_response.status_code = 201
+        mock_result_response.parsed = MagicMock(id=uuid.uuid4())
+        mock_result_create.return_value = mock_result_response
+
+        run_id = str(uuid.uuid4())
+        registration_key = str(self.mock_agent_id)
+
+        response = self.router.route_with_tracking(
+            registration_key=registration_key,
+            request_data={"prompt": "test"},
+            run_id=run_id,
+            client=self.mock_client,
+        )
+
+        # Verify adapter was called
+        self.mock_adapter.handle_request.assert_called_once()
+
+        # Verify result was created
+        mock_result_create.assert_called_once()
+
+        # Verify response was returned
+        self.assertEqual(response, {"response": "test response"})
+
+    @patch("hackagent.api.run.run_result_create.sync_detailed")
+    def test_route_with_tracking_handles_result_creation_failure(
+        self, mock_result_create
+    ):
+        """Test route_with_tracking handles result creation failure gracefully."""
+        # Setup adapter response
+        self.mock_adapter.handle_request.return_value = {"response": "test response"}
+
+        # Setup result create to fail
+        mock_result_response = MagicMock()
+        mock_result_response.status_code = 500
+        mock_result_create.return_value = mock_result_response
+
+        run_id = str(uuid.uuid4())
+        registration_key = str(self.mock_agent_id)
+
+        # Should not raise, just log warning
+        response = self.router.route_with_tracking(
+            registration_key=registration_key,
+            request_data={"prompt": "test"},
+            run_id=run_id,
+            client=self.mock_client,
+        )
+
+        # Response should still be returned
+        self.assertEqual(response, {"response": "test response"})
+
+    @patch("hackagent.api.run.run_result_create.sync_detailed")
+    def test_route_with_tracking_handles_exception(self, mock_result_create):
+        """Test route_with_tracking handles exceptions during result creation."""
+        # Setup adapter response
+        self.mock_adapter.handle_request.return_value = {"response": "test response"}
+
+        # Setup result create to raise exception
+        mock_result_create.side_effect = Exception("API Error")
+
+        run_id = str(uuid.uuid4())
+        registration_key = str(self.mock_agent_id)
+
+        # Should not raise, just log error
+        response = self.router.route_with_tracking(
+            registration_key=registration_key,
+            request_data={"prompt": "test"},
+            run_id=run_id,
+            client=self.mock_client,
+        )
+
+        # Response should still be returned
+        self.assertEqual(response, {"response": "test response"})
+
+    @patch("hackagent.api.run.run_result_create.sync_detailed")
+    def test_route_with_tracking_with_custom_evaluation_status(
+        self, mock_result_create
+    ):
+        """Test route_with_tracking with custom evaluation status."""
+        from hackagent.models import EvaluationStatusEnum
+
+        # Setup adapter response
+        self.mock_adapter.handle_request.return_value = {"response": "test"}
+
+        # Setup result create response
+        mock_result_response = MagicMock()
+        mock_result_response.status_code = 201
+        mock_result_response.parsed = MagicMock(id=uuid.uuid4())
+        mock_result_create.return_value = mock_result_response
+
+        run_id = str(uuid.uuid4())
+        registration_key = str(self.mock_agent_id)
+
+        self.router.route_with_tracking(
+            registration_key=registration_key,
+            request_data={"prompt": "test"},
+            run_id=run_id,
+            client=self.mock_client,
+            evaluation_status=EvaluationStatusEnum.PASSED_CRITERIA,
+        )
+
+        # Verify the evaluation status was passed
+        call_args = mock_result_create.call_args
+        body = call_args.kwargs["body"]
+        self.assertEqual(body.evaluation_status, EvaluationStatusEnum.PASSED_CRITERIA)
 
 
 if __name__ == "__main__":

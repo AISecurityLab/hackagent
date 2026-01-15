@@ -18,12 +18,11 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/key",
+        "url": "/key",
     }
 
-    _body = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
-    _kwargs["json"] = _body
     headers["Content-Type"] = "application/json"
 
     _kwargs["headers"] = headers
@@ -61,6 +60,9 @@ def sync_detailed(
 ) -> Response[UserAPIKey]:
     """ViewSet for managing User API Keys.
 
+    Web-only endpoint - requires Auth0 authentication.
+    API keys cannot manage other API keys for security reasons.
+
     Args:
         body (UserAPIKeyRequest): Serializer for User API Keys.
             Exposes read-only information about the key, including its prefix.
@@ -92,6 +94,9 @@ def sync(
 ) -> Optional[UserAPIKey]:
     """ViewSet for managing User API Keys.
 
+    Web-only endpoint - requires Auth0 authentication.
+    API keys cannot manage other API keys for security reasons.
+
     Args:
         body (UserAPIKeyRequest): Serializer for User API Keys.
             Exposes read-only information about the key, including its prefix.
@@ -117,6 +122,9 @@ async def asyncio_detailed(
     body: UserAPIKeyRequest,
 ) -> Response[UserAPIKey]:
     """ViewSet for managing User API Keys.
+
+    Web-only endpoint - requires Auth0 authentication.
+    API keys cannot manage other API keys for security reasons.
 
     Args:
         body (UserAPIKeyRequest): Serializer for User API Keys.
@@ -146,6 +154,9 @@ async def asyncio(
     body: UserAPIKeyRequest,
 ) -> Optional[UserAPIKey]:
     """ViewSet for managing User API Keys.
+
+    Web-only endpoint - requires Auth0 authentication.
+    API keys cannot manage other API keys for security reasons.
 
     Args:
         body (UserAPIKeyRequest): Serializer for User API Keys.

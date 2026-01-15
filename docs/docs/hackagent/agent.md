@@ -44,7 +44,9 @@ def __init__(endpoint: str,
              api_key: Optional[str] = None,
              raise_on_unexpected_status: bool = False,
              timeout: Optional[float] = None,
-             env_file_path: Optional[str] = None)
+             env_file_path: Optional[str] = None,
+             metadata: Optional[Dict[str, Any]] = None,
+             adapter_operational_config: Optional[Dict[str, Any]] = None)
 ```
 
 Initializes the HackAgent client and prepares it for interaction.
@@ -88,7 +90,9 @@ attack strategies.
 ```python
 def hack(attack_config: Dict[str, Any],
          run_config_override: Optional[Dict[str, Any]] = None,
-         fail_on_run_error: bool = True) -> Any
+         fail_on_run_error: bool = True,
+         _tui_app: Optional[Any] = None,
+         _tui_log_callback: Optional[Any] = None) -> Any
 ```
 
 Executes a specified attack strategy against the configured victim agent.

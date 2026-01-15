@@ -80,6 +80,8 @@ class BaseTab(Container):
         Returns:
             Formatted error message
         """
+        from rich.markup import escape
+
         if isinstance(error, httpx.TimeoutException):
             return f"[red]Timeout:[/red] {context} took too long"
         elif isinstance(error, httpx.HTTPStatusError):
@@ -94,7 +96,9 @@ class BaseTab(Container):
             else:
                 return f"[red]HTTP {error.response.status_code}:[/red] {context} failed"
         else:
-            return f"[red]Error:[/red] {str(error)}"
+            # Escape error message to prevent Rich markup issues
+            error_text = escape(str(error))
+            return f"[red]Error:[/red] {error_text}"
 
     def refresh_data(self) -> None:
         """Refresh tab data from API.

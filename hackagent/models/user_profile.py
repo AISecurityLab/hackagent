@@ -19,7 +19,7 @@ class UserProfile:
         username (str):
         organization (UUID):
         organization_name (str):
-        privy_user_id (Union[None, str]): The unique Decentralized ID (DID) provided by Privy.
+        auth0_user_id (Union[None, str]): The unique user identifier (sub claim) provided by Auth0.
         email (Union[Unset, str]):
         first_name (Union[Unset, str]):
         last_name (Union[Unset, str]):
@@ -30,7 +30,7 @@ class UserProfile:
     username: str
     organization: UUID
     organization_name: str
-    privy_user_id: Union[None, str]
+    auth0_user_id: Union[None, str]
     email: Union[Unset, str] = UNSET
     first_name: Union[Unset, str] = UNSET
     last_name: Union[Unset, str] = UNSET
@@ -47,8 +47,8 @@ class UserProfile:
 
         organization_name = self.organization_name
 
-        privy_user_id: Union[None, str]
-        privy_user_id = self.privy_user_id
+        auth0_user_id: Union[None, str]
+        auth0_user_id = self.auth0_user_id
 
         email = self.email
 
@@ -65,7 +65,7 @@ class UserProfile:
                 "username": username,
                 "organization": organization,
                 "organization_name": organization_name,
-                "privy_user_id": privy_user_id,
+                "auth0_user_id": auth0_user_id,
             }
         )
         if email is not UNSET:
@@ -90,12 +90,12 @@ class UserProfile:
 
         organization_name = d.pop("organization_name")
 
-        def _parse_privy_user_id(data: object) -> Union[None, str]:
+        def _parse_auth0_user_id(data: object) -> Union[None, str]:
             if data is None:
                 return data
             return cast(Union[None, str], data)
 
-        privy_user_id = _parse_privy_user_id(d.pop("privy_user_id"))
+        auth0_user_id = _parse_auth0_user_id(d.pop("auth0_user_id"))
 
         email = d.pop("email", UNSET)
 
@@ -109,7 +109,7 @@ class UserProfile:
             username=username,
             organization=organization,
             organization_name=organization_name,
-            privy_user_id=privy_user_id,
+            auth0_user_id=auth0_user_id,
             email=email,
             first_name=first_name,
             last_name=last_name,

@@ -13,14 +13,19 @@
 # limitations under the License.
 
 
-import os
 import logging
+import os
 from typing import Any, Dict, List, Optional
 
 # Attempt to import openai, but catch ImportError if not installed.
 try:
-    from openai import OpenAI
-    from openai import OpenAIError, APIConnectionError, RateLimitError, APITimeoutError
+    from openai import (
+        APIConnectionError,
+        APITimeoutError,
+        OpenAI,
+        OpenAIError,
+        RateLimitError,
+    )
 
     OPENAI_AVAILABLE = True
 except ImportError:
@@ -81,9 +86,10 @@ class OpenAIAgentAdapter(Agent):
                           - 'tool_choice' (optional): Controls which tools the model can call.
         """
         super().__init__(id, config)
+        # Use hierarchical logger name for TUI handler inheritance
         self.logger = logging.getLogger(
-            f"{__name__}.{self.id}"
-        )  # Instance-specific logger
+            f"hackagent.router.adapters.OpenAIAgentAdapter.{self.id}"
+        )
 
         if not OPENAI_AVAILABLE:
             msg = (
@@ -94,10 +100,7 @@ class OpenAIAgentAdapter(Agent):
             raise OpenAIConfigurationError(msg)
 
         if "name" not in self.config:
-            msg = (
-                f"Missing required configuration key 'name' (for model string) for "
-                f"OpenAIAgentAdapter: {self.id}"
-            )
+            msg = f"Missing required configuration key 'name' (for model string) for OpenAIAgentAdapter: {self.id}"
             self.logger.error(msg)
             raise OpenAIConfigurationError(msg)
 

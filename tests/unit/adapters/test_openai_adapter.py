@@ -13,9 +13,9 @@
 # limitations under the License.
 
 
-import unittest
-from unittest.mock import patch, MagicMock
 import logging
+import unittest
+from unittest.mock import MagicMock, patch
 
 from hackagent.router.adapters.openai_adapter import (
     OpenAIAgentAdapter,
@@ -81,8 +81,11 @@ class TestOpenAIAgentAdapterInit(unittest.TestCase):
         adapter = OpenAIAgentAdapter(id=adapter_id, config=config)
 
         self.assertEqual(adapter.api_base_url, "https://custom.openai.proxy.com/v1")
-        mock_openai_class.assert_called_once_with(
-            base_url="https://custom.openai.proxy.com/v1"
+        # Verify OpenAI was called with the correct base_url (api_key may vary)
+        mock_openai_class.assert_called_once()
+        call_kwargs = mock_openai_class.call_args.kwargs
+        self.assertEqual(
+            call_kwargs.get("base_url"), "https://custom.openai.proxy.com/v1"
         )
 
     @patch("hackagent.router.adapters.openai_adapter.OPENAI_AVAILABLE", True)

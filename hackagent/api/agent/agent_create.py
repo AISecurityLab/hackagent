@@ -18,12 +18,11 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/agent",
+        "url": "/agent",
     }
 
-    _body = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
-    _kwargs["json"] = _body
     headers["Content-Type"] = "application/json"
 
     _kwargs["headers"] = headers
@@ -66,7 +65,9 @@ def sync_detailed(
     It filters agent listings for users and handles the logic for creating
     agents, including associating them with the correct organization and owner.
 
-    Authentication uses UserAPIKeyAuthentication and PrivyAuthentication.
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+
     Permissions are based on IsAuthenticated, with queryset filtering providing
     row-level access control.
 
@@ -75,7 +76,7 @@ def sync_detailed(
                              This is further filtered by `get_queryset()`.
         serializer_class (AgentSerializer): The serializer used for validating and
                                           deserializing input, and for serializing output.
-        authentication_classes (list): List of authentication classes to use.
+        authentication_classes (list): API Key (primary) + Auth0 (fallback) authentication.
         permission_classes (list): List of permission classes to use.
         parser_classes (list): List of parser classes for handling request data.
         lookup_field (str): The model field used for looking up individual instances (UUID 'id').
@@ -96,8 +97,8 @@ def sync_detailed(
                 owner_detail (UserProfileMinimalSerializer): Read-only nested serializer
                     for the agent's owner's user profile. Displays minimal details.
                     Can be null if the agent has no owner or the owner has no profile.
-                type (CharField): The type of the agent (e.g., GENERIC_ADK, OPENAI_SDK).
-                                  Uses the choices defined in the Agent model's AgentType enum.
+                agent_type (CharField): The type of the agent as a string
+                                  (e.g., LITELLM, OPENAI_SDK, GOOGLE_ADK).
 
             Meta:
                 model (Agent): The model class that this serializer works with.
@@ -140,7 +141,9 @@ def sync(
     It filters agent listings for users and handles the logic for creating
     agents, including associating them with the correct organization and owner.
 
-    Authentication uses UserAPIKeyAuthentication and PrivyAuthentication.
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+
     Permissions are based on IsAuthenticated, with queryset filtering providing
     row-level access control.
 
@@ -149,7 +152,7 @@ def sync(
                              This is further filtered by `get_queryset()`.
         serializer_class (AgentSerializer): The serializer used for validating and
                                           deserializing input, and for serializing output.
-        authentication_classes (list): List of authentication classes to use.
+        authentication_classes (list): API Key (primary) + Auth0 (fallback) authentication.
         permission_classes (list): List of permission classes to use.
         parser_classes (list): List of parser classes for handling request data.
         lookup_field (str): The model field used for looking up individual instances (UUID 'id').
@@ -170,8 +173,8 @@ def sync(
                 owner_detail (UserProfileMinimalSerializer): Read-only nested serializer
                     for the agent's owner's user profile. Displays minimal details.
                     Can be null if the agent has no owner or the owner has no profile.
-                type (CharField): The type of the agent (e.g., GENERIC_ADK, OPENAI_SDK).
-                                  Uses the choices defined in the Agent model's AgentType enum.
+                agent_type (CharField): The type of the agent as a string
+                                  (e.g., LITELLM, OPENAI_SDK, GOOGLE_ADK).
 
             Meta:
                 model (Agent): The model class that this serializer works with.
@@ -209,7 +212,9 @@ async def asyncio_detailed(
     It filters agent listings for users and handles the logic for creating
     agents, including associating them with the correct organization and owner.
 
-    Authentication uses UserAPIKeyAuthentication and PrivyAuthentication.
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+
     Permissions are based on IsAuthenticated, with queryset filtering providing
     row-level access control.
 
@@ -218,7 +223,7 @@ async def asyncio_detailed(
                              This is further filtered by `get_queryset()`.
         serializer_class (AgentSerializer): The serializer used for validating and
                                           deserializing input, and for serializing output.
-        authentication_classes (list): List of authentication classes to use.
+        authentication_classes (list): API Key (primary) + Auth0 (fallback) authentication.
         permission_classes (list): List of permission classes to use.
         parser_classes (list): List of parser classes for handling request data.
         lookup_field (str): The model field used for looking up individual instances (UUID 'id').
@@ -239,8 +244,8 @@ async def asyncio_detailed(
                 owner_detail (UserProfileMinimalSerializer): Read-only nested serializer
                     for the agent's owner's user profile. Displays minimal details.
                     Can be null if the agent has no owner or the owner has no profile.
-                type (CharField): The type of the agent (e.g., GENERIC_ADK, OPENAI_SDK).
-                                  Uses the choices defined in the Agent model's AgentType enum.
+                agent_type (CharField): The type of the agent as a string
+                                  (e.g., LITELLM, OPENAI_SDK, GOOGLE_ADK).
 
             Meta:
                 model (Agent): The model class that this serializer works with.
@@ -281,7 +286,9 @@ async def asyncio(
     It filters agent listings for users and handles the logic for creating
     agents, including associating them with the correct organization and owner.
 
-    Authentication uses UserAPIKeyAuthentication and PrivyAuthentication.
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+
     Permissions are based on IsAuthenticated, with queryset filtering providing
     row-level access control.
 
@@ -290,7 +297,7 @@ async def asyncio(
                              This is further filtered by `get_queryset()`.
         serializer_class (AgentSerializer): The serializer used for validating and
                                           deserializing input, and for serializing output.
-        authentication_classes (list): List of authentication classes to use.
+        authentication_classes (list): API Key (primary) + Auth0 (fallback) authentication.
         permission_classes (list): List of permission classes to use.
         parser_classes (list): List of parser classes for handling request data.
         lookup_field (str): The model field used for looking up individual instances (UUID 'id').
@@ -311,8 +318,8 @@ async def asyncio(
                 owner_detail (UserProfileMinimalSerializer): Read-only nested serializer
                     for the agent's owner's user profile. Displays minimal details.
                     Can be null if the agent has no owner or the owner has no profile.
-                type (CharField): The type of the agent (e.g., GENERIC_ADK, OPENAI_SDK).
-                                  Uses the choices defined in the Agent model's AgentType enum.
+                agent_type (CharField): The type of the agent as a string
+                                  (e.g., LITELLM, OPENAI_SDK, GOOGLE_ADK).
 
             Meta:
                 model (Agent): The model class that this serializer works with.

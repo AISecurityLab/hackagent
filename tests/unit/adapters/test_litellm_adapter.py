@@ -13,16 +13,17 @@
 # limitations under the License.
 
 
-import unittest
-from unittest.mock import patch, MagicMock
 import logging
 import os
+import unittest
+from unittest.mock import MagicMock, patch
+
+import litellm  # Required for litellm.exceptions
 
 from hackagent.router.adapters.litellm_adapter import (
     LiteLLMAgentAdapter,
     LiteLLMConfigurationError,
 )
-import litellm  # Required for litellm.exceptions
 
 # Disable logging for tests
 logging.disable(logging.CRITICAL)
@@ -62,7 +63,8 @@ class TestLiteLLMAgentAdapterInit(unittest.TestCase):
             adapter = LiteLLMAgentAdapter(id=adapter_id, config=config)
             self.assertEqual(adapter.model_name, config["name"])
             self.assertEqual(adapter.api_base_url, config["endpoint"])
-            self.assertIsNone(adapter.actual_api_key)  # Not set in env
+            # When env var is not found, the adapter uses the string itself as the key
+            self.assertEqual(adapter.actual_api_key, "OPENAI_API_KEY_ENV_VAR_NAME")
             self.assertEqual(adapter.default_max_new_tokens, config["max_new_tokens"])
             self.assertEqual(adapter.default_temperature, config["temperature"])
             self.assertEqual(adapter.default_top_p, config["top_p"])
@@ -113,7 +115,8 @@ class TestLiteLLMAgentAdapterHandleRequest(unittest.TestCase):
         response = self.adapter.handle_request(request_data)
         self.assertEqual(response["status_code"], 400)
         self.assertIn(
-            "Request data must include a 'prompt' field.", response["error_message"]
+            "Request data must include either 'messages' or 'prompt' field.",
+            response["error_message"],
         )
         self.assertEqual(response["raw_request"], request_data)
 
@@ -131,9 +134,7 @@ class TestLiteLLMAgentAdapterHandleRequest(unittest.TestCase):
 
         self.assertEqual(response["status_code"], 200)
         self.assertIsNone(response["error_message"])
-        self.assertEqual(
-            response["processed_response"], self.prompt + " a successful response."
-        )
+        self.assertEqual(response["processed_response"], " a successful response.")
         self.assertEqual(response["raw_request"], request_data)
         self.assertEqual(
             response["agent_specific_data"]["model_name"], self.config["name"]
@@ -153,7 +154,9 @@ class TestLiteLLMAgentAdapterHandleRequest(unittest.TestCase):
             temperature=self.config["temperature"],
             top_p=self.config["top_p"],
             api_base=self.config["endpoint"],
-            api_key=None,  # As no api_key in config for this test
+            api_key="sk-placeholder-key-for-custom-endpoint",
+            custom_llm_provider="openai",
+            extra_headers={"User-Agent": "HackAgent/0.1.0"},
         )
 
     @patch("litellm.completion")
@@ -196,10 +199,12 @@ class TestLiteLLMAgentAdapterHandleRequest(unittest.TestCase):
     def test_handle_request_unexpected_response_structure_no_message_content(
         self, mock_litellm_completion
     ):
+        # Create a proper mock that returns None for all reasoning fields
         mock_choice = MagicMock()
-        mock_choice.message = MagicMock()
-        mock_choice.message.content = None  # No content
-        mock_choice.message.reasoning = None  # No reasoning either (truly empty)
+        mock_message = MagicMock(spec=["content"])  # Only spec content attribute
+        mock_message.content = None  # No content
+        mock_message.configure_mock(reasoning_content=None, reasoning=None)
+        mock_choice.message = mock_message
         mock_response = MagicMock()
         mock_response.choices = [mock_choice]
         mock_litellm_completion.return_value = mock_response
@@ -207,11 +212,10 @@ class TestLiteLLMAgentAdapterHandleRequest(unittest.TestCase):
         request_data = {"prompt": self.prompt}
         response = self.adapter.handle_request(request_data)
 
+        # Implementation returns 500 error when content is empty/None
         self.assertEqual(response["status_code"], 500)
-        self.assertIn(
-            "LiteLLM generation error: [GENERATION_ERROR: EMPTY_RESPONSE]",
-            response["error_message"],
-        )
+        self.assertIn("LiteLLM generation error", response["error_message"])
+        self.assertIn("[GENERATION_ERROR: EMPTY_RESPONSE]", response["error_message"])
 
     @patch("litellm.completion")
     def test_handle_request_reasoning_model_with_reasoning_field(
@@ -221,7 +225,10 @@ class TestLiteLLMAgentAdapterHandleRequest(unittest.TestCase):
         mock_choice = MagicMock()
         mock_choice.message = MagicMock()
         mock_choice.message.content = ""  # Empty content (typical for reasoning models)
-        mock_choice.message.reasoning = "This is the reasoning output from the model"
+        mock_choice.message.reasoning_content = (
+            "This is the reasoning output from the model"
+        )
+        mock_choice.message.reasoning = None
         mock_response = MagicMock()
         mock_response.choices = [mock_choice]
         mock_litellm_completion.return_value = mock_response
@@ -230,7 +237,10 @@ class TestLiteLLMAgentAdapterHandleRequest(unittest.TestCase):
         response = self.adapter.handle_request(request_data)
 
         self.assertEqual(response["status_code"], 200)
-        self.assertIn("This is the reasoning output", response["processed_response"])
+        self.assertEqual(
+            response["processed_response"],
+            "This is the reasoning output from the model",
+        )
         self.assertIsNone(response["error_message"])
 
     @patch("litellm.completion")
@@ -244,16 +254,14 @@ class TestLiteLLMAgentAdapterHandleRequest(unittest.TestCase):
         # The method _execute_litellm_completion itself ensures a list of the same length as input texts.
         # So this tests the outer handle_request logic if completions was somehow empty.
 
-        # Let's mock _execute_litellm_completion directly for this specific scenario
+        # Let's mock _execute_litellm_completion_with_messages to return empty string
         with patch.object(
-            self.adapter, "_execute_litellm_completion", return_value=[]
+            self.adapter, "_execute_litellm_completion_with_messages", return_value=""
         ) as mock_execute:
             request_data = {"prompt": self.prompt}
             response = self.adapter.handle_request(request_data)
             self.assertEqual(response["status_code"], 500)
-            self.assertIn(
-                "LiteLLM returned empty or invalid result.", response["error_message"]
-            )
+            self.assertIn("LiteLLM returned empty result.", response["error_message"])
             mock_execute.assert_called_once()
 
     def test_handle_request_passes_additional_kwargs_to_litellm(self):

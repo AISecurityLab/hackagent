@@ -14,7 +14,7 @@ def _get_kwargs(
 ) -> dict[str, Any]:
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": f"/api/run/{id}",
+        "url": f"/run/{id}",
     }
 
     return _kwargs
@@ -52,6 +52,10 @@ def sync_detailed(
     Creation of server-side runs is handled by custom actions.
     Runs initiated from Attack definitions are created via AttackViewSet.
 
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+    This is a core SDK operation for executing and monitoring security tests.
+
     Args:
         id (UUID):
 
@@ -83,6 +87,10 @@ async def asyncio_detailed(
     Primarily for listing/retrieving runs.
     Creation of server-side runs is handled by custom actions.
     Runs initiated from Attack definitions are created via AttackViewSet.
+
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+    This is a core SDK operation for executing and monitoring security tests.
 
     Args:
         id (UUID):

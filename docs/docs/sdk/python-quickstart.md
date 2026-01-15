@@ -24,7 +24,7 @@ The **HackAgent SDK** wraps the HackAgent platform's HTTP API in easy-to-use cla
 - You want to run security tests from command line or scripts
 - You prefer a simple interface without writing code
 
-For the interactive HTTP API documentation, visit: **[https://hackagent.dev/api/schema/swagger-ui](https://hackagent.dev/api/schema/swagger-ui)**
+For the interactive HTTP API documentation, visit: **[https://api.hackagent.dev/schema/swagger-ui](https://api.hackagent.dev/schema/swagger-ui)**
 
 This guide focuses on the SDK. For CLI usage, see the [CLI Documentation](../cli/README.md).
 
@@ -38,20 +38,12 @@ import TabItem from '@theme/TabItem';
 <Tabs>
   <TabItem value="uv" label="uv" default>
     ```bash
-    # Basic installation
     uv pip install hackagent
-    
-    # With optional dependencies
-    uv pip install hackagent[google-adk,litellm]
     ```
   </TabItem>
   <TabItem value="pip" label="pip">
     ```bash
-    # Basic installation
     pip install hackagent
-    
-    # With optional dependencies
-    pip install hackagent[google-adk,litellm]
     ```
   </TabItem>
 </Tabs>
@@ -64,7 +56,7 @@ For development or to access the latest features:
   <TabItem value="uv-dev" label="uv (Recommended)" default>
     ```bash
     # Clone the repository
-    git clone https://github.com/vistalabs-org/hackagent.git
+    git clone https://github.com/AISecurityLab/hackagent.git
     cd hackagent
     
     # Install with uv
@@ -74,7 +66,7 @@ For development or to access the latest features:
   <TabItem value="pip-dev" label="pip">
     ```bash
     # Clone the repository
-    git clone https://github.com/vistalabs-org/hackagent.git
+    git clone https://github.com/AISecurityLab/hackagent.git
     cd hackagent
     
     # Install in development mode
@@ -87,15 +79,14 @@ For development or to access the latest features:
 
 ```python
 # Core imports
-from hackagent import HackAgent
-from hackagent.models import AgentTypeEnum
+from hackagent import HackAgent, AgentTypeEnum
 ```
 
 ## 🔑 Authentication Setup
 
 ### Get Your API Key
 
-1. Visit [hackagent.dev](https://hackagent.dev)
+1. Visit [app.hackagent.dev](https://app.hackagent.dev)
 2. Sign up or log in to your account
 3. Navigate to **Settings** → **API Keys**
 4. Click **Generate New Key**
@@ -121,7 +112,7 @@ agent = HackAgent(
     name="my_test_agent",
     endpoint="http://localhost:8000",     # Your agent's endpoint
     agent_type=AgentTypeEnum.GOOGLE_ADK,
-    base_url="https://hackagent.dev",     # HackAgent API base URL
+    base_url="https://api.hackagent.dev",     # HackAgent API base URL
     api_key="your_api_key_here"           # Optional: pass directly
 )
 ```
@@ -131,15 +122,14 @@ agent = HackAgent(
 ### Your First Security Test
 
 ```python
-from hackagent import HackAgent
-from hackagent.models import AgentTypeEnum
+from hackagent import HackAgent, AgentTypeEnum
 
 # Initialize the HackAgent client
 agent = HackAgent(
     name="multi_tool_agent",
-    endpoint="http://localhost:8000",      # Your agent's URL
+    endpoint="http://localhost:8000",
     agent_type=AgentTypeEnum.GOOGLE_ADK,
-    base_url="https://hackagent.dev"       # HackAgent platform URL
+    base_url="https://api.hackagent.dev"
 )
 
 # Configure the attack
@@ -179,15 +169,14 @@ Here's the actual working example from the test suite:
 
 ```python
 import os
-from hackagent import HackAgent
-from hackagent.models import AgentTypeEnum
+from hackagent import HackAgent, AgentTypeEnum
 
 def test_adk_attack_scenario():
     # Initialize HackAgent client
     agent = HackAgent(
         name="multi_tool_agent",
-        base_url=os.getenv("HACKAGENT_API_BASE_URL"),
-        endpoint=os.getenv("AGENT_URL"),  # e.g., "http://localhost:8001"
+        base_url=os.getenv("HACKAGENT_BASE_URL", "https://api.hackagent.dev"),
+        endpoint=os.getenv("AGENT_URL"),
         agent_type=AgentTypeEnum.GOOGLE_ADK,
     )
 
@@ -223,17 +212,17 @@ def test_adk_attack_scenario():
 
 ### Supported Agent Types
 
-The SDK supports these agent types (from the actual `AgentTypeEnum`):
-
 ```python
-from hackagent.models import AgentTypeEnum
+from hackagent import AgentTypeEnum
 
 # Available agent types
 AgentTypeEnum.GOOGLE_ADK    # Google Agent Development Kit
-AgentTypeEnum.LITELLM       # LiteLLM (multi-provider LLM interface)
-AgentTypeEnum.OPENAI_SDK    # OpenAI SDK/API compatible agents
-AgentTypeEnum.OTHER         # Custom or proprietary implementations
-AgentTypeEnum.UNKNOWN       # Unknown/unspecified (default fallback)
+AgentTypeEnum.LITELLM       # LiteLLM multi-provider interface
+AgentTypeEnum.OPENAI_SDK    # OpenAI-compatible endpoints
+AgentTypeEnum.LANGCHAIN     # LangChain (uses LiteLLM adapter)
+AgentTypeEnum.MCP           # Model Context Protocol
+AgentTypeEnum.A2A           # Agent-to-Agent protocol
+AgentTypeEnum.UNKNOWN       # Unknown/fallback type
 ```
 
 ### Google ADK Configuration
@@ -349,14 +338,14 @@ DEFAULT_CONFIG = {
     "output_dir": "./logs/runs",
     "generator": {
         "identifier": "hackagent/generate",
-        "endpoint": "https://hackagent.dev/api/generate",
+        "endpoint": "https://api.hackagent.dev/generate",
         "batch_size": 2,
         "max_new_tokens": 50,
         "temperature": 0.7
     },
     "judges": [{
         "identifier": "hackagent/judge",
-        "endpoint": "https://hackagent.dev/api/judge",
+        "endpoint": "https://api.hackagent.dev/judge",
         "type": "harmbench"
     }],
     "min_char_length": 10,
@@ -444,7 +433,7 @@ Set up your environment properly:
 ```bash
 # Required environment variables
 export HACKAGENT_API_KEY="your_api_key"
-export HACKAGENT_API_BASE_URL="https://hackagent.dev"
+export HACKAGENT_API_BASE_URL="https://api.hackagent.dev"
 
 # Optional: Agent endpoint
 export AGENT_URL="http://localhost:8001"
@@ -462,7 +451,7 @@ The attack returns structured results that are automatically sent to the HackAge
 results = agent.hack(attack_config=attack_config)
 
 # Results are automatically uploaded to the platform
-# Access your results at https://hackagent.dev/dashboard
+# Access your results at https://app.hackagent.dev
 ```
 
 ## 🧪 Development Setup
@@ -527,9 +516,9 @@ Explore these advanced topics:
 
 ## 📞 Support
 
-- **GitHub Issues**: [Report bugs and request features](https://github.com/vistalabs-org/hackagent/issues)
-- **Documentation**: [Complete documentation](https://hackagent.dev/docs)
-- **Email Support**: [devs@vista-labs.ai](mailto:devs@vista-labs.ai)
+- **GitHub Issues**: [Report bugs and request features](https://github.com/AISecurityLab/hackagent/issues)
+- **Documentation**: [Complete documentation](https://docs.hackagent.dev)
+- **Email Support**: [ais@ai4i.it](mailto:ais@ai4i.it)
 
 ---
 

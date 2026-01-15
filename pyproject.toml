@@ -1,6 +1,6 @@
 [project]
 name = "hackagent"
-version = "0.3.0"
+version = "0.3.1"
 description = "HackAgent is an open-source security toolkit to detect vulnerabilities of your AI Agents."
 authors = [
     {name = "AI Security Lab", email = "ais@ai4i.it"}
@@ -44,6 +44,8 @@ dev = [
     "google-adk>=1.4.2",
     "anyio>=4.3.0",
     "pytest-asyncio>=0.23.7,<1.1.0",
+    "flask>=3.1.2",
+    "mcp>=1.21.2",
 ]
 docs = [
     "pydoc-markdown>=4.8.2",

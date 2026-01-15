@@ -23,7 +23,7 @@ from rich.console import Console
 from rich.table import Table
 
 from hackagent.cli.config import CLIConfig
-from hackagent.cli.utils import handle_errors, display_success, display_info
+from hackagent.cli.utils import display_info, display_success, handle_errors
 
 console = Console()
 
@@ -42,9 +42,14 @@ def config():
     type=click.Choice(["table", "json", "csv"]),
     help="Default output format",
 )
+@click.option(
+    "--verbose",
+    type=str,
+    help="Default verbosity level: 0/error, 1/warning, 2/info, 3/debug",
+)
 @click.pass_context
 @handle_errors
-def set(ctx, api_key, base_url, output_format):
+def set(ctx, api_key, base_url, output_format, verbose):
     """Set configuration values"""
 
     cli_config: CLIConfig = ctx.obj["config"]
@@ -54,21 +59,55 @@ def set(ctx, api_key, base_url, output_format):
     if api_key:
         cli_config.api_key = api_key
         updated = True
-        display_success("API key updated")
+        if cli_config.should_show_info():
+            display_success("API key updated")
 
     if base_url:
         cli_config.base_url = base_url
         updated = True
-        display_success(f"Base URL updated to: {base_url}")
+        if cli_config.should_show_info():
+            display_success(f"Base URL updated to: {base_url}")
 
     if output_format:
         cli_config.output_format = output_format
         updated = True
-        display_success(f"Output format updated to: {output_format}")
+        if cli_config.should_show_info():
+            display_success(f"Output format updated to: {output_format}")
+
+    if verbose is not None:
+        from hackagent.cli.config import VERBOSITY_LEVELS, VERBOSITY_NAMES
+
+        # Try to parse as integer first, then as name
+        try:
+            verbose_int = int(verbose)
+            if 0 <= verbose_int <= 3:
+                cli_config.verbose = verbose_int
+                updated = True
+                if cli_config.verbose > 0:
+                    display_success(
+                        f"Verbosity level updated to: {verbose_int} ({VERBOSITY_NAMES[verbose_int]})"
+                    )
+            else:
+                display_info("Verbosity level must be between 0 and 3")
+        except ValueError:
+            # Try as name
+            verbose_lower = verbose.lower()
+            if verbose_lower in VERBOSITY_LEVELS:
+                verbose_int = VERBOSITY_LEVELS[verbose_lower]
+                cli_config.verbose = verbose_int
+                updated = True
+                if cli_config.verbose > 0:
+                    display_success(
+                        f"Verbosity level updated to: {verbose_int} ({VERBOSITY_NAMES[verbose_int]})"
+                    )
+            else:
+                display_info(
+                    f"Invalid verbosity level. Use: 0-3 or {', '.join(VERBOSITY_LEVELS.keys())}"
+                )
 
     if updated:
         cli_config.save()
-        display_success(f"Configuration saved to: {cli_config.default_config_path}")
+        display_success("✅ Configuration saved")
     else:
         display_info("No configuration changes made")
 
@@ -99,7 +138,7 @@ def show(ctx):
             api_key_source = "Environment/Default config"
 
     base_url_source = "Default"
-    if cli_config.base_url != "https://hackagent.dev":
+    if cli_config.base_url != "https://api.hackagent.dev":
         if ctx.params.get("base_url"):
             base_url_source = "CLI argument"
         elif cli_config.config_file:
@@ -111,22 +150,29 @@ def show(ctx):
     api_key_display = (
         cli_config.api_key[:8] + "..." if cli_config.api_key else "Not set"
     )
+    from hackagent.cli.config import VERBOSITY_NAMES
+
     table.add_row("API Key", api_key_display, api_key_source)
     table.add_row("Base URL", cli_config.base_url, base_url_source)
     table.add_row("Output Format", cli_config.output_format, "Default/Config")
+    verbosity_display = (
+        f"{cli_config.verbose} ({VERBOSITY_NAMES.get(cli_config.verbose, 'UNKNOWN')})"
+    )
+    table.add_row("Verbosity", verbosity_display, "Default/Config")
     table.add_row(
         "Config File", str(cli_config.default_config_path), "Default location"
     )
 
     console.print(table)
 
-    # Show config file status
-    if cli_config.default_config_path.exists():
-        display_info(f"Configuration file exists: {cli_config.default_config_path}")
-    else:
-        display_info(
-            "No configuration file found. Use 'hackagent config set' to create one."
-        )
+    # Show config file status only in info mode or higher
+    if cli_config.should_show_info():
+        if cli_config.default_config_path.exists():
+            display_info(f"Configuration file: {cli_config.default_config_path}")
+        else:
+            display_info(
+                "No configuration file found. Use 'hackagent config set' to create one."
+            )
 
 
 @config.command()
@@ -148,12 +194,13 @@ def reset(ctx, confirm):
     # Remove config file if it exists
     if cli_config.default_config_path.exists():
         cli_config.default_config_path.unlink()
-        display_success(f"Configuration file removed: {cli_config.default_config_path}")
-
-    display_success("Configuration reset to defaults")
-    display_info(
-        "API key will need to be set again using environment variable or 'hackagent config set --api-key'"
-    )
+        display_success("✅ Configuration reset to defaults")
+        if cli_config.should_show_info():
+            display_info(
+                "API key will need to be set again using environment variable or 'hackagent config set --api-key'"
+            )
+    else:
+        display_info("No configuration file to reset")
 
 
 @config.command()
@@ -166,34 +213,45 @@ def validate(ctx):
 
     try:
         cli_config.validate()
-        display_success("✅ Configuration is valid")
 
         # Test API connection
-        with console.status("[bold green]Testing API connection..."):
+        if cli_config.should_show_info():
+            with console.status("[bold green]Testing API connection..."):
+                from hackagent.client import AuthenticatedClient
+
+                client = AuthenticatedClient(
+                    base_url=cli_config.base_url,
+                    token=cli_config.api_key,
+                    prefix="Bearer",
+                )
+
+                # Try to make a simple API call to test connection
+                from hackagent.api.key import key_list
+
+                response = key_list.sync_detailed(client=client)
+        else:
             from hackagent.client import AuthenticatedClient
 
             client = AuthenticatedClient(
                 base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
             )
-
-            # Try to make a simple API call to test connection
             from hackagent.api.key import key_list
 
             response = key_list.sync_detailed(client=client)
 
-            if response.status_code == 200:
-                display_success("🌐 API connection successful")
-            else:
-                console.print(
-                    f"[yellow]⚠️ API connection issue: Status {response.status_code}"
-                )
+        if response.status_code == 200:
+            display_success("✅ Configuration valid - API connection successful")
+        else:
+            console.print(
+                f"[yellow]⚠️ Configuration valid but API connection issue: Status {response.status_code}"
+            )
 
     except ValueError as e:
         console.print(f"[red]❌ Configuration validation failed: {e}")
         console.print("\n[cyan]💡 Quick fixes:")
         console.print("  • Set API key: hackagent config set --api-key YOUR_KEY")
         console.print(
-            "  • Set base URL: hackagent config set --base-url https://hackagent.dev"
+            "  • Set base URL: hackagent config set --base-url https://api.hackagent.dev"
         )
         raise click.ClickException("Configuration validation failed")
     except Exception as e:
@@ -233,8 +291,9 @@ def import_config(ctx, config_file):
 
         if updated_fields:
             cli_config.save()
-            display_success(f"Imported configuration: {', '.join(updated_fields)}")
-            display_success(f"Configuration saved to: {cli_config.default_config_path}")
+            display_success(f"✅ Configuration imported: {', '.join(updated_fields)}")
+            if cli_config.should_show_info():
+                display_info(f"Saved to: {cli_config.default_config_path}")
         else:
             display_info("No valid configuration found in file")
 

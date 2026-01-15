@@ -292,4 +292,4 @@ For commercial security research:
 
 **Remember**: Security research is a responsibility, not just a technical exercise. By following these guidelines, you contribute to a more secure digital ecosystem while protecting yourself and others from harm.
 
-For questions about responsible use of HackAgent, contact our security team at [devs@vista-labs.ai](mailto:devs@vista-labs.ai). 
+For questions about responsible use of HackAgent, contact our security team at [ais@ai4i.it](mailto:ais@ai4i.it). 

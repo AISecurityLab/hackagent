@@ -15,7 +15,7 @@ def _get_kwargs(
 ) -> dict[str, Any]:
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": f"/api/organization/{id}",
+        "url": f"/organization/{id}",
     }
 
     return _kwargs
@@ -52,6 +52,9 @@ def sync_detailed(
 ) -> Response[Organization]:
     """Provides access to Organization details for the authenticated user.
 
+    Web-only endpoint - requires Auth0 authentication.
+    Organization management and billing operations require browser context.
+
     Args:
         id (UUID):
 
@@ -81,6 +84,9 @@ def sync(
 ) -> Optional[Organization]:
     """Provides access to Organization details for the authenticated user.
 
+    Web-only endpoint - requires Auth0 authentication.
+    Organization management and billing operations require browser context.
+
     Args:
         id (UUID):
 
@@ -104,6 +110,9 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
 ) -> Response[Organization]:
     """Provides access to Organization details for the authenticated user.
+
+    Web-only endpoint - requires Auth0 authentication.
+    Organization management and billing operations require browser context.
 
     Args:
         id (UUID):
@@ -131,6 +140,9 @@ async def asyncio(
     client: AuthenticatedClient,
 ) -> Optional[Organization]:
     """Provides access to Organization details for the authenticated user.
+
+    Web-only endpoint - requires Auth0 authentication.
+    Organization management and billing operations require browser context.
 
     Args:
         id (UUID):

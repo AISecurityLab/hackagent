@@ -18,18 +18,19 @@ Main TUI Application
 Full-screen tabbed interface for HackAgent.
 """
 
-from textual.app import App, ComposeResult
-from textual.containers import Container
-from textual.widgets import Footer, TabbedContent, TabPane, Static
-from textual.binding import Binding
+from typing import Any
+
 from rich.text import Text
+from textual.app import App, ComposeResult
+from textual.binding import Binding
+from textual.containers import Container
+from textual.widgets import Footer, Static, TabbedContent, TabPane
 
 from hackagent.cli.config import CLIConfig
-from hackagent.cli.tui.tabs.dashboard import DashboardTab
-from hackagent.cli.tui.tabs.agents import AgentsTab
-from hackagent.cli.tui.tabs.attacks import AttacksTab
-from hackagent.cli.tui.tabs.results import ResultsTab
-from hackagent.cli.tui.tabs.config import ConfigTab
+from hackagent.cli.tui.views.agents import AgentsTab
+from hackagent.cli.tui.views.attacks import AttacksTab
+from hackagent.cli.tui.views.config import ConfigTab
+from hackagent.cli.tui.views.results import ResultsTab
 
 
 class HackAgentHeader(Container):
@@ -159,6 +160,40 @@ class HackAgentTUI(App):
     DataTable > .datatable--cursor {
         background: #5b0000;
     }
+
+    /* Results tab specific styles - horizontal split 20-80 */
+    ResultsTab #results-left-panel {
+        border-right: solid #ff0000;
+        background: $panel;
+    }
+
+    ResultsTab #results-right-panel {
+        background: $panel;
+    }
+
+    ResultsTab #results-title {
+        height: 3;
+        width: 100%;
+        text-align: center;
+        background: #8b0000;
+        color: #ffffff;
+        padding: 1;
+    }
+
+    ResultsTab #details-title {
+        height: 3;
+        width: 100%;
+        text-align: center;
+        background: #8b0000;
+        color: #ffffff;
+        padding: 1;
+    }
+
+    ResultsTab .toolbar {
+        height: 3;
+        width: 100%;
+        padding: 0 1;
+    }
     """
 
     TITLE = "🔴 HACKAGENT 🔴 - AI Security Testing Toolkit"
@@ -166,7 +201,6 @@ class HackAgentTUI(App):
 
     BINDINGS = [
         Binding("q", "quit", "Quit", priority=True),
-        Binding("d", "switch_tab('dashboard')", "Dashboard", show=False),
         Binding("a", "switch_tab('agents')", "Agents", show=False),
         Binding("k", "switch_tab('attacks')", "Attacks", show=False),
         Binding("r", "switch_tab('results')", "Results", show=False),
@@ -177,14 +211,14 @@ class HackAgentTUI(App):
     def __init__(
         self,
         cli_config: CLIConfig,
-        initial_tab: str = "dashboard",
-        initial_data: dict = None,
+        initial_tab: str = "agents",
+        initial_data: dict[Any, Any] | None = None,
     ):
         """Initialize the TUI application.
 
         Args:
             cli_config: CLI configuration object
-            initial_tab: Which tab to show initially (default: "dashboard")
+            initial_tab: Which tab to show initially (default: "agents")
             initial_data: Initial data to pre-fill in the tab (default: None)
         """
         super().__init__()
@@ -198,9 +232,6 @@ class HackAgentTUI(App):
         yield HackAgentHeader()
 
         with TabbedContent(initial=self.initial_tab):
-            with TabPane("Dashboard", id="dashboard"):
-                yield DashboardTab(self.cli_config)
-
             with TabPane("Agents", id="agents"):
                 yield AgentsTab(self.cli_config)
 
@@ -233,7 +264,6 @@ class HackAgentTUI(App):
             for child in active_pane.children:
                 if hasattr(child, "refresh_data"):
                     child.refresh_data()
-                    self.notify("Data refreshed", severity="information")
                     break
 
     def on_mount(self) -> None:
@@ -243,16 +273,16 @@ class HackAgentTUI(App):
 
     def show_success(self, message: str) -> None:
         """Show success notification with checkmark."""
-        self.notify(f"✅ {message}", severity="information", timeout=3)
+        pass
 
     def show_error(self, message: str) -> None:
         """Show error notification with X mark."""
-        self.notify(f"❌ {message}", severity="error", timeout=5)
+        pass
 
     def show_warning(self, message: str) -> None:
         """Show warning notification with warning sign."""
-        self.notify(f"⚠️ {message}", severity="warning", timeout=4)
+        pass
 
     def show_info(self, message: str) -> None:
         """Show info notification with info icon."""
-        self.notify(f"ℹ️ {message}", severity="information", timeout=3)
+        pass

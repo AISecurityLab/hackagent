@@ -136,8 +136,8 @@ hackagent results summary --days 7
 ### CLI Configuration (YAML)
 
 ```yaml
-api_key: "your-api-key"
-base_url: "https://hackagent.dev"
+api_key: "your-api-key-here"
+base_url: "https://api.hackagent.dev"
 output_format: "table"
 ```
 
@@ -145,8 +145,10 @@ output_format: "table"
 
 ```bash
 # Set these in your shell or .env file
-export HACKAGENT_API_KEY="your-api-key"
-export HACKAGENT_BASE_URL="https://hackagent.dev"
+```bash
+export HACKAGENT_API_KEY="your-api-key-here"
+export HACKAGENT_BASE_URL="https://api.hackagent.dev"
+export HACKAGENT_OUTPUT_FORMAT="table"
 export HACKAGENT_DEBUG=1  # Enable debug mode
 ```
 

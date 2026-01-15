@@ -4,6 +4,8 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from .. import types
+
 T = TypeVar("T", bound="CheckoutSessionRequestRequest")
 
 
@@ -30,24 +32,20 @@ class CheckoutSessionRequestRequest:
 
         return field_dict
 
-    def to_multipart(self) -> dict[str, Any]:
-        credits_to_purchase = (
-            None,
-            str(self.credits_to_purchase).encode(),
-            "text/plain",
+    def to_multipart(self) -> types.RequestFiles:
+        files: types.RequestFiles = []
+
+        files.append(
+            (
+                "credits_to_purchase",
+                (None, str(self.credits_to_purchase).encode(), "text/plain"),
+            )
         )
 
-        field_dict: dict[str, Any] = {}
         for prop_name, prop in self.additional_properties.items():
-            field_dict[prop_name] = (None, str(prop).encode(), "text/plain")
+            files.append((prop_name, (None, str(prop).encode(), "text/plain")))
 
-        field_dict.update(
-            {
-                "credits_to_purchase": credits_to_purchase,
-            }
-        )
-
-        return field_dict
+        return files
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:

@@ -21,7 +21,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/user",
+        "url": "/user",
         "params": params,
     }
 
@@ -60,6 +60,9 @@ def sync_detailed(
     """Provides access to the UserProfile for the authenticated user.
     Allows updating fields like the linked user's first_name, last_name, email.
 
+    Web-only endpoint - requires Auth0 authentication.
+    User profile management requires OAuth context and is not for SDK use.
+
     Args:
         page (Union[Unset, int]):
 
@@ -90,6 +93,9 @@ def sync(
     """Provides access to the UserProfile for the authenticated user.
     Allows updating fields like the linked user's first_name, last_name, email.
 
+    Web-only endpoint - requires Auth0 authentication.
+    User profile management requires OAuth context and is not for SDK use.
+
     Args:
         page (Union[Unset, int]):
 
@@ -114,6 +120,9 @@ async def asyncio_detailed(
 ) -> Response[PaginatedUserProfileList]:
     """Provides access to the UserProfile for the authenticated user.
     Allows updating fields like the linked user's first_name, last_name, email.
+
+    Web-only endpoint - requires Auth0 authentication.
+    User profile management requires OAuth context and is not for SDK use.
 
     Args:
         page (Union[Unset, int]):
@@ -142,6 +151,9 @@ async def asyncio(
 ) -> Optional[PaginatedUserProfileList]:
     """Provides access to the UserProfile for the authenticated user.
     Allows updating fields like the linked user's first_name, last_name, email.
+
+    Web-only endpoint - requires Auth0 authentication.
+    User profile management requires OAuth context and is not for SDK use.
 
     Args:
         page (Union[Unset, int]):

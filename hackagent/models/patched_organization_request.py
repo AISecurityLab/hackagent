@@ -4,6 +4,7 @@ from typing import Any, TypeVar, Union
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from .. import types
 from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="PatchedOrganizationRequest")
@@ -30,22 +31,16 @@ class PatchedOrganizationRequest:
 
         return field_dict
 
-    def to_multipart(self) -> dict[str, Any]:
-        name = (
-            self.name
-            if isinstance(self.name, Unset)
-            else (None, str(self.name).encode(), "text/plain")
-        )
+    def to_multipart(self) -> types.RequestFiles:
+        files: types.RequestFiles = []
 
-        field_dict: dict[str, Any] = {}
+        if not isinstance(self.name, Unset):
+            files.append(("name", (None, str(self.name).encode(), "text/plain")))
+
         for prop_name, prop in self.additional_properties.items():
-            field_dict[prop_name] = (None, str(prop).encode(), "text/plain")
+            files.append((prop_name, (None, str(prop).encode(), "text/plain")))
 
-        field_dict.update({})
-        if name is not UNSET:
-            field_dict["name"] = name
-
-        return field_dict
+        return files
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:

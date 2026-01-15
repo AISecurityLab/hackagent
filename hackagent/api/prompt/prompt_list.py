@@ -24,7 +24,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/prompt",
+        "url": "/prompt",
         "params": params,
     }
 
@@ -63,6 +63,9 @@ def sync_detailed(
 ) -> Response[PaginatedPromptList]:
     """ViewSet for managing Prompt instances.
 
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+
     Args:
         category (Union[Unset, str]):
         page (Union[Unset, int]):
@@ -95,6 +98,9 @@ def sync(
 ) -> Optional[PaginatedPromptList]:
     """ViewSet for managing Prompt instances.
 
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
+
     Args:
         category (Union[Unset, str]):
         page (Union[Unset, int]):
@@ -121,6 +127,9 @@ async def asyncio_detailed(
     page: Union[Unset, int] = UNSET,
 ) -> Response[PaginatedPromptList]:
     """ViewSet for managing Prompt instances.
+
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
 
     Args:
         category (Union[Unset, str]):
@@ -151,6 +160,9 @@ async def asyncio(
     page: Union[Unset, int] = UNSET,
 ) -> Optional[PaginatedPromptList]:
     """ViewSet for managing Prompt instances.
+
+    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
+    Auth0 authentication is supported as fallback for web dashboard use.
 
     Args:
         category (Union[Unset, str]):

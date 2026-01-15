@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 from typing import Dict, Tuple
 
-import logging
+from hackagent.api.prompt import prompt_create, prompt_list
 from hackagent.client import AuthenticatedClient
-from hackagent.api.prompt import prompt_list, prompt_create
 from hackagent.models.prompt import Prompt
 from hackagent.models.prompt_request import PromptRequest
-
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +65,6 @@ def get_or_create_prompt(
         category=category,
         evaluation_criteria=evaluation_criteria,
         tags=tags_data,
-        organization=organization_id,
     )
     create_response = prompt_create.sync_detailed(client=client, body=prompt_req_body)
 
@@ -78,9 +76,6 @@ def get_or_create_prompt(
         body_content = (
             create_response.content.decode() if create_response.content else "N/A"
         )
-        err_msg = (
-            f"Failed to create prompt. Status: {create_response.status_code}, "
-            f"Body: {body_content}"
-        )
+        err_msg = f"Failed to create prompt. Status: {create_response.status_code}, Body: {body_content}"
         logger.error(err_msg)
         raise RuntimeError(err_msg)

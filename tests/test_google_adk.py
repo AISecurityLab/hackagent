@@ -16,12 +16,11 @@
 import logging
 import os
 from urllib.parse import urlparse
+
+import dotenv
 import pytest
 
-from hackagent import HackAgent
-
-from hackagent.models import AgentTypeEnum
-import dotenv
+from hackagent import HackAgent, AgentTypeEnum
 
 dotenv.load_dotenv()
 

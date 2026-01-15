@@ -19,7 +19,7 @@ const config: Config = {
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
-  organizationName: 'vista-labs', // Usually your GitHub org/user name.
+  organizationName: 'AISecurityLab', // Usually your GitHub org/user name.
   projectName: 'hackagent', // Usually your repo name.
 
   onBrokenLinks: 'throw',
@@ -46,7 +46,7 @@ const config: Config = {
         docs: {
           sidebarPath: './sidebars.ts',
           routeBasePath: '/',
-          editUrl: 'https://github.com/vistalabs-org/hackagent',
+          editUrl: 'https://github.com/AISecurityLab/hackagent',
           // Enable versioning for API docs
           includeCurrentVersion: true,
           lastVersion: 'current',
@@ -75,7 +75,7 @@ const config: Config = {
     announcementBar: {
       id: 'github_star', // Any unique ID for this banner
       content:
-        '<b>Like our product? Please <a target="_blank" rel="noopener noreferrer" href="https://github.com/vistalabs-org/hackagent">leave a star on the GitHub repo</a>!</b>',
+        '<b>Like our product? Please <a target="_blank" rel="noopener noreferrer" href="https://github.com/AISecurityLab/hackagent">leave a star on the GitHub repo</a>!</b>',
       backgroundColor: '#FFA500', // Change background to orange
       textColor: '#000000', // Adjust text color for contrast if needed (e.g., black)
       isCloseable: true, // Defaults to `true`
@@ -98,7 +98,7 @@ const config: Config = {
           label: 'Docs',
         },
         {
-          href: 'https://github.com/vistalabs-org/hackagent',
+          href: 'https://github.com/AISecurityLab/hackagent',
           label: 'GitHub',
           position: 'right',
         },
@@ -117,15 +117,15 @@ const config: Config = {
           ],
         },
         {
-          title: 'Community',
+          title: 'Contacts',
           items: [
             {
-              label: 'Discord',
-              href: 'https://discord.gg/BBJkTStF4h',
+              label: 'LinkedIn',
+              href: 'https://www.linkedin.com/company/ai4industry/',
             },
             {
-              label: 'X',
-              href: 'https://x.com/vistalabsai',
+              label: 'Website',
+              href: 'https://ai4i.it',
             },
           ],
         },
@@ -134,12 +134,12 @@ const config: Config = {
           items: [
             {
               label: 'GitHub',
-              href: 'https://github.com/vistalabs-org',
+              href: 'https://github.com/AISecurityLab/hackagent',
             },
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} Vista Labs, Ltd.`,
+      copyright: `Copyright © ${new Date().getFullYear()} [AI4I](https://ai4i.it).`,
     },
     prism: {
       theme: prismThemes.github,
