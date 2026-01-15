@@ -367,11 +367,11 @@ curl http://localhost:11434/api/generate \
 
 ## 📚 Next Steps
 
-- [**AdvPrefix Deep Dive**](../attacks/advprefix-attacks) — Full AdvPrefix documentation
-- [**PAIR Attack Guide**](../attacks/pair-attacks) — Iterative refinement techniques
-- [**Baseline Templates**](../attacks/baseline-attacks) — Template customization
-- [**Python SDK Reference**](../sdk/python-quickstart) — Complete SDK guide
-- [**CLI Documentation**](../cli/README) — All CLI commands
+- [**AdvPrefix Deep Dive**](../attacks/advprefix-attacks.md) — Full AdvPrefix documentation
+- [**PAIR Attack Guide**](../attacks/pair-attacks.md) — Iterative refinement techniques
+- [**Baseline Templates**](../attacks/baseline-attacks.md) — Template customization
+- [**Python SDK Reference**](../sdk/python-quickstart.md) — Complete SDK guide
+- [**CLI Documentation**](../cli/README.md) — All CLI commands
 
 ---
 

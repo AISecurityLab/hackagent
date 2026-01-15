@@ -519,8 +519,8 @@ Explore these advanced topics:
 
 1. **[AdvPrefix Attacks](../attacks/advprefix-attacks.md)** - Advanced attack techniques
 2. **[Google ADK Integration](../integrations/google-adk.md)** - Framework-specific setup
-3. **[Getting Started Tutorial](../tutorial-basics/AdvPrefix.md)** - Basic AdvPrefix tutorial
-4. **[Security Guidelines](../security/responsible-disclosure)** - Responsible disclosure and ethics
+3. **[Attack Tutorial](../tutorial-basics/attack-tutorial.md)** - Getting started with attacks
+4. **[Security Guidelines](../security/responsible-disclosure.md)** - Responsible disclosure and ethics
 
 ## 📞 Support
 

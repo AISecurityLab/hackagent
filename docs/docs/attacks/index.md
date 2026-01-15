@@ -22,9 +22,9 @@ graph LR
 
 | Attack | Description | Sophistication | Speed |
 |--------|-------------|----------------|-------|
-| [**AdvPrefix**](./advprefix-attacks) | Multi-step adversarial prefix optimization | ⭐⭐⭐ High | Slower |
-| [**PAIR**](./pair-attacks) | LLM-driven iterative prompt refinement | ⭐⭐ Medium | Medium |
-| [**Baseline**](./baseline-attacks) | Template-based prompt injection | ⭐ Basic | Fast |
+| [**AdvPrefix**](./advprefix-attacks.md) | Multi-step adversarial prefix optimization | ⭐⭐⭐ High | Slower |
+| [**PAIR**](./pair-attacks.md) | LLM-driven iterative prompt refinement | ⭐⭐ Medium | Medium |
+| [**Baseline**](./baseline-attacks.md) | Template-based prompt injection | ⭐ Basic | Fast |
 
 ---
 
@@ -53,7 +53,7 @@ attack_config = {
 }
 ```
 
-[**Learn more about AdvPrefix →**](./advprefix-attacks)
+[**Learn more about AdvPrefix →**](./advprefix-attacks.md)
 
 ---
 
@@ -85,7 +85,7 @@ attack_config = {
 }
 ```
 
-[**Learn more about PAIR →**](./pair-attacks)
+[**Learn more about PAIR →**](./pair-attacks.md)
 
 ---
 
@@ -113,7 +113,7 @@ attack_config = {
 }
 ```
 
-[**Learn more about Baseline →**](./baseline-attacks)
+[**Learn more about Baseline →**](./baseline-attacks.md)
 
 ---
 
@@ -171,6 +171,6 @@ graph TD
 
 ## Next Steps
 
-- [AdvPrefix Deep Dive](./advprefix-attacks) — Full documentation with advanced configuration
-- [PAIR Attack Guide](./pair-attacks) — Iterative refinement techniques
-- [Baseline Templates](./baseline-attacks) — Template categories and customization
+- [AdvPrefix Deep Dive](./advprefix-attacks.md) — Full documentation with advanced configuration
+- [PAIR Attack Guide](./pair-attacks.md) — Iterative refinement techniques
+- [Baseline Templates](./baseline-attacks.md) — Template categories and customization
