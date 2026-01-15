@@ -44,7 +44,7 @@ from uuid import UUID
 
 from hackagent.api.run import run_result_create
 from hackagent.models import EvaluationStatusEnum, ResultRequest, StatusEnum
-from hackagent.tracking import StepTracker, TrackingContext
+from hackagent.router.tracking import StepTracker, TrackingContext
 
 logger = logging.getLogger(__name__)
 

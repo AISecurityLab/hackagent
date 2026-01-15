@@ -26,11 +26,12 @@ from contextlib import contextmanager
 from typing import Any, Dict, Optional
 
 from hackagent.api.result import result_partial_update, result_trace_create
-from hackagent.api.run import run_partial_update
+from hackagent.api.run import run_partial_update, run_result_create
 from hackagent.models import (
     EvaluationStatusEnum,
     PatchedResultRequest,
     PatchedRunRequest,
+    ResultRequest,
     StatusEnum,
     StepTypeEnum,
     TraceRequest,
@@ -439,3 +440,111 @@ class StepTracker:
             self.context.metadata["progress_log"] = self.context.metadata[
                 "progress_log"
             ][-20:]
+
+    def create_result(
+        self,
+        request_payload: Dict[str, Any],
+        response_body: Dict[str, Any],
+        evaluation_status: Optional[EvaluationStatusEnum] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Optional[str]:
+        """
+        Create a Result record for an agent interaction.
+
+        This method creates individual result records (test results) that are
+        associated with the current run. These results represent individual
+        agent calls and their outcomes during attack execution.
+
+        Args:
+            request_payload: The request sent to the agent
+            response_body: The response received from the agent
+            evaluation_status: Evaluation status (defaults to PENDING)
+            metadata: Additional metadata to store with the result
+
+        Returns:
+            Result ID if successful, None otherwise
+
+        Example:
+            >>> result_id = tracker.create_result(
+            ...     request_payload={"prompt": "test prompt"},
+            ...     response_body={"content": "test response"},
+            ...     evaluation_status=EvaluationStatusEnum.PENDING,
+            ...     metadata={"model": "gpt-4"}
+            ... )
+        """
+        if not self.context.can_create_results:
+            self.logger.warning(
+                "Tracking context is disabled for results - cannot create result (missing client, run_id, or parent_result_id)"
+            )
+            return None
+
+        self.logger.info(
+            f"Creating result for run_id={self.context.run_id}, parent_result_id={self.context.parent_result_id}"
+        )
+
+        try:
+            run_uuid = self.context.get_run_uuid()
+            if not run_uuid:
+                self.logger.warning("Cannot create result: invalid run UUID")
+                return None
+
+            self.logger.info(f"Run UUID validated: {run_uuid}")
+
+            # Default to PENDING if not specified
+            if evaluation_status is None:
+                evaluation_status = EvaluationStatusEnum.PENDING
+
+            # Create result request
+            result_request = ResultRequest(
+                request_payload=request_payload,
+                response_body=response_body,
+                evaluation_status=evaluation_status,
+                agent_specific_data=metadata,
+            )
+
+            # Call API to create result under this run
+            response = run_result_create.sync_detailed(
+                client=self.context.client,
+                id=run_uuid,
+                body=result_request,
+            )
+
+            # Parse response
+            if response.status_code == 201:
+                result_id = self._extract_result_id(response)
+                if result_id:
+                    self.logger.info(f"Created result record (ID: {result_id})")
+                    return result_id
+            else:
+                self.logger.error(
+                    f"Failed to create result: status={response.status_code}, body={response.content}"
+                )
+
+        except Exception as e:
+            self.logger.error(f"Exception creating result: {e}", exc_info=True)
+
+        return None
+
+    def _extract_result_id(self, response) -> Optional[str]:
+        """
+        Extract result ID from API response.
+
+        Args:
+            response: API response object
+
+        Returns:
+            Result ID if found, None otherwise
+        """
+        # Try parsed response first
+        if response.parsed and hasattr(response.parsed, "id"):
+            return str(response.parsed.id)
+
+        # Try parsing raw content
+        try:
+            response_data = json.loads(response.content.decode())
+            if "id" in response_data:
+                return str(response_data["id"])
+        except Exception as e:
+            self.logger.warning(f"Could not parse result ID: {e}")
+
+        return None

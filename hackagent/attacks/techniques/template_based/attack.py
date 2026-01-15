@@ -119,6 +119,8 @@ class TemplateBasedAttack(BaseAttack):
                     "max_new_tokens",
                     "temperature",
                     "n_samples_per_template",
+                    "_run_id",  # For real-time result tracking
+                    "_client",  # For real-time result tracking
                 ],
                 "input_data_arg_name": "goals",
                 "required_args": ["logger", "agent_router", "config"],
@@ -131,6 +133,8 @@ class TemplateBasedAttack(BaseAttack):
                     "objective",
                     "evaluator_type",
                     "min_response_length",
+                    "_run_id",  # For real-time result tracking
+                    "_client",  # For real-time result tracking
                 ],
                 "input_data_arg_name": "input_data",
                 "required_args": ["logger", "config"],

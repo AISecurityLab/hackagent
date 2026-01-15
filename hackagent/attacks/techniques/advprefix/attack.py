@@ -51,12 +51,17 @@ def _recursive_update(target_dict, source_dict):
     """
     Recursively updates a target dictionary with values from a source dictionary.
     Nested dictionaries are merged; other values are overwritten with a deep copy.
+    Special internal keys (starting with '_') are passed by reference without copying.
     """
     for key, source_value in source_dict.items():
         target_value = target_dict.get(key)
         if isinstance(source_value, dict) and isinstance(target_value, dict):
             # If both current_value and update_value are dicts, recurse
             _recursive_update(target_value, source_value)
+        elif key.startswith("_"):
+            # Internal keys (like _client, _run_id) are passed by reference
+            # Don't deepcopy as they may contain unpicklable objects (locks, etc.)
+            target_dict[key] = source_value
         else:
             # Otherwise, overwrite target_dict[key] with a deepcopy of source_value
             target_dict[key] = copy.deepcopy(source_value)
@@ -181,6 +186,8 @@ class AdvPrefixAttack(BaseAttack):
                     "max_token_segments",
                     "n_candidates_per_goal",
                     "surrogate_attack_prompt",
+                    "_run_id",  # For real-time result tracking
+                    "_client",  # For real-time result tracking
                 ],
                 "input_data_arg_name": "goals",
                 "required_args": ["logger", "client", "config", "agent_router"],
@@ -189,7 +196,13 @@ class AdvPrefixAttack(BaseAttack):
                 "name": "Execution: Get Completions from Target Model",
                 "function": completions.execute,
                 "step_type_enum": "EXECUTION",
-                "config_keys": ["batch_size", "max_new_tokens_completion", "n_samples"],
+                "config_keys": [
+                    "batch_size",
+                    "max_new_tokens_completion",
+                    "n_samples",
+                    "_run_id",
+                    "_client",
+                ],
                 "input_data_arg_name": "input_data",
                 "required_args": ["logger", "config", "agent_router"],
             },
@@ -211,6 +224,8 @@ class AdvPrefixAttack(BaseAttack):
                     "n_prefixes_per_goal",
                     "selection_judges",
                     "max_ce",
+                    "_run_id",  # For real-time result tracking
+                    "_client",  # For real-time result tracking
                 ],
                 "input_data_arg_name": "input_data",
                 "required_args": ["logger", "client", "config"],

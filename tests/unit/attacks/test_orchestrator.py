@@ -232,14 +232,18 @@ class TestAttackOrchestratorExecution(unittest.TestCase):
 
         attack_config = {"param1": "value1"}
         run_config = {"param2": "value2"}
+        run_id = "test-run-id-123"
 
-        kwargs = orchestrator._get_attack_impl_kwargs(attack_config, run_config)
+        kwargs = orchestrator._get_attack_impl_kwargs(attack_config, run_config, run_id)
 
         self.assertIn("config", kwargs)
         self.assertIn("client", kwargs)
         self.assertIn("agent_router", kwargs)
         self.assertEqual(kwargs["config"]["param1"], "value1")
         self.assertEqual(kwargs["config"]["param2"], "value2")
+        # Verify tracking context is added
+        self.assertEqual(kwargs["config"]["_run_id"], run_id)
+        self.assertEqual(kwargs["config"]["_client"], orchestrator.client)
 
     @patch.object(AttackOrchestrator, "_create_server_attack_record")
     @patch.object(AttackOrchestrator, "_create_server_run_record")

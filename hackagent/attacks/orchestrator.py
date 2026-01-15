@@ -44,9 +44,11 @@ from hackagent.api.attack.attack_create import (
     sync_detailed as attacks_create_sync_detailed,
 )
 from hackagent.api.run import run_run_tests_create
+from hackagent.api.run.run_update import sync_detailed as run_update
 from hackagent.errors import HackAgentError
 from hackagent.models.attack_request import AttackRequest
 from hackagent.models.run_request import RunRequest
+from hackagent.models.status_enum import StatusEnum
 
 if TYPE_CHECKING:
     from hackagent.agent import HackAgent
@@ -222,6 +224,7 @@ class AttackOrchestrator:
         self,
         attack_config: Dict[str, Any],
         run_config_override: Optional[Dict[str, Any]],
+        run_id: str,
     ) -> Dict[str, Any]:
         """
         Prepare kwargs for attack implementation instantiation.
@@ -232,12 +235,18 @@ class AttackOrchestrator:
         Args:
             attack_config: Full attack configuration
             run_config_override: Optional run overrides
+            run_id: Server-side run record ID for result tracking
 
         Returns:
             Kwargs for attack_impl_class constructor
         """
         return {
-            "config": {**attack_config, **(run_config_override or {})},
+            "config": {
+                **attack_config,
+                **(run_config_override or {}),
+                "_run_id": run_id,  # Add run_id for result tracking
+                "_client": self.client,  # Add client for result tracking
+            },
             "client": self.client,
             "agent_router": self.hack_agent.router,
         }
@@ -267,7 +276,9 @@ class AttackOrchestrator:
             f"Executing {self.attack_type} attack (Attack: {attack_id}, Run: {run_id})"
         )
 
-        impl_kwargs = self._get_attack_impl_kwargs(attack_config, run_config_override)
+        impl_kwargs = self._get_attack_impl_kwargs(
+            attack_config, run_config_override, run_id
+        )
         attack_impl = self.attack_impl_class(**impl_kwargs)
         results = attack_impl.run(**attack_params)
 
@@ -331,16 +342,65 @@ class AttackOrchestrator:
             run_config_override=run_config_override,
         )
 
-        # 4. Execute locally
-        results = self._execute_local_attack(
-            attack_id=attack_id,
-            run_id=run_id,
-            attack_params=attack_params,
-            attack_config=attack_config,
-            run_config_override=run_config_override,
-        )
+        # 4. Update run status to RUNNING
+        try:
+            logger.info(f"Updating run {run_id} status to RUNNING")
+            run_update(
+                id=run_id,
+                client=self.client,
+                body=RunRequest(
+                    agent=victim_agent_id,
+                    attack=attack_id,
+                    status=StatusEnum.RUNNING,
+                ),
+            )
+        except Exception as e:
+            logger.warning(f"Failed to update run status to RUNNING: {e}")
 
-        return results
+        # 5. Execute locally
+        try:
+            results = self._execute_local_attack(
+                attack_id=attack_id,
+                run_id=run_id,
+                attack_params=attack_params,
+                attack_config=attack_config,
+                run_config_override=run_config_override,
+            )
+
+            # 6. Update run status to COMPLETED
+            try:
+                logger.info(f"Updating run {run_id} status to COMPLETED")
+                run_update(
+                    id=run_id,
+                    client=self.client,
+                    body=RunRequest(
+                        agent=victim_agent_id,
+                        attack=attack_id,
+                        status=StatusEnum.COMPLETED,
+                    ),
+                )
+            except Exception as e:
+                logger.warning(f"Failed to update run status to COMPLETED: {e}")
+
+            return results
+
+        except Exception as e:
+            # Update run status to FAILED on error
+            try:
+                logger.error(f"Attack execution failed: {e}")
+                run_update(
+                    id=run_id,
+                    client=self.client,
+                    body=RunRequest(
+                        agent=victim_agent_id,
+                        attack=attack_id,
+                        status=StatusEnum.FAILED,
+                        run_notes=f"Execution failed: {str(e)}",
+                    ),
+                )
+            except Exception as update_error:
+                logger.warning(f"Failed to update run status to FAILED: {update_error}")
+            raise
 
     # ========================================================================
     # HTTP Response Helpers

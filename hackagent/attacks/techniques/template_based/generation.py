@@ -57,13 +57,12 @@ def generate_prompts(
     for goal in goals:
         for category in categories:
             # Get templates for this category
-            templates = AttackTemplates.get_templates_by_category(
-                category, limit=templates_per_cat
-            )
+            all_templates = AttackTemplates.get_by_category(category)
+            templates = all_templates[:templates_per_cat]  # Limit number of templates
 
             for template in templates:
                 # Format template with goal
-                attack_prompt = template.format(harmful_request=goal)
+                attack_prompt = template.format(goal=goal)
 
                 results.append(
                     {
@@ -106,6 +105,18 @@ def execute_prompts(
     temperature = config.get("temperature", 0.7)
     n_samples = config.get("n_samples_per_template", 1)
 
+    # Extract tracking information from config
+    run_id = config.get("_run_id")
+    client = config.get("_client")
+
+    logger.info(
+        f"📊 Template-based tracking context: run_id={run_id}, client={'Present' if client else 'Missing'}"
+    )
+    if not run_id or not client:
+        logger.warning(
+            "⚠️ Missing tracking context in template-based - results will NOT be created!"
+        )
+
     completions = []
 
     for idx, row in df.iterrows():
@@ -119,10 +130,22 @@ def execute_prompts(
 
             # Get completion(s)
             for _ in range(n_samples):
-                response = agent_router.route_request(
-                    registration_key=list(agent_router._agent_registry.keys())[0],
-                    request_data=request_data,
-                )
+                # Use route_with_tracking if available for real-time result creation
+                if run_id and client:
+                    logger.info(
+                        "🔍 Calling route_with_tracking for template-based attack"
+                    )
+                    response = agent_router.route_with_tracking(
+                        registration_key=list(agent_router._agent_registry.keys())[0],
+                        request_data=request_data,
+                        run_id=run_id,
+                        client=client,
+                    )
+                else:
+                    response = agent_router.route_request(
+                        registration_key=list(agent_router._agent_registry.keys())[0],
+                        request_data=request_data,
+                    )
 
                 completion = ""
                 if response and hasattr(response, "choices") and response.choices:

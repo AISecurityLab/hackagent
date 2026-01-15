@@ -80,6 +80,7 @@ def _pair_setup_attacker(
     self,
     attack_config: Dict[str, Any],
     run_config_override: Optional[Dict[str, Any]],
+    run_id: str,
 ) -> Dict[str, Any]:
     """
     PAIR-specific setup: creates attacker router for adversarial prompt generation.
@@ -88,7 +89,7 @@ def _pair_setup_attacker(
     that are then tested against the target agent.
     """
     kwargs = AttackOrchestrator._get_attack_impl_kwargs(
-        self, attack_config, run_config_override
+        self, attack_config, run_config_override, run_id
     )
 
     attacker_config = attack_config.get("attacker", {})
@@ -98,7 +99,7 @@ def _pair_setup_attacker(
     kwargs["attacker_router"] = AgentRouter(
         client=self.client,
         name=attacker_config.get("identifier", "hackagent-attacker"),
-        agent_type="OPENAI",
+        agent_type="OPENAI_SDK",
         endpoint=attacker_config.get("endpoint", "https://api.openai.com/v1"),
         metadata=attacker_config,
         adapter_operational_config=attacker_config,

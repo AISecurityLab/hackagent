@@ -151,19 +151,32 @@ SCORE: {score}"""
 
         return None
 
-    def _query_target(self, prompt: str) -> Optional[str]:
+    def _query_target(
+        self, prompt: str, run_id: Optional[str] = None, client: Optional[Any] = None
+    ) -> Optional[str]:
         """Query target model with adversarial prompt."""
         try:
             messages = [{"role": "user", "content": prompt}]
 
-            response = self.agent_router.route_request(
-                registration_key=list(self.agent_router._agent_registry.keys())[0],
-                request_data={
-                    "messages": messages,
-                    "max_tokens": self.config.get("max_new_tokens", 150),
-                    "temperature": self.config.get("temperature", 0.7),
-                },
-            )
+            request_data = {
+                "messages": messages,
+                "max_tokens": self.config.get("max_new_tokens", 150),
+                "temperature": self.config.get("temperature", 0.7),
+            }
+
+            # Use route_with_tracking if available for real-time result creation
+            if run_id and client:
+                response = self.agent_router.route_with_tracking(
+                    registration_key=list(self.agent_router._agent_registry.keys())[0],
+                    request_data=request_data,
+                    run_id=run_id,
+                    client=client,
+                )
+            else:
+                response = self.agent_router.route_request(
+                    registration_key=list(self.agent_router._agent_registry.keys())[0],
+                    request_data=request_data,
+                )
 
             if response and hasattr(response, "choices") and response.choices:
                 return response.choices[0].message.content or ""
@@ -222,6 +235,10 @@ SCORE: {score}"""
         n_iterations = self.config.get("n_iterations", 5)
         early_stop = self.config.get("early_stop_on_success", True)
 
+        # Extract tracking information from config
+        run_id = self.config.get("_run_id")
+        client = self.config.get("_client")
+
         best_prompt = ""
         best_response = ""
         best_score = 0
@@ -243,7 +260,9 @@ SCORE: {score}"""
             self.logger.info(f"Iteration {iteration + 1}/{n_iterations}")
 
             # Query target with adversarial prompt
-            target_response = self._query_target(adversarial_prompt)
+            target_response = self._query_target(
+                adversarial_prompt, run_id=run_id, client=client
+            )
 
             if not target_response:
                 self.logger.warning(

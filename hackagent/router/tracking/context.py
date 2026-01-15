@@ -71,19 +71,27 @@ class TrackingContext:
     @property
     def is_enabled(self) -> bool:
         """
-        Check if tracking is enabled.
+        Check if tracking is enabled for creating traces.
 
-        Tracking is enabled when all required components are available:
-        client, run_id, and parent_result_id.
+        Trace creation requires client and run_id.
+        Result creation additionally requires parent_result_id.
 
         Returns:
-            True if tracking is enabled, False otherwise
+            True if basic tracking is enabled (can create traces), False otherwise
         """
-        return bool(
-            self.client is not None
-            and self.run_id is not None
-            and self.parent_result_id is not None
-        )
+        return bool(self.client is not None and self.run_id is not None)
+
+    @property
+    def can_create_results(self) -> bool:
+        """
+        Check if we can create Result records.
+
+        Result creation requires parent_result_id in addition to basic tracking.
+
+        Returns:
+            True if result creation is enabled, False otherwise
+        """
+        return self.is_enabled and self.parent_result_id is not None
 
     def increment_sequence(self) -> int:
         """
