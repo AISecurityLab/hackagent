@@ -967,3 +967,96 @@ class AgentRouter:
                 raw_request=request_data,
                 registration_key=registration_key,
             )
+
+    def route_with_tracking(
+        self,
+        registration_key: str,
+        request_data: Dict[str, Any],
+        run_id: str,
+        client,
+        evaluation_status=None,
+        raise_on_error: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Route a request to an agent and automatically create a Result record.
+
+        This method combines routing with automatic result tracking. After the agent
+        processes the request, a Result record is automatically created in the backend
+        with the request/response data.
+
+        Args:
+            registration_key: The key identifying the target adapter
+            request_data: Data to send to the agent's handle_request method
+            run_id: Run ID to associate the result with
+            client: Authenticated client for API calls
+            evaluation_status: Optional evaluation status (defaults to NOT_EVALUATED)
+            raise_on_error: If True, raises exceptions for errors
+
+        Returns:
+            Response dictionary from the agent adapter
+
+        Example:
+            >>> response = router.route_with_tracking(
+            ...     registration_key=agent_id,
+            ...     request_data={"prompt": "test"},
+            ...     run_id=run_id,
+            ...     client=client
+            ... )
+        """
+        logger.info(
+            f"route_with_tracking called: run_id={run_id}, registration_key={registration_key}"
+        )
+
+        # Route the request
+        response = self.route_request(
+            registration_key=registration_key,
+            request_data=request_data,
+            raise_on_error=raise_on_error,
+        )
+
+        logger.info("Agent response received, creating Result record...")
+
+        # Create Result record directly under Run
+        try:
+            from ..api.run import run_result_create
+            from ..models import ResultRequest, EvaluationStatusEnum
+            from uuid import UUID
+
+            # Prepare result request
+            if evaluation_status is None:
+                evaluation_status = EvaluationStatusEnum.NOT_EVALUATED
+
+            run_uuid = UUID(run_id)
+
+            # Convert response to string if it's a dict
+            response_str = response if isinstance(response, str) else str(response)
+
+            result_req = ResultRequest(
+                run=run_uuid,
+                request_payload=request_data,
+                response_body=response_str,  # Must be string
+                evaluation_status=evaluation_status,
+            )
+
+            # Create result under run
+            result_response = run_result_create.sync_detailed(
+                id=run_uuid,
+                client=client,
+                body=result_req,
+            )
+
+            if result_response.status_code == 201:
+                if result_response.parsed:
+                    result_id = str(result_response.parsed.id)
+                    logger.info(f"✅ Result record created successfully: {result_id}")
+                else:
+                    logger.info("✅ Result record created (status=201)")
+            else:
+                logger.warning(
+                    f"⚠️ Result creation failed: status={result_response.status_code}"
+                )
+
+        except Exception as e:
+            logger.error(f"❌ Failed to create Result record: {e}", exc_info=True)
+
+        return response

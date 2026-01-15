@@ -87,14 +87,14 @@ def resolve_api_token(
 
     Priority order:
     1. Direct api_key parameter (highest priority)
-    2. Config file (~/.hackagent/config.json or specified path)
+    2. Config file (~/.config/hackagent/config.json or specified path)
     3. Environment variable (HACKAGENT_API_KEY, with .env file support)
     4. Error if not found (lowest priority)
 
     Args:
         direct_api_key_param: API key provided directly as parameter
         env_file_path: Optional path to .env file to load environment variables from
-        config_file_path: Optional path to config file (defaults to ~/.hackagent/config.json)
+        config_file_path: Optional path to config file (defaults to ~/.config/hackagent/config.json)
 
     Returns:
         str: The resolved API token
@@ -123,7 +123,7 @@ def resolve_api_token(
     error_message = (
         "API token not found from any source. Tried:\n"
         "1. Direct 'api_key' parameter\n"
-        "2. Config file (~/.hackagent/config.json)\n"
+        "2. Config file (~/.config/hackagent/config.json)\n"
         "3. HACKAGENT_API_KEY environment variable\n"
         "\nTo fix: Set HACKAGENT_API_KEY, create config file, or pass api_key directly."
     )
@@ -136,7 +136,7 @@ def _load_api_key_from_config(config_file_path: Optional[str] = None) -> Optiona
         if config_file_path:
             config_path = Path(config_file_path)
         else:
-            config_path = Path.home() / ".hackagent" / "config.json"
+            config_path = Path.home() / ".config" / "hackagent" / "config.json"
 
         if not config_path.exists():
             logger.debug(f"Config file not found at: {config_path}")

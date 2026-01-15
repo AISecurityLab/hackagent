@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE: This file is generated for docs tooling.
 """
 HackAgent Documentation Generator
 
@@ -11,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import textwrap
 from pathlib import Path
 
 try:
@@ -72,44 +74,52 @@ def check_requirements():
 
 def create_pydoc_config(output_dir):
     """Create pydoc-markdown configuration."""
-    config = f"""
-loaders:
-  - type: python
-    modules: 
-      - hackagent.agent
-      - hackagent.client
-      - hackagent.errors
-      - hackagent.models
-      - hackagent.router
-      - hackagent.attacks.strategies
-      - hackagent.attacks.base
-      - hackagent.attacks.AdvPrefix.generate
-      - hackagent.attacks.AdvPrefix.compute_ce
-      - hackagent.attacks.AdvPrefix.completions
-      - hackagent.attacks.AdvPrefix.evaluation
-      - hackagent.attacks.AdvPrefix.aggregation
-      - hackagent.attacks.AdvPrefix.preprocessing
-      - hackagent.attacks.AdvPrefix.utils
-      - hackagent.attacks.AdvPrefix.scorer
-      - hackagent.attacks.AdvPrefix.scorer_parser
-      - hackagent.attacks.AdvPrefix.selector
-      - hackagent.vulnerabilities.prompts
+    config = textwrap.dedent(
+        f"""
+        loaders:
+          - type: python
+            modules:
+              - hackagent
+              - hackagent.agent
+              - hackagent.client
+              - hackagent.errors
+              - hackagent.models
+              - hackagent.router
+              - hackagent.router.types
+              - hackagent.attacks
+              - hackagent.attacks.base
+              - hackagent.attacks.registry
+              - hackagent.attacks.orchestrator
+              - hackagent.attacks.techniques.base
+              - hackagent.attacks.techniques.advprefix.attack
+              - hackagent.attacks.techniques.advprefix.generate
+              - hackagent.attacks.techniques.advprefix.completions
+              - hackagent.attacks.techniques.advprefix.evaluation
+              - hackagent.attacks.techniques.advprefix.utils
+              - hackagent.attacks.techniques.pair.attack
+              - hackagent.attacks.techniques.pair.config
+              - hackagent.attacks.techniques.baseline.attack
+              - hackagent.attacks.techniques.baseline.config
+              - hackagent.attacks.techniques.baseline.evaluation
+              - hackagent.attacks.techniques.baseline.generation
+              - hackagent.vulnerabilities.prompts
 
-processors:
-  - type: filter
-    documented_only: true
-    skip_empty_modules: true
-  - type: smart
-  - type: crossref
+        processors:
+          - type: filter
+            documented_only: true
+            skip_empty_modules: true
+          - type: smart
+          - type: crossref
 
-renderer:
-  type: docusaurus
-  docs_base_path: {output_dir}
-  sidebar_top_level_label: "🔗 API Reference"
-"""
+        renderer:
+          type: docusaurus
+          docs_base_path: {output_dir}
+          sidebar_top_level_label: "🔗 API Reference"
+        """
+    ).strip()
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as f:
-        f.write(config.strip())
+        f.write(config)
         return f.name
 
 

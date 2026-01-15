@@ -195,14 +195,14 @@ class CLIConfig:
 
     def _load_default_config(self):
         """Load from default config file"""
-        default_config = Path.home() / ".hackagent" / "config.json"
+        default_config = Path.home() / ".config" / "hackagent" / "config.json"
         if default_config.exists():
             self._load_from_file(str(default_config))
 
     def save(self, path: Optional[str] = None):
         """Save configuration to file"""
         if not path:
-            config_dir = Path.home() / ".hackagent"
+            config_dir = Path.home() / ".config" / "hackagent"
             config_dir.mkdir(parents=True, exist_ok=True)
             path = config_dir / "config.json"
 
@@ -246,4 +246,4 @@ class CLIConfig:
     @property
     def default_config_path(self) -> Path:
         """Get the default configuration file path"""
-        return Path.home() / ".hackagent" / "config.json"
+        return Path.home() / ".config" / "hackagent" / "config.json"

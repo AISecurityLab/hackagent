@@ -19,6 +19,7 @@ View and analyze attack results.
 """
 
 from datetime import datetime
+from dateutil import tz
 import json
 from typing import Any
 from uuid import UUID
@@ -902,139 +903,185 @@ class ResultsTab(Container):
 
                 details += "\n"
 
-        # Fallback: Show logs if available but no results (legacy support)
-        elif hasattr(run, "logs") and run.logs:
-            logs_str = str(result.logs)
-            log_lines = logs_str.split("\n")
+        else:
+            # No results yet - show informative message
+            details += "\n[bold bright_white]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold bright_white]\n"
+            details += "[bold bright_white]  NO RESULTS YET[/bold bright_white]\n"
+            details += "[bold bright_white]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold bright_white]\n\n"
 
-            # Parse agent actions from logs
-            actions = self._parse_agent_actions(logs_str)
+            if status_display == "PENDING":
+                # Check if this is likely a stale/interrupted run
 
-            # Show Agent Actions section if any were found
-            if actions:
-                details += "\n[bold magenta]╔════════════════════════════════════════╗[/bold magenta]\n"
-                details += "[bold magenta]║      🔧 AGENT ACTIONS ({})      ║[/bold magenta]\n".format(
-                    len(actions)
-                )
-                details += "[bold magenta]╚════════════════════════════════════════╝[/bold magenta]\n\n"
-
-                for idx, action in enumerate(actions, 1):
-                    if action["type"] == "http_request":
-                        details += f"[bold yellow]━━━ Action {idx}: HTTP Request ━━━[/bold yellow]\n"
-                        details += f"  🌐 [bold cyan]{action['method']}[/bold cyan] [blue]{action['url']}[/blue]\n"
-                        details += f"  [dim]Line: {action['line_num']}[/dim]\n\n"
-
-                    elif action["type"] == "tool_call":
-                        details += f"[bold green]━━━ Action {idx}: Tool Call ━━━[/bold green]\n"
-                        details += (
-                            f"  🔧 [bold cyan]{action['tool_name']}[/bold cyan]\n"
+                run_age = None
+                if hasattr(run, "timestamp") and run.timestamp:
+                    try:
+                        now = dt.datetime.now(tz.UTC)
+                        run_timestamp = (
+                            run.timestamp
+                            if run.timestamp.tzinfo
+                            else run.timestamp.replace(tzinfo=tz.UTC)
                         )
-                        if action.get("arguments"):
-                            details += f"  [yellow]{action['arguments']}[/yellow]\n"
-                        details += f"  [dim]Line: {action['line_num']}[/dim]\n\n"
+                        run_age = (
+                            now - run_timestamp
+                        ).total_seconds() / 60  # age in minutes
+                    except Exception:
+                        pass
 
-                    elif action["type"] == "adk_tool_call":
-                        details += f"[bold blue]━━━ Action {idx}: ADK Tool Call ━━━[/bold blue]\n"
-                        details += f"  🤖 [cyan]{action['content']}[/cyan]\n"
-                        details += f"  [dim]Line: {action['line_num']}[/dim]\n\n"
-
-                    elif action["type"] == "adk_tool_result":
-                        details += f"[bold blue]━━━ Action {idx}: ADK Tool Result ━━━[/bold blue]\n"
-                        details += f"  📤 [green]{action['content']}[/green]\n"
-                        details += f"  [dim]Line: {action['line_num']}[/dim]\n\n"
-
-                    elif action["type"] == "llm_query":
-                        details += f"[bold magenta]━━━ Action {idx}: LLM Query ━━━[/bold magenta]\n"
-                        details += f"  🧠 [cyan]Model: {action['model']}[/cyan]\n"
-                        details += f"  [dim]Line: {action['line_num']}[/dim]\n\n"
-
-            # Show Full Execution Logs
-            details += (
-                "\n[bold cyan]╔════════════════════════════════════════╗[/bold cyan]\n"
-            )
-            details += "[bold cyan]║      📝 FULL EXECUTION LOGS      ║[/bold cyan]\n"
-            details += (
-                "[bold cyan]╚════════════════════════════════════════╝[/bold cyan]\n\n"
-            )
-
-            # SHOW ALL LOGS - user can scroll
-            display_lines = log_lines
-            if status_display.upper() == "RUNNING":
-                details += "[bold yellow]⚡ LIVE LOGS[/bold yellow] [dim](Auto-refreshing every 5s)[/dim]\n\n"
+                # If run is older than 5 minutes with no results, likely interrupted
+                if run_age and run_age > 5:
+                    details += "[bold yellow]⚠️  Stale Run Detected[/bold yellow]\n\n"
+                    details += f"[dim]This run was created {int(run_age)} minutes ago but has no results.[/dim]\n"
+                    details += "[dim]This typically means:[/dim]\n"
+                    details += "[dim]  • [bold]The client was interrupted or killed[/bold][/dim]\n"
+                    details += "[dim]  • The attack process crashed before creating results[/dim]\n"
+                    details += "[dim]  • The run was never properly started[/dim]\n\n"
+                    details += "[bold red]⚡ Action Needed:[/bold red]\n"
+                    details += "[yellow]This run should be marked as FAILED or CANCELLED.[/yellow]\n"
+                    details += (
+                        "[cyan]Use the API or CLI to update the run status:[/cyan]\n"
+                    )
+                    details += (
+                        f"[dim]  hackagent run update {run.id} --status FAILED[/dim]\n"
+                    )
+                else:
+                    details += "[bold yellow]⏳ This run is pending[/bold yellow]\n\n"
+                    details += "[dim]The attack has been initiated but results are not yet available.[/dim]\n"
+                    details += "[dim]This could mean:[/dim]\n"
+                    details += "[dim]  • The attack pipeline is still executing[/dim]\n"
+                    details += "[dim]  • The client was just interrupted[/dim]\n"
+                    details += "[dim]  • Results will appear here once agent interactions complete[/dim]\n\n"
+                    details += "[cyan]💡 Tip: Results are created when the attack makes calls to your agent[/cyan]\n"
+            elif status_display == "RUNNING":
+                details += "[bold cyan]🔄 Run is active[/bold cyan]\n\n"
+                details += (
+                    "[dim]Results will be added as the attack progresses...[/dim]\n"
+                )
+            elif status_display == "COMPLETED":
+                details += (
+                    "[bold yellow]⚠️  Run completed with no results[/bold yellow]\n\n"
+                )
+                details += "[dim]This might happen if:[/dim]\n"
+                details += "[dim]  • The attack configuration didn't generate any test cases[/dim]\n"
+                details += "[dim]  • Agent calls failed before results could be created[/dim]\n"
+                details += "[dim]  • The run was manually completed without executing attacks[/dim]\n"
+            elif status_display == "FAILED":
+                details += "[bold red]❌ Run failed[/bold red]\n\n"
+                details += "[dim]The run encountered errors before results could be created.[/dim]\n"
+                details += "[dim]Check the run notes above for error details.[/dim]\n"
             else:
-                details += f"[dim]Total: {len(log_lines)} lines | Actions detected: {len(actions)}[/dim]\n\n"
+                details += f"[bold yellow]Status: {status_display}[/bold yellow]\n\n"
+                details += (
+                    "[dim]No results have been recorded for this run yet.[/dim]\n"
+                )
 
-            # Process and display log lines with enhanced formatting
-            for line_num, line in enumerate(display_lines, 1):
-                line = line.strip()
-                if not line:
-                    continue
+            # Fallback: Show logs if available but no results (legacy support)
+            if hasattr(run, "logs") and run.logs:
+                logs_str = str(run.logs)
+                log_lines = logs_str.split("\n")
 
-                # Add line numbers for context
-                line_prefix = f"[dim]{line_num:4d}[/dim] "
+                # Parse agent actions from logs
+                actions = self._parse_agent_actions(logs_str)
 
-                # Enhanced color coding with more patterns
-                if "ERROR" in line.upper() or "FAIL" in line.upper() or "❌" in line:
-                    details += f"{line_prefix}[bold red]❌ {line}[/bold red]\n"
-                elif "CRITICAL" in line.upper():
-                    details += f"{line_prefix}[bold red on white]🔥 {line}[/bold red on white]\n"
-                elif "WARN" in line.upper() or "WARNING" in line.upper():
-                    details += f"{line_prefix}[bold yellow]⚠️  {line}[/bold yellow]\n"
-                elif (
-                    "SUCCESS" in line.upper()
-                    or "COMPLETE" in line.upper()
-                    or "✅" in line
-                ):
-                    details += f"{line_prefix}[bold green]✅ {line}[/bold green]\n"
-                elif "HTTP" in line.upper() or "🌐" in line:
-                    details += f"{line_prefix}[bold cyan]🌐 {line}[/bold cyan]\n"
-                elif "Tool" in line or "Function" in line or "🔧" in line:
-                    details += f"{line_prefix}[bold green]🔧 {line}[/bold green]\n"
-                elif "ADK" in line or "🤖" in line:
-                    details += f"{line_prefix}[bold blue]🤖 {line}[/bold blue]\n"
-                elif "LLM" in line or "model" in line.lower():
-                    details += f"{line_prefix}[bold magenta]🧠 {line}[/bold magenta]\n"
-                elif "INFO" in line.upper() or "START" in line.upper():
-                    details += f"{line_prefix}[cyan]ℹ️  {line}[/cyan]\n"
-                elif "DEBUG" in line.upper():
-                    details += f"{line_prefix}[dim]🔍 {line}[/dim]\n"
-                elif line.startswith(">") or line.startswith("+"):
-                    details += f"{line_prefix}[green]{line}[/green]\n"
-                elif line.startswith("<") or line.startswith("-"):
-                    details += f"{line_prefix}[red]{line}[/red]\n"
+                # Show Agent Actions section if any were found
+                if actions:
+                    details += "\n[bold magenta]╔════════════════════════════════════════╗[/bold magenta]\n"
+                    details += "[bold magenta]║      🔧 AGENT ACTIONS ({})      ║[/bold magenta]\n".format(
+                        len(actions)
+                    )
+                    details += "[bold magenta]╚════════════════════════════════════════╝[/bold magenta]\n\n"
+
+                    for idx, action in enumerate(actions, 1):
+                        if action["type"] == "http_request":
+                            details += f"[bold yellow]━━━ Action {idx}: HTTP Request ━━━[/bold yellow]\n"
+                            details += f"  🌐 [bold cyan]{action['method']}[/bold cyan] [blue]{action['url']}[/blue]\n"
+                            details += f"  [dim]Line: {action['line_num']}[/dim]\n\n"
+
+                        elif action["type"] == "tool_call":
+                            details += f"[bold green]━━━ Action {idx}: Tool Call ━━━[/bold green]\n"
+                            details += (
+                                f"  🔧 [bold cyan]{action['tool_name']}[/bold cyan]\n"
+                            )
+                            if action.get("arguments"):
+                                details += f"  [yellow]{action['arguments']}[/yellow]\n"
+                            details += f"  [dim]Line: {action['line_num']}[/dim]\n\n"
+
+                        elif action["type"] == "adk_tool_call":
+                            details += f"[bold blue]━━━ Action {idx}: ADK Tool Call ━━━[/bold blue]\n"
+                            details += f"  🤖 [cyan]{action['content']}[/cyan]\n"
+                            details += f"  [dim]Line: {action['line_num']}[/dim]\n\n"
+
+                        elif action["type"] == "adk_tool_result":
+                            details += f"[bold blue]━━━ Action {idx}: ADK Tool Result ━━━[/bold blue]\n"
+                            details += f"  📤 [green]{action['content']}[/green]\n"
+                            details += f"  [dim]Line: {action['line_num']}[/dim]\n\n"
+
+                        elif action["type"] == "llm_query":
+                            details += f"[bold magenta]━━━ Action {idx}: LLM Query ━━━[/bold magenta]\n"
+                            details += f"  🧠 [cyan]Model: {action['model']}[/cyan]\n"
+                            details += f"  [dim]Line: {action['line_num']}[/dim]\n\n"
+
+                # Show Full Execution Logs
+                details += "\n[bold cyan]╔════════════════════════════════════════╗[/bold cyan]\n"
+                details += (
+                    "[bold cyan]║      📝 FULL EXECUTION LOGS      ║[/bold cyan]\n"
+                )
+                details += "[bold cyan]╚════════════════════════════════════════╝[/bold cyan]\n\n"
+
+                # SHOW ALL LOGS - user can scroll
+                display_lines = log_lines
+                if status_display.upper() == "RUNNING":
+                    details += "[bold yellow]⚡ LIVE LOGS[/bold yellow] [dim](Auto-refreshing every 5s)[/dim]\n\n"
                 else:
-                    details += f"{line_prefix}[dim]{line}[/dim]\n"
+                    details += f"[dim]Total: {len(log_lines)} lines | Actions detected: {len(actions)}[/dim]\n\n"
 
-        # Show result data if available - SHOW ALL DATA
-        if hasattr(result, "data") and result.data:
-            details += "\n[bold yellow]━━━ Result Data ━━━[/bold yellow]\n"
-            try:
-                if isinstance(result.data, dict):
-                    data_str = json.dumps(result.data, indent=2)
-                    # Color-code JSON for better readability - SHOW ALL
-                    lines = data_str.split("\n")
-                    formatted_lines = []
-                    for line in lines:  # Show ALL lines
-                        if ":" in line and '"' in line:
-                            # Color keys and values differently
-                            parts = line.split(":", 1)
-                            if len(parts) == 2:
-                                key = parts[0]
-                                value = parts[1]
-                                formatted_lines.append(
-                                    f"[bold yellow]{key}[/bold yellow]:[cyan]{value}[/cyan]"
-                                )
-                            else:
-                                formatted_lines.append(f"[dim]{line}[/dim]")
-                        elif line.strip() in ["{", "}", "[", "]", ","]:
-                            formatted_lines.append(f"[dim]{line}[/dim]")
-                        else:
-                            formatted_lines.append(f"{line}")
-                    details += "\n".join(formatted_lines) + "\n"
-                else:
-                    details += f"[dim]{str(result.data)}[/dim]\n"  # Show all
-            except Exception:
-                details += f"[dim]{str(result.data)}[/dim]\n"
+                # Process and display log lines with enhanced formatting
+                for line_num, line in enumerate(display_lines, 1):
+                    line = line.strip()
+                    if not line:
+                        continue
+
+                    # Add line numbers for context
+                    line_prefix = f"[dim]{line_num:4d}[/dim] "
+
+                    # Enhanced color coding with more patterns
+                    if (
+                        "ERROR" in line.upper()
+                        or "FAIL" in line.upper()
+                        or "❌" in line
+                    ):
+                        details += f"{line_prefix}[bold red]❌ {line}[/bold red]\n"
+                    elif "CRITICAL" in line.upper():
+                        details += f"{line_prefix}[bold red on white]🔥 {line}[/bold red on white]\n"
+                    elif "WARN" in line.upper() or "WARNING" in line.upper():
+                        details += (
+                            f"{line_prefix}[bold yellow]⚠️  {line}[/bold yellow]\n"
+                        )
+                    elif (
+                        "SUCCESS" in line.upper()
+                        or "COMPLETE" in line.upper()
+                        or "✅" in line
+                    ):
+                        details += f"{line_prefix}[bold green]✅ {line}[/bold green]\n"
+                    elif "HTTP" in line.upper() or "🌐" in line:
+                        details += f"{line_prefix}[bold cyan]🌐 {line}[/bold cyan]\n"
+                    elif "Tool" in line or "Function" in line or "🔧" in line:
+                        details += f"{line_prefix}[bold green]🔧 {line}[/bold green]\n"
+                    elif "ADK" in line or "🤖" in line:
+                        details += f"{line_prefix}[bold blue]🤖 {line}[/bold blue]\n"
+                    elif "LLM" in line or "model" in line.lower():
+                        details += (
+                            f"{line_prefix}[bold magenta]🧠 {line}[/bold magenta]\n"
+                        )
+                    elif "INFO" in line.upper() or "START" in line.upper():
+                        details += f"{line_prefix}[cyan]ℹ️  {line}[/cyan]\n"
+                    elif "DEBUG" in line.upper():
+                        details += f"{line_prefix}[dim]🔍 {line}[/dim]\n"
+                    elif line.startswith(">") or line.startswith("+"):
+                        details += f"{line_prefix}[green]{line}[/green]\n"
+                    elif line.startswith("<") or line.startswith("-"):
+                        details += f"{line_prefix}[red]{line}[/red]\n"
+                    else:
+                        details += f"{line_prefix}[dim]{line}[/dim]\n"
 
         details += (
             "\n\n[bold cyan]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold cyan]\n"

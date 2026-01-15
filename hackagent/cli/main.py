@@ -212,7 +212,7 @@ def init(ctx):
         cli_config.validate()
 
         # Test API connection
-        from hackagent.api.key import key_list
+        from hackagent.api.agent import agent_list
         from hackagent.client import AuthenticatedClient
 
         client = AuthenticatedClient(
@@ -221,14 +221,21 @@ def init(ctx):
 
         if cli_config.should_show_info():
             with console.status("[bold green]Testing API connection..."):
-                response = key_list.sync_detailed(client=client)
+                response = agent_list.sync_detailed(client=client)
         else:
-            response = key_list.sync_detailed(client=client)
+            response = agent_list.sync_detailed(client=client)
 
         if response.status_code == 200:
             console.print(
                 "[bold green]✅ Setup complete! API connection verified.[/bold green]"
             )
+            if response.parsed and cli_config.should_show_info():
+                agent_count = (
+                    len(response.parsed.results) if response.parsed.results else 0
+                )
+                console.print(
+                    f"[dim]Found {agent_count} agent(s) in your organization[/dim]"
+                )
             if cli_config.should_show_info():
                 console.print("\n[bold cyan]💡 Next steps:[/bold cyan]")
                 console.print("  [green]hackagent attack advprefix --help[/green]")
