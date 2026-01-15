@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-Template-based attack implementation.
+Baseline attack implementation.
 
 Uses predefined prompt templates to attempt jailbreaks by combining
 templates with harmful goals.
@@ -43,9 +43,9 @@ except ImportError:
         return decorator
 
 
-class TemplateBasedAttack(BaseAttack):
+class BaselineAttack(BaseAttack):
     """
-    Template-based attack using predefined prompt patterns.
+    Baseline attack using predefined prompt patterns.
 
     Combines templates with goals to generate jailbreak attempts,
     then evaluates responses using objective-based criteria.
@@ -58,7 +58,7 @@ class TemplateBasedAttack(BaseAttack):
         agent_router: Optional[AgentRouter] = None,
     ):
         """
-        Initialize template-based attack.
+        Initialize baseline attack.
 
         Args:
             config: Configuration dictionary
@@ -76,7 +76,7 @@ class TemplateBasedAttack(BaseAttack):
             current_config.update(config)
 
         # Set logger name for hierarchical logging
-        self.logger = logging.getLogger("hackagent.attacks.template_based")
+        self.logger = logging.getLogger("hackagent.attacks.baseline")
 
         # Call parent - handles all setup
         super().__init__(current_config, client, agent_router)
@@ -110,7 +110,7 @@ class TemplateBasedAttack(BaseAttack):
         """Define attack pipeline."""
         return [
             {
-                "name": "Generation: Generate and Execute Template-Based Prompts",
+                "name": "Generation: Generate and Execute Baseline Prompts",
                 "function": generation.execute,
                 "step_type_enum": "GENERATION",
                 "config_keys": [
@@ -144,7 +144,7 @@ class TemplateBasedAttack(BaseAttack):
     @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
     def run(self, goals: List[str]) -> Dict[str, Any]:
         """
-        Execute template-based attack.
+        Execute baseline attack.
 
         Args:
             goals: List of harmful goals to test
@@ -157,7 +157,7 @@ class TemplateBasedAttack(BaseAttack):
 
         # Initialize tracking using base class
         self.tracker = self._initialize_tracking(
-            "template_based",
+            "baseline",
             goals,
             metadata={"objective": self.config.get("objective")},
         )
@@ -166,7 +166,7 @@ class TemplateBasedAttack(BaseAttack):
             # Execute pipeline using base class
             results = self._execute_pipeline(self._get_pipeline_steps(), goals)
 
-            # Custom success check for template-based (checks dict structure)
+            # Custom success check for baseline (checks dict structure)
             def success_check(output):
                 return output and isinstance(output, dict)
 

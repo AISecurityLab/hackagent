@@ -27,6 +27,7 @@ from typing import Any, Dict, List, Optional
 
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.objectives import OBJECTIVES
+from hackagent.attacks.shared.progress import create_progress_bar
 from hackagent.client import AuthenticatedClient
 from hackagent.models import StatusEnum
 from hackagent.router.router import AgentRouter
@@ -100,6 +101,15 @@ class PAIRAttack(BaseAttack):
         if missing:
             raise ValueError(f"Missing config keys: {missing}")
 
+    def _get_pipeline_steps(self) -> List[Dict]:
+        """
+        Define attack pipeline steps.
+
+        PAIR uses a custom iterative approach rather than discrete pipeline steps,
+        so this returns an empty list. The actual logic is in run().
+        """
+        return []
+
     def _query_attacker(
         self, goal: str, target_response: str, score: int, iteration: int
     ) -> Optional[str]:
@@ -123,12 +133,19 @@ SCORE: {score}"""
                 {"role": "user", "content": user_prompt},
             ]
 
+            # Use max_tokens (OpenAI API parameter name)
+            attacker_config = self.config.get("attacker", {})
+            max_tokens = attacker_config.get(
+                "max_new_tokens", attacker_config.get("max_tokens", 500)
+            )
+            temperature = attacker_config.get("temperature", 1.0)
+
             response = self.attacker_router.route_request(
                 registration_key=list(self.attacker_router._agent_registry.keys())[0],
                 request_data={
                     "messages": messages,
-                    "max_tokens": self.config["attacker"]["max_new_tokens"],
-                    "temperature": self.config["attacker"]["temperature"],
+                    "max_tokens": max_tokens,
+                    "temperature": temperature,
                 },
             )
 
@@ -230,7 +247,9 @@ SCORE: {score}"""
 
         return 1  # Default to failed
 
-    def _run_single_goal(self, goal: str) -> Dict[str, Any]:
+    def _run_single_goal(
+        self, goal: str, progress_bar=None, task=None
+    ) -> Dict[str, Any]:
         """Run PAIR attack for a single goal."""
         n_iterations = self.config.get("n_iterations", 5)
         early_stop = self.config.get("early_stop_on_success", True)
@@ -255,6 +274,9 @@ SCORE: {score}"""
                 self.logger.warning(
                     f"Failed to generate prompt at iteration {iteration}"
                 )
+                # Update progress even on failure
+                if progress_bar and task is not None:
+                    progress_bar.update(task, advance=1)
                 continue
 
             self.logger.info(f"Iteration {iteration + 1}/{n_iterations}")
@@ -268,6 +290,9 @@ SCORE: {score}"""
                 self.logger.warning(
                     f"Failed to get target response at iteration {iteration}"
                 )
+                # Update progress even on failure
+                if progress_bar and task is not None:
+                    progress_bar.update(task, advance=1)
                 continue
 
             # Judge the response
@@ -282,9 +307,17 @@ SCORE: {score}"""
                 best_response = target_response
                 self.logger.info(f"New best score: {best_score}/10")
 
+            # Update progress bar
+            if progress_bar and task is not None:
+                progress_bar.update(task, advance=1)
+
             # Early stopping
             if early_stop and best_score >= 10:
                 self.logger.info("Early stopping: Perfect score achieved")
+                # Advance remaining iterations in progress
+                remaining = n_iterations - iteration - 1
+                if progress_bar and task is not None and remaining > 0:
+                    progress_bar.update(task, advance=remaining)
                 break
 
         return {
@@ -316,18 +349,24 @@ SCORE: {score}"""
         )
 
         results = []
+        n_iterations = self.config.get("n_iterations", 5)
+        total_iterations = len(goals) * n_iterations
 
         try:
             with self.tracker.track_step(
                 "PAIR: Iterative prompt refinement",
                 "GENERATION",
                 goals[:3],
-                {"n_iterations": self.config.get("n_iterations")},
+                {"n_iterations": n_iterations},
             ):
-                for i, goal in enumerate(goals):
-                    self.logger.info(f"Processing goal {i + 1}/{len(goals)}")
-                    result = self._run_single_goal(goal)
-                    results.append(result)
+                # Use progress bar for visual feedback
+                with create_progress_bar(
+                    "[cyan]PAIR iterative refinement...", total_iterations
+                ) as (progress_bar, task):
+                    for i, goal in enumerate(goals):
+                        self.logger.info(f"Processing goal {i + 1}/{len(goals)}")
+                        result = self._run_single_goal(goal, progress_bar, task)
+                        results.append(result)
 
             # Custom success check: count successful attacks
             success_count = sum(1 for r in results if r.get("is_success", False))

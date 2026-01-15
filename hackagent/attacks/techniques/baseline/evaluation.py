@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-Evaluation module for template-based attacks.
+Evaluation module for baseline attacks.
 
 Evaluates attack success using objectives and shared evaluators.
 """
@@ -27,7 +27,7 @@ from hackagent.attacks.objectives import OBJECTIVES
 from hackagent.attacks.shared.evaluators import PatternEvaluator, KeywordEvaluator
 
 
-logger = logging.getLogger("hackagent.attacks.template_based.evaluation")
+logger = logging.getLogger("hackagent.attacks.baseline.evaluation")
 
 
 def evaluate_responses(

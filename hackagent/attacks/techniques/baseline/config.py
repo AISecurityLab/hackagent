@@ -13,9 +13,9 @@
 # limitations under the License.
 
 """
-Configuration for template-based attacks.
+Configuration for baseline attacks.
 
-Template-based attacks use predefined prompt patterns to attempt jailbreaks,
+Baseline attacks use predefined prompt patterns to attempt jailbreaks,
 combining templates with goals to generate attack prompts.
 """
 
@@ -57,7 +57,7 @@ DEFAULT_TEMPLATE_CONFIG: Dict[str, Any] = {
 
 @dataclass
 class TemplateAttackConfig:
-    """Configuration for template-based attack pipeline."""
+    """Configuration for baseline attack pipeline."""
 
     # Paths
     output_dir: str = "./logs/runs"

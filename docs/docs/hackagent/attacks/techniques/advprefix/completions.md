@@ -1,6 +1,6 @@
 ---
 sidebar_label: completions
-title: hackagent.attacks.AdvPrefix.completions
+title: hackagent.attacks.techniques.advprefix.completions
 ---
 
 Target model completion generation module.
@@ -23,50 +23,42 @@ determine attack success rates.
 #### execute
 
 ```python
-def execute(agent_router: AgentRouter, input_df: pd.DataFrame,
-            config: Dict[str, Any], logger: logging.Logger,
-            run_dir: str) -> pd.DataFrame
+@handle_empty_input("Get Completions", empty_result=[])
+@require_agent_router("Get Completions")
+@log_errors("Get Completions")
+def execute(agent_router: AgentRouter, input_data: List[Dict],
+            config: Dict[str, Any], logger: logging.Logger) -> List[Dict]
 ```
 
-Execute Step 6 of the AdvPrefix pipeline: Generate completions using adversarial prefixes.
+Execute the Execution stage of the AdvPrefix pipeline: Generate completions using adversarial prefixes.
 
-This function takes the filtered adversarial prefixes from previous pipeline steps
+This function takes the filtered adversarial prefixes from the Generation stage
 and uses them to generate completions from the target agent. It combines prefixes
 with configurable surrogate attack prompts and collects the agent&#x27;s responses
-for later evaluation.
+for evaluation.
 
 **Arguments**:
 
-- `agent_router` - AgentRouter instance configured for the target agent.
-  Used to send requests and receive completions from the victim agent.
-- `input_df` - DataFrame containing adversarial prefixes from previous steps.
-  Expected to have columns: &#x27;prefix&#x27;, and optionally &#x27;goal&#x27;.
+- `agent_router` - AgentRouter instance configured for the target agent (validated by decorator).
+- `input_data` - List of dictionaries containing adversarial prefixes.
+  Each dict should have key: &#x27;prefix&#x27;, and optionally &#x27;goal&#x27;.
 - `config` - Configuration dictionary containing completion parameters including:
   - surrogate_attack_prompt: Template or suffix to append to prefixes
   - max_new_tokens_completion: Maximum tokens to generate per completion
   - temperature: Sampling temperature for completion generation
-  - n_samples: Number of completion samples per prefix
-  - run_id: Run identifier for session management (ADK agents)
 - `logger` - Logger instance for tracking completion generation progress.
-- `run_dir` - Directory path for saving intermediate results and logs.
   
 
 **Returns**:
 
-  A pandas DataFrame with the input data augmented with new columns:
+  List of dictionaries with input data augmented with new keys:
   - completion: Generated completion text from the target agent
-  - s6_raw_request_payload: Request payloads sent to the agent
-  - s6_raw_response_status: HTTP status codes from agent responses
-  - s6_raw_response_headers: Response headers from agent interactions
-  - s6_raw_response_body: Raw response bodies from the agent
-  - s6_adapter_specific_events: Agent-specific event data
-  - s6_error_message: Error messages if requests failed
-  
-
-**Raises**:
-
-- `ValueError` - If agent_router is not provided or lacks required backend_agent
-  configuration.
+  - raw_request_payload: Request payloads sent to the agent
+  - raw_response_status: HTTP status codes from agent responses
+  - raw_response_headers: Response headers from agent interactions
+  - raw_response_body: Raw response bodies from the agent
+  - adapter_specific_events: Agent-specific event data
+  - error_message: Error messages if requests failed
   
 
 **Notes**:

@@ -37,9 +37,11 @@ from typing import Any, Dict, List, Optional
 # --- Import AgentRouter and related components ---
 from hackagent.router.router import AgentRouter
 
+# --- Import shared progress bar ---
+from hackagent.attacks.shared.progress import create_progress_bar
+
 # --- Import utilities ---
 from .utils import (
-    create_progress_bar,
     handle_empty_input,
     log_errors,
     require_agent_router,

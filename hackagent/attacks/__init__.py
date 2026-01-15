@@ -22,7 +22,7 @@ Architecture:
     - objectives/: Define WHAT vulnerability we test (metadata/config)
     - techniques/: Define HOW we generate attacks (implementation)
         - advprefix/: Prefix optimization technique
-        - template_based/: Template-based prompt injection
+        - baseline/: Baseline prompt injection
         - pair/: LLM-driven iterative refinement
     - shared/: Reusable components (evaluators, templates, metrics)
     - orchestrator.py: Attack orchestration for server integration
@@ -30,7 +30,7 @@ Architecture:
 
 Available attacks:
 - AdvPrefixOrchestrator: Adversarial prefix generation orchestrator
-- TemplateBasedOrchestrator: Template-based prompt injection orchestrator
+- BaselineOrchestrator: Baseline prompt injection orchestrator
 - PAIROrchestrator: Prompt Automatic Iterative Refinement orchestrator
 
 The module integrates with the HackAgent backend for result tracking and reporting.
@@ -39,21 +39,13 @@ The module integrates with the HackAgent backend for result tracking and reporti
 from .registry import (
     ATTACK_REGISTRY,
     AdvPrefixOrchestrator,
+    BaselineOrchestrator,
     PAIROrchestrator,
-    TemplateBasedOrchestrator,
 )
-
-# Backward compatibility aliases
-AdvPrefix = AdvPrefixOrchestrator
-TemplateBased = TemplateBasedOrchestrator
-PAIR = PAIROrchestrator
 
 __all__ = [
     "ATTACK_REGISTRY",
     "AdvPrefixOrchestrator",
-    "TemplateBasedOrchestrator",
+    "BaselineOrchestrator",
     "PAIROrchestrator",
-    "AdvPrefix",
-    "TemplateBased",
-    "PAIR",
 ]

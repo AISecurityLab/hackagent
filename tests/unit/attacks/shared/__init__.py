@@ -12,13 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Shared components for attacks.
-
-This module contains reusable components used across different
-objectives and techniques.
-"""
-
-from .progress import create_progress_bar
-
-__all__ = ["create_progress_bar"]
+"""Tests for shared attack components."""

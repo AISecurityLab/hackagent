@@ -18,8 +18,8 @@ from typing import Any, Dict, Optional, Union
 from hackagent import utils
 from hackagent.attacks.registry import (
     AdvPrefixOrchestrator,
+    BaselineOrchestrator,
     PAIROrchestrator,
-    TemplateBasedOrchestrator,
 )
 from hackagent.client import AuthenticatedClient
 from hackagent.errors import HackAgentError
@@ -138,7 +138,7 @@ class HackAgent:
 
         self.attack_strategies = {
             "advprefix": AdvPrefixOrchestrator(hack_agent=self),
-            "template_based": TemplateBasedOrchestrator(hack_agent=self),
+            "baseline": BaselineOrchestrator(hack_agent=self),
             "pair": PAIROrchestrator(hack_agent=self),
         }
 

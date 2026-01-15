@@ -20,7 +20,7 @@ implementation that can target different objectives.
 
 Available techniques:
 - advprefix/: Prefix optimization using uncensored models + judges
-- template_based/: Template-based prompt injection attacks
+- baseline/: Baseline prompt injection attacks
 
 Architecture pattern for techniques:
     1. attack.py - Main BaseAttack subclass

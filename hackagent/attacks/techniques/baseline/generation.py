@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-Template generation module for template-based attacks.
+Template generation module for baseline attacks.
 
 Generates attack prompts by combining predefined templates with goals.
 """
@@ -24,10 +24,11 @@ from typing import Any, Dict, List
 import pandas as pd
 
 from hackagent.attacks.shared.templates import AttackTemplates
+from hackagent.attacks.shared.progress import create_progress_bar
 from hackagent.router.router import AgentRouter
 
 
-logger = logging.getLogger("hackagent.attacks.template_based.generation")
+logger = logging.getLogger("hackagent.attacks.baseline.generation")
 
 
 def generate_prompts(
@@ -46,7 +47,7 @@ def generate_prompts(
     Returns:
         DataFrame with columns: goal, template_category, template, attack_prompt
     """
-    logger.info(f"Generating template-based prompts for {len(goals)} goals...")
+    logger.info(f"Generating baseline prompts for {len(goals)} goals...")
 
     # Get template configuration
     categories = config.get("template_categories", [])
@@ -110,65 +111,77 @@ def execute_prompts(
     client = config.get("_client")
 
     logger.info(
-        f"📊 Template-based tracking context: run_id={run_id}, client={'Present' if client else 'Missing'}"
+        f"📊 Baseline tracking context: run_id={run_id}, client={'Present' if client else 'Missing'}"
     )
     if not run_id or not client:
         logger.warning(
-            "⚠️ Missing tracking context in template-based - results will NOT be created!"
+            "⚠️ Missing tracking context in baseline - results will NOT be created!"
         )
 
     completions = []
+    total_requests = len(df) * n_samples
 
-    for idx, row in df.iterrows():
-        try:
-            # Prepare request
-            request_data = {
-                "messages": [{"role": "user", "content": row["attack_prompt"]}],
-                "max_tokens": max_tokens,
-                "temperature": temperature,
-            }
+    # Use progress bar for visual feedback
+    with create_progress_bar("[cyan]Executing baseline prompts...", total_requests) as (
+        progress_bar,
+        task,
+    ):
+        for idx, row in df.iterrows():
+            try:
+                # Prepare request
+                request_data = {
+                    "messages": [{"role": "user", "content": row["attack_prompt"]}],
+                    "max_tokens": max_tokens,
+                    "temperature": temperature,
+                }
 
-            # Get completion(s)
-            for _ in range(n_samples):
-                # Use route_with_tracking if available for real-time result creation
-                if run_id and client:
-                    logger.info(
-                        "🔍 Calling route_with_tracking for template-based attack"
+                # Get completion(s)
+                for _ in range(n_samples):
+                    # Use route_with_tracking if available for real-time result creation
+                    if run_id and client:
+                        response = agent_router.route_with_tracking(
+                            registration_key=list(agent_router._agent_registry.keys())[
+                                0
+                            ],
+                            request_data=request_data,
+                            run_id=run_id,
+                            client=client,
+                        )
+                    else:
+                        response = agent_router.route_request(
+                            registration_key=list(agent_router._agent_registry.keys())[
+                                0
+                            ],
+                            request_data=request_data,
+                        )
+
+                    completion = ""
+                    if response and hasattr(response, "choices") and response.choices:
+                        completion = response.choices[0].message.content or ""
+
+                    completions.append(
+                        {
+                            **row.to_dict(),
+                            "completion": completion,
+                            "response_length": len(completion),
+                        }
                     )
-                    response = agent_router.route_with_tracking(
-                        registration_key=list(agent_router._agent_registry.keys())[0],
-                        request_data=request_data,
-                        run_id=run_id,
-                        client=client,
-                    )
-                else:
-                    response = agent_router.route_request(
-                        registration_key=list(agent_router._agent_registry.keys())[0],
-                        request_data=request_data,
-                    )
 
-                completion = ""
-                if response and hasattr(response, "choices") and response.choices:
-                    completion = response.choices[0].message.content or ""
+                    # Update progress bar
+                    progress_bar.update(task, advance=1)
 
+            except Exception as e:
+                logger.warning(f"Error executing prompt {idx}: {e}")
                 completions.append(
                     {
                         **row.to_dict(),
-                        "completion": completion,
-                        "response_length": len(completion),
+                        "completion": "",
+                        "response_length": 0,
+                        "error": str(e),
                     }
                 )
-
-        except Exception as e:
-            logger.warning(f"Error executing prompt {idx}: {e}")
-            completions.append(
-                {
-                    **row.to_dict(),
-                    "completion": "",
-                    "response_length": 0,
-                    "error": str(e),
-                }
-            )
+                # Still advance progress on error
+                progress_bar.update(task, advance=n_samples)
 
     result_df = pd.DataFrame(completions)
     logger.info(f"Execution complete. Got {len(result_df)} completions")

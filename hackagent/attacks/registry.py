@@ -35,7 +35,8 @@ from hackagent.attacks.orchestrator import AttackOrchestrator
 from hackagent.attacks.techniques.advprefix import AdvPrefixAttack
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.techniques.pair import PAIRAttack
-from hackagent.attacks.techniques.template_based import TemplateBasedAttack
+from hackagent.attacks.techniques.baseline import BaselineAttack
+from hackagent.router.types import AgentTypeEnum
 
 
 def create_orchestrator(
@@ -99,7 +100,7 @@ def _pair_setup_attacker(
     kwargs["attacker_router"] = AgentRouter(
         client=self.client,
         name=attacker_config.get("identifier", "hackagent-attacker"),
-        agent_type="OPENAI_SDK",
+        agent_type=AgentTypeEnum.OPENAI_SDK,
         endpoint=attacker_config.get("endpoint", "https://api.openai.com/v1"),
         metadata=attacker_config,
         adapter_operational_config=attacker_config,
@@ -111,28 +112,20 @@ def _pair_setup_attacker(
 
 # Create orchestrators using factory (1 line per attack instead of 6-50 lines)
 AdvPrefixOrchestrator = create_orchestrator("AdvPrefix", AdvPrefixAttack)
-TemplateBasedOrchestrator = create_orchestrator("TemplateBased", TemplateBasedAttack)
+BaselineOrchestrator = create_orchestrator("Baseline", BaselineAttack)
 PAIROrchestrator = create_orchestrator("PAIR", PAIRAttack, _pair_setup_attacker)
 
 
 # Registry of all available attacks
 ATTACK_REGISTRY = {
     "AdvPrefix": AdvPrefixOrchestrator,
-    "TemplateBased": TemplateBasedOrchestrator,
+    "Baseline": BaselineOrchestrator,
     "PAIR": PAIROrchestrator,
 }
 
-# Backward compatibility aliases
-AdvPrefix = AdvPrefixOrchestrator
-TemplateBased = TemplateBasedOrchestrator
-PAIR = PAIROrchestrator
-
 __all__ = [
     "AdvPrefixOrchestrator",
-    "TemplateBasedOrchestrator",
+    "BaselineOrchestrator",
     "PAIROrchestrator",
     "ATTACK_REGISTRY",
-    "AdvPrefix",
-    "TemplateBased",
-    "PAIR",
 ]

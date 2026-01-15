@@ -15,17 +15,32 @@
 """Tests for attack registry."""
 
 import unittest
+from unittest.mock import MagicMock, patch
 
 from hackagent.attacks.orchestrator import AttackOrchestrator
 from hackagent.attacks.registry import (
     ATTACK_REGISTRY,
     AdvPrefixOrchestrator,
+    BaselineOrchestrator,
     PAIROrchestrator,
-    TemplateBasedOrchestrator,
+    create_orchestrator,
+    _pair_setup_attacker,
 )
 from hackagent.attacks.techniques.advprefix.attack import AdvPrefixAttack
 from hackagent.attacks.techniques.pair.attack import PAIRAttack
-from hackagent.attacks.techniques.template_based.attack import TemplateBasedAttack
+from hackagent.attacks.techniques.baseline.attack import BaselineAttack
+from hackagent.attacks.techniques.base import BaseAttack
+from hackagent.router.types import AgentTypeEnum
+
+
+class MockAttack(BaseAttack):
+    """Mock attack implementation for testing."""
+
+    def _get_pipeline_steps(self):
+        return []
+
+    def run(self, **kwargs):
+        return {"success": True}
 
 
 class TestAttackRegistry(unittest.TestCase):
@@ -39,9 +54,9 @@ class TestAttackRegistry(unittest.TestCase):
         """Test that registry contains AdvPrefix attack."""
         self.assertIn("AdvPrefix", ATTACK_REGISTRY)
 
-    def test_registry_contains_template_based(self):
-        """Test that registry contains TemplateBased attack."""
-        self.assertIn("TemplateBased", ATTACK_REGISTRY)
+    def test_registry_contains_baseline(self):
+        """Test that registry contains Baseline attack."""
+        self.assertIn("Baseline", ATTACK_REGISTRY)
 
     def test_registry_contains_pair(self):
         """Test that registry contains PAIR attack."""
@@ -68,22 +83,20 @@ class TestAdvPrefixOrchestrator(unittest.TestCase):
         self.assertEqual(AdvPrefixOrchestrator.attack_impl_class, AdvPrefixAttack)
 
 
-class TestTemplateBasedOrchestrator(unittest.TestCase):
-    """Test TemplateBasedOrchestrator configuration."""
+class TestBaselineOrchestrator(unittest.TestCase):
+    """Test BaselineOrchestrator configuration."""
 
     def test_orchestrator_is_subclass(self):
-        """Test that TemplateBasedOrchestrator is a subclass of AttackOrchestrator."""
-        self.assertTrue(issubclass(TemplateBasedOrchestrator, AttackOrchestrator))
+        """Test that BaselineOrchestrator is a subclass of AttackOrchestrator."""
+        self.assertTrue(issubclass(BaselineOrchestrator, AttackOrchestrator))
 
-    def test_attack_type_is_template_based(self):
-        """Test that attack_type is set to 'TemplateBased'."""
-        self.assertEqual(TemplateBasedOrchestrator.attack_type, "TemplateBased")
+    def test_attack_type_is_baseline(self):
+        """Test that attack_type is set to 'Baseline'."""
+        self.assertEqual(BaselineOrchestrator.attack_type, "Baseline")
 
     def test_attack_impl_class_is_correct(self):
-        """Test that attack_impl_class is TemplateBasedAttack."""
-        self.assertEqual(
-            TemplateBasedOrchestrator.attack_impl_class, TemplateBasedAttack
-        )
+        """Test that attack_impl_class is BaselineAttack."""
+        self.assertEqual(BaselineOrchestrator.attack_impl_class, BaselineAttack)
 
 
 class TestPAIROrchestrator(unittest.TestCase):
@@ -130,6 +143,145 @@ class TestRegistryIntegration(unittest.TestCase):
         for attack_name, orchestrator_class in ATTACK_REGISTRY.items():
             with self.subTest(attack=attack_name):
                 self.assertEqual(attack_name, orchestrator_class.attack_type)
+
+
+class TestCreateOrchestrator(unittest.TestCase):
+    """Test create_orchestrator factory function."""
+
+    def test_creates_orchestrator_class(self):
+        """Test that create_orchestrator creates a proper orchestrator class."""
+        TestOrchestrator = create_orchestrator("TestAttack", MockAttack)
+
+        self.assertTrue(issubclass(TestOrchestrator, AttackOrchestrator))
+        self.assertEqual(TestOrchestrator.attack_type, "TestAttack")
+        self.assertEqual(TestOrchestrator.attack_impl_class, MockAttack)
+
+    def test_class_name_is_generated(self):
+        """Test that the class name is properly generated."""
+        TestOrchestrator = create_orchestrator("MyCustomAttack", MockAttack)
+
+        self.assertEqual(TestOrchestrator.__name__, "MyCustomAttackOrchestrator")
+
+    def test_docstring_is_generated(self):
+        """Test that a docstring is generated."""
+        TestOrchestrator = create_orchestrator("DocTestAttack", MockAttack)
+
+        self.assertIn("DocTestAttack", TestOrchestrator.__doc__)
+
+    def test_custom_setup_is_added(self):
+        """Test that custom setup method is added when provided."""
+
+        def custom_setup(self, attack_config, run_config_override, run_id):
+            return {"custom": "kwargs"}
+
+        TestOrchestrator = create_orchestrator(
+            "CustomSetupAttack", MockAttack, custom_setup
+        )
+
+        self.assertEqual(TestOrchestrator._get_attack_impl_kwargs, custom_setup)
+
+
+class TestPairSetupAttacker(unittest.TestCase):
+    """Test _pair_setup_attacker function."""
+
+    @patch("hackagent.router.AgentRouter")
+    def test_pair_setup_creates_attacker_router(self, mock_agent_router_class):
+        """Test that _pair_setup_attacker creates an attacker router."""
+        # Create a mock orchestrator
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.client = MagicMock()
+        mock_orchestrator._get_attack_impl_kwargs = (
+            AttackOrchestrator._get_attack_impl_kwargs
+        )
+        mock_orchestrator.agent_router = MagicMock()
+
+        attack_config = {
+            "attack": {
+                "goals": ["test goal"],
+                "output_dir": "/tmp/test",
+            },
+            "attacker": {
+                "identifier": "test-attacker",
+                "endpoint": "https://api.openai.com/v1",
+                "model": "gpt-4",
+                "api_key": "test-key",
+            },
+        }
+
+        # Call the function
+        result = _pair_setup_attacker(
+            mock_orchestrator,
+            attack_config,
+            None,
+            "run-123",
+        )
+
+        # Verify attacker_router was created
+        self.assertIn("attacker_router", result)
+        mock_agent_router_class.assert_called_once()
+
+        # Verify AgentRouter was called with correct parameters
+        call_kwargs = mock_agent_router_class.call_args.kwargs
+        self.assertEqual(call_kwargs["name"], "test-attacker")
+        self.assertEqual(call_kwargs["endpoint"], "https://api.openai.com/v1")
+
+    @patch("hackagent.router.AgentRouter")
+    def test_pair_setup_uses_defaults(self, mock_agent_router_class):
+        """Test that _pair_setup_attacker uses defaults when not specified."""
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.client = MagicMock()
+        mock_orchestrator._get_attack_impl_kwargs = (
+            AttackOrchestrator._get_attack_impl_kwargs
+        )
+        mock_orchestrator.agent_router = MagicMock()
+
+        attack_config = {
+            "attack": {
+                "goals": ["test goal"],
+                "output_dir": "/tmp/test",
+            },
+            # No attacker config - use defaults
+        }
+
+        _pair_setup_attacker(
+            mock_orchestrator,
+            attack_config,
+            None,
+            "run-123",
+        )
+
+        # Verify defaults were used
+        call_kwargs = mock_agent_router_class.call_args.kwargs
+        self.assertEqual(call_kwargs["name"], "hackagent-attacker")
+        self.assertEqual(call_kwargs["endpoint"], "https://api.openai.com/v1")
+
+    @patch("hackagent.router.AgentRouter")
+    def test_pair_setup_uses_agent_type_enum(self, mock_agent_router_class):
+        """Test that _pair_setup_attacker uses AgentTypeEnum.OPENAI_SDK."""
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.client = MagicMock()
+        mock_orchestrator._get_attack_impl_kwargs = (
+            AttackOrchestrator._get_attack_impl_kwargs
+        )
+        mock_orchestrator.agent_router = MagicMock()
+
+        attack_config = {
+            "attack": {
+                "goals": ["test goal"],
+                "output_dir": "/tmp/test",
+            },
+        }
+
+        _pair_setup_attacker(
+            mock_orchestrator,
+            attack_config,
+            None,
+            "run-123",
+        )
+
+        # Verify agent_type is the enum, not a string
+        call_kwargs = mock_agent_router_class.call_args.kwargs
+        self.assertEqual(call_kwargs["agent_type"], AgentTypeEnum.OPENAI_SDK)
 
 
 if __name__ == "__main__":

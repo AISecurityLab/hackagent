@@ -6,24 +6,51 @@
           "items": [
             {
               "items": [
-                "reference/hackagent/attacks/AdvPrefix/aggregation",
-                "reference/hackagent/attacks/AdvPrefix/completions",
-                "reference/hackagent/attacks/AdvPrefix/compute_ce",
-                "reference/hackagent/attacks/AdvPrefix/evaluation",
-                "reference/hackagent/attacks/AdvPrefix/generate",
-                "reference/hackagent/attacks/AdvPrefix/preprocessing",
-                "reference/hackagent/attacks/AdvPrefix/scorer",
-                "reference/hackagent/attacks/AdvPrefix/scorer_parser",
-                "reference/hackagent/attacks/AdvPrefix/selector",
-                "reference/hackagent/attacks/AdvPrefix/utils"
+                {
+                  "items": [
+                    "reference/hackagent/attacks/techniques/advprefix/attack",
+                    "reference/hackagent/attacks/techniques/advprefix/completions",
+                    "reference/hackagent/attacks/techniques/advprefix/evaluation",
+                    "reference/hackagent/attacks/techniques/advprefix/generate",
+                    "reference/hackagent/attacks/techniques/advprefix/utils"
+                  ],
+                  "label": "hackagent.attacks.techniques.advprefix",
+                  "type": "category"
+                },
+                {
+                  "items": [
+                    "reference/hackagent/attacks/techniques/baseline/attack",
+                    "reference/hackagent/attacks/techniques/baseline/config",
+                    "reference/hackagent/attacks/techniques/baseline/evaluation",
+                    "reference/hackagent/attacks/techniques/baseline/generation"
+                  ],
+                  "label": "hackagent.attacks.techniques.baseline",
+                  "type": "category"
+                },
+                {
+                  "items": [
+                    "reference/hackagent/attacks/techniques/pair/attack"
+                  ],
+                  "label": "hackagent.attacks.techniques.pair",
+                  "type": "category"
+                },
+                "reference/hackagent/attacks/techniques/base"
               ],
-              "label": "hackagent.attacks.AdvPrefix",
+              "label": "hackagent.attacks.techniques",
               "type": "category"
             },
             "reference/hackagent/attacks/base",
-            "reference/hackagent/attacks/strategies"
+            "reference/hackagent/attacks/orchestrator",
+            "reference/hackagent/attacks/registry"
           ],
           "label": "hackagent.attacks",
+          "type": "category"
+        },
+        {
+          "items": [
+            "reference/hackagent/router/types"
+          ],
+          "label": "hackagent.router",
           "type": "category"
         },
         {

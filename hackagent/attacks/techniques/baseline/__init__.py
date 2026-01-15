@@ -13,12 +13,19 @@
 # limitations under the License.
 
 """
-Shared components for attacks.
+Baseline attack technique.
 
-This module contains reusable components used across different
-objectives and techniques.
+Uses predefined prompt templates combined with harmful goals to attempt
+jailbreaks. Simpler than optimization-based approaches like AdvPrefix,
+but can be effective for testing basic prompt injection vulnerabilities.
+
+Architecture:
+- generation.py: Generate and execute baseline prompts
+- evaluation.py: Evaluate responses using objective-based criteria
+- attack.py: Main attack class coordinating the pipeline
+- config.py: Configuration and defaults
 """
 
-from .progress import create_progress_bar
+from .attack import BaselineAttack
 
-__all__ = ["create_progress_bar"]
+__all__ = ["BaselineAttack"]

@@ -24,7 +24,7 @@ Architecture:
 
 Attack techniques are organized in:
     techniques/advprefix/attack.py    - AdvPrefixAttack
-    techniques/template_based/attack.py - TemplateBasedAttack
+    techniques/baseline/attack.py - BaselineAttack
     techniques/pair/attack.py         - PAIRAttack
 
 Each technique:

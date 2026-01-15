@@ -11,21 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-"""
-Template-based attack technique.
-
-Uses predefined prompt templates combined with harmful goals to attempt
-jailbreaks. Simpler than optimization-based approaches like AdvPrefix,
-but can be effective for testing basic prompt injection vulnerabilities.
-
-Architecture:
-- generation.py: Generate and execute template-based prompts
-- evaluation.py: Evaluate responses using objective-based criteria
-- attack.py: Main attack class coordinating the pipeline
-- config.py: Configuration and defaults
-"""
-
-from .attack import TemplateBasedAttack
-
-__all__ = ["TemplateBasedAttack"]
