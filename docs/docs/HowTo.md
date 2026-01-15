@@ -16,40 +16,23 @@ Here's a step-by-step guide to get started with HackAgent. Before doing these st
 3. **Target Agent**: A running AI agent to test
 4. **Python 3.10+**: For SDK usage
 
-## Choose Your Interface
-
-### SDK (Recommended)
-Python SDK with object-oriented interface, automatic authentication, and full feature support.
-
-### CLI
-Command-line interface for quick testing without coding.
-
 ## 🚀 Quick Start
 
-### Step 1: Set up Environment
+### Step 1: Initialize Configuration
 
-Create a `.env` file in your project directory:
+Run the interactive setup wizard to configure your API key and preferences:
 
 ```bash
-HACKAGENT_API_KEY="your-api-key-here"
+hackagent init
 ```
 
-### Install HackAgent
+This will guide you through:
+1. 🔑 **Enter your API key** — Get yours at [app.hackagent.dev](https://app.hackagent.dev)
+2. 🌐 **Configure the base URL** — Default: `https://api.hackagent.dev`
+3. 📊 **Set output format** — Choose between `table`, `json`, or `csv`
+4. 💾 **Save configuration** — Stored securely for future use
 
-<Tabs>
-  <TabItem value="uv" label="uv" default>
-    ```bash
-    uv pip install hackagent
-    ```
-  </TabItem>
-  <TabItem value="pip" label="pip">
-    ```bash
-    pip install hackagent
-    ```
-  </TabItem>
-</Tabs>
-
-### Step 3: Ensure Your Agent is Running
+### Step 2: Ensure Your Agent is Running
 
 HackAgent supports multiple agent frameworks:
 

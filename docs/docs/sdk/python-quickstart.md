@@ -94,16 +94,24 @@ from hackagent import HackAgent, AgentTypeEnum
 
 ### Configure Authentication
 
-**Method 1: Environment Variable (Recommended)**
+**Method 1: Interactive Setup (Recommended)**
+```bash
+hackagent init
+```
+
+This wizard will:
+- Prompt for your API key
+- Configure the base URL
+- Set your preferred output format
+- Save configuration securely
+
+**Method 2: Environment Variable**
 ```bash
 # Add to your shell profile (.bashrc, .zshrc, etc.)
 export HACKAGENT_API_KEY="your_api_key_here"
-
-# Or create a .env file in your project
-echo "HACKAGENT_API_KEY=your_api_key_here" > .env
 ```
 
-**Method 2: Direct Configuration**
+**Method 3: Direct Configuration**
 ```python
 from hackagent import HackAgent
 from hackagent.models import AgentTypeEnum

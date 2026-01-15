@@ -20,8 +20,9 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: '🚀 Getting Started',
       items: [
+        'getting-started/installation',
         'HowTo',
-        'tutorial-basics/AdvPrefix',
+        'tutorial-basics/attack-tutorial',
       ],
     },
     {
@@ -70,8 +71,14 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: '⚔️ Attack Types',
+      link: {
+        type: 'doc',
+        id: 'attacks/index',
+      },
       items: [
         'attacks/advprefix-attacks',
+        'attacks/pair-attacks',
+        'attacks/baseline-attacks',
       ],
     },
     {
