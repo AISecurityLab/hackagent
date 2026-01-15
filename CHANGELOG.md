@@ -1,3 +1,35 @@
+## v0.4.0 (2026-01-15)
+
+### ✨ Features
+
+- **attacks**: adding attacks and orchestrator
+
+### 🐛🚑️ Fixes
+
+- **TUI**: fixed the results visulization within the TUI
+- **documentation**: doc build fixed
+- **TUI**: fixed the results visulization within the TUI
+- **tracking**: the results where not being saved properly
+- **metadata**: demo script and metadata
+
+### bump
+
+- **deps**: bump openai from 2.8.0 to 2.8.1
+- **deps**: bump pytest from 8.4.2 to 9.0.1
+- **deps**: bump pre-commit from 4.4.0 to 4.5.0
+- **deps**: bump ruff from 0.12.12 to 0.14.6
+- **deps**: bump google-adk from 1.4.2 to 1.19.0
+
+### ✅🤡🧪 Tests
+
+- **tracking**: add tests for the new attacks and tracking of the coverage
+
+### 📝💡 Documentation
+
+- **update**: Update documentation with new attacks
+- **update**: updating documentation
+- **update**: updating documentation
+
 ## v0.3.1 (2025-12-05)
 
 ### 🐛🚑️ Fixes
