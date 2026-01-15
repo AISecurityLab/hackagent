@@ -52,7 +52,8 @@ const sidebars: SidebarsConfig = {
               label: 'Attacks',
               items: [
                 'hackagent/attacks/base',
-                'hackagent/attacks/strategies',
+                'hackagent/attacks/orchestrator',
+                'hackagent/attacks/registry',
               ],
             },
             {

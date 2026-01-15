@@ -18,7 +18,7 @@ Attacks Tab
 Execute and manage security attacks.
 """
 
-from typing import Optional
+from typing import Any, Optional
 
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -39,6 +39,27 @@ from textual.widgets import (
 from hackagent.cli.config import CLIConfig
 from hackagent.cli.tui.widgets.actions import AgentActionsViewer
 from hackagent.cli.tui.widgets.logs import AttackLogViewer
+
+
+def _escape(value: Any) -> str:
+    """Escape a value for safe Rich markup rendering.
+
+    Args:
+        value: Any value to escape
+
+    Returns:
+        String with Rich markup characters escaped
+
+    Note:
+        We escape ALL square brackets, not just tag-like patterns,
+        because Rich's markup parser can get confused by unescaped
+        brackets in certain contexts (e.g., JSON arrays inside colored text).
+    """
+    if value is None:
+        return ""
+    # Escape ALL square brackets to prevent any markup interpretation issues
+    text = str(value)
+    return text.replace("[", "\\[").replace("]", "\\]")
 
 
 class AttacksTab(Container):
@@ -274,11 +295,11 @@ class AttacksTab(Container):
             status_widget.update(
                 f"""[bold yellow]Dry Run Mode[/bold yellow]
 
-[bold]Agent:[/bold] {agent_name}
-[bold]Type:[/bold] {agent_type}
-[bold]Endpoint:[/bold] {endpoint}
-[bold]Strategy:[/bold] {strategy}
-[bold]Goals:[/bold] {goals}
+[bold]Agent:[/bold] {_escape(agent_name)}
+[bold]Type:[/bold] {_escape(agent_type)}
+[bold]Endpoint:[/bold] {_escape(endpoint)}
+[bold]Strategy:[/bold] {_escape(strategy)}
+[bold]Goals:[/bold] {_escape(goals)}
 [bold]Timeout:[/bold] {timeout}s
 
 [green]✅ Configuration validation passed[/green]
@@ -289,11 +310,11 @@ class AttacksTab(Container):
             status_widget.update(
                 f"""[bold cyan]🚀 Initializing Attack...[/bold cyan]
 
-[bold]Agent:[/bold] {agent_name}
-[bold]Type:[/bold] {agent_type}
-[bold]Endpoint:[/bold] {endpoint}
-[bold]Strategy:[/bold] {strategy}
-[bold]Goals:[/bold] {goals}
+[bold]Agent:[/bold] {_escape(agent_name)}
+[bold]Type:[/bold] {_escape(agent_type)}
+[bold]Endpoint:[/bold] {_escape(endpoint)}
+[bold]Strategy:[/bold] {_escape(strategy)}
+[bold]Goals:[/bold] {_escape(goals)}
 [bold]Timeout:[/bold] {timeout}s
 
 [yellow]⏳ Connecting to agent and preparing attack...[/yellow]"""
@@ -304,11 +325,11 @@ class AttacksTab(Container):
             status_widget.update(
                 f"""[bold cyan]🚀 Starting Attack...[/bold cyan]
 
-[bold]Agent:[/bold] {agent_name}
-[bold]Type:[/bold] {agent_type}
-[bold]Endpoint:[/bold] {endpoint}
-[bold]Strategy:[/bold] {strategy}
-[bold]Goals:[/bold] {goals}
+[bold]Agent:[/bold] {_escape(agent_name)}
+[bold]Type:[/bold] {_escape(agent_type)}
+[bold]Endpoint:[/bold] {_escape(endpoint)}
+[bold]Strategy:[/bold] {_escape(strategy)}
+[bold]Goals:[/bold] {_escape(goals)}
 
 [yellow]⏳ Launching attack execution...[/yellow]
 [dim]Progress: 5%[/dim]"""
@@ -330,7 +351,7 @@ class AttacksTab(Container):
                 status_widget.update(
                     f"""[bold red]❌ Failed to Start Attack[/bold red]
 
-[bold]Error:[/bold] {str(e)}
+[bold]Error:[/bold] {_escape(str(e))}
 
 [red]Could not start attack worker thread.[/red]
 [dim]This might be a configuration or system issue.[/dim]"""
@@ -429,9 +450,9 @@ class AttacksTab(Container):
                 status_widget.update,
                 f"""[bold cyan]🔧 Initializing HackAgent...[/bold cyan]
 
-[bold]Agent:[/bold] {agent_name}
-[bold]Type:[/bold] {agent_type}
-[bold]Endpoint:[/bold] {endpoint}
+[bold]Agent:[/bold] {_escape(agent_name)}
+[bold]Type:[/bold] {_escape(agent_type)}
+[bold]Endpoint:[/bold] {_escape(endpoint)}
 
 [yellow]⏳ Setting up attack infrastructure...[/yellow]
 [dim]Progress: 10%[/dim]""",
@@ -461,8 +482,8 @@ class AttacksTab(Container):
                 status_widget.update,
                 f"""[bold cyan]⚔️ Executing AdvPrefix Attack...[/bold cyan]
 
-[bold]Agent:[/bold] {agent_name}
-[bold]Goals:[/bold] {goals}
+[bold]Agent:[/bold] {_escape(agent_name)}
+[bold]Goals:[/bold] {_escape(goals)}
 
 [yellow]⏳ Attack in progress... This may take several minutes...[/yellow]
 [dim]Generating adversarial prefixes and testing against target agent...[/dim]
@@ -554,7 +575,7 @@ class AttacksTab(Container):
                 status_widget.update,
                 f"""[bold green]✅ Attack Completed Successfully![/bold green]
 
-[bold]Agent:[/bold] {agent_name}
+[bold]Agent:[/bold] {_escape(agent_name)}
 [bold]Duration:[/bold] {duration:.1f} seconds
 [bold]Results Generated:[/bold] {result_count}
 
@@ -570,8 +591,8 @@ class AttacksTab(Container):
                 status_widget.update,
                 f"""[bold red]❌ Attack Failed[/bold red]
 
-[bold]Agent:[/bold] {agent_name}
-[bold]Error:[/bold] {str(e)}
+[bold]Agent:[/bold] {_escape(agent_name)}
+[bold]Error:[/bold] {_escape(str(e))}
 
 [red]Attack execution encountered an error.[/red]
 [dim]Please check your configuration and try again.[/dim]

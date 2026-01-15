@@ -19,9 +19,32 @@ A reusable Textual widget for displaying live attack execution logs
 with syntax highlighting, auto-scrolling, and filtering capabilities.
 """
 
+from typing import Any
+
 from textual.app import ComposeResult
 from textual.containers import Container
 from textual.widgets import Button, RichLog, Static
+
+
+def _escape(value: Any) -> str:
+    """Escape a value for safe Rich markup rendering.
+
+    Args:
+        value: Any value to escape
+
+    Returns:
+        String with Rich markup characters escaped
+
+    Note:
+        We escape ALL square brackets, not just tag-like patterns,
+        because Rich's markup parser can get confused by unescaped
+        brackets in certain contexts (e.g., JSON arrays inside colored text).
+    """
+    if value is None:
+        return ""
+    # Escape ALL square brackets to prevent any markup interpretation issues
+    text = str(value)
+    return text.replace("[", "\\[").replace("]", "\\]")
 
 
 class AttackLogViewer(Container):
@@ -153,15 +176,16 @@ class AttackLogViewer(Container):
 
         color = level_colors.get(level, "white")
 
-        # Format the message with color
+        # Format the message with color - escape user content
+        escaped_message = _escape(message)
         if level in ["ERROR", "CRITICAL"]:
-            formatted_message = f"[{color}]🔴 {message}[/{color}]"
+            formatted_message = f"[{color}]🔴 {escaped_message}[/{color}]"
         elif level == "WARNING":
-            formatted_message = f"[{color}]⚠️  {message}[/{color}]"
+            formatted_message = f"[{color}]⚠️  {escaped_message}[/{color}]"
         elif level == "DEBUG":
-            formatted_message = f"[{color}]🔍 {message}[/{color}]"
+            formatted_message = f"[{color}]🔍 {escaped_message}[/{color}]"
         else:  # INFO and default
-            formatted_message = f"[{color}]{message}[/{color}]"
+            formatted_message = f"[{color}]{escaped_message}[/{color}]"
 
         # Add to log display
         log_widget.write(formatted_message)
@@ -189,12 +213,13 @@ class AttackLogViewer(Container):
         """
         log_widget = self.query_one("#attack-log-display", RichLog)
 
-        # Create a visual separator
+        # Create a visual separator - escape step_name
         separator = "─" * 60
+        escaped_step_name = _escape(step_name)
         if step_number > 0:
-            header = f"\n[bold magenta]{separator}\n🎯 STEP {step_number}: {step_name}\n{separator}[/bold magenta]\n"
+            header = f"\n[bold magenta]{separator}\n🎯 STEP {step_number}: {escaped_step_name}\n{separator}[/bold magenta]\n"
         else:
-            header = f"\n[bold magenta]{separator}\n🎯 {step_name}\n{separator}[/bold magenta]\n"
+            header = f"\n[bold magenta]{separator}\n🎯 {escaped_step_name}\n{separator}[/bold magenta]\n"
 
         log_widget.write(header)
 
