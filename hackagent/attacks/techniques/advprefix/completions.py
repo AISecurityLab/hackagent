@@ -226,12 +226,14 @@ def _get_completion_via_router(
     # Use route_with_tracking if we have run_id and client for real-time result creation
     if run_id and client:
         logger_instance.info(f"🔍 Calling route_with_tracking with run_id={run_id}")
-        response = agent_router.route_with_tracking(
+        tracking_result = agent_router.route_with_tracking(
             registration_key=agent_reg_key,
             request_data=request_data,
             run_id=run_id,
             client=client,
         )
+        # route_with_tracking returns {"response": ..., "result_id": ...}
+        response = tracking_result.get("response", tracking_result)
     else:
         logger_instance.warning(
             f"⚠️ Using fallback route_request (run_id={run_id}, client={client is not None})"

@@ -38,16 +38,37 @@ from .config import (
     JUDGE_SYSTEM_PROMPT,
 )
 
-# TUI logging support (imported conditionally to avoid import errors in non-TUI contexts)
-try:
-    from hackagent.cli.tui.logger import with_tui_logging
-except ImportError:
-    # Fallback decorator that does nothing if TUI is not available
-    def with_tui_logging(*args, **kwargs):
-        def decorator(func):
-            return func
+# TUI logging support - lazy loaded to avoid circular imports
+_with_tui_logging = None
 
-        return decorator
+
+def _get_tui_logging_decorator():
+    """Lazily import the TUI logging decorator to avoid circular imports."""
+    global _with_tui_logging
+    if _with_tui_logging is not None:
+        return _with_tui_logging
+
+    try:
+        from hackagent.cli.tui.logger import with_tui_logging
+
+        _with_tui_logging = with_tui_logging
+    except ImportError:
+
+        def with_tui_logging(*args, **kwargs):
+            def decorator(func):
+                return func
+
+            return decorator
+
+        _with_tui_logging = with_tui_logging
+
+    return _with_tui_logging
+
+
+def with_tui_logging(*args, **kwargs):
+    """Wrapper that lazily loads the actual TUI logging decorator."""
+    decorator = _get_tui_logging_decorator()
+    return decorator(*args, **kwargs)
 
 
 class PAIRAttack(BaseAttack):
@@ -110,6 +131,80 @@ class PAIRAttack(BaseAttack):
         """
         return []
 
+    def _extract_prompt_from_response(self, content: str) -> Optional[str]:
+        """
+        Extract the adversarial prompt from the attacker LLM's response.
+
+        Tries multiple strategies to parse the response:
+        1. Direct JSON parsing
+        2. JSON extraction from markdown code blocks
+        3. Regex extraction for "prompt" field
+        4. Plain text fallback (if content looks like a prompt)
+
+        Args:
+            content: The raw response content from the attacker LLM
+
+        Returns:
+            The extracted prompt string, or None if extraction failed
+        """
+        if not content:
+            return None
+
+        content = content.strip()
+
+        # Strategy 1: Direct JSON parsing
+        try:
+            parsed = json.loads(content)
+            prompt = parsed.get("prompt", "")
+            if prompt:
+                return prompt
+        except json.JSONDecodeError:
+            pass
+
+        # Strategy 2: Extract JSON from markdown code blocks (```json ... ```)
+        code_block_match = re.search(
+            r"```(?:json)?\s*\n?(.*?)\n?```", content, re.DOTALL
+        )
+        if code_block_match:
+            try:
+                parsed = json.loads(code_block_match.group(1).strip())
+                prompt = parsed.get("prompt", "")
+                if prompt:
+                    return prompt
+            except json.JSONDecodeError:
+                pass
+
+        # Strategy 3: Regex to extract "prompt" field value (handles multiline)
+        # Match "prompt": "value" or "prompt": 'value'
+        prompt_match = re.search(
+            r'"prompt"\s*:\s*"((?:[^"\\]|\\.)*)"|'
+            r"\"prompt\"\s*:\s*'((?:[^'\\]|\\.)*)'",
+            content,
+            re.DOTALL,
+        )
+        if prompt_match:
+            extracted = prompt_match.group(1) or prompt_match.group(2)
+            if extracted:
+                # Unescape common escape sequences
+                try:
+                    extracted = extracted.encode().decode("unicode_escape")
+                except Exception:
+                    pass
+                return extracted
+
+        # Strategy 4: If the content doesn't look like JSON at all,
+        # and is non-empty, use it as the prompt directly
+        # (some models may just output the prompt without JSON formatting)
+        if not content.startswith("{") and not content.startswith("["):
+            # Only use as fallback if it's substantial text
+            if len(content) > 20:
+                self.logger.debug(
+                    "Using raw response as prompt (no JSON structure detected)"
+                )
+                return content
+
+        return None
+
     def _query_attacker(
         self, goal: str, target_response: str, score: int, iteration: int
     ) -> Optional[str]:
@@ -149,19 +244,34 @@ SCORE: {score}"""
                 },
             )
 
+            # Extract content from response - handle multiple formats
+            content = None
+
+            # Format 1: OpenAI-style object with choices
             if response and hasattr(response, "choices") and response.choices:
                 content = response.choices[0].message.content or ""
+            # Format 2: Dictionary with generated_text or processed_response
+            elif isinstance(response, dict):
+                content = (
+                    response.get("generated_text")
+                    or response.get("processed_response")
+                    or ""
+                )
 
-                # Parse JSON response
-                try:
-                    parsed = json.loads(content)
-                    return parsed.get("prompt", "")
-                except json.JSONDecodeError:
-                    # Try to extract prompt from response
-                    match = re.search(r'"prompt"\s*:\s*"([^"]+)"', content)
-                    if match:
-                        return match.group(1)
-                    return content
+            if content:
+                # Parse JSON response - try multiple strategies
+                prompt = self._extract_prompt_from_response(content)
+                if prompt:
+                    return prompt
+
+                # If all parsing fails, log the raw content for debugging
+                self.logger.debug(
+                    f"Could not extract prompt from attacker response: {content[:200]}..."
+                )
+            else:
+                self.logger.warning(
+                    f"No valid response content from attacker LLM. Response type: {type(response)}"
+                )
 
         except Exception as e:
             self.logger.error(f"Error querying attacker: {e}")
@@ -183,11 +293,17 @@ SCORE: {score}"""
 
             # Use route_with_tracking if available for real-time result creation
             if run_id and client:
-                response = self.agent_router.route_with_tracking(
+                tracking_result = self.agent_router.route_with_tracking(
                     registration_key=list(self.agent_router._agent_registry.keys())[0],
                     request_data=request_data,
                     run_id=run_id,
                     client=client,
+                )
+                # route_with_tracking returns {"response": <actual_response>, "result_id": <id>}
+                response = (
+                    tracking_result.get("response")
+                    if isinstance(tracking_result, dict)
+                    else tracking_result
                 )
             else:
                 response = self.agent_router.route_request(
@@ -195,8 +311,23 @@ SCORE: {score}"""
                     request_data=request_data,
                 )
 
+            # Extract content from response - handle multiple formats
+            # Format 1: OpenAI-style object with choices
             if response and hasattr(response, "choices") and response.choices:
                 return response.choices[0].message.content or ""
+            # Format 2: Dictionary with generated_text or processed_response
+            elif isinstance(response, dict):
+                content = response.get("generated_text") or response.get(
+                    "processed_response"
+                )
+                if content:
+                    return content
+                # Check for error
+                if response.get("error_message"):
+                    self.logger.warning(
+                        f"Target response error: {response.get('error_message')}"
+                    )
+                    return None
 
         except Exception as e:
             self.logger.error(f"Error querying target: {e}")
@@ -224,13 +355,24 @@ SCORE: {score}"""
                 },
             )
 
+            # Extract content from response - handle multiple formats
+            content = None
+            # Format 1: OpenAI-style object with choices
             if (
                 judge_response
                 and hasattr(judge_response, "choices")
                 and judge_response.choices
             ):
                 content = judge_response.choices[0].message.content or ""
+            # Format 2: Dictionary with generated_text or processed_response
+            elif isinstance(judge_response, dict):
+                content = (
+                    judge_response.get("generated_text")
+                    or judge_response.get("processed_response")
+                    or ""
+                )
 
+            if content:
                 # Extract rating
                 match = re.search(r"Rating:\s*\[\[(\d+)\]\]", content)
                 if match:

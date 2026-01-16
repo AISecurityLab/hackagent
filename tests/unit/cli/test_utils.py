@@ -23,7 +23,6 @@ from hackagent.cli.utils import (
 # Import the new utils functions for testing
 from hackagent.utils import (
     _load_api_key_from_config,
-    _load_api_key_from_env,
     resolve_agent_type,
     resolve_api_token,
 )
@@ -86,20 +85,17 @@ class TestOutputFormatting:
 
     def test_display_results_table_empty_data(self):
         """Test table display with empty data"""
-        import pandas as pd
-
-        # Test with empty DataFrame
-        empty_df = pd.DataFrame()
+        # Test with empty list
+        empty_list: list = []
         # Should not raise an error
-        display_results_table(empty_df, "Test Results")
+        display_results_table(empty_list, "Test Results")
 
     def test_display_results_table_with_data(self):
         """Test table display with data"""
-        import pandas as pd
-
-        data = pd.DataFrame(
-            {"col1": ["value1", "value3"], "col2": ["value2", "value4"]}
-        )
+        data = [
+            {"col1": "value1", "col2": "value2"},
+            {"col1": "value3", "col2": "value4"},
+        ]
 
         # Should not raise an error
         display_results_table(data, "Test Results")
@@ -219,7 +215,7 @@ class TestInteractiveElements:
 
 # NEW COMPREHENSIVE TESTS FOR STANDARDIZED API TOKEN RESOLUTION
 class TestStandardizedAPITokenResolution:
-    """Test the new standardized API token resolution functionality"""
+    """Test the standardized API token resolution functionality"""
 
     def test_load_api_key_from_config_success(self):
         """Test successful API key loading from config file"""
@@ -309,39 +305,9 @@ output_format: table
         finally:
             Path(config_file).unlink()
 
-    def test_load_api_key_from_env_success(self):
-        """Test successful API key loading from environment"""
-        with patch.dict("os.environ", {"HACKAGENT_API_KEY": "test-env-key"}):
-            result = _load_api_key_from_env()
-            assert result == "test-env-key"
-
-    def test_load_api_key_from_env_not_set(self):
-        """Test behavior when environment variable not set"""
-        with (
-            patch.dict("os.environ", {}, clear=True),
-            patch("hackagent.utils.find_dotenv", return_value=None),
-        ):
-            result = _load_api_key_from_env()
-            assert result is None
-
-    def test_load_api_key_from_env_with_dotenv(self):
-        """Test loading API key from .env file"""
-        env_content = "HACKAGENT_API_KEY=dotenv-test-key\nOTHER_VAR=value\n"
-
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete=False) as f:
-            f.write(env_content)
-            env_file = f.name
-
-        try:
-            with patch.dict("os.environ", {}, clear=True):
-                result = _load_api_key_from_env(env_file)
-                assert result == "dotenv-test-key"
-        finally:
-            Path(env_file).unlink()
-
     def test_resolve_api_token_direct_parameter_priority(self):
         """Test direct parameter has highest priority"""
-        # Set up config file and environment that should be ignored
+        # Set up config file that should be ignored
         config_data = {"api_key": "config-should-be-ignored"}
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
@@ -349,40 +315,28 @@ output_format: table
             config_file = f.name
 
         try:
-            with patch.dict(
-                "os.environ", {"HACKAGENT_API_KEY": "env-should-be-ignored"}
-            ):
-                result = resolve_api_token(
-                    direct_api_key_param="direct-wins", config_file_path=config_file
-                )
-                assert result == "direct-wins"
+            result = resolve_api_token(
+                direct_api_key_param="direct-wins", config_file_path=config_file
+            )
+            assert result == "direct-wins"
         finally:
             Path(config_file).unlink()
 
-    def test_resolve_api_token_config_over_env_priority(self):
-        """Test config file takes priority over environment (NEW behavior)"""
-        config_data = {"api_key": "config-should-win"}
+    def test_resolve_api_token_config_file(self):
+        """Test config file is used when no direct parameter"""
+        config_data = {"api_key": "config-key"}
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(config_data, f)
             config_file = f.name
 
         try:
-            with patch.dict("os.environ", {"HACKAGENT_API_KEY": "env-should-lose"}):
-                result = resolve_api_token(
-                    direct_api_key_param=None, config_file_path=config_file
-                )
-                assert result == "config-should-win"
+            result = resolve_api_token(
+                direct_api_key_param=None, config_file_path=config_file
+            )
+            assert result == "config-key"
         finally:
             Path(config_file).unlink()
-
-    def test_resolve_api_token_env_fallback(self):
-        """Test environment variable as fallback when no config file"""
-        with patch.dict("os.environ", {"HACKAGENT_API_KEY": "env-fallback"}):
-            result = resolve_api_token(
-                direct_api_key_param=None, config_file_path="/nonexistent/config.json"
-            )
-            assert result == "env-fallback"
 
     def test_resolve_api_token_default_config_path(self):
         """Test using default config path when not specified"""
@@ -400,63 +354,35 @@ output_format: table
                 with open(config_file, "w") as f:
                     json.dump(config_data, f)
 
-                with patch.dict("os.environ", {"HACKAGENT_API_KEY": "env-should-lose"}):
-                    result = resolve_api_token(direct_api_key_param=None)
-                    assert result == "default-config-key"
+                result = resolve_api_token(direct_api_key_param=None)
+                assert result == "default-config-key"
 
     def test_resolve_api_token_error_no_sources(self):
         """Test error when no API token found from any source"""
-        with (
-            patch.dict("os.environ", {}, clear=True),
-            patch("hackagent.utils.find_dotenv", return_value=None),
-        ):
-            with pytest.raises(ValueError) as exc_info:
-                resolve_api_token(
-                    direct_api_key_param=None,
-                    config_file_path="/nonexistent/config.json",
-                )
+        with pytest.raises(ValueError) as exc_info:
+            resolve_api_token(
+                direct_api_key_param=None,
+                config_file_path="/nonexistent/config.json",
+            )
 
-            error_msg = str(exc_info.value)
-            assert "API token not found from any source" in error_msg
-            assert "Direct 'api_key' parameter" in error_msg
-            assert "Config file" in error_msg
-            assert "HACKAGENT_API_KEY environment variable" in error_msg
-
-    def test_resolve_api_token_with_dotenv_file(self):
-        """Test resolve_api_token with .env file support"""
-        env_content = "HACKAGENT_API_KEY=dotenv-key\n"
-
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete=False) as f:
-            f.write(env_content)
-            env_file = f.name
-
-        try:
-            with patch.dict("os.environ", {}, clear=True):
-                result = resolve_api_token(
-                    direct_api_key_param=None,
-                    env_file_path=env_file,
-                    config_file_path="/nonexistent/config.json",
-                )
-                assert result == "dotenv-key"
-        finally:
-            Path(env_file).unlink()
+        error_msg = str(exc_info.value)
+        assert "API token not found from any source" in error_msg
+        assert "Direct 'api_key' parameter" in error_msg
+        assert "Config file" in error_msg
 
     def test_resolve_api_token_comprehensive_priority_matrix(self):
-        """Comprehensive test of all priority scenarios"""
+        """Comprehensive test of priority scenarios (direct > config)"""
         scenarios = [
-            # (direct, config_exists, config_key, env_key, expected, description)
-            ("direct", True, "config", "env", "direct", "Direct beats all"),
-            (None, True, "config", "env", "config", "Config beats env"),
-            (None, False, None, "env", "env", "Env when no config"),
-            (None, True, None, "env", "env", "Env when config has no key"),
-            ("direct", False, None, "env", "direct", "Direct beats env when no config"),
+            # (direct, config_exists, config_key, expected, description)
+            ("direct", True, "config", "direct", "Direct beats config"),
+            (None, True, "config", "config", "Config when no direct"),
+            ("direct", False, None, "direct", "Direct when no config"),
             (
                 "direct",
                 True,
-                "config",
                 None,
                 "direct",
-                "Direct beats config when no env",
+                "Direct when config has no key",
             ),
         ]
 
@@ -464,7 +390,6 @@ output_format: table
             direct,
             config_exists,
             config_key,
-            env_key,
             expected,
             description,
         ) in scenarios:
@@ -479,20 +404,18 @@ output_format: table
                 config_file = "/nonexistent/config.json"
 
             try:
-                env_dict = {"HACKAGENT_API_KEY": env_key} if env_key else {}
-                with patch.dict("os.environ", env_dict, clear=True):
-                    if expected is not None:
-                        result = resolve_api_token(
-                            direct_api_key_param=direct, config_file_path=config_file
+                if expected is not None:
+                    result = resolve_api_token(
+                        direct_api_key_param=direct, config_file_path=config_file
+                    )
+                    assert result == expected, f"Failed scenario: {description}"
+                else:
+                    # Should raise error
+                    with pytest.raises(ValueError):
+                        resolve_api_token(
+                            direct_api_key_param=direct,
+                            config_file_path=config_file,
                         )
-                        assert result == expected, f"Failed scenario: {description}"
-                    else:
-                        # Should raise error
-                        with pytest.raises(ValueError):
-                            resolve_api_token(
-                                direct_api_key_param=direct,
-                                config_file_path=config_file,
-                            )
             finally:
                 if config_exists and Path(config_file).exists():
                     Path(config_file).unlink()
@@ -581,21 +504,13 @@ class TestUtilityIntegration:
 
     def test_error_scenarios_integration(self):
         """Test error handling across integrated utilities"""
-        # Test error handling when multiple utilities fail
-        with (
-            patch.dict("os.environ", {}, clear=True),
-            patch("hackagent.utils.find_dotenv", return_value=None),
-        ):
-            # Should handle missing config gracefully
-            config_key = _load_api_key_from_config("/nonexistent/config.json")
-            assert config_key is None
+        # Should handle missing config gracefully
+        config_key = _load_api_key_from_config("/nonexistent/config.json")
+        assert config_key is None
 
-            env_key = _load_api_key_from_env()
-            assert env_key is None
-
-            # Should raise appropriate error when all sources fail
-            with pytest.raises(ValueError):
-                resolve_api_token(
-                    direct_api_key_param=None,
-                    config_file_path="/nonexistent/config.json",
-                )
+        # Should raise appropriate error when all sources fail
+        with pytest.raises(ValueError):
+            resolve_api_token(
+                direct_api_key_param=None,
+                config_file_path="/nonexistent/config.json",
+            )

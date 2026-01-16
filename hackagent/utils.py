@@ -14,11 +14,9 @@
 
 import json
 import logging
-import os
 from pathlib import Path
 from typing import Optional, Union
 
-from dotenv import find_dotenv, load_dotenv
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
@@ -79,7 +77,6 @@ def resolve_agent_type(agent_type_input: Union[AgentTypeEnum, str]) -> AgentType
 
 def resolve_api_token(
     direct_api_key_param: Optional[str],
-    env_file_path: Optional[str] = None,
     config_file_path: Optional[str] = None,
 ) -> str:
     """
@@ -88,12 +85,10 @@ def resolve_api_token(
     Priority order:
     1. Direct api_key parameter (highest priority)
     2. Config file (~/.config/hackagent/config.json or specified path)
-    3. Environment variable (HACKAGENT_API_KEY, with .env file support)
-    4. Error if not found (lowest priority)
+    3. Error if not found
 
     Args:
         direct_api_key_param: API key provided directly as parameter
-        env_file_path: Optional path to .env file to load environment variables from
         config_file_path: Optional path to config file (defaults to ~/.config/hackagent/config.json)
 
     Returns:
@@ -113,19 +108,12 @@ def resolve_api_token(
         logger.debug("Using API token from config file.")
         return api_token_from_config
 
-    # Priority 3: Environment variable (with .env file support)
-    api_token_from_env = _load_api_key_from_env(env_file_path)
-    if api_token_from_env:
-        logger.debug("Using API token from HACKAGENT_API_KEY environment variable.")
-        return api_token_from_env
-
-    # Priority 4: Error - no token found
+    # Priority 3: Error - no token found
     error_message = (
         "API token not found from any source. Tried:\n"
         "1. Direct 'api_key' parameter\n"
         "2. Config file (~/.config/hackagent/config.json)\n"
-        "3. HACKAGENT_API_KEY environment variable\n"
-        "\nTo fix: Set HACKAGENT_API_KEY, create config file, or pass api_key directly."
+        "\nTo fix: Create config file with 'hackagent init' or pass api_key directly."
     )
     raise ValueError(error_message)
 
@@ -166,29 +154,4 @@ def _load_api_key_from_config(config_file_path: Optional[str] = None) -> Optiona
 
     except Exception as e:
         logger.warning(f"Error loading config file: {e}")
-        return None
-
-
-def _load_api_key_from_env(env_file_path: Optional[str] = None) -> Optional[str]:
-    """Load API key from environment variables with .env file support."""
-    try:
-        # Load .env file if specified or found
-        dotenv_to_load = env_file_path or find_dotenv(usecwd=True)
-
-        if dotenv_to_load:
-            logger.debug(f"Loading .env file from: {dotenv_to_load}")
-            load_dotenv(dotenv_to_load)
-        else:
-            logger.debug("No .env file found to load.")
-
-        api_token = os.getenv("HACKAGENT_API_KEY")
-        if api_token:
-            logger.debug("Found API key in HACKAGENT_API_KEY environment variable")
-            return api_token
-        else:
-            logger.debug("HACKAGENT_API_KEY environment variable not set")
-            return None
-
-    except Exception as e:
-        logger.warning(f"Error loading environment variables: {e}")
         return None

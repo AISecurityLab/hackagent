@@ -44,7 +44,6 @@ def __init__(endpoint: str,
              api_key: Optional[str] = None,
              raise_on_unexpected_status: bool = False,
              timeout: Optional[float] = None,
-             env_file_path: Optional[str] = None,
              metadata: Optional[Dict[str, Any]] = None,
              adapter_operational_config: Optional[Dict[str, Any]] = None)
 ```
@@ -73,11 +72,10 @@ attack strategies.
 - `base_url` - The base URL for the HackAgent API service.
 - `api_key` - The API key for authenticating with the HackAgent API.
   If omitted, the client will attempt to retrieve it from the
-  `HACKAGENT_API_KEY` environment variable. The `name`0
-  parameter can specify a .env file to load this variable from.
-- `name`1 - If set to `name`2, the API client will
+  config file (~/.config/hackagent/config.json).
+- `raise_on_unexpected_status` - If set to `True`, the API client will
   raise an exception for any HTTP status codes that are not typically
-  expected for a successful operation. Defaults to `name`3.
+  expected for a successful operation. Defaults to `False`.
 - `name`4 - The timeout duration in seconds for API requests made by the
   authenticated client. Defaults to `name`5 (which might mean a
   default timeout from the underlying HTTP library is used).

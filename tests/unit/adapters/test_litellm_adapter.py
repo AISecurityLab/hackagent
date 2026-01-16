@@ -154,7 +154,6 @@ class TestLiteLLMAgentAdapterHandleRequest(unittest.TestCase):
             temperature=self.config["temperature"],
             top_p=self.config["top_p"],
             api_base=self.config["endpoint"],
-            api_key="sk-placeholder-key-for-custom-endpoint",
             custom_llm_provider="openai",
             extra_headers={"User-Agent": "HackAgent/0.1.0"},
         )

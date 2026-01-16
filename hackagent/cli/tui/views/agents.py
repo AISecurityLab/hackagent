@@ -27,7 +27,7 @@ from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Button, DataTable, Static
 
 from hackagent.cli.config import CLIConfig
-from hackagent.cli.tui.base import BaseTab
+from hackagent.cli.tui.base import BaseTab, HackAgentHeader
 
 
 def _escape(value: Any) -> str:
@@ -127,6 +127,9 @@ class AgentsTab(BaseTab):
 
     def compose(self) -> ComposeResult:
         """Compose the agents layout."""
+        # Logo - displayed only in Agents tab
+        yield HackAgentHeader()
+
         # Title section
         yield Static(
             "🤖 [bold cyan]Agent Management[/bold cyan]", classes="section-header"

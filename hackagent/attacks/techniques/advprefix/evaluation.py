@@ -38,8 +38,6 @@ from collections import defaultdict
 from dataclasses import fields
 from typing import Any, Dict, List, Optional
 
-import pandas as pd
-
 from hackagent.attacks.techniques.advprefix.evaluators import (
     HarmBenchEvaluator,
     JailbreakBenchEvaluator,
@@ -135,6 +133,14 @@ class EvaluationPipeline:
             logger: Logger for tracking execution
             client: Authenticated client for API access
         """
+        # Extract tracking context BEFORE converting to dataclass (which filters unknown fields)
+        self._run_id: Optional[str] = (
+            config.get("_run_id") if isinstance(config, dict) else None
+        )
+        self._tracking_client = (
+            config.get("_client") if isinstance(config, dict) else None
+        )
+
         self.config = (
             EvaluationPipelineConfig.from_dict(config)
             if isinstance(config, dict)
@@ -238,8 +244,8 @@ class EvaluationPipeline:
             self.logger.warning("No judges configured, skipping evaluation")
             return input_data
 
-        # Convert to DataFrame for evaluators
-        original_df = pd.DataFrame(input_data)
+        # Keep as list of dicts for evaluators
+        original_data = [row.copy() for row in input_data]
 
         # Base config for evaluators
         evaluator_base_config_dict = {
@@ -251,7 +257,7 @@ class EvaluationPipeline:
             "organization_id": self.config.organization_id,
         }
 
-        judge_results_dfs = {}
+        judge_results = {}
         judges_to_run = self._prepare_judge_configs(
             judge_configs_list, evaluator_base_config_dict
         )
@@ -262,22 +268,22 @@ class EvaluationPipeline:
 
         # Execute judges sequentially
         for judge_type_str, subprocess_config in judges_to_run:
-            evaluated_df = self._run_single_evaluator(
+            evaluated_data = self._run_single_evaluator(
                 judge_type=judge_type_str,
                 config=subprocess_config,
-                df=original_df.copy(),
+                data=[row.copy() for row in original_data],
             )
 
-            if evaluated_df is not None:
-                judge_results_dfs[judge_type_str] = evaluated_df
+            if evaluated_data is not None:
+                judge_results[judge_type_str] = evaluated_data
                 self._statistics["successful_judges"].append(judge_type_str)
             else:
                 self._statistics["failed_judges"].append(judge_type_str)
 
         # Merge results
-        final_df = self._merge_evaluation_results(original_df, judge_results_dfs)
+        final_data = self._merge_evaluation_results(original_data, judge_results)
 
-        return final_df.to_dict(orient="records")
+        return final_data
 
     def _prepare_judge_configs(
         self, judge_configs_list: List[Dict], base_config: Dict[str, Any]
@@ -322,8 +328,9 @@ class EvaluationPipeline:
                 judge_config_item.get("agent_name")
                 or f"judge-{judge_type_str}-{judge_identifier.replace('/', '-')[:20]}"
             )
+            # Default to OPENAI_SDK to avoid Pydantic serialization warnings from LiteLLM
             subprocess_config["agent_type"] = judge_config_item.get(
-                "agent_type", "LITELLM"
+                "agent_type", "OPENAI_SDK"
             )
             subprocess_config["model_id"] = judge_identifier
             subprocess_config["agent_endpoint"] = judge_config_item.get("endpoint")
@@ -354,8 +361,8 @@ class EvaluationPipeline:
         self,
         judge_type: str,
         config: Dict[str, Any],
-        df: pd.DataFrame,
-    ) -> Optional[pd.DataFrame]:
+        data: List[Dict],
+    ) -> Optional[List[Dict]]:
         """Execute a single evaluator process."""
         evaluator_class = EVALUATOR_MAP.get(judge_type)
         if not evaluator_class:
@@ -383,21 +390,31 @@ class EvaluationPipeline:
                     return None
 
             evaluator_config = EvaluatorConfig(**filtered_config)
-            evaluator = evaluator_class(client=self.client, config=evaluator_config)
-            evaluated_df = evaluator.evaluate(df)
+            # Pass tracking context to the evaluator
+            evaluator = evaluator_class(
+                client=self.client,
+                config=evaluator_config,
+                run_id=self._run_id,
+                tracking_client=self._tracking_client,
+            )
+            evaluated_data = evaluator.evaluate(data)
 
             # Return only merge keys + judge-specific columns
             eval_cols = JUDGE_COLUMN_MAP.get(judge_type, [])
-            if not all(key in evaluated_df.columns for key in MERGE_KEYS):
+            if not evaluated_data:
+                return None
+
+            if not all(key in evaluated_data[0] for key in MERGE_KEYS):
                 self.logger.error(
                     f"Evaluation result missing merge keys for {judge_type}"
                 )
                 return None
 
-            cols_to_return = MERGE_KEYS + [
-                col for col in eval_cols if col in evaluated_df.columns
+            cols_to_return = set(MERGE_KEYS + [col for col in eval_cols])
+            return [
+                {k: v for k, v in row.items() if k in cols_to_return}
+                for row in evaluated_data
             ]
-            return evaluated_df[cols_to_return]
 
         except Exception as e:
             self.logger.error(
@@ -408,30 +425,28 @@ class EvaluationPipeline:
             del evaluator
 
     def _merge_evaluation_results(
-        self, original_df: pd.DataFrame, judge_results: Dict[str, pd.DataFrame]
-    ) -> pd.DataFrame:
+        self, original_data: List[Dict], judge_results: Dict[str, List[Dict]]
+    ) -> List[Dict]:
         """Merge evaluation results from multiple judges."""
-        final_df = original_df.copy()
-
-        for judge_type, judge_df in judge_results.items():
+        # Build lookup dictionaries keyed by merge keys
+        for judge_type, judge_data in judge_results.items():
             eval_cols = JUDGE_COLUMN_MAP.get(judge_type, [])
-            judge_cols_present = [col for col in eval_cols if col in judge_df.columns]
-
-            if not judge_cols_present:
-                self.logger.warning(f"No evaluation columns found for {judge_type}")
+            if not judge_data:
                 continue
 
-            try:
-                final_df = final_df.merge(
-                    judge_df,
-                    on=MERGE_KEYS,
-                    how="left",
-                    suffixes=("", f"_{judge_type}_dup"),
-                )
-            except Exception as e:
-                self.logger.error(f"Error merging results for {judge_type}: {e}")
+            # Build lookup by merge keys
+            lookup = {}
+            for row in judge_data:
+                key = tuple(row.get(k) for k in MERGE_KEYS)
+                lookup[key] = {col: row.get(col) for col in eval_cols if col in row}
 
-        return final_df
+            # Merge into original data
+            for row in original_data:
+                key = tuple(row.get(k) for k in MERGE_KEYS)
+                if key in lookup:
+                    row.update(lookup[key])
+
+        return original_data
 
     # ========================================================================
     # AGGREGATION METHODS
