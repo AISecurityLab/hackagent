@@ -1834,7 +1834,7 @@ dev = [
     { name = "flask", specifier = ">=3.1.2" },
     { name = "google-adk", specifier = ">=1.4.2" },
     { name = "mcp", specifier = ">=1.21.2" },
-    { name = "openapi-python-client", specifier = ">=0.24.3,<0.26.0" },
+    { name = "openapi-python-client", specifier = ">=0.24.3,<0.29.0" },
     { name = "pre-commit", specifier = ">=4.2.0" },
     { name = "pytest", specifier = ">=8.3.5" },
     { name = "pytest-asyncio", specifier = ">=0.23.7,<1.4.0" },
@@ -2687,7 +2687,7 @@ wheels = [
 
 [[package]]
 name = "openapi-python-client"
-version = "0.25.3"
+version = "0.28.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "attrs" },
@@ -2700,11 +2700,10 @@ dependencies = [
     { name = "ruff" },
     { name = "shellingham" },
     { name = "typer" },
-    { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f9/af/df5579c9a3cf515501518634c9c2004fa0999a810a0ef1145fa3bc82beac/openapi_python_client-0.25.3.tar.gz", hash = "sha256:cafc6b5aebd0c55fe7be4d400b24d3b107f7ec64923b8117ef8aa7ceb2a918a4", size = 124703, upload-time = "2025-07-28T01:25:53.66Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ff/6f/8267f10fd571c1473a32bfccb3a940494c1aa612878df662609612feaa20/openapi_python_client-0.28.1.tar.gz", hash = "sha256:f11afc63c33c0e0b19beff9a1424026f0738815063c2c8e773e1f71dc10d692c", size = 125947, upload-time = "2026-01-10T23:19:42.568Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5f/d2/539333a5cf2f14f5dd9aa8a3a73a4029464328e3f6ac4350577a28ea08ce/openapi_python_client-0.25.3-py3-none-any.whl", hash = "sha256:008e4c5f3079f312c135b55b142eb9616eafbd739ad6d5f8e95add726d1a02f2", size = 182159, upload-time = "2025-07-28T01:25:51.941Z" },
+    { url = "https://files.pythonhosted.org/packages/8c/e2/1cdfbc19c6917b1a878e5270a221904290113d0fce0df3599edd79d77906/openapi_python_client-0.28.1-py3-none-any.whl", hash = "sha256:9cf2f139f3c718f376f6a6981ed8ae37671f0fb2dd0f1d9504b2f583af1f82f9", size = 183195, upload-time = "2026-01-10T23:19:40.618Z" },
 ]
 
 [[package]]
