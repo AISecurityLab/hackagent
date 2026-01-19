@@ -83,6 +83,20 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
+      label: '📊 Datasets',
+      link: {
+        type: 'doc',
+        id: 'datasets/index',
+      },
+      items: [
+        'datasets/presets',
+        'datasets/huggingface',
+        'datasets/file',
+        'datasets/custom-providers',
+      ],
+    },
+    {
+      type: 'category',
       label: '🔌 Integrations',
       items: [
         'integrations/google-adk',

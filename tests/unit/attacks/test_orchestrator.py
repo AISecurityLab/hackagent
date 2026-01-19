@@ -393,5 +393,139 @@ class TestAttackOrchestratorHTTPHelpers(unittest.TestCase):
         self.assertIn("attack_id", str(context.exception).lower())
 
 
+class TestAttackOrchestratorDatasetIntegration(unittest.TestCase):
+    """Test AttackOrchestrator dataset loading functionality."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+
+        class TestAttack(BaseAttack):
+            def _get_pipeline_steps(self):
+                return []
+
+            def run(self, **kwargs):
+                return kwargs.get("goals", [])
+
+        class TestOrchestrator(AttackOrchestrator):
+            attack_type = "test"
+            attack_impl_class = TestAttack
+
+        self.TestOrchestrator = TestOrchestrator
+        self.mock_hack_agent = MagicMock()
+        self.mock_hack_agent.client = MagicMock()
+        self.orchestrator = TestOrchestrator(self.mock_hack_agent)
+
+    def test_prepare_attack_params_with_direct_goals(self):
+        """Test that direct goals list is used when provided."""
+        attack_config = {"goals": ["goal1", "goal2", "goal3"]}
+
+        params = self.orchestrator._prepare_attack_params(attack_config)
+
+        self.assertEqual(params["goals"], ["goal1", "goal2", "goal3"])
+
+    def test_prepare_attack_params_requires_goals_or_dataset(self):
+        """Test that either goals or dataset must be provided."""
+        attack_config = {"some_other_param": "value"}
+
+        with self.assertRaises(ValueError) as context:
+            self.orchestrator._prepare_attack_params(attack_config)
+
+        self.assertIn("goals", str(context.exception).lower())
+        self.assertIn("dataset", str(context.exception).lower())
+
+    def test_prepare_attack_params_empty_goals_raises_error(self):
+        """Test that empty goals list raises error."""
+        attack_config = {"goals": []}
+
+        with self.assertRaises(ValueError) as context:
+            self.orchestrator._prepare_attack_params(attack_config)
+
+        self.assertIn("empty", str(context.exception).lower())
+
+    def test_prepare_attack_params_goals_must_be_list(self):
+        """Test that goals must be a list."""
+        attack_config = {"goals": "not a list"}
+
+        with self.assertRaises(ValueError) as context:
+            self.orchestrator._prepare_attack_params(attack_config)
+
+        self.assertIn("list", str(context.exception).lower())
+
+    @patch("hackagent.attacks.orchestrator.AttackOrchestrator._load_goals_from_dataset")
+    def test_prepare_attack_params_loads_from_dataset(self, mock_load):
+        """Test that goals are loaded from dataset config when provided."""
+        mock_load.return_value = ["dataset_goal1", "dataset_goal2"]
+
+        attack_config = {
+            "dataset": {
+                "preset": "agentharm",
+                "limit": 10,
+            }
+        }
+
+        params = self.orchestrator._prepare_attack_params(attack_config)
+
+        mock_load.assert_called_once_with(attack_config["dataset"])
+        self.assertEqual(params["goals"], ["dataset_goal1", "dataset_goal2"])
+
+    @patch("hackagent.attacks.orchestrator.AttackOrchestrator._load_goals_from_dataset")
+    def test_prepare_attack_params_prefers_direct_goals_over_dataset(self, mock_load):
+        """Test that direct goals take precedence over dataset."""
+        attack_config = {
+            "goals": ["direct_goal"],
+            "dataset": {"preset": "agentharm"},
+        }
+
+        params = self.orchestrator._prepare_attack_params(attack_config)
+
+        # Should NOT call load from dataset when goals are provided
+        mock_load.assert_not_called()
+        self.assertEqual(params["goals"], ["direct_goal"])
+
+    @patch("hackagent.datasets.load_goals_from_config")
+    def test_load_goals_from_dataset_calls_registry(self, mock_load_goals):
+        """Test that _load_goals_from_dataset calls the registry function."""
+        mock_load_goals.return_value = ["loaded_goal"]
+
+        dataset_config = {
+            "provider": "huggingface",
+            "path": "test/dataset",
+            "goal_field": "prompt",
+        }
+
+        goals = self.orchestrator._load_goals_from_dataset(dataset_config)
+
+        mock_load_goals.assert_called_once_with(dataset_config)
+        self.assertEqual(goals, ["loaded_goal"])
+
+    @patch("hackagent.datasets.load_goals_from_config")
+    def test_load_goals_from_dataset_handles_errors(self, mock_load_goals):
+        """Test that dataset loading errors are wrapped in ValueError."""
+        mock_load_goals.side_effect = Exception("Dataset not found")
+
+        dataset_config = {"preset": "nonexistent"}
+
+        with self.assertRaises(ValueError) as context:
+            self.orchestrator._load_goals_from_dataset(dataset_config)
+
+        self.assertIn("Failed to load goals", str(context.exception))
+
+    @patch("hackagent.datasets.load_goals_from_config")
+    def test_load_goals_from_dataset_with_preset(self, mock_load_goals):
+        """Test loading goals using a preset configuration."""
+        mock_load_goals.return_value = ["agentharm_goal1", "agentharm_goal2"]
+
+        dataset_config = {
+            "preset": "agentharm",
+            "limit": 50,
+            "shuffle": True,
+        }
+
+        goals = self.orchestrator._load_goals_from_dataset(dataset_config)
+
+        mock_load_goals.assert_called_once_with(dataset_config)
+        self.assertEqual(len(goals), 2)
+
+
 if __name__ == "__main__":
     unittest.main()

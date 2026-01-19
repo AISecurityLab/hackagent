@@ -26,6 +26,10 @@ graph LR
 | [**PAIR**](./pair-attacks.md) | LLM-driven iterative prompt refinement | ⭐⭐ Medium | Medium |
 | [**Baseline**](./baseline-attacks.md) | Template-based prompt injection | ⭐ Basic | Fast |
 
+:::tip Dataset Support
+All attacks support loading goals from AI safety benchmarks like **AgentHarm**, **StrongREJECT**, and **HarmBench**. See [Dataset Providers](../datasets/) for details.
+:::
+
 ---
 
 ## 🎯 AdvPrefix — Advanced Prefix Optimization
