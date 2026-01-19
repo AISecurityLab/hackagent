@@ -472,6 +472,10 @@ class LiteLLMAgentAdapter(Agent):
             k: v for k, v in request_data.items() if k not in excluded_keys
         }
 
+        # Get exception class for error handling
+        exceptions = _get_litellm_exceptions()
+        AuthenticationError = exceptions["AuthenticationError"]
+
         try:
             completion_text = self._execute_litellm_completion_with_messages(
                 messages=messages,
