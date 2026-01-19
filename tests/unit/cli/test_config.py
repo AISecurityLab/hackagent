@@ -20,6 +20,7 @@ class TestCLIConfig:
         # Mock the default config file to not exist and clear env vars
         with (
             patch("pathlib.Path.exists", return_value=False),
+            patch("pathlib.Path.home", return_value=Path("/fake/home")),
             patch.dict("os.environ", {}, clear=True),
         ):
             config = CLIConfig()
@@ -300,6 +301,7 @@ class TestCLIConfig:
         """Test validation failure with missing API key"""
         with (
             patch("pathlib.Path.exists", return_value=False),
+            patch("pathlib.Path.home", return_value=Path("/fake/home")),
             patch.dict("os.environ", {}, clear=True),
         ):
             config = CLIConfig(base_url="https://example.com")
@@ -316,10 +318,14 @@ class TestCLIConfig:
 
     def test_default_config_path(self):
         """Test default configuration path"""
-        with patch.dict("os.environ", {}, clear=True):
+        fake_home = Path("/fake/home")
+        with (
+            patch("pathlib.Path.home", return_value=fake_home),
+            patch.dict("os.environ", {}, clear=True),
+        ):
             config = CLIConfig()
 
-            expected_path = Path.home() / ".config" / "hackagent" / "config.json"
+            expected_path = fake_home / ".config" / "hackagent" / "config.json"
             assert config.default_config_path == expected_path
 
     def test_yaml_config_loading(self):
