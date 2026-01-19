@@ -97,6 +97,11 @@ HackAgent automates testing for these vulnerabilities using **research-backed at
 </div>
 
 <div style={{padding: '1.5rem', borderRadius: '12px', background: 'var(--ifm-background-surface-color)', border: '1px solid var(--ifm-color-emphasis-200)'}}>
+  <h3>📊 Benchmark Datasets</h3>
+  <p>Use AI safety benchmarks like <strong>AgentHarm</strong>, <strong>StrongREJECT</strong>, and <strong>HarmBench</strong> directly in your attacks with pre-configured presets.</p>
+</div>
+
+<div style={{padding: '1.5rem', borderRadius: '12px', background: 'var(--ifm-background-surface-color)', border: '1px solid var(--ifm-color-emphasis-200)'}}>
   <h3>🐍 Python SDK</h3>
   <p>Full-featured SDK with type hints, async support, and seamless integration into your CI/CD pipelines.</p>
 </div>
@@ -164,6 +169,22 @@ results = agent.hack(attack_config={
 
 # Results are automatically sent to the dashboard
 print(f"Attack completed: {results}")
+```
+
+#### Using AI Safety Benchmarks
+
+Load goals from popular AI safety benchmarks like AgentHarm:
+
+```python
+# Use AgentHarm benchmark for attack goals
+results = agent.hack(attack_config={
+    "attack_type": "baseline",
+    "dataset": {
+        "preset": "agentharm",  # Pre-configured benchmark
+        "limit": 50,            # Test with 50 goals
+        "shuffle": True,        # Randomize selection
+    }
+})
 ```
 
 ---

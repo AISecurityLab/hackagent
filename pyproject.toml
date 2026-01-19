@@ -33,6 +33,11 @@ dependencies = [
     "attrs>=21.0.0",
 ]
 
+[project.optional-dependencies]
+datasets = [
+    "datasets>=2.14.0",  # HuggingFace datasets library
+]
+
 [dependency-groups]
 dev = [
     "openapi-python-client>=0.24.3,<0.29.0",

@@ -204,21 +204,85 @@ class AttackOrchestrator:
         Extract parameters for attack execution.
 
         Override this method for custom parameter handling.
-        Default implementation extracts 'goals' from config.
+        Default implementation extracts 'goals' from config, either directly
+        as a list or by loading them from a dataset source.
 
         Args:
-            attack_config: Full attack configuration
+            attack_config: Full attack configuration. Can contain either:
+                - goals: Direct list of goal strings
+                - dataset: Configuration for loading goals from a dataset source
 
         Returns:
             Parameters to pass to technique's run() method
 
         Raises:
-            ValueError: If required parameters are missing
+            ValueError: If neither 'goals' nor 'dataset' is provided, or if format is invalid
         """
+        # Check for direct goals first
         goals = attack_config.get("goals")
+        dataset_config = attack_config.get("dataset")
+
+        if goals is not None and dataset_config is not None:
+            logger.warning(
+                "Both 'goals' and 'dataset' provided. Using 'goals' directly."
+            )
+            dataset_config = None
+
+        if dataset_config is not None:
+            # Load goals from dataset source
+            goals = self._load_goals_from_dataset(dataset_config)
+        elif goals is None:
+            raise ValueError(
+                f"'{self.attack_type}' requires either 'goals' (list) or 'dataset' (config)"
+            )
+
         if not isinstance(goals, list):
             raise ValueError(f"'goals' must be a list for {self.attack_type}")
+
+        if len(goals) == 0:
+            raise ValueError(f"'goals' list is empty for {self.attack_type}")
+
+        logger.info(f"Prepared {len(goals)} goals for {self.attack_type} attack")
         return {"goals": goals}
+
+    def _load_goals_from_dataset(self, dataset_config: Dict[str, Any]) -> list:
+        """
+        Load goals from a dataset configuration.
+
+        Supports loading from:
+        - Pre-configured presets (e.g., "agentharm", "strongreject")
+        - HuggingFace datasets
+        - Local files (JSON, CSV, JSONL, TXT)
+
+        Args:
+            dataset_config: Dataset configuration dictionary with keys:
+                - preset (str, optional): Name of a pre-configured preset
+                - provider (str, optional): "huggingface" or "file"
+                - path (str, optional): Dataset path or file path
+                - goal_field (str, optional): Field containing goal text
+                - split (str, optional): Dataset split (for HuggingFace)
+                - limit (int, optional): Maximum goals to load
+                - shuffle (bool, optional): Shuffle before selecting
+                - seed (int, optional): Random seed for shuffling
+
+        Returns:
+            List of goal strings
+
+        Raises:
+            ValueError: If dataset configuration is invalid
+            ImportError: If required dependencies are not available
+        """
+        from hackagent.datasets import load_goals_from_config
+
+        logger.info(f"Loading goals from dataset: {dataset_config}")
+
+        try:
+            goals = load_goals_from_config(dataset_config)
+            logger.info(f"Loaded {len(goals)} goals from dataset")
+            return goals
+        except Exception as e:
+            logger.error(f"Failed to load goals from dataset: {e}", exc_info=True)
+            raise ValueError(f"Failed to load goals from dataset: {e}") from e
 
     def _get_attack_impl_kwargs(
         self,
