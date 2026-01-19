@@ -17,6 +17,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 
 dependencies = [
@@ -28,6 +29,8 @@ dependencies = [
     "click>=8.1.0",
     "pyyaml>=6.0.0",
     "textual>=1.0.0",
+    "python-dateutil>=2.8.0",
+    "attrs>=21.0.0",
 ]
 
 [dependency-groups]
@@ -84,7 +87,7 @@ omit = [
 ]
 
 [tool.coverage.report]
-fail_under = 40
+fail_under = 50
 precision = 1
 show_missing = true
 skip_covered = true
