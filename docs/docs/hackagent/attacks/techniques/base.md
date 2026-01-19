@@ -74,7 +74,7 @@ Initialize attack implementation with common setup.
 - `config` - Attack configuration (will be merged with DEFAULT_CONFIG)
 - `client` - Authenticated HackAgent client
 - `agent_router` - Target agent router
-- `**kwargs` - Additional technique-specific parameters (e.g., attacker_router for PAIR)
+- `**kwargs` - Additional technique-specific parameters
 
 #### run
 

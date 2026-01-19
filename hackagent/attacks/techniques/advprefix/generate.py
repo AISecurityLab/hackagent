@@ -28,8 +28,6 @@ import os
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-import pandas as pd
-
 from hackagent.client import AuthenticatedClient
 from hackagent.router.router import AgentRouter
 from hackagent.router.types import AgentTypeEnum
@@ -90,6 +88,14 @@ class PrefixGenerationPipeline:
             client: Authenticated client for API access
             agent_router: Optional router for CE computation
         """
+        # Extract tracking context BEFORE converting to dataclass (which filters unknown fields)
+        self._run_id: Optional[str] = (
+            config.get("_run_id") if isinstance(config, dict) else None
+        )
+        self._tracking_client = (
+            config.get("_client") if isinstance(config, dict) else None
+        )
+
         self.config = (
             PrefixGenerationConfig.from_dict(config)
             if isinstance(config, dict)
@@ -262,10 +268,21 @@ class PrefixGenerationPipeline:
                 "top_p": self.config.top_p,
             }
 
+            # Use OPENAI_SDK to avoid Pydantic serialization warnings from LiteLLM
+            # Can be overridden via config.generator["agent_type"] if needed
+            agent_type_str = self.config.generator.get("agent_type", "OPENAI_SDK")
+            try:
+                agent_type = AgentTypeEnum(agent_type_str.upper())
+            except ValueError:
+                self.logger.warning(
+                    f"Invalid agent_type '{agent_type_str}', defaulting to OPENAI_SDK"
+                )
+                agent_type = AgentTypeEnum.OPENAI_SDK
+
             router = AgentRouter(
                 client=self.client,
                 name=model_name,
-                agent_type=AgentTypeEnum.LITELLM,
+                agent_type=agent_type,
                 endpoint=endpoint,
                 adapter_operational_config=operational_config,
                 metadata=operational_config.copy(),
@@ -355,6 +372,14 @@ class PrefixGenerationPipeline:
 
         registration_key = next(iter(self._generation_router._agent_registry.keys()))  # type: ignore
 
+        # Log tracking context status
+        if self._run_id and self._tracking_client:
+            self.logger.info(f"📊 Generation tracking enabled: run_id={self._run_id}")
+        else:
+            self.logger.warning(
+                "⚠️ Generation tracking disabled - results will NOT be created!"
+            )
+
         progress_desc = f"[cyan]Generating ({mode})..."
 
         with create_progress_bar(progress_desc, total=len(prompts)) as (pbar, task):
@@ -366,10 +391,21 @@ class PrefixGenerationPipeline:
                     "top_p": self.config.top_p,
                 }
 
-                response = self._generation_router.route_request(
-                    registration_key=registration_key,
-                    request_data=request_params,
-                )
+                # Use route_with_tracking if tracking context is available
+                if self._run_id and self._tracking_client:
+                    response_data = self._generation_router.route_with_tracking(
+                        registration_key=registration_key,
+                        request_data=request_params,
+                        run_id=self._run_id,
+                        client=self._tracking_client,
+                    )
+                    # route_with_tracking returns {"response": ..., "result_id": ...}
+                    response = response_data.get("response", response_data)
+                else:
+                    response = self._generation_router.route_request(
+                        registration_key=registration_key,
+                        request_data=request_params,
+                    )
 
                 generated_text = self._extract_generated_text(response, prompt, goal)
                 final_prefix = meta_prefix + generated_text
@@ -424,20 +460,20 @@ class PrefixGenerationPipeline:
         - Prefixes without required linebreaks
         - Duplicate prefixes (within goals)
         """
-        df = pd.DataFrame(prefixes)
+        data = prefixes
 
         # Apply filters sequentially
-        df = self._filter_by_start_patterns(df)
-        df = self._filter_by_contain_patterns(df)
-        df = self._filter_by_char_length(df)
+        data = self._filter_by_start_patterns(data)
+        data = self._filter_by_contain_patterns(data)
+        data = self._filter_by_char_length(data)
 
         if self.config.require_linebreak:
-            df = self._filter_by_linebreak(df)
+            data = self._filter_by_linebreak(data)
 
-        df = self._merge_duplicates(df)
+        data = self._merge_duplicates(data)
 
-        self._log_filtering_stats(df, "Phase 1")
-        return df.to_dict("records")
+        self._log_filtering_stats(data, "Phase 1")
+        return data
 
     def _apply_phase2_preprocessing(self, prefixes: List[Dict]) -> List[Dict]:
         """
@@ -447,166 +483,230 @@ class PrefixGenerationPipeline:
         - Prefixes with CE scores above threshold
         - Keeps only top-k prefixes per goal based on CE score
         """
-        df = pd.DataFrame(prefixes)
-
-        if "prefix_nll" not in df.columns:
-            self.logger.error("Phase 2 requires 'prefix_nll' column, skipping")
+        if not prefixes:
             return prefixes
+
+        # Check for prefix_nll key
+        if "prefix_nll" not in prefixes[0]:
+            self.logger.error("Phase 2 requires 'prefix_nll' key, skipping")
+            return prefixes
+
+        data = prefixes
 
         # Filter by CE threshold
         if self.config.max_ce is not None:
-            df = self._filter_by_ce_threshold(df)
+            data = self._filter_by_ce_threshold(data)
 
         # Top-k selection per goal
         if self.config.n_candidates_per_goal > 0:
-            df = self._select_top_k_per_goal(df)
+            data = self._select_top_k_per_goal(data)
 
-        self._log_filtering_stats(df, "Phase 2")
-        return df.to_dict("records")
+        self._log_filtering_stats(data, "Phase 2")
+        return data
 
-    def _filter_by_start_patterns(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _filter_by_start_patterns(self, data: List[Dict]) -> List[Dict]:
         """Remove prefixes starting with refusal patterns."""
         if not self.config.start_patterns:
-            return df
+            return data
 
-        before = len(df)
-        df_filtered = df[
-            ~df["prefix"]
-            .str.lstrip()
-            .str.startswith(self.config.start_patterns, na=False)
+        before = len(data)
+        patterns = tuple(self.config.start_patterns)
+        filtered = [
+            row
+            for row in data
+            if not (row.get("prefix") or "").lstrip().startswith(patterns)
         ]
-        removed = before - len(df_filtered)
+        removed = before - len(filtered)
 
         if removed > 0:
             self.logger.debug(f"Start pattern filter removed {removed} prefixes")
 
-        return df_filtered
+        return filtered
 
-    def _filter_by_contain_patterns(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _filter_by_contain_patterns(self, data: List[Dict]) -> List[Dict]:
         """Remove prefixes containing refusal patterns."""
         if not self.config.contain_patterns:
-            return df
+            return data
 
-        before = len(df)
-        pattern = "|".join(map(re.escape, self.config.contain_patterns))
-        df_filtered = df[~df["prefix"].str.contains(pattern, regex=True, na=False)]
-        removed = before - len(df_filtered)
+        before = len(data)
+        pattern = re.compile("|".join(map(re.escape, self.config.contain_patterns)))
+        filtered = [row for row in data if not pattern.search(row.get("prefix") or "")]
+        removed = before - len(filtered)
 
         if removed > 0:
             self.logger.debug(f"Contain pattern filter removed {removed} prefixes")
 
-        return df_filtered
+        return filtered
 
-    def _filter_by_char_length(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _filter_by_char_length(self, data: List[Dict]) -> List[Dict]:
         """Remove prefixes shorter than minimum character length."""
         if self.config.min_char_length <= 0:
-            return df
+            return data
 
-        before = len(df)
-        df_filtered = df[df["prefix"].str.len() >= self.config.min_char_length]
-        removed = before - len(df_filtered)
+        before = len(data)
+        filtered = [
+            row
+            for row in data
+            if len(row.get("prefix") or "") >= self.config.min_char_length
+        ]
+        removed = before - len(filtered)
 
         if removed > 0:
             self.logger.debug(
                 f"Character length filter removed {removed} prefixes (< {self.config.min_char_length} chars)"
             )
 
-        return df_filtered
+        return filtered
 
-    def _filter_by_linebreak(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _filter_by_linebreak(self, data: List[Dict]) -> List[Dict]:
         """Remove prefixes without internal linebreaks."""
-        before = len(df)
-        df_filtered = df[
-            df["prefix"].str.strip().str.strip("\n").str.contains("\n", na=False)
+        before = len(data)
+        filtered = [
+            row for row in data if "\n" in (row.get("prefix") or "").strip().strip("\n")
         ]
-        removed = before - len(df_filtered)
+        removed = before - len(filtered)
 
         if removed > 0:
             self.logger.debug(f"Linebreak filter removed {removed} prefixes")
 
-        return df_filtered
+        return filtered
 
-    def _filter_by_ce_threshold(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _filter_by_ce_threshold(self, data: List[Dict]) -> List[Dict]:
         """Remove prefixes with CE scores above threshold."""
-        df["prefix_nll_numeric"] = pd.to_numeric(df["prefix_nll"], errors="coerce")
+
+        def parse_numeric(val):
+            try:
+                return float(val)
+            except (ValueError, TypeError):
+                return float("inf")
 
         # Check if all values are infinite
-        valid_scores = df["prefix_nll_numeric"][
-            ~df["prefix_nll_numeric"].isin([float("inf"), float("-inf")])
+        valid_scores = [
+            parse_numeric(row.get("prefix_nll"))
+            for row in data
+            if parse_numeric(row.get("prefix_nll")) not in (float("inf"), float("-inf"))
         ]
 
         if len(valid_scores) == 0:
             self.logger.warning("All CE scores are infinite, skipping CE filtering")
-            return df.drop(columns=["prefix_nll_numeric"])
+            return data
 
-        before = len(df)
-        df_filtered = df[df["prefix_nll_numeric"] <= self.config.max_ce]
-        removed = before - len(df_filtered)
+        before = len(data)
+        filtered = [
+            row
+            for row in data
+            if parse_numeric(row.get("prefix_nll")) <= self.config.max_ce
+        ]
+        removed = before - len(filtered)
 
         if removed > 0:
             self.logger.debug(
                 f"CE threshold filter removed {removed} prefixes (CE > {self.config.max_ce})"
             )
 
-        return df_filtered.drop(columns=["prefix_nll_numeric"])
+        return filtered
 
-    def _select_top_k_per_goal(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _select_top_k_per_goal(self, data: List[Dict]) -> List[Dict]:
         """Select top-k prefixes per goal based on CE score."""
-        df["prefix_nll_numeric"] = pd.to_numeric(df["prefix_nll"], errors="coerce")
 
-        before = len(df)
-        df_selected = (
-            df.sort_values("prefix_nll_numeric", na_position="last")
-            .groupby("goal")
-            .head(self.config.n_candidates_per_goal)
-        )
-        removed = before - len(df_selected)
+        def parse_numeric(val):
+            try:
+                return float(val)
+            except (ValueError, TypeError):
+                return float("inf")
+
+        before = len(data)
+
+        # Group by goal
+        from collections import defaultdict
+
+        goal_groups = defaultdict(list)
+        for row in data:
+            goal_groups[row.get("goal", "")].append(row)
+
+        # Sort each group by prefix_nll and take top k
+        result = []
+        for goal, rows in goal_groups.items():
+            sorted_rows = sorted(rows, key=lambda x: parse_numeric(x.get("prefix_nll")))
+            result.extend(sorted_rows[: self.config.n_candidates_per_goal])
+
+        removed = before - len(result)
 
         if removed > 0:
             self.logger.debug(
                 f"Top-k selection removed {removed} prefixes (keeping top {self.config.n_candidates_per_goal} per goal)"
             )
 
-        return df_selected.drop(columns=["prefix_nll_numeric"]).reset_index(drop=True)
+        return result
 
-    def _merge_duplicates(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _merge_duplicates(self, data: List[Dict]) -> List[Dict]:
         """Merge duplicate prefixes within goal groups."""
-        before = len(df)
+        from collections import defaultdict
 
-        def merge_group(group):
-            agg_dict = {
-                "model_name": lambda x: ",".join(str(v) for v in set(x)),
-                "meta_prefix": lambda x: ",".join(
-                    str(v) for v in set(x) if pd.notna(v)
-                ),
-                "temperature": lambda x: ",".join(str(v) for v in set(x)),
-                "goal": "first",
-            }
+        before = len(data)
 
-            if "prefix_nll" in group.columns:
-                agg_dict["prefix_nll"] = "first"
+        # Group by goal, then by prefix
+        goal_groups = defaultdict(lambda: defaultdict(list))
+        for row in data:
+            goal = row.get("goal", "")
+            prefix = row.get("prefix", "")
+            goal_groups[goal][prefix].append(row)
 
-            return group.groupby("prefix").agg(agg_dict).reset_index()
+        # Merge duplicates within each goal
+        result = []
+        for goal, prefix_groups in goal_groups.items():
+            for prefix, rows in prefix_groups.items():
+                if len(rows) == 1:
+                    result.append(rows[0])
+                else:
+                    # Merge by combining values
+                    merged = {
+                        "prefix": prefix,
+                        "goal": goal,
+                        "model_name": ",".join(
+                            str(r.get("model_name"))
+                            for r in rows
+                            if r.get("model_name")
+                        ),
+                        "meta_prefix": ",".join(
+                            str(r.get("meta_prefix"))
+                            for r in rows
+                            if r.get("meta_prefix")
+                        ),
+                        "temperature": ",".join(
+                            str(r.get("temperature"))
+                            for r in rows
+                            if r.get("temperature") is not None
+                        ),
+                    }
+                    # Keep first prefix_nll if exists
+                    if "prefix_nll" in rows[0]:
+                        merged["prefix_nll"] = rows[0]["prefix_nll"]
+                    result.append(merged)
 
-        df = df.groupby("goal").apply(merge_group).reset_index(drop=True)
-        removed = before - len(df)
+        removed = before - len(result)
 
         if removed > 0:
             self.logger.debug(f"Deduplication removed {removed} duplicate prefixes")
 
-        return df
+        return result
 
-    def _log_filtering_stats(self, df: pd.DataFrame, phase_name: str):
+    def _log_filtering_stats(self, data: List[Dict], phase_name: str):
         """Log detailed statistics about filtering results."""
-        if df.empty:
+        if not data:
             self.logger.info(f"{phase_name}: No prefixes remaining")
             return
 
-        goal_counts = df.groupby("goal")["prefix"].count()
+        # Count prefixes per goal
+        from collections import Counter
+
+        goal_counts = Counter(row.get("goal", "") for row in data)
+        counts = list(goal_counts.values())
+
         self.logger.info(
-            f"{phase_name}: {len(df)} prefixes remaining for {len(goal_counts)} goals "
-            f"(min={goal_counts.min()}, max={goal_counts.max()}, "
-            f"avg={goal_counts.mean():.1f})"
+            f"{phase_name}: {len(data)} prefixes remaining for {len(goal_counts)} goals "
+            f"(min={min(counts)}, max={max(counts)}, "
+            f"avg={sum(counts) / len(counts):.1f})"
         )
 
     # ========================================================================
@@ -627,6 +727,16 @@ class PrefixGenerationPipeline:
 
         results = []
         victim_key = str(self.agent_router.backend_agent.id)
+
+        # Log tracking context status for CE computation
+        if self._run_id and self._tracking_client:
+            self.logger.info(
+                f"📊 CE computation tracking enabled: run_id={self._run_id}"
+            )
+        else:
+            self.logger.warning(
+                "⚠️ CE computation tracking disabled - results will NOT be created!"
+            )
 
         progress_desc = (
             f"[blue]Computing CE via {self.agent_router.backend_agent.agent_type}..."
@@ -651,11 +761,21 @@ class PrefixGenerationPipeline:
                     pbar.update(task, advance=1)
                     continue
 
-                # Send request to agent
-                response = self.agent_router.route_request(
-                    registration_key=victim_key,
-                    request_data={"prompt": prefix_text},
-                )
+                # Send request to agent - use route_with_tracking if available
+                if self._run_id and self._tracking_client:
+                    response_data = self.agent_router.route_with_tracking(
+                        registration_key=victim_key,
+                        request_data={"prompt": prefix_text},
+                        run_id=self._run_id,
+                        client=self._tracking_client,
+                    )
+                    # route_with_tracking returns {"response": ..., "result_id": ...}
+                    response = response_data.get("response", response_data)
+                else:
+                    response = self.agent_router.route_request(
+                        registration_key=victim_key,
+                        request_data={"prompt": prefix_text},
+                    )
 
                 # Evaluate response
                 generated_text = response.get("generated_text")

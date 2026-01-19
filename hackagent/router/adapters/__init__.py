@@ -12,9 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .google_adk import ADKAgentAdapter  # noqa F401
-from .litellm_adapter import LiteLLMAgentAdapter  # noqa F401
-from .openai_adapter import OpenAIAgentAdapter  # noqa F401
-from .base import Agent  # Added re-export
+# Lazy imports for adapters to improve startup time
+# These adapters import heavy dependencies (litellm ~2s, google-adk ~0.1s)
+from .base import Agent  # Base class is lightweight, import directly
+
+
+def __getattr__(name):
+    """Lazy load adapter classes on first access."""
+    if name == "ADKAgentAdapter":
+        from .google_adk import ADKAgentAdapter
+
+        return ADKAgentAdapter
+    elif name == "LiteLLMAgentAdapter":
+        from .litellm_adapter import LiteLLMAgentAdapter
+
+        return LiteLLMAgentAdapter
+    elif name == "OpenAIAgentAdapter":
+        from .openai_adapter import OpenAIAgentAdapter
+
+        return OpenAIAgentAdapter
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = ["ADKAgentAdapter", "LiteLLMAgentAdapter", "OpenAIAgentAdapter", "Agent"]

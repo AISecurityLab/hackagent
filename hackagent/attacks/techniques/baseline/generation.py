@@ -21,8 +21,6 @@ Generates attack prompts by combining predefined templates with goals.
 import logging
 from typing import Any, Dict, List
 
-import pandas as pd
-
 from hackagent.attacks.shared.templates import AttackTemplates
 from hackagent.attacks.shared.progress import create_progress_bar
 from hackagent.router.router import AgentRouter
@@ -35,7 +33,7 @@ def generate_prompts(
     goals: List[str],
     config: Dict[str, Any],
     logger: logging.Logger,
-) -> pd.DataFrame:
+) -> List[Dict[str, Any]]:
     """
     Generate attack prompts using templates.
 
@@ -45,7 +43,7 @@ def generate_prompts(
         logger: Logger instance
 
     Returns:
-        DataFrame with columns: goal, template_category, template, attack_prompt
+        List of dicts with keys: goal, template_category, template, attack_prompt
     """
     logger.info(f"Generating baseline prompts for {len(goals)} goals...")
 
@@ -74,33 +72,32 @@ def generate_prompts(
                     }
                 )
 
-    df = pd.DataFrame(results)
     logger.info(
-        f"Generated {len(df)} attack prompts across {len(categories)} categories"
+        f"Generated {len(results)} attack prompts across {len(categories)} categories"
     )
 
-    return df
+    return results
 
 
 def execute_prompts(
-    df: pd.DataFrame,
+    data: List[Dict[str, Any]],
     agent_router: AgentRouter,
     config: Dict[str, Any],
     logger: logging.Logger,
-) -> pd.DataFrame:
+) -> List[Dict[str, Any]]:
     """
     Execute attack prompts against target model.
 
     Args:
-        df: DataFrame with attack_prompt column
+        data: List of dicts with attack_prompt key
         agent_router: Target agent router
         config: Configuration dictionary
         logger: Logger instance
 
     Returns:
-        DataFrame with added completion column
+        List of dicts with added completion key
     """
-    logger.info(f"Executing {len(df)} prompts against target model...")
+    logger.info(f"Executing {len(data)} prompts against target model...")
 
     max_tokens = config.get("max_new_tokens", 150)
     temperature = config.get("temperature", 0.7)
@@ -119,14 +116,14 @@ def execute_prompts(
         )
 
     completions = []
-    total_requests = len(df) * n_samples
+    total_requests = len(data) * n_samples
 
     # Use progress bar for visual feedback
     with create_progress_bar("[cyan]Executing baseline prompts...", total_requests) as (
         progress_bar,
         task,
     ):
-        for idx, row in df.iterrows():
+        for idx, row in enumerate(data):
             try:
                 # Prepare request
                 request_data = {
@@ -137,9 +134,10 @@ def execute_prompts(
 
                 # Get completion(s)
                 for _ in range(n_samples):
+                    result_id = None
                     # Use route_with_tracking if available for real-time result creation
                     if run_id and client:
-                        response = agent_router.route_with_tracking(
+                        tracking_result = agent_router.route_with_tracking(
                             registration_key=list(agent_router._agent_registry.keys())[
                                 0
                             ],
@@ -147,6 +145,9 @@ def execute_prompts(
                             run_id=run_id,
                             client=client,
                         )
+                        # route_with_tracking returns {"response": ..., "result_id": ...}
+                        response = tracking_result.get("response")
+                        result_id = tracking_result.get("result_id")
                     else:
                         response = agent_router.route_request(
                             registration_key=list(agent_router._agent_registry.keys())[
@@ -161,9 +162,10 @@ def execute_prompts(
 
                     completions.append(
                         {
-                            **row.to_dict(),
+                            **row,
                             "completion": completion,
                             "response_length": len(completion),
+                            "result_id": result_id,  # Track result ID for later updates
                         }
                     )
 
@@ -174,7 +176,7 @@ def execute_prompts(
                 logger.warning(f"Error executing prompt {idx}: {e}")
                 completions.append(
                     {
-                        **row.to_dict(),
+                        **row,
                         "completion": "",
                         "response_length": 0,
                         "error": str(e),
@@ -183,10 +185,9 @@ def execute_prompts(
                 # Still advance progress on error
                 progress_bar.update(task, advance=n_samples)
 
-    result_df = pd.DataFrame(completions)
-    logger.info(f"Execution complete. Got {len(result_df)} completions")
+    logger.info(f"Execution complete. Got {len(completions)} completions")
 
-    return result_df
+    return completions
 
 
 def execute(
@@ -194,7 +195,7 @@ def execute(
     agent_router: AgentRouter,
     config: Dict[str, Any],
     logger: logging.Logger,
-) -> pd.DataFrame:
+) -> List[Dict[str, Any]]:
     """
     Complete generation pipeline: generate prompts and execute them.
 
@@ -205,12 +206,12 @@ def execute(
         logger: Logger instance
 
     Returns:
-        DataFrame with goals, prompts, and completions
+        List of dicts with goals, prompts, and completions
     """
     # Step 1: Generate prompts
-    prompts_df = generate_prompts(goals, config, logger)
+    prompts_data = generate_prompts(goals, config, logger)
 
     # Step 2: Execute prompts
-    results_df = execute_prompts(prompts_df, agent_router, config, logger)
+    results_data = execute_prompts(prompts_data, agent_router, config, logger)
 
-    return results_df
+    return results_data

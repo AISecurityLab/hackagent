@@ -17,61 +17,76 @@ import logging
 import os
 from typing import Any, Dict, List, Optional
 
-# Attempt to import litellm, but catch ImportError if not installed.
-try:
-    import litellm
-    from litellm.exceptions import (
-        APIConnectionError,
-        APIError,
-        AuthenticationError,
-        BadRequestError,
-        ContextWindowExceededError,
-        NotFoundError,
-        PermissionDeniedError,
-        RateLimitError,
-        ServiceUnavailableError,
-        Timeout,
-    )
-
-    LITELLM_AVAILABLE = True
-except ImportError:
-    litellm = None  # type: ignore
-
-    # Define dummy exceptions if litellm is not available so the rest of the code can type hint
-    class APIConnectionError(Exception):
-        pass
-
-    class RateLimitError(Exception):
-        pass
-
-    class ServiceUnavailableError(Exception):
-        pass
-
-    class Timeout(Exception):
-        pass
-
-    class APIError(Exception):
-        pass
-
-    class AuthenticationError(Exception):
-        pass
-
-    class BadRequestError(Exception):
-        pass
-
-    class NotFoundError(Exception):
-        pass
-
-    class PermissionDeniedError(Exception):
-        pass
-
-    class ContextWindowExceededError(Exception):
-        pass
-
-    LITELLM_AVAILABLE = False
-
-
 from .base import Agent  # Updated import
+
+# Lazy load litellm - only import when actually needed to avoid ~2s startup delay
+# The actual import happens in _get_litellm() method
+_litellm_module = None
+_litellm_exceptions = None
+
+
+def _get_litellm():
+    """Lazily import litellm module. Returns (litellm_module, is_available)."""
+    global _litellm_module, _litellm_exceptions
+    if _litellm_module is not None:
+        return _litellm_module, True
+
+    try:
+        import litellm
+
+        _litellm_module = litellm
+        return litellm, True
+    except ImportError:
+        return None, False
+
+
+def _get_litellm_exceptions():
+    """Lazily import litellm exceptions. Returns dict of exception classes."""
+    global _litellm_exceptions
+    if _litellm_exceptions is not None:
+        return _litellm_exceptions
+
+    try:
+        from litellm.exceptions import (
+            APIConnectionError,
+            APIError,
+            AuthenticationError,
+            BadRequestError,
+            ContextWindowExceededError,
+            NotFoundError,
+            PermissionDeniedError,
+            RateLimitError,
+            ServiceUnavailableError,
+            Timeout,
+        )
+
+        _litellm_exceptions = {
+            "APIConnectionError": APIConnectionError,
+            "APIError": APIError,
+            "AuthenticationError": AuthenticationError,
+            "BadRequestError": BadRequestError,
+            "ContextWindowExceededError": ContextWindowExceededError,
+            "NotFoundError": NotFoundError,
+            "PermissionDeniedError": PermissionDeniedError,
+            "RateLimitError": RateLimitError,
+            "ServiceUnavailableError": ServiceUnavailableError,
+            "Timeout": Timeout,
+        }
+    except ImportError:
+        # Define dummy exceptions if litellm is not available
+        _litellm_exceptions = {
+            "APIConnectionError": Exception,
+            "APIError": Exception,
+            "AuthenticationError": Exception,
+            "BadRequestError": Exception,
+            "ContextWindowExceededError": Exception,
+            "NotFoundError": Exception,
+            "PermissionDeniedError": Exception,
+            "RateLimitError": Exception,
+            "ServiceUnavailableError": Exception,
+            "Timeout": Exception,
+        }
+    return _litellm_exceptions
 
 
 # --- Custom Exceptions ---
@@ -183,14 +198,12 @@ class LiteLLMAgentAdapter(Agent):
                         f"HackAgent model '{self.model_name}' requires HACKAGENT_API_KEY but none found. "
                         f"Requests will likely fail with authentication errors."
                     )
-                    # Use placeholder to avoid immediate failure, let backend reject with clear error
-                    self.actual_api_key = "sk-placeholder-missing-hackagent-key"
             else:
-                # Other custom endpoints (LangChain, etc.) - use placeholder
-                # The actual endpoint will handle its own authentication
-                self.actual_api_key = "sk-placeholder-key-for-custom-endpoint"
+                # Other custom endpoints (LangChain, local APIs, etc.) - no api_key needed
+                # The actual endpoint will handle its own authentication (if any)
+                # If the API requires a key, it will return an authentication error
                 self.logger.debug(
-                    f"Using custom endpoint '{self.api_base_url}' - agent handles its own authentication"
+                    f"Using custom endpoint '{self.api_base_url}' without api_key - endpoint handles its own auth"
                 )
 
         self.logger.info(
@@ -218,9 +231,13 @@ class LiteLLMAgentAdapter(Agent):
             "max_tokens": max_new_tokens,
             "temperature": temperature,
             "top_p": top_p,
-            "api_base": self.api_base_url,
-            "api_key": self.actual_api_key,
         }
+
+        # Only include api_base and api_key if they are set
+        if self.api_base_url:
+            litellm_params["api_base"] = self.api_base_url
+        if self.actual_api_key:
+            litellm_params["api_key"] = self.actual_api_key
 
         # Handle custom endpoint scenarios (LangChain, custom agents, etc.)
         if self.api_base_url:
@@ -304,6 +321,13 @@ class LiteLLMAgentAdapter(Agent):
         **kwargs,
     ) -> str:
         """Execute a single completion using litellm.completion with messages format."""
+        litellm, is_available = _get_litellm()
+        if not is_available:
+            raise LiteLLMConfigurationError("litellm is not installed")
+
+        exceptions = _get_litellm_exceptions()
+        AuthenticationError = exceptions["AuthenticationError"]
+
         try:
             # Log agent interaction for TUI visibility
             if messages:
@@ -343,6 +367,13 @@ class LiteLLMAgentAdapter(Agent):
         """Generate completions for multiple text prompts using litellm.completion."""
         if not texts:
             return []
+
+        litellm, is_available = _get_litellm()
+        if not is_available:
+            raise LiteLLMConfigurationError("litellm is not installed")
+
+        exceptions = _get_litellm_exceptions()
+        AuthenticationError = exceptions["AuthenticationError"]
 
         completions = []
         self.logger.info(
@@ -440,6 +471,10 @@ class LiteLLMAgentAdapter(Agent):
         additional_kwargs = {
             k: v for k, v in request_data.items() if k not in excluded_keys
         }
+
+        # Get exception class for error handling
+        exceptions = _get_litellm_exceptions()
+        AuthenticationError = exceptions["AuthenticationError"]
 
         try:
             completion_text = self._execute_litellm_completion_with_messages(

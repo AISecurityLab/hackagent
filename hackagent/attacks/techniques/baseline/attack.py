@@ -31,16 +31,37 @@ from hackagent.attacks.techniques.base import BaseAttack
 from . import generation, evaluation
 from .config import DEFAULT_TEMPLATE_CONFIG
 
-# TUI logging support (imported conditionally to avoid import errors in non-TUI contexts)
-try:
-    from hackagent.cli.tui.logger import with_tui_logging
-except ImportError:
-    # Fallback decorator that does nothing if TUI is not available
-    def with_tui_logging(*args, **kwargs):
-        def decorator(func):
-            return func
+# TUI logging support - lazy loaded to avoid circular imports
+_with_tui_logging = None
 
-        return decorator
+
+def _get_tui_logging_decorator():
+    """Lazily import the TUI logging decorator to avoid circular imports."""
+    global _with_tui_logging
+    if _with_tui_logging is not None:
+        return _with_tui_logging
+
+    try:
+        from hackagent.cli.tui.logger import with_tui_logging
+
+        _with_tui_logging = with_tui_logging
+    except ImportError:
+
+        def with_tui_logging(*args, **kwargs):
+            def decorator(func):
+                return func
+
+            return decorator
+
+        _with_tui_logging = with_tui_logging
+
+    return _with_tui_logging
+
+
+def with_tui_logging(*args, **kwargs):
+    """Wrapper that lazily loads the actual TUI logging decorator."""
+    decorator = _get_tui_logging_decorator()
+    return decorator(*args, **kwargs)
 
 
 class BaselineAttack(BaseAttack):

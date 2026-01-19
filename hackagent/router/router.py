@@ -25,13 +25,17 @@ from hackagent.models import (
     AgentRequest,
     PatchedAgentRequest,
 )
-from hackagent.router.adapters import ADKAgentAdapter
 from hackagent.router.adapters.base import Agent
-from hackagent.router.adapters.litellm_adapter import LiteLLMAgentAdapter
-from hackagent.router.adapters.openai_adapter import OpenAIAgentAdapter
 from hackagent.router.types import AgentTypeEnum
 
 from ..types import UNSET, Unset
+
+# Adapter imports - these are imported at module level for backwards compatibility
+# with test patching (tests patch hackagent.router.router.LiteLLMAgentAdapter etc.)
+# The actual heavy dependency (litellm) is lazy-loaded within LiteLLMAgentAdapter
+from hackagent.router.adapters import ADKAgentAdapter
+from hackagent.router.adapters.litellm_adapter import LiteLLMAgentAdapter
+from hackagent.router.adapters.openai_adapter import OpenAIAgentAdapter
 
 # Use explicit hierarchical logger name for clarity
 logger = logging.getLogger("hackagent.router")
@@ -418,7 +422,12 @@ class AgentRouter:
                     adapter_instance_config["name"] = self.backend_agent.metadata[
                         "name"
                     ]
-                else:
+                # For custom endpoints, model name is optional (will default to 'default')
+                # Only raise error if no endpoint is configured (i.e., using OpenAI API directly)
+                elif (
+                    "endpoint" not in adapter_instance_config
+                    and not self.backend_agent.endpoint
+                ):
                     raise ValueError(
                         f"OpenAI SDK agent '{name}' (ID: {registration_key}) missing "
                         f"'name' (model string) in adapter_operational_config or backend metadata. "
@@ -977,6 +986,7 @@ class AgentRouter:
         evaluation_status=None,
         raise_on_error: bool = False,
     ) -> Dict[str, Any]:
+        # NOTE: Returns {"response": <agent_response>, "result_id": <uuid_string_or_None>}
         """
         Route a request to an agent and automatically create a Result record.
 
@@ -1045,12 +1055,28 @@ class AgentRouter:
                 body=result_req,
             )
 
+            result_id = None
             if result_response.status_code == 201:
-                if result_response.parsed:
+                # First try the parsed response
+                if result_response.parsed and hasattr(result_response.parsed, "id"):
                     result_id = str(result_response.parsed.id)
                     logger.info(f"✅ Result record created successfully: {result_id}")
                 else:
-                    logger.info("✅ Result record created (status=201)")
+                    # Fallback: extract ID from raw JSON content
+                    # (workaround for API client parsing issue)
+                    import json
+
+                    try:
+                        content_json = json.loads(result_response.content)
+                        if "id" in content_json:
+                            result_id = str(content_json["id"])
+                            logger.info(f"✅ Result record created: {result_id}")
+                        else:
+                            logger.warning("Result created but no 'id' in response")
+                    except Exception as parse_err:
+                        logger.warning(
+                            f"Result created but failed to parse response: {parse_err}"
+                        )
             else:
                 logger.warning(
                     f"⚠️ Result creation failed: status={result_response.status_code}"
@@ -1058,5 +1084,7 @@ class AgentRouter:
 
         except Exception as e:
             logger.error(f"❌ Failed to create Result record: {e}", exc_info=True)
+            result_id = None
 
-        return response
+        # Return both response and result_id for tracking
+        return {"response": response, "result_id": result_id}

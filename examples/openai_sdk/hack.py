@@ -9,7 +9,7 @@ from hackagent import HackAgent
 from hackagent.models import AgentTypeEnum
 
 # Initialize HackAgent for an OpenAI SDK-based agent
-# Note: You'll need to set your HACKAGENT_API_KEY and OPENAI_API_KEY environment variables
+# Note: You'll need to set your OPENAI_API_KEY environment variable
 agent = HackAgent(
     name="openai_agent",
     endpoint="https://api.openai.com/v1",

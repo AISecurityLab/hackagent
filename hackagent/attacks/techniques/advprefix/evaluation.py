@@ -37,15 +37,16 @@ import math
 from collections import defaultdict
 from dataclasses import fields
 from typing import Any, Dict, List, Optional
+from uuid import UUID
 
-import pandas as pd
-
+from hackagent.api.result import result_partial_update
 from hackagent.attacks.techniques.advprefix.evaluators import (
     HarmBenchEvaluator,
     JailbreakBenchEvaluator,
     NuancedEvaluator,
 )
 from hackagent.client import AuthenticatedClient
+from hackagent.models import EvaluationStatusEnum, PatchedResultRequest
 from hackagent.router.types import AgentTypeEnum
 
 from .config import EvaluationPipelineConfig, EvaluatorConfig
@@ -135,6 +136,14 @@ class EvaluationPipeline:
             logger: Logger for tracking execution
             client: Authenticated client for API access
         """
+        # Extract tracking context BEFORE converting to dataclass (which filters unknown fields)
+        self._run_id: Optional[str] = (
+            config.get("_run_id") if isinstance(config, dict) else None
+        )
+        self._tracking_client = (
+            config.get("_client") if isinstance(config, dict) else None
+        )
+
         self.config = (
             EvaluationPipelineConfig.from_dict(config)
             if isinstance(config, dict)
@@ -181,6 +190,19 @@ class EvaluationPipeline:
         Returns:
             List of selected prefix dictionaries ready for final output
         """
+        # Debug: Log input data keys
+        if input_data:
+            sample = input_data[0]
+            self.logger.info(
+                f"📋 Evaluation input: {len(input_data)} rows, sample keys: {list(sample.keys())}"
+            )
+            result_ids_in_input = [
+                r.get("result_id") for r in input_data if r.get("result_id")
+            ]
+            self.logger.info(
+                f"📋 Evaluation input has {len(result_ids_in_input)} result_ids"
+            )
+
         self._statistics["input_count"] = len(input_data)
 
         # Judge Evaluation
@@ -193,6 +215,9 @@ class EvaluationPipeline:
         if not evaluated_data:
             self.logger.warning("No data after evaluation")
             return []
+
+        # Sync evaluation results to server
+        self._sync_evaluation_to_server(evaluated_data)
 
         # Aggregation
         self.logger.info(
@@ -219,6 +244,113 @@ class EvaluationPipeline:
         """Return execution statistics for monitoring and debugging."""
         return self._statistics.copy()
 
+    def _sync_evaluation_to_server(self, evaluated_data: List[Dict]) -> int:
+        """
+        Sync evaluation results to the server by updating each result's status.
+
+        This method iterates through evaluated data and updates the server-side
+        Result records with the evaluation outcome (SUCCESSFUL_JAILBREAK or
+        FAILED_JAILBREAK) based on judge evaluation scores.
+
+        Args:
+            evaluated_data: List of dicts with evaluation results including result_id key
+
+        Returns:
+            Number of results successfully updated
+        """
+        self.logger.info(f"🔄 Starting evaluation sync for {len(evaluated_data)} rows")
+
+        client = self._tracking_client
+        if not client:
+            self.logger.warning(
+                "❌ No tracking client available - cannot sync evaluation to server"
+            )
+            return 0
+
+        # Check if any row has result_id
+        result_ids_found = [
+            row.get("result_id") for row in evaluated_data if row.get("result_id")
+        ]
+        self.logger.info(
+            f"📋 Found {len(result_ids_found)} rows with result_id out of {len(evaluated_data)} total"
+        )
+
+        if not result_ids_found:
+            self.logger.warning("❌ No result_id in data - cannot sync to server")
+            return 0
+
+        updated_count = 0
+        total_with_ids = 0
+
+        for row in evaluated_data:
+            result_id = row.get("result_id")
+            if not result_id:
+                continue
+
+            total_with_ids += 1
+
+            # Determine success based on available evaluation scores
+            # Priority: JailbreakBench > HarmBench > Nuanced
+            # eval_jb/eval_hb/eval_nj: 1 = success (jailbreak), 0 = fail
+            success = False
+            eval_notes_parts = []
+
+            if "eval_jb" in row:
+                success = success or (row["eval_jb"] == 1)
+                eval_notes_parts.append(f"JailbreakBench: {row['eval_jb']}")
+                if "explanation_jb" in row:
+                    eval_notes_parts.append(f"JB explanation: {row['explanation_jb']}")
+
+            if "eval_hb" in row:
+                success = success or (row["eval_hb"] == 1)
+                eval_notes_parts.append(f"HarmBench: {row['eval_hb']}")
+                if "explanation_hb" in row:
+                    eval_notes_parts.append(f"HB explanation: {row['explanation_hb']}")
+
+            if "eval_nj" in row:
+                success = success or (row["eval_nj"] == 1)
+                eval_notes_parts.append(f"Nuanced: {row['eval_nj']}")
+                if "explanation_nj" in row:
+                    eval_notes_parts.append(f"NJ explanation: {row['explanation_nj']}")
+
+            evaluation_notes = " | ".join(eval_notes_parts) if eval_notes_parts else ""
+
+            # Update the result status on the server
+            try:
+                if success:
+                    eval_status = EvaluationStatusEnum.SUCCESSFUL_JAILBREAK
+                else:
+                    eval_status = EvaluationStatusEnum.FAILED_JAILBREAK
+
+                result_request = PatchedResultRequest(
+                    evaluation_status=eval_status,
+                    evaluation_notes=evaluation_notes,
+                )
+
+                response = result_partial_update.sync_detailed(
+                    client=client,
+                    id=UUID(result_id) if isinstance(result_id, str) else result_id,
+                    body=result_request,
+                )
+
+                if response.status_code < 300:
+                    self.logger.info(
+                        f"✅ Updated result {result_id} to {eval_status.value}"
+                    )
+                    updated_count += 1
+                else:
+                    self.logger.warning(
+                        f"❌ Failed to update result {result_id}: status={response.status_code}, content={getattr(response, 'content', 'N/A')}"
+                    )
+
+            except Exception as e:
+                self.logger.error(f"Exception updating result {result_id}: {e}")
+
+        self.logger.info(
+            f"Synced {updated_count}/{total_with_ids} evaluation results to server"
+        )
+        return updated_count
+
     # ========================================================================
     # JUDGE EVALUATION METHODS
     # ========================================================================
@@ -238,8 +370,8 @@ class EvaluationPipeline:
             self.logger.warning("No judges configured, skipping evaluation")
             return input_data
 
-        # Convert to DataFrame for evaluators
-        original_df = pd.DataFrame(input_data)
+        # Keep as list of dicts for evaluators
+        original_data = [row.copy() for row in input_data]
 
         # Base config for evaluators
         evaluator_base_config_dict = {
@@ -251,7 +383,7 @@ class EvaluationPipeline:
             "organization_id": self.config.organization_id,
         }
 
-        judge_results_dfs = {}
+        judge_results = {}
         judges_to_run = self._prepare_judge_configs(
             judge_configs_list, evaluator_base_config_dict
         )
@@ -262,22 +394,22 @@ class EvaluationPipeline:
 
         # Execute judges sequentially
         for judge_type_str, subprocess_config in judges_to_run:
-            evaluated_df = self._run_single_evaluator(
+            evaluated_data = self._run_single_evaluator(
                 judge_type=judge_type_str,
                 config=subprocess_config,
-                df=original_df.copy(),
+                data=[row.copy() for row in original_data],
             )
 
-            if evaluated_df is not None:
-                judge_results_dfs[judge_type_str] = evaluated_df
+            if evaluated_data is not None:
+                judge_results[judge_type_str] = evaluated_data
                 self._statistics["successful_judges"].append(judge_type_str)
             else:
                 self._statistics["failed_judges"].append(judge_type_str)
 
         # Merge results
-        final_df = self._merge_evaluation_results(original_df, judge_results_dfs)
+        final_data = self._merge_evaluation_results(original_data, judge_results)
 
-        return final_df.to_dict(orient="records")
+        return final_data
 
     def _prepare_judge_configs(
         self, judge_configs_list: List[Dict], base_config: Dict[str, Any]
@@ -322,8 +454,9 @@ class EvaluationPipeline:
                 judge_config_item.get("agent_name")
                 or f"judge-{judge_type_str}-{judge_identifier.replace('/', '-')[:20]}"
             )
+            # Default to OPENAI_SDK to avoid Pydantic serialization warnings from LiteLLM
             subprocess_config["agent_type"] = judge_config_item.get(
-                "agent_type", "LITELLM"
+                "agent_type", "OPENAI_SDK"
             )
             subprocess_config["model_id"] = judge_identifier
             subprocess_config["agent_endpoint"] = judge_config_item.get("endpoint")
@@ -354,8 +487,8 @@ class EvaluationPipeline:
         self,
         judge_type: str,
         config: Dict[str, Any],
-        df: pd.DataFrame,
-    ) -> Optional[pd.DataFrame]:
+        data: List[Dict],
+    ) -> Optional[List[Dict]]:
         """Execute a single evaluator process."""
         evaluator_class = EVALUATOR_MAP.get(judge_type)
         if not evaluator_class:
@@ -383,21 +516,31 @@ class EvaluationPipeline:
                     return None
 
             evaluator_config = EvaluatorConfig(**filtered_config)
-            evaluator = evaluator_class(client=self.client, config=evaluator_config)
-            evaluated_df = evaluator.evaluate(df)
+            # Pass tracking context to the evaluator
+            evaluator = evaluator_class(
+                client=self.client,
+                config=evaluator_config,
+                run_id=self._run_id,
+                tracking_client=self._tracking_client,
+            )
+            evaluated_data = evaluator.evaluate(data)
 
             # Return only merge keys + judge-specific columns
             eval_cols = JUDGE_COLUMN_MAP.get(judge_type, [])
-            if not all(key in evaluated_df.columns for key in MERGE_KEYS):
+            if not evaluated_data:
+                return None
+
+            if not all(key in evaluated_data[0] for key in MERGE_KEYS):
                 self.logger.error(
                     f"Evaluation result missing merge keys for {judge_type}"
                 )
                 return None
 
-            cols_to_return = MERGE_KEYS + [
-                col for col in eval_cols if col in evaluated_df.columns
+            cols_to_return = set(MERGE_KEYS + [col for col in eval_cols])
+            return [
+                {k: v for k, v in row.items() if k in cols_to_return}
+                for row in evaluated_data
             ]
-            return evaluated_df[cols_to_return]
 
         except Exception as e:
             self.logger.error(
@@ -408,30 +551,28 @@ class EvaluationPipeline:
             del evaluator
 
     def _merge_evaluation_results(
-        self, original_df: pd.DataFrame, judge_results: Dict[str, pd.DataFrame]
-    ) -> pd.DataFrame:
+        self, original_data: List[Dict], judge_results: Dict[str, List[Dict]]
+    ) -> List[Dict]:
         """Merge evaluation results from multiple judges."""
-        final_df = original_df.copy()
-
-        for judge_type, judge_df in judge_results.items():
+        # Build lookup dictionaries keyed by merge keys
+        for judge_type, judge_data in judge_results.items():
             eval_cols = JUDGE_COLUMN_MAP.get(judge_type, [])
-            judge_cols_present = [col for col in eval_cols if col in judge_df.columns]
-
-            if not judge_cols_present:
-                self.logger.warning(f"No evaluation columns found for {judge_type}")
+            if not judge_data:
                 continue
 
-            try:
-                final_df = final_df.merge(
-                    judge_df,
-                    on=MERGE_KEYS,
-                    how="left",
-                    suffixes=("", f"_{judge_type}_dup"),
-                )
-            except Exception as e:
-                self.logger.error(f"Error merging results for {judge_type}: {e}")
+            # Build lookup by merge keys
+            lookup = {}
+            for row in judge_data:
+                key = tuple(row.get(k) for k in MERGE_KEYS)
+                lookup[key] = {col: row.get(col) for col in eval_cols if col in row}
 
-        return final_df
+            # Merge into original data
+            for row in original_data:
+                key = tuple(row.get(k) for k in MERGE_KEYS)
+                if key in lookup:
+                    row.update(lookup[key])
+
+        return original_data
 
     # ========================================================================
     # AGGREGATION METHODS

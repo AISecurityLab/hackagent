@@ -91,7 +91,7 @@ class BaseAttack(abc.ABC):
             config: Attack configuration (will be merged with DEFAULT_CONFIG)
             client: Authenticated HackAgent client
             agent_router: Target agent router
-            **kwargs: Additional technique-specific parameters (e.g., attacker_router for PAIR)
+            **kwargs: Additional technique-specific parameters
         """
         # Store additional kwargs for subclass access
         for key, value in kwargs.items():

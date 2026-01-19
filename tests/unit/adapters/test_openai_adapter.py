@@ -327,9 +327,9 @@ class TestOpenAIAgentAdapterHandleRequest(unittest.TestCase):
 
     def test_handle_request_api_timeout_error(self):
         """Test handling of API timeout errors."""
-        from hackagent.router.adapters.openai_adapter import APITimeoutError
+        import openai
 
-        self.mock_client.chat.completions.create.side_effect = APITimeoutError(
+        self.mock_client.chat.completions.create.side_effect = openai.APITimeoutError(
             "Request timed out"
         )
 
@@ -342,14 +342,14 @@ class TestOpenAIAgentAdapterHandleRequest(unittest.TestCase):
 
     def test_handle_request_rate_limit_error(self):
         """Test handling of rate limit errors."""
-        from hackagent.router.adapters.openai_adapter import RateLimitError
+        import openai
 
         # Create mock response and body for RateLimitError
         mock_response = MagicMock()
         mock_response.status_code = 429
         mock_body = {"error": {"message": "Rate limit exceeded"}}
 
-        error = RateLimitError(
+        error = openai.RateLimitError(
             "Rate limit exceeded", response=mock_response, body=mock_body
         )
         self.mock_client.chat.completions.create.side_effect = error
@@ -362,11 +362,13 @@ class TestOpenAIAgentAdapterHandleRequest(unittest.TestCase):
 
     def test_handle_request_connection_error(self):
         """Test handling of connection errors."""
-        from hackagent.router.adapters.openai_adapter import APIConnectionError
+        import openai
 
         # APIConnectionError requires a request parameter
         mock_request = MagicMock()
-        error = APIConnectionError(message="Connection failed", request=mock_request)
+        error = openai.APIConnectionError(
+            message="Connection failed", request=mock_request
+        )
         self.mock_client.chat.completions.create.side_effect = error
 
         request_data = {"prompt": "Hello"}

@@ -19,10 +19,39 @@ Base class for all TUI tabs with common functionality.
 """
 
 import httpx
+from rich.text import Text
+from textual.app import ComposeResult
 from textual.containers import Container
+from textual.widgets import Static
 
 from hackagent.cli.config import CLIConfig
 from hackagent.client import AuthenticatedClient
+
+
+class HackAgentHeader(Container):
+    """Custom header with ASCII logo"""
+
+    DEFAULT_CSS = """
+    HackAgentHeader {
+        width: 100%;
+        height: 7;
+        padding: 0 1;
+    }
+
+    HackAgentHeader Static {
+        color: #ff0000;
+        text-style: bold;
+        width: 100%;
+        content-align: center middle;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        from hackagent.utils import HACKAGENT
+
+        # Display the ASCII logo as-is (now side-by-side format)
+        logo_text = Text(HACKAGENT, style="bold red")
+        yield Static(logo_text)
 
 
 class BaseTab(Container):

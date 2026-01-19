@@ -17,37 +17,69 @@ import logging
 import os
 from typing import Any, Dict, List, Optional
 
-# Attempt to import openai, but catch ImportError if not installed.
-try:
-    from openai import (
-        APIConnectionError,
-        APITimeoutError,
-        OpenAI,
-        OpenAIError,
-        RateLimitError,
-    )
-
-    OPENAI_AVAILABLE = True
-except ImportError:
-    OpenAI = None  # type: ignore
-
-    # Define dummy exceptions if openai is not available
-    class OpenAIError(Exception):
-        pass
-
-    class APIConnectionError(Exception):
-        pass
-
-    class RateLimitError(Exception):
-        pass
-
-    class APITimeoutError(Exception):
-        pass
-
-    OPENAI_AVAILABLE = False
-
-
 from .base import Agent
+
+# Lazy-load openai to improve startup time
+_openai_module = None
+_openai_available = None
+
+# Module-level names for test patching compatibility
+# These will be populated when _get_openai() is first called,
+# but tests can patch them directly
+OpenAI = None
+OPENAI_AVAILABLE = None
+
+
+def _get_openai():
+    """Lazily import and return the openai module."""
+    global _openai_module, _openai_available, OpenAI, OPENAI_AVAILABLE
+    if _openai_module is None:
+        try:
+            import openai as _openai
+
+            _openai_module = _openai
+            _openai_available = True
+            # Also set module-level names for compatibility
+            OpenAI = _openai.OpenAI
+            OPENAI_AVAILABLE = True
+        except ImportError:
+            _openai_module = False
+            _openai_available = False
+            OPENAI_AVAILABLE = False
+    return _openai_module if _openai_module else None
+
+
+def _get_openai_exceptions():
+    """Get OpenAI exception classes, or dummy classes if not available."""
+    openai = _get_openai()
+    if openai:
+        return (
+            openai.OpenAIError,
+            openai.APIConnectionError,
+            openai.RateLimitError,
+            openai.APITimeoutError,
+        )
+    else:
+        # Return dummy exceptions
+        return (Exception, Exception, Exception, Exception)
+
+
+def _is_openai_available():
+    """Check if openai is available."""
+    global _openai_available, OPENAI_AVAILABLE
+    # Allow test patches to override OPENAI_AVAILABLE
+    if OPENAI_AVAILABLE is not None:
+        return OPENAI_AVAILABLE
+    if _openai_available is None:
+        _get_openai()
+    return _openai_available
+
+
+def _check_openai_available():
+    global OPENAI_AVAILABLE
+    if OPENAI_AVAILABLE is None:
+        OPENAI_AVAILABLE = _is_openai_available()
+    return OPENAI_AVAILABLE
 
 
 # --- Custom Exceptions ---
@@ -91,7 +123,7 @@ class OpenAIAgentAdapter(Agent):
             f"hackagent.router.adapters.OpenAIAgentAdapter.{self.id}"
         )
 
-        if not OPENAI_AVAILABLE:
+        if not _is_openai_available():
             msg = (
                 f"OpenAI SDK is not installed. Please install it with: pip install openai. "
                 f"OpenAIAgentAdapter: {self.id}"
@@ -99,13 +131,22 @@ class OpenAIAgentAdapter(Agent):
             self.logger.error(msg)
             raise OpenAIConfigurationError(msg)
 
-        if "name" not in self.config:
-            msg = f"Missing required configuration key 'name' (for model string) for OpenAIAgentAdapter: {self.id}"
-            self.logger.error(msg)
-            raise OpenAIConfigurationError(msg)
-
-        self.model_name: str = self.config["name"]
         self.api_base_url: Optional[str] = self.config.get("endpoint")
+
+        # Model name defaults to "default" for custom endpoints (server decides the model)
+        if "name" not in self.config:
+            if self.api_base_url:
+                # Custom endpoint - use a default model name, server will handle it
+                self.model_name = self.config.get("name", "default")
+                self.logger.info(
+                    "No model name specified for custom endpoint, using 'default'"
+                )
+            else:
+                msg = f"Missing required configuration key 'name' (for model string) for OpenAIAgentAdapter: {self.id}"
+                self.logger.error(msg)
+                raise OpenAIConfigurationError(msg)
+        else:
+            self.model_name: str = self.config["name"]
 
         # Handle API key: can be env var name or the key itself
         api_key_config: Optional[str] = self.config.get("api_key")
@@ -118,14 +159,32 @@ class OpenAIAgentAdapter(Agent):
             # Default to OPENAI_API_KEY environment variable
             self.actual_api_key = os.environ.get("OPENAI_API_KEY")
 
+        # For custom endpoints without API key, use a placeholder
+        # (some local servers don't require authentication)
+        if not self.actual_api_key and self.api_base_url:
+            self.actual_api_key = "not-required"
+            self.logger.info(
+                f"No API key configured for custom endpoint '{self.api_base_url}', using placeholder"
+            )
+
         # Initialize OpenAI client
+        # Check for test-patched OpenAI first, then fall back to lazy-loaded module
+        global OpenAI
+        if OpenAI is not None:
+            # Use patched or pre-loaded OpenAI class
+            openai_client_class = OpenAI
+        else:
+            # Lazy load the module
+            openai = _get_openai()
+            openai_client_class = openai.OpenAI
+
         client_kwargs = {}
         if self.actual_api_key:
             client_kwargs["api_key"] = self.actual_api_key
         if self.api_base_url:
             client_kwargs["base_url"] = self.api_base_url
 
-        self.client = OpenAI(**client_kwargs)
+        self.client = openai_client_class(**client_kwargs)
 
         self.logger.info(
             f"OpenAIAgentAdapter '{self.id}' initialized for model: '{self.model_name}'"
@@ -183,6 +242,15 @@ class OpenAIAgentAdapter(Agent):
             # Add any additional kwargs
             openai_params.update(kwargs)
 
+            # Log request parameters at debug level
+            self.logger.debug(
+                f"OpenAI API request params: model={self.model_name}, "
+                f"base_url={self.api_base_url}, "
+                f"messages={messages[:1] if messages else []}, "
+                f"temperature={temperature}, max_tokens={max_tokens}, "
+                f"extra_kwargs={list(kwargs.keys())}"
+            )
+
             # Make the API call
             response = self.client.chat.completions.create(**openai_params)
 
@@ -203,53 +271,69 @@ class OpenAIAgentAdapter(Agent):
 
             return result
 
-        except APITimeoutError as e:
-            self.logger.error(
-                f"OpenAI API timeout for model '{self.model_name}': {e}", exc_info=True
-            )
-            return {
-                "success": False,
-                "error_type": "timeout",
-                "error_message": str(e),
-            }
-        except RateLimitError as e:
-            self.logger.error(
-                f"OpenAI rate limit exceeded for model '{self.model_name}': {e}",
-                exc_info=True,
-            )
-            return {
-                "success": False,
-                "error_type": "rate_limit",
-                "error_message": str(e),
-            }
-        except APIConnectionError as e:
-            self.logger.error(
-                f"OpenAI API connection error for model '{self.model_name}': {e}",
-                exc_info=True,
-            )
-            return {
-                "success": False,
-                "error_type": "connection",
-                "error_message": str(e),
-            }
-        except OpenAIError as e:
-            self.logger.error(
-                f"OpenAI API error for model '{self.model_name}': {e}", exc_info=True
-            )
-            return {
-                "success": False,
-                "error_type": "api_error",
-                "error_message": str(e),
-            }
         except Exception as e:
-            self.logger.exception(
-                f"Unexpected error during OpenAI completion for model '{self.model_name}': {e}"
-            )
-            return {
-                "success": False,
-                "error_type": "unexpected",
-                "error_message": f"{type(e).__name__}: {str(e)}",
-            }
+            # Get OpenAI exceptions dynamically
+            openai = _get_openai()
+            if openai:
+                OpenAIError = openai.OpenAIError
+                APITimeoutError = openai.APITimeoutError
+                RateLimitError = openai.RateLimitError
+                APIConnectionError = openai.APIConnectionError
+            else:
+                # If openai not available, these will never match
+                OpenAIError = APITimeoutError = RateLimitError = APIConnectionError = (
+                    type(None)
+                )
+
+            if isinstance(e, APITimeoutError):
+                self.logger.error(
+                    f"OpenAI API timeout for model '{self.model_name}': {e}",
+                    exc_info=True,
+                )
+                return {
+                    "success": False,
+                    "error_type": "timeout",
+                    "error_message": str(e),
+                }
+            elif isinstance(e, RateLimitError):
+                self.logger.error(
+                    f"OpenAI rate limit exceeded for model '{self.model_name}': {e}",
+                    exc_info=True,
+                )
+                return {
+                    "success": False,
+                    "error_type": "rate_limit",
+                    "error_message": str(e),
+                }
+            elif isinstance(e, APIConnectionError):
+                self.logger.error(
+                    f"OpenAI API connection error for model '{self.model_name}': {e}",
+                    exc_info=True,
+                )
+                return {
+                    "success": False,
+                    "error_type": "connection",
+                    "error_message": str(e),
+                }
+            elif isinstance(e, OpenAIError):
+                self.logger.error(
+                    f"OpenAI API error for model '{self.model_name}': {e}",
+                    exc_info=True,
+                )
+                return {
+                    "success": False,
+                    "error_type": "api_error",
+                    "error_message": str(e),
+                }
+            else:
+                self.logger.exception(
+                    f"Unexpected error during OpenAI completion for model '{self.model_name}': {e}"
+                )
+                return {
+                    "success": False,
+                    "error_type": "unexpected",
+                    "error_message": f"{type(e).__name__}: {str(e)}",
+                }
 
     def handle_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -290,7 +374,10 @@ class OpenAIAgentAdapter(Agent):
         )
 
         # Get parameters with defaults
-        max_tokens = request_data.get("max_tokens", self.default_max_tokens)
+        # Support both max_tokens (OpenAI standard) and max_new_tokens (HuggingFace style)
+        max_tokens = request_data.get("max_tokens") or request_data.get(
+            "max_new_tokens", self.default_max_tokens
+        )
         temperature = request_data.get("temperature", self.default_temperature)
         tools = request_data.get("tools", self.default_tools)
         tool_choice = request_data.get("tool_choice", self.default_tool_choice)
@@ -300,6 +387,7 @@ class OpenAIAgentAdapter(Agent):
             "prompt",
             "messages",
             "max_tokens",
+            "max_new_tokens",  # HuggingFace style, converted to max_tokens above
             "temperature",
             "tools",
             "tool_choice",

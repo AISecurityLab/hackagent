@@ -15,7 +15,6 @@
 """Tests for attack registry."""
 
 import unittest
-from unittest.mock import MagicMock, patch
 
 from hackagent.attacks.orchestrator import AttackOrchestrator
 from hackagent.attacks.registry import (
@@ -24,13 +23,11 @@ from hackagent.attacks.registry import (
     BaselineOrchestrator,
     PAIROrchestrator,
     create_orchestrator,
-    _pair_setup_attacker,
 )
 from hackagent.attacks.techniques.advprefix.attack import AdvPrefixAttack
 from hackagent.attacks.techniques.pair.attack import PAIRAttack
 from hackagent.attacks.techniques.baseline.attack import BaselineAttack
 from hackagent.attacks.techniques.base import BaseAttack
-from hackagent.router.types import AgentTypeEnum
 
 
 class MockAttack(BaseAttack):
@@ -179,109 +176,6 @@ class TestCreateOrchestrator(unittest.TestCase):
         )
 
         self.assertEqual(TestOrchestrator._get_attack_impl_kwargs, custom_setup)
-
-
-class TestPairSetupAttacker(unittest.TestCase):
-    """Test _pair_setup_attacker function."""
-
-    @patch("hackagent.router.AgentRouter")
-    def test_pair_setup_creates_attacker_router(self, mock_agent_router_class):
-        """Test that _pair_setup_attacker creates an attacker router."""
-        # Create a mock orchestrator
-        mock_orchestrator = MagicMock()
-        mock_orchestrator.client = MagicMock()
-        mock_orchestrator._get_attack_impl_kwargs = (
-            AttackOrchestrator._get_attack_impl_kwargs
-        )
-        mock_orchestrator.agent_router = MagicMock()
-
-        attack_config = {
-            "attack": {
-                "goals": ["test goal"],
-                "output_dir": "/tmp/test",
-            },
-            "attacker": {
-                "identifier": "test-attacker",
-                "endpoint": "https://api.openai.com/v1",
-                "model": "gpt-4",
-                "api_key": "test-key",
-            },
-        }
-
-        # Call the function
-        result = _pair_setup_attacker(
-            mock_orchestrator,
-            attack_config,
-            None,
-            "run-123",
-        )
-
-        # Verify attacker_router was created
-        self.assertIn("attacker_router", result)
-        mock_agent_router_class.assert_called_once()
-
-        # Verify AgentRouter was called with correct parameters
-        call_kwargs = mock_agent_router_class.call_args.kwargs
-        self.assertEqual(call_kwargs["name"], "test-attacker")
-        self.assertEqual(call_kwargs["endpoint"], "https://api.openai.com/v1")
-
-    @patch("hackagent.router.AgentRouter")
-    def test_pair_setup_uses_defaults(self, mock_agent_router_class):
-        """Test that _pair_setup_attacker uses defaults when not specified."""
-        mock_orchestrator = MagicMock()
-        mock_orchestrator.client = MagicMock()
-        mock_orchestrator._get_attack_impl_kwargs = (
-            AttackOrchestrator._get_attack_impl_kwargs
-        )
-        mock_orchestrator.agent_router = MagicMock()
-
-        attack_config = {
-            "attack": {
-                "goals": ["test goal"],
-                "output_dir": "/tmp/test",
-            },
-            # No attacker config - use defaults
-        }
-
-        _pair_setup_attacker(
-            mock_orchestrator,
-            attack_config,
-            None,
-            "run-123",
-        )
-
-        # Verify defaults were used
-        call_kwargs = mock_agent_router_class.call_args.kwargs
-        self.assertEqual(call_kwargs["name"], "hackagent-attacker")
-        self.assertEqual(call_kwargs["endpoint"], "https://api.openai.com/v1")
-
-    @patch("hackagent.router.AgentRouter")
-    def test_pair_setup_uses_agent_type_enum(self, mock_agent_router_class):
-        """Test that _pair_setup_attacker uses AgentTypeEnum.OPENAI_SDK."""
-        mock_orchestrator = MagicMock()
-        mock_orchestrator.client = MagicMock()
-        mock_orchestrator._get_attack_impl_kwargs = (
-            AttackOrchestrator._get_attack_impl_kwargs
-        )
-        mock_orchestrator.agent_router = MagicMock()
-
-        attack_config = {
-            "attack": {
-                "goals": ["test goal"],
-                "output_dir": "/tmp/test",
-            },
-        }
-
-        _pair_setup_attacker(
-            mock_orchestrator,
-            attack_config,
-            None,
-            "run-123",
-        )
-
-        # Verify agent_type is the enum, not a string
-        call_kwargs = mock_agent_router_class.call_args.kwargs
-        self.assertEqual(call_kwargs["agent_type"], AgentTypeEnum.OPENAI_SDK)
 
 
 if __name__ == "__main__":

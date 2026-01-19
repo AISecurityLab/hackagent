@@ -13,19 +13,18 @@
 # limitations under the License.
 
 import logging
-from typing import Any, Dict, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 from hackagent import utils
-from hackagent.attacks.registry import (
-    AdvPrefixOrchestrator,
-    BaselineOrchestrator,
-    PAIROrchestrator,
-)
 from hackagent.client import AuthenticatedClient
 from hackagent.errors import HackAgentError
 from hackagent.router import AgentRouter
 from hackagent.router.types import AgentTypeEnum
 from hackagent.vulnerabilities.prompts import DEFAULT_PROMPTS
+
+# Lazy import for attack orchestrators to avoid ~0.5s startup delay
+if TYPE_CHECKING:
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +65,6 @@ class HackAgent:
         api_key: Optional[str] = None,
         raise_on_unexpected_status: bool = False,
         timeout: Optional[float] = None,
-        env_file_path: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
         adapter_operational_config: Optional[Dict[str, Any]] = None,
     ):
@@ -94,22 +92,18 @@ class HackAgent:
             base_url: The base URL for the HackAgent API service.
             api_key: The API key for authenticating with the HackAgent API.
                 If omitted, the client will attempt to retrieve it from the
-                `HACKAGENT_API_KEY` environment variable. The `env_file_path`
-                parameter can specify a .env file to load this variable from.
+                config file (~/.config/hackagent/config.json).
             raise_on_unexpected_status: If set to `True`, the API client will
                 raise an exception for any HTTP status codes that are not typically
                 expected for a successful operation. Defaults to `False`.
             timeout: The timeout duration in seconds for API requests made by the
                 authenticated client. Defaults to `None` (which might mean a
                 default timeout from the underlying HTTP library is used).
-            env_file_path: An optional path to a .env file. If provided, environment
-                variables (such as `HACKAGENT_API_KEY`) will be loaded from this
-                file if not already present in the environment.
+            metadata: Optional dictionary containing agent-specific metadata.
+            adapter_operational_config: Optional configuration for the agent adapter.
         """
 
-        resolved_auth_token = utils.resolve_api_token(
-            direct_api_key_param=api_key, env_file_path=env_file_path
-        )
+        resolved_auth_token = utils.resolve_api_token(direct_api_key_param=api_key)
 
         # Use default base_url if not provided
         if base_url is None:
@@ -136,11 +130,26 @@ class HackAgent:
             adapter_operational_config=adapter_operational_config,
         )
 
-        self.attack_strategies = {
-            "advprefix": AdvPrefixOrchestrator(hack_agent=self),
-            "baseline": BaselineOrchestrator(hack_agent=self),
-            "pair": PAIROrchestrator(hack_agent=self),
-        }
+        # Attack strategies are lazy-loaded to improve startup time
+        self._attack_strategies: Optional[Dict[str, Any]] = None
+
+    @property
+    def attack_strategies(self) -> Dict[str, Any]:
+        """Lazy-loaded attack strategies dictionary."""
+        if self._attack_strategies is None:
+            # Import here to avoid circular imports and improve startup time
+            from hackagent.attacks.registry import (
+                AdvPrefixOrchestrator,
+                BaselineOrchestrator,
+                PAIROrchestrator,
+            )
+
+            self._attack_strategies = {
+                "advprefix": AdvPrefixOrchestrator(hack_agent=self),
+                "baseline": BaselineOrchestrator(hack_agent=self),
+                "pair": PAIROrchestrator(hack_agent=self),
+            }
+        return self._attack_strategies
 
     def hack(
         self,

@@ -96,30 +96,7 @@ def load_config_file(path: str) -> Dict[str, Any]:
 
 def display_results_table(results: Any, title: str = "Results") -> None:
     """Display results in a formatted table"""
-    import pandas as pd
-
-    if isinstance(results, pd.DataFrame):
-        if results.empty:
-            console.print(f"[yellow]ℹ️ No {title.lower()} found")
-            return
-
-        table = Table(title=title, show_header=True, header_style="bold cyan")
-
-        # Add columns
-        for column in results.columns:
-            table.add_column(str(column))
-
-        # Add rows (limit to first 20 for display)
-        display_results = results.head(20)
-        for _, row in display_results.iterrows():
-            table.add_row(*[str(value) for value in row])
-
-        console.print(table)
-
-        if len(results) > 20:
-            console.print(f"[dim]... and {len(results) - 20} more rows")
-
-    elif isinstance(results, list):
+    if isinstance(results, list):
         if not results:
             console.print(f"[yellow]ℹ️ No {title.lower()} found")
             return

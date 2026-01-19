@@ -831,8 +831,10 @@ class TestAgentRouterRouteWithTracking(unittest.TestCase):
         # Verify result was created
         mock_result_create.assert_called_once()
 
-        # Verify response was returned
-        self.assertEqual(response, {"response": "test response"})
+        # Verify response structure includes both response and result_id
+        self.assertIn("response", response)
+        self.assertIn("result_id", response)
+        self.assertEqual(response["response"], {"response": "test response"})
 
     @patch("hackagent.api.run.run_result_create.sync_detailed")
     def test_route_with_tracking_handles_result_creation_failure(
@@ -858,8 +860,9 @@ class TestAgentRouterRouteWithTracking(unittest.TestCase):
             client=self.mock_client,
         )
 
-        # Response should still be returned
-        self.assertEqual(response, {"response": "test response"})
+        # Response should still be returned with None result_id
+        self.assertEqual(response["response"], {"response": "test response"})
+        self.assertIsNone(response["result_id"])
 
     @patch("hackagent.api.run.run_result_create.sync_detailed")
     def test_route_with_tracking_handles_exception(self, mock_result_create):
@@ -881,8 +884,9 @@ class TestAgentRouterRouteWithTracking(unittest.TestCase):
             client=self.mock_client,
         )
 
-        # Response should still be returned
-        self.assertEqual(response, {"response": "test response"})
+        # Response should still be returned with None result_id
+        self.assertEqual(response["response"], {"response": "test response"})
+        self.assertIsNone(response["result_id"])
 
     @patch("hackagent.api.run.run_result_create.sync_detailed")
     def test_route_with_tracking_with_custom_evaluation_status(
