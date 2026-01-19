@@ -1057,11 +1057,26 @@ class AgentRouter:
 
             result_id = None
             if result_response.status_code == 201:
-                if result_response.parsed:
+                # First try the parsed response
+                if result_response.parsed and hasattr(result_response.parsed, "id"):
                     result_id = str(result_response.parsed.id)
                     logger.info(f"✅ Result record created successfully: {result_id}")
                 else:
-                    logger.info("✅ Result record created (status=201)")
+                    # Fallback: extract ID from raw JSON content
+                    # (workaround for API client parsing issue)
+                    import json
+
+                    try:
+                        content_json = json.loads(result_response.content)
+                        if "id" in content_json:
+                            result_id = str(content_json["id"])
+                            logger.info(f"✅ Result record created: {result_id}")
+                        else:
+                            logger.warning("Result created but no 'id' in response")
+                    except Exception as parse_err:
+                        logger.warning(
+                            f"Result created but failed to parse response: {parse_err}"
+                        )
             else:
                 logger.warning(
                     f"⚠️ Result creation failed: status={result_response.status_code}"

@@ -21,7 +21,6 @@ using a factory function to eliminate boilerplate code.
 The factory dynamically creates orchestrator classes that configure:
 - attack_type: String identifier for the attack
 - attack_impl_class: BaseAttack subclass implementing the algorithm
-- Custom methods: Optional specialized behavior (e.g., PAIR's attacker setup)
 
 To add a new attack:
 1. Implement BaseAttack subclass in techniques/your_attack/
@@ -29,14 +28,13 @@ To add a new attack:
 3. Add to ATTACK_REGISTRY dict
 """
 
-from typing import Any, Callable, Dict, Optional, Type
+from typing import Callable, Optional, Type
 
 from hackagent.attacks.orchestrator import AttackOrchestrator
 from hackagent.attacks.techniques.advprefix import AdvPrefixAttack
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.techniques.pair import PAIRAttack
 from hackagent.attacks.techniques.baseline import BaselineAttack
-from hackagent.router.types import AgentTypeEnum
 
 
 def create_orchestrator(
@@ -70,50 +68,17 @@ def create_orchestrator(
         "__doc__": f"{attack_name}: {attack_impl_class.__doc__ or 'Attack technique orchestrator'}",
     }
 
-    # Add custom method if provided (e.g., PAIR's attacker router setup)
+    # Add custom method if provided
     if custom_setup:
         class_attrs["_get_attack_impl_kwargs"] = custom_setup
 
     return type(f"{attack_name}Orchestrator", (AttackOrchestrator,), class_attrs)
 
 
-def _pair_setup_attacker(
-    self,
-    attack_config: Dict[str, Any],
-    run_config_override: Optional[Dict[str, Any]],
-    run_id: str,
-) -> Dict[str, Any]:
-    """
-    PAIR-specific setup: creates attacker router for adversarial prompt generation.
-
-    PAIR uses a separate LLM as an "attacker" to generate adversarial prompts
-    that are then tested against the target agent.
-    """
-    kwargs = AttackOrchestrator._get_attack_impl_kwargs(
-        self, attack_config, run_config_override, run_id
-    )
-
-    attacker_config = attack_config.get("attacker", {})
-
-    from hackagent.router import AgentRouter
-
-    kwargs["attacker_router"] = AgentRouter(
-        client=self.client,
-        name=attacker_config.get("identifier", "hackagent-attacker"),
-        agent_type=AgentTypeEnum.OPENAI_SDK,
-        endpoint=attacker_config.get("endpoint", "https://api.openai.com/v1"),
-        metadata=attacker_config,
-        adapter_operational_config=attacker_config,
-        overwrite_metadata=True,
-    )
-
-    return kwargs
-
-
-# Create orchestrators using factory (1 line per attack instead of 6-50 lines)
+# Create orchestrators using factory (1 line per attack)
 AdvPrefixOrchestrator = create_orchestrator("AdvPrefix", AdvPrefixAttack)
 BaselineOrchestrator = create_orchestrator("Baseline", BaselineAttack)
-PAIROrchestrator = create_orchestrator("PAIR", PAIRAttack, _pair_setup_attacker)
+PAIROrchestrator = create_orchestrator("PAIR", PAIRAttack)
 
 
 # Registry of all available attacks

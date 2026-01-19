@@ -221,11 +221,12 @@ def _get_completion_via_router(
         "adapter_specific_events": None,
         "error_message": None,
         "log_message": None,  # For per-prefix logging by the main loop
+        "result_id": None,  # ID for updating evaluation status later
     }
 
     # Use route_with_tracking if we have run_id and client for real-time result creation
     if run_id and client:
-        logger_instance.info(f"🔍 Calling route_with_tracking with run_id={run_id}")
+        logger_instance.debug(f"Calling route_with_tracking with run_id={run_id}")
         tracking_result = agent_router.route_with_tracking(
             registration_key=agent_reg_key,
             request_data=request_data,
@@ -234,6 +235,12 @@ def _get_completion_via_router(
         )
         # route_with_tracking returns {"response": ..., "result_id": ...}
         response = tracking_result.get("response", tracking_result)
+        # Capture result_id for later evaluation updates
+        result_dict["result_id"] = tracking_result.get("result_id")
+        if result_dict["result_id"]:
+            logger_instance.debug(
+                f"Captured result_id={result_dict['result_id']} for evaluation tracking"
+            )
     else:
         logger_instance.warning(
             f"⚠️ Using fallback route_request (run_id={run_id}, client={client is not None})"
@@ -442,6 +449,14 @@ def execute(
             "adapter_specific_events"
         )
         result["error_message"] = completion_result.get("error_message")
+        # Pass through result_id for evaluation status updates
+        result["result_id"] = completion_result.get("result_id")
         results.append(result)
+
+    # Debug: verify result_ids are being passed through
+    result_ids_in_output = [r.get("result_id") for r in results if r.get("result_id")]
+    logger.info(
+        f"📊 Completions execute returning {len(results)} results with {len(result_ids_in_output)} result_ids"
+    )
 
     return results

@@ -1011,6 +1011,8 @@ class ResultsTab(Container):
     BINDINGS = [
         Binding("enter", "view_result", "View Details"),
         Binding("s", "show_summary", "Summary"),
+        Binding("c", "toggle_compare", "Compare Runs"),
+        Binding("d", "show_dashboard", "Dashboard"),
         Binding("pageup", "prev_page", "Previous Page", show=False),
         Binding("pagedown", "next_page", "Next Page", show=False),
         Binding("[", "prev_page", "Previous Page"),
@@ -1036,6 +1038,11 @@ class ResultsTab(Container):
         self.selected_result: Any = None
         self._detail_page: int = 0  # Current page for result details pagination
         self._run_id_map: dict[str, Any] = {}  # Map run ID strings to run objects
+        self._compare_runs: list[Any] = []  # Runs selected for comparison
+        self._show_dashboard: bool = False  # Toggle dashboard view
+        self._total_count: int = (
+            0  # Total number of runs from API (for correct numbering)
+        )
 
     def compose(self) -> ComposeResult:
         """Compose the results layout with horizontal split."""
@@ -1050,6 +1057,8 @@ class ResultsTab(Container):
                 yield Button("🔄 Refresh", id="refresh-results", variant="primary")
                 yield Button("📊 CSV", id="export-csv", variant="default")
                 yield Button("📄 JSON", id="export-json", variant="default")
+                yield Button("⚖️ Compare", id="compare-btn", variant="warning")
+                yield Button("📈 Dashboard", id="dashboard-btn", variant="success")
 
             with Horizontal(classes="toolbar"):
                 yield Label("Filter:")
@@ -1218,6 +1227,12 @@ class ResultsTab(Container):
                 all_runs = response.parsed.results if response.parsed.results else []
 
                 self.results_data = all_runs if all_runs else []
+                # Store total count for correct run numbering
+                self._total_count = (
+                    response.parsed.count
+                    if response.parsed.count
+                    else len(self.results_data)
+                )
 
                 if not self.results_data:
                     self._show_empty_state(
@@ -1297,9 +1312,15 @@ class ResultsTab(Container):
 
             sorted_runs = sorted(self.results_data, key=get_timestamp)
 
+            # Calculate the starting number based on total count and displayed results
+            # If we have 50 total runs and display 10, the oldest displayed run should be #41
+            # The newest displayed run should be #50
+            num_displayed = len(sorted_runs)
+            start_number = self._total_count - num_displayed + 1
+
             # Create list of (run, stable_number) pairs, then reverse for display
-            # so newest appears on top but oldest is still #1
-            numbered_runs = list(enumerate(sorted_runs, start=1))
+            # so newest appears on top but oldest still has its correct global number
+            numbered_runs = list(enumerate(sorted_runs, start=start_number))
             numbered_runs.reverse()  # Newest on top, oldest at bottom
 
             for idx, run in numbered_runs:

@@ -22,6 +22,7 @@ an attacker LLM to iteratively refine jailbreak prompts.
 import copy
 import json
 import logging
+import os
 import re
 from typing import Any, Dict, List, Optional
 
@@ -31,6 +32,7 @@ from hackagent.attacks.shared.progress import create_progress_bar
 from hackagent.client import AuthenticatedClient
 from hackagent.models import StatusEnum
 from hackagent.router.router import AgentRouter
+from hackagent.router.types import AgentTypeEnum
 
 from .config import (
     ATTACKER_SYSTEM_PROMPT,
@@ -84,15 +86,12 @@ class PAIRAttack(BaseAttack):
         config: Optional[Dict[str, Any]] = None,
         client: Optional[AuthenticatedClient] = None,
         agent_router: Optional[AgentRouter] = None,
-        attacker_router: Optional[AgentRouter] = None,
     ):
         """Initialize PAIR attack."""
         if client is None:
             raise ValueError("AuthenticatedClient must be provided.")
         if agent_router is None:
             raise ValueError("Target AgentRouter must be provided.")
-        if attacker_router is None:
-            raise ValueError("Attacker AgentRouter must be provided.")
 
         # Merge config
         current_config = copy.deepcopy(DEFAULT_PAIR_CONFIG)
@@ -102,16 +101,80 @@ class PAIRAttack(BaseAttack):
         # Set logger name for hierarchical logging
         self.logger = logging.getLogger("hackagent.attacks.pair")
 
-        # Call parent - attacker_router passed as kwarg for special handling
-        super().__init__(
-            current_config, client, agent_router, attacker_router=attacker_router
-        )
+        # Call parent
+        super().__init__(current_config, client, agent_router)
+
+        # Initialize attacker router from config (similar to AdvPrefix's generator)
+        self.attacker_router = self._initialize_attacker_router()
+        if self.attacker_router is None:
+            raise ValueError("Failed to initialize attacker router from config.")
 
         # Load objective
         objective_name = self.config.get("objective", "jailbreak")
         if objective_name not in OBJECTIVES:
             raise ValueError(f"Unknown objective: {objective_name}")
         self.objective = OBJECTIVES[objective_name]
+
+    def _initialize_attacker_router(self) -> Optional[AgentRouter]:
+        """
+        Initialize and configure the AgentRouter for the attacker LLM.
+
+        Similar to AdvPrefix's _initialize_generation_router, this creates
+        the router internally based on the 'attacker' config section.
+        """
+        try:
+            attacker_config = self.config.get("attacker", {})
+
+            endpoint = attacker_config.get("endpoint", "https://api.hackagent.dev/v1")
+            model_name = attacker_config.get("identifier", "hackagent-attacker")
+
+            # Handle API key - use client token as default, allow override
+            api_key = self.client.token
+            api_key_config = attacker_config.get("api_key")
+            if api_key_config:
+                env_key = os.environ.get(api_key_config)
+                api_key = env_key if env_key else api_key_config
+
+            operational_config = {
+                "name": attacker_config.get("model", model_name),
+                "endpoint": endpoint,
+                "api_key": api_key,
+                "max_new_tokens": attacker_config.get("max_new_tokens", 500),
+                "temperature": attacker_config.get("temperature", 1.0),
+            }
+
+            # Use OPENAI_SDK by default, allow override
+            agent_type_str = attacker_config.get("agent_type", "OPENAI_SDK")
+            try:
+                agent_type = AgentTypeEnum(agent_type_str.upper())
+            except ValueError:
+                self.logger.warning(
+                    f"Invalid agent_type '{agent_type_str}', defaulting to OPENAI_SDK"
+                )
+                agent_type = AgentTypeEnum.OPENAI_SDK
+
+            router = AgentRouter(
+                client=self.client,
+                name=model_name,
+                agent_type=agent_type,
+                endpoint=endpoint,
+                adapter_operational_config=operational_config,
+                metadata=operational_config.copy(),
+                overwrite_metadata=True,
+            )
+
+            if not router._agent_registry:
+                self.logger.error("Router initialized but no agent registered")
+                return None
+
+            self.logger.debug(f"Attacker router initialized for {model_name}")
+            return router
+
+        except Exception as e:
+            self.logger.error(
+                f"Failed to initialize attacker router: {e}", exc_info=True
+            )
+            return None
 
     def _validate_config(self):
         """Validate configuration."""

@@ -37,13 +37,16 @@ import math
 from collections import defaultdict
 from dataclasses import fields
 from typing import Any, Dict, List, Optional
+from uuid import UUID
 
+from hackagent.api.result import result_partial_update
 from hackagent.attacks.techniques.advprefix.evaluators import (
     HarmBenchEvaluator,
     JailbreakBenchEvaluator,
     NuancedEvaluator,
 )
 from hackagent.client import AuthenticatedClient
+from hackagent.models import EvaluationStatusEnum, PatchedResultRequest
 from hackagent.router.types import AgentTypeEnum
 
 from .config import EvaluationPipelineConfig, EvaluatorConfig
@@ -187,6 +190,19 @@ class EvaluationPipeline:
         Returns:
             List of selected prefix dictionaries ready for final output
         """
+        # Debug: Log input data keys
+        if input_data:
+            sample = input_data[0]
+            self.logger.info(
+                f"📋 Evaluation input: {len(input_data)} rows, sample keys: {list(sample.keys())}"
+            )
+            result_ids_in_input = [
+                r.get("result_id") for r in input_data if r.get("result_id")
+            ]
+            self.logger.info(
+                f"📋 Evaluation input has {len(result_ids_in_input)} result_ids"
+            )
+
         self._statistics["input_count"] = len(input_data)
 
         # Judge Evaluation
@@ -199,6 +215,9 @@ class EvaluationPipeline:
         if not evaluated_data:
             self.logger.warning("No data after evaluation")
             return []
+
+        # Sync evaluation results to server
+        self._sync_evaluation_to_server(evaluated_data)
 
         # Aggregation
         self.logger.info(
@@ -224,6 +243,113 @@ class EvaluationPipeline:
     def get_statistics(self) -> Dict[str, Any]:
         """Return execution statistics for monitoring and debugging."""
         return self._statistics.copy()
+
+    def _sync_evaluation_to_server(self, evaluated_data: List[Dict]) -> int:
+        """
+        Sync evaluation results to the server by updating each result's status.
+
+        This method iterates through evaluated data and updates the server-side
+        Result records with the evaluation outcome (SUCCESSFUL_JAILBREAK or
+        FAILED_JAILBREAK) based on judge evaluation scores.
+
+        Args:
+            evaluated_data: List of dicts with evaluation results including result_id key
+
+        Returns:
+            Number of results successfully updated
+        """
+        self.logger.info(f"🔄 Starting evaluation sync for {len(evaluated_data)} rows")
+
+        client = self._tracking_client
+        if not client:
+            self.logger.warning(
+                "❌ No tracking client available - cannot sync evaluation to server"
+            )
+            return 0
+
+        # Check if any row has result_id
+        result_ids_found = [
+            row.get("result_id") for row in evaluated_data if row.get("result_id")
+        ]
+        self.logger.info(
+            f"📋 Found {len(result_ids_found)} rows with result_id out of {len(evaluated_data)} total"
+        )
+
+        if not result_ids_found:
+            self.logger.warning("❌ No result_id in data - cannot sync to server")
+            return 0
+
+        updated_count = 0
+        total_with_ids = 0
+
+        for row in evaluated_data:
+            result_id = row.get("result_id")
+            if not result_id:
+                continue
+
+            total_with_ids += 1
+
+            # Determine success based on available evaluation scores
+            # Priority: JailbreakBench > HarmBench > Nuanced
+            # eval_jb/eval_hb/eval_nj: 1 = success (jailbreak), 0 = fail
+            success = False
+            eval_notes_parts = []
+
+            if "eval_jb" in row:
+                success = success or (row["eval_jb"] == 1)
+                eval_notes_parts.append(f"JailbreakBench: {row['eval_jb']}")
+                if "explanation_jb" in row:
+                    eval_notes_parts.append(f"JB explanation: {row['explanation_jb']}")
+
+            if "eval_hb" in row:
+                success = success or (row["eval_hb"] == 1)
+                eval_notes_parts.append(f"HarmBench: {row['eval_hb']}")
+                if "explanation_hb" in row:
+                    eval_notes_parts.append(f"HB explanation: {row['explanation_hb']}")
+
+            if "eval_nj" in row:
+                success = success or (row["eval_nj"] == 1)
+                eval_notes_parts.append(f"Nuanced: {row['eval_nj']}")
+                if "explanation_nj" in row:
+                    eval_notes_parts.append(f"NJ explanation: {row['explanation_nj']}")
+
+            evaluation_notes = " | ".join(eval_notes_parts) if eval_notes_parts else ""
+
+            # Update the result status on the server
+            try:
+                if success:
+                    eval_status = EvaluationStatusEnum.SUCCESSFUL_JAILBREAK
+                else:
+                    eval_status = EvaluationStatusEnum.FAILED_JAILBREAK
+
+                result_request = PatchedResultRequest(
+                    evaluation_status=eval_status,
+                    evaluation_notes=evaluation_notes,
+                )
+
+                response = result_partial_update.sync_detailed(
+                    client=client,
+                    id=UUID(result_id) if isinstance(result_id, str) else result_id,
+                    body=result_request,
+                )
+
+                if response.status_code < 300:
+                    self.logger.info(
+                        f"✅ Updated result {result_id} to {eval_status.value}"
+                    )
+                    updated_count += 1
+                else:
+                    self.logger.warning(
+                        f"❌ Failed to update result {result_id}: status={response.status_code}, content={getattr(response, 'content', 'N/A')}"
+                    )
+
+            except Exception as e:
+                self.logger.error(f"Exception updating result {result_id}: {e}")
+
+        self.logger.info(
+            f"Synced {updated_count}/{total_with_ids} evaluation results to server"
+        )
+        return updated_count
 
     # ========================================================================
     # JUDGE EVALUATION METHODS
