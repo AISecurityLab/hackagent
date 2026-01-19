@@ -28,16 +28,11 @@ _openai_available = None
 # but tests can patch them directly
 OpenAI = None
 OPENAI_AVAILABLE = None
-_OpenAIError = None
-_APIConnectionError = None
-_RateLimitError = None
-_APITimeoutError = None
 
 
 def _get_openai():
     """Lazily import and return the openai module."""
     global _openai_module, _openai_available, OpenAI, OPENAI_AVAILABLE
-    global _OpenAIError, _APIConnectionError, _RateLimitError, _APITimeoutError
     if _openai_module is None:
         try:
             import openai as _openai
@@ -47,32 +42,11 @@ def _get_openai():
             # Also set module-level names for compatibility
             OpenAI = _openai.OpenAI
             OPENAI_AVAILABLE = True
-            _OpenAIError = _openai.OpenAIError
-            _APIConnectionError = _openai.APIConnectionError
-            _RateLimitError = _openai.RateLimitError
-            _APITimeoutError = _openai.APITimeoutError
         except ImportError:
             _openai_module = False
             _openai_available = False
             OPENAI_AVAILABLE = False
     return _openai_module if _openai_module else None
-
-
-def __getattr__(name):
-    """Lazy module-level attribute access for exception classes."""
-    # Map exception names to their private globals
-    exception_map = {
-        "OpenAIError": "_OpenAIError",
-        "APIConnectionError": "_APIConnectionError",
-        "RateLimitError": "_RateLimitError",
-        "APITimeoutError": "_APITimeoutError",
-    }
-    if name in exception_map:
-        # Ensure openai is loaded
-        _get_openai()
-        # Return the exception class (may be None if openai not available)
-        return globals().get(exception_map[name])
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def _get_openai_exceptions():
@@ -99,10 +73,6 @@ def _is_openai_available():
     if _openai_available is None:
         _get_openai()
     return _openai_available
-
-
-# For backward compatibility - make it a simple function call
-OPENAI_AVAILABLE = None  # Will be set lazily
 
 
 def _check_openai_available():

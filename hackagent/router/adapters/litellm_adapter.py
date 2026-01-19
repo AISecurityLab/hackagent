@@ -15,7 +15,7 @@
 
 import logging
 import os
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from .base import Agent  # Updated import
 
@@ -87,11 +87,6 @@ def _get_litellm_exceptions():
             "Timeout": Exception,
         }
     return _litellm_exceptions
-
-
-# For backwards compatibility and type checking
-if TYPE_CHECKING:
-    from litellm.exceptions import AuthenticationError
 
 
 # --- Custom Exceptions ---
