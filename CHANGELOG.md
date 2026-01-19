@@ -1,3 +1,32 @@
+## v0.4.1 (2026-01-19)
+
+### 🐛🚑️ Fixes
+
+- **removing-openAI-api-key**: Removing the openAI-api-key requested by the litellm adapter
+- **Visualization**: improving TUI and visualization of the results
+- **removing-openAI-api-key**: Removing the openAI-api-key requested by the litellm adapter
+
+### bump
+
+- **deps**: bump textual from 6.6.0 to 7.3.0
+- **deps-dev**: bump pytest from 8.4.2 to 9.0.2
+- **deps-dev**: bump anyio from 4.11.0 to 4.12.1
+- **deps-dev**: bump commitizen from 4.10.0 to 4.11.6
+- **deps-dev**: bump openapi-python-client from 0.25.3 to 0.28.1
+- **deps-dev**: bump pre-commit from 4.5.0 to 4.5.1
+- **deps-dev**: bump pytest-asyncio from 1.0.0 to 1.3.0
+- **deps**: bump litellm from 1.80.0 to 1.80.16
+- **deps-dev**: bump mcp from 1.21.2 to 1.25.0
+- **deps-dev**: bump google-adk from 1.19.0 to 1.22.1
+
+### ✅🤡🧪 Tests
+
+- **import**: incorrect import
+
+### 🚨 Linting
+
+- **unused-code**: Removed unused code within the files
+
 ## v0.4.0 (2026-01-15)
 
 ### ✨ Features
