@@ -255,18 +255,38 @@ class StepTracker:
             Sanitized configuration dictionary
         """
         sensitive_keys = {"api_key", "token", "secret", "password", "key"}
+        # Keys that contain non-serializable objects (like client instances)
+        skip_keys = {"_client", "client"}
 
         sanitized = {}
         for key, value in config.items():
+            # Skip non-serializable objects
+            if key in skip_keys:
+                sanitized[key] = f"<{type(value).__name__}>"
+                continue
+
             key_lower = key.lower()
             if any(sensitive in key_lower for sensitive in sensitive_keys):
                 sanitized[key] = "***REDACTED***"
             elif isinstance(value, dict):
                 sanitized[key] = self._sanitize_config(value)
+            elif not self._is_json_serializable(value):
+                # Skip non-JSON-serializable values
+                sanitized[key] = f"<{type(value).__name__}>"
             else:
                 sanitized[key] = value
 
         return sanitized
+
+    def _is_json_serializable(self, value: Any) -> bool:
+        """Check if a value is JSON serializable."""
+        import json
+
+        try:
+            json.dumps(value)
+            return True
+        except (TypeError, ValueError):
+            return False
 
     def _handle_step_error(self, step_name: str, error_message: str) -> None:
         """

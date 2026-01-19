@@ -105,8 +105,9 @@ class BaseAttack(abc.ABC):
         # This allows subclass to merge with its own defaults first
         self.config = config
 
-        # Run setup
-        self.run_id = self.config.get("run_id")
+        # Run setup - check both "run_id" and "_run_id" for backwards compatibility
+        # The orchestrator passes "_run_id" while direct usage may use "run_id"
+        self.run_id = self.config.get("_run_id") or self.config.get("run_id")
         self.run_dir = self.config.get("output_dir", "./logs/runs")
 
         # Tracking

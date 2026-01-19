@@ -1082,9 +1082,170 @@ class AgentRouter:
                     f"⚠️ Result creation failed: status={result_response.status_code}"
                 )
 
+            # Create traces for this result if we have a result_id
+            if result_id:
+                self._create_traces_for_result(
+                    result_id=result_id,
+                    client=client,
+                    request_data=request_data,
+                    response=response,
+                )
+
         except Exception as e:
             logger.error(f"❌ Failed to create Result record: {e}", exc_info=True)
             result_id = None
 
         # Return both response and result_id for tracking
         return {"response": response, "result_id": result_id}
+
+    def _create_traces_for_result(
+        self,
+        result_id: str,
+        client,
+        request_data: Dict[str, Any],
+        response: Any,
+    ) -> None:
+        """
+        Create trace records for a result capturing the agent execution details.
+
+        Args:
+            result_id: The UUID of the result to attach traces to
+            client: Authenticated client for API calls
+            request_data: The original request data sent to the agent
+            response: The response from the agent
+        """
+        from ..api.result import result_trace_create
+        from ..models import TraceRequest, StepTypeEnum
+
+        sequence = 0
+
+        try:
+            result_uuid = UUID(result_id)
+
+            # Trace 1: Capture the user input/request
+            sequence += 1
+            input_trace = TraceRequest(
+                sequence=sequence,
+                step_type=StepTypeEnum.OTHER,
+                content={
+                    "step_name": "User Request",
+                    "messages": request_data.get("messages", []),
+                    "prompt": request_data.get("prompt", ""),
+                },
+            )
+            result_trace_create.sync_detailed(
+                id=result_uuid,
+                client=client,
+                body=input_trace,
+            )
+            logger.debug(f"Created input trace for result {result_id}")
+
+            # Trace 2: Capture tool calls if present
+            if hasattr(response, "tool_calls") and response.tool_calls:
+                for tool_call in response.tool_calls:
+                    sequence += 1
+                    tool_trace = TraceRequest(
+                        sequence=sequence,
+                        step_type=StepTypeEnum.TOOL_CALL,
+                        content={
+                            "step_name": "Tool Call",
+                            "tool_name": tool_call.get("function", {}).get(
+                                "name", "unknown"
+                            )
+                            if isinstance(tool_call, dict)
+                            else getattr(
+                                getattr(tool_call, "function", None), "name", "unknown"
+                            ),
+                            "tool_id": tool_call.get("id", "")
+                            if isinstance(tool_call, dict)
+                            else getattr(tool_call, "id", ""),
+                            "arguments": tool_call.get("function", {}).get(
+                                "arguments", ""
+                            )
+                            if isinstance(tool_call, dict)
+                            else getattr(
+                                getattr(tool_call, "function", None), "arguments", ""
+                            ),
+                        },
+                    )
+                    result_trace_create.sync_detailed(
+                        id=result_uuid,
+                        client=client,
+                        body=tool_trace,
+                    )
+                logger.debug(f"Created {len(response.tool_calls)} tool call traces")
+
+            # Check dict response for tool_calls
+            elif isinstance(response, dict) and response.get("tool_calls"):
+                for tool_call in response["tool_calls"]:
+                    sequence += 1
+                    tool_trace = TraceRequest(
+                        sequence=sequence,
+                        step_type=StepTypeEnum.TOOL_CALL,
+                        content={
+                            "step_name": "Tool Call",
+                            "tool_name": tool_call.get("function", {}).get(
+                                "name", "unknown"
+                            ),
+                            "tool_id": tool_call.get("id", ""),
+                            "arguments": tool_call.get("function", {}).get(
+                                "arguments", ""
+                            ),
+                        },
+                    )
+                    result_trace_create.sync_detailed(
+                        id=result_uuid,
+                        client=client,
+                        body=tool_trace,
+                    )
+                logger.debug(f"Created {len(response['tool_calls'])} tool call traces")
+
+            # Trace 3: Capture the agent response
+            sequence += 1
+            response_content = ""
+            if hasattr(response, "choices") and response.choices:
+                choice = response.choices[0]
+                if hasattr(choice, "message") and choice.message:
+                    response_content = getattr(choice.message, "content", "") or ""
+            elif isinstance(response, dict):
+                if "choices" in response and response["choices"]:
+                    response_content = (
+                        response["choices"][0].get("message", {}).get("content", "")
+                    )
+                elif "generated_text" in response:
+                    response_content = response["generated_text"]
+                elif "content" in response:
+                    response_content = response["content"]
+
+            response_trace = TraceRequest(
+                sequence=sequence,
+                step_type=StepTypeEnum.AGENT_RESPONSE_CHUNK,
+                content={
+                    "step_name": "Agent Response",
+                    "response": response_content[:5000]
+                    if response_content
+                    else "",  # Truncate large responses
+                    "finish_reason": self._extract_finish_reason(response),
+                },
+            )
+            result_trace_create.sync_detailed(
+                id=result_uuid,
+                client=client,
+                body=response_trace,
+            )
+            logger.info(f"✅ Created {sequence} traces for result {result_id}")
+
+        except Exception as e:
+            logger.warning(f"Failed to create traces for result {result_id}: {e}")
+
+    def _extract_finish_reason(self, response: Any) -> str:
+        """Extract finish_reason from response."""
+        if hasattr(response, "choices") and response.choices:
+            choice = response.choices[0]
+            if hasattr(choice, "finish_reason"):
+                return choice.finish_reason or "unknown"
+        elif isinstance(response, dict) and "choices" in response:
+            choices = response.get("choices", [])
+            if choices:
+                return choices[0].get("finish_reason", "unknown")
+        return "unknown"
