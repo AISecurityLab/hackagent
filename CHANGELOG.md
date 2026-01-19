@@ -1,3 +1,23 @@
+## v0.4.2 (2026-01-19)
+
+### 🐛🚑️ Fixes
+
+- **Traces**: Add proper tracing
+- **Traces**: Add proper tracing
+
+### ✅🤡🧪 Tests
+
+- **OS-&-Python-versions**: Added compilation to different OS and pyhton versions
+- **Pyhon-3.9-excluded**: python 3.9 is excluded
+- **OS-&-Python-versions**: Added compilation to different OS and pyhton versions
+
+### 📝💡 Documentation
+
+- **Datasets**: Adding Huggingface datasets to the documentation
+- **Datasets**: Adding Huggingface datasets to the documentation
+- **Datasets**: Adding Huggingface datasets to the documentation
+- **Datasets**: Adding HuggingFace datasets to load goals
+
 ## v0.4.1 (2026-01-19)
 
 ### 🐛🚑️ Fixes
