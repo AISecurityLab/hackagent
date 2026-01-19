@@ -83,7 +83,7 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
-      label: '� Datasets',
+      label: '📊 Datasets',
       link: {
         type: 'doc',
         id: 'datasets/index',
@@ -97,7 +97,7 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
-      label: '�🔌 Integrations',
+      label: '🔌 Integrations',
       items: [
         'integrations/google-adk',
       ],
