@@ -16,14 +16,20 @@
 Template generation module for baseline attacks.
 
 Generates attack prompts by combining predefined templates with goals.
+
+Result Tracking:
+    Uses Tracker to create one Result per goal, with traces for each
+    template attempt. This provides better organization where each Result
+    represents a complete attack attempt on a single goal.
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from hackagent.attacks.shared.templates import AttackTemplates
 from hackagent.attacks.shared.progress import create_progress_bar
 from hackagent.router.router import AgentRouter
+from hackagent.router.tracking import Tracker
 
 
 logger = logging.getLogger("hackagent.attacks.baseline.generation")
@@ -84,15 +90,20 @@ def execute_prompts(
     agent_router: AgentRouter,
     config: Dict[str, Any],
     logger: logging.Logger,
+    goal_tracker: Optional[Tracker] = None,
 ) -> List[Dict[str, Any]]:
     """
     Execute attack prompts against target model.
+
+    Uses Tracker (if provided) to add traces for each interaction,
+    grouping all attempts under a single Result per goal.
 
     Args:
         data: List of dicts with attack_prompt key
         agent_router: Target agent router
         config: Configuration dictionary
         logger: Logger instance
+        goal_tracker: Optional Tracker for per-goal result tracking
 
     Returns:
         List of dicts with added completion key
@@ -103,20 +114,48 @@ def execute_prompts(
     temperature = config.get("temperature", 0.7)
     n_samples = config.get("n_samples_per_template", 1)
 
-    # Extract tracking information from config
+    # Extract tracking information from config (for backwards compatibility)
     run_id = config.get("_run_id")
     client = config.get("_client")
 
-    logger.info(
-        f"📊 Baseline tracking context: run_id={run_id}, client={'Present' if client else 'Missing'}"
-    )
-    if not run_id or not client:
-        logger.warning(
-            "⚠️ Missing tracking context in baseline - results will NOT be created!"
+    # Use Tracker if provided, otherwise log warning
+    if goal_tracker:
+        logger.info("📊 Using Tracker for per-goal result tracking")
+    elif run_id and client:
+        logger.info(f"📊 Creating Tracker for baseline (run_id={run_id})")
+        goal_tracker = Tracker(
+            client=client,
+            run_id=run_id,
+            logger=logger,
+            attack_type="baseline",
         )
+    else:
+        logger.warning("⚠️ Missing tracking context - results will NOT be created!")
 
     completions = []
     total_requests = len(data) * n_samples
+
+    # Group data by goal for organized tracking
+    goals_data: Dict[str, List[Dict[str, Any]]] = {}
+    for row in data:
+        goal = row.get("goal", "unknown")
+        if goal not in goals_data:
+            goals_data[goal] = []
+        goals_data[goal].append(row)
+
+    # Create goal results upfront if using Tracker
+    goal_contexts = {}
+    if goal_tracker:
+        for goal_idx, goal in enumerate(goals_data.keys()):
+            ctx = goal_tracker.create_goal_result(
+                goal=goal,
+                goal_index=goal_idx,
+                initial_metadata={
+                    "num_templates": len(goals_data[goal]),
+                    "n_samples_per_template": n_samples,
+                },
+            )
+            goal_contexts[goal] = ctx
 
     # Use progress bar for visual feedback
     with create_progress_bar("[cyan]Executing baseline prompts...", total_requests) as (
@@ -124,6 +163,9 @@ def execute_prompts(
         task,
     ):
         for idx, row in enumerate(data):
+            goal = row.get("goal", "unknown")
+            goal_ctx = goal_contexts.get(goal) if goal_tracker else None
+
             try:
                 # Prepare request
                 request_data = {
@@ -133,39 +175,46 @@ def execute_prompts(
                 }
 
                 # Get completion(s)
-                for _ in range(n_samples):
-                    result_id = None
-                    # Use route_with_tracking if available for real-time result creation
-                    if run_id and client:
-                        tracking_result = agent_router.route_with_tracking(
-                            registration_key=list(agent_router._agent_registry.keys())[
-                                0
-                            ],
-                            request_data=request_data,
-                            run_id=run_id,
-                            client=client,
-                        )
-                        # route_with_tracking returns {"response": ..., "result_id": ...}
-                        response = tracking_result.get("response")
-                        result_id = tracking_result.get("result_id")
-                    else:
-                        response = agent_router.route_request(
-                            registration_key=list(agent_router._agent_registry.keys())[
-                                0
-                            ],
-                            request_data=request_data,
-                        )
+                for sample_idx in range(n_samples):
+                    # Route request WITHOUT automatic result creation
+                    # (we're using Tracker for organized tracking instead)
+                    response = agent_router.route_request(
+                        registration_key=list(agent_router._agent_registry.keys())[0],
+                        request_data=request_data,
+                    )
 
                     completion = ""
                     if response and hasattr(response, "choices") and response.choices:
                         completion = response.choices[0].message.content or ""
+                    elif isinstance(response, dict):
+                        completion = (
+                            response.get("generated_text")
+                            or response.get("processed_response")
+                            or ""
+                        )
+
+                    # Add trace for this interaction if tracking
+                    if goal_tracker and goal_ctx:
+                        goal_tracker.add_interaction_trace(
+                            ctx=goal_ctx,
+                            request=request_data,
+                            response=response,
+                            step_name=f"Template: {row.get('template_category', 'unknown')}",
+                            metadata={
+                                "template_category": row.get("template_category"),
+                                "sample_index": sample_idx,
+                                "response_length": len(completion),
+                            },
+                        )
 
                     completions.append(
                         {
                             **row,
                             "completion": completion,
                             "response_length": len(completion),
-                            "result_id": result_id,  # Track result ID for later updates
+                            "goal_index": list(goals_data.keys()).index(goal)
+                            if goal in goals_data
+                            else idx,
                         }
                     )
 
@@ -174,16 +223,41 @@ def execute_prompts(
 
             except Exception as e:
                 logger.warning(f"Error executing prompt {idx}: {e}")
+
+                # Add error trace if tracking
+                if goal_tracker and goal_ctx:
+                    goal_tracker.add_custom_trace(
+                        ctx=goal_ctx,
+                        step_name="Execution Error",
+                        content={
+                            "error": str(e),
+                            "template_category": row.get("template_category"),
+                            "attack_prompt": row.get("attack_prompt", "")[:200],
+                        },
+                    )
+
                 completions.append(
                     {
                         **row,
                         "completion": "",
                         "response_length": 0,
                         "error": str(e),
+                        "goal_index": list(goals_data.keys()).index(goal)
+                        if goal in goals_data
+                        else idx,
                     }
                 )
                 # Still advance progress on error
                 progress_bar.update(task, advance=n_samples)
+
+    logger.info(f"Execution complete. Got {len(completions)} completions")
+
+    # Store goal_tracker in config for evaluation phase to use
+    if goal_tracker:
+        config["_goal_tracker"] = goal_tracker
+        config["_goal_contexts"] = goal_contexts
+
+    return completions
 
     logger.info(f"Execution complete. Got {len(completions)} completions")
 

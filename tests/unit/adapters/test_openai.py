@@ -17,8 +17,8 @@ import logging
 import unittest
 from unittest.mock import MagicMock, patch
 
-from hackagent.router.adapters.openai_adapter import (
-    OpenAIAgentAdapter,
+from hackagent.router.adapters.openai import (
+    OpenAIAgent,
     OpenAIConfigurationError,
 )
 
@@ -26,11 +26,11 @@ from hackagent.router.adapters.openai_adapter import (
 logging.disable(logging.CRITICAL)
 
 
-class TestOpenAIAgentAdapterInit(unittest.TestCase):
-    """Test initialization of OpenAIAgentAdapter."""
+class TestOpenAIAgentInit(unittest.TestCase):
+    """Test initialization of OpenAIAgent."""
 
-    @patch("hackagent.router.adapters.openai_adapter.OPENAI_AVAILABLE", True)
-    @patch("hackagent.router.adapters.openai_adapter.OpenAI")
+    @patch("hackagent.router.adapters.openai.OPENAI_AVAILABLE", True)
+    @patch("hackagent.router.adapters.openai.OpenAI")
     def test_init_success_with_required_config(self, mock_openai_class):
         """Test successful initialization with minimum required config."""
         adapter_id = "openai_test_agent_001"
@@ -40,7 +40,7 @@ class TestOpenAIAgentAdapterInit(unittest.TestCase):
         mock_client = MagicMock()
         mock_openai_class.return_value = mock_client
 
-        adapter = OpenAIAgentAdapter(id=adapter_id, config=config)
+        adapter = OpenAIAgent(id=adapter_id, config=config)
 
         self.assertEqual(adapter.id, adapter_id)
         self.assertEqual(adapter.model_name, "gpt-4")
@@ -48,8 +48,8 @@ class TestOpenAIAgentAdapterInit(unittest.TestCase):
         self.assertEqual(adapter.default_temperature, 1.0)
         mock_openai_class.assert_called_once()
 
-    @patch("hackagent.router.adapters.openai_adapter.OPENAI_AVAILABLE", True)
-    @patch("hackagent.router.adapters.openai_adapter.OpenAI")
+    @patch("hackagent.router.adapters.openai.OPENAI_AVAILABLE", True)
+    @patch("hackagent.router.adapters.openai.OpenAI")
     @patch.dict("os.environ", {"CUSTOM_API_KEY": "test-key-123"})
     def test_init_with_api_key_from_env(self, mock_openai_class):
         """Test initialization with API key from environment variable."""
@@ -61,13 +61,13 @@ class TestOpenAIAgentAdapterInit(unittest.TestCase):
         mock_client = MagicMock()
         mock_openai_class.return_value = mock_client
 
-        adapter = OpenAIAgentAdapter(id=adapter_id, config=config)
+        adapter = OpenAIAgent(id=adapter_id, config=config)
 
         self.assertEqual(adapter.actual_api_key, "test-key-123")
         mock_openai_class.assert_called_once_with(api_key="test-key-123")
 
-    @patch("hackagent.router.adapters.openai_adapter.OPENAI_AVAILABLE", True)
-    @patch("hackagent.router.adapters.openai_adapter.OpenAI")
+    @patch("hackagent.router.adapters.openai.OPENAI_AVAILABLE", True)
+    @patch("hackagent.router.adapters.openai.OpenAI")
     def test_init_with_custom_endpoint(self, mock_openai_class):
         """Test initialization with custom API endpoint."""
         adapter_id = "openai_test_agent_003"
@@ -78,7 +78,7 @@ class TestOpenAIAgentAdapterInit(unittest.TestCase):
         mock_client = MagicMock()
         mock_openai_class.return_value = mock_client
 
-        adapter = OpenAIAgentAdapter(id=adapter_id, config=config)
+        adapter = OpenAIAgent(id=adapter_id, config=config)
 
         self.assertEqual(adapter.api_base_url, "https://custom.openai.proxy.com/v1")
         # Verify OpenAI was called with the correct base_url (api_key may vary)
@@ -88,8 +88,8 @@ class TestOpenAIAgentAdapterInit(unittest.TestCase):
             call_kwargs.get("base_url"), "https://custom.openai.proxy.com/v1"
         )
 
-    @patch("hackagent.router.adapters.openai_adapter.OPENAI_AVAILABLE", True)
-    @patch("hackagent.router.adapters.openai_adapter.OpenAI")
+    @patch("hackagent.router.adapters.openai.OPENAI_AVAILABLE", True)
+    @patch("hackagent.router.adapters.openai.OpenAI")
     def test_init_with_generation_parameters(self, mock_openai_class):
         """Test initialization with custom generation parameters."""
         adapter_id = "openai_test_agent_004"
@@ -103,7 +103,7 @@ class TestOpenAIAgentAdapterInit(unittest.TestCase):
         mock_client = MagicMock()
         mock_openai_class.return_value = mock_client
 
-        adapter = OpenAIAgentAdapter(id=adapter_id, config=config)
+        adapter = OpenAIAgent(id=adapter_id, config=config)
 
         self.assertEqual(adapter.default_max_tokens, 500)
         self.assertEqual(adapter.default_temperature, 0.7)
@@ -115,19 +115,19 @@ class TestOpenAIAgentAdapterInit(unittest.TestCase):
         with self.assertRaisesRegex(
             OpenAIConfigurationError, "Missing required configuration key 'name'"
         ):
-            OpenAIAgentAdapter(id="err_agent_1", config={})
+            OpenAIAgent(id="err_agent_1", config={})
 
-    @patch("hackagent.router.adapters.openai_adapter.OPENAI_AVAILABLE", False)
+    @patch("hackagent.router.adapters.openai.OPENAI_AVAILABLE", False)
     def test_init_without_openai_installed_raises_error(self):
         """Test that initialization fails gracefully when OpenAI SDK not installed."""
         with self.assertRaisesRegex(
             OpenAIConfigurationError, "OpenAI SDK is not installed"
         ):
-            OpenAIAgentAdapter(id="err_agent_2", config={"name": "gpt-4"})
+            OpenAIAgent(id="err_agent_2", config={"name": "gpt-4"})
 
 
-class TestOpenAIAgentAdapterHandleRequest(unittest.TestCase):
-    """Test handle_request method of OpenAIAgentAdapter."""
+class TestOpenAIAgentHandleRequest(unittest.TestCase):
+    """Test handle_request method of OpenAIAgent."""
 
     def setUp(self):
         """Set up test fixtures."""
@@ -140,11 +140,9 @@ class TestOpenAIAgentAdapterHandleRequest(unittest.TestCase):
 
         # Patch at module level
         self.openai_patch = patch(
-            "hackagent.router.adapters.openai_adapter.OPENAI_AVAILABLE", True
+            "hackagent.router.adapters.openai.OPENAI_AVAILABLE", True
         )
-        self.openai_class_patch = patch(
-            "hackagent.router.adapters.openai_adapter.OpenAI"
-        )
+        self.openai_class_patch = patch("hackagent.router.adapters.openai.OpenAI")
 
         self.openai_patch.start()
         self.mock_openai_class = self.openai_class_patch.start()
@@ -152,7 +150,7 @@ class TestOpenAIAgentAdapterHandleRequest(unittest.TestCase):
         self.mock_client = MagicMock()
         self.mock_openai_class.return_value = self.mock_client
 
-        self.adapter = OpenAIAgentAdapter(id=self.adapter_id, config=self.config)
+        self.adapter = OpenAIAgent(id=self.adapter_id, config=self.config)
 
     def tearDown(self):
         """Clean up patches."""
@@ -204,7 +202,7 @@ class TestOpenAIAgentAdapterHandleRequest(unittest.TestCase):
         self.assertIsNone(response["error_message"])
         self.assertEqual(response["generated_text"], "This is a test response")
         self.assertEqual(response["agent_id"], self.adapter_id)
-        self.assertEqual(response["adapter_type"], "OpenAIAgentAdapter")
+        self.assertEqual(response["adapter_type"], "OpenAIAgent")
 
         # Verify agent specific data
         self.assertEqual(response["agent_specific_data"]["model_name"], "gpt-4")
@@ -412,17 +410,17 @@ class TestOpenAIAgentAdapterHandleRequest(unittest.TestCase):
         self.assertEqual(call_kwargs["temperature"], 0.5)
 
 
-class TestOpenAIAgentAdapterIntegration(unittest.TestCase):
-    """Integration-style tests for OpenAIAgentAdapter."""
+class TestOpenAIAgentIntegration(unittest.TestCase):
+    """Integration-style tests for OpenAIAgent."""
 
-    @patch("hackagent.router.adapters.openai_adapter.OPENAI_AVAILABLE", True)
-    @patch("hackagent.router.adapters.openai_adapter.OpenAI")
+    @patch("hackagent.router.adapters.openai.OPENAI_AVAILABLE", True)
+    @patch("hackagent.router.adapters.openai.OpenAI")
     def test_full_conversation_flow(self, mock_openai_class):
         """Test a full conversation flow with multiple messages."""
         mock_client = MagicMock()
         mock_openai_class.return_value = mock_client
 
-        adapter = OpenAIAgentAdapter(
+        adapter = OpenAIAgent(
             id="conversation_test", config={"name": "gpt-4", "temperature": 0.7}
         )
 
@@ -461,7 +459,7 @@ class TestOpenAIAgentAdapterIntegration(unittest.TestCase):
         self.assertEqual(response["agent_specific_data"]["model_name"], "gpt-4")
 
 
-class TestOpenAIAgentAdapterReasoningModels(unittest.TestCase):
+class TestOpenAIAgentReasoningModels(unittest.TestCase):
     """Test reasoning model support (e.g., o1-preview, o1-mini)."""
 
     def setUp(self):
@@ -474,11 +472,9 @@ class TestOpenAIAgentAdapterReasoningModels(unittest.TestCase):
 
         # Patch at module level
         self.openai_patch = patch(
-            "hackagent.router.adapters.openai_adapter.OPENAI_AVAILABLE", True
+            "hackagent.router.adapters.openai.OPENAI_AVAILABLE", True
         )
-        self.openai_class_patch = patch(
-            "hackagent.router.adapters.openai_adapter.OpenAI"
-        )
+        self.openai_class_patch = patch("hackagent.router.adapters.openai.OpenAI")
 
         self.openai_patch.start()
         self.mock_openai_class = self.openai_class_patch.start()
@@ -486,7 +482,7 @@ class TestOpenAIAgentAdapterReasoningModels(unittest.TestCase):
         self.mock_client = MagicMock()
         self.mock_openai_class.return_value = self.mock_client
 
-        self.adapter = OpenAIAgentAdapter(id=self.adapter_id, config=self.config)
+        self.adapter = OpenAIAgent(id=self.adapter_id, config=self.config)
 
     def tearDown(self):
         """Clean up patches."""

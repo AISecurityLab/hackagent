@@ -224,11 +224,47 @@ class ConfigTab(VerticalScroll):
 
         return f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
+    def _get_required_packages(self) -> list[str]:
+        """Get required packages from installed package metadata."""
+        import re
+        from importlib.metadata import requires
+
+        # Map pypi package names to import names
+        package_to_import = {
+            "pyyaml": "yaml",
+            "python-dateutil": "dateutil",
+        }
+
+        try:
+            # Get dependencies from installed package metadata
+            deps = requires("hackagent")
+            if not deps:
+                return []
+
+            packages = []
+            for dep in deps:
+                # Skip optional dependencies (those with extras like "; extra == ...")
+                if "extra" in dep:
+                    continue
+                # Get package name before version specifier
+                pkg_name = re.split(r"[<>=!~\[;\s]", dep)[0].strip()
+                if pkg_name:
+                    # Map to import name if needed
+                    import_name = package_to_import.get(pkg_name.lower(), pkg_name)
+                    packages.append(import_name)
+
+            return packages
+        except Exception:
+            return []
+
     def _check_dependencies(self) -> str:
         """Check if required dependencies are installed."""
         import importlib.util
 
-        required_packages = ["pandas", "yaml", "litellm", "textual"]
+        required_packages = self._get_required_packages()
+        if not required_packages:
+            return "[yellow]⚠️ Could not read package dependencies[/yellow]"
+
         missing = [
             pkg for pkg in required_packages if importlib.util.find_spec(pkg) is None
         ]

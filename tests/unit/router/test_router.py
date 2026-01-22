@@ -15,8 +15,8 @@ class TestAgentRouterInitialization(unittest.TestCase):
     @patch("hackagent.router.router.agent_list")
     @patch("hackagent.router.router.agent_create")
     @patch("hackagent.router.router.agent_partial_update")
-    @patch("hackagent.router.router.LiteLLMAgentAdapter", autospec=True)
-    @patch("hackagent.router.router.ADKAgentAdapter", autospec=True)
+    @patch("hackagent.router.router.LiteLLMAgent", autospec=True)
+    @patch("hackagent.router.router.ADKAgent", autospec=True)
     @patch("hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
     def test_agent_router_init_creates_new_agent_if_not_exists(
         self,
@@ -31,8 +31,8 @@ class TestAgentRouterInitialization(unittest.TestCase):
         MockAgentMap[AgentTypeEnum.GOOGLE_ADK] = MockADKAdapter
         MockAgentMap[AgentTypeEnum.LITELLM] = MockLiteLLMAdapter
 
-        MockADKAdapter.__name__ = "ADKAgentAdapter"
-        MockLiteLLMAdapter.__name__ = "LiteLLMAgentAdapter"
+        MockADKAdapter.__name__ = "ADKAgent"
+        MockLiteLLMAdapter.__name__ = "LiteLLMAgent"
 
         mock_client = MagicMock(spec=AuthenticatedClient)
         mock_client.token = "test_token_prefix_12345"
@@ -141,8 +141,8 @@ class TestAgentRouterInitialization(unittest.TestCase):
     @patch("hackagent.router.router.agent_list")
     @patch("hackagent.router.router.agent_create")
     @patch("hackagent.router.router.agent_partial_update")
-    @patch("hackagent.router.router.LiteLLMAgentAdapter", autospec=True)
-    @patch("hackagent.router.router.ADKAgentAdapter", autospec=True)
+    @patch("hackagent.router.router.LiteLLMAgent", autospec=True)
+    @patch("hackagent.router.router.ADKAgent", autospec=True)
     @patch("hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
     def test_agent_router_init_updates_existing_agent_if_metadata_differs(
         self,
@@ -156,8 +156,8 @@ class TestAgentRouterInitialization(unittest.TestCase):
         # --- MOCK SETUP ---
         MockAgentMap[AgentTypeEnum.GOOGLE_ADK] = MockADKAdapter
         MockAgentMap[AgentTypeEnum.LITELLM] = MockLiteLLMAdapter
-        MockADKAdapter.__name__ = "ADKAgentAdapter"
-        MockLiteLLMAdapter.__name__ = "LiteLLMAgentAdapter"
+        MockADKAdapter.__name__ = "ADKAgent"
+        MockLiteLLMAdapter.__name__ = "LiteLLMAgent"
 
         mock_client = MagicMock(spec=AuthenticatedClient)
         mock_client.token = "test_token_prefix_existing_agent"
@@ -271,8 +271,8 @@ class TestAgentRouterInitialization(unittest.TestCase):
     @patch("hackagent.router.router.agent_list")
     @patch("hackagent.router.router.agent_create")
     @patch("hackagent.router.router.agent_partial_update")
-    @patch("hackagent.router.router.LiteLLMAgentAdapter", autospec=True)
-    @patch("hackagent.router.router.ADKAgentAdapter", autospec=True)
+    @patch("hackagent.router.router.LiteLLMAgent", autospec=True)
+    @patch("hackagent.router.router.ADKAgent", autospec=True)
     @patch("hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
     def test_agent_router_init_existing_agent_metadata_matches_overwrite_true(
         self,
@@ -285,9 +285,9 @@ class TestAgentRouterInitialization(unittest.TestCase):
     ):
         # --- MOCK SETUP ---
         MockAgentMap[AgentTypeEnum.GOOGLE_ADK] = MockADKAdapter
-        MockADKAdapter.__name__ = "ADKAgentAdapter"
+        MockADKAdapter.__name__ = "ADKAgent"
         # MockLiteLLMAdapter not used in this specific ADK test but keep for consistency
-        MockLiteLLMAdapter.__name__ = "LiteLLMAgentAdapter"
+        MockLiteLLMAdapter.__name__ = "LiteLLMAgent"
 
         mock_client = MagicMock(spec=AuthenticatedClient)
         mock_client.token = "test_token_metadata_m_atch_suffix"
@@ -375,8 +375,8 @@ class TestAgentRouterInitialization(unittest.TestCase):
     @patch("hackagent.router.router.agent_list")
     @patch("hackagent.router.router.agent_create")
     @patch("hackagent.router.router.agent_partial_update")
-    @patch("hackagent.router.router.LiteLLMAgentAdapter", autospec=True)
-    @patch("hackagent.router.router.ADKAgentAdapter", autospec=True)
+    @patch("hackagent.router.router.LiteLLMAgent", autospec=True)
+    @patch("hackagent.router.router.ADKAgent", autospec=True)
     @patch("hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
     def test_agent_router_init_existing_agent_metadata_matches_overwrite_false(
         self,
@@ -389,8 +389,8 @@ class TestAgentRouterInitialization(unittest.TestCase):
     ):
         # --- MOCK SETUP ---
         MockAgentMap[AgentTypeEnum.GOOGLE_ADK] = MockADKAdapter
-        MockADKAdapter.__name__ = "ADKAgentAdapter"
-        MockLiteLLMAdapter.__name__ = "LiteLLMAgentAdapter"
+        MockADKAdapter.__name__ = "ADKAgent"
+        MockLiteLLMAdapter.__name__ = "LiteLLMAgent"
 
         mock_client = MagicMock(spec=AuthenticatedClient)
         mock_client.token = "test_token_meta_match_overwrite_false"
@@ -470,8 +470,8 @@ class TestAgentRouterInitialization(unittest.TestCase):
     @patch("hackagent.router.router.agent_list")
     @patch("hackagent.router.router.agent_create")
     @patch("hackagent.router.router.agent_partial_update")
-    @patch("hackagent.router.router.LiteLLMAgentAdapter", autospec=True)
-    @patch("hackagent.router.router.ADKAgentAdapter", autospec=True)
+    @patch("hackagent.router.router.LiteLLMAgent", autospec=True)
+    @patch("hackagent.router.router.ADKAgent", autospec=True)
     @patch("hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
     def test_agent_router_init_existing_agent_metadata_differs_overwrite_false(
         self,
@@ -484,8 +484,8 @@ class TestAgentRouterInitialization(unittest.TestCase):
     ):
         # --- MOCK SETUP ---
         MockAgentMap[AgentTypeEnum.GOOGLE_ADK] = MockADKAdapter
-        MockADKAdapter.__name__ = "ADKAgentAdapter"
-        MockLiteLLMAdapter.__name__ = "LiteLLMAgentAdapter"
+        MockADKAdapter.__name__ = "ADKAgent"
+        MockLiteLLMAdapter.__name__ = "LiteLLMAgent"
 
         mock_client = MagicMock(spec=AuthenticatedClient)
         mock_client.token = "test_token_diff_meta_ow_false"
@@ -599,8 +599,8 @@ class TestAgentRouterInitialization(unittest.TestCase):
     @patch("hackagent.router.router.agent_list")
     @patch("hackagent.router.router.agent_create")
     @patch("hackagent.router.router.agent_partial_update")
-    @patch("hackagent.router.router.LiteLLMAgentAdapter", autospec=True)
-    @patch("hackagent.router.router.ADKAgentAdapter", autospec=True)
+    @patch("hackagent.router.router.LiteLLMAgent", autospec=True)
+    @patch("hackagent.router.router.ADKAgent", autospec=True)
     @patch("hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
     def test_agent_router_init_creates_new_litellm_agent(
         self,
@@ -615,8 +615,8 @@ class TestAgentRouterInitialization(unittest.TestCase):
         MockAgentMap[AgentTypeEnum.LITELLM] = MockLiteLLMAdapter
         # Need to map ADK as well, even if not called, as AGENT_TYPE_TO_ADAPTER_MAP is fully replaced
         MockAgentMap[AgentTypeEnum.GOOGLE_ADK] = MockADKAdapter
-        MockADKAdapter.__name__ = "ADKAgentAdapter"
-        MockLiteLLMAdapter.__name__ = "LiteLLMAgentAdapter"
+        MockADKAdapter.__name__ = "ADKAgent"
+        MockLiteLLMAdapter.__name__ = "LiteLLMAgent"
 
         mock_client = MagicMock(spec=AuthenticatedClient)
         mock_client.token = "test_token_litellm_create"
@@ -741,7 +741,7 @@ class TestAgentRouterRouteWithTracking(unittest.TestCase):
 
     @patch("hackagent.router.router.agent_list")
     @patch("hackagent.router.router.agent_create")
-    @patch("hackagent.router.router.LiteLLMAgentAdapter", autospec=True)
+    @patch("hackagent.router.router.LiteLLMAgent", autospec=True)
     @patch("hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
     def setUp(
         self,
@@ -752,7 +752,7 @@ class TestAgentRouterRouteWithTracking(unittest.TestCase):
     ):
         """Set up router with mocked dependencies."""
         MockAgentMap[AgentTypeEnum.LITELLM] = MockLiteLLMAdapter
-        MockLiteLLMAdapter.__name__ = "LiteLLMAgentAdapter"
+        MockLiteLLMAdapter.__name__ = "LiteLLMAgent"
 
         self.mock_client = MagicMock(spec=AuthenticatedClient)
         self.mock_client.token = "test_token_prefix_12345"

@@ -20,7 +20,7 @@ from unittest.mock import MagicMock, patch
 import requests  # Added for requests.exceptions
 
 from hackagent.router.adapters.google_adk import (
-    ADKAgentAdapter,
+    ADKAgent,
     AgentConfigurationError,
     AgentInteractionError,
 )
@@ -29,7 +29,7 @@ from hackagent.router.adapters.google_adk import (
 logging.disable(logging.CRITICAL)
 
 
-class TestADKAgentAdapterInit(unittest.TestCase):
+class TestADKAgentInit(unittest.TestCase):
     def test_init_success_with_all_required_config(self):
         adapter_id = "adk_test_agent_001"
         config = {
@@ -39,16 +39,14 @@ class TestADKAgentAdapterInit(unittest.TestCase):
             "request_timeout": 60,
         }
         try:
-            adapter = ADKAgentAdapter(id=adapter_id, config=config)
+            adapter = ADKAgent(id=adapter_id, config=config)
             self.assertEqual(adapter.id, adapter_id)
             self.assertEqual(adapter.name, config["name"])
             self.assertEqual(adapter.endpoint, config["endpoint"].strip("/"))
             self.assertEqual(adapter.user_id, config["user_id"])
             self.assertEqual(adapter.request_timeout, config["request_timeout"])
         except AgentConfigurationError:
-            self.fail(
-                "ADKAgentAdapter initialization failed unexpectedly with valid config."
-            )
+            self.fail("ADKAgent initialization failed unexpectedly with valid config.")
 
     def test_init_uses_default_timeout_if_not_provided(self):
         adapter_id = "adk_test_agent_002"
@@ -57,32 +55,26 @@ class TestADKAgentAdapterInit(unittest.TestCase):
             "endpoint": "http://another-endpoint.com",
             "user_id": "user_abc",
         }
-        adapter = ADKAgentAdapter(id=adapter_id, config=config)
+        adapter = ADKAgent(id=adapter_id, config=config)
         self.assertEqual(adapter.request_timeout, 120)  # Default timeout
 
     def test_init_missing_name_raises_error(self):
         with self.assertRaisesRegex(
             AgentConfigurationError, "Missing required configuration key 'name'"
         ):
-            ADKAgentAdapter(
-                id="err_agent_1", config={"endpoint": "ep", "user_id": "uid"}
-            )
+            ADKAgent(id="err_agent_1", config={"endpoint": "ep", "user_id": "uid"})
 
     def test_init_missing_endpoint_raises_error(self):
         with self.assertRaisesRegex(
             AgentConfigurationError, "Missing required configuration key 'endpoint'"
         ):
-            ADKAgentAdapter(
-                id="err_agent_2", config={"name": "app_name", "user_id": "uid"}
-            )
+            ADKAgent(id="err_agent_2", config={"name": "app_name", "user_id": "uid"})
 
     def test_init_missing_user_id_raises_error(self):
         with self.assertRaisesRegex(
             AgentConfigurationError, "Missing required configuration key 'user_id'"
         ):
-            ADKAgentAdapter(
-                id="err_agent_3", config={"name": "app_name", "endpoint": "ep"}
-            )
+            ADKAgent(id="err_agent_3", config={"name": "app_name", "endpoint": "ep"})
 
     def test_init_endpoint_gets_stripped(self):
         adapter_id = "adk_strip_test"
@@ -91,11 +83,11 @@ class TestADKAgentAdapterInit(unittest.TestCase):
             "endpoint": "http://fake-adk-endpoint.com/api/",  # trailing slash
             "user_id": "strip_user",
         }
-        adapter = ADKAgentAdapter(id=adapter_id, config=config)
+        adapter = ADKAgent(id=adapter_id, config=config)
         self.assertEqual(adapter.endpoint, "http://fake-adk-endpoint.com/api")
 
 
-class TestADKAgentAdapterCreateSession(unittest.TestCase):
+class TestADKAgentCreateSession(unittest.TestCase):
     def setUp(self):
         self.adapter_id = "adk_session_test_agent"
         self.config = {
@@ -103,7 +95,7 @@ class TestADKAgentAdapterCreateSession(unittest.TestCase):
             "endpoint": "http://fake-adk.com",
             "user_id": "test_user",
         }
-        self.adapter = ADKAgentAdapter(id=self.adapter_id, config=self.config)
+        self.adapter = ADKAgent(id=self.adapter_id, config=self.config)
         self.session_id = "test_session_123"
 
     @patch("requests.post")
@@ -200,7 +192,7 @@ class TestADKAgentAdapterCreateSession(unittest.TestCase):
             self.adapter._create_session_internal(session_id=self.session_id)
 
 
-class TestADKAgentAdapterHandleRequestValidation(unittest.TestCase):
+class TestADKAgentHandleRequestValidation(unittest.TestCase):
     def setUp(self):
         self.adapter_id = "adk_handle_req_test_agent"
         self.config = {
@@ -208,7 +200,7 @@ class TestADKAgentAdapterHandleRequestValidation(unittest.TestCase):
             "endpoint": "http://fake-handle.com",
             "user_id": "handle_user",
         }
-        self.adapter = ADKAgentAdapter(id=self.adapter_id, config=self.config)
+        self.adapter = ADKAgent(id=self.adapter_id, config=self.config)
 
     def test_handle_request_missing_prompt(self):
         request_data = {"session_id": "sess_abc"}

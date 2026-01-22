@@ -117,6 +117,7 @@ class AttacksTab(Container):
                         ("LiteLLM", "litellm"),
                         ("LangChain", "langchain"),
                         ("OpenAI SDK", "openai-sdk"),
+                        ("Ollama", "ollama"),
                         ("MCP", "mcp"),
                         ("A2A", "a2a"),
                     ],

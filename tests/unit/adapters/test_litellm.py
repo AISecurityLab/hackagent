@@ -20,8 +20,8 @@ from unittest.mock import MagicMock, patch
 
 import litellm  # Required for litellm.exceptions
 
-from hackagent.router.adapters.litellm_adapter import (
-    LiteLLMAgentAdapter,
+from hackagent.router.adapters.litellm import (
+    LiteLLMAgent,
     LiteLLMConfigurationError,
 )
 
@@ -29,14 +29,14 @@ from hackagent.router.adapters.litellm_adapter import (
 logging.disable(logging.CRITICAL)
 
 
-class TestLiteLLMAgentAdapterInit(unittest.TestCase):
+class TestLiteLLMAgentInit(unittest.TestCase):
     def test_init_success_minimal_config(self):
         adapter_id = "litellm_test_001"
         config = {
             "name": "ollama/llama2"  # Model string
         }
         try:
-            adapter = LiteLLMAgentAdapter(id=adapter_id, config=config)
+            adapter = LiteLLMAgent(id=adapter_id, config=config)
             self.assertEqual(adapter.id, adapter_id)
             self.assertEqual(adapter.model_name, config["name"])
             self.assertIsNone(adapter.api_base_url)
@@ -45,9 +45,7 @@ class TestLiteLLMAgentAdapterInit(unittest.TestCase):
             self.assertEqual(adapter.default_temperature, 0.8)
             self.assertEqual(adapter.default_top_p, 0.95)
         except LiteLLMConfigurationError:
-            self.fail(
-                "LiteLLMAgentAdapter initialization failed with minimal valid config."
-            )
+            self.fail("LiteLLMAgent initialization failed with minimal valid config.")
 
     def test_init_success_full_config_no_api_key_env(self):
         adapter_id = "litellm_test_002"
@@ -60,7 +58,7 @@ class TestLiteLLMAgentAdapterInit(unittest.TestCase):
             "top_p": 0.9,
         }
         with patch.dict(os.environ, {}, clear=True):  # Ensure env var is not set
-            adapter = LiteLLMAgentAdapter(id=adapter_id, config=config)
+            adapter = LiteLLMAgent(id=adapter_id, config=config)
             self.assertEqual(adapter.model_name, config["name"])
             self.assertEqual(adapter.api_base_url, config["endpoint"])
             # When env var is not found, the adapter uses the string itself as the key
@@ -76,14 +74,14 @@ class TestLiteLLMAgentAdapterInit(unittest.TestCase):
             "name": "claude-2",
             "api_key": "MY_LLM_API_KEY",  # Env var name
         }
-        adapter = LiteLLMAgentAdapter(id=adapter_id, config=config)
+        adapter = LiteLLMAgent(id=adapter_id, config=config)
         self.assertEqual(adapter.actual_api_key, "actual_key_from_env")
 
     def test_init_missing_name_raises_error(self):
         with self.assertRaisesRegex(
             LiteLLMConfigurationError, "Missing required configuration key 'name'"
         ):
-            LiteLLMAgentAdapter(id="err_litellm_1", config={})
+            LiteLLMAgent(id="err_litellm_1", config={})
 
     def test_init_config_without_api_key_field(self):
         # Should not try to get from env if 'api_key' field itself is missing in config
@@ -92,12 +90,12 @@ class TestLiteLLMAgentAdapterInit(unittest.TestCase):
         with patch.object(
             os.environ, "get"
         ) as mock_os_environ_get:  # More specific patch
-            adapter = LiteLLMAgentAdapter(id=adapter_id, config=config)
+            adapter = LiteLLMAgent(id=adapter_id, config=config)
             self.assertIsNone(adapter.actual_api_key)
             mock_os_environ_get.assert_not_called()
 
 
-class TestLiteLLMAgentAdapterHandleRequest(unittest.TestCase):
+class TestLiteLLMAgentHandleRequest(unittest.TestCase):
     def setUp(self):
         self.adapter_id = "litellm_handle_req_agent"
         self.config = {
@@ -107,7 +105,7 @@ class TestLiteLLMAgentAdapterHandleRequest(unittest.TestCase):
             "temperature": 0.5,
             "top_p": 0.9,
         }
-        self.adapter = LiteLLMAgentAdapter(id=self.adapter_id, config=self.config)
+        self.adapter = LiteLLMAgent(id=self.adapter_id, config=self.config)
         self.prompt = "Hello LiteLLM"
 
     def test_handle_request_missing_prompt(self):
@@ -139,8 +137,9 @@ class TestLiteLLMAgentAdapterHandleRequest(unittest.TestCase):
         self.assertEqual(
             response["agent_specific_data"]["model_name"], self.config["name"]
         )
+        # ChatCompletionsAgent base class normalizes to max_tokens
         self.assertEqual(
-            response["agent_specific_data"]["invoked_parameters"]["max_new_tokens"], 150
+            response["agent_specific_data"]["invoked_parameters"]["max_tokens"], 150
         )  # Overridden
         self.assertEqual(
             response["agent_specific_data"]["invoked_parameters"]["temperature"],
@@ -172,10 +171,8 @@ class TestLiteLLMAgentAdapterHandleRequest(unittest.TestCase):
         response = self.adapter.handle_request(request_data)
 
         self.assertEqual(response["status_code"], 500)
-        self.assertIn(
-            "LiteLLM generation error: [GENERATION_ERROR: APIError]",
-            response["error_message"],
-        )
+        # The ChatCompletionsAgent base class formats errors differently
+        self.assertIn("APIError", response["error_message"])
         self.assertEqual(response["raw_request"], request_data)
 
     @patch("litellm.completion")
@@ -189,9 +186,10 @@ class TestLiteLLMAgentAdapterHandleRequest(unittest.TestCase):
         request_data = {"prompt": self.prompt}
         response = self.adapter.handle_request(request_data)
         self.assertEqual(response["status_code"], 500)
+        # The ChatCompletionsAgent base class uses ADAPTER_TYPE in error messages
+        self.assertIn("generation error", response["error_message"])
         self.assertIn(
-            "LiteLLM generation error: [GENERATION_ERROR: UNEXPECTED_RESPONSE]",
-            response["error_message"],
+            "[GENERATION_ERROR: UNEXPECTED_RESPONSE]", response["error_message"]
         )
 
     @patch("litellm.completion")
@@ -213,7 +211,7 @@ class TestLiteLLMAgentAdapterHandleRequest(unittest.TestCase):
 
         # Implementation returns 500 error when content is empty/None
         self.assertEqual(response["status_code"], 500)
-        self.assertIn("LiteLLM generation error", response["error_message"])
+        self.assertIn("generation error", response["error_message"])
         self.assertIn("[GENERATION_ERROR: EMPTY_RESPONSE]", response["error_message"])
 
     @patch("litellm.completion")
@@ -246,21 +244,20 @@ class TestLiteLLMAgentAdapterHandleRequest(unittest.TestCase):
     def test_handle_request_empty_completions_list_from_execute(
         self, mock_litellm_completion
     ):
-        # This simulates the _execute_litellm_completion returning an empty list,
-        # though it's less likely with current _execute_litellm_completion logic which appends errors.
-        # To properly test this, we might need to patch _execute_litellm_completion itself.
-        # For now, let's assume litellm.completion directly causes such a state that leads to empty completions.
-        # The method _execute_litellm_completion itself ensures a list of the same length as input texts.
-        # So this tests the outer handle_request logic if completions was somehow empty.
+        # This simulates the _execute_completion returning an empty/None content,
+        # which should result in an error response.
+        # The ChatCompletionsAgent base class handle_request checks for None content.
 
-        # Let's mock _execute_litellm_completion_with_messages to return empty string
+        # Mock _execute_completion to return success but with None content
         with patch.object(
-            self.adapter, "_execute_litellm_completion_with_messages", return_value=""
+            self.adapter,
+            "_execute_completion",
+            return_value={"success": True, "content": None},
         ) as mock_execute:
             request_data = {"prompt": self.prompt}
             response = self.adapter.handle_request(request_data)
             self.assertEqual(response["status_code"], 500)
-            self.assertIn("LiteLLM returned empty result.", response["error_message"])
+            self.assertIn("returned empty result", response["error_message"])
             mock_execute.assert_called_once()
 
     def test_handle_request_passes_additional_kwargs_to_litellm(self):

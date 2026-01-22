@@ -1,4 +1,9 @@
-# OpenAI SDK Integration
+---
+sidebar_position: 3
+slug: /agents/openai-sdk
+---
+
+# <img src="https://openai.com/favicon.ico" alt="OpenAI" style={{height: '48px', marginRight: '12px', verticalAlign: 'middle'}} />OpenAI SDK
 
 OpenAI SDK is the official Python library for interacting with OpenAI's API, including GPT-4, GPT-3.5, and other models. HackAgent provides native support for testing agents built with the OpenAI SDK, including those using function calling and tool use.
 
@@ -11,24 +16,27 @@ OpenAI SDK is the official Python library for interacting with OpenAI's API, inc
 3. **OpenAI SDK**: Automatically installed with HackAgent
 4. **HackAgent API Key**: Get from [app.hackagent.dev](https://app.hackagent.dev)
 
-### Environment Variables
+### Authentication
+
+Set up your OpenAI API key:
 
 ```bash
-# Required
-export HACKAGENT_API_KEY="your-hackagent-api-key"
 export OPENAI_API_KEY="your-openai-api-key"
 
 # Optional: Custom endpoint (for Azure OpenAI, etc.)
 export OPENAI_API_BASE="https://api.openai.com/v1"
 ```
 
+For HackAgent authentication, either:
+- Run `hackagent init` to create a config file, or
+- Pass `api_key` directly to `HackAgent()`
+
 ## 🚀 Basic Integration
 
 ### Initialize HackAgent Client
 
 ```python
-from hackagent import HackAgent
-from hackagent.models import AgentTypeEnum
+from hackagent import HackAgent, AgentTypeEnum
 
 # Configure for OpenAI SDK
 agent = HackAgent(
@@ -204,7 +212,7 @@ except Exception as e:
 
 - [OpenAI API Documentation](https://platform.openai.com/docs)
 - [OpenAI SDK GitHub](https://github.com/openai/openai-python)
-- [HackAgent Python SDK](../sdk/python-quickstart.md)
+- [HackAgent Attack Tutorial](../getting-started/attack-tutorial.md)
 - [Function Calling Guide](https://platform.openai.com/docs/guides/function-calling)
 
 ## 🔄 Next Steps

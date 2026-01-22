@@ -16,16 +16,21 @@
 Evaluation module for baseline attacks.
 
 Evaluates attack success using objectives and shared evaluators.
+
+Result Tracking:
+    Uses Tracker (passed via config) to finalize Results per goal
+    with evaluation status and add evaluation traces.
 """
 
 import logging
 from collections import defaultdict
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from hackagent.attacks.objectives import OBJECTIVES
 from hackagent.attacks.shared.evaluators import PatternEvaluator, KeywordEvaluator
 from hackagent.api.result import result_partial_update
 from hackagent.models import EvaluationStatusEnum, PatchedResultRequest
+from hackagent.router.tracking import Tracker
 
 
 logger = logging.getLogger("hackagent.attacks.baseline.evaluation")
@@ -300,25 +305,44 @@ def _sync_evaluation_to_server(
     logger: logging.Logger,
 ) -> int:
     """
-    Sync evaluation results to the server by updating each result's status.
+    Sync evaluation results to the server using Tracker (preferred) or legacy method.
+
+    With Tracker (preferred):
+        - Finalizes each goal's Result with aggregated evaluation status
+        - Adds evaluation traces showing detailed results
+        - One Result per goal with all traces inside
+
+    Legacy method (fallback):
+        - Updates individual result_id records if present
+        - Creates scattered Results (one per LLM call)
 
     Args:
-        evaluated_data: List of dicts with evaluation results including result_id key
-        config: Configuration dictionary (must contain _client)
+        evaluated_data: List of dicts with evaluation results
+        config: Configuration dictionary (may contain _goal_tracker, _goal_contexts)
         logger: Logger instance
 
     Returns:
-        Number of results successfully updated
+        Number of results/goals successfully updated
     """
+    goal_tracker: Optional[Tracker] = config.get("_goal_tracker")
+    goal_contexts: Optional[Dict[str, Any]] = config.get("_goal_contexts")
+
+    # Preferred: Use Tracker for organized per-goal results
+    if goal_tracker and goal_contexts:
+        return _finalize_goals_with_tracker(
+            evaluated_data, goal_tracker, goal_contexts, logger
+        )
+
+    # Legacy fallback: Update individual result_id records
     client = config.get("_client")
     if not client:
         logger.warning("No client available - cannot sync evaluation to server")
         return 0
 
-    # Check if any row has result_id
+    # Check if any row has result_id (legacy tracking)
     has_result_ids = any(row.get("result_id") for row in evaluated_data)
     if not has_result_ids:
-        logger.warning("No result_id in data - cannot sync to server")
+        logger.warning("No result_id in data - cannot sync to server (legacy mode)")
         return 0
 
     updated_count = 0
@@ -336,8 +360,114 @@ def _sync_evaluation_to_server(
         if _update_result_status(result_id, success, notes, client, logger):
             updated_count += 1
 
-    logger.info(f"Synced {updated_count}/{total_with_ids} evaluation results to server")
+    logger.info(
+        f"Synced {updated_count}/{total_with_ids} evaluation results to server (legacy mode)"
+    )
     return updated_count
+
+
+def _finalize_goals_with_tracker(
+    evaluated_data: List[Dict[str, Any]],
+    goal_tracker: Tracker,
+    goal_contexts: Dict[str, Any],
+    logger: logging.Logger,
+) -> int:
+    """
+    Finalize goal Results using Tracker.
+
+    Aggregates evaluation results per goal and finalizes each goal's Result
+    with the appropriate evaluation status.
+
+    Args:
+        evaluated_data: List of dicts with evaluation results
+        goal_tracker: Tracker instance
+        goal_contexts: Dict mapping goal strings to Context
+        logger: Logger instance
+
+    Returns:
+        Number of goals successfully finalized
+    """
+    logger.info("Finalizing goals using Tracker...")
+
+    # Aggregate results per goal
+    goal_results: Dict[str, Dict[str, Any]] = defaultdict(
+        lambda: {
+            "total": 0,
+            "successful": 0,
+            "evaluations": [],
+        }
+    )
+
+    for row in evaluated_data:
+        goal = row.get("goal", "unknown")
+        goal_results[goal]["total"] += 1
+        if row.get("success", False):
+            goal_results[goal]["successful"] += 1
+        goal_results[goal]["evaluations"].append(
+            {
+                "template_category": row.get("template_category"),
+                "success": row.get("success", False),
+                "evaluation_notes": row.get("evaluation_notes", ""),
+                "response_length": row.get("response_length", 0),
+            }
+        )
+
+    # Finalize each goal
+    finalized_count = 0
+    for goal, ctx in goal_contexts.items():
+        if ctx.is_finalized:
+            continue
+
+        results = goal_results.get(
+            goal, {"total": 0, "successful": 0, "evaluations": []}
+        )
+        total = results["total"]
+        successful = results["successful"]
+
+        # Goal is successful if ANY template attempt succeeded
+        goal_success = successful > 0
+        success_rate = (successful / total * 100) if total > 0 else 0
+
+        # Add evaluation summary trace
+        goal_tracker.add_evaluation_trace(
+            ctx=ctx,
+            evaluation_result={
+                "total_attempts": total,
+                "successful_attempts": successful,
+                "success_rate": success_rate,
+                "evaluations": results["evaluations"][:10],  # Limit for readability
+            },
+            score=success_rate,
+            explanation=f"{successful}/{total} attempts successful ({success_rate:.1f}%)",
+            evaluator_name="baseline_pattern_evaluator",
+        )
+
+        # Finalize the goal
+        evaluation_notes = f"Baseline attack: {successful}/{total} attempts successful ({success_rate:.1f}%)"
+
+        if goal_tracker.finalize_goal(
+            ctx=ctx,
+            success=goal_success,
+            evaluation_notes=evaluation_notes,
+            final_metadata={
+                "total_attempts": total,
+                "successful_attempts": successful,
+                "success_rate": success_rate,
+            },
+        ):
+            finalized_count += 1
+
+    logger.info(f"Finalized {finalized_count}/{len(goal_contexts)} goals with Tracker")
+
+    # Log summary
+    summary = goal_tracker.get_summary()
+    logger.info(
+        f"Tracker summary: {summary['successful_attacks']}/{summary['total_goals']} "
+        f"successful ({summary['success_rate']:.1f}%), "
+        f"{summary['total_traces']} total traces"
+    )
+
+    return finalized_count
 
 
 def execute(

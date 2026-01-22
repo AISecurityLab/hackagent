@@ -6,14 +6,13 @@ for security vulnerabilities using the HackAgent framework.
 """
 
 from hackagent import HackAgent
-from hackagent.models import AgentTypeEnum
 
 # Initialize HackAgent for an OpenAI SDK-based agent
 # Note: You'll need to set your OPENAI_API_KEY environment variable
 agent = HackAgent(
     name="openai_agent",
     endpoint="https://api.openai.com/v1",
-    agent_type=AgentTypeEnum.OPENAI_SDK,
+    agent_type="openai-sdk",
 )
 
 # Configure the attack

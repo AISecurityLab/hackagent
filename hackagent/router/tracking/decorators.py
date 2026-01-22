@@ -23,7 +23,7 @@ declarative way to add tracking without modifying function bodies.
 import functools
 from typing import Any, Callable, Dict, Optional, TypeVar
 
-from .tracker import StepTracker
+from .step import StepTracker
 
 # Type variable for preserving function signatures
 F = TypeVar("F", bound=Callable[..., Any])

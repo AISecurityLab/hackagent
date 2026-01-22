@@ -79,12 +79,12 @@ attack_config = {
     },
     "judges": [{
         "identifier": "ollama/llama3",
-        "endpoint": "http://localhost:11434/api/judge",
+        "endpoint": "http://localhost:11434/api/generate",
         "type": "harmbench"
     }],
     "selection_judges": [{
         "identifier": "ollama/llama3",
-        "endpoint": "http://localhost:11434/api/judge",
+        "endpoint": "http://localhost:11434/api/generate",
         "type": "harmbench"
     }]
 }
@@ -370,8 +370,7 @@ curl http://localhost:11434/api/generate \
 - [**AdvPrefix Deep Dive**](../attacks/advprefix-attacks.md) — Full AdvPrefix documentation
 - [**PAIR Attack Guide**](../attacks/pair-attacks.md) — Iterative refinement techniques
 - [**Baseline Templates**](../attacks/baseline-attacks.md) — Template customization
-- [**Python SDK Reference**](../sdk/python-quickstart.md) — Complete SDK guide
-- [**CLI Documentation**](../cli/README.md) — All CLI commands
+- [**CLI Documentation**](../cli/overview.md) — All CLI commands
 
 ---
 

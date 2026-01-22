@@ -139,3 +139,18 @@ table th {
   background: var(--ifm-color-emphasis-200);
 }
 
+/* Enhanced code block styling for bash/terminal */
+[data-theme='dark'] .prism-code {
+  background: #1e1e1e !important;
+}
+
+/* Code block container styling */
+.theme-code-block {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme='dark'] .theme-code-block {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+}

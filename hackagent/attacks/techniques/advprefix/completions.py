@@ -143,7 +143,7 @@ def _get_completion_via_router(
     This helper function sends a single adversarial prefix (optionally combined
     with a surrogate attack prompt) to the target agent and collects the generated
     completion. Session management for ADK agents is handled automatically by the
-    ADKAgentAdapter.
+    ADKAgent.
 
     Args:
         agent_router: AgentRouter instance configured for the target agent.
@@ -171,7 +171,7 @@ def _get_completion_via_router(
 
     Note:
         For ADK agents, session management is handled automatically by the
-        ADKAgentAdapter. The function handles surrogate prompt formatting with
+        ADKAgent. The function handles surrogate prompt formatting with
         placeholder replacement or simple concatenation based on template format.
 
         Errors are captured in the error_message field rather than raising
@@ -209,7 +209,7 @@ def _get_completion_via_router(
     if n_samples is not None and n_samples > 0:
         request_data["n"] = n_samples  # Common key for number of completions
 
-    # Session management is now handled by the ADKAgentAdapter (no need to pass session_id/user_id)
+    # Session management is now handled by the ADKAgent (no need to pass session_id/user_id)
 
     # Prepare result structure
     result_dict = {
@@ -221,35 +221,14 @@ def _get_completion_via_router(
         "adapter_specific_events": None,
         "error_message": None,
         "log_message": None,  # For per-prefix logging by the main loop
-        "result_id": None,  # ID for updating evaluation status later
     }
 
-    # Use route_with_tracking if we have run_id and client for real-time result creation
-    if run_id and client:
-        logger_instance.debug(f"Calling route_with_tracking with run_id={run_id}")
-        tracking_result = agent_router.route_with_tracking(
-            registration_key=agent_reg_key,
-            request_data=request_data,
-            run_id=run_id,
-            client=client,
-        )
-        # route_with_tracking returns {"response": ..., "result_id": ...}
-        response = tracking_result.get("response", tracking_result)
-        # Capture result_id for later evaluation updates
-        result_dict["result_id"] = tracking_result.get("result_id")
-        if result_dict["result_id"]:
-            logger_instance.debug(
-                f"Captured result_id={result_dict['result_id']} for evaluation tracking"
-            )
-    else:
-        logger_instance.warning(
-            f"⚠️ Using fallback route_request (run_id={run_id}, client={client is not None})"
-        )
-        # Fallback to standard routing without tracking
-        response = agent_router.route_request(
-            registration_key=agent_reg_key,
-            request_data=request_data,
-        )
+    # Use simple route_request (no automatic result creation)
+    # Tracker handles per-goal result tracking instead of scattered per-call results
+    response = agent_router.route_request(
+        registration_key=agent_reg_key,
+        request_data=request_data,
+    )
 
     # Update result_dict with response data
     result_dict["raw_request_payload"] = (
@@ -449,14 +428,8 @@ def execute(
             "adapter_specific_events"
         )
         result["error_message"] = completion_result.get("error_message")
-        # Pass through result_id for evaluation status updates
-        result["result_id"] = completion_result.get("result_id")
         results.append(result)
 
-    # Debug: verify result_ids are being passed through
-    result_ids_in_output = [r.get("result_id") for r in results if r.get("result_id")]
-    logger.info(
-        f"📊 Completions execute returning {len(results)} results with {len(result_ids_in_output)} result_ids"
-    )
+    logger.info(f"📊 Completions execute returning {len(results)} results")
 
     return results

@@ -1,4 +1,9 @@
-# Google ADK Integration
+---
+sidebar_position: 4
+slug: /agents/google-adk
+---
+
+# <img src="https://google.github.io/adk-docs/assets/agent-development-kit.png" alt="Google ADK" style={{height: '48px', marginRight: '12px', verticalAlign: 'middle'}} />Google ADK
 
 Google Agent Development Kit (ADK) is a framework for building conversational AI agents with tool-calling capabilities. HackAgent provides native support for testing ADK-based agents.
 
@@ -62,14 +67,14 @@ attack_config = {
     "judges": [
         {
             "identifier": "ollama/llama3",
-            "endpoint": "http://localhost:11434/api/judge",
+            "endpoint": "http://localhost:11434/api/generate",
             "type": "harmbench"
         }
     ],
     "selection_judges": [
         {
             "identifier": "ollama/llama3",
-            "endpoint": "http://localhost:11434/api/judge",
+            "endpoint": "http://localhost:11434/api/generate",
             "type": "harmbench"
         }
     ]
@@ -109,14 +114,14 @@ def test_adk_security():
         "judges": [
             {
                 "identifier": "ollama/llama3",
-                "endpoint": f"{os.getenv('HACKAGENT_API_BASE_URL')}/api/judge",
+                "endpoint": f"{os.getenv('HACKAGENT_API_BASE_URL')}/api/generate",
                 "type": "harmbench",
             }
         ],
         "selection_judges": [
             {
                 "identifier": "ollama/llama3",
-                "endpoint": f"{os.getenv('HACKAGENT_API_BASE_URL')}/api/judge",
+                "endpoint": f"{os.getenv('HACKAGENT_API_BASE_URL')}/api/generate",
                 "type": "harmbench",
             }
         ],
@@ -183,14 +188,15 @@ agent = HackAgent(
 ### Environment Variables
 
 ```bash
-# Required
-export HACKAGENT_API_KEY="your_api_key"
+# Agent endpoint
 export AGENT_URL="http://localhost:8001"
 
 # Optional
 export HACKAGENT_BASE_URL="https://api.hackagent.dev"
 export OLLAMA_BASE_URL="http://localhost:11434"
 ```
+
+**Note:** For HackAgent authentication, run `hackagent init` or pass `api_key` directly to `HackAgent()`.
 
 ### ADK Session Management
 
@@ -245,12 +251,14 @@ logging.getLogger('hackagent').setLevel(logging.DEBUG)
 
 **Authentication Issues**:
 ```bash
-# Verify API key is set
-echo $HACKAGENT_API_KEY
+# Verify config file exists
+cat ~/.config/hackagent/config.json
+
+# Or re-initialize
+hackagent init
 
 # Test API connectivity
-curl -H "Authorization: Bearer $HACKAGENT_API_KEY" \
-     https://api.hackagent.dev/agents/
+hackagent auth
 ```
 
 ### Debug Mode
@@ -301,10 +309,9 @@ attack_config = {
 
 ## �� Next Steps
 
-1. **[Python SDK Guide](../sdk/python-quickstart.md)** - Complete SDK documentation
-2. **[AdvPrefix Attacks](../attacks/advprefix-attacks.md)** - Advanced attack techniques
-3. **[Attack Tutorial](../tutorial-basics/attack-tutorial.md)** - Getting started with attacks
-4. **[Security Guidelines](../security/responsible-disclosure.md)** - Responsible disclosure practices
+1. **[AdvPrefix Attacks](../attacks/advprefix-attacks.md)** - Advanced attack techniques
+2. **[Attack Tutorial](../getting-started/attack-tutorial.md)** - Getting started with attacks
+3. **[Security Guidelines](../security/responsible-disclosure.md)** - Responsible disclosure practices
 
 ## 📞 Support
 

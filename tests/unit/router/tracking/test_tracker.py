@@ -21,7 +21,7 @@ from unittest.mock import MagicMock, patch
 
 from hackagent.models import EvaluationStatusEnum, StatusEnum
 from hackagent.router.tracking.context import TrackingContext
-from hackagent.router.tracking.tracker import StepTracker
+from hackagent.router.tracking.step import StepTracker
 
 
 class TestStepTrackerInitialization(unittest.TestCase):
@@ -55,7 +55,7 @@ class TestStepTrackerTrackStep(unittest.TestCase):
         with tracker.track_step("Test Step", "TEST_STEP") as trace_id:
             self.assertIsNone(trace_id)
 
-    @patch("hackagent.router.tracking.tracker.result_trace_create")
+    @patch("hackagent.router.tracking.step.result_trace_create")
     def test_track_step_creates_trace(self, mock_trace_create):
         """Test track_step creates a trace when enabled."""
         mock_client = MagicMock()
@@ -76,8 +76,8 @@ class TestStepTrackerTrackStep(unittest.TestCase):
 
         mock_trace_create.sync_detailed.assert_called_once()
 
-    @patch("hackagent.router.tracking.tracker.result_trace_create")
-    @patch("hackagent.router.tracking.tracker.result_partial_update")
+    @patch("hackagent.router.tracking.step.result_trace_create")
+    @patch("hackagent.router.tracking.step.result_partial_update")
     def test_track_step_handles_exception(self, mock_partial_update, mock_trace_create):
         """Test track_step handles exceptions and re-raises."""
         mock_client = MagicMock()
@@ -176,7 +176,7 @@ class TestStepTrackerUpdateRunStatus(unittest.TestCase):
 
         self.assertFalse(result)
 
-    @patch("hackagent.router.tracking.tracker.run_partial_update")
+    @patch("hackagent.router.tracking.step.run_partial_update")
     def test_update_run_status_success(self, mock_run_update):
         """Test successful run status update."""
         mock_client = MagicMock()
@@ -195,7 +195,7 @@ class TestStepTrackerUpdateRunStatus(unittest.TestCase):
         self.assertTrue(result)
         mock_run_update.sync_detailed.assert_called_once()
 
-    @patch("hackagent.router.tracking.tracker.run_partial_update")
+    @patch("hackagent.router.tracking.step.run_partial_update")
     def test_update_run_status_invalid_uuid(self, mock_run_update):
         """Test update_run_status handles invalid UUID."""
         mock_client = MagicMock()
@@ -210,7 +210,7 @@ class TestStepTrackerUpdateRunStatus(unittest.TestCase):
         self.assertFalse(result)
         mock_run_update.sync_detailed.assert_not_called()
 
-    @patch("hackagent.router.tracking.tracker.run_partial_update")
+    @patch("hackagent.router.tracking.step.run_partial_update")
     def test_update_run_status_api_failure(self, mock_run_update):
         """Test update_run_status handles API failures."""
         mock_client = MagicMock()
@@ -242,7 +242,7 @@ class TestStepTrackerUpdateResultStatus(unittest.TestCase):
 
         self.assertFalse(result)
 
-    @patch("hackagent.router.tracking.tracker.result_partial_update")
+    @patch("hackagent.router.tracking.step.result_partial_update")
     def test_update_result_status_success(self, mock_result_update):
         """Test successful result status update."""
         mock_client = MagicMock()
@@ -266,7 +266,7 @@ class TestStepTrackerUpdateResultStatus(unittest.TestCase):
         self.assertTrue(result)
         mock_result_update.sync_detailed.assert_called_once()
 
-    @patch("hackagent.router.tracking.tracker.result_partial_update")
+    @patch("hackagent.router.tracking.step.result_partial_update")
     def test_update_result_status_invalid_uuid(self, mock_result_update):
         """Test update_result_status handles invalid UUID."""
         mock_client = MagicMock()
@@ -380,7 +380,7 @@ class TestStepTrackerHandleStepError(unittest.TestCase):
         # Should not raise
         tracker._handle_step_error("Test Step", "Test error")
 
-    @patch("hackagent.router.tracking.tracker.result_partial_update")
+    @patch("hackagent.router.tracking.step.result_partial_update")
     def test_handle_step_error_updates_result(self, mock_partial_update):
         """Test _handle_step_error updates result status."""
         mock_client = MagicMock()

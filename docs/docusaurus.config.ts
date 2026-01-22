@@ -10,7 +10,7 @@ const config: Config = {
   favicon: 'img/favicon.ico',
 
   // Set the production url of your site here
-  url: 'https://hackagent.dev',
+  url: 'https://docs.hackagent.dev',
   // Set the /<baseUrl>/ pathname under which your site is served
   // For local development, use '/' to serve at root
   // For production, you can change this to '/docs/' if needed
@@ -48,7 +48,7 @@ const config: Config = {
         docs: {
           sidebarPath: './sidebars.ts',
           routeBasePath: '/',
-          editUrl: 'https://github.com/AISecurityLab/hackagent',
+          editUrl: 'https://github.com/AISecurityLab/hackagent/edit/main/docs/',
           // Enable versioning for API docs
           includeCurrentVersion: true,
           lastVersion: 'current',
@@ -70,6 +70,12 @@ const config: Config = {
   plugins: [],
 
   themeConfig: {
+    // Color mode configuration
+    colorMode: {
+      defaultMode: 'dark',
+      disableSwitch: false,
+      respectPrefersColorScheme: true,
+    },
     // Mermaid theme configuration
     mermaid: {
       theme: {light: 'neutral', dark: 'dark'},
@@ -98,6 +104,11 @@ const config: Config = {
           sidebarId: 'tutorialSidebar',
           position: 'left',
           label: 'Docs',
+        },
+        {
+          href: 'https://app.hackagent.dev',
+          label: 'App',
+          position: 'right',
         },
         {
           href: 'https://github.com/AISecurityLab/hackagent',
@@ -146,6 +157,7 @@ const config: Config = {
     prism: {
       theme: prismThemes.github,
       darkTheme: prismThemes.dracula,
+      additionalLanguages: ['bash', 'json', 'python', 'yaml', 'toml'],
     },
   } satisfies Preset.ThemeConfig,
 };
