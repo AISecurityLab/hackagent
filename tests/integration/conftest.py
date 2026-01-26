@@ -63,18 +63,25 @@ logger = logging.getLogger(__name__)
 # LiteLLM's HTTP handler tries to log when closing connections after pytest
 # has already closed stdout/stderr, causing "I/O operation on closed file" errors.
 # This suppresses those harmless but alarming-looking messages.
+
+# Suppress asyncio debug logging immediately (before any async operations)
+# This prevents the "Using selector: EpollSelector" message during cleanup
+logging.getLogger("asyncio").setLevel(logging.WARNING)
+
+
 @atexit.register
 def _suppress_httpcore_cleanup_logging():
-    """Suppress httpcore debug logging during interpreter shutdown."""
-    logging.getLogger("httpcore").setLevel(logging.CRITICAL)
-    logging.getLogger("httpx").setLevel(logging.CRITICAL)
-    # Redirect any remaining stderr writes to devnull during cleanup
-    if not sys.stderr.closed:
-        try:
-            logging.getLogger("httpcore").handlers = []
-            logging.getLogger("httpx").handlers = []
-        except Exception:
-            pass
+    """Suppress httpcore/asyncio debug logging during interpreter shutdown."""
+    # Suppress all potentially noisy loggers during cleanup
+    for logger_name in ("httpcore", "httpx", "asyncio", "litellm"):
+        logger = logging.getLogger(logger_name)
+        logger.setLevel(logging.CRITICAL)
+        logger.handlers = []
+    
+    # Disable propagation to prevent any messages reaching root logger
+    logging.getLogger("httpcore").propagate = False
+    logging.getLogger("httpx").propagate = False
+    logging.getLogger("asyncio").propagate = False
 
 
 # ============================================================================
