@@ -95,6 +95,7 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: reports/coverage.xml
+          flags: unit
           fail_ci_if_error: true
 
   # Quick test - for PRs to non-main branches
@@ -126,6 +127,7 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: reports/coverage.xml
+          flags: unit
           fail_ci_if_error: true
 
   # Integration tests with Ollama - only on PRs to main
