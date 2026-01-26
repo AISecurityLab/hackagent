@@ -56,7 +56,7 @@ dev = [
 docs = [
     "pydoc-markdown>=4.8.2",
     "toml>=0.10.2",
-    "packaging>=24,<26",
+    "packaging>=24,<27",
     "requests>=2.31.0",
 ]
 
