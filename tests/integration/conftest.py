@@ -43,7 +43,6 @@ OpenRouter Support:
 """
 
 import os
-import sys
 import atexit
 import logging
 from typing import Any, Dict, Generator, Optional
@@ -77,7 +76,7 @@ def _suppress_httpcore_cleanup_logging():
         logger = logging.getLogger(logger_name)
         logger.setLevel(logging.CRITICAL)
         logger.handlers = []
-    
+
     # Disable propagation to prevent any messages reaching root logger
     logging.getLogger("httpcore").propagate = False
     logging.getLogger("httpx").propagate = False
