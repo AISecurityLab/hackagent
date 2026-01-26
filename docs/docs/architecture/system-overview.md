@@ -91,13 +91,13 @@ import Link from '@docusaurus/Link';
     </Link>
   </div>
   <div className="col col--3" style={{marginBottom: '1rem'}}>
-    <Link to="/integrations/google-adk" style={{textDecoration: 'none', display: 'block', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '2px solid var(--ifm-color-primary)'}}>
+    <Link to="/agents/google-adk" style={{textDecoration: 'none', display: 'block', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '2px solid var(--ifm-color-primary)'}}>
       <h4 style={{margin: 0}}>🔌 Google ADK</h4>
       <p style={{margin: '0.5rem 0 0 0', fontSize: '0.9rem'}}>Test Google ADK-based agents</p>
     </Link>
   </div>
   <div className="col col--3" style={{marginBottom: '1rem'}}>
-    <Link to="/integrations/openai-sdk" style={{textDecoration: 'none', display: 'block', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '2px solid var(--ifm-color-primary)'}}>
+    <Link to="/agents/openai-sdk" style={{textDecoration: 'none', display: 'block', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '2px solid var(--ifm-color-primary)'}}>
       <h4 style={{margin: 0}}>🔌 OpenAI SDK</h4>
       <p style={{margin: '0.5rem 0 0 0', fontSize: '0.9rem'}}>Test OpenAI SDK-based agents</p>
     </Link>

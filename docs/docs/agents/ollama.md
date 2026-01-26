@@ -13,20 +13,31 @@ Ollama is a lightweight framework for running large language models locally. Hac
 
 ### Prerequisites
 
-1. **Ollama**: Install from [ollama.ai](https://ollama.ai)
-2. **A Model**: Pull a model with `ollama pull llama3` (or any other model)
+1. **Install Ollama**:
+   ```bash
+   # Linux/WSL
+   curl -fsSL https://ollama.com/install.sh | sh
+   
+   # macOS (via Homebrew)
+   brew install ollama
+   ```
+   Or download from [ollama.com/download](https://ollama.com/download)
 
-### Starting Ollama
+2. **Start the Ollama server** (runs on `localhost:11434`):
+   ```bash
+   ollama serve
+   ```
 
-Make sure Ollama is running before testing:
+3. **Pull a model**:
+   ```bash
+   ollama pull llama3
+   ```
 
-```bash
-# Start Ollama server
-ollama serve
-
-# Pull a model (if not already done)
-ollama pull llama3
-```
+4. **Verify setup**:
+   ```bash
+   curl http://localhost:11434/api/tags
+   # Should return JSON with your installed models
+   ```
 
 ## 🚀 Basic Usage
 
@@ -215,4 +226,4 @@ agent = HackAgent(
 
 - [Ollama Documentation](https://ollama.ai)
 - [Ollama Model Library](https://ollama.ai/library)
-- [HackAgent Attack Types](/docs/attacks)
+- [HackAgent Attack Types](/attacks)

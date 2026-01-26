@@ -19,8 +19,22 @@ Ollama is a lightweight framework for running large language models locally. Hac
 
 ### Prerequisites
 
-1. **Ollama**: Install from [ollama.ai](https://ollama.ai)
-2. **A Model**: Pull a model with `ollama pull llama3`
+1. **Install Ollama**:
+   ```bash
+   curl -fsSL https://ollama.com/install.sh | sh
+   ```
+2. **Start Ollama** (runs on `localhost:11434` by default):
+   ```bash
+   ollama serve
+   ```
+3. **Pull a model**:
+   ```bash
+   ollama pull llama3
+   ```
+4. **Verify** it's running:
+   ```bash
+   curl http://localhost:11434/api/tags
+   ```
 
 ### Quick Start
 
@@ -88,7 +102,16 @@ OpenAI SDK is the official Python library for interacting with OpenAI's API. Hac
 
 ### Prerequisites
 
-1. **OpenAI API Key**: Get from [platform.openai.com](https://platform.openai.com)
+1. **Get an OpenAI API key** from [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+2. **Set the environment variable**:
+   ```bash
+   export OPENAI_API_KEY="sk-..."
+   ```
+3. **Verify** your key works:
+   ```bash
+   curl https://api.openai.com/v1/models \
+     -H "Authorization: Bearer $OPENAI_API_KEY"
+   ```
 
 ### Quick Start
 
@@ -156,7 +179,19 @@ Google Agent Development Kit (ADK) is a framework for building conversational AI
 
 ### Prerequisites
 
-1. **Google ADK Agent**: A running ADK agent/application
+1. **Install Google ADK**:
+   ```bash
+   pip install google-adk
+   ```
+2. **Create and start your agent** (example using the sample agent):
+   ```bash
+   cd your_agent_directory
+   adk web
+   ```
+3. **Verify** it's running on `http://localhost:8000`:
+   ```bash
+   curl http://localhost:8000/list-apps
+   ```
 
 ### Quick Start
 

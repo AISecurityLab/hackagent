@@ -140,11 +140,22 @@ class StepTracker:
 
             # Step completed successfully
             self.logger.debug(f"Step '{step_name}' completed successfully")
+            self._create_summary_trace(
+                step_name=step_name,
+                step_type=step_type,
+                status="completed",
+            )
 
         except Exception as e:
             # Handle step failure
             self.logger.error(f"Step '{step_name}' failed: {e}", exc_info=True)
             self._handle_step_error(step_name, str(e))
+            self._create_summary_trace(
+                step_name=step_name,
+                step_type=step_type,
+                status="failed",
+                error_message=str(e),
+            )
             # Re-raise to allow caller to handle
             raise
 
@@ -285,6 +296,98 @@ class StepTracker:
                 sanitized[key] = value
 
         return sanitized
+
+    def _sanitize_metadata_payload(self, payload: Any) -> Any:
+        """Sanitize step metadata payloads for JSON serialization."""
+        if payload is None:
+            return None
+        if isinstance(payload, dict):
+            return self._sanitize_config(payload)
+        if isinstance(payload, list):
+            return [self._sanitize_metadata_payload(item) for item in payload]
+        if self._is_json_serializable(payload):
+            return payload
+        return f"<{type(payload).__name__}>"
+
+    def _drain_step_metadata(self) -> Dict[str, Any]:
+        """Pop per-step metadata/progress logs from context."""
+        drained: Dict[str, Any] = {}
+        if "step_metadata" in self.context.metadata:
+            drained["step_metadata"] = self.context.metadata.pop("step_metadata")
+        if "progress_log" in self.context.metadata:
+            drained["progress_log"] = self.context.metadata.pop("progress_log")
+        return drained
+
+    def _create_summary_trace(
+        self,
+        step_name: str,
+        step_type: str,
+        status: str,
+        error_message: Optional[str] = None,
+    ) -> Optional[str]:
+        """
+        Create a summary trace after a step completes.
+
+        Captures step metadata and progress logs recorded during execution.
+        """
+        if not self.context.is_enabled:
+            return None
+
+        try:
+            sequence = self.context.increment_sequence()
+            trace_content = {
+                "step_name": f"{step_name} (Summary)",
+                "step_type_identifier": step_type,
+                "status": status,
+            }
+
+            drained = self._drain_step_metadata()
+            if drained:
+                trace_content.update(
+                    self._sanitize_metadata_payload(drained)
+                    if isinstance(drained, dict)
+                    else drained
+                )
+
+            if error_message:
+                trace_content["error_message"] = error_message
+
+            # Create trace request
+            trace_request = TraceRequest(
+                sequence=sequence,
+                step_type=StepTypeEnum.OTHER,
+                content=trace_content,
+            )
+
+            result_uuid = self.context.get_result_uuid()
+            if not result_uuid:
+                return None
+
+            response = result_trace_create.sync_detailed(
+                client=self.context.client,
+                id=result_uuid,
+                body=trace_request,
+            )
+
+            if response.status_code == 201:
+                trace_id = self._extract_trace_id(response, step_name)
+                if trace_id:
+                    self.logger.info(
+                        f"Created summary trace for '{step_name}' (ID: {trace_id}, seq: {sequence})"
+                    )
+                    return trace_id
+            else:
+                self.logger.error(
+                    f"Failed to create summary trace for '{step_name}': status={response.status_code}, body={response.content}"
+                )
+
+        except Exception as e:
+            self.logger.error(
+                f"Exception creating summary trace for '{step_name}': {e}",
+                exc_info=True,
+            )
+
+        return None
 
     def _is_json_serializable(self, value: Any) -> bool:
         """Check if a value is JSON serializable."""

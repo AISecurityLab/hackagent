@@ -23,6 +23,7 @@ const sidebars: SidebarsConfig = {
         'getting-started/installation',
         'getting-started/quick-start',
         'getting-started/attack-tutorial',
+        'getting-started/datasets-tutorial',
       ],
     },
     {

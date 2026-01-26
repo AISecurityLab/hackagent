@@ -7,7 +7,7 @@ from google.adk.models.lite_llm import LiteLlm
 from google.adk.tools import FunctionTool
 
 # Get the Ollama model name from environment variable, default to 'llama2'
-ollama_model_name = os.environ.get("OLLAMA_MODEL", "llama3.2:1b")
+ollama_model_name = os.environ.get("OLLAMA_MODEL", "tinyllama")
 
 
 def get_weather(city: str) -> dict:

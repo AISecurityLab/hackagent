@@ -343,7 +343,7 @@ class OllamaAgent(Agent):
         Args:
             request_data: The data for the agent to process. Expected keys:
                 - 'prompt' or 'messages': The input for generation
-                - 'max_new_tokens' (optional): Override default max tokens
+                - 'max_new_tokens' or 'max_tokens' (optional): Override default max tokens
                 - 'temperature' (optional): Override default temperature
                 - 'top_p' (optional): Override default top_p
                 - 'top_k' (optional): Override default top_k
@@ -376,8 +376,12 @@ class OllamaAgent(Agent):
             )
 
         # Build options from request data
+        # Support both 'max_new_tokens' and 'max_tokens' (OpenAI convention)
+        max_tokens_value = request_data.get("max_new_tokens") or request_data.get(
+            "max_tokens"
+        )
         options = self._build_options(
-            max_new_tokens=request_data.get("max_new_tokens"),
+            max_new_tokens=max_tokens_value,
             temperature=request_data.get("temperature"),
             top_p=request_data.get("top_p"),
             top_k=request_data.get("top_k"),

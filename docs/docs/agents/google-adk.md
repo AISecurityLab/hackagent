@@ -11,16 +11,40 @@ Google Agent Development Kit (ADK) is a framework for building conversational AI
 
 ### Prerequisites
 
-1. **Google ADK Agent**: A running ADK agent/application
-2. **HackAgent SDK**: Install with `pip install hackagent`
-3. **API Access**: HackAgent platform API key
+1. **Install Google ADK**:
+   ```bash
+   pip install google-adk
+   ```
 
-### ADK Agent Requirements
+2. **Set up your LLM backend** (choose one):
+   
+   **Option A: Google AI (Gemini)**
+   ```bash
+   export GOOGLE_API_KEY="your-gemini-api-key"
+   ```
+   
+   **Option B: Ollama (local)**
+   ```bash
+   ollama serve
+   ollama pull gemma3  # or any other model
+   ```
 
-Your ADK agent should be:
-- Running and accessible via HTTP
-- Configured with proper session management
-- Exposing the standard ADK API endpoints
+3. **Start your ADK agent**:
+   ```bash
+   cd your_agent_directory
+   adk web
+   ```
+
+4. **Verify it's running** on `http://localhost:8000`:
+   ```bash
+   curl http://localhost:8000/list-apps
+   # Should return your agent name(s)
+   ```
+
+5. **Install HackAgent**:
+   ```bash
+   pip install hackagent
+   ```
 
 ## 🚀 Basic Integration
 

@@ -373,7 +373,7 @@ AdvPrefix attacks may exhibit these patterns:
 
 ## 🔄 Next Steps
 
-- **[Google ADK Integration](../integrations/google-adk.md)** - Framework-specific testing
+- **[Google ADK Integration](../agents/google-adk.md)** - Framework-specific testing
 - **[Attack Tutorial](../getting-started/attack-tutorial.md)** - Getting started with attacks
 - **[Security Guidelines](../security/responsible-disclosure.md)** - Responsible testing practices
 

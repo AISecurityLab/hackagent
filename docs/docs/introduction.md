@@ -88,7 +88,7 @@ HackAgent automates testing for these vulnerabilities using **research-backed at
     <a href="./getting-started/installation" style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem', textDecoration: 'none', color: 'inherit'}}>📖 Installation</a>
     <a href="./cli/overview" style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem', textDecoration: 'none', color: 'inherit'}}>🖥️ CLI Reference</a>
     <a href="./attacks" style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem', textDecoration: 'none', color: 'inherit'}}>⚔️ Attack Techniques</a>
-    <a href="./integrations/google-adk" style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem', textDecoration: 'none', color: 'inherit'}}>🔌 Integrations</a>
+    <a href="./agents/google-adk" style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem', textDecoration: 'none', color: 'inherit'}}>🔌 Integrations</a>
   </div>
 </div>
 

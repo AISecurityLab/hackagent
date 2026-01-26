@@ -11,25 +11,32 @@ OpenAI SDK is the official Python library for interacting with OpenAI's API, inc
 
 ### Prerequisites
 
-1. **OpenAI API Key**: Get your API key from [platform.openai.com](https://platform.openai.com)
-2. **HackAgent SDK**: Install with `pip install hackagent`
-3. **OpenAI SDK**: Automatically installed with HackAgent
-4. **HackAgent API Key**: Get from [app.hackagent.dev](https://app.hackagent.dev)
+1. **Get an OpenAI API key**:
+   - Go to [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+   - Click "Create new secret key"
+   - Copy the key (starts with `sk-`)
 
-### Authentication
+2. **Set the environment variable**:
+   ```bash
+   export OPENAI_API_KEY="sk-..."
+   ```
 
-Set up your OpenAI API key:
+3. **Verify your API key**:
+   ```bash
+   curl https://api.openai.com/v1/models \
+     -H "Authorization: Bearer $OPENAI_API_KEY"
+   # Should return a list of available models
+   ```
 
-```bash
-export OPENAI_API_KEY="your-openai-api-key"
+4. **Install HackAgent** (includes OpenAI SDK):
+   ```bash
+   pip install hackagent
+   ```
 
-# Optional: Custom endpoint (for Azure OpenAI, etc.)
-export OPENAI_API_BASE="https://api.openai.com/v1"
-```
-
-For HackAgent authentication, either:
-- Run `hackagent init` to create a config file, or
-- Pass `api_key` directly to `HackAgent()`
+5. **(Optional) For Azure OpenAI**, set custom endpoint:
+   ```bash
+   export OPENAI_API_BASE="https://your-resource.openai.azure.com"
+   ```
 
 ## 🚀 Basic Integration
 
