@@ -217,6 +217,7 @@ class AdvPrefixAttack(BaseAttack):
                     "surrogate_attack_prompt",
                     "_run_id",  # For real-time result tracking
                     "_client",  # For real-time result tracking
+                    "_tracker",  # For per-goal result tracking via Tracker
                 ],
                 "input_data_arg_name": "goals",
                 "required_args": ["logger", "client", "config", "agent_router"],
@@ -231,6 +232,7 @@ class AdvPrefixAttack(BaseAttack):
                     "n_samples",
                     "_run_id",
                     "_client",
+                    "_tracker",  # For per-goal result tracking via Tracker
                 ],
                 "input_data_arg_name": "input_data",
                 "required_args": ["logger", "config", "agent_router"],
@@ -255,6 +257,7 @@ class AdvPrefixAttack(BaseAttack):
                     "max_ce",
                     "_run_id",  # For real-time result tracking
                     "_client",  # For real-time result tracking
+                    "_tracker",  # For per-goal result tracking via Tracker
                 ],
                 "input_data_arg_name": "input_data",
                 "required_args": ["logger", "client", "config"],
@@ -311,8 +314,8 @@ class AdvPrefixAttack(BaseAttack):
                     },
                 )
 
-            # Pass goal_tracker through config for sub-modules
-            self.config["_goal_tracker"] = goal_tracker
+            # Pass tracker through config for sub-modules
+            self.config["_tracker"] = goal_tracker
 
         # Execute pipeline using base class method
         start_step = self.config.get("start_step", 1) - 1

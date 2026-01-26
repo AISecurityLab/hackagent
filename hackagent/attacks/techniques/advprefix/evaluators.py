@@ -39,10 +39,13 @@ Key Features:
 import logging
 import os
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from hackagent.client import AuthenticatedClient
 from hackagent.router.router import AgentRouter
+
+if TYPE_CHECKING:
+    from hackagent.router.tracking import Tracker
 
 from .config import EvaluatorConfig
 from .utils import create_progress_bar, log_errors
@@ -69,6 +72,7 @@ class BaseEvaluator(ABC):
         config: EvaluatorConfig,
         run_id: Optional[str] = None,
         tracking_client: Optional[AuthenticatedClient] = None,
+        tracker: Optional["Tracker"] = None,
     ):
         """
         Initialize the base evaluator with client and configuration.
@@ -78,12 +82,15 @@ class BaseEvaluator(ABC):
             config: Evaluator configuration
             run_id: Optional run ID for result tracking
             tracking_client: Optional client for tracking (uses `client` if not provided)
+            tracker: Optional Tracker for per-goal result tracking
         """
         self.client = client
         self.config = config
         # Store tracking context
         self._run_id = run_id
         self._tracking_client = tracking_client or client
+        # Store tracker for per-goal result tracking
+        self._tracker = tracker
         # Use hierarchical logger name for TUI handler inheritance
         self.logger = logging.getLogger(
             f"hackagent.attacks.advprefix.evaluators.{self.__class__.__name__}"
@@ -202,12 +209,10 @@ class BaseEvaluator(ABC):
             return results_eval, results_expl, processed_indices
 
         # Log tracking context status
-        if self._run_id and self._tracking_client:
-            self.logger.info(f"📊 Evaluator tracking enabled: run_id={self._run_id}")
+        if self._tracker:
+            self.logger.info("📊 Evaluator tracking via Tracker enabled")
         else:
-            self.logger.debug(
-                "Evaluator tracking disabled - judge results will NOT be tracked"
-            )
+            self.logger.debug("Evaluator tracking disabled - no tracker available")
 
         task_desc = f"[blue]{self.config.agent_name}: {progress_description.replace('[cyan]', '').strip()}"
         with create_progress_bar(task_desc, total=len(rows_to_process)) as (
@@ -218,6 +223,8 @@ class BaseEvaluator(ABC):
                 original_index = row.get("_original_index", idx)
                 current_eval: Any = 0
                 current_expl: Optional[str] = "Evaluation failed or skipped"
+                request_data = None
+                response = None
 
                 try:
                     request_data = self._get_request_data_for_row(row)
@@ -254,6 +261,32 @@ class BaseEvaluator(ABC):
                         f"Exception processing row {original_index}: {e}", exc_info=True
                     )
                 finally:
+                    # Add trace to goal's Result via Tracker
+                    if self._tracker and request_data is not None:
+                        goal = row.get("goal", "")
+                        if goal:
+                            goal_ctx = self._tracker.get_goal_context_by_goal(goal)
+                            if goal_ctx:
+                                self._tracker.add_evaluation_trace(
+                                    ctx=goal_ctx,
+                                    evaluation_result={
+                                        "score": current_eval,
+                                        "explanation": current_expl,
+                                    },
+                                    score=float(current_eval)
+                                    if isinstance(current_eval, (int, float))
+                                    else 0.0,
+                                    explanation=current_expl,
+                                    evaluator_name=self.__class__.__name__,
+                                    metadata={
+                                        "prefix": row.get("prefix", "")[:100],
+                                        "completion": row.get("completion", "")[:100]
+                                        if row.get("completion")
+                                        else None,
+                                        "judge_model": self.config.model_id,
+                                    },
+                                )
+
                     results_eval.append(current_eval)
                     results_expl.append(current_expl)
                     processed_indices.append(original_index)

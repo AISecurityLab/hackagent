@@ -254,7 +254,7 @@ def execute_prompts(
 
     # Store goal_tracker in config for evaluation phase to use
     if goal_tracker:
-        config["_goal_tracker"] = goal_tracker
+        config["_tracker"] = goal_tracker
         config["_goal_contexts"] = goal_contexts
 
     return completions

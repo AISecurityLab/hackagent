@@ -396,67 +396,6 @@ SCORE: {score}"""
 
         return None
 
-    def _query_target(
-        self, prompt: str, run_id: Optional[str] = None, client: Optional[Any] = None
-    ) -> Optional[str]:
-        """
-        Query target model with adversarial prompt.
-
-        DEPRECATED: Use _query_target_simple() with Tracker instead.
-        This method is kept for backwards compatibility.
-        """
-        try:
-            messages = [{"role": "user", "content": prompt}]
-
-            request_data = {
-                "messages": messages,
-                "max_tokens": self.config.get("max_new_tokens", 150),
-                "temperature": self.config.get("temperature", 0.7),
-            }
-
-            # Use route_with_tracking if available for real-time result creation
-            if run_id and client:
-                tracking_result = self.agent_router.route_with_tracking(
-                    registration_key=list(self.agent_router._agent_registry.keys())[0],
-                    request_data=request_data,
-                    run_id=run_id,
-                    client=client,
-                )
-                # route_with_tracking returns {"response": <actual_response>, "result_id": <id>}
-                response = (
-                    tracking_result.get("response")
-                    if isinstance(tracking_result, dict)
-                    else tracking_result
-                )
-            else:
-                response = self.agent_router.route_request(
-                    registration_key=list(self.agent_router._agent_registry.keys())[0],
-                    request_data=request_data,
-                )
-
-            # Extract content from response - handle multiple formats
-            # Format 1: OpenAI-style object with choices
-            if response and hasattr(response, "choices") and response.choices:
-                return response.choices[0].message.content or ""
-            # Format 2: Dictionary with generated_text or processed_response
-            elif isinstance(response, dict):
-                content = response.get("generated_text") or response.get(
-                    "processed_response"
-                )
-                if content:
-                    return content
-                # Check for error
-                if response.get("error_message"):
-                    self.logger.warning(
-                        f"Target response error: {response.get('error_message')}"
-                    )
-                    return None
-
-        except Exception as e:
-            self.logger.error(f"Error querying target: {e}")
-
-        return None
-
     def _judge_response(self, goal: str, prompt: str, response: str) -> int:
         """Judge response quality (1-10 scale)."""
         try:

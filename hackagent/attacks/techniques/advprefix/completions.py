@@ -354,7 +354,7 @@ def execute(
     # Extract tracking information from config
     run_id = config.get("_run_id")
     client = config.get("_client")
-    goal_tracker = config.get("_goal_tracker")
+    tracker = config.get("_tracker")
 
     logger.info(
         f"📊 Tracking context: run_id={run_id}, client={'Present' if client else 'Missing'}"
@@ -362,21 +362,8 @@ def execute(
     if not run_id or not client:
         logger.warning("⚠️ Missing tracking context - results will NOT be created!")
 
-    goal_order: List[str] = []
-    goal_contexts: Dict[str, Any] = {}
-    if goal_tracker:
+    if tracker:
         logger.info("📊 Using Tracker for per-goal result tracking")
-        for row in input_data:
-            goal = row.get("goal", "")
-            if goal not in goal_order:
-                goal_order.append(goal)
-
-        for idx, goal in enumerate(goal_order):
-            goal_contexts[goal] = goal_tracker.get_goal_context(idx)
-            if goal_contexts[goal] is None:
-                logger.warning(
-                    f"Missing goal context for goal '{goal[:50]}...' (index {idx})"
-                )
 
     # --- Completion Parameters from config ---
     request_timeout = 120
@@ -411,31 +398,37 @@ def execute(
                 )
                 completion_results_list.append(result)
 
+                # Add trace to the correct goal's Result via Tracker
                 goal = record.get("goal", "")
-                goal_ctx = goal_contexts.get(goal) if goal_tracker else None
-                if goal_tracker and goal_ctx:
-                    completion_text = result.get("completion")
-                    response_payload = {
-                        "generated_text": completion_text,
-                        "raw_response_body": result.get("raw_response_body"),
-                        "raw_response_status": result.get("raw_response_status"),
-                    }
-                    goal_tracker.add_interaction_trace(
-                        ctx=goal_ctx,
-                        request=result.get("raw_request_payload") or {},
-                        response=response_payload,
-                        step_name="Target Completion",
-                        metadata={
-                            "prefix": prefix_text,
-                            "surrogate_attack_prompt": actual_surrogate_prompt_str,
-                            "error_message": result.get("error_message"),
-                            "adapter_specific_events": result.get(
-                                "adapter_specific_events"
-                            ),
-                            "agent_specific_data": result.get("agent_specific_data"),
+                if tracker and goal:
+                    goal_ctx = tracker.get_goal_context_by_goal(goal)
+                    if goal_ctx:
+                        completion_text = result.get("completion")
+                        response_payload = {
+                            "generated_text": completion_text,
+                            "raw_response_body": result.get("raw_response_body"),
                             "raw_response_status": result.get("raw_response_status"),
-                        },
-                    )
+                        }
+                        tracker.add_interaction_trace(
+                            ctx=goal_ctx,
+                            request=result.get("raw_request_payload") or {},
+                            response=response_payload,
+                            step_name="Target Completion",
+                            metadata={
+                                "prefix": prefix_text,
+                                "surrogate_attack_prompt": actual_surrogate_prompt_str,
+                                "error_message": result.get("error_message"),
+                                "adapter_specific_events": result.get(
+                                    "adapter_specific_events"
+                                ),
+                                "agent_specific_data": result.get(
+                                    "agent_specific_data"
+                                ),
+                                "raw_response_status": result.get(
+                                    "raw_response_status"
+                                ),
+                            },
+                        )
             except Exception as e:
                 logger.error(
                     f"Exception during synchronous completion for original index {index}: {e}",

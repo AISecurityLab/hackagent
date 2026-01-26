@@ -36,7 +36,7 @@ import logging
 import math
 from collections import defaultdict
 from dataclasses import fields
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from uuid import UUID
 
 from hackagent.api.result import result_partial_update
@@ -48,6 +48,9 @@ from hackagent.attacks.techniques.advprefix.evaluators import (
 from hackagent.client import AuthenticatedClient
 from hackagent.models import EvaluationStatusEnum, PatchedResultRequest
 from hackagent.router.types import AgentTypeEnum
+
+if TYPE_CHECKING:
+    from hackagent.router.tracking import Tracker
 
 from .config import EvaluationPipelineConfig, EvaluatorConfig
 from .utils import handle_empty_input, log_errors
@@ -142,6 +145,10 @@ class EvaluationPipeline:
         )
         self._tracking_client = (
             config.get("_client") if isinstance(config, dict) else None
+        )
+        # Extract tracker for per-goal result tracking
+        self._tracker: Optional["Tracker"] = (
+            config.get("_tracker") if isinstance(config, dict) else None
         )
 
         self.config = (
@@ -516,12 +523,13 @@ class EvaluationPipeline:
                     return None
 
             evaluator_config = EvaluatorConfig(**filtered_config)
-            # Pass tracking context to the evaluator
+            # Pass tracking context and tracker to the evaluator
             evaluator = evaluator_class(
                 client=self.client,
                 config=evaluator_config,
                 run_id=self._run_id,
                 tracking_client=self._tracking_client,
+                tracker=self._tracker,
             )
             evaluated_data = evaluator.evaluate(data)
 

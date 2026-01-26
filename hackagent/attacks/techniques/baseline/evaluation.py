@@ -318,13 +318,13 @@ def _sync_evaluation_to_server(
 
     Args:
         evaluated_data: List of dicts with evaluation results
-        config: Configuration dictionary (may contain _goal_tracker, _goal_contexts)
+        config: Configuration dictionary (may contain _tracker, _goal_contexts)
         logger: Logger instance
 
     Returns:
         Number of results/goals successfully updated
     """
-    goal_tracker: Optional[Tracker] = config.get("_goal_tracker")
+    goal_tracker: Optional[Tracker] = config.get("_tracker")
     goal_contexts: Optional[Dict[str, Any]] = config.get("_goal_contexts")
 
     # Preferred: Use Tracker for organized per-goal results

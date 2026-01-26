@@ -471,6 +471,24 @@ class Tracker:
         """Get the Context for a specific goal index."""
         return self._goal_contexts.get(goal_index)
 
+    def get_goal_context_by_goal(self, goal: str) -> Optional[Context]:
+        """
+        Get the Context for a specific goal string.
+
+        Searches all contexts to find one matching the goal text.
+        Use this when you have the goal string but not the index.
+
+        Args:
+            goal: The goal text to find
+
+        Returns:
+            Context if found, None otherwise
+        """
+        for ctx in self._goal_contexts.values():
+            if ctx.goal == goal:
+                return ctx
+        return None
+
     def get_result_id(self, goal_index: int) -> Optional[str]:
         """Get the result ID for a specific goal index."""
         ctx = self._goal_contexts.get(goal_index)

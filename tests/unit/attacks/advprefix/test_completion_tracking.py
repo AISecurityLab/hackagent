@@ -58,7 +58,7 @@ class TestAdvPrefixCompletionTracking(unittest.TestCase):
 
         config = {
             "surrogate_attack_prompt": "",
-            "_goal_tracker": goal_tracker,
+            "_tracker": goal_tracker,
             "_run_id": "run-id",
             "_client": MagicMock(),
         }
