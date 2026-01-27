@@ -23,7 +23,7 @@ graph TB
     
     subgraph "Core Services"
         AGENT[Agent Management]
-        ATTACK[Attack Engine]
+        ATTACK[⚔️ Attack Engine]
         EVAL[Evaluation Service]
         BILLING[Billing Service]
     end
@@ -32,11 +32,12 @@ graph TB
         DB[(PostgreSQL)]
         CACHE[(Redis Cache)]
         FILES[File Storage]
+        DATASETS[📊 Datasets]
     end
     
     subgraph "External Integrations"
-        ADK[Google ADK]
-        OPENAI[OpenAI API]
+        ADK[🔌 Google ADK]
+        OPENAI[🔌 OpenAI SDK]
         LITELLM[LiteLLM]
         CUSTOM[Custom Agents]
     end
@@ -52,6 +53,7 @@ graph TB
     
     AGENT --> DB
     ATTACK --> DB
+    ATTACK --> DATASETS
     EVAL --> DB
     BILLING --> DB
     
@@ -64,6 +66,45 @@ graph TB
     AGENT --> CUSTOM
     
     EVAL --> FILES
+
+    style ATTACK fill:#ff6b6b,stroke:#c92a2a,color:#fff
+    style DATASETS fill:#4dabf7,stroke:#1971c2,color:#fff
+    style ADK fill:#69db7c,stroke:#2f9e44,color:#fff
+    style OPENAI fill:#69db7c,stroke:#2f9e44,color:#fff
+```
+
+### 🔗 Explore Components
+
+import Link from '@docusaurus/Link';
+
+<div className="row" style={{marginTop: '1rem'}}>
+  <div className="col col--3" style={{marginBottom: '1rem'}}>
+    <Link to="/attacks/" style={{textDecoration: 'none', display: 'block', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '2px solid var(--ifm-color-primary)'}}>
+      <h4 style={{margin: 0}}>⚔️ Attack Engine</h4>
+      <p style={{margin: '0.5rem 0 0 0', fontSize: '0.9rem'}}>Learn about different attack types and techniques</p>
+    </Link>
+  </div>
+  <div className="col col--3" style={{marginBottom: '1rem'}}>
+    <Link to="/datasets/" style={{textDecoration: 'none', display: 'block', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '2px solid var(--ifm-color-primary)'}}>
+      <h4 style={{margin: 0}}>📊 Datasets</h4>
+      <p style={{margin: '0.5rem 0 0 0', fontSize: '0.9rem'}}>Configure data sources for security testing</p>
+    </Link>
+  </div>
+  <div className="col col--3" style={{marginBottom: '1rem'}}>
+    <Link to="/agents/google-adk" style={{textDecoration: 'none', display: 'block', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '2px solid var(--ifm-color-primary)'}}>
+      <h4 style={{margin: 0}}>🔌 Google ADK</h4>
+      <p style={{margin: '0.5rem 0 0 0', fontSize: '0.9rem'}}>Test Google ADK-based agents</p>
+    </Link>
+  </div>
+  <div className="col col--3" style={{marginBottom: '1rem'}}>
+    <Link to="/agents/openai-sdk" style={{textDecoration: 'none', display: 'block', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '2px solid var(--ifm-color-primary)'}}>
+      <h4 style={{margin: 0}}>🔌 OpenAI SDK</h4>
+      <p style={{margin: '0.5rem 0 0 0', fontSize: '0.9rem'}}>Test OpenAI SDK-based agents</p>
+    </Link>
+  </div>
+</div>
+    style ADK fill:#69db7c,stroke:#2f9e44,color:#fff
+    style OPENAI fill:#69db7c,stroke:#2f9e44,color:#fff
 ```
 
 ## 🧩 Core Components

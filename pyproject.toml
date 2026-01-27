@@ -47,6 +47,7 @@ dev = [
     "commitizen>=4.7.1",
     "cz-conventional-gitmoji>=0.7.0",
     "pytest-cov>=6.1.1",
+    "pytest-rerunfailures>=14.0",
     "google-adk>=1.4.2",
     "anyio>=4.3.0",
     "pytest-asyncio>=0.23.7,<1.4.0",

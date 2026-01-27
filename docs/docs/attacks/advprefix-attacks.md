@@ -78,14 +78,14 @@ attack_config = {
     "judges": [
         {
             "identifier": "ollama/llama3",
-            "endpoint": "http://localhost:11434/api/judge",
+            "endpoint": "http://localhost:11434/api/generate",
             "type": "harmbench"
         }
     ],
     "selection_judges": [
         {
             "identifier": "ollama/llama3",
-            "endpoint": "http://localhost:11434/api/judge",
+            "endpoint": "http://localhost:11434/api/generate",
             "type": "harmbench"
         }
     ]
@@ -121,7 +121,7 @@ advanced_config = {
     "judges": [
         {
             "identifier": "ollama/llama3",
-            "endpoint": "http://localhost:11434/api/judge",
+            "endpoint": "http://localhost:11434/api/generate",
             "type": "harmbench"
         },
         {
@@ -189,7 +189,7 @@ Judges evaluate prefix effectiveness and harmfulness:
 "judges": [
     {
         "identifier": "ollama/llama3",
-        "endpoint": "http://localhost:11434/api/judge",
+        "endpoint": "http://localhost:11434/api/generate",
         "type": "harmbench"
     }
 ]
@@ -373,9 +373,8 @@ AdvPrefix attacks may exhibit these patterns:
 
 ## 🔄 Next Steps
 
-- **[Python SDK Guide](../sdk/python-quickstart.md)** - Complete SDK documentation
-- **[Google ADK Integration](../integrations/google-adk.md)** - Framework-specific testing
-- **[Attack Tutorial](../tutorial-basics/attack-tutorial.md)** - Getting started with attacks
+- **[Google ADK Integration](../agents/google-adk.md)** - Framework-specific testing
+- **[Attack Tutorial](../getting-started/attack-tutorial.md)** - Getting started with attacks
 - **[Security Guidelines](../security/responsible-disclosure.md)** - Responsible testing practices
 
 ---

@@ -20,32 +20,37 @@ from typing import Any, Dict, Optional, Tuple
 import requests
 from requests.structures import CaseInsensitiveDict
 
-from hackagent.router.adapters.base import Agent
+from hackagent.router.adapters.base import (
+    Agent,
+    AdapterConfigurationError,
+    AdapterInteractionError,
+    AdapterResponseParsingError,
+)
 
 # Global logger for this module, can be used by utility functions too
 logger = logging.getLogger(__name__)
 
 
-# --- Custom Exceptions (moved from api.utils.py) ---
-class AgentConfigurationError(Exception):
+# --- Custom Exceptions (subclass from base) ---
+class AgentConfigurationError(AdapterConfigurationError):
     """Custom exception for agent configuration issues."""
 
     pass
 
 
-class AgentInteractionError(Exception):
+class AgentInteractionError(AdapterInteractionError):
     """Custom exception for errors during interaction with the agent API."""
 
     pass
 
 
-class ResponseParsingError(Exception):
+class ResponseParsingError(AdapterResponseParsingError):
     """Custom exception for errors parsing the agent's response."""
 
     pass
 
 
-class ADKAgentAdapter(Agent):
+class ADKAgent(Agent):
     """
     Adapter for interacting with ADK (Agent Development Kit) based agents.
 
@@ -63,9 +68,11 @@ class ADKAgentAdapter(Agent):
         logger (logging.Logger): Logger instance for this adapter.
     """
 
+    ADAPTER_TYPE = "ADKAgent"
+
     def __init__(self, id: str, config: Dict[str, Any]):
         """
-        Initializes the ADKAgentAdapter.
+        Initializes the ADKAgent.
 
         Args:
             id: The unique identifier for this ADK agent instance.
@@ -81,30 +88,24 @@ class ADKAgentAdapter(Agent):
             AgentConfigurationError: If any required configuration key (name, endpoint, user_id) is missing.
         """
         super().__init__(id, config)
-        required_keys = ["name", "endpoint", "user_id"]
-        for key in required_keys:
-            if key not in self.config:
-                msg = f"Missing required configuration key '{key}' for ADKAgentAdapter: {self.id}"
-                raise AgentConfigurationError(msg)
 
-        self.name: str = self.config["name"]
-        self.endpoint: str = self.config["endpoint"].strip("/")
-        self.user_id: str = self.config["user_id"]
-        self.request_timeout: int = self.config.get("request_timeout", 120)
+        # Validate required configuration keys using base class helper
+        self.name: str = self._require_config_key("name", AgentConfigurationError)
+        endpoint_raw: str = self._require_config_key(
+            "endpoint", AgentConfigurationError
+        )
+        self.user_id: str = self._require_config_key("user_id", AgentConfigurationError)
+
+        self.endpoint: str = endpoint_raw.strip("/")
+        self.request_timeout: int = self._get_config_key("request_timeout", 120)
 
         # Generate a unique session ID for this adapter instance
         # This keeps session state persistent across multiple requests to the same agent
         import uuid
 
-        self.session_id: str = self.config.get("session_id", str(uuid.uuid4()))
+        self.session_id: str = self._get_config_key("session_id", str(uuid.uuid4()))
 
-        # Use hierarchical logger name for TUI handler inheritance
-        self.logger = logging.getLogger(
-            f"hackagent.router.adapters.ADKAgentAdapter.{self.id}"
-        )
-        self.logger.info(
-            f"ADKAgentAdapter initialized with session_id: {self.session_id}"
-        )
+        self.logger.info(f"ADKAgent initialized with session_id: {self.session_id}")
 
     def _initialize_session(
         self, session_id_to_init: str, initial_state: Optional[dict] = None
@@ -548,19 +549,15 @@ class ADKAgentAdapter(Agent):
             if raw_request is None:
                 raw_request = interaction_details.get("request_payload")
 
-        return {
-            "raw_request": raw_request,
-            "processed_response": None,
-            "status_code": (
-                actual_status_code if actual_status_code is not None else 500
-            ),
-            "raw_response_headers": raw_response_headers,
-            "raw_response_body": raw_response_body,
-            "agent_specific_data": {"adk_events_list": adk_events},
-            "error_message": error_message,
-            "agent_id": self.id,
-            "adapter_type": "ADKAgentAdapter",
-        }
+        # Use base class method with ADK-specific data
+        return super()._build_error_response(
+            error_message=error_message,
+            status_code=actual_status_code,
+            raw_request=raw_request,
+            raw_response_body=raw_response_body,
+            raw_response_headers=raw_response_headers,
+            agent_specific_data={"adk_events_list": adk_events},
+        )
 
     def handle_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -634,23 +631,18 @@ class ADKAgentAdapter(Agent):
                 )
 
             # Success case
-            return {
-                "raw_request": interaction_details.get(
-                    "raw_request"
-                ),  # Changed from request_payload
-                "generated_text": interaction_details.get("generated_text"),
-                "status_code": interaction_details.get("raw_response_status"),
-                "raw_response_headers": interaction_details.get("raw_response_headers"),
-                "raw_response_body": interaction_details.get("raw_response_body"),
-                "agent_specific_data": {
+            return self._build_success_response(
+                processed_response=interaction_details.get("generated_text"),
+                raw_request=interaction_details.get("raw_request"),
+                raw_response_body=interaction_details.get("raw_response_body"),
+                raw_response_headers=interaction_details.get("raw_response_headers"),
+                agent_specific_data={
                     "adk_events_list": interaction_details.get(
                         "adapter_specific_events"
                     )
                 },
-                "error_message": None,
-                "agent_id": self.id,
-                "adapter_type": "ADKAgentAdapter",
-            }
+                status_code=interaction_details.get("raw_response_status") or 200,
+            )
         except AgentInteractionError as aie_session:  # Specific catch for session errors from _create_session_internal
             self.logger.error(
                 f"Failed to ensure ADK session '{session_id_to_use}': {aie_session}"

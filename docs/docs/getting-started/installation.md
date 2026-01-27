@@ -9,24 +9,20 @@ import TabItem from '@theme/TabItem';
 
 Get HackAgent up and running in seconds.
 
-## Requirements
+## Quick Install
+
+### Requirements
 
 - **Python 3.10+**
 - **pip** or **uv** package manager
 
-## Production Installation
+### Production Installation
 
 <Tabs>
   <TabItem value="uv" label="uv (Recommended)" default>
 
 ```bash
 uv add hackagent
-```
-
-Or using pip with uv:
-
-```bash
-uv pip install hackagent
 ```
 
   </TabItem>
@@ -39,13 +35,27 @@ pip install hackagent
   </TabItem>
 </Tabs>
 
-## Verify Installation
+### Verify Installation
 
 After installation, verify everything works:
 
 ```bash
 hackagent --version
 ```
+
+### Initial Setup
+
+After installation, run the interactive setup wizard:
+
+```bash
+hackagent init
+```
+
+This will guide you through:
+1. 🔑 **Enter your API key** — Get yours at [app.hackagent.dev](https://app.hackagent.dev)
+2. 📊 **Set output format** — Choose between `table`, `json`, or `csv`
+3. 🔊 **Set verbosity level** — Control logging detail (0=ERROR to 3=DEBUG)
+4. 💾 **Save configuration** — Stored securely for future use
 
 ## Development Installation
 
@@ -78,49 +88,10 @@ pip install -e ".[dev]"
   </TabItem>
 </Tabs>
 
-## Initial Setup
-
-After installation, run the interactive setup wizard:
-
-```bash
-hackagent init
-```
-
-This will guide you through:
-1. 🔑 **Enter your API key** — Get yours at [app.hackagent.dev](https://app.hackagent.dev)
-2. 🌐 **Configure the base URL** — Default: `https://api.hackagent.dev`
-3. 📊 **Set output format** — Choose between `table`, `json`, or `csv`
-4. 💾 **Save configuration** — Stored securely for future use
-
-## Optional Dependencies
-
-### For Local LLM Support
-
-If you plan to use local models with Ollama:
-
-```bash
-# Install Ollama (macOS/Linux)
-curl -fsSL https://ollama.com/install.sh | sh
-
-# Pull recommended models
-ollama pull llama3
-ollama pull llama2-uncensored
-```
-
-### For Development
-
-```bash
-# Install development dependencies
-uv sync --group dev
-
-# Or with pip
-pip install -e ".[dev]"
-```
-
 ---
 
 ## Next Steps
 
-- [**How to Use HackAgent**](../HowTo) — Step-by-step usage guide
-- [**Attack Tutorial**](../tutorial-basics/attack-tutorial) — Run your first security test
-- [**Python SDK**](../sdk/python-quickstart) — Full SDK documentation
+- [**Quick Start**](./quick-start) — Get started in minutes
+- [**Attack Tutorial**](./attack-tutorial) — Run your first security test
+- [**CLI Reference**](../cli/overview) — Command-line interface documentation

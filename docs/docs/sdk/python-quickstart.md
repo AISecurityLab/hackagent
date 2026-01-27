@@ -2,9 +2,11 @@
 sidebar_position: 1
 ---
 
-# SDK Quick Start
+# SDK Reference
 
-The HackAgent SDK provides a powerful interface for conducting AI security testing programmatically. This guide covers installation, configuration, and practical usage examples.
+The HackAgent SDK provides a powerful interface for conducting AI security testing programmatically.
+
+For installation instructions, see the [Installation Guide](../getting-started/installation.md).
 
 ## SDK vs HTTP API
 
@@ -20,109 +22,12 @@ The **HackAgent SDK** wraps the HackAgent platform's HTTP API in easy-to-use cla
 - You need maximum control over requests and responses
 - You're building custom integrations
 
-**Use the CLI when:**
-- You want to run security tests from command line or scripts
-- You prefer a simple interface without writing code
-
 For the interactive HTTP API documentation, visit: **[https://api.hackagent.dev/schema/swagger-ui](https://api.hackagent.dev/schema/swagger-ui)**
 
-This guide focuses on the SDK. For CLI usage, see the [CLI Documentation](../cli/README.md).
-
-## 🚀 Installation
-
-### Production Installation (Recommended)
-
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
-<Tabs>
-  <TabItem value="uv" label="uv" default>
-    ```bash
-    uv pip install hackagent
-    ```
-  </TabItem>
-  <TabItem value="pip" label="pip">
-    ```bash
-    pip install hackagent
-    ```
-  </TabItem>
-</Tabs>
-
-### Development Installation (Local Package)
-
-For development or to access the latest features:
-
-<Tabs>
-  <TabItem value="uv-dev" label="uv (Recommended)" default>
-    ```bash
-    # Clone the repository
-    git clone https://github.com/AISecurityLab/hackagent.git
-    cd hackagent
-    
-    # Install with uv
-    uv sync --group dev
-    ```
-  </TabItem>
-  <TabItem value="pip-dev" label="pip">
-    ```bash
-    # Clone the repository
-    git clone https://github.com/AISecurityLab/hackagent.git
-    cd hackagent
-    
-    # Install in development mode
-    pip install -e .
-    ```
-  </TabItem>
-</Tabs>
-
-### Import the SDK
+## Import the SDK
 
 ```python
-# Core imports
 from hackagent import HackAgent, AgentTypeEnum
-```
-
-## 🔑 Authentication Setup
-
-### Get Your API Key
-
-1. Visit [app.hackagent.dev](https://app.hackagent.dev)
-2. Sign up or log in to your account
-3. Navigate to **Settings** → **API Keys**
-4. Click **Generate New Key**
-5. Copy your API key (keep it secure!)
-
-### Configure Authentication
-
-**Method 1: Interactive Setup (Recommended)**
-```bash
-hackagent init
-```
-
-This wizard will:
-- Prompt for your API key
-- Configure the base URL
-- Set your preferred output format
-- Save configuration securely
-
-**Method 2: Environment Variable**
-```bash
-# Add to your shell profile (.bashrc, .zshrc, etc.)
-export HACKAGENT_API_KEY="your_api_key_here"
-```
-
-**Method 3: Direct Configuration**
-```python
-from hackagent import HackAgent
-from hackagent.models import AgentTypeEnum
-
-agent = HackAgent(
-    name="my_test_agent",
-    endpoint="http://localhost:8000",     # Your agent's endpoint
-    agent_type=AgentTypeEnum.GOOGLE_ADK,
-    base_url="https://api.hackagent.dev",     # HackAgent API base URL
-    api_key="your_api_key_here"           # Optional: pass directly
-)
 ```
 
 ## 🎯 Basic Usage
@@ -154,14 +59,14 @@ attack_config = {
     "judges": [
         {
             "identifier": "ollama/llama3",
-            "endpoint": "http://localhost:11434/api/judge",
+            "endpoint": "http://localhost:11434/api/generate",
             "type": "harmbench"
         }
     ],
     "selection_judges": [
         {
             "identifier": "ollama/llama3", 
-            "endpoint": "http://localhost:11434/api/judge",
+            "endpoint": "http://localhost:11434/api/generate",
             "type": "harmbench"
         }
     ]
@@ -199,14 +104,14 @@ def test_adk_attack_scenario():
         "judges": [
             {
                 "identifier": "ollama/llama3",
-                "endpoint": f"{os.getenv('HACKAGENT_API_BASE_URL')}/api/judge",
+                "endpoint": f"{os.getenv('HACKAGENT_API_BASE_URL')}/api/generate",
                 "type": "harmbench",
             }
         ],
         "selection_judges": [
             {
                 "identifier": "ollama/llama3",
-                "endpoint": f"{os.getenv('HACKAGENT_API_BASE_URL')}/api/judge",
+                "endpoint": f"{os.getenv('HACKAGENT_API_BASE_URL')}/api/generate",
                 "type": "harmbench",
             }
         ],
@@ -302,7 +207,7 @@ attack_config = {
     "judges": [
         {
             "identifier": "ollama/llama3",
-            "endpoint": "http://localhost:11434/api/judge",
+            "endpoint": "http://localhost:11434/api/generate",
             "type": "harmbench"  # Evaluation type
         }
     ],
@@ -311,7 +216,7 @@ attack_config = {
     "selection_judges": [
         {
             "identifier": "ollama/llama3",
-            "endpoint": "http://localhost:11434/api/judge", 
+            "endpoint": "http://localhost:11434/api/generate", 
             "type": "harmbench"
         }
     ],
@@ -439,15 +344,25 @@ results = agent.hack(
 Set up your environment properly:
 
 ```bash
-# Required environment variables
-export HACKAGENT_API_KEY="your_api_key"
-export HACKAGENT_API_BASE_URL="https://api.hackagent.dev"
+# Initialize HackAgent with your API key (creates ~/.config/hackagent/config.json)
+hackagent init
 
 # Optional: Agent endpoint
 export AGENT_URL="http://localhost:8001"
 
 # Optional: External model endpoints
 export OLLAMA_BASE_URL="http://localhost:11434"
+```
+
+Alternatively, pass the API key directly:
+
+```python
+agent = HackAgent(
+    name="my_agent",
+    endpoint="http://localhost:8000",
+    agent_type="google-adk",
+    api_key="your_api_key",  # Direct API key
+)
 ```
 
 ### Working with Results
@@ -518,8 +433,8 @@ mypy hackagent/
 Explore these advanced topics:
 
 1. **[AdvPrefix Attacks](../attacks/advprefix-attacks.md)** - Advanced attack techniques
-2. **[Google ADK Integration](../integrations/google-adk.md)** - Framework-specific setup
-3. **[Attack Tutorial](../tutorial-basics/attack-tutorial.md)** - Getting started with attacks
+2. **[Google ADK Integration](../agents/google-adk.md)** - Framework-specific setup
+3. **[Attack Tutorial](../getting-started/attack-tutorial.md)** - Getting started with attacks
 4. **[Security Guidelines](../security/responsible-disclosure.md)** - Responsible disclosure and ethics
 
 ## 📞 Support

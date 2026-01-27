@@ -183,6 +183,7 @@ def get_agent_type_enum(agent_type: str):
         "OPENAI_SDK": AgentTypeEnum.OPENAI_SDK,
         "OPENAI-SDK": AgentTypeEnum.OPENAI_SDK,
         "OPENAI": AgentTypeEnum.OPENAI_SDK,
+        "OLLAMA": AgentTypeEnum.OLLAMA,
         "OTHER": AgentTypeEnum.UNKNOWN,
         "UNKNOWN": AgentTypeEnum.UNKNOWN,
     }

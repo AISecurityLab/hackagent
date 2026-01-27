@@ -14,24 +14,44 @@
 
 # Lazy imports for adapters to improve startup time
 # These adapters import heavy dependencies (litellm ~2s, google-adk ~0.1s)
-from .base import Agent  # Base class is lightweight, import directly
+from .base import (
+    Agent,
+    ChatCompletionsAgent,
+    AdapterConfigurationError,
+    AdapterInteractionError,
+    AdapterResponseParsingError,
+)
 
 
 def __getattr__(name):
     """Lazy load adapter classes on first access."""
-    if name == "ADKAgentAdapter":
-        from .google_adk import ADKAgentAdapter
+    if name == "ADKAgent":
+        from .google_adk import ADKAgent
 
-        return ADKAgentAdapter
-    elif name == "LiteLLMAgentAdapter":
-        from .litellm_adapter import LiteLLMAgentAdapter
+        return ADKAgent
+    elif name == "LiteLLMAgent":
+        from .litellm import LiteLLMAgent
 
-        return LiteLLMAgentAdapter
-    elif name == "OpenAIAgentAdapter":
-        from .openai_adapter import OpenAIAgentAdapter
+        return LiteLLMAgent
+    elif name == "OpenAIAgent":
+        from .openai import OpenAIAgent
 
-        return OpenAIAgentAdapter
+        return OpenAIAgent
+    elif name == "OllamaAgent":
+        from .ollama import OllamaAgent
+
+        return OllamaAgent
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-__all__ = ["ADKAgentAdapter", "LiteLLMAgentAdapter", "OpenAIAgentAdapter", "Agent"]
+__all__ = [
+    "ADKAgent",
+    "LiteLLMAgent",
+    "OpenAIAgent",
+    "OllamaAgent",
+    "Agent",
+    "ChatCompletionsAgent",
+    "AdapterConfigurationError",
+    "AdapterInteractionError",
+    "AdapterResponseParsingError",
+]

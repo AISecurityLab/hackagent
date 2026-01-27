@@ -14,10 +14,9 @@
 
 
 import logging
-import os
 from typing import Any, Dict, List, Optional
 
-from .base import Agent
+from .base import ChatCompletionsAgent, AdapterConfigurationError
 
 # Lazy-load openai to improve startup time
 _openai_module = None
@@ -82,8 +81,8 @@ def _check_openai_available():
     return OPENAI_AVAILABLE
 
 
-# --- Custom Exceptions ---
-class OpenAIConfigurationError(Exception):
+# --- Custom Exceptions (subclass from base) ---
+class OpenAIConfigurationError(AdapterConfigurationError):
     """Custom exception for OpenAI adapter configuration issues."""
 
     pass
@@ -92,7 +91,7 @@ class OpenAIConfigurationError(Exception):
 logger = logging.getLogger(__name__)  # Module-level logger
 
 
-class OpenAIAgentAdapter(Agent):
+class OpenAIAgent(ChatCompletionsAgent):
     """
     Adapter for interacting with AI agents built using the OpenAI SDK.
 
@@ -100,9 +99,12 @@ class OpenAIAgentAdapter(Agent):
     function calling and tool use, which are common patterns in agent implementations.
     """
 
+    ADAPTER_TYPE = "OpenAIAgent"
+    DEFAULT_TEMPERATURE = 1.0  # OpenAI default
+
     def __init__(self, id: str, config: Dict[str, Any]):
         """
-        Initializes the OpenAIAgentAdapter.
+        Initializes the OpenAIAgent.
 
         Args:
             id: The unique identifier for this OpenAI agent instance.
@@ -118,46 +120,36 @@ class OpenAIAgentAdapter(Agent):
                           - 'tool_choice' (optional): Controls which tools the model can call.
         """
         super().__init__(id, config)
-        # Use hierarchical logger name for TUI handler inheritance
-        self.logger = logging.getLogger(
-            f"hackagent.router.adapters.OpenAIAgentAdapter.{self.id}"
-        )
 
         if not _is_openai_available():
             msg = (
                 f"OpenAI SDK is not installed. Please install it with: pip install openai. "
-                f"OpenAIAgentAdapter: {self.id}"
+                f"OpenAIAgent: {self.id}"
             )
             self.logger.error(msg)
             raise OpenAIConfigurationError(msg)
 
-        self.api_base_url: Optional[str] = self.config.get("endpoint")
+        self.api_base_url: Optional[str] = self._get_config_key("endpoint")
 
         # Model name defaults to "default" for custom endpoints (server decides the model)
         if "name" not in self.config:
             if self.api_base_url:
                 # Custom endpoint - use a default model name, server will handle it
-                self.model_name = self.config.get("name", "default")
+                self.model_name = self._get_config_key("name", "default")
                 self.logger.info(
                     "No model name specified for custom endpoint, using 'default'"
                 )
             else:
-                msg = f"Missing required configuration key 'name' (for model string) for OpenAIAgentAdapter: {self.id}"
-                self.logger.error(msg)
-                raise OpenAIConfigurationError(msg)
+                self.model_name = self._require_config_key(
+                    "name", OpenAIConfigurationError
+                )
         else:
             self.model_name: str = self.config["name"]
 
-        # Handle API key: can be env var name or the key itself
-        api_key_config: Optional[str] = self.config.get("api_key")
-        if api_key_config:
-            # Try as environment variable first
-            self.actual_api_key: Optional[str] = os.environ.get(
-                api_key_config, api_key_config
-            )
-        else:
-            # Default to OPENAI_API_KEY environment variable
-            self.actual_api_key = os.environ.get("OPENAI_API_KEY")
+        # Handle API key resolution
+        self.actual_api_key = self._resolve_api_key(
+            config_key="api_key", env_var_fallback="OPENAI_API_KEY"
+        )
 
         # For custom endpoints without API key, use a placeholder
         # (some local servers don't require authentication)
@@ -187,39 +179,58 @@ class OpenAIAgentAdapter(Agent):
         self.client = openai_client_class(**client_kwargs)
 
         self.logger.info(
-            f"OpenAIAgentAdapter '{self.id}' initialized for model: '{self.model_name}'"
+            f"OpenAIAgent '{self.id}' initialized for model: '{self.model_name}'"
             + (f" API Base: '{self.api_base_url}'" if self.api_base_url else "")
         )
 
         # Store default generation parameters
-        self.default_max_tokens = self.config.get("max_tokens")
-        self.default_temperature = self.config.get("temperature", 1.0)
-        self.default_tools = self.config.get("tools")
-        self.default_tool_choice = self.config.get("tool_choice")
+        self.default_max_tokens = self._get_config_key("max_tokens")
+        self.default_max_new_tokens = self.default_max_tokens  # Alias for base class
+        self.default_temperature = self._get_config_key(
+            "temperature", self.DEFAULT_TEMPERATURE
+        )
+        self.default_tools = self._get_config_key("tools")
+        self.default_tool_choice = self._get_config_key("tool_choice")
 
-    def _execute_openai_completion(
+    def _get_excluded_request_keys(self) -> set:
+        """Returns keys to exclude when extracting additional kwargs."""
+        base_keys = super()._get_excluded_request_keys()
+        return base_keys | {"tools", "tool_choice"}
+
+    def _get_completion_parameters(
+        self, request_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Extract parameters including OpenAI-specific tools."""
+        params = super()._get_completion_parameters(request_data)
+
+        # Add OpenAI-specific parameters
+        params["tools"] = request_data.get("tools", self.default_tools)
+        params["tool_choice"] = request_data.get(
+            "tool_choice", self.default_tool_choice
+        )
+
+        return params
+
+    def _execute_completion(
         self,
         messages: List[Dict[str, str]],
-        max_tokens: Optional[int],
-        temperature: float,
-        tools: Optional[List[Dict[str, Any]]] = None,
-        tool_choice: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """
-        Internal method to generate completions using OpenAI's chat completions API.
+        Execute the completion request using OpenAI's chat completions API.
 
         Args:
             messages: List of message dictionaries with 'role' and 'content'.
-            max_tokens: Maximum tokens to generate.
-            temperature: Sampling temperature.
-            tools: Optional list of tool/function definitions.
-            tool_choice: Optional tool choice parameter.
-            **kwargs: Additional parameters to pass to the API.
+            **kwargs: Additional parameters (temperature, max_tokens, tools, etc.)
 
         Returns:
-            A dictionary containing the response data and metadata.
+            A dictionary containing the result with 'success', 'content', etc.
         """
+        max_tokens = kwargs.pop("max_tokens", None)
+        temperature = kwargs.pop("temperature", self.default_temperature)
+        tools = kwargs.pop("tools", None)
+        tool_choice = kwargs.pop("tool_choice", None)
+
         self.logger.info(
             f"Sending request to OpenAI model '{self.model_name}' with {len(messages)} messages..."
         )
@@ -255,12 +266,38 @@ class OpenAIAgentAdapter(Agent):
             response = self.client.chat.completions.create(**openai_params)
 
             # Extract response data
+            message = response.choices[0].message
+            content = message.content if message.content else ""
+
+            # For reasoning models (e.g., o1-preview, o1-mini), check reasoning field
+            if not content and hasattr(message, "reasoning") and message.reasoning:
+                content = message.reasoning
+                self.logger.info(
+                    f"OpenAI extracted text from 'reasoning' field (reasoning model) for '{self.model_name}'"
+                )
+
+            # Check if there are tool calls
+            tool_calls = None
+            if hasattr(message, "tool_calls") and message.tool_calls:
+                tool_calls = [
+                    {
+                        "id": tc.id,
+                        "type": tc.type,
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments,
+                        },
+                    }
+                    for tc in message.tool_calls
+                ]
+
             result = {
                 "success": True,
-                "message": response.choices[0].message,
+                "content": content,
                 "finish_reason": response.choices[0].finish_reason,
                 "usage": response.usage.model_dump() if response.usage else None,
                 "model": response.model,
+                "tool_calls": tool_calls,
                 "raw_response": response,
             }
 
@@ -335,180 +372,21 @@ class OpenAIAgentAdapter(Agent):
                     "error_message": f"{type(e).__name__}: {str(e)}",
                 }
 
-    def handle_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Handles an incoming request by processing it through the OpenAI API.
-
-        Args:
-            request_data: A dictionary containing the request data.
-                          Expected keys:
-                          - 'prompt': The text prompt to send to the model (will be converted to messages).
-                          - 'messages' (optional): Pre-formatted messages list (takes precedence over prompt).
-                          - 'max_tokens' (optional): Override default max tokens.
-                          - 'temperature' (optional): Override default temperature.
-                          - 'tools' (optional): Override default tools.
-                          - 'tool_choice' (optional): Override default tool choice.
-                          - Any other kwargs to pass to the OpenAI API.
-
-        Returns:
-            A dictionary representing the agent's response or an error.
-        """
-        # Get messages or convert prompt to messages
-        messages = request_data.get("messages")
-        prompt_text = request_data.get("prompt")
-
-        if not messages and not prompt_text:
-            self.logger.warning("No 'messages' or 'prompt' found in request_data.")
-            return self._build_error_response(
-                error_message="Request data must include either 'messages' or 'prompt' field.",
-                status_code=400,
-                raw_request=request_data,
-            )
-
-        # Convert prompt to messages if messages not provided
-        if not messages:
-            messages = [{"role": "user", "content": prompt_text}]
-
-        self.logger.info(
-            f"Handling request for OpenAI adapter {self.id} with {len(messages)} messages"
-        )
-
-        # Get parameters with defaults
-        # Support both max_tokens (OpenAI standard) and max_new_tokens (HuggingFace style)
-        max_tokens = request_data.get("max_tokens") or request_data.get(
-            "max_new_tokens", self.default_max_tokens
-        )
-        temperature = request_data.get("temperature", self.default_temperature)
-        tools = request_data.get("tools", self.default_tools)
-        tool_choice = request_data.get("tool_choice", self.default_tool_choice)
-
-        # Get additional kwargs (exclude known parameters)
-        excluded_keys = {
-            "prompt",
-            "messages",
-            "max_tokens",
-            "max_new_tokens",  # HuggingFace style, converted to max_tokens above
-            "temperature",
-            "tools",
-            "tool_choice",
-        }
-        additional_kwargs = {
-            k: v for k, v in request_data.items() if k not in excluded_keys
-        }
-
-        try:
-            # Execute the completion
-            result = self._execute_openai_completion(
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                tools=tools,
-                tool_choice=tool_choice,
-                **additional_kwargs,
-            )
-
-            if not result.get("success"):
-                # Handle API errors
-                return self._build_error_response(
-                    error_message=f"OpenAI API error ({result.get('error_type')}): {result.get('error_message')}",
-                    status_code=500,
-                    raw_request=request_data,
-                )
-
-            # Extract the generated text
-            message = result["message"]
-            content = message.content if message.content else ""
-
-            # For reasoning models (e.g., o1-preview, o1-mini), check reasoning field
-            if not content and hasattr(message, "reasoning") and message.reasoning:
-                generated_text = message.reasoning
-                self.logger.info(
-                    f"OpenAI extracted text from 'reasoning' field (reasoning model) for '{self.model_name}'"
-                )
-            else:
-                generated_text = content
-
-            # Check if there are tool calls
-            tool_calls = None
-            if hasattr(message, "tool_calls") and message.tool_calls:
-                tool_calls = [
-                    {
-                        "id": tc.id,
-                        "type": tc.type,
-                        "function": {
-                            "name": tc.function.name,
-                            "arguments": tc.function.arguments,
-                        },
-                    }
-                    for tc in message.tool_calls
-                ]
-
-            self.logger.info(
-                f"Successfully processed request for OpenAI adapter {self.id}."
-            )
-
-            return {
-                "raw_request": request_data,
-                "generated_text": generated_text,
-                "processed_response": generated_text,
-                "status_code": 200,
-                "raw_response_headers": None,
-                "raw_response_body": None,
-                "agent_specific_data": {
-                    "model_name": self.model_name,
-                    "finish_reason": result["finish_reason"],
-                    "usage": result.get("usage"),
-                    "tool_calls": tool_calls,
-                    "invoked_parameters": {
-                        "max_tokens": max_tokens,
-                        "temperature": temperature,
-                        "tools_provided": tools is not None,
-                        **additional_kwargs,
-                    },
-                },
-                "error_message": None,
-                "agent_id": self.id,
-                "adapter_type": "OpenAIAgentAdapter",
-            }
-
-        except Exception as e:
-            self.logger.exception(
-                f"Unexpected error in OpenAIAgentAdapter handle_request for agent {self.id}: {e}"
-            )
-            return self._build_error_response(
-                error_message=f"Unexpected adapter error: {type(e).__name__} - {str(e)}",
-                status_code=500,
-                raw_request=request_data,
-            )
-
-    def _build_error_response(
+    def _build_agent_specific_data(
         self,
-        error_message: str,
-        status_code: Optional[int],
-        raw_request: Optional[Dict[str, Any]] = None,
+        completion_result: Dict[str, Any],
+        parameters: Dict[str, Any],
     ) -> Dict[str, Any]:
-        """
-        Constructs a standardized error response dictionary for the adapter.
+        """Build OpenAI-specific response data including tool calls."""
+        data = super()._build_agent_specific_data(completion_result, parameters)
 
-        Args:
-            error_message: The primary error message string.
-            status_code: The HTTP status code associated with the error.
-            raw_request: The original request data that led to the error.
+        # Add tool calls if present
+        if completion_result.get("tool_calls"):
+            data["tool_calls"] = completion_result["tool_calls"]
 
-        Returns:
-            A dictionary representing a standardized error response.
-        """
-        return {
-            "raw_request": raw_request,
-            "processed_response": None,
-            "generated_text": None,
-            "status_code": status_code if status_code is not None else 500,
-            "raw_response_headers": None,
-            "raw_response_body": None,
-            "agent_specific_data": {
-                "model_name": self.model_name if hasattr(self, "model_name") else "N/A"
-            },
-            "error_message": error_message,
-            "agent_id": self.id,
-            "adapter_type": "OpenAIAgentAdapter",
-        }
+        # Add tools_provided flag
+        data["invoked_parameters"]["tools_provided"] = (
+            parameters.get("tools") is not None
+        )
+
+        return data

@@ -215,10 +215,10 @@ def advprefix(
         raise click.ClickException(f"Attack execution failed: {e}")
 
 
-@attack.command()
+@attack.command(name="list")
 @click.pass_context
 @handle_errors
-def list(ctx):
+def list_attacks(ctx):
     """List available attack strategies"""
 
     table = Table(
@@ -297,10 +297,29 @@ def _display_attack_results(results: Any) -> None:
 
     console.print("\n[bold cyan]📊 Attack Results Summary")
 
-    try:
-        import pandas as pd
+    # Handle list results (most common case when pandas is not available)
+    if isinstance(results, list):
+        console.print(f"[green]📈 Generated {len(results)} result entries")
+        if results and isinstance(results[0], dict):
+            # Show sample of keys from first result
+            sample_keys = list(results[0].keys())[:5]
+            console.print(f"[cyan]📋 Sample fields: {', '.join(sample_keys)}")
 
-        if isinstance(results, pd.DataFrame):
+            # Try to show some useful info from results
+            success_count = sum(
+                1 for r in results if r.get("eval_hb") == 1 or r.get("eval_jb") == 1
+            )
+            if success_count > 0:
+                console.print(
+                    f"[green]✅ Successful jailbreaks: {success_count}/{len(results)}"
+                )
+            else:
+                console.print("[yellow]⚠️ No successful jailbreaks detected")
+        return
+
+    try:
+        # Check if results is a pandas DataFrame (optional dependency)
+        if hasattr(results, "columns") and hasattr(results, "empty"):
             console.print(f"[green]📈 Generated {len(results)} result entries")
 
             # Show key metrics if available

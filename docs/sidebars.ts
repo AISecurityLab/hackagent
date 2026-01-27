@@ -15,62 +15,20 @@ import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
 const sidebars: SidebarsConfig = {
   // By default, Docusaurus generates a sidebar from the docs folder structure
   tutorialSidebar: [
-    'intro',
+    'introduction',
     {
       type: 'category',
       label: '🚀 Getting Started',
       items: [
         'getting-started/installation',
-        'HowTo',
-        'tutorial-basics/attack-tutorial',
+        'getting-started/quick-start',
+        'getting-started/attack-tutorial',
+        'getting-started/datasets-tutorial',
       ],
     },
     {
       type: 'category',
-      label: '🖥️ CLI Documentation',
-      items: [
-        'cli/README',
-      ],
-    },
-    {
-      type: 'category',
-      label: '🔧 SDK Reference',
-      items: [
-        'sdk/python-quickstart',
-        {
-          type: 'category',
-          label: 'API Reference',
-          link: {
-            type: 'doc',
-            id: 'api-index',
-          },
-          items: [
-            'hackagent/agent',
-            'hackagent/client', 
-            'hackagent/errors',
-            {
-              type: 'category',
-              label: 'Attacks',
-              items: [
-                'hackagent/attacks/base',
-                'hackagent/attacks/orchestrator',
-                'hackagent/attacks/registry',
-              ],
-            },
-            {
-              type: 'category',
-              label: 'Vulnerabilities',
-              items: [
-                'hackagent/vulnerabilities/prompts',
-              ],
-            },
-          ],
-        },
-      ],
-    },
-    {
-      type: 'category',
-      label: '⚔️ Attack Types',
+      label: '⚔️ Attacks',
       link: {
         type: 'doc',
         id: 'attacks/index',
@@ -97,9 +55,67 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
-      label: '🔌 Integrations',
+      label: '🤖 Agents',
+      link: {
+        type: 'doc',
+        id: 'agents/index',
+      },
       items: [
-        'integrations/google-adk',
+        {
+          type: 'doc',
+          id: 'agents/ollama',
+          label: 'Ollama',
+        },
+        {
+          type: 'doc',
+          id: 'agents/openai-sdk',
+          label: 'OpenAI SDK',
+        },
+        {
+          type: 'doc',
+          id: 'agents/google-adk',
+          label: 'Google ADK',
+        },
+      ],
+    },
+    {
+      type: 'category',
+      label: '🖥️ CLI Reference',
+      items: [
+        'cli/overview',
+        'cli/initialization',
+        'cli/config',
+        'cli/attack',
+        'cli/results',
+      ],
+    },
+    {
+      type: 'category',
+      label: ' API Reference',
+      link: {
+        type: 'doc',
+        id: 'api-index',
+      },
+      items: [
+        'hackagent/agent',
+        'hackagent/client', 
+        'hackagent/errors',
+        {
+          type: 'category',
+          label: 'Attacks',
+          items: [
+            'hackagent/attacks/base',
+            'hackagent/attacks/orchestrator',
+            'hackagent/attacks/registry',
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Vulnerabilities',
+          items: [
+            'hackagent/vulnerabilities/prompts',
+          ],
+        },
       ],
     },
     {
@@ -117,20 +133,7 @@ const sidebars: SidebarsConfig = {
         'tutorial-extras/manage-docs-versions',
       ],
     },
-  ],
-
-  // But you can create a sidebar manually
-  /*
-  tutorialSidebar: [
-    'intro',
-    'hello',
-    {
-      type: 'category',
-      label: 'Tutorial',
-      items: ['tutorial-basics/create-a-document'],
-    },
-  ],
-   */
+  ]
 };
 
 export default sidebars;

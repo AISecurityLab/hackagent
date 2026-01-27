@@ -31,7 +31,7 @@ def list(ctx):
 @click.option(
     "--type",
     "agent_type",
-    type=click.Choice(["google-adk", "litellm"]),
+    type=click.Choice(["google-adk", "litellm", "openai-sdk", "ollama"]),
     required=True,
     help="Agent type",
 )

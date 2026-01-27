@@ -188,8 +188,8 @@ class TestEvaluationStatusUpdates(unittest.TestCase):
         """
         FIXED: Generation step now tracks result IDs.
 
-        When route_with_tracking creates a result, the result ID is now
-        captured and added to the data for later updates.
+        The execute_prompts function now uses Tracker with goal_contexts
+        to track results. Each goal gets a Context object with a result_id.
         """
         from hackagent.attacks.techniques.baseline import generation
         import inspect
@@ -197,9 +197,10 @@ class TestEvaluationStatusUpdates(unittest.TestCase):
         # Check the execute_prompts function source
         source = inspect.getsource(generation.execute_prompts)
 
-        # The code now tracks result_id
-        self.assertIn("result_id", source)
-        self.assertIn('tracking_result.get("result_id")', source)
+        # The code now uses Tracker with goal_contexts for result tracking
+        self.assertIn("goal_tracker", source)
+        self.assertIn("goal_contexts", source)
+        self.assertIn("create_goal_result", source)
 
 
 class TestEvaluationEndToEnd(unittest.TestCase):

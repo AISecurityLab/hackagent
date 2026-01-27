@@ -131,6 +131,8 @@ class AttackLogViewer(Container):
         if self.show_controls:
             with Container(classes="log-controls"):
                 yield Button("Clear Logs", id="clear-logs", variant="default")
+                yield Button("Copy Logs", id="copy-logs", variant="default")
+                yield Button("View in Pager", id="view-pager", variant="default")
                 yield Button("Auto-scroll: ON", id="toggle-scroll", variant="primary")
                 yield Static("", id="log-count")
 
@@ -152,6 +154,13 @@ class AttackLogViewer(Container):
         """Handle button press events."""
         if event.button.id == "clear-logs":
             self.clear_logs()
+        elif event.button.id == "copy-logs":
+            self.copy_logs()
+            self.notify(
+                "Logs copied to clipboard!", title="Copy", severity="information"
+            )
+        elif event.button.id == "view-pager":
+            self.view_in_pager()
         elif event.button.id == "toggle-scroll":
             self.toggle_auto_scroll()
 
@@ -234,10 +243,14 @@ class AttackLogViewer(Container):
         self._log_buffer.clear()
         self.update_log_count(0)
 
-    def copy_logs(self) -> None:
-        """Copy all log messages to clipboard or save to file."""
+    def copy_logs(self) -> bool:
+        """Copy all log messages to clipboard or save to file.
+
+        Returns:
+            True if logs were copied successfully, False otherwise.
+        """
         if not self._log_buffer:
-            return
+            return False
 
         log_text = "\n".join(self._log_buffer)
 
@@ -291,7 +304,7 @@ class AttackLogViewer(Container):
                 copied = True
 
             if copied:
-                pass
+                return True
         except Exception:
             pass
 
@@ -301,11 +314,25 @@ class AttackLogViewer(Container):
                 import pyperclip
 
                 pyperclip.copy(log_text)
-                copied = True
+                return True
             except ImportError:
                 pass
             except Exception:
                 pass
+
+        # Method 3: Save to file as last resort
+        try:
+            import tempfile
+            import os
+
+            log_file = os.path.join(tempfile.gettempdir(), "hackagent_logs.txt")
+            with open(log_file, "w") as f:
+                f.write(log_text)
+            return True
+        except Exception:
+            pass
+
+        return False
 
     def view_in_pager(self) -> None:
         """View logs in a pager (less) for easy selection and navigation."""

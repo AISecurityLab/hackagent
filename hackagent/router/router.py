@@ -31,21 +31,23 @@ from hackagent.router.types import AgentTypeEnum
 from ..types import UNSET, Unset
 
 # Adapter imports - these are imported at module level for backwards compatibility
-# with test patching (tests patch hackagent.router.router.LiteLLMAgentAdapter etc.)
-# The actual heavy dependency (litellm) is lazy-loaded within LiteLLMAgentAdapter
-from hackagent.router.adapters import ADKAgentAdapter
-from hackagent.router.adapters.litellm_adapter import LiteLLMAgentAdapter
-from hackagent.router.adapters.openai_adapter import OpenAIAgentAdapter
+# with test patching (tests patch hackagent.router.router.LiteLLMAgent etc.)
+# The actual heavy dependency (litellm) is lazy-loaded within LiteLLMAgent
+from hackagent.router.adapters import ADKAgent
+from hackagent.router.adapters.litellm import LiteLLMAgent
+from hackagent.router.adapters.openai import OpenAIAgent
+from hackagent.router.adapters.ollama import OllamaAgent
 
 # Use explicit hierarchical logger name for clarity
 logger = logging.getLogger("hackagent.router")
 
 # --- Agent Type to Adapter Mapping ---
 AGENT_TYPE_TO_ADAPTER_MAP: Dict[AgentTypeEnum, Type[Agent]] = {
-    AgentTypeEnum.GOOGLE_ADK: ADKAgentAdapter,
-    AgentTypeEnum.LITELLM: LiteLLMAgentAdapter,
-    AgentTypeEnum.OPENAI_SDK: OpenAIAgentAdapter,
-    AgentTypeEnum.LANGCHAIN: LiteLLMAgentAdapter,  # LangChain agents can use LiteLLM adapter
+    AgentTypeEnum.GOOGLE_ADK: ADKAgent,
+    AgentTypeEnum.LITELLM: LiteLLMAgent,
+    AgentTypeEnum.OPENAI_SDK: OpenAIAgent,
+    AgentTypeEnum.OLLAMA: OllamaAgent,
+    AgentTypeEnum.LANGCHAIN: LiteLLMAgent,  # LangChain agents can use LiteLLM adapter
     # Add other agent types and their corresponding adapters here
 }
 
@@ -61,8 +63,8 @@ class AgentRouter:
         checking if an agent with the specified name, type, and organization
         already exists. If not, it creates a new agent. If it exists, it may
         update its metadata based on the `overwrite_metadata` flag.
-    3.  Instantiating the appropriate adapter (e.g., `ADKAgentAdapter`,
-        `LiteLLMAgentAdapter`) based on the `agent_type`.
+    3.  Instantiating the appropriate adapter (e.g., `ADKAgent`,
+        `LiteLLMAgent`) based on the `agent_type`.
     4.  Storing this adapter for subsequent request routing.
 
     Once initialized, the router uses the adapter to handle requests directed
@@ -431,7 +433,7 @@ class AgentRouter:
                     raise ValueError(
                         f"OpenAI SDK agent '{name}' (ID: {registration_key}) missing "
                         f"'name' (model string) in adapter_operational_config or backend metadata. "
-                        f"Cannot configure OpenAIAgentAdapter."
+                        f"Cannot configure OpenAIAgent."
                     )
 
             # Always use backend agent's endpoint if not already in config
@@ -450,6 +452,47 @@ class AgentRouter:
             ]
             if isinstance(self.backend_agent.metadata, dict):
                 for key in optional_openai_keys:
+                    if (
+                        key not in adapter_instance_config
+                        and key in self.backend_agent.metadata
+                    ):
+                        adapter_instance_config[key] = self.backend_agent.metadata[key]
+
+        elif agent_type == AgentTypeEnum.OLLAMA:
+            # Configure Ollama adapter
+            if "name" not in adapter_instance_config:
+                if (
+                    isinstance(self.backend_agent.metadata, dict)
+                    and "name" in self.backend_agent.metadata
+                ):
+                    adapter_instance_config["name"] = self.backend_agent.metadata[
+                        "name"
+                    ]
+                else:
+                    logger.warning(
+                        f"Agent '{name}' (Type: {agent_type.value}) missing 'name' (model string) in metadata. "
+                        f"Defaulting to agent name '{self.backend_agent.name}'."
+                    )
+                    adapter_instance_config["name"] = self.backend_agent.name
+
+            # Always use backend agent's endpoint if not already in config
+            if (
+                "endpoint" not in adapter_instance_config
+                and self.backend_agent.endpoint
+            ):
+                adapter_instance_config["endpoint"] = self.backend_agent.endpoint
+
+            optional_ollama_keys = [
+                "max_new_tokens",
+                "temperature",
+                "top_p",
+                "top_k",
+                "num_ctx",
+                "stream",
+                "timeout",
+            ]
+            if isinstance(self.backend_agent.metadata, dict):
+                for key in optional_ollama_keys:
                     if (
                         key not in adapter_instance_config
                         and key in self.backend_agent.metadata

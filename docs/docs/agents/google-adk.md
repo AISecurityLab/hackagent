@@ -1,4 +1,9 @@
-# Google ADK Integration
+---
+sidebar_position: 4
+slug: /agents/google-adk
+---
+
+# <img src="https://google.github.io/adk-docs/assets/agent-development-kit.png" alt="Google ADK" style={{height: '48px', marginRight: '12px', verticalAlign: 'middle'}} />Google ADK
 
 Google Agent Development Kit (ADK) is a framework for building conversational AI agents with tool-calling capabilities. HackAgent provides native support for testing ADK-based agents.
 
@@ -6,16 +11,40 @@ Google Agent Development Kit (ADK) is a framework for building conversational AI
 
 ### Prerequisites
 
-1. **Google ADK Agent**: A running ADK agent/application
-2. **HackAgent SDK**: Install with `pip install hackagent`
-3. **API Access**: HackAgent platform API key
+1. **Install Google ADK**:
+   ```bash
+   pip install google-adk
+   ```
 
-### ADK Agent Requirements
+2. **Set up your LLM backend** (choose one):
+   
+   **Option A: Google AI (Gemini)**
+   ```bash
+   export GOOGLE_API_KEY="your-gemini-api-key"
+   ```
+   
+   **Option B: Ollama (local)**
+   ```bash
+   ollama serve
+   ollama pull gemma3  # or any other model
+   ```
 
-Your ADK agent should be:
-- Running and accessible via HTTP
-- Configured with proper session management
-- Exposing the standard ADK API endpoints
+3. **Start your ADK agent**:
+   ```bash
+   cd your_agent_directory
+   adk web
+   ```
+
+4. **Verify it's running** on `http://localhost:8000`:
+   ```bash
+   curl http://localhost:8000/list-apps
+   # Should return your agent name(s)
+   ```
+
+5. **Install HackAgent**:
+   ```bash
+   pip install hackagent
+   ```
 
 ## 🚀 Basic Integration
 
@@ -62,14 +91,14 @@ attack_config = {
     "judges": [
         {
             "identifier": "ollama/llama3",
-            "endpoint": "http://localhost:11434/api/judge",
+            "endpoint": "http://localhost:11434/api/generate",
             "type": "harmbench"
         }
     ],
     "selection_judges": [
         {
             "identifier": "ollama/llama3",
-            "endpoint": "http://localhost:11434/api/judge",
+            "endpoint": "http://localhost:11434/api/generate",
             "type": "harmbench"
         }
     ]
@@ -109,14 +138,14 @@ def test_adk_security():
         "judges": [
             {
                 "identifier": "ollama/llama3",
-                "endpoint": f"{os.getenv('HACKAGENT_API_BASE_URL')}/api/judge",
+                "endpoint": f"{os.getenv('HACKAGENT_API_BASE_URL')}/api/generate",
                 "type": "harmbench",
             }
         ],
         "selection_judges": [
             {
                 "identifier": "ollama/llama3",
-                "endpoint": f"{os.getenv('HACKAGENT_API_BASE_URL')}/api/judge",
+                "endpoint": f"{os.getenv('HACKAGENT_API_BASE_URL')}/api/generate",
                 "type": "harmbench",
             }
         ],
@@ -183,14 +212,15 @@ agent = HackAgent(
 ### Environment Variables
 
 ```bash
-# Required
-export HACKAGENT_API_KEY="your_api_key"
+# Agent endpoint
 export AGENT_URL="http://localhost:8001"
 
 # Optional
 export HACKAGENT_BASE_URL="https://api.hackagent.dev"
 export OLLAMA_BASE_URL="http://localhost:11434"
 ```
+
+**Note:** For HackAgent authentication, run `hackagent init` or pass `api_key` directly to `HackAgent()`.
 
 ### ADK Session Management
 
@@ -245,12 +275,14 @@ logging.getLogger('hackagent').setLevel(logging.DEBUG)
 
 **Authentication Issues**:
 ```bash
-# Verify API key is set
-echo $HACKAGENT_API_KEY
+# Verify config file exists
+cat ~/.config/hackagent/config.json
+
+# Or re-initialize
+hackagent init
 
 # Test API connectivity
-curl -H "Authorization: Bearer $HACKAGENT_API_KEY" \
-     https://api.hackagent.dev/agents/
+hackagent auth
 ```
 
 ### Debug Mode
@@ -301,10 +333,9 @@ attack_config = {
 
 ## �� Next Steps
 
-1. **[Python SDK Guide](../sdk/python-quickstart.md)** - Complete SDK documentation
-2. **[AdvPrefix Attacks](../attacks/advprefix-attacks.md)** - Advanced attack techniques
-3. **[Attack Tutorial](../tutorial-basics/attack-tutorial.md)** - Getting started with attacks
-4. **[Security Guidelines](../security/responsible-disclosure.md)** - Responsible disclosure practices
+1. **[AdvPrefix Attacks](../attacks/advprefix-attacks.md)** - Advanced attack techniques
+2. **[Attack Tutorial](../getting-started/attack-tutorial.md)** - Getting started with attacks
+3. **[Security Guidelines](../security/responsible-disclosure.md)** - Responsible disclosure practices
 
 ## 📞 Support
 

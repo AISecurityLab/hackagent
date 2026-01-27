@@ -18,24 +18,37 @@ Operation tracking and synchronization module.
 This module provides components for tracking pipeline operations and
 synchronizing state with the HackAgent backend API. It includes:
 
-- StepTracker: Main tracking class for managing operation lifecycle
+- Tracker: Main tracking class for per-goal result tracking (recommended)
+- StepTracker: Step-level tracking for pipeline steps
 - track_step: Context manager for tracking individual steps
 - track_operation: Decorator for automatic operation tracking
 - TrackingContext: Shared context for tracking state
+- Context: Context for tracking a single goal's attack execution
 
 The tracking system is designed to be:
 - Modular: Each component has a single responsibility
 - Reusable: Works with any attack or pipeline implementation
 - Optional: Gracefully degrades when tracking is disabled
 - Thread-safe: Safe for concurrent operations
+
+Result Organization:
+- Tracker: Creates one Result per goal/datapoint, with multiple Traces
+  capturing the full attack journey (preferred for attack techniques)
+- StepTracker: Creates traces for pipeline steps (useful for high-level tracking)
+
+The Tracker approach ensures each Result represents a meaningful datapoint
+(e.g., one attack goal) rather than individual LLM interactions.
 """
 
 from .context import TrackingContext
 from .decorators import track_operation, track_pipeline
-from .tracker import StepTracker
+from .step import StepTracker
+from .tracker import Context, Tracker
 
 __all__ = [
+    "Context",
     "StepTracker",
+    "Tracker",
     "TrackingContext",
     "track_operation",
     "track_pipeline",

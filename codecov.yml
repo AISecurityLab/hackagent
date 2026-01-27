@@ -1,0 +1,45 @@
+# Codecov configuration
+# https://docs.codecov.com/docs/codecovyml-reference
+
+coverage:
+  precision: 2
+  round: down
+  range: "60...100"
+  
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 5%  # Allow 5% drop from base
+        
+    patch:
+      default:
+        target: 50%  # Minimum 50% coverage on new code
+        threshold: 10%  # Allow some flexibility
+
+# Merge coverage from different test runs
+flag_management:
+  default_rules:
+    carryforward: true
+  individual_flags:
+    - name: unit
+      paths:
+        - hackagent/
+      carryforward: true
+    - name: integration
+      paths:
+        - hackagent/
+      carryforward: true
+
+comment:
+  layout: "reach,diff,flags,files"
+  behavior: default
+  require_changes: false
+
+# Ignore test files and generated code
+ignore:
+  - "tests/**/*"
+  - "docs/**/*"
+  - "examples/**/*"
+  - "htmlcov/**/*"
+  - "**/__pycache__/**"

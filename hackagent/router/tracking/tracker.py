@@ -13,558 +13,634 @@
 # limitations under the License.
 
 """
-Core tracking functionality.
+Goal-based result tracking for attack techniques.
 
-This module provides the StepTracker class which handles the lifecycle
-of operation tracking including trace creation, status updates, and
-error handling. It integrates with the HackAgent backend API to maintain
-synchronized state.
+This module provides the main Tracker class which creates one Result per
+goal/datapoint and accumulates traces for each interaction during the attack.
+This addresses the issue of having too many Results (one per LLM call) with
+only 1-2 traces each.
+
+Architecture:
+    Attack → Tracker → Result per goal → Multiple Traces per Result
+
+Instead of:
+    Attack → route_with_tracking → Result per LLM call (scattered)
+
+We now have:
+    Attack → Tracker.create_goal_result() → One Result per goal
+          → Tracker.add_trace() → Traces for each interaction
+          → Tracker.finalize_goal() → Update evaluation status
+
+For step-level tracking (pipeline steps like "Generation", "Evaluation"),
+use the StepTracker class from step.py instead.
 """
 
 import json
+import logging
 from contextlib import contextmanager
-from typing import Any, Dict, Optional
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+from uuid import UUID
 
 from hackagent.api.result import result_partial_update, result_trace_create
-from hackagent.api.run import run_partial_update, run_result_create
+from hackagent.api.run import run_result_create
 from hackagent.models import (
     EvaluationStatusEnum,
     PatchedResultRequest,
-    PatchedRunRequest,
     ResultRequest,
-    StatusEnum,
     StepTypeEnum,
     TraceRequest,
 )
 
-from .context import TrackingContext
+
+@dataclass
+class Context:
+    """Context for tracking a single goal's attack execution."""
+
+    goal: str
+    goal_index: int
+    result_id: Optional[str] = None
+    sequence_counter: int = 0
+    traces: List[Dict[str, Any]] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    is_finalized: bool = False
 
 
-class StepTracker:
+class Tracker:
     """
-    Tracks operation execution and synchronizes with backend API.
+    Tracks attack execution on a per-goal basis.
 
-    This class manages the complete lifecycle of operation tracking:
-    - Creating trace records for each step
-    - Handling exceptions and updating error states
-    - Managing sequence counters for ordered operations
-    - Updating run and result statuses
+    Creates one Result per goal, with multiple Traces capturing:
+    - Attack attempts (prompts sent, responses received)
+    - Intermediate steps (judge evaluations, refinements)
+    - Final evaluation status
 
-    The tracker is designed to fail gracefully - if tracking is disabled
-    or API calls fail, the underlying operations continue unaffected.
+    This provides better organization of results where each Result represents
+    a complete attack attempt on a single goal/datapoint.
 
     Attributes:
-        context: TrackingContext containing tracking configuration
-        logger: Logger instance for tracking operations
+        client: Authenticated client for API calls
+        run_id: Server-side run record ID
+        logger: Logger instance
 
     Example:
-        >>> context = TrackingContext(client=client, run_id="123", parent_result_id="456")
-        >>> tracker = StepTracker(context)
+        >>> tracker = Tracker(client=client, run_id=run_id)
         >>>
-        >>> with tracker.track_step("Process Data", "STEP1_PROCESS"):
-        ...     result = process_data()
-        >>>
-        >>> tracker.update_run_status(StatusEnum.COMPLETED)
+        >>> for goal in goals:
+        ...     # Create result for this goal
+        ...     goal_ctx = tracker.create_goal_result(goal, goal_index=i)
+        ...
+        ...     # Add traces for each attack attempt
+        ...     for iteration in range(n_iterations):
+        ...         response = query_target(prompt)
+        ...         tracker.add_interaction_trace(
+        ...             goal_ctx,
+        ...             request={"prompt": prompt},
+        ...             response={"content": response},
+        ...             step_name="Attack Attempt"
+        ...         )
+        ...
+        ...     # Finalize with evaluation
+        ...     tracker.finalize_goal(
+        ...         goal_ctx,
+        ...         success=is_success,
+        ...         evaluation_notes="Attack succeeded with score 10/10"
+        ...     )
     """
 
-    def __init__(self, context: TrackingContext):
-        """
-        Initialize the step tracker.
-
-        Args:
-            context: TrackingContext instance with tracking configuration
-        """
-        self.context = context
-        self.logger = context.logger
-
-    @contextmanager
-    def track_step(
+    def __init__(
         self,
-        step_name: str,
-        step_type: str,
-        input_data: Optional[Dict[str, Any]] = None,
-        config: Optional[Dict[str, Any]] = None,
+        client: Any,
+        run_id: str,
+        logger: Optional[logging.Logger] = None,
+        attack_type: Optional[str] = None,
     ):
         """
-        Context manager for tracking a single operation step.
-
-        This context manager handles the complete lifecycle of step tracking:
-        1. Creates a trace record at step start
-        2. Yields control to the caller
-        3. Handles exceptions and updates error states
-        4. Ensures proper cleanup
+        Initialize tracker.
 
         Args:
-            step_name: Human-readable step name
-            step_type: Step type identifier (e.g., "STEP1_GENERATE")
-            input_data: Optional input data sample for tracking
-            config: Optional configuration snapshot for this step
-
-        Yields:
-            trace_id: ID of the created trace record (or None if tracking disabled)
-
-        Example:
-            >>> with tracker.track_step("Generate Prefixes", "STEP1_GENERATE"):
-            ...     prefixes = generate_prefixes(goals)
-            ...     # Step automatically tracked
-
-        Raises:
-            Re-raises any exception from the tracked code block after
-            recording the error state.
+            client: Authenticated client for API calls
+            run_id: Server-side run record ID
+            logger: Optional logger instance
+            attack_type: Optional attack type identifier for metadata
         """
-        if not self.context.is_enabled:
-            # Tracking disabled, just yield and return
-            yield None
-            return
+        self.client = client
+        self.run_id = run_id
+        self.logger = logger or logging.getLogger(__name__)
+        self.attack_type = attack_type
 
-        trace_id = None
-        try:
-            # Create trace record at step start
-            trace_id = self._create_trace(
-                step_name=step_name,
-                step_type=step_type,
-                input_data=input_data,
-                config=config,
-            )
+        # Track all goal contexts for batch operations
+        self._goal_contexts: Dict[int, Context] = {}
 
-            # Yield control to the tracked code block
-            yield trace_id
+    @property
+    def is_enabled(self) -> bool:
+        """Check if tracking is enabled (has client and run_id)."""
+        return self.client is not None and self.run_id is not None
 
-            # Step completed successfully
-            self.logger.debug(f"Step '{step_name}' completed successfully")
+    def _get_run_uuid(self) -> Optional[UUID]:
+        """Get run_id as UUID."""
+        if self.run_id:
+            try:
+                return UUID(self.run_id)
+            except (ValueError, AttributeError):
+                self.logger.warning(f"Invalid UUID format for run_id: {self.run_id}")
+        return None
 
-        except Exception as e:
-            # Handle step failure
-            self.logger.error(f"Step '{step_name}' failed: {e}", exc_info=True)
-            self._handle_step_error(step_name, str(e))
-            # Re-raise to allow caller to handle
-            raise
-
-    def _create_trace(
+    def create_goal_result(
         self,
-        step_name: str,
-        step_type: str,
-        input_data: Optional[Dict[str, Any]],
-        config: Optional[Dict[str, Any]],
-    ) -> Optional[str]:
+        goal: str,
+        goal_index: int,
+        initial_metadata: Optional[Dict[str, Any]] = None,
+    ) -> Context:
         """
-        Create a trace record on the backend API.
+        Create a Result record for a goal and return its tracking context.
 
         Args:
-            step_name: Human-readable step name
-            step_type: Step type identifier
-            input_data: Optional input data sample
-            config: Optional configuration snapshot
+            goal: The goal/datapoint text
+            goal_index: Index of this goal in the batch
+            initial_metadata: Optional initial metadata to store
 
         Returns:
-            Trace ID if successful, None otherwise
+            Context for tracking this goal's attack execution
         """
+        ctx = Context(
+            goal=goal,
+            goal_index=goal_index,
+            metadata=initial_metadata or {},
+        )
+
+        if not self.is_enabled:
+            self.logger.debug(f"Tracking disabled - goal {goal_index} won't be tracked")
+            self._goal_contexts[goal_index] = ctx
+            return ctx
+
         try:
-            sequence = self.context.increment_sequence()
+            run_uuid = self._get_run_uuid()
+            if not run_uuid:
+                self._goal_contexts[goal_index] = ctx
+                return ctx
 
-            # Prepare trace content
-            trace_content = {
-                "step_name": step_name,
-                "step_type_identifier": step_type,
-            }
-
-            if config is not None:
-                trace_content["config_snapshot"] = self._sanitize_config(config)
-
-            if input_data is not None:
-                trace_content["input_data_sample"] = input_data
-
-            # Add any additional metadata
-            if self.context.metadata:
-                trace_content["context_metadata"] = self.context.metadata
-
-            # Create trace request
-            trace_request = TraceRequest(
-                sequence=sequence,
-                step_type=StepTypeEnum.OTHER,
-                content=trace_content,
+            # Create result with goal information
+            result_request = ResultRequest(
+                run=run_uuid,
+                request_payload={
+                    "goal": goal,
+                    "goal_index": goal_index,
+                    "attack_type": self.attack_type,
+                },
+                evaluation_status=EvaluationStatusEnum.NOT_EVALUATED,
+                agent_specific_data={
+                    "goal": goal,
+                    "goal_index": goal_index,
+                    **(initial_metadata or {}),
+                },
             )
 
-            # Call API
-            result_uuid = self.context.get_result_uuid()
-            if not result_uuid:
-                self.logger.warning(
-                    f"Cannot create trace for '{step_name}': invalid result UUID"
-                )
-                return None
-
-            response = result_trace_create.sync_detailed(
-                client=self.context.client,
-                id=result_uuid,
-                body=trace_request,
+            response = run_result_create.sync_detailed(
+                client=self.client,
+                id=run_uuid,
+                body=result_request,
             )
 
-            # Parse response
             if response.status_code == 201:
-                trace_id = self._extract_trace_id(response, step_name)
-                if trace_id:
+                result_id = self._extract_id(response)
+                if result_id:
+                    ctx.result_id = result_id
                     self.logger.info(
-                        f"Created trace for '{step_name}' (ID: {trace_id}, seq: {sequence})"
+                        f"Created result for goal {goal_index}: {result_id}"
                     )
-                    return trace_id
+
+                    # Add initial trace with goal info
+                    self._add_trace(
+                        ctx,
+                        step_name="Goal Setup",
+                        step_type=StepTypeEnum.OTHER,
+                        content={
+                            "goal": goal,
+                            "goal_index": goal_index,
+                            "attack_type": self.attack_type,
+                        },
+                    )
             else:
-                self.logger.error(
-                    f"Failed to create trace for '{step_name}': status={response.status_code}, body={response.content}"
+                self.logger.warning(
+                    f"Failed to create result for goal {goal_index}: "
+                    f"status={response.status_code}"
                 )
 
         except Exception as e:
             self.logger.error(
-                f"Exception creating trace for '{step_name}': {e}", exc_info=True
+                f"Exception creating result for goal {goal_index}: {e}", exc_info=True
             )
 
-        return None
+        self._goal_contexts[goal_index] = ctx
+        return ctx
 
-    def _extract_trace_id(self, response, step_name: str) -> Optional[str]:
-        """
-        Extract trace ID from API response.
-
-        Args:
-            response: API response object
-            step_name: Step name for logging
-
-        Returns:
-            Trace ID if found, None otherwise
-        """
-        # Try parsed response first
-        if response.parsed and hasattr(response.parsed, "id"):
-            return str(response.parsed.id)
-
-        # Try parsing raw content
-        try:
-            response_data = json.loads(response.content.decode())
-            if "id" in response_data:
-                return str(response_data["id"])
-        except Exception as e:
-            self.logger.warning(f"Could not parse trace ID for '{step_name}': {e}")
-
-        return None
-
-    def _sanitize_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Remove sensitive information from config before sending to API.
-
-        Args:
-            config: Configuration dictionary
-
-        Returns:
-            Sanitized configuration dictionary
-        """
-        sensitive_keys = {"api_key", "token", "secret", "password", "key"}
-        # Keys that contain non-serializable objects (like client instances)
-        skip_keys = {"_client", "client"}
-
-        sanitized = {}
-        for key, value in config.items():
-            # Skip non-serializable objects
-            if key in skip_keys:
-                sanitized[key] = f"<{type(value).__name__}>"
-                continue
-
-            key_lower = key.lower()
-            if any(sensitive in key_lower for sensitive in sensitive_keys):
-                sanitized[key] = "***REDACTED***"
-            elif isinstance(value, dict):
-                sanitized[key] = self._sanitize_config(value)
-            elif not self._is_json_serializable(value):
-                # Skip non-JSON-serializable values
-                sanitized[key] = f"<{type(value).__name__}>"
-            else:
-                sanitized[key] = value
-
-        return sanitized
-
-    def _is_json_serializable(self, value: Any) -> bool:
-        """Check if a value is JSON serializable."""
-        import json
-
-        try:
-            json.dumps(value)
-            return True
-        except (TypeError, ValueError):
-            return False
-
-    def _handle_step_error(self, step_name: str, error_message: str) -> None:
-        """
-        Update backend with step error information.
-
-        Args:
-            step_name: Name of the failed step
-            error_message: Error message
-        """
-        if not self.context.is_enabled:
-            return
-
-        try:
-            result_uuid = self.context.get_result_uuid()
-            if not result_uuid:
-                return
-
-            error_request = PatchedResultRequest(
-                evaluation_status=EvaluationStatusEnum.ERROR_TEST_FRAMEWORK,
-                evaluation_notes=f"Pipeline failed at '{step_name}': {error_message}",
-            )
-
-            result_partial_update.sync_detailed(
-                client=self.context.client,
-                id=result_uuid,
-                body=error_request,
-            )
-
-            self.logger.info(f"Updated result with error status for '{step_name}'")
-
-        except Exception as e:
-            self.logger.error(f"Failed to update error status: {e}", exc_info=True)
-
-    def update_run_status(self, status: StatusEnum) -> bool:
-        """
-        Update the run status on the backend.
-
-        Args:
-            status: New status to set
-
-        Returns:
-            True if update was successful, False otherwise
-        """
-        if not self.context.is_enabled:
-            return False
-
-        try:
-            run_uuid = self.context.get_run_uuid()
-            if not run_uuid:
-                self.logger.warning("Cannot update run status: invalid run UUID")
-                return False
-
-            run_request = PatchedRunRequest(status=status)
-
-            response = run_partial_update.sync_detailed(
-                client=self.context.client,
-                id=run_uuid,
-                body=run_request,
-            )
-
-            if response.status_code < 300:
-                self.logger.info(f"Updated run {self.context.run_id} to {status.value}")
-                return True
-            else:
-                self.logger.error(
-                    f"Failed to update run status: status={response.status_code}, body={response.content}"
-                )
-                return False
-
-        except Exception as e:
-            self.logger.error(f"Exception updating run status: {e}", exc_info=True)
-            return False
-
-    def update_result_status(
+    def add_interaction_trace(
         self,
-        evaluation_status: EvaluationStatusEnum,
+        ctx: Context,
+        request: Dict[str, Any],
+        response: Any,
+        step_name: str = "Agent Interaction",
+        step_type: StepTypeEnum = StepTypeEnum.OTHER,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """
+        Add a trace for an agent interaction (request/response pair).
+
+        Args:
+            ctx: Context from create_goal_result
+            request: Request data sent to the agent
+            response: Response received from the agent
+            step_name: Human-readable step name
+            step_type: Type of step for categorization
+            metadata: Optional additional metadata
+        """
+        # Extract response content
+        response_content = self._extract_response_content(response)
+
+        content = {
+            "step_name": step_name,
+            "request": self._sanitize_for_json(request),
+            "response": response_content,
+        }
+
+        if metadata:
+            content["metadata"] = metadata
+
+        self._add_trace(ctx, step_name, step_type, content)
+
+    def add_evaluation_trace(
+        self,
+        ctx: Context,
+        evaluation_result: Any,
+        score: Optional[float] = None,
+        explanation: Optional[str] = None,
+        evaluator_name: Optional[str] = None,
+    ) -> None:
+        """
+        Add a trace for an evaluation step.
+
+        Args:
+            ctx: Context from create_goal_result
+            evaluation_result: Result from the evaluator
+            score: Optional numeric score
+            explanation: Optional explanation text
+            evaluator_name: Name of the evaluator used
+        """
+        content = {
+            "step_name": "Evaluation",
+            "evaluator": evaluator_name,
+            "result": self._sanitize_for_json(evaluation_result),
+        }
+
+        if score is not None:
+            content["score"] = score
+        if explanation:
+            content["explanation"] = explanation
+
+        self._add_trace(ctx, "Evaluation", StepTypeEnum.OTHER, content)
+
+    def add_custom_trace(
+        self,
+        ctx: Context,
+        step_name: str,
+        content: Dict[str, Any],
+        step_type: StepTypeEnum = StepTypeEnum.OTHER,
+    ) -> None:
+        """
+        Add a custom trace with arbitrary content.
+
+        Args:
+            ctx: Context from create_goal_result
+            step_name: Human-readable step name
+            content: Trace content dictionary
+            step_type: Type of step for categorization
+        """
+        self._add_trace(ctx, step_name, step_type, content)
+
+    def _add_trace(
+        self,
+        ctx: Context,
+        step_name: str,
+        step_type: StepTypeEnum,
+        content: Dict[str, Any],
+    ) -> Optional[str]:
+        """
+        Internal method to add a trace to a goal's result.
+
+        Args:
+            ctx: Context
+            step_name: Step name
+            step_type: Step type enum
+            content: Trace content
+
+        Returns:
+            Trace ID if successful, None otherwise
+        """
+        # Always track locally
+        ctx.sequence_counter += 1
+        trace_record = {
+            "sequence": ctx.sequence_counter,
+            "step_name": step_name,
+            "step_type": (
+                step_type.value if hasattr(step_type, "value") else str(step_type)
+            ),
+            "content": content,
+        }
+        ctx.traces.append(trace_record)
+
+        # Send to server if enabled and we have a result_id
+        if not self.is_enabled or not ctx.result_id:
+            return None
+
+        try:
+            result_uuid = UUID(ctx.result_id)
+
+            trace_request = TraceRequest(
+                sequence=ctx.sequence_counter,
+                step_type=step_type,
+                content=content,
+            )
+
+            response = result_trace_create.sync_detailed(
+                client=self.client,
+                id=result_uuid,
+                body=trace_request,
+            )
+
+            if response.status_code == 201:
+                trace_id = self._extract_id(response)
+                self.logger.debug(
+                    f"Created trace {ctx.sequence_counter} for goal {ctx.goal_index}: {trace_id}"
+                )
+                return trace_id
+            else:
+                self.logger.warning(
+                    f"Failed to create trace for goal {ctx.goal_index}: "
+                    f"status={response.status_code}"
+                )
+
+        except Exception as e:
+            self.logger.error(
+                f"Exception creating trace for goal {ctx.goal_index}: {e}",
+                exc_info=True,
+            )
+
+        return None
+
+    def finalize_goal(
+        self,
+        ctx: Context,
+        success: bool,
         evaluation_notes: Optional[str] = None,
-        agent_specific_data: Optional[Dict[str, Any]] = None,
+        final_metadata: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """
-        Update the result evaluation status.
+        Finalize a goal's result with evaluation status.
 
         Args:
-            evaluation_status: Evaluation status to set
-            evaluation_notes: Optional notes about the evaluation
-            agent_specific_data: Optional agent-specific result data
+            ctx: Context from create_goal_result
+            success: Whether the attack was successful
+            evaluation_notes: Optional evaluation notes
+            final_metadata: Optional final metadata to merge
 
         Returns:
             True if update was successful, False otherwise
         """
-        if not self.context.is_enabled:
+        if ctx.is_finalized:
+            self.logger.warning(f"Goal {ctx.goal_index} already finalized")
+            return False
+
+        ctx.is_finalized = True
+
+        # Update local metadata
+        if final_metadata:
+            ctx.metadata.update(final_metadata)
+        ctx.metadata["success"] = success
+        ctx.metadata["total_traces"] = len(ctx.traces)
+
+        if not self.is_enabled or not ctx.result_id:
             return False
 
         try:
-            result_uuid = self.context.get_result_uuid()
-            if not result_uuid:
-                self.logger.warning("Cannot update result status: invalid result UUID")
-                return False
+            result_uuid = UUID(ctx.result_id)
+
+            # Map success to evaluation status
+            if success:
+                eval_status = EvaluationStatusEnum.SUCCESSFUL_JAILBREAK
+            else:
+                eval_status = EvaluationStatusEnum.FAILED_JAILBREAK
 
             result_request = PatchedResultRequest(
-                evaluation_status=evaluation_status,
+                evaluation_status=eval_status,
                 evaluation_notes=evaluation_notes,
-                agent_specific_data=agent_specific_data,
+                agent_specific_data={
+                    **ctx.metadata,
+                    "goal": ctx.goal,
+                    "goal_index": ctx.goal_index,
+                    "total_traces": len(ctx.traces),
+                },
             )
 
             response = result_partial_update.sync_detailed(
-                client=self.context.client,
+                client=self.client,
                 id=result_uuid,
                 body=result_request,
             )
 
             if response.status_code < 300:
                 self.logger.info(
-                    f"Updated result {self.context.parent_result_id} to {evaluation_status.value}"
+                    f"Finalized goal {ctx.goal_index} (result {ctx.result_id}): "
+                    f"{'SUCCESS' if success else 'FAILED'}"
                 )
                 return True
             else:
-                self.logger.error(
-                    f"Failed to update result status: status={response.status_code}, body={response.content}"
+                self.logger.warning(
+                    f"Failed to finalize goal {ctx.goal_index}: "
+                    f"status={response.status_code}"
                 )
                 return False
 
         except Exception as e:
-            self.logger.error(f"Exception updating result status: {e}", exc_info=True)
+            self.logger.error(
+                f"Exception finalizing goal {ctx.goal_index}: {e}", exc_info=True
+            )
             return False
 
-    def add_step_metadata(self, key: str, value: Any) -> None:
-        """
-        Add metadata that will be included in the next trace.
+    def get_goal_context(self, goal_index: int) -> Optional[Context]:
+        """Get the Context for a specific goal index."""
+        return self._goal_contexts.get(goal_index)
 
-        This allows steps to record additional information like:
-        - Item counts (e.g., "prefixes_generated": 150)
-        - Processing stats (e.g., "success_rate": 0.85)
-        - Warnings (e.g., "empty_results": True)
+    def get_goal_context_by_goal(self, goal: str) -> Optional[Context]:
+        """
+        Get the Context for a specific goal string.
+
+        Searches all contexts to find one matching the goal text.
+        Use this when you have the goal string but not the index.
 
         Args:
-            key: Metadata key
-            value: Metadata value (must be JSON-serializable)
-
-        Example:
-            >>> tracker.add_step_metadata("items_processed", 100)
-            >>> tracker.add_step_metadata("warning", "Some items filtered")
-        """
-        if "step_metadata" not in self.context.metadata:
-            self.context.metadata["step_metadata"] = {}
-        self.context.metadata["step_metadata"][key] = value
-
-    def record_progress(self, message: str, **metrics) -> None:
-        """
-        Record progress information during step execution.
-
-        This is useful for long-running operations to track intermediate
-        progress without cluttering logs. Information is added to context
-        metadata and will be included in the next trace update.
-
-        Args:
-            message: Progress message
-            **metrics: Additional metrics as keyword arguments
-
-        Example:
-            >>> tracker.record_progress("Processing batch 1/10", items=50, errors=0)
-        """
-        if "progress_log" not in self.context.metadata:
-            self.context.metadata["progress_log"] = []
-
-        progress_entry = {"message": message, **metrics}
-        self.context.metadata["progress_log"].append(progress_entry)
-
-        # Keep only last 20 entries to avoid bloat
-        if len(self.context.metadata["progress_log"]) > 20:
-            self.context.metadata["progress_log"] = self.context.metadata[
-                "progress_log"
-            ][-20:]
-
-    def create_result(
-        self,
-        request_payload: Dict[str, Any],
-        response_body: Dict[str, Any],
-        evaluation_status: Optional[EvaluationStatusEnum] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Optional[str]:
-        """
-        Create a Result record for an agent interaction.
-
-        This method creates individual result records (test results) that are
-        associated with the current run. These results represent individual
-        agent calls and their outcomes during attack execution.
-
-        Args:
-            request_payload: The request sent to the agent
-            response_body: The response received from the agent
-            evaluation_status: Evaluation status (defaults to PENDING)
-            metadata: Additional metadata to store with the result
+            goal: The goal text to find
 
         Returns:
-            Result ID if successful, None otherwise
-
-        Example:
-            >>> result_id = tracker.create_result(
-            ...     request_payload={"prompt": "test prompt"},
-            ...     response_body={"content": "test response"},
-            ...     evaluation_status=EvaluationStatusEnum.PENDING,
-            ...     metadata={"model": "gpt-4"}
-            ... )
+            Context if found, None otherwise
         """
-        if not self.context.can_create_results:
-            self.logger.warning(
-                "Tracking context is disabled for results - cannot create result (missing client, run_id, or parent_result_id)"
-            )
-            return None
-
-        self.logger.info(
-            f"Creating result for run_id={self.context.run_id}, parent_result_id={self.context.parent_result_id}"
-        )
-
-        try:
-            run_uuid = self.context.get_run_uuid()
-            if not run_uuid:
-                self.logger.warning("Cannot create result: invalid run UUID")
-                return None
-
-            self.logger.info(f"Run UUID validated: {run_uuid}")
-
-            # Default to PENDING if not specified
-            if evaluation_status is None:
-                evaluation_status = EvaluationStatusEnum.PENDING
-
-            # Create result request
-            result_request = ResultRequest(
-                request_payload=request_payload,
-                response_body=response_body,
-                evaluation_status=evaluation_status,
-                agent_specific_data=metadata,
-            )
-
-            # Call API to create result under this run
-            response = run_result_create.sync_detailed(
-                client=self.context.client,
-                id=run_uuid,
-                body=result_request,
-            )
-
-            # Parse response
-            if response.status_code == 201:
-                result_id = self._extract_result_id(response)
-                if result_id:
-                    self.logger.info(f"Created result record (ID: {result_id})")
-                    return result_id
-            else:
-                self.logger.error(
-                    f"Failed to create result: status={response.status_code}, body={response.content}"
-                )
-
-        except Exception as e:
-            self.logger.error(f"Exception creating result: {e}", exc_info=True)
-
+        for ctx in self._goal_contexts.values():
+            if ctx.goal == goal:
+                return ctx
         return None
 
-    def _extract_result_id(self, response) -> Optional[str]:
+    def get_result_id(self, goal_index: int) -> Optional[str]:
+        """Get the result ID for a specific goal index."""
+        ctx = self._goal_contexts.get(goal_index)
+        return ctx.result_id if ctx else None
+
+    def get_all_contexts(self) -> Dict[int, Context]:
+        """Get all goal contexts."""
+        return self._goal_contexts.copy()
+
+    def get_summary(self) -> Dict[str, Any]:
+        """Get summary statistics for all tracked goals."""
+        total = len(self._goal_contexts)
+        successful = sum(
+            1
+            for ctx in self._goal_contexts.values()
+            if ctx.metadata.get("success", False)
+        )
+        finalized = sum(1 for ctx in self._goal_contexts.values() if ctx.is_finalized)
+        total_traces = sum(len(ctx.traces) for ctx in self._goal_contexts.values())
+
+        return {
+            "total_goals": total,
+            "successful_attacks": successful,
+            "finalized": finalized,
+            "total_traces": total_traces,
+            "success_rate": (successful / total * 100) if total > 0 else 0,
+            "avg_traces_per_goal": (total_traces / total) if total > 0 else 0,
+        }
+
+    @contextmanager
+    def track_goal(
+        self,
+        goal: str,
+        goal_index: int,
+        initial_metadata: Optional[Dict[str, Any]] = None,
+    ):
         """
-        Extract result ID from API response.
+        Context manager for tracking a single goal's attack execution.
+
+        Creates result on entry, yields context for adding traces,
+        and auto-finalizes on exit (with failure status if exception occurs).
 
         Args:
-            response: API response object
+            goal: The goal/datapoint text
+            goal_index: Index of this goal
+            initial_metadata: Optional initial metadata
 
-        Returns:
-            Result ID if found, None otherwise
+        Yields:
+            Context for adding traces during execution
+
+        Example:
+            >>> with tracker.track_goal(goal, i) as ctx:
+            ...     response = attack(goal)
+            ...     tracker.add_interaction_trace(ctx, request, response)
+            ...     # Finalize manually or let context manager handle it
         """
-        # Try parsed response first
+        ctx = self.create_goal_result(goal, goal_index, initial_metadata)
+
+        try:
+            yield ctx
+        except Exception as e:
+            # Finalize with failure on exception
+            if not ctx.is_finalized:
+                self.finalize_goal(
+                    ctx,
+                    success=False,
+                    evaluation_notes=f"Attack failed with exception: {str(e)[:200]}",
+                )
+            raise
+        finally:
+            # Auto-finalize if not already done
+            if not ctx.is_finalized:
+                self.logger.warning(
+                    f"Goal {goal_index} not explicitly finalized - "
+                    "defaulting to NOT_EVALUATED"
+                )
+
+    def _extract_id(self, response) -> Optional[str]:
+        """Extract ID from API response."""
         if response.parsed and hasattr(response.parsed, "id"):
             return str(response.parsed.id)
 
-        # Try parsing raw content
         try:
             response_data = json.loads(response.content.decode())
             if "id" in response_data:
                 return str(response_data["id"])
-        except Exception as e:
-            self.logger.warning(f"Could not parse result ID: {e}")
+        except Exception:
+            pass
 
         return None
+
+    def _extract_response_content(self, response: Any) -> Any:
+        """Extract content from various response formats."""
+        if response is None:
+            return None
+
+        # OpenAI-style response
+        if hasattr(response, "choices") and response.choices:
+            try:
+                return response.choices[0].message.content
+            except (AttributeError, IndexError):
+                pass
+
+        # Dictionary response
+        if isinstance(response, dict):
+            return (
+                response.get("generated_text")
+                or response.get("processed_response")
+                or response.get("content")
+            )
+
+        # String response
+        if isinstance(response, str):
+            return response
+
+        # Fallback: convert to string
+        return str(response)
+
+    def _sanitize_for_json(self, data: Any) -> Any:
+        """Sanitize data for JSON serialization."""
+        if data is None:
+            return None
+
+        if isinstance(data, dict):
+            sanitized = {}
+            for k, v in data.items():
+                # Skip non-serializable keys
+                if k in ("_client", "client"):
+                    sanitized[k] = f"<{type(v).__name__}>"
+                    continue
+                # Redact sensitive keys
+                if any(s in k.lower() for s in ("key", "token", "secret", "password")):
+                    sanitized[k] = "***REDACTED***"
+                    continue
+                # Recurse
+                sanitized[k] = self._sanitize_for_json(v)
+            return sanitized
+
+        if isinstance(data, list):
+            return [self._sanitize_for_json(item) for item in data]
+
+        if isinstance(data, (str, int, float, bool)):
+            return data
+
+        # Handle special float values
+        if isinstance(data, float):
+            if data == float("inf") or data == float("-inf"):
+                return None
+
+        # Fallback: try to convert, else stringify
+        try:
+            json.dumps(data)
+            return data
+        except (TypeError, ValueError):
+            return str(data)
