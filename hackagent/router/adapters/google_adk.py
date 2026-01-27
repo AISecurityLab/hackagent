@@ -339,7 +339,8 @@ class ADKAgent(Agent):
         try:
             response.raise_for_status()
         except requests.exceptions.HTTPError as http_err:
-            status = http_err.response.status_code if http_err.response else "Unknown"
+            # Use response.status_code directly since we have the response object
+            status = response.status_code
             self.logger.error(
                 f"HTTP error {status} from {response.url}: {response_body_str}"
             )
