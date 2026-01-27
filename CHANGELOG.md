@@ -1,3 +1,12 @@
+## v0.4.4 (2026-01-27)
+
+### 🐛🚑️ Fixes
+
+- **Google-ADK**: Error within the google adk tracer
+- **minor**: google adk output
+- **Google-ADK**: fixed the session creation
+- **Google-ADK**: Error within the google adk tracer
+
 ## v0.4.3 (2026-01-27)
 
 ### 🐛🚑️ Fixes
