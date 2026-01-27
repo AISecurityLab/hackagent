@@ -865,6 +865,15 @@ class AgentRouter:
                 patch_kwargs["agent_type"] = agent_type.value
                 needs_update = True
 
+            # Check endpoint
+            current_endpoint = existing_agent.endpoint
+            if current_endpoint != endpoint_for_backend:
+                logger.info(
+                    f"Backend agent '{name}' exists but endpoint differs. Current: '{current_endpoint}', Requested: '{endpoint_for_backend}'. Will update."
+                )
+                patch_kwargs["endpoint"] = endpoint_for_backend
+                needs_update = True
+
             if needs_update and update_metadata_if_exists:
                 logger.info(
                     f"Backend agent '{name}' exists and needs update. Proceeding with update."
