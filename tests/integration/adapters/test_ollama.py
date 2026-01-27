@@ -194,6 +194,7 @@ class TestOllamaAdapterIntegration:
 
 @pytest.mark.integration
 @pytest.mark.ollama
+@pytest.mark.hackagent_backend
 class TestOllamaHackAgentIntegration:
     """End-to-end tests for HackAgent with Ollama backend."""
 
@@ -270,6 +271,7 @@ class TestOllamaHackAgentIntegration:
 
 @pytest.mark.integration
 @pytest.mark.ollama
+@pytest.mark.hackagent_backend
 class TestOllamaRouterIntegration:
     """Integration tests for AgentRouter with Ollama."""
 

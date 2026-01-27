@@ -239,6 +239,7 @@ class TestLiteLLMAdapterIntegration:
 
 @pytest.mark.integration
 @pytest.mark.litellm
+@pytest.mark.hackagent_backend
 class TestLiteLLMHackAgentIntegration:
     """End-to-end tests for HackAgent with LiteLLM backend."""
 
@@ -334,6 +335,7 @@ class TestLiteLLMHackAgentIntegration:
 
 @pytest.mark.integration
 @pytest.mark.litellm
+@pytest.mark.hackagent_backend
 class TestLiteLLMRouterIntegration:
     """Integration tests for AgentRouter with LiteLLM."""
 

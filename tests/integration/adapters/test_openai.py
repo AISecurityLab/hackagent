@@ -245,6 +245,7 @@ class TestOpenAIAdapterIntegration:
 
 @pytest.mark.integration
 @pytest.mark.openai_sdk
+@pytest.mark.hackagent_backend
 class TestOpenAIHackAgentIntegration:
     """End-to-end tests for HackAgent with OpenAI backend."""
 
@@ -321,6 +322,7 @@ class TestOpenAIHackAgentIntegration:
 
 @pytest.mark.integration
 @pytest.mark.openai_sdk
+@pytest.mark.hackagent_backend
 class TestOpenAIRouterIntegration:
     """Integration tests for AgentRouter with OpenAI."""
 

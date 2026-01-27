@@ -105,6 +105,10 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "google_adk: mark test as requiring Google ADK")
     config.addinivalue_line("markers", "litellm: mark test as requiring LiteLLM")
     config.addinivalue_line("markers", "slow: mark test as slow running")
+    config.addinivalue_line(
+        "markers",
+        "hackagent_backend: mark test as requiring HackAgent backend API (may be rate limited)",
+    )
 
 
 def pytest_collection_modifyitems(config, items):
