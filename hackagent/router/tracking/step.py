@@ -495,9 +495,11 @@ class StepTracker:
                 self.logger.warning("Cannot update result status: invalid result UUID")
                 return False
 
+            # Backend requires non-null evaluation_notes
+            notes = evaluation_notes if evaluation_notes else "Status updated"
             result_request = PatchedResultRequest(
                 evaluation_status=evaluation_status,
-                evaluation_notes=evaluation_notes,
+                evaluation_notes=notes,
                 agent_specific_data=agent_specific_data,
             )
 

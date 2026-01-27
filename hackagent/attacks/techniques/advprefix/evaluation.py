@@ -320,7 +320,13 @@ class EvaluationPipeline:
                 if "explanation_nj" in row:
                     eval_notes_parts.append(f"NJ explanation: {row['explanation_nj']}")
 
-            evaluation_notes = " | ".join(eval_notes_parts) if eval_notes_parts else ""
+            # Provide a default evaluation_notes value if none found
+            # The backend API requires this field to be non-null
+            evaluation_notes = (
+                " | ".join(eval_notes_parts)
+                if eval_notes_parts
+                else "No evaluation scores available"
+            )
 
             # Update the result status on the server
             try:
@@ -562,21 +568,32 @@ class EvaluationPipeline:
         self, original_data: List[Dict], judge_results: Dict[str, List[Dict]]
     ) -> List[Dict]:
         """Merge evaluation results from multiple judges."""
+
+        def _normalize_key_value(key_name: str, value: Any) -> Any:
+            """Normalize key values for consistent matching.
+
+            The evaluator's prepare_responses() converts None to "" for string fields,
+            so we need to apply the same normalization when building lookup keys.
+            """
+            if key_name in ("goal", "prefix", "completion"):
+                return str(value) if value is not None else ""
+            return value
+
         # Build lookup dictionaries keyed by merge keys
         for judge_type, judge_data in judge_results.items():
             eval_cols = JUDGE_COLUMN_MAP.get(judge_type, [])
             if not judge_data:
                 continue
 
-            # Build lookup by merge keys
+            # Build lookup by merge keys (normalized)
             lookup = {}
             for row in judge_data:
-                key = tuple(row.get(k) for k in MERGE_KEYS)
+                key = tuple(_normalize_key_value(k, row.get(k)) for k in MERGE_KEYS)
                 lookup[key] = {col: row.get(col) for col in eval_cols if col in row}
 
-            # Merge into original data
+            # Merge into original data (using same normalization)
             for row in original_data:
-                key = tuple(row.get(k) for k in MERGE_KEYS)
+                key = tuple(_normalize_key_value(k, row.get(k)) for k in MERGE_KEYS)
                 if key in lookup:
                     row.update(lookup[key])
 

@@ -52,6 +52,30 @@ from hackagent.models import (
     TraceRequest,
 )
 
+import math
+
+
+def _sanitize_for_json(obj: Any) -> Any:
+    """
+    Recursively sanitize an object for JSON serialization.
+
+    Converts inf/-inf to "Infinity"/"-Infinity" strings and NaN to "NaN".
+    This prevents JSON serialization errors for non-compliant float values.
+    """
+    if isinstance(obj, float):
+        if math.isinf(obj):
+            return "Infinity" if obj > 0 else "-Infinity"
+        if math.isnan(obj):
+            return "NaN"
+        return obj
+    elif isinstance(obj, dict):
+        return {k: _sanitize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_sanitize_for_json(item) for item in obj]
+    elif isinstance(obj, tuple):
+        return tuple(_sanitize_for_json(item) for item in obj)
+    return obj
+
 
 @dataclass
 class Context:
@@ -276,6 +300,7 @@ class Tracker:
         score: Optional[float] = None,
         explanation: Optional[str] = None,
         evaluator_name: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
         Add a trace for an evaluation step.
@@ -286,6 +311,7 @@ class Tracker:
             score: Optional numeric score
             explanation: Optional explanation text
             evaluator_name: Name of the evaluator used
+            metadata: Optional additional metadata
         """
         content = {
             "step_name": "Evaluation",
@@ -297,6 +323,8 @@ class Tracker:
             content["score"] = score
         if explanation:
             content["explanation"] = explanation
+        if metadata:
+            content["metadata"] = self._sanitize_for_json(metadata)
 
         self._add_trace(ctx, "Evaluation", StepTypeEnum.OTHER, content)
 
@@ -337,6 +365,9 @@ class Tracker:
         Returns:
             Trace ID if successful, None otherwise
         """
+        # Sanitize content to handle inf/nan values
+        sanitized_content = _sanitize_for_json(content)
+
         # Always track locally
         ctx.sequence_counter += 1
         trace_record = {
@@ -345,7 +376,7 @@ class Tracker:
             "step_type": (
                 step_type.value if hasattr(step_type, "value") else str(step_type)
             ),
-            "content": content,
+            "content": sanitized_content,
         }
         ctx.traces.append(trace_record)
 
@@ -359,7 +390,7 @@ class Tracker:
             trace_request = TraceRequest(
                 sequence=ctx.sequence_counter,
                 step_type=step_type,
-                content=content,
+                content=sanitized_content,
             )
 
             response = result_trace_create.sync_detailed(
@@ -431,9 +462,20 @@ class Tracker:
             else:
                 eval_status = EvaluationStatusEnum.FAILED_JAILBREAK
 
+            # Backend requires non-null evaluation_notes
+            notes = (
+                evaluation_notes
+                if evaluation_notes
+                else (
+                    "Goal completed successfully"
+                    if success
+                    else "Goal evaluation failed"
+                )
+            )
+
             result_request = PatchedResultRequest(
                 evaluation_status=eval_status,
-                evaluation_notes=evaluation_notes,
+                evaluation_notes=notes,
                 agent_specific_data={
                     **ctx.metadata,
                     "goal": ctx.goal,

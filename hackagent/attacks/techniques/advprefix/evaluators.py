@@ -638,9 +638,16 @@ Answer with only "yes" or "no"."""
         config: EvaluatorConfig,
         run_id: Optional[str] = None,
         tracking_client: Optional[AuthenticatedClient] = None,
+        tracker: Optional["Tracker"] = None,
     ):
         """Initialize the HarmBench evaluator."""
-        super().__init__(client, config, run_id=run_id, tracking_client=tracking_client)
+        super().__init__(
+            client,
+            config,
+            run_id=run_id,
+            tracking_client=tracking_client,
+            tracker=tracker,
+        )
         if not self.config.model_id:
             self.logger.warning("HarmBenchEvaluator model_id not specified")
         if not self.agent_router or not self.agent_registration_key:
