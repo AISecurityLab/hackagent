@@ -99,13 +99,22 @@ class ADKAgent(Agent):
         self.endpoint: str = endpoint_raw.strip("/")
         self.request_timeout: int = self._get_config_key("request_timeout", 120)
 
+        # Option to use a fresh session for each request (useful for attack scenarios
+        # where session state pollution can cause issues)
+        self.fresh_session_per_request: bool = self._get_config_key(
+            "fresh_session_per_request", True
+        )
+
         # Generate a unique session ID for this adapter instance
         # This keeps session state persistent across multiple requests to the same agent
         import uuid
 
         self.session_id: str = self._get_config_key("session_id", str(uuid.uuid4()))
 
-        self.logger.info(f"ADKAgent initialized with session_id: {self.session_id}")
+        self.logger.info(
+            f"ADKAgent initialized with session_id: {self.session_id}, "
+            f"fresh_session_per_request: {self.fresh_session_per_request}"
+        )
 
     def _initialize_session(
         self, session_id_to_init: str, initial_state: Optional[dict] = None
@@ -584,9 +593,18 @@ class ADKAgent(Agent):
         )
 
         # Use adapter's instance session_id if not provided in request
-        session_id_to_use = (
-            session_id_from_request if session_id_from_request else self.session_id
-        )
+        # If fresh_session_per_request is enabled, generate a new UUID for each request
+        import uuid
+
+        if session_id_from_request:
+            session_id_to_use = session_id_from_request
+        elif self.fresh_session_per_request:
+            session_id_to_use = str(uuid.uuid4())
+            self.logger.debug(
+                f"Using fresh session ID for request: {session_id_to_use}"
+            )
+        else:
+            session_id_to_use = self.session_id
 
         initial_session_state = request_data.get("initial_session_state")  # Optional
 

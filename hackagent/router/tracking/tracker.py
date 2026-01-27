@@ -462,9 +462,20 @@ class Tracker:
             else:
                 eval_status = EvaluationStatusEnum.FAILED_JAILBREAK
 
+            # Backend requires non-null evaluation_notes
+            notes = (
+                evaluation_notes
+                if evaluation_notes
+                else (
+                    "Goal completed successfully"
+                    if success
+                    else "Goal evaluation failed"
+                )
+            )
+
             result_request = PatchedResultRequest(
                 evaluation_status=eval_status,
-                evaluation_notes=evaluation_notes,
+                evaluation_notes=notes,
                 agent_specific_data={
                     **ctx.metadata,
                     "goal": ctx.goal,

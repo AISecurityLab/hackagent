@@ -329,7 +329,7 @@ class TestBaseAttackPipelineExecution(unittest.TestCase):
 
         # Verify successful status was set
         attack.tracker.update_result_status.assert_called_once_with(
-            EvaluationStatusEnum.PASSED_CRITERIA, None
+            EvaluationStatusEnum.PASSED_CRITERIA, "Pipeline completed successfully."
         )
         attack.tracker.update_run_status.assert_called_once_with(StatusEnum.COMPLETED)
 
@@ -379,7 +379,7 @@ class TestBaseAttackPipelineExecution(unittest.TestCase):
 
         # Verify custom check was used (count > 3 = success)
         attack.tracker.update_result_status.assert_called_once_with(
-            EvaluationStatusEnum.PASSED_CRITERIA, None
+            EvaluationStatusEnum.PASSED_CRITERIA, "Pipeline completed successfully."
         )
 
 

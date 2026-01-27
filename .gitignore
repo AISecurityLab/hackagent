@@ -3,6 +3,7 @@ logs/
 *.sbatch
 .ruff_cache/
 reports/
+.adk/
 
 # Editors
 .vscode/

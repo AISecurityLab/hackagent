@@ -403,7 +403,7 @@ class BaseAttack(abc.ABC):
 
         if is_success:
             eval_status = EvaluationStatusEnum.PASSED_CRITERIA
-            eval_notes = None
+            eval_notes = "Pipeline completed successfully."
             run_status = StatusEnum.COMPLETED
         else:
             eval_status = EvaluationStatusEnum.FAILED_CRITERIA

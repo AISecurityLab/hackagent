@@ -13,12 +13,14 @@ attack_config = {
     "generator": {
         "identifier": "tinyllama",
         "endpoint": "http://localhost:11434/v1",
+        "max_new_tokens": 150,
     },
     "judges": [
         {
             "identifier": "tinyllama",
             "endpoint": "http://localhost:11434/v1",
             "type": "harmbench",
+            "max_new_tokens": 10,
         }
     ],
     "selection_judges": [
@@ -26,6 +28,7 @@ attack_config = {
             "identifier": "tinyllama",
             "endpoint": "http://localhost:11434/v1",
             "type": "harmbench",
+            "max_new_tokens": 10,
         }
     ],
 }
