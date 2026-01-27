@@ -1,3 +1,36 @@
+## v0.4.3 (2026-01-27)
+
+### 🐛🚑️ Fixes
+
+- **Ollama**: Adding ollama, improving docs, adding base class for adapters, and tracker for samples/goals
+
+### bump
+
+- **deps-dev**: bump google-adk from 1.22.1 to 1.23.0
+- **deps-dev**: bump ruff from 0.14.13 to 0.14.14
+- **deps-dev**: bump commitizen from 4.12.0 to 4.12.1
+- **deps-dev**: bump packaging from 25.0 to 26.0
+- **deps**: bump litellm from 1.81.0 to 1.81.1
+- **deps**: bump litellm from 1.80.16 to 1.81.0
+- **deps-dev**: bump ruff from 0.12.12 to 0.14.13
+- **deps**: bump pydantic from 2.12.4 to 2.12.5
+- **deps-dev**: bump commitizen from 4.11.6 to 4.12.0
+- **deps**: bump openai from 2.8.1 to 2.15.0
+
+### ✅🤡🧪 Tests
+
+- **Integration-Tests**: adding integration tests within the ci
+- **Integration-tests**: add delayed repetition of the tests that has not succeed
+- **integration**: ruff syntax
+- **litellm**: logging
+- **Integration-Tests**: Removing minimum coverage from integration tests
+- **codecov.yml**: Adding codecov.yml for unit and integration tests
+- **Integration-Tests**: adding integration tests within the ci
+
+### 📝💡 Documentation
+
+- **Quick-Start**: Adding frameworks to the quick start documentation
+
 ## v0.4.2 (2026-01-19)
 
 ### 🐛🚑️ Fixes
