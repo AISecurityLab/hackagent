@@ -1,7 +1,6 @@
 import requests
 import os
 from hackagent import HackAgent, AgentTypeEnum
-import logging
 
 ANYTHING_API_KEY = os.getenv("ANYTHINGLLM_API_KEY")
 HACKAGENT_API_KEY = os.getenv("HACKAGENT_API_KEY")
@@ -37,7 +36,8 @@ def connection_test(ENDPOINT, API_KEY):
 agent = HackAgent(
   name="nidum-gemma-2b-uncensored",
   endpoint=ENDPOINT_LMSTUDIO,
-  agent_type=AgentTypeEnum.OPENAI_SDK
+  agent_type=AgentTypeEnum.OPENAI_SDK,
+  api_key=HACKAGENT_API_KEY
 )
 
 
