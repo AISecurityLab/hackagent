@@ -3,9 +3,7 @@ from hackagent import HackAgent
 
 # Initialize HackAgent
 agent = HackAgent(
-    name="multi_tool_agent", 
-    endpoint="http://localhost:8000", 
-    agent_type="google-adk"
+    name="multi_tool_agent", endpoint="http://localhost:8000", agent_type="google-adk"
 )
 
 # Configure attack
