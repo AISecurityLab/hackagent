@@ -178,6 +178,25 @@ class StepTracker:
         Returns:
             Trace ID if successful, None otherwise
         """
+
+        def _deep_clean(obj):
+            # If OpenAI/Pydantic object -> convert to dict
+            if hasattr(obj, "model_dump"):
+                return obj.model_dump()
+            if hasattr(obj, "dict"):  # For legacy
+                return obj.dict()
+
+            # If dictionary -> clean each element recursively
+            if isinstance(obj, dict):
+                return {k: _deep_clean(v) for k, v in obj.items()}
+
+            # If it is a list -> clean each element recursively
+            if isinstance(obj, list):
+                return [_deep_clean(v) for v in obj]
+
+            # Otherwise return the object as-is (string, int, etc)
+            return obj
+
         try:
             sequence = self.context.increment_sequence()
 
@@ -191,7 +210,13 @@ class StepTracker:
                 trace_content["config_snapshot"] = self._sanitize_config(config)
 
             if input_data is not None:
-                trace_content["input_data_sample"] = input_data
+                try:
+                    trace_content["input_data_sample"] = _deep_clean(input_data)
+                except Exception as e:
+                    # If it fails, store error message instead
+                    trace_content["input_data_sample"] = (
+                        f"Serialization Error: {str(e)}"
+                    )
 
             # Add any additional metadata
             if self.context.metadata:
