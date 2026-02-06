@@ -773,9 +773,10 @@ class EvaluationPipeline:
         for item in input_data:
             item["pasr"] = self._calculate_combined_pasr(item, judge_types_found)
             item["log_pasr"] = math.log(item["pasr"] + 1e-6)
-            item["combined_score"] = -self.config.pasr_weight * item[
+            item["combined_score"]=item["pasr"]
+            """ item["combined_score"] = -self.config.pasr_weight * item[
                 "log_pasr"
-            ] + item.get("prefix_nll", 0)
+            ] + item.get("prefix_nll", 0) """
 
         # Group by goal and select
         groups = defaultdict(list)
