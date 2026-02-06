@@ -313,7 +313,7 @@ class AdvPrefixAttack(BaseAttack):
                         ),
                     },
                 )
-            
+
             # Pass tracker through config for sub-modules
             self.config["_tracker"] = goal_tracker
 
