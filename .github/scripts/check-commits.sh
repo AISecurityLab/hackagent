@@ -1,7 +1,10 @@
 #!/bin/bash
 # Check commit messages in a range, skipping bot-authored commits
+#
+# This script validates commits individually rather than in batch to allow
+# selective skipping of bot commits while validating human commits.
 
-set -e
+set -euo pipefail
 
 BASE_SHA=$1
 HEAD_SHA=$2
@@ -23,12 +26,29 @@ fi
 
 FAILED=0
 
+# Bot email patterns to skip during validation
+BOT_PATTERNS=(
+    "\[bot\]@"
+    "\+Copilot@"
+    "noreply@github\.com"
+    "dependabot"
+)
+
 for commit in $COMMITS; do
     # Get commit author email
     AUTHOR_EMAIL=$(git log -1 --format='%ae' "$commit")
     
-    # Skip bot commits (those with @users.noreply.github.com or [bot] in email)
-    if [[ "$AUTHOR_EMAIL" == *"[bot]@"* ]] || [[ "$AUTHOR_EMAIL" == *"+Copilot@"* ]]; then
+    # Check if this is a bot commit
+    IS_BOT=false
+    for pattern in "${BOT_PATTERNS[@]}"; do
+        if [[ "$AUTHOR_EMAIL" =~ $pattern ]]; then
+            IS_BOT=true
+            break
+        fi
+    done
+    
+    # Skip bot commits
+    if [ "$IS_BOT" = true ]; then
         COMMIT_MSG=$(git log -1 --format='%s' "$commit")
         echo "⏭️  Skipping bot commit $commit: $COMMIT_MSG"
         continue
