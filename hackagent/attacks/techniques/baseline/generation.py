@@ -26,7 +26,8 @@ Result Tracking:
 import logging
 from typing import Any, Dict, List, Optional
 
-from hackagent.attacks.shared.templates import AttackTemplates
+from hackagent.attacks.shared.response_utils import extract_response_content
+from hackagent.attacks.generator import AttackTemplates
 from hackagent.attacks.shared.progress import create_progress_bar
 from hackagent.router.router import AgentRouter
 from hackagent.router.tracking import Tracker
@@ -183,15 +184,7 @@ def execute_prompts(
                         request_data=request_data,
                     )
 
-                    completion = ""
-                    if response and hasattr(response, "choices") and response.choices:
-                        completion = response.choices[0].message.content or ""
-                    elif isinstance(response, dict):
-                        completion = (
-                            response.get("generated_text")
-                            or response.get("processed_response")
-                            or ""
-                        )
+                    completion = extract_response_content(response, logger) or ""
 
                     # Add trace for this interaction if tracking
                     if goal_tracker and goal_ctx:
@@ -256,10 +249,6 @@ def execute_prompts(
     if goal_tracker:
         config["_tracker"] = goal_tracker
         config["_goal_contexts"] = goal_contexts
-
-    return completions
-
-    logger.info(f"Execution complete. Got {len(completions)} completions")
 
     return completions
 

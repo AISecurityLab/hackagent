@@ -13,20 +13,30 @@
 # limitations under the License.
 
 """
-Shared components for attacks.
+Generator module for attack prompt generation.
 
-This module contains reusable components used across different
-objectives and techniques.
+This package provides reusable prompt templates and generation
+utilities used across different attack techniques.
+
+Modules:
+    templates: Attack prompt template library and pattern constants
+
+Usage:
+    from hackagent.attacks.generator import (
+        AttackTemplates,
+        REFUSAL_PATTERNS,
+        SUCCESS_PATTERNS,
+    )
 """
 
-from .progress import create_progress_bar
-from .response_utils import extract_response_content
-from .router_factory import create_router
-from .tui import with_tui_logging
+from hackagent.attacks.generator.templates import (
+    REFUSAL_PATTERNS,
+    SUCCESS_PATTERNS,
+    AttackTemplates,
+)
 
 __all__ = [
-    "create_progress_bar",
-    "create_router",
-    "extract_response_content",
-    "with_tui_logging",
+    "AttackTemplates",
+    "REFUSAL_PATTERNS",
+    "SUCCESS_PATTERNS",
 ]

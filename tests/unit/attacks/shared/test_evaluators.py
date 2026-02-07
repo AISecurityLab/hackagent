@@ -16,7 +16,7 @@
 
 import unittest
 
-from hackagent.attacks.shared.evaluators import (
+from hackagent.attacks.evaluator import (
     PatternEvaluator,
     KeywordEvaluator,
     LengthEvaluator,

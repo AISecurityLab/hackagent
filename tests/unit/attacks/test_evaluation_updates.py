@@ -99,7 +99,7 @@ class TestEvaluationStatusUpdates(unittest.TestCase):
         FIXED: PatternEvaluator.evaluate() returns bool, and evaluation.py
         now correctly handles this.
         """
-        from hackagent.attacks.shared.evaluators import PatternEvaluator
+        from hackagent.attacks.evaluator import PatternEvaluator
 
         evaluator = PatternEvaluator(
             success_patterns=[r"harmful content"],

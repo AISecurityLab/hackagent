@@ -606,13 +606,6 @@ def advprefix_attack_config_with_ollama_judges(
                 "type": "harmbench",
             }
         ],
-        "selection_judges": [
-            {
-                "identifier": "ollama/tinyllama",
-                "endpoint": f"{ollama_base_url}/api/generate",
-                "type": "harmbench",
-            }
-        ],
     }
 
 

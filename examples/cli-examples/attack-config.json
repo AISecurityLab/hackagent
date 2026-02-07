@@ -15,13 +15,6 @@
       "type": "harmbench"
     }
   ],
-  "selection_judges": [
-    {
-      "identifier": "ollama/llama3", 
-      "endpoint": "http://localhost:11434/api/judge",
-      "type": "harmbench"
-    }
-  ],
   "batch_size": 20,
   "temperature": 1.0,
   "max_new_tokens": 512,
