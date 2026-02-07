@@ -31,7 +31,7 @@ jobs:
         run: uv sync --group dev
 
       - name: Check commit messages in PR
-        run: uv run cz check --rev-range ${{ github.event.pull_request.base.sha }}..${{ github.sha }}
+        run: bash .github/scripts/check-commits.sh ${{ github.event.pull_request.base.sha }} ${{ github.sha }}
 
   python-checks:
     name: Linting and Formatting
