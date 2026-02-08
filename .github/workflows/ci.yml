@@ -163,7 +163,7 @@ jobs:
           sleep 5
 
       - name: Cache Ollama models
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.ollama/models
           key: ollama-models-tinyllama-${{ runner.os }}
