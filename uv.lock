@@ -1124,7 +1124,7 @@ http = [
 
 [[package]]
 name = "google-adk"
-version = "1.24.0"
+version = "1.24.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiosqlite" },
@@ -1172,9 +1172,9 @@ dependencies = [
     { name = "watchdog" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/83/03/28ebdc464e319af70da60e596cd7939f3c9b8f030d6fe133487faecd6a8b/google_adk-1.24.0.tar.gz", hash = "sha256:7f8bda238f7f1b625ac5838264cdd8d04e2f0db730be5eb96561f4da60f823ec", size = 2209145, upload-time = "2026-02-05T18:29:24.037Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/44/d4/067ff47a8e485059cea5f5222a35ae59d739a0db313d6f19fd5b61f1b9df/google_adk-1.24.1.tar.gz", hash = "sha256:f61cdbc2aedaac691d98f66e5c18b133c5d7d8a3f66658dbf0eac2bea99060f3", size = 2209820, upload-time = "2026-02-06T18:55:33.942Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b8/e0/6a16c98e8682e385c73891fc3ee351c6b0e12df6028cf46183492c4a418e/google_adk-1.24.0-py3-none-any.whl", hash = "sha256:9a91e82d665b2d5fc5e7524925938205e855709d92f580bf9ae3cfb0bf3f6fcc", size = 2562892, upload-time = "2026-02-05T18:29:21.715Z" },
+    { url = "https://files.pythonhosted.org/packages/d6/46/0d07a161882f2890d5bb98b99473d0e31856825185b4cdbade6dee3a4bb7/google_adk-1.24.1-py3-none-any.whl", hash = "sha256:8a05014fa0c95b34dc0995b5fc6511bff651835c82d8549a33c5e8c20e727bc4", size = 2563511, upload-time = "2026-02-06T18:55:31.791Z" },
 ]
 
 [[package]]
@@ -2194,7 +2194,7 @@ wheels = [
 
 [[package]]
 name = "litellm"
-version = "1.81.5"
+version = "1.81.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -2210,9 +2210,9 @@ dependencies = [
     { name = "tiktoken" },
     { name = "tokenizers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/38/f4/c109bc5504520baa7b96a910b619d1b1b5af6cb5c28053e53adfed83e3ab/litellm-1.81.5.tar.gz", hash = "sha256:599994651cbb64b8ee7cd3b4979275139afc6e426bdd4aa840a61121bb3b04c9", size = 13615436, upload-time = "2026-01-29T01:37:54.817Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/eb/1d/e8f95dd1fc0eed36f2698ca82d8a0693d5388c6f2f1718f3f5ed472daaf4/litellm-1.81.8.tar.gz", hash = "sha256:5cc6547697748b8ca38d17d755662871da125df6e378cc987eaf2208a15626fb", size = 14066801, upload-time = "2026-02-05T05:56:03.37Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/74/0f/5312b944208efeec5dcbf8e0ed956f8f7c430b0c6458301d206380c90b56/litellm-1.81.5-py3-none-any.whl", hash = "sha256:206505c5a0c6503e465154b9c979772be3ede3f5bf746d15b37dca5ae54d239f", size = 11950016, upload-time = "2026-01-29T01:37:52.6Z" },
+    { url = "https://files.pythonhosted.org/packages/d8/5a/6f391c2f251553dae98b6edca31c070d7e2291cef6153ae69e0688159093/litellm-1.81.8-py3-none-any.whl", hash = "sha256:78cca92f36bc6c267c191d1fe1e2630c812bff6daec32c58cade75748c2692f6", size = 12286316, upload-time = "2026-02-05T05:56:00.248Z" },
 ]
 
 [[package]]
@@ -3822,15 +3822,15 @@ wheels = [
 
 [[package]]
 name = "rich"
-version = "14.3.1"
+version = "14.3.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "markdown-it-py" },
     { name = "pygments" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a1/84/4831f881aa6ff3c976f6d6809b58cdfa350593ffc0dc3c58f5f6586780fb/rich-14.3.1.tar.gz", hash = "sha256:b8c5f568a3a749f9290ec6bddedf835cec33696bfc1e48bcfecb276c7386e4b8", size = 230125, upload-time = "2026-01-24T21:40:44.847Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/74/99/a4cab2acbb884f80e558b0771e97e21e939c5dfb460f488d19df485e8298/rich-14.3.2.tar.gz", hash = "sha256:e712f11c1a562a11843306f5ed999475f09ac31ffb64281f73ab29ffdda8b3b8", size = 230143, upload-time = "2026-02-01T16:20:47.908Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/87/2a/a1810c8627b9ec8c57ec5ec325d306701ae7be50235e8fd81266e002a3cc/rich-14.3.1-py3-none-any.whl", hash = "sha256:da750b1aebbff0b372557426fb3f35ba56de8ef954b3190315eb64076d6fb54e", size = 309952, upload-time = "2026-01-24T21:40:42.969Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/45/615f5babd880b4bd7d405cc0dc348234c5ffb6ed1ea33e152ede08b2072d/rich-14.3.2-py3-none-any.whl", hash = "sha256:08e67c3e90884651da3239ea668222d19bea7b589149d8014a21c633420dbb69", size = 309963, upload-time = "2026-02-01T16:20:46.078Z" },
 ]
 
 [[package]]
