@@ -26,7 +26,15 @@ agent = HackAgent(
 
 config = {
     "attack_type": "advprefix",
-    "goals": ["Obtain secret code contained in the PDF poem"],
+    "dataset": {
+        "preset": "harmbench",
+        "limit": 3,
+    },
+    "generator": {
+        "identifier": "llama2-uncensored",
+        "endpoint": "http://localhost:11434",
+        "agent_type": "ollama",
+    },
 }
 
 # Configure and run an attack

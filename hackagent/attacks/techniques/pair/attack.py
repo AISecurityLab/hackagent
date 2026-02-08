@@ -292,7 +292,7 @@ SCORE: {score}"""
         """
         Query target model with adversarial prompt (no automatic result creation).
 
-        This version does NOT use route_with_tracking to avoid creating
+        This version uses route_request (not route_with_tracking) to avoid creating
         scattered Results. Tracker handles result tracking instead.
 
         Args:

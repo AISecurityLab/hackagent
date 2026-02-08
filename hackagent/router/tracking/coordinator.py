@@ -54,10 +54,8 @@ Usage:
 
 import logging
 from typing import Any, Callable, Dict, List, Optional
-from uuid import UUID
 
-from hackagent.api.run import run_result_create
-from hackagent.models import EvaluationStatusEnum, ResultRequest, StatusEnum
+from hackagent.models import EvaluationStatusEnum, StatusEnum
 
 from .context import TrackingContext
 from .step import StepTracker
@@ -117,8 +115,11 @@ class TrackingCoordinator:
         """
         Factory method to create a fully-initialized coordinator.
 
-        Creates both StepTracker and Tracker, creates the parent result
-        for StepTracker, and optionally initializes goal results.
+        Creates both StepTracker and Tracker, and optionally initializes
+        goal results. Pipeline-level traces from the StepTracker are
+        attached to the first goal's Result (set during initialize_goals),
+        so that there is exactly one Result per goal with no extra
+        synthetic parent Result.
 
         Args:
             client: Authenticated API client (or None to disable tracking)
@@ -133,16 +134,12 @@ class TrackingCoordinator:
         """
         _logger = logger or logging.getLogger(__name__)
 
-        # Create parent result for StepTracker
-        parent_result_id = None
-        if client and run_id:
-            parent_result_id = cls._create_parent_result(client, run_id, _logger)
-
-        # Build StepTracker
+        # Build StepTracker (parent_result_id is set later via initialize_goals
+        # to reuse the first goal's Result, avoiding an extra synthetic Result)
         tracking_context = TrackingContext(
             client=client,
             run_id=run_id,
-            parent_result_id=parent_result_id,
+            parent_result_id=None,
             logger=_logger,
         )
         tracking_context.add_metadata("attack_type", attack_type)
@@ -232,6 +229,24 @@ class TrackingCoordinator:
                 goal=goal,
                 goal_index=i,
                 initial_metadata=initial_metadata or {},
+            )
+
+        # Link StepTracker to the first goal's Result so pipeline-level
+        # traces (Generation, Evaluation, etc.) are attached there instead
+        # of requiring a separate synthetic parent Result.
+        #
+        # IMPORTANT: We also *delegate* the StepTracker's sequence counter
+        # to goal 0's Context.  Both the StepTracker and the Tracker write
+        # traces to the same Result, so they must share a single monotonic
+        # counter to avoid (result_id, sequence) collisions on the backend.
+        first_ctx = self.goal_tracker.get_goal_context(0)
+        if first_ctx and first_ctx.result_id:
+            self.step_tracker.context.parent_result_id = first_ctx.result_id
+            self.step_tracker.context.delegate_sequence_to(first_ctx)
+
+            self.logger.debug(
+                f"StepTracker linked to first goal result: {first_ctx.result_id} "
+                f"(shared sequence at {first_ctx.sequence_counter})"
             )
 
         self.logger.info(f"Initialized {len(goals)} goal results for tracking")
@@ -402,6 +417,13 @@ class TrackingCoordinator:
         """
         Finalize pipeline-level tracking (StepTracker).
 
+        Updates the run status to COMPLETED.  When the StepTracker is
+        linked to a goal's Result (the normal case), the Result's
+        evaluation status is **not** touched here because it was already
+        set correctly by ``finalize_all_goals`` (e.g. SUCCESSFUL_JAILBREAK).
+        Only when the StepTracker owns its own independent Result do we
+        set a pipeline-level evaluation status.
+
         Args:
             results: Pipeline output
             success_check: Optional callable to determine success
@@ -413,16 +435,22 @@ class TrackingCoordinator:
                 len(results) > 0 if hasattr(results, "__len__") else True
             )
 
-        if is_success:
-            eval_status = EvaluationStatusEnum.PASSED_CRITERIA
-            notes = "Pipeline completed successfully."
-            run_status = StatusEnum.COMPLETED
-        else:
-            eval_status = EvaluationStatusEnum.FAILED_CRITERIA
-            notes = "Pipeline completed with no successful results."
-            run_status = StatusEnum.COMPLETED
+        run_status = StatusEnum.COMPLETED
 
-        self.step_tracker.update_result_status(eval_status, notes)
+        # Only update the Result's evaluation status when the StepTracker
+        # owns an independent Result (i.e. is NOT delegated to a goal's
+        # Result).  When delegated, finalize_all_goals() already set the
+        # correct per-goal evaluation status (SUCCESSFUL_JAILBREAK, etc.)
+        # and overwriting it with a generic PASSED_CRITERIA would be wrong.
+        if not self.step_tracker.context._delegate_ctx:
+            if is_success:
+                eval_status = EvaluationStatusEnum.PASSED_CRITERIA
+                notes = "Pipeline completed successfully."
+            else:
+                eval_status = EvaluationStatusEnum.FAILED_CRITERIA
+                notes = "Pipeline completed with no successful results."
+            self.step_tracker.update_result_status(eval_status, notes)
+
         self.step_tracker.update_run_status(run_status)
 
     # ========================================================================
@@ -459,34 +487,6 @@ class TrackingCoordinator:
     # ========================================================================
     # INTERNAL HELPERS
     # ========================================================================
-
-    @staticmethod
-    def _create_parent_result(client, run_id: str, logger) -> Optional[str]:
-        """Create parent result for StepTracker."""
-        try:
-            import json
-
-            parent_result_request = ResultRequest(
-                run=UUID(run_id),
-                evaluation_status=EvaluationStatusEnum.PASSED_CRITERIA,
-            )
-            response = run_result_create.sync_detailed(
-                client=client,
-                id=UUID(run_id),
-                body=parent_result_request,
-            )
-            if response.status_code == 201:
-                if response.parsed and hasattr(response.parsed, "id"):
-                    return str(response.parsed.id)
-                try:
-                    data = json.loads(response.content.decode())
-                    if "id" in data:
-                        return str(data["id"])
-                except Exception:
-                    pass
-        except Exception as e:
-            logger.error(f"Failed to create parent result: {e}", exc_info=True)
-        return None
 
     @staticmethod
     def _default_goal_scorer(goal_data: List[Dict], threshold: float) -> bool:
