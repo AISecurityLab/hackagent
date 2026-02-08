@@ -24,44 +24,12 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from hackagent.client import AuthenticatedClient
-from hackagent.models import StatusEnum
 from hackagent.router.router import AgentRouter
 from hackagent.attacks.techniques.base import BaseAttack
+from hackagent.attacks.shared.tui import with_tui_logging
 
 from . import generation, evaluation
 from .config import DEFAULT_TEMPLATE_CONFIG
-
-# TUI logging support - lazy loaded to avoid circular imports
-_with_tui_logging = None
-
-
-def _get_tui_logging_decorator():
-    """Lazily import the TUI logging decorator to avoid circular imports."""
-    global _with_tui_logging
-    if _with_tui_logging is not None:
-        return _with_tui_logging
-
-    try:
-        from hackagent.cli.tui.logger import with_tui_logging
-
-        _with_tui_logging = with_tui_logging
-    except ImportError:
-
-        def with_tui_logging(*args, **kwargs):
-            def decorator(func):
-                return func
-
-            return decorator
-
-        _with_tui_logging = with_tui_logging
-
-    return _with_tui_logging
-
-
-def with_tui_logging(*args, **kwargs):
-    """Wrapper that lazily loads the actual TUI logging decorator."""
-    decorator = _get_tui_logging_decorator()
-    return decorator(*args, **kwargs)
 
 
 class BaselineAttack(BaseAttack):
@@ -167,6 +135,8 @@ class BaselineAttack(BaseAttack):
         """
         Execute baseline attack.
 
+        Uses TrackingCoordinator for unified pipeline and goal tracking.
+
         Args:
             goals: List of harmful goals to test
 
@@ -176,11 +146,11 @@ class BaselineAttack(BaseAttack):
         if not goals:
             return {"evaluated": [], "summary": []}
 
-        # Initialize tracking using base class
-        self.tracker = self._initialize_tracking(
-            "baseline",
-            goals,
-            metadata={"objective": self.config.get("objective")},
+        # Initialize unified coordinator
+        coordinator = self._initialize_coordinator(
+            attack_type="baseline",
+            goals=goals,
+            initial_metadata={"objective": self.config.get("objective")},
         )
 
         try:
@@ -191,13 +161,13 @@ class BaselineAttack(BaseAttack):
             def success_check(output):
                 return output and isinstance(output, dict)
 
-            # Finalize using base class
-            self._finalize_pipeline(results, success_check)
+            # Finalize pipeline-level tracking via coordinator
+            coordinator.finalize_pipeline(results, success_check)
 
             return results if results else {"evaluated": [], "summary": []}
 
         except Exception as e:
             self.logger.error(f"Pipeline failed: {e}", exc_info=True)
-            if self.tracker:
-                self.tracker.update_run_status(StatusEnum.FAILED)
+            # Crash-safe: finalize all tracking on error
+            coordinator.finalize_on_error("Baseline pipeline failed with exception")
             raise

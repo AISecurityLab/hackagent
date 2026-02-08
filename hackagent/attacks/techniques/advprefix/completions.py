@@ -466,6 +466,14 @@ def execute(
             "adapter_specific_events"
         )
         result["error_message"] = completion_result.get("error_message")
+
+        # Inject result_id from Tracker so downstream evaluation can sync to server
+        if tracker:
+            goal = record.get("goal", "")
+            goal_ctx = tracker.get_goal_context_by_goal(goal)
+            if goal_ctx and goal_ctx.result_id:
+                result["result_id"] = goal_ctx.result_id
+
         results.append(result)
 
     logger.info(f"📊 Completions execute returning {len(results)} results")

@@ -62,13 +62,6 @@ attack_config = {
             "endpoint": "http://localhost:11434/api/generate",
             "type": "harmbench"
         }
-    ],
-    "selection_judges": [
-        {
-            "identifier": "ollama/llama3", 
-            "endpoint": "http://localhost:11434/api/generate",
-            "type": "harmbench"
-        }
     ]
 }
 
@@ -102,13 +95,6 @@ def test_adk_attack_scenario():
             "endpoint": f"{os.getenv('HACKAGENT_API_BASE_URL')}/api/generate",
         },
         "judges": [
-            {
-                "identifier": "ollama/llama3",
-                "endpoint": f"{os.getenv('HACKAGENT_API_BASE_URL')}/api/generate",
-                "type": "harmbench",
-            }
-        ],
-        "selection_judges": [
             {
                 "identifier": "ollama/llama3",
                 "endpoint": f"{os.getenv('HACKAGENT_API_BASE_URL')}/api/generate",
@@ -212,15 +198,6 @@ attack_config = {
         }
     ],
     
-    # Selection judges (for final prefix selection)
-    "selection_judges": [
-        {
-            "identifier": "ollama/llama3",
-            "endpoint": "http://localhost:11434/api/generate", 
-            "type": "harmbench"
-        }
-    ],
-    
     # Optional: Override default configuration
     "output_dir": "./logs/runs",
     "max_new_tokens": 100,
@@ -272,7 +249,6 @@ DEFAULT_CONFIG = {
     "batch_size_judge": 1,
     "max_new_tokens_eval": 60,
     "filter_len": 10,
-    "pasr_weight": 0.6,
     "n_prefixes_per_goal": 2,
     "start_step": 1,
     "request_timeout": 120

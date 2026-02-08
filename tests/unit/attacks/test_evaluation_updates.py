@@ -20,7 +20,7 @@ after the local evaluation step completes.
 
 ISSUES FIXED:
 1. Results are created with NOT_EVALUATED status during generation via
-   route_with_tracking(), and now are updated after evaluation completes.
+   the Tracker, and are updated after evaluation completes.
 
 2. The evaluation.py code now correctly handles bool return from
    PatternEvaluator.evaluate() instead of expecting a dict.
@@ -45,61 +45,12 @@ class TestEvaluationStatusUpdates(unittest.TestCase):
         self.run_id = str(uuid4())
         self.mock_client = MagicMock()
 
-    def test_route_with_tracking_creates_results_as_not_evaluated(self):
-        """Test that route_with_tracking creates results with NOT_EVALUATED status."""
-        from hackagent.router.router import AgentRouter
-
-        # This is expected behavior - results start as NOT_EVALUATED
-        # The issue is they should be updated after evaluation
-
-        with patch.object(AgentRouter, "__init__", lambda x, **kwargs: None):
-            router = AgentRouter.__new__(AgentRouter)
-            router._agent_registry = {"test-agent": MagicMock()}
-            router.logger = self.logger
-
-            # Mock the route_request to return a response
-            mock_response = MagicMock()
-            mock_response.choices = [
-                MagicMock(message=MagicMock(content="test response"))
-            ]
-
-            with patch.object(router, "route_request", return_value=mock_response):
-                # The import happens inside route_with_tracking, so we patch there
-                with patch(
-                    "hackagent.api.run.run_result_create.sync_detailed"
-                ) as mock_create:
-                    mock_create_response = MagicMock()
-                    mock_create_response.status_code = 201
-                    mock_create_response.parsed = MagicMock(id=uuid4())
-                    mock_create.return_value = mock_create_response
-
-                    # Call route_with_tracking
-                    router.route_with_tracking(
-                        registration_key="test-agent",
-                        request_data={
-                            "messages": [{"role": "user", "content": "test"}]
-                        },
-                        run_id=self.run_id,
-                        client=self.mock_client,
-                    )
-
-                    # Verify result was created with NOT_EVALUATED status
-                    mock_create.assert_called_once()
-                    call_args = mock_create.call_args
-                    result_request = call_args.kwargs["body"]
-
-                    self.assertEqual(
-                        result_request.evaluation_status,
-                        EvaluationStatusEnum.NOT_EVALUATED,
-                        "Results should be created with NOT_EVALUATED status initially",
-                    )
-
     def test_pattern_evaluator_returns_bool(self):
         """
         FIXED: PatternEvaluator.evaluate() returns bool, and evaluation.py
         now correctly handles this.
         """
-        from hackagent.attacks.shared.evaluators import PatternEvaluator
+        from hackagent.attacks.evaluator import PatternEvaluator
 
         evaluator = PatternEvaluator(
             success_patterns=[r"harmful content"],
@@ -271,62 +222,6 @@ class TestEvaluationEndToEnd(unittest.TestCase):
 
             self.assertTrue(result)
             mock_update.sync_detailed.assert_called_once()
-
-
-class TestResultIdTracking(unittest.TestCase):
-    """Test that result IDs are properly tracked through the pipeline."""
-
-    def test_route_with_tracking_returns_response_and_result_id(self):
-        """
-        FIXED: route_with_tracking now returns both response and result_id.
-        """
-        from hackagent.router.router import AgentRouter
-
-        with patch.object(AgentRouter, "__init__", lambda x, **kwargs: None):
-            router = AgentRouter.__new__(AgentRouter)
-            router._agent_registry = {"test-agent": MagicMock()}
-            router.logger = logging.getLogger("test")
-
-            mock_response = MagicMock()
-            mock_response.choices = [MagicMock(message=MagicMock(content="test"))]
-
-            result_id = uuid4()
-
-            with patch.object(router, "route_request", return_value=mock_response):
-                with patch(
-                    "hackagent.api.run.run_result_create.sync_detailed"
-                ) as mock_create:
-                    mock_create_response = MagicMock()
-                    mock_create_response.status_code = 201
-                    mock_create_response.parsed = MagicMock(id=result_id)
-                    mock_create.return_value = mock_create_response
-
-                    result = router.route_with_tracking(
-                        registration_key="test-agent",
-                        request_data={
-                            "messages": [{"role": "user", "content": "test"}]
-                        },
-                        run_id=str(uuid4()),
-                        client=MagicMock(),
-                    )
-
-                    # Now returns dict with both response and result_id
-                    self.assertIsInstance(result, dict)
-                    self.assertIn("response", result)
-                    self.assertIn("result_id", result)
-                    self.assertEqual(result["result_id"], str(result_id))
-
-    def test_route_with_tracking_docstring_updated(self):
-        """
-        Verify route_with_tracking documents the new return type.
-        """
-        from hackagent.router.router import AgentRouter
-        import inspect
-
-        source = inspect.getsource(AgentRouter.route_with_tracking)
-
-        # Should document the return structure
-        self.assertIn("result_id", source)
 
 
 if __name__ == "__main__":

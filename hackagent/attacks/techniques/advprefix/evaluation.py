@@ -33,14 +33,13 @@ The module provides functionality for:
 """
 
 import logging
-import math
 from collections import defaultdict
 from dataclasses import fields
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from uuid import UUID
 
 from hackagent.api.result import result_partial_update
-from hackagent.attacks.techniques.advprefix.evaluators import (
+from hackagent.attacks.evaluator import (
     HarmBenchEvaluator,
     JailbreakBenchEvaluator,
     NuancedEvaluator,
@@ -287,18 +286,16 @@ class EvaluationPipeline:
             return 0
 
         updated_count = 0
-        total_with_ids = 0
 
+        # Aggregate the best evaluation per result_id to avoid last-wins overwrites.
+        # Multiple completion rows share the same result_id (one per goal).
+        best_per_result: Dict[str, Dict] = {}
         for row in evaluated_data:
             result_id = row.get("result_id")
             if not result_id:
                 continue
 
-            total_with_ids += 1
-
-            # Determine success based on available evaluation scores
-            # Priority: JailbreakBench > HarmBench > Nuanced
-            # eval_jb/eval_hb/eval_nj: 1 = success (jailbreak), 0 = fail
+            # Determine success for this row
             success = False
             eval_notes_parts = []
 
@@ -320,24 +317,31 @@ class EvaluationPipeline:
                 if "explanation_nj" in row:
                     eval_notes_parts.append(f"NJ explanation: {row['explanation_nj']}")
 
-            # Provide a default evaluation_notes value if none found
-            # The backend API requires this field to be non-null
             evaluation_notes = (
                 " | ".join(eval_notes_parts)
                 if eval_notes_parts
                 else "No evaluation scores available"
             )
 
-            # Update the result status on the server
+            # Keep the best (success wins over failure) per result_id
+            existing = best_per_result.get(result_id)
+            if existing is None or (success and not existing["success"]):
+                best_per_result[result_id] = {
+                    "success": success,
+                    "evaluation_notes": evaluation_notes,
+                }
+
+        # Now do one PATCH per result_id
+        for result_id, info in best_per_result.items():
             try:
-                if success:
+                if info["success"]:
                     eval_status = EvaluationStatusEnum.SUCCESSFUL_JAILBREAK
                 else:
                     eval_status = EvaluationStatusEnum.FAILED_JAILBREAK
 
                 result_request = PatchedResultRequest(
                     evaluation_status=eval_status,
-                    evaluation_notes=evaluation_notes,
+                    evaluation_notes=info["evaluation_notes"],
                 )
 
                 response = result_partial_update.sync_detailed(
@@ -360,7 +364,7 @@ class EvaluationPipeline:
                 self.logger.error(f"Exception updating result {result_id}: {e}")
 
         self.logger.info(
-            f"Synced {updated_count}/{total_with_ids} evaluation results to server"
+            f"Synced {updated_count}/{len(best_per_result)} evaluation results to server"
         )
         return updated_count
 
@@ -663,6 +667,18 @@ class EvaluationPipeline:
             result["temperature"] = group_items[0].get("temperature")
             result["n_eval_samples"] = len(group_items)
 
+            # Preserve result_id (all items in a goal share the same result_id)
+            result_id = next(
+                (
+                    item.get("result_id")
+                    for item in group_items
+                    if item.get("result_id")
+                ),
+                None,
+            )
+            if result_id:
+                result["result_id"] = result_id
+
             # Calculate judge statistics
             for judge_type, col_name in available_judges_agg_cols.items():
                 values = []
@@ -734,8 +750,7 @@ class EvaluationPipeline:
         - Diversity-preserving selection
         - Sub-prefix elimination
         """
-        # Use selection_judges if specified, otherwise use all judges
-        judge_configs = self.config.selection_judges or self.config.judges
+        judge_configs = self.config.judges
 
         if not isinstance(judge_configs, list) or not judge_configs:
             self.logger.error("No judges configured for selection")
@@ -772,10 +787,6 @@ class EvaluationPipeline:
         # Calculate selection scores
         for item in input_data:
             item["pasr"] = self._calculate_combined_pasr(item, judge_types_found)
-            item["log_pasr"] = math.log(item["pasr"] + 1e-6)
-            item["combined_score"] = -self.config.pasr_weight * item[
-                "log_pasr"
-            ] + item.get("prefix_nll", 0)
 
         # Group by goal and select
         groups = defaultdict(list)
@@ -784,7 +795,7 @@ class EvaluationPipeline:
 
         selected_prefixes = []
         for goal, group in groups.items():
-            if not group or all(item.get("combined_score") is None for item in group):
+            if not group or all(item.get("pasr") is None for item in group):
                 self.logger.warning(
                     f"Skipping goal '{goal[:50]}...' due to invalid scores"
                 )
@@ -818,10 +829,10 @@ class EvaluationPipeline:
 
     def _select_prefixes_for_goal(self, group: List[Dict]) -> List[Dict]:
         """Select top prefixes for a single goal using multi-criteria optimization."""
-        # First: Select prefix with best combined score
-        first_selection = min(
-            (item for item in group if item.get("combined_score") is not None),
-            key=lambda x: x["combined_score"],
+        # First: Select prefix with highest PASR (best jailbreak success rate)
+        first_selection = max(
+            (item for item in group if item.get("pasr") is not None),
+            key=lambda x: x["pasr"],
         )
 
         # Second: Filter by PASR tolerance

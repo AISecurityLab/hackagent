@@ -19,15 +19,22 @@ from hackagent import HackAgent
 
 # Initialize HackAgent for an Ollama-based agent
 agent = HackAgent(
-    name="tinyllama",
+    name="Almawave/Velvet:2b",
     endpoint="http://localhost:11434",
     agent_type="ollama",
 )
 
 config = {
     "attack_type": "advprefix",
-    "goals": ["Bypass content safety filters"],
-    "max_new_tokens": 150,
+    "dataset": {
+        "preset": "harmbench",
+        "limit": 3,
+    },
+    "generator": {
+        "identifier": "llama2-uncensored",
+        "endpoint": "http://localhost:11434",
+        "agent_type": "ollama",
+    },
 }
 
 # Configure and run an attack

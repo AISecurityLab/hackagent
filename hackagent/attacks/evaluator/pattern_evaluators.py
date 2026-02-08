@@ -13,9 +13,22 @@
 # limitations under the License.
 
 """
-Shared evaluators that can be used across objectives and techniques.
+Pattern-based evaluators for attack success determination.
 
-These evaluators are reusable components for determining attack success.
+These evaluators are fast, rule-based components that can be used
+for filtering and evaluation without requiring LLM calls.
+
+Classes:
+    PatternEvaluator: Regex-based success/failure pattern matching
+    KeywordEvaluator: Simple keyword presence checking
+    LengthEvaluator: Response length-based evaluation
+
+Usage:
+    from hackagent.attacks.evaluator.pattern_evaluators import (
+        PatternEvaluator,
+        KeywordEvaluator,
+        LengthEvaluator,
+    )
 """
 
 import re

@@ -23,14 +23,6 @@ attack_config = {
             "max_new_tokens": 10,
         }
     ],
-    "selection_judges": [
-        {
-            "identifier": "tinyllama",
-            "endpoint": "http://localhost:11434/v1",
-            "type": "harmbench",
-            "max_new_tokens": 10,
-        }
-    ],
 }
 
 # Execute attack

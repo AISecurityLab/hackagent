@@ -23,13 +23,8 @@ only 1-2 traces each.
 Architecture:
     Attack → Tracker → Result per goal → Multiple Traces per Result
 
-Instead of:
-    Attack → route_with_tracking → Result per LLM call (scattered)
-
-We now have:
-    Attack → Tracker.create_goal_result() → One Result per goal
-          → Tracker.add_trace() → Traces for each interaction
-          → Tracker.finalize_goal() → Update evaluation status
+Each attack creates one Result per goal/datapoint via Tracker,
+then accumulates traces for each interaction during the attack.
 
 For step-level tracking (pipeline steps like "Generation", "Evaluation"),
 use the StepTracker class from step.py instead.
