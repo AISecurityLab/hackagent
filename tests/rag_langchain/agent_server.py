@@ -13,15 +13,12 @@ from langchain_classic.chains import create_retrieval_chain
 from langchain_classic.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 
-# --- 1. CONFIGURAZIONE ---
-warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
-
 
 
 DB_INDEX_PATH = "db_index"
 
-# --- 2. SETUP MODELLI (RAG) ---
-print("--- Avvio Server RAG ---")
+# RAG MODEL SETUP
+print("--- RAG server startup ---")
 
 try:
     llm = ChatOpenAI(
@@ -38,7 +35,7 @@ try:
     )
 
     if not os.path.exists(DB_INDEX_PATH):
-        raise RuntimeError(f"ERRORE: La cartella '{DB_INDEX_PATH}' non esiste. Lancia ingest.py!")
+        raise RuntimeError(f"ERROR: The folder '{DB_INDEX_PATH}' does not exist. Run ingest.py first!")
 
     vectorstore = FAISS.load_local(
         DB_INDEX_PATH, 
@@ -63,8 +60,8 @@ try:
     rag_chain = create_retrieval_chain(retriever, question_answer_chain)
 
 except Exception as e:
-    print(f"ERRORE INIZIALIZZAZIONE: {e}")
-    # Continuiamo per far vedere l'errore pydantic se c'è, ma il server non funzionerà bene senza RAG
+    print(f"INITIALIZATION ERROR: {e}")
+    # We continue to show pydantic error if there is any, but the server will not work correctly without RAG
     pass
 
 # DEFINITION OF OPENAI MODEL (FIX FOR PYDANTIC V2) ---
@@ -92,7 +89,7 @@ class ChatCompletionRequest(BaseModel):
         extra = "ignore"
 
 # 
-# Pydantic V2 a volte ha bisogno di questo per risolvere le referenze annidate (List[Message])
+# Pydantic V2 sometimes needs it to resolve nested references (List[Message])
 Message.model_rebuild()
 ChatCompletionRequest.model_rebuild()
 # ================================
@@ -110,25 +107,25 @@ class ChatCompletionResponse(BaseModel):
     choices: List[ChatCompletionResponseChoice]
     usage: dict
 
-# --- 4. ENDPOINT API ---
+# --- API ENDPOINT ---
 
 app = FastAPI(title="OpenAI Compatible RAG Agent")
 
 @app.post("/v1/chat/completions", response_model=ChatCompletionResponse)
 async def chat_completions(request: ChatCompletionRequest):
     try:
-        # 1. Recupera l'ultimo messaggio
+        # Retrieve last message
         last_user_message = request.messages[-1].content
-        print(f"[RAG] Domanda ricevuta: {last_user_message}")
+        print(f"[RAG] Received query: {last_user_message}")
 
-        # 2. Esegui RAG
+        # Execute RAG
         if 'rag_chain' not in globals():
-            raise HTTPException(status_code=500, detail="Il sistema RAG non è stato inizializzato correttamente.")
+            raise HTTPException(status_code=500, detail="The RAG system was not correctly initialized.")
             
         response = rag_chain.invoke({"input": last_user_message})
         answer_text = response["answer"]
         
-        # 3. Rispondi
+        # Answer
         return ChatCompletionResponse(
             id=f"chatcmpl-{uuid.uuid4()}",
             created=int(time.time()),
@@ -144,7 +141,7 @@ async def chat_completions(request: ChatCompletionRequest):
         )
 
     except Exception as e:
-        print(f"!!! ERRORE SERVER: {str(e)}")
+        print(f"SERVER ERRROR: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

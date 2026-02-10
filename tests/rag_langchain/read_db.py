@@ -12,7 +12,7 @@ EMBEDDING_MODEL_NAME = "text-embedding-3-small" # Or "text-embedding-3-large" if
 def read_vector_db():
     print(f"--- Loading Vector Database from '{DB_FOLDER}' ---")
 
-    # 1. Initialize Embedding Model
+    # Initialize Embedding Model
     # (Required to load the FAISS index structure, even if we are just reading text)
     embeddings = OpenAIEmbeddings(
         openai_api_base="https://openrouter.ai/api/v1",
@@ -20,7 +20,7 @@ def read_vector_db():
         model=EMBEDDING_MODEL_NAME
     )
 
-    # 2. Load the Database
+    # Load the Database
     try:
         # allow_dangerous_deserialization is needed because we are loading a local pickle file
         vectorstore = FAISS.load_local(
@@ -33,14 +33,14 @@ def read_vector_db():
         print("Did you run ingest.py first?")
         return
 
-    # 3. Access the internal document store
+    # Access the internal document store
     # The 'docstore' object holds the actual text chunks mapped to IDs
     all_documents = vectorstore.docstore._dict
 
     total_chunks = len(all_documents)
     print(f"Successfully loaded. Total chunks found: {total_chunks}\n")
 
-    # 4. Print Content
+    # Print Content
     print("--- CONTENT PREVIEW ---")
     
     # Iterate through all stored chunks
