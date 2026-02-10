@@ -7,7 +7,6 @@ from typing import List, Optional, Any
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-# Se usi langchain, importa questo per evitare conflitti, altrimenti usa i modelli sopra
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_classic.chains import create_retrieval_chain
