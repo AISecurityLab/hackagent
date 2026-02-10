@@ -40,11 +40,8 @@ allowing techniques to focus solely on attack algorithms.
 import abc
 import logging
 from typing import Any, Dict, List, Optional
-from uuid import UUID
 
-from hackagent.api.run import run_result_create
-from hackagent.models import EvaluationStatusEnum, ResultRequest, StatusEnum
-from hackagent.router.tracking import StepTracker, TrackingContext
+from hackagent.router.tracking import StepTracker, TrackingCoordinator
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +71,8 @@ class BaseAttack(abc.ABC):
         logger: Logger instance for this attack
         run_id: Unique run identifier
         run_dir: Output directory for this run
-        tracker: StepTracker for execution tracking
+        coordinator: TrackingCoordinator for unified tracking
+        tracker: StepTracker for execution tracking (alias for coordinator.step_tracker)
     """
 
     def __init__(
@@ -112,6 +110,7 @@ class BaseAttack(abc.ABC):
 
         # Tracking
         self.tracker: Optional[StepTracker] = None
+        self.coordinator: Optional[TrackingCoordinator] = None
 
         # Validate and setup
         self._validate_config()
@@ -170,45 +169,6 @@ class BaseAttack(abc.ABC):
             )
             self.logger.addHandler(ch)
 
-    def _create_parent_result(self) -> Optional[str]:
-        """
-        Create parent result for tracking and return its ID.
-
-        Used by StepTracker to organize hierarchical results.
-        Returns None if run_id or client not available.
-        """
-        if not self.run_id or not self.client:
-            return None
-
-        try:
-            parent_result_request = ResultRequest(
-                run=UUID(self.run_id),
-                evaluation_status=EvaluationStatusEnum.PASSED_CRITERIA,
-            )
-            response = run_result_create.sync_detailed(
-                client=self.client,
-                id=UUID(self.run_id),
-                body=parent_result_request,
-            )
-
-            if response.status_code == 201:
-                if response.parsed and hasattr(response.parsed, "id"):
-                    return str(response.parsed.id)
-                else:
-                    # Try extracting from raw response
-                    import json
-
-                    try:
-                        response_data = json.loads(response.content.decode())
-                        if "id" in response_data:
-                            return str(response_data["id"])
-                    except Exception:
-                        pass
-        except Exception as e:
-            self.logger.error(f"Exception creating parent result: {e}", exc_info=True)
-
-        return None
-
     def _prepare_input_sample(self, data: Any) -> Any:
         """
         Prepare input sample for tracking (limit size, sanitize values).
@@ -241,45 +201,44 @@ class BaseAttack(abc.ABC):
 
         return None
 
-    def _initialize_tracking(
+    def _initialize_coordinator(
         self,
         attack_type: str,
         goals: List[str],
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> StepTracker:
+        initial_metadata: Optional[Dict[str, Any]] = None,
+    ) -> TrackingCoordinator:
         """
-        Initialize tracking context and step tracker.
+        Initialize unified tracking coordinator.
+
+        Creates a TrackingCoordinator that manages both StepTracker
+        (pipeline-level) and Tracker (per-goal) in a single call.
+        Also sets ``self.tracker`` for backward compatibility.
 
         Args:
             attack_type: Attack identifier (e.g., "advprefix", "pair")
             goals: List of goals being attacked
-            metadata: Additional metadata to track
+            initial_metadata: Optional metadata for each goal result
 
         Returns:
-            Initialized StepTracker instance
+            Initialized TrackingCoordinator
         """
-        parent_result_id = self._create_parent_result() if self.run_id else None
+        run_id = self.config.get("_run_id") or self.run_id
+        client = self.config.get("_client") or self.client
 
-        tracking_context = TrackingContext(
-            client=self.client,
-            run_id=self.run_id,
-            parent_result_id=parent_result_id,
+        coordinator = TrackingCoordinator.create(
+            client=client,
+            run_id=run_id,
             logger=self.logger,
+            attack_type=attack_type,
+            goals=goals,
+            initial_metadata=initial_metadata,
         )
 
-        # Add common metadata
-        tracking_context.add_metadata("attack_type", attack_type)
-        tracking_context.add_metadata("num_goals", len(goals))
+        # Backward-compat: expose step_tracker as self.tracker
+        self.tracker = coordinator.step_tracker
+        self.coordinator = coordinator
 
-        # Add custom metadata
-        if metadata:
-            for key, value in metadata.items():
-                tracking_context.add_metadata(key, value)
-
-        tracker = StepTracker(tracking_context)
-        tracker.update_run_status(StatusEnum.RUNNING)
-
-        return tracker
+        return coordinator
 
     def _build_step_args(
         self, step_info: Dict, step_config: Dict, input_data: Any
@@ -384,36 +343,6 @@ class BaseAttack(abc.ABC):
 
         return current_output
 
-    def _finalize_pipeline(self, final_output: Any, success_check=None):
-        """
-        Finalize pipeline execution by setting status.
-
-        Args:
-            final_output: Output from final pipeline step
-            success_check: Optional callable to determine success (receives final_output)
-                         If None, checks if output is non-empty
-        """
-        if success_check:
-            is_success = success_check(final_output)
-        else:
-            # Default: check if output is non-empty
-            is_success = final_output is not None and (
-                len(final_output) > 0 if hasattr(final_output, "__len__") else True
-            )
-
-        if is_success:
-            eval_status = EvaluationStatusEnum.PASSED_CRITERIA
-            eval_notes = "Pipeline completed successfully."
-            run_status = StatusEnum.COMPLETED
-        else:
-            eval_status = EvaluationStatusEnum.FAILED_CRITERIA
-            eval_notes = "Pipeline completed with no successful results."
-            run_status = StatusEnum.COMPLETED
-
-        if self.tracker:
-            self.tracker.update_result_status(eval_status, eval_notes)
-            self.tracker.update_run_status(run_status)
-
     @abc.abstractmethod
     def _get_pipeline_steps(self) -> List[Dict]:
         """
@@ -455,10 +384,10 @@ class BaseAttack(abc.ABC):
         Execute the attack technique.
 
         This method should:
-        1. Initialize tracking with self._initialize_tracking()
+        1. Initialize tracking with self._initialize_coordinator()
         2. Define pipeline with self._get_pipeline_steps()
         3. Execute pipeline with self._execute_pipeline()
-        4. Finalize with self._finalize_pipeline()
+        4. Finalize with coordinator.finalize_all_goals() and coordinator.finalize_pipeline()
         5. Return results
 
         Args:

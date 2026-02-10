@@ -17,6 +17,20 @@ Shared attack templates library.
 
 This module provides reusable attack prompt templates that can be used
 across different objectives and techniques.
+
+Classes:
+    AttackTemplates: Centralized library of attack prompt templates
+
+Constants:
+    REFUSAL_PATTERNS: Regex patterns for detecting model refusals
+    SUCCESS_PATTERNS: Regex patterns for detecting successful attacks
+
+Usage:
+    from hackagent.attacks.generator.templates import (
+        AttackTemplates,
+        REFUSAL_PATTERNS,
+        SUCCESS_PATTERNS,
+    )
 """
 
 from typing import List

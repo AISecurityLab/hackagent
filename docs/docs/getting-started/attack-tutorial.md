@@ -308,11 +308,6 @@ attack_config = {
         "identifier": "ollama/llama3",
         "endpoint": "http://localhost:11434/api/generate",
         "type": "harmbench"
-    }],
-    "selection_judges": [{
-        "identifier": "ollama/llama3",
-        "endpoint": "http://localhost:11434/api/generate",
-        "type": "harmbench"
     }]
 }
 
@@ -394,11 +389,6 @@ attack_config = {
         "endpoint": "https://api.openai.com/v1"
     },
     "judges": [{
-        "identifier": "gpt-4",
-        "endpoint": "https://api.openai.com/v1",
-        "type": "harmbench"
-    }],
-    "selection_judges": [{
         "identifier": "gpt-4",
         "endpoint": "https://api.openai.com/v1",
         "type": "harmbench"
@@ -486,11 +476,6 @@ attack_config = {
         "identifier": "ollama/llama3",
         "endpoint": "http://localhost:11434/api/generate",
         "type": "harmbench"
-    }],
-    "selection_judges": [{
-        "identifier": "ollama/llama3",
-        "endpoint": "http://localhost:11434/api/generate",
-        "type": "harmbench"
     }]
 }
 
@@ -572,11 +557,6 @@ attack_config = {
         "endpoint": "http://localhost:4000/v1"
     },
     "judges": [{
-        "identifier": "gpt-4",
-        "endpoint": "http://localhost:4000/v1",
-        "type": "harmbench"
-    }],
-    "selection_judges": [{
         "identifier": "gpt-4",
         "endpoint": "http://localhost:4000/v1",
         "type": "harmbench"
@@ -705,7 +685,6 @@ advanced_config = {
     # Attack parameters
     "n_candidates_per_goal": 10,
     "meta_prefixes": ["Write a guide:", "Explain how to:"],
-    "pasr_weight": 0.7,
     "n_prefixes_per_goal": 3
 }
 ```

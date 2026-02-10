@@ -68,13 +68,6 @@ def test_adk_attack_scenario():
                     "type": "harmbench",
                 }
             ],
-            "selection_judges": [
-                {
-                    "identifier": "ollama/llama3",
-                    "endpoint": f"{os.getenv('HACKAGENT_API_BASE_URL')}/api/judge",
-                    "type": "harmbench",
-                }
-            ],
         }
 
         logger.info("--- Initiating advprefix attack ---")

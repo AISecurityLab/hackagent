@@ -86,10 +86,10 @@ def run(**kwargs) -> Any
 Execute the attack technique.
 
 This method should:
-1. Initialize tracking with self._initialize_tracking()
+1. Initialize tracking with self._initialize_coordinator()
 2. Define pipeline with self._get_pipeline_steps()
 3. Execute pipeline with self._execute_pipeline()
-4. Finalize with self._finalize_pipeline()
+4. Finalize with coordinator.finalize_all_goals() and coordinator.finalize_pipeline()
 5. Return results
 
 **Arguments**:

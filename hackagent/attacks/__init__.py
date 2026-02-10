@@ -19,12 +19,17 @@ This package contains various attack implementations designed to test the securi
 and robustness of AI agents and language models.
 
 Architecture:
+    - evaluator/: Reusable evaluation components (judge evaluators, pattern
+      evaluators, metrics, server sync)
+    - generator/: Reusable generation components (attack templates, patterns)
     - objectives/: Define WHAT vulnerability we test (metadata/config)
     - techniques/: Define HOW we generate attacks (implementation)
         - advprefix/: Prefix optimization technique
         - baseline/: Baseline prompt injection
         - pair/: LLM-driven iterative refinement
-    - shared/: Reusable components (evaluators, templates, metrics)
+    - shared/: Cross-cutting infrastructure (progress, response utils,
+      router factory, TUI) — legacy evaluator/generator shims re-export
+      from evaluator/ and generator/ for backward compatibility
     - orchestrator.py: Attack orchestration for server integration
     - registry.py: Attack registration and discovery
 

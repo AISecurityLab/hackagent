@@ -16,7 +16,7 @@
 
 import unittest
 
-from hackagent.attacks.shared.templates import (
+from hackagent.attacks.generator import (
     AttackTemplates,
     REFUSAL_PATTERNS,
     SUCCESS_PATTERNS,

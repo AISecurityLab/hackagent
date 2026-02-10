@@ -94,13 +94,6 @@ attack_config = {
             "endpoint": "http://localhost:11434/api/generate",
             "type": "harmbench"
         }
-    ],
-    "selection_judges": [
-        {
-            "identifier": "ollama/llama3",
-            "endpoint": "http://localhost:11434/api/generate",
-            "type": "harmbench"
-        }
     ]
 }
 
@@ -136,13 +129,6 @@ def test_adk_security():
             "endpoint": f"{os.getenv('HACKAGENT_API_BASE_URL')}/api/generate",
         },
         "judges": [
-            {
-                "identifier": "ollama/llama3",
-                "endpoint": f"{os.getenv('HACKAGENT_API_BASE_URL')}/api/generate",
-                "type": "harmbench",
-            }
-        ],
-        "selection_judges": [
             {
                 "identifier": "ollama/llama3",
                 "endpoint": f"{os.getenv('HACKAGENT_API_BASE_URL')}/api/generate",

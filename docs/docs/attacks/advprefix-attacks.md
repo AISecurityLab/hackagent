@@ -81,13 +81,6 @@ attack_config = {
             "endpoint": "http://localhost:11434/api/generate",
             "type": "harmbench"
         }
-    ],
-    "selection_judges": [
-        {
-            "identifier": "ollama/llama3",
-            "endpoint": "http://localhost:11434/api/generate",
-            "type": "harmbench"
-        }
     ]
 }
 
@@ -144,7 +137,6 @@ advanced_config = {
     "meta_prefix_samples": 5,
     "max_new_tokens_completion": 200,
     "n_samples": 3,
-    "pasr_weight": 0.7,
     "n_prefixes_per_goal": 3
 }
 ```
@@ -157,7 +149,6 @@ advanced_config = {
 | `max_token_segments` | Maximum prefix complexity | 5 | 1-20 |
 | `n_candidates_per_goal` | Candidates generated per goal | 5 | 1-50 |
 | `meta_prefix_samples` | Samples per meta prefix | 2 | 1-10 |
-| `pasr_weight` | Prefix Attack Success Rate weight | 0.6 | 0.0-1.0 |
 | `n_prefixes_per_goal` | Final prefixes selected per goal | 2 | 1-10 |
 
 ## 🔍 Understanding Components

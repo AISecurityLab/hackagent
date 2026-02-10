@@ -1,6 +1,6 @@
 [project]
 name = "hackagent"
-version = "0.4.3"
+version = "0.4.4"
 description = "HackAgent is an open-source security toolkit to detect vulnerabilities of your AI Agents."
 authors = [
     {name = "AI Security Lab", email = "ais@ai4i.it"}
@@ -108,6 +108,12 @@ exclude_lines = [
 output = "reports/coverage.xml"
 
 [tool.pytest.ini_options]
+testpaths = ["tests/unit"]
+collect_ignore = [
+    "tests/test_auth.py",
+    "tests/test_google_adk.py",
+    "tests/test_rag_lmstudio.py",
+]
 markers = [
     "google_adk: marks tests that require Google ADK server (deselect with '-m \"not google_adk\"')",
 ]

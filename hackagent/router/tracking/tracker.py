@@ -23,13 +23,8 @@ only 1-2 traces each.
 Architecture:
     Attack → Tracker → Result per goal → Multiple Traces per Result
 
-Instead of:
-    Attack → route_with_tracking → Result per LLM call (scattered)
-
-We now have:
-    Attack → Tracker.create_goal_result() → One Result per goal
-          → Tracker.add_trace() → Traces for each interaction
-          → Tracker.finalize_goal() → Update evaluation status
+Each attack creates one Result per goal/datapoint via Tracker,
+then accumulates traces for each interaction during the attack.
 
 For step-level tracking (pipeline steps like "Generation", "Evaluation"),
 use the StepTracker class from step.py instead.
@@ -365,26 +360,26 @@ class Tracker:
         Returns:
             Trace ID if successful, None otherwise
         """
-        
+
         def _deep_clean(obj):
             # If OpenAI/Pydantic object -> convert to dict
             if hasattr(obj, "model_dump"):
                 return obj.model_dump()
-            if hasattr(obj, "dict"): # For legacy
+            if hasattr(obj, "dict"):  # For legacy
                 return obj.dict()
-            
+
             # If dictionary -> clean each element recursively
             if isinstance(obj, dict):
                 return {k: _deep_clean(v) for k, v in obj.items()}
-            
+
             # If it is a list -> clean each element recursively
             if isinstance(obj, list):
                 return [_deep_clean(v) for v in obj]
-            
+
             # Otherwise return the object as-is (string, int, etc)
             return obj
-        
-        try: 
+
+        try:
             content = _deep_clean(content)
         except Exception as e:
             self.logger.warning(f"Deep clean failed: {e}")

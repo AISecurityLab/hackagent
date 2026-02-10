@@ -46,13 +46,6 @@ DEFAULT_PREFIX_GENERATION_CONFIG: Dict[str, Any] = {
             "type": "harmbench",
         }
     ],
-    "selection_judges": [
-        {
-            "identifier": "hackagent-judge",
-            "endpoint": "https://api.hackagent.dev/v1",
-            "type": "harmbench",
-        }
-    ],
     # --- Preprocessor/Filter Params ---
     "min_char_length": 10,
     "max_token_segments": 5,  # Used by Preprocessor
@@ -73,7 +66,6 @@ DEFAULT_PREFIX_GENERATION_CONFIG: Dict[str, Any] = {
     "batch_size_judge": 1,
     "max_new_tokens_eval": 512,
     "filter_len": 10,
-    "pasr_weight": 0.6,
     "n_prefixes_per_goal": 2,
     # --- Other General Params ---
     "start_step": 1,
@@ -194,10 +186,8 @@ class EvaluationPipelineConfig:
 
     # Aggregation settings
     max_ce: Optional[float] = None
-    selection_judges: Optional[List[Dict[str, Any]]] = None
 
     # Selection settings
-    pasr_weight: float = 0.5
     n_prefixes_per_goal: int = 3
     nll_tol: float = 999
     pasr_tol: float = 0
@@ -250,6 +240,7 @@ class EvaluatorConfig:
     filter_len: int = 500
     request_timeout: int = 120
     temperature: float = 0.0
+    max_judge_retries: int = 1
 
 
 # Custom chat templates for specific uncensored models

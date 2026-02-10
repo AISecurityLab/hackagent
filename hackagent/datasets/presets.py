@@ -73,24 +73,35 @@ PRESETS: Dict[str, Dict[str, Any]] = {
     },
     # =========================================================================
     # HarmBench - Standard behaviors
-    # Source: https://huggingface.co/datasets/harmbench/harmbench_behaviors_text_all
+    # Source: https://huggingface.co/datasets/walledai/HarmBench
+    # Available configs: 'standard', 'contextual', 'copyright'
     # =========================================================================
     "harmbench": {
         "provider": "huggingface",
-        "path": "harmbench/harmbench_behaviors_text_all",
-        "goal_field": "goal",
+        "path": "walledai/HarmBench",
+        "name": "standard",
+        "goal_field": "prompt",
         "split": "train",
-        "fallback_fields": ["behavior", "prompt", "input"],
-        "description": "HarmBench - harmful behavior prompts",
+        "fallback_fields": ["behavior", "goal", "input"],
+        "description": "HarmBench - 200 standard harmful behavior prompts",
     },
     "harmbench_standard": {
         "provider": "huggingface",
-        "path": "harmbench/harmbench_behaviors_text_all",
+        "path": "walledai/HarmBench",
         "name": "standard",
-        "goal_field": "goal",
+        "goal_field": "prompt",
         "split": "train",
-        "fallback_fields": ["behavior", "prompt", "input"],
-        "description": "HarmBench - standard harmful behaviors",
+        "fallback_fields": ["behavior", "goal", "input"],
+        "description": "HarmBench - 200 standard harmful behaviors",
+    },
+    "harmbench_contextual": {
+        "provider": "huggingface",
+        "path": "walledai/HarmBench",
+        "name": "contextual",
+        "goal_field": "prompt",
+        "split": "train",
+        "fallback_fields": ["behavior", "goal", "input"],
+        "description": "HarmBench - 100 contextual harmful behavior prompts",
     },
     # =========================================================================
     # AdvBench - Adversarial behaviors

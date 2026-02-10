@@ -13,10 +13,23 @@
 # limitations under the License.
 
 """
-Shared metrics and evaluation utilities.
+Metrics and evaluation analysis utilities.
 
 This module provides reusable metric calculation and analysis
 functions for attack evaluation.
+
+Functions:
+    calculate_success_rate: Overall success rate from results
+    calculate_confidence_score: Average confidence from results
+    group_by_goal: Group results by goal
+    calculate_per_goal_metrics: Per-goal metric breakdown
+    generate_summary_report: Comprehensive summary report
+
+Usage:
+    from hackagent.attacks.evaluator.metrics import (
+        calculate_success_rate,
+        generate_summary_report,
+    )
 """
 
 from typing import Any, Dict, List
@@ -66,7 +79,7 @@ def group_by_goal(results: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any
     Returns:
         Dictionary mapping goals to their results
     """
-    grouped = {}
+    grouped: Dict[str, List[Dict[str, Any]]] = {}
     for result in results:
         goal = result.get("goal", "unknown")
         if goal not in grouped:
@@ -89,7 +102,7 @@ def calculate_per_goal_metrics(
     """
     grouped = group_by_goal(results)
 
-    metrics = {}
+    metrics: Dict[str, Dict[str, Any]] = {}
     for goal, goal_results in grouped.items():
         metrics[goal] = {
             "total_attempts": len(goal_results),
