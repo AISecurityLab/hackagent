@@ -67,7 +67,7 @@ except Exception as e:
     # Continuiamo per far vedere l'errore pydantic se c'è, ma il server non funzionerà bene senza RAG
     pass
 
-# --- 3. DEFINIZIONE MODELLI OPENAI (FIX PER PYDANTIC V2) ---
+# DEFINITION OF OPENAI MODEL (FIX FOR PYDANTIC V2) ---
 
 class Message(BaseModel):
     role: str
@@ -91,7 +91,7 @@ class ChatCompletionRequest(BaseModel):
     class Config:
         extra = "ignore"
 
-# === FIX IMPORTANTE QUI SOTTO ===
+# 
 # Pydantic V2 a volte ha bisogno di questo per risolvere le referenze annidate (List[Message])
 Message.model_rebuild()
 ChatCompletionRequest.model_rebuild()
