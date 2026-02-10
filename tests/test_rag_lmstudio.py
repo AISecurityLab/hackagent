@@ -5,7 +5,7 @@ from hackagent import HackAgent, AgentTypeEnum
 ANYTHINGLLM_API_KEY = os.getenv("ANYTHINGLLM_API_KEY")
 HACKAGENT_API_KEY = os.getenv("HACKAGENT_API_KEY")
 LMSTUDIO_API_KEY = os.getenv("LMSTUDIO_API_KEY")
-ENDPOINT_ANYTHING = "http://localhost:3001/api/v1/openai/"
+ENDPOINT_ANYTHING = "http://localhost:3001/api|brx-X7FKMEK-7S7MS8G-KH8QQ9C-KW511Z1/v1/openai/"
 ENDPOINT_LMSTUDIO = "http://localhost:1234/v1"
 
 def connection_test(ENDPOINT, API_KEY):
@@ -38,7 +38,7 @@ def connection_test(ENDPOINT, API_KEY):
 agent_anythingLLM = HackAgent(
   name="test_text", #name of the workspace with the embedded pdf (target)
   endpoint=ENDPOINT_ANYTHING, #openAI endpoint of anythingLLM
-  agent_type=AgentTypeEnum.OPENAI_SDK,
+  agent_type=AgentTypeEnum.OLLAMA,
   api_key=HACKAGENT_API_KEY, #api key of hackagent
   metadata={
     "model": "test_text", #name of the workspace with the embedded pdf (target)
@@ -112,6 +112,7 @@ attack_config_lmstudio = {
         "endpoint": ENDPOINT_LMSTUDIO,
         "type": "harmbench"
     }],
+    
     "selection_judges": [
         {
             "identifier":"harmbench-llama-2-13b-cls-i1",
@@ -128,4 +129,4 @@ attack_config_lmstudio = {
 }
 
 #agent_lmstudio.hack(attack_config=attack_config_lmstudio)
-#agent_anythingLLM.hack(attack_config=attack_config_anythingLLM)
+agent_anythingLLM.hack(attack_config=attack_config_anythingLLM)
