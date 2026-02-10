@@ -4,10 +4,8 @@ from langchain_openai import OpenAIEmbeddings
 import warnings
 
 
-# ... resto del tuo codice ...
 # --- CONFIGURATION ---
 # You must use the EXACT SAME API key and Model used during ingestion
-os.environ["OPENROUTER_API_KEY"] = "sk-or-v1-..." 
 DB_FOLDER = "db_index"
 EMBEDDING_MODEL_NAME = "text-embedding-3-small" # Or "text-embedding-3-large" if you changed it
 
