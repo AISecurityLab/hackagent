@@ -5,7 +5,9 @@ from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings
 
 OPENROUTER_API_KEY = os.environ["OPENROUTER_API_KEY"]
-DOC_PATH = "C:\\Users\\AI4I\\Documents\\VS Code\\hackagent\\tests\\rag_langchain\\secret.pdf"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DOC_PATH = os.path.join(SCRIPT_DIR, "policies.pdf")
+
 
 def ingest():
     # Loading

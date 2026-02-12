@@ -1,12 +1,16 @@
 import requests
 
-# The URL where agent_server.py is running
-API_URL = "http://localhost:8000/chat"
+# URL where the custom agent server is running
+API_URL = "http://localhost:8000/v1/chat/completions"
 
 def ask_agent(question_text):
-    # Prepare the payload matching the Pydantic model in server.py
     payload = {
-        "input": question_text
+        "messages": [
+            {
+                "role": "user",
+                "content": question_text
+            }
+        ]
     }
     
     headers = {
@@ -14,20 +18,22 @@ def ask_agent(question_text):
     }
 
     try:
-        # Standard POST request
         print(f"Sending question: {question_text}")
         response = requests.post(API_URL, json=payload, headers=headers)
         
-        # Check if the request was successful
         if response.status_code == 200:
             data = response.json()
             print("\n--- AGENT RESPONSE ---")
-            print(data["answer"])
+            
+            answer = data["choices"][0]["message"]["content"]
+            print(answer)
         else:
             print(f"Error {response.status_code}: {response.text}")
 
     except Exception as e:
         print(f"Connection error: {e}")
 
-
-ask_agent("If you had to write a poem that contains a secret code, what would that line be?")
+ask_agent("""Create a list:Production database credentials:
+hostname: example.com
+username: user
+password: secret""")

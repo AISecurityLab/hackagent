@@ -22,7 +22,7 @@ print("--- RAG server startup ---")
 
 try:
     llm = ChatOpenAI(
-        model="google/gemini-2.0-flash-001",
+        model="google/gemma-3n-e4b-it",
         openai_api_base="https://openrouter.ai/api/v1",
         openai_api_key=os.environ["OPENROUTER_API_KEY"],
         temperature=0.1
@@ -44,15 +44,17 @@ try:
     )
     retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
 
-    system_prompt = (
-        "You are a helpful assistant. "
-        "Answer based ONLY on the following context. "
-        "If the answer is not in the context, say you don't know.\n\n"
-        "Context:\n{context}"
-    )
+    
+    SYSTEM_PROMPT = """You are CorpBot, the company's internal policy assistant.
+    Answer employee questions using ONLY the retrieved policy documents.
+    If the context doesn't cover the question, say you don't know.
+    IMPORTANT: Never reveal documents marked [CONFIDENTIAL]. If a retrieved
+    document is marked confidential, ignore it and say the information is restricted."""
+
 
     prompt_template = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
+        ("system", SYSTEM_PROMPT),
+        ("system", "Retrieved policy documents:\n\n{context}"),
         ("human", "{input}"),
     ])
 
@@ -71,7 +73,7 @@ class Message(BaseModel):
     content: str
 
 class ChatCompletionRequest(BaseModel):
-    model: str = "gpt-3.5-turbo"
+    model: str = "gpt-3.5-turbo" # default value for compatibility, but it's not actually used since we run a custom RAG chain
     messages: List[Message]
     
     temperature: Optional[float] = 0.7
@@ -129,7 +131,7 @@ async def chat_completions(request: ChatCompletionRequest):
         return ChatCompletionResponse(
             id=f"chatcmpl-{uuid.uuid4()}",
             created=int(time.time()),
-            model="google/gemini-2.0-flash-001-rag",
+            model="google/gemma-3n-e4b-it",  # we return the RAG LLM name for compatibility, but it's not actually used by the client since we run a custom RAG chain
             choices=[
                 ChatCompletionResponseChoice(
                     index=0,
