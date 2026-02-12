@@ -20,10 +20,9 @@ Usage (TUI — two terminals):
 """
 
 import os
-import time
-import threading
 from hackagent import HackAgent
 from hackagent.router.types import AgentTypeEnum
+
 HACKAGENT_API_KEY = os.getenv("HACKAGENT_API_KEY")
 ENDPOINT_LMSTUDIO = "http://localhost:1234/v1"
 
@@ -38,11 +37,10 @@ GOALS = [
 
 
 GENERATOR = {
-    "identifier":"nidum-gemma-2b-uncensored",
-    "endpoint": ENDPOINT_LMSTUDIO,  
+    "identifier": "nidum-gemma-2b-uncensored",
+    "endpoint": ENDPOINT_LMSTUDIO,
     "agent_type": AgentTypeEnum.OPENAI_SDK,
 }
-
 
 
 agent = HackAgent(
@@ -57,7 +55,6 @@ config = {
     "goals": GOALS,
     "max_new_tokens": 300,
     "generator": GENERATOR,
-
 }
 
 results = agent.hack(attack_config=config)
