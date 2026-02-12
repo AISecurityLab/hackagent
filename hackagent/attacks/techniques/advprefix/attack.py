@@ -200,12 +200,11 @@ class AdvPrefixAttack(BaseAttack):
             },
             {
                 "name": "Evaluation: Judge, Aggregate, and Select Best Prefixes",
-                "function": lambda input_data,
-                config,
-                logger,
-                client: EvaluationPipeline(
-                    config=config, logger=logger, client=client
-                ).execute(input_data=input_data),
+                "function": lambda input_data, config, logger, client: (
+                    EvaluationPipeline(
+                        config=config, logger=logger, client=client
+                    ).execute(input_data=input_data)
+                ),
                 "step_type_enum": "EVALUATION",
                 "config_keys": [
                     "judges",
