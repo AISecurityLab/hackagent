@@ -2761,7 +2761,7 @@ wheels = [
 
 [[package]]
 name = "openapi-python-client"
-version = "0.28.1"
+version = "0.28.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "attrs" },
@@ -2775,9 +2775,9 @@ dependencies = [
     { name = "shellingham" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ff/6f/8267f10fd571c1473a32bfccb3a940494c1aa612878df662609612feaa20/openapi_python_client-0.28.1.tar.gz", hash = "sha256:f11afc63c33c0e0b19beff9a1424026f0738815063c2c8e773e1f71dc10d692c", size = 125947, upload-time = "2026-01-10T23:19:42.568Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/60/78/3ecdf2a6fc49cabb09c75c20df2cfa8756d360409093f7f9f8ee5c23984d/openapi_python_client-0.28.2.tar.gz", hash = "sha256:3699a7138fae3d89ce7f27922a985562e88fe790171db5626bfc7b4ae4cd4c31", size = 125955, upload-time = "2026-02-12T01:22:51.583Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8c/e2/1cdfbc19c6917b1a878e5270a221904290113d0fce0df3599edd79d77906/openapi_python_client-0.28.1-py3-none-any.whl", hash = "sha256:9cf2f139f3c718f376f6a6981ed8ae37671f0fb2dd0f1d9504b2f583af1f82f9", size = 183195, upload-time = "2026-01-10T23:19:40.618Z" },
+    { url = "https://files.pythonhosted.org/packages/df/1b/10f47043498f16c4f6a0492d2d309c2b42599f6cd7440adab7e88b1c0d3a/openapi_python_client-0.28.2-py3-none-any.whl", hash = "sha256:0b6b84114af49ca672a57ae4421db9b2b09f55304a525731b91cf9d80e9313e5", size = 183194, upload-time = "2026-02-12T01:22:49.629Z" },
 ]
 
 [[package]]
