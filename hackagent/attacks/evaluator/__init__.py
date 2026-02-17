@@ -51,6 +51,7 @@ Usage:
 """
 
 from hackagent.attacks.evaluator.base import AssertionResult, BaseJudgeEvaluator
+from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
 from hackagent.attacks.evaluator.judge_evaluators import (
     EVALUATOR_MAP,
     HarmBenchEvaluator,
@@ -78,6 +79,7 @@ __all__ = [
     # Base
     "AssertionResult",
     "BaseJudgeEvaluator",
+    "BaseEvaluationStep",
     # Judge evaluators
     "NuancedEvaluator",
     "JailbreakBenchEvaluator",
