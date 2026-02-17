@@ -142,12 +142,14 @@ class HackAgent:
                 AdvPrefixOrchestrator,
                 BaselineOrchestrator,
                 PAIROrchestrator,
+                FlipAttackOrchestrator,
             )
 
             self._attack_strategies = {
                 "advprefix": AdvPrefixOrchestrator(hack_agent=self),
                 "baseline": BaselineOrchestrator(hack_agent=self),
                 "pair": PAIROrchestrator(hack_agent=self),
+                "flipattack": FlipAttackOrchestrator(hack_agent=self),
             }
         return self._attack_strategies
 
