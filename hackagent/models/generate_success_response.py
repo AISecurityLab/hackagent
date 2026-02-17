@@ -1,14 +1,14 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
-
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
 if TYPE_CHECKING:
     from ..models.choice import Choice
     from ..models.usage import Usage
-
-
 T = TypeVar("T", bound="GenerateSuccessResponse")
 
 

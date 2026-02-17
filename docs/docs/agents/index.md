@@ -91,7 +91,7 @@ agent.hack(attack_config=attack_config)
   </TabItem>
 </Tabs>
 
-👉 [Full Ollama Documentation](/agents/ollama)
+[Full Ollama Documentation](/agents/ollama)
 
   </TabItem>
   <TabItem value="openai" label={<span><img src="https://openai.com/favicon.ico" alt="OpenAI" style={{height: '24px', marginRight: '8px', verticalAlign: 'middle'}} />OpenAI SDK</span>}>
@@ -168,7 +168,7 @@ agent.hack(attack_config=attack_config)
   </TabItem>
 </Tabs>
 
-👉 [Full OpenAI SDK Documentation](/agents/openai-sdk)
+[Full OpenAI SDK Documentation](/agents/openai-sdk)
 
   </TabItem>
   <TabItem value="google-adk" label={<span><img src="https://google.github.io/adk-docs/assets/agent-development-kit.png" alt="Google ADK" style={{height: '24px', marginRight: '8px', verticalAlign: 'middle'}} />Google ADK</span>}>
@@ -249,7 +249,7 @@ agent.hack(attack_config=attack_config)
   </TabItem>
 </Tabs>
 
-👉 [Full Google ADK Documentation](/agents/google-adk)
+[Full Google ADK Documentation](/agents/google-adk)
 
   </TabItem>
 </Tabs>

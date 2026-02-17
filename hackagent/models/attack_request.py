@@ -1,7 +1,9 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from collections.abc import Mapping
 from typing import Any, TypeVar
 from uuid import UUID
-
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
@@ -11,7 +13,6 @@ T = TypeVar("T", bound="AttackRequest")
 @_attrs_define
 class AttackRequest:
     """Serializer for the Attack model, which represents an Attack configuration.
-
     Handles the conversion of Attack configuration instances to JSON (and vice-versa)
     for API requests and responses. It includes read-only fields for related
     object names (like agent_name, owner_username) for convenience in API outputs.

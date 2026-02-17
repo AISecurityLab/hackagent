@@ -54,10 +54,8 @@
           "type": "category"
         },
         {
-          "items": [
-            "reference/hackagent/vulnerabilities/prompts"
-          ],
-          "label": "hackagent.vulnerabilities",
+          "items": [],
+          "label": "hackagent.risks",
           "type": "category"
         },
         "reference/hackagent/agent",

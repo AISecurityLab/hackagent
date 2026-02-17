@@ -1,16 +1,5 @@
-# Copyright 2025 - AI4I. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 """Tests for HackAgent class (hackagent/agent.py)."""
 
@@ -38,7 +27,6 @@ class TestHackAgentInitialization(unittest.TestCase):
         )
 
         self.assertIsNotNone(agent.client)
-        self.assertIsNotNone(agent.prompts)
         self.assertIsNotNone(agent.router)
         mock_router.assert_called_once()
 
@@ -70,23 +58,6 @@ class TestHackAgentInitialization(unittest.TestCase):
         )
 
         self.assertEqual(agent.client._base_url, "https://custom.api.com")
-
-    @patch("hackagent.agent.AgentRouter")
-    @patch("hackagent.agent.utils.resolve_api_token", return_value="test-token")
-    @patch("hackagent.agent.utils.resolve_agent_type")
-    def test_prompts_are_copy(self, mock_resolve_type, mock_resolve_token, mock_router):
-        """Test prompts are a copy of DEFAULT_PROMPTS."""
-        from hackagent.agent import HackAgent
-        from hackagent.vulnerabilities.prompts import DEFAULT_PROMPTS
-
-        agent = HackAgent(
-            endpoint="http://localhost:8000",
-            api_key="test-key",
-        )
-
-        # Should be equal but not the same object
-        self.assertEqual(agent.prompts, DEFAULT_PROMPTS)
-        self.assertIsNot(agent.prompts, DEFAULT_PROMPTS)
 
     @patch("hackagent.agent.AgentRouter")
     @patch("hackagent.agent.utils.resolve_api_token", return_value="test-token")

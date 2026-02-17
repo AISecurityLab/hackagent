@@ -1,9 +1,10 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from http import HTTPStatus
 from typing import Any, Optional, Union
 from uuid import UUID
-
 import httpx
-
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.patched_prompt_request import PatchedPromptRequest

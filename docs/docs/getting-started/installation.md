@@ -52,10 +52,10 @@ hackagent init
 ```
 
 This will guide you through:
-1. 🔑 **Enter your API key** — Get yours at [app.hackagent.dev](https://app.hackagent.dev)
-2. 📊 **Set output format** — Choose between `table`, `json`, or `csv`
-3. 🔊 **Set verbosity level** — Control logging detail (0=ERROR to 3=DEBUG)
-4. 💾 **Save configuration** — Stored securely for future use
+1. **Enter your API key** — Get yours at [app.hackagent.dev](https://app.hackagent.dev)
+2. **Set output format** — Choose between `table`, `json`, or `csv`
+3. **Set verbosity level** — Control logging detail (0=ERROR to 3=DEBUG)
+4. **Save configuration** — Stored securely for future use
 
 ## Development Installation
 

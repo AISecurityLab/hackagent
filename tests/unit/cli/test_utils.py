@@ -1,3 +1,6 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Unit tests for CLI utilities and helper functions.
 """
@@ -6,10 +9,8 @@ import json
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
-
 import pytest
 from rich.console import Console
-
 from hackagent.cli.utils import (
     console,
     display_error,

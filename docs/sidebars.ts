@@ -1,7 +1,4 @@
 import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
-
-// This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
-
 /**
  * Creating a sidebar allows you to:
  - create an ordered group of docs
@@ -18,7 +15,8 @@ const sidebars: SidebarsConfig = {
     'introduction',
     {
       type: 'category',
-      label: '🚀 Getting Started',
+      label: 'Getting Started',
+      className: 'sidebar-icon sidebar-icon-rocket',
       items: [
         'getting-started/installation',
         'getting-started/quick-start',
@@ -28,7 +26,8 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
-      label: '⚔️ Attacks',
+      label: 'Attacks',
+      className: 'sidebar-icon sidebar-icon-sword',
       link: {
         type: 'doc',
         id: 'attacks/index',
@@ -41,7 +40,8 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
-      label: '📊 Datasets',
+      label: 'Datasets',
+      className: 'sidebar-icon sidebar-icon-database',
       link: {
         type: 'doc',
         id: 'datasets/index',
@@ -55,7 +55,8 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
-      label: '🤖 Agents',
+      label: 'Agents',
+      className: 'sidebar-icon sidebar-icon-cpu',
       link: {
         type: 'doc',
         id: 'agents/index',
@@ -80,7 +81,40 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
-      label: '🖥️ CLI Reference',
+      label: 'Risks & Evaluation',
+      className: 'sidebar-icon sidebar-icon-shield-alert',
+      link: {
+        type: 'doc',
+        id: 'risks/index',
+      },
+      items: [
+        {
+          type: 'category',
+          label: 'Categories',
+          link: {
+            type: 'doc',
+            id: 'risks/categories/index',
+          },
+          items: [
+            'risks/categories/cybersecurity',
+            'risks/categories/data-privacy',
+            'risks/categories/fairness',
+            'risks/categories/trustworthiness',
+            'risks/categories/safety',
+            'risks/categories/transparency',
+            'risks/categories/third-party',
+          ],
+        },
+        'risks/vulnerabilities',
+        'risks/threat-profiles',
+        'risks/evaluation-campaigns',
+        'risks/custom-vulnerabilities',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'CLI Reference',
+      className: 'sidebar-icon sidebar-icon-terminal',
       items: [
         'cli/overview',
         'cli/initialization',
@@ -91,7 +125,8 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
-      label: ' API Reference',
+      label: 'API Reference',
+      className: 'sidebar-icon sidebar-icon-code',
       link: {
         type: 'doc',
         id: 'api-index',
@@ -111,16 +146,19 @@ const sidebars: SidebarsConfig = {
         },
         {
           type: 'category',
-          label: 'Vulnerabilities',
-          items: [
-            'hackagent/vulnerabilities/prompts',
-          ],
+          label: 'Risks',
+          link: {
+            type: 'doc',
+            id: 'risks/index',
+          },
+          items: [],
         },
       ],
     },
     {
       type: 'category',
-      label: '🔐 Security & Ethics',
+      label: 'Security & Ethics',
+      className: 'sidebar-icon sidebar-icon-lock',
       items: [
         'security/responsible-disclosure',
         'security/ethical-guidelines',
@@ -128,7 +166,8 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
-      label: '🛠️ Advanced Usage',
+      label: 'Advanced Usage',
+      className: 'sidebar-icon sidebar-icon-settings',
       items: [
         'tutorial-extras/manage-docs-versions',
       ],

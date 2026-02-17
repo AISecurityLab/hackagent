@@ -6,7 +6,7 @@ sidebar_position: 4
 
 Baseline attacks use **predefined prompt templates** combined with harmful goals to attempt jailbreaks. While simpler than optimization-based approaches like AdvPrefix or adaptive methods like PAIR, baseline attacks are fast and effective for testing basic prompt injection defenses.
 
-## 🎯 Overview
+## Overview
 
 Baseline attacks work by combining known jailbreak templates with your test objectives. This approach is useful for:
 
@@ -24,7 +24,7 @@ Baseline attacks work by combining known jailbreak templates with your test obje
 
 ---
 
-## 🔄 How Baseline Attacks Work
+## How Baseline Attacks Work
 
 ```mermaid
 graph TD
@@ -52,7 +52,7 @@ graph TD
 
 ---
 
-## 🚀 Basic Usage
+## Basic Usage
 
 ### Simple Configuration
 
@@ -95,11 +95,11 @@ hackagent attack baseline \
 
 ---
 
-## 📚 Template Categories
+## Template Categories
 
 Baseline attacks include several categories of prompt templates:
 
-### 🎭 Roleplay
+### Roleplay
 
 Attempts to make the model assume a different persona that isn't bound by safety rules.
 
@@ -111,7 +111,7 @@ Attempts to make the model assume a different persona that isn't bound by safety
 
 **Effectiveness**: Works against models with weak persona separation
 
-### 🔐 Encoding
+### Encoding
 
 Uses encoding schemes to obfuscate harmful requests.
 
@@ -123,7 +123,7 @@ Uses encoding schemes to obfuscate harmful requests.
 
 **Effectiveness**: Tests if safety filters work on encoded content
 
-### 🔄 Context Switch
+### Context Switch
 
 Attempts to break out of the current context or conversation frame.
 
@@ -135,7 +135,7 @@ Attempts to break out of the current context or conversation frame.
 
 **Effectiveness**: Tests prompt injection resistance
 
-### 📝 Instruction Override
+### Instruction Override
 
 Direct attempts to override or contradict system instructions.
 
@@ -147,7 +147,7 @@ Direct attempts to override or contradict system instructions.
 
 **Effectiveness**: Tests instruction hierarchy robustness
 
-### 🎪 Hypothetical
+### Hypothetical
 
 Frames harmful requests as hypothetical or fictional scenarios.
 
@@ -161,7 +161,7 @@ Frames harmful requests as hypothetical or fictional scenarios.
 
 ---
 
-## 🎛️ Advanced Configuration
+## Advanced Configuration
 
 ### Full Configuration Options
 
@@ -213,7 +213,7 @@ advanced_config = {
 
 ---
 
-## 🛠️ Custom Templates
+## Custom Templates
 
 ### Adding Custom Templates
 
@@ -247,7 +247,7 @@ config = {
 
 ---
 
-## 📊 Evaluation & Results
+## Evaluation & Results
 
 ### Objective-Based Scoring
 
@@ -290,7 +290,7 @@ Baseline attacks evaluate responses using predefined objectives:
 
 ---
 
-## 🎯 Use Cases
+## Use Cases
 
 ### 1. Quick Security Scan
 
@@ -343,7 +343,7 @@ for model in models:
 
 ---
 
-## 📈 Interpreting Results
+## Interpreting Results
 
 ### Success Rate Analysis
 
@@ -369,7 +369,7 @@ category_success = {
 
 ---
 
-## 💡 Best Practices
+## Best Practices
 
 1. **Run baseline first**: Use as initial scan before advanced attacks
 2. **Track template effectiveness**: Build knowledge of what works
@@ -379,7 +379,7 @@ category_success = {
 
 ---
 
-## ⚠️ Limitations
+## Limitations
 
 1. **Static patterns**: No adaptation based on responses
 2. **Known techniques**: Only tests documented attack patterns
@@ -390,7 +390,7 @@ For more sophisticated testing, consider [AdvPrefix](./advprefix-attacks) or [PA
 
 ---
 
-## 🔗 Related
+## Related
 
 - [Attack Overview](./index.md) — Compare all attack types
 - [AdvPrefix Attacks](./advprefix-attacks) — Sophisticated prefix optimization

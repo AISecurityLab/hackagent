@@ -1,8 +1,10 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 #!/usr/bin/env python3
 # NOTE: This file is generated for docs tooling.
 """
 HackAgent Documentation Generator
-
 Generates API documentation from PyPI versions using uv and pydoc-markdown.
 """
 
@@ -102,7 +104,6 @@ def create_pydoc_config(output_dir):
               - hackagent.attacks.techniques.baseline.config
               - hackagent.attacks.techniques.baseline.evaluation
               - hackagent.attacks.techniques.baseline.generation
-              - hackagent.vulnerabilities.prompts
 
         processors:
           - type: filter

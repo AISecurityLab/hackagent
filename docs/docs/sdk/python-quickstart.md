@@ -30,7 +30,7 @@ For the interactive HTTP API documentation, visit: **[https://api.hackagent.dev/
 from hackagent import HackAgent, AgentTypeEnum
 ```
 
-## 🎯 Basic Usage
+## Basic Usage
 
 ### Your First Security Test
 
@@ -107,7 +107,7 @@ def test_adk_attack_scenario():
     agent.hack(attack_config=attack_config)
 ```
 
-## 🔧 Agent Configuration
+## Agent Configuration
 
 ### Supported Agent Types
 
@@ -163,7 +163,7 @@ agent = HackAgent(
 )
 ```
 
-## ⚔️ Attack Types & Configurations
+## Attack Types & Configurations
 
 ### AdvPrefix Attack (Primary Implementation)
 
@@ -255,7 +255,7 @@ DEFAULT_CONFIG = {
 }
 ```
 
-## 🛠️ Error Handling
+## Error Handling
 
 ### Exception Hierarchy
 
@@ -295,7 +295,7 @@ logging.getLogger('hackagent').setLevel(logging.DEBUG)
 # The SDK automatically configures Rich handlers for beautiful output
 ```
 
-## 🔄 Advanced Usage
+## Advanced Usage
 
 ### Custom Run Configuration
 
@@ -353,7 +353,7 @@ results = agent.hack(attack_config=attack_config)
 # Access your results at https://app.hackagent.dev
 ```
 
-## 🧪 Development Setup
+## Development Setup
 
 ### Running Tests
 
@@ -386,7 +386,7 @@ poetry run ruff check .
 mypy hackagent/
 ```
 
-## 📚 SDK Architecture
+## SDK Architecture
 
 ### Core Components
 
@@ -404,7 +404,7 @@ mypy hackagent/
 4. `AttackStrategy` executes multi-step attack process
 5. Results automatically uploaded to platform
 
-## 🔄 Next Steps
+## Next Steps
 
 Explore these advanced topics:
 
@@ -413,7 +413,7 @@ Explore these advanced topics:
 3. **[Attack Tutorial](../getting-started/attack-tutorial.md)** - Getting started with attacks
 4. **[Security Guidelines](../security/responsible-disclosure.md)** - Responsible disclosure and ethics
 
-## 📞 Support
+## Support
 
 - **GitHub Issues**: [Report bugs and request features](https://github.com/AISecurityLab/hackagent/issues)
 - **Documentation**: [Complete documentation](https://docs.hackagent.dev)

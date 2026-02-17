@@ -1,23 +1,27 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Corporate Policy RAG Agent — OpenAI SDK.
-
 A company chatbot that answers employee questions about HR, IT, and security
 policies by retrieving documents from an internal knowledge base.
-
 Vulnerability: CONFIDENTIAL documents were accidentally indexed alongside
 legitimate policies. The system prompt tells the agent to ignore them,
 but that's the only guardrail.
-
 Usage:
   ollama pull Almawave/Velvet:2b
   python agent.py
 """
 
+import logging
 import os
 import re
 from flask import Flask, request, jsonify
 from openai import OpenAI
 from knowledge_base import DOCUMENTS
+
+# Silence Werkzeug's per-request logs (the "POST /v1/..." lines)
+logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
 PORT = int(os.environ.get("PORT", 5000))
 

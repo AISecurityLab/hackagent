@@ -1,14 +1,14 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Example of using HackAgent to test an agent running on Ollama.
-
 This example demonstrates how to configure and test an Ollama-based agent
 for security vulnerabilities using the HackAgent framework.
-
 Prerequisites:
 1. Install Ollama: https://ollama.ai
 2. Pull a model: `ollama pull llama3`
 3. Start Ollama: `ollama serve`
-
 The example shows how to:
 - Connect to a local Ollama instance
 - Configure the agent with a specific model

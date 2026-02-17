@@ -25,10 +25,6 @@ attack methodologies.
 **Attributes**:
 
 - `client` - An `AuthenticatedClient` instance for API communication.
-- `prompts` - A dictionary of default prompts. This dictionary is a copy of
-  `DEFAULT_PROMPTS` and can be modified after instantiation if needed,
-  though the primary mechanism for custom prompts is usually via attack
-  configurations.
 - `router` - An `AgentRouter` instance managing the agent&#x27;s representation
   in the HackAgent backend.
 - `attack_strategies` - A dictionary mapping strategy names to their

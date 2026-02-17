@@ -1,17 +1,16 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 import json
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
-
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
-
 from .. import types
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.message_request import MessageRequest
-
-
 T = TypeVar("T", bound="GenerateRequestRequest")
 
 

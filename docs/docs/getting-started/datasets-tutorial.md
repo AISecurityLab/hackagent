@@ -9,7 +9,7 @@ import TabItem from '@theme/TabItem';
 
 This tutorial introduces you to loading and using datasets with HackAgent. You'll learn how to leverage pre-built benchmarks, load custom datasets, and configure dataset options for your security tests.
 
-## 🎯 Prerequisites
+## Prerequisites
 
 Before starting, ensure you have:
 
@@ -17,7 +17,7 @@ Before starting, ensure you have:
 2. ✅ **Configuration complete**: Run `hackagent init` to set up your API key
 3. ✅ **Target agent running**: An AI agent accessible via HTTP endpoint
 
-## 🚀 Why Use Datasets?
+## Why Use Datasets?
 
 Instead of manually writing attack goals, datasets allow you to:
 
@@ -28,7 +28,7 @@ Instead of manually writing attack goals, datasets allow you to:
 
 ---
 
-## 1️⃣ Using Presets (Easiest)
+## 1. Using Presets (Easiest)
 
 Presets are ready-to-use configurations for popular AI safety benchmarks.
 
@@ -88,7 +88,7 @@ hackagent attack baseline \
 
 ---
 
-## 2️⃣ Loading from HuggingFace
+## 2. Loading from HuggingFace
 
 Load any dataset directly from the HuggingFace Hub:
 
@@ -155,7 +155,7 @@ hackagent attack advprefix \
 
 ---
 
-## 3️⃣ Loading from Local Files
+## 3. Loading from Local Files
 
 Load goals from local JSON, JSONL, CSV, or TXT files:
 
@@ -231,7 +231,7 @@ attack_config = {
 
 ---
 
-## 4️⃣ Dataset Options
+## 4. Dataset Options
 
 All dataset providers support these common options:
 
@@ -258,7 +258,7 @@ attack_config = {
 
 ---
 
-## 5️⃣ Combining Datasets with Attacks
+## 5. Combining Datasets with Attacks
 
 Here's a complete example combining datasets with different attack types:
 
@@ -306,7 +306,7 @@ advprefix_results = agent.hack(attack_config={
 
 ---
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### Dataset not loading?
 

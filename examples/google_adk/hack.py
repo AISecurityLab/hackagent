@@ -1,11 +1,12 @@
-from hackagent import HackAgent
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
+from hackagent import HackAgent
 
 # Initialize HackAgent
 agent = HackAgent(
     name="multi_tool_agent", endpoint="http://localhost:8000", agent_type="google-adk"
 )
-
 # Configure attack
 attack_config = {
     "attack_type": "advprefix",
