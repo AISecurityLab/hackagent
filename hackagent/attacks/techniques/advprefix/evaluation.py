@@ -23,56 +23,20 @@ The module provides functionality for:
 
 import logging
 from collections import defaultdict
-from dataclasses import fields
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
-from uuid import UUID
+from typing import Any, Dict, List
 
-from hackagent.api.result import result_partial_update
-from hackagent.attacks.evaluator import (
-    HarmBenchEvaluator,
-    JailbreakBenchEvaluator,
-    NuancedEvaluator,
+from hackagent.attacks.evaluator.evaluation_step import (
+    BaseEvaluationStep,
+    JUDGE_MEAN_COLUMN_MAP,
 )
 from hackagent.client import AuthenticatedClient
-from hackagent.models import EvaluationStatusEnum, PatchedResultRequest
-from hackagent.router.types import AgentTypeEnum
 
-if TYPE_CHECKING:
-    from hackagent.router.tracking import Tracker
-
-from .config import EvaluationPipelineConfig, EvaluatorConfig
+from .config import EvaluationPipelineConfig
 from .utils import handle_empty_input, log_errors
 
 # ============================================================================
-# CONSTANTS AND MAPPINGS
+# CONSTANTS (technique-specific; shared ones live in BaseEvaluationStep)
 # ============================================================================
-
-EVALUATOR_MAP = {
-    "nuanced": NuancedEvaluator,
-    "jailbreakbench": JailbreakBenchEvaluator,
-    "harmbench": HarmBenchEvaluator,
-}
-
-MERGE_KEYS = ["goal", "prefix", "completion"]
-
-JUDGE_COLUMN_MAP = {
-    "nuanced": ["eval_nj", "explanation_nj"],
-    "jailbreakbench": ["eval_jb", "explanation_jb"],
-    "harmbench": ["eval_hb", "explanation_hb"],
-}
-
-JUDGE_AGG_COLUMN_MAP = {
-    "nuanced": "eval_nj",
-    "jailbreakbench": "eval_jb",
-    "harmbench": "eval_hb",
-}
-
-JUDGE_MEAN_COLUMN_MAP = {
-    "nuanced": "eval_nj_mean",
-    "jailbreakbench": "eval_jb_mean",
-    "harmbench": "eval_hb_mean",
-    "strongreject": "eval_sj_binary_mean",
-}
 
 GROUP_KEYS = ["goal", "prefix"]
 
@@ -82,27 +46,18 @@ GROUP_KEYS = ["goal", "prefix"]
 # ============================================================================
 
 
-class EvaluationPipeline:
+class EvaluationPipeline(BaseEvaluationStep):
     """
-    Unified pipeline for the Evaluation stage of AdvPrefix attacks.
+    Evaluation pipeline for the AdvPrefix attack.
 
-    This class encapsulates all functionality related to evaluating completions,
-    aggregating results, and selecting optimal prefixes, providing a clean interface
-    with proper state management and comprehensive tracking capabilities.
+    Extends ``BaseEvaluationStep`` (multi-judge evaluation, merge, sync)
+    and adds AdvPrefix-specific aggregation and selection stages.
 
     Architecture:
-        - Initialization: Sets up config, logger, client, and internal state
-        - Judge Evaluation: Run judge models on completions
+        - Judge Evaluation (inherited): Run judge models on completions
         - Aggregation: Aggregate evaluation results by goal/prefix
         - Selection: Select best prefixes using multi-criteria optimization
         - Orchestration: execute() method coordinates the full pipeline
-
-    Key Benefits:
-        - Single source of truth for configuration
-        - Consistent logging throughout all operations
-        - Easy to test individual components via method mocking
-        - Clear method boundaries with single responsibilities
-        - Stateful execution tracking for debugging
 
     Example:
         pipeline = EvaluationPipeline(
@@ -119,48 +74,22 @@ class EvaluationPipeline:
         logger: logging.Logger,
         client: AuthenticatedClient,
     ):
-        """
-        Initialize the pipeline with configuration and dependencies.
+        super().__init__(config, logger, client)
 
-        Args:
-            config: Configuration dictionary or EvaluationPipelineConfig instance
-            logger: Logger for tracking execution
-            client: Authenticated client for API access
-        """
-        # Extract tracking context BEFORE converting to dataclass (which filters unknown fields)
-        self._run_id: Optional[str] = (
-            config.get("_run_id") if isinstance(config, dict) else None
-        )
-        self._tracking_client = (
-            config.get("_client") if isinstance(config, dict) else None
-        )
-        # Extract tracker for per-goal result tracking
-        self._tracker: Optional["Tracker"] = (
-            config.get("_tracker") if isinstance(config, dict) else None
-        )
-
+        # Convert raw config dict to typed dataclass
         self.config = (
             EvaluationPipelineConfig.from_dict(config)
             if isinstance(config, dict)
             else config
         )
-        # Use provided logger, but ensure it's child of hackagent.attacks hierarchy
-        self.logger = (
-            logger
-            if logger.name.startswith("hackagent.attacks")
-            else logging.getLogger("hackagent.attacks.advprefix.evaluation")
-        )
-        self.client = client
 
-        # Initialize internal state for tracking
-        self._statistics: Dict[str, Any] = {
-            "input_count": 0,
-            "evaluated_count": 0,
-            "aggregated_count": 0,
-            "selected_count": 0,
-            "successful_judges": [],
-            "failed_judges": [],
-        }
+        # Extend statistics for aggregation/selection stages
+        self._statistics.update(
+            {
+                "aggregated_count": 0,
+                "selected_count": 0,
+            }
+        )
 
         self.logger.info("EvaluationPipeline initialized")
 
@@ -200,11 +129,15 @@ class EvaluationPipeline:
 
         self._statistics["input_count"] = len(input_data)
 
-        # Judge Evaluation
+        # Judge Evaluation (via inherited multi-judge pipeline)
         self.logger.info(
             f"Judge Evaluation: Starting evaluation for {len(input_data)} completions"
         )
-        evaluated_data = self._run_evaluation(input_data)
+        judges_config = self.config.judges
+        base_eval_config = self._build_base_eval_config()
+        evaluated_data = self._run_evaluation(
+            input_data, judges_config, base_eval_config
+        )
         self._statistics["evaluated_count"] = len(evaluated_data)
 
         if not evaluated_data:
@@ -212,7 +145,8 @@ class EvaluationPipeline:
             return []
 
         # Sync evaluation results to server
-        self._sync_evaluation_to_server(evaluated_data)
+        judge_keys = self._build_judge_keys_from_data(evaluated_data)
+        self._sync_to_server(evaluated_data, judge_keys)
 
         # Aggregation
         self.logger.info(
@@ -234,363 +168,6 @@ class EvaluationPipeline:
 
         self._log_pipeline_statistics()
         return selected_data
-
-    def get_statistics(self) -> Dict[str, Any]:
-        """Return execution statistics for monitoring and debugging."""
-        return self._statistics.copy()
-
-    def _sync_evaluation_to_server(self, evaluated_data: List[Dict]) -> int:
-        """
-        Sync evaluation results to the server by updating each result's status.
-
-        This method iterates through evaluated data and updates the server-side
-        Result records with the evaluation outcome (SUCCESSFUL_JAILBREAK or
-        FAILED_JAILBREAK) based on judge evaluation scores.
-
-        Args:
-            evaluated_data: List of dicts with evaluation results including result_id key
-
-        Returns:
-            Number of results successfully updated
-        """
-        self.logger.info(f"🔄 Starting evaluation sync for {len(evaluated_data)} rows")
-
-        client = self._tracking_client
-        if not client:
-            self.logger.warning(
-                "❌ No tracking client available - cannot sync evaluation to server"
-            )
-            return 0
-
-        # Check if any row has result_id
-        result_ids_found = [
-            row.get("result_id") for row in evaluated_data if row.get("result_id")
-        ]
-        self.logger.info(
-            f"📋 Found {len(result_ids_found)} rows with result_id out of {len(evaluated_data)} total"
-        )
-
-        if not result_ids_found:
-            self.logger.warning("❌ No result_id in data - cannot sync to server")
-            return 0
-
-        updated_count = 0
-
-        # Aggregate the best evaluation per result_id to avoid last-wins overwrites.
-        # Multiple completion rows share the same result_id (one per goal).
-        best_per_result: Dict[str, Dict] = {}
-        for row in evaluated_data:
-            result_id = row.get("result_id")
-            if not result_id:
-                continue
-
-            # Determine success for this row
-            success = False
-            eval_notes_parts = []
-
-            if "eval_jb" in row:
-                success = success or (row["eval_jb"] == 1)
-                eval_notes_parts.append(f"JailbreakBench: {row['eval_jb']}")
-                if "explanation_jb" in row:
-                    eval_notes_parts.append(f"JB explanation: {row['explanation_jb']}")
-
-            if "eval_hb" in row:
-                success = success or (row["eval_hb"] == 1)
-                eval_notes_parts.append(f"HarmBench: {row['eval_hb']}")
-                if "explanation_hb" in row:
-                    eval_notes_parts.append(f"HB explanation: {row['explanation_hb']}")
-
-            if "eval_nj" in row:
-                success = success or (row["eval_nj"] == 1)
-                eval_notes_parts.append(f"Nuanced: {row['eval_nj']}")
-                if "explanation_nj" in row:
-                    eval_notes_parts.append(f"NJ explanation: {row['explanation_nj']}")
-
-            evaluation_notes = (
-                " | ".join(eval_notes_parts)
-                if eval_notes_parts
-                else "No evaluation scores available"
-            )
-
-            # Keep the best (success wins over failure) per result_id
-            existing = best_per_result.get(result_id)
-            if existing is None or (success and not existing["success"]):
-                best_per_result[result_id] = {
-                    "success": success,
-                    "evaluation_notes": evaluation_notes,
-                }
-
-        # Now do one PATCH per result_id
-        for result_id, info in best_per_result.items():
-            try:
-                if info["success"]:
-                    eval_status = EvaluationStatusEnum.SUCCESSFUL_JAILBREAK
-                else:
-                    eval_status = EvaluationStatusEnum.FAILED_JAILBREAK
-
-                result_request = PatchedResultRequest(
-                    evaluation_status=eval_status,
-                    evaluation_notes=info["evaluation_notes"],
-                )
-
-                response = result_partial_update.sync_detailed(
-                    client=client,
-                    id=UUID(result_id) if isinstance(result_id, str) else result_id,
-                    body=result_request,
-                )
-
-                if response.status_code < 300:
-                    self.logger.info(
-                        f"✅ Updated result {result_id} to {eval_status.value}"
-                    )
-                    updated_count += 1
-                else:
-                    self.logger.warning(
-                        f"❌ Failed to update result {result_id}: status={response.status_code}, content={getattr(response, 'content', 'N/A')}"
-                    )
-
-            except Exception as e:
-                self.logger.error(f"Exception updating result {result_id}: {e}")
-
-        self.logger.info(
-            f"Synced {updated_count}/{len(best_per_result)} evaluation results to server"
-        )
-        return updated_count
-
-    # ========================================================================
-    # JUDGE EVALUATION METHODS
-    # ========================================================================
-
-    def _run_evaluation(self, input_data: List[Dict]) -> List[Dict]:
-        """
-        Execute judge evaluation: Evaluate completions using judge models.
-
-        Handles:
-        - Judge configuration validation
-        - Sequential or parallel judge execution
-        - Result merging across judges
-        - Error handling for failed judges
-        """
-        judge_configs_list = self.config.judges
-        if not isinstance(judge_configs_list, list) or not judge_configs_list:
-            self.logger.warning("No judges configured, skipping evaluation")
-            return input_data
-
-        # Keep as list of dicts for evaluators
-        original_data = [row.copy() for row in input_data]
-
-        # Base config for evaluators
-        evaluator_base_config_dict = {
-            "batch_size": self.config.batch_size_judge,
-            "max_new_tokens_eval": self.config.max_new_tokens_eval,
-            "filter_len": self.config.filter_len,
-            "request_timeout": self.config.judge_request_timeout,
-            "temperature": self.config.judge_temperature,
-            "organization_id": self.config.organization_id,
-        }
-
-        judge_results = {}
-        judges_to_run = self._prepare_judge_configs(
-            judge_configs_list, evaluator_base_config_dict
-        )
-
-        if not judges_to_run:
-            self.logger.warning("No valid judges found after configuration processing")
-            return input_data
-
-        # Execute judges sequentially
-        for judge_type_str, subprocess_config in judges_to_run:
-            evaluated_data = self._run_single_evaluator(
-                judge_type=judge_type_str,
-                config=subprocess_config,
-                data=[row.copy() for row in original_data],
-            )
-
-            if evaluated_data is not None:
-                judge_results[judge_type_str] = evaluated_data
-                self._statistics["successful_judges"].append(judge_type_str)
-            else:
-                self._statistics["failed_judges"].append(judge_type_str)
-
-        # Merge results
-        final_data = self._merge_evaluation_results(original_data, judge_results)
-
-        return final_data
-
-    def _prepare_judge_configs(
-        self, judge_configs_list: List[Dict], base_config: Dict[str, Any]
-    ) -> List[tuple]:
-        """Prepare and validate judge configurations."""
-        judges_to_run = []
-
-        for judge_config_item in judge_configs_list:
-            if not isinstance(judge_config_item, dict):
-                self.logger.warning(
-                    f"Skipping invalid judge config: {judge_config_item}"
-                )
-                continue
-
-            # Extract judge type
-            judge_type_str = judge_config_item.get(
-                "evaluator_type"
-            ) or judge_config_item.get("type")
-            judge_identifier = judge_config_item.get("identifier")
-
-            if not judge_type_str:
-                judge_type_str = self._infer_judge_type(judge_identifier)
-
-            if not judge_type_str or judge_type_str not in EVALUATOR_MAP:
-                self.logger.warning(
-                    f"Unknown or missing judge type for: {judge_config_item}"
-                )
-                continue
-
-            if not judge_identifier:
-                self.logger.warning(
-                    f"Missing identifier for judge: {judge_config_item}"
-                )
-                continue
-
-            # Prepare subprocess config
-            subprocess_config = base_config.copy()
-            subprocess_config.update(judge_config_item)
-
-            # Populate EvaluatorConfig fields
-            subprocess_config["agent_name"] = (
-                judge_config_item.get("agent_name")
-                or f"judge-{judge_type_str}-{judge_identifier.replace('/', '-')[:20]}"
-            )
-            # Default to OPENAI_SDK to avoid Pydantic serialization warnings from LiteLLM
-            subprocess_config["agent_type"] = judge_config_item.get(
-                "agent_type", "OPENAI_SDK"
-            )
-            subprocess_config["model_id"] = judge_identifier
-            subprocess_config["agent_endpoint"] = judge_config_item.get("endpoint")
-            subprocess_config["agent_metadata"] = judge_config_item.get(
-                "agent_metadata", {}
-            )
-
-            judges_to_run.append((judge_type_str, subprocess_config))
-
-        return judges_to_run
-
-    def _infer_judge_type(self, identifier: Optional[str]) -> Optional[str]:
-        """Infer judge type from identifier string."""
-        if not identifier:
-            return None
-
-        identifier_lower = identifier.lower()
-        if "nuanced" in identifier_lower:
-            return "nuanced"
-        elif "harmbench" in identifier_lower:
-            return "harmbench"
-        elif "jailbreak" in identifier_lower:
-            return "jailbreakbench"
-
-        return None
-
-    def _run_single_evaluator(
-        self,
-        judge_type: str,
-        config: Dict[str, Any],
-        data: List[Dict],
-    ) -> Optional[List[Dict]]:
-        """Execute a single evaluator process."""
-        evaluator_class = EVALUATOR_MAP.get(judge_type)
-        if not evaluator_class:
-            self.logger.warning(f"Unknown judge type: {judge_type}")
-            return None
-
-        evaluator = None
-        try:
-            # Filter config for EvaluatorConfig
-            expected_fields = {f.name for f in fields(EvaluatorConfig)}
-            filtered_config = {k: v for k, v in config.items() if k in expected_fields}
-
-            # Convert agent_type string to enum
-            if "agent_type" in filtered_config and isinstance(
-                filtered_config["agent_type"], str
-            ):
-                try:
-                    filtered_config["agent_type"] = AgentTypeEnum(
-                        filtered_config["agent_type"].upper()
-                    )
-                except ValueError:
-                    self.logger.error(
-                        f"Invalid agent_type: {filtered_config['agent_type']}"
-                    )
-                    return None
-
-            evaluator_config = EvaluatorConfig(**filtered_config)
-            # Pass tracking context and tracker to the evaluator
-            evaluator = evaluator_class(
-                client=self.client,
-                config=evaluator_config,
-                run_id=self._run_id,
-                tracking_client=self._tracking_client,
-                tracker=self._tracker,
-            )
-            evaluated_data = evaluator.evaluate(data)
-
-            # Return only merge keys + judge-specific columns
-            eval_cols = JUDGE_COLUMN_MAP.get(judge_type, [])
-            if not evaluated_data:
-                return None
-
-            if not all(key in evaluated_data[0] for key in MERGE_KEYS):
-                self.logger.error(
-                    f"Evaluation result missing merge keys for {judge_type}"
-                )
-                return None
-
-            cols_to_return = set(MERGE_KEYS + [col for col in eval_cols])
-            return [
-                {k: v for k, v in row.items() if k in cols_to_return}
-                for row in evaluated_data
-            ]
-
-        except Exception as e:
-            self.logger.error(
-                f"Error running {judge_type} evaluator: {e}", exc_info=True
-            )
-            return None
-        finally:
-            del evaluator
-
-    def _merge_evaluation_results(
-        self, original_data: List[Dict], judge_results: Dict[str, List[Dict]]
-    ) -> List[Dict]:
-        """Merge evaluation results from multiple judges."""
-
-        def _normalize_key_value(key_name: str, value: Any) -> Any:
-            """Normalize key values for consistent matching.
-
-            The evaluator's prepare_responses() converts None to "" for string fields,
-            so we need to apply the same normalization when building lookup keys.
-            """
-            if key_name in ("goal", "prefix", "completion"):
-                return str(value) if value is not None else ""
-            return value
-
-        # Build lookup dictionaries keyed by merge keys
-        for judge_type, judge_data in judge_results.items():
-            eval_cols = JUDGE_COLUMN_MAP.get(judge_type, [])
-            if not judge_data:
-                continue
-
-            # Build lookup by merge keys (normalized)
-            lookup = {}
-            for row in judge_data:
-                key = tuple(_normalize_key_value(k, row.get(k)) for k in MERGE_KEYS)
-                lookup[key] = {col: row.get(col) for col in eval_cols if col in row}
-
-            # Merge into original data (using same normalization)
-            for row in original_data:
-                key = tuple(_normalize_key_value(k, row.get(k)) for k in MERGE_KEYS)
-                if key in lookup:
-                    row.update(lookup[key])
-
-        return original_data
 
     # ========================================================================
     # AGGREGATION METHODS
@@ -708,23 +285,6 @@ class EvaluationPipeline:
             self.logger.error(f"Error during NLL filtering: {e}")
             return data
 
-    def _get_available_judge_agg_cols(
-        self, data: List[Dict], config_judges: List[str]
-    ) -> Dict[str, str]:
-        """Identify available judge evaluation keys."""
-        available_judges_agg_cols = {}
-        sample_keys = set(data[0].keys()) if data else set()
-
-        for judge_type, col_name in JUDGE_AGG_COLUMN_MAP.items():
-            if col_name in sample_keys:
-                available_judges_agg_cols[judge_type] = col_name
-            elif judge_type in config_judges:
-                self.logger.warning(
-                    f"Expected key '{col_name}' for judge '{judge_type}' not found"
-                )
-
-        return available_judges_agg_cols
-
     # ========================================================================
     # SELECTION METHODS
     # ========================================================================
@@ -795,26 +355,6 @@ class EvaluationPipeline:
             selected_prefixes.extend(goal_selections)
 
         return selected_prefixes
-
-    def _calculate_combined_pasr(self, item: Dict, judge_types: List[str]) -> float:
-        """Calculate combined Pass@1 Success Rate across judges."""
-        judge_scores = []
-
-        for judge_type in judge_types:
-            key = JUDGE_MEAN_COLUMN_MAP[judge_type]
-            if key in item:
-                try:
-                    score = float(item[key]) if item[key] is not None else None
-                    if score is not None:
-                        judge_scores.append(score)
-                except (ValueError, TypeError) as e:
-                    self.logger.warning(f"Could not convert '{key}' to numeric: {e}")
-
-        if not judge_scores:
-            self.logger.warning("No valid judge scores for PASR calculation")
-            return 0.0
-
-        return sum(judge_scores) / len(judge_scores)
 
     def _select_prefixes_for_goal(self, group: List[Dict]) -> List[Dict]:
         """Select top prefixes for a single goal using multi-criteria optimization."""

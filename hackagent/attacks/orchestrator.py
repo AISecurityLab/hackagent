@@ -295,7 +295,7 @@ class AttackOrchestrator:
         """
         return {
             "config": {
-                **attack_config,
+                **attack_config,  ## Spread full attack config
                 **(run_config_override or {}),
                 "_run_id": run_id,  # Add run_id for result tracking
                 "_client": self.client,  # Add client for result tracking
