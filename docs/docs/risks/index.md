@@ -1,123 +1,189 @@
 ---
 sidebar_position: 1
+sidebar_label: Risks
 ---
 
-# AI Risk Assessment
+# AI Risks Assessment
 
-HackAgent includes a comprehensive **AI risk assessment framework** that maps 33 vulnerabilities across 7 risk macro areas to recommended datasets, attack techniques, and evaluation metrics. This enables structured, repeatable security evaluations grounded in real-world threat taxonomies.
+HackAgent provides a comprehensive AI security testing framework with vulnerability classes, threat profiles, and evaluation campaigns for systematically testing LLM and agent security.
 
-## Overview
+## Framework Architecture
 
-The risk framework is organized into two layers:
-
-- **Threats** — A vulnerability taxonomy of 33 concrete vulnerability classes grouped into 7 risk categories, based on established AI governance standards (NIST AI RMF, EU AI Act, OWASP LLM Top 10).
-- **Profiles** — Threat-to-evaluation mappings that link each vulnerability to the datasets, attacks, objectives, and metrics needed to run an evaluation campaign.
+<div style={{textAlign: 'center', margin: '2rem 0'}}>
 
 ```mermaid
-graph LR
-    subgraph "Risk Categories"
-        RC[7 Categories]
-    end
-    subgraph "Threats"
-        V[33 Vulnerabilities]
-    end
-    subgraph "Profiles"
-        D[Datasets]
-        A[Attacks]
-        M[Metrics]
-    end
-    RC --> V
-    V --> D
-    V --> A
-    V --> M
-    D --> E[Evaluation Campaign]
-    A --> E
-    M --> E
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#f5f5f5','primaryTextColor':'#333','primaryBorderColor':'#d1d5db','lineColor':'#6b7280'}}}%%
+flowchart LR
+    V["<b>Vulnerabilities</b><br/><small>13 classes with sub-types</small>"]
+    TP["<b>Threat Profiles</b><br/><small>Datasets • Attacks • Metrics</small>"]
+    EC["<b>Evaluation</b><br/><small>Campaigns & Testing</small>"]
+    R["<b>Results</b><br/><small>Reports & Analysis</small>"]
+
+    V ==> TP ==> EC ==> R
+
+    style V fill:#f9fafb,stroke:#9ca3af,stroke-width:2px,color:#1f2937,rx:10,ry:10
+    style TP fill:#f3f4f6,stroke:#9ca3af,stroke-width:2px,color:#1f2937,rx:10,ry:10
+    style EC fill:#e5e7eb,stroke:#9ca3af,stroke-width:2px,color:#1f2937,rx:10,ry:10
+    style R fill:#d1d5db,stroke:#9ca3af,stroke-width:2px,color:#1f2937,rx:10,ry:10
 ```
 
-## Risk Categories
+</div>
 
-HackAgent defines **7 risk categories** covering the full spectrum of AI safety concerns:
+## Vulnerabilities
 
-| Code | Category | Vulnerabilities | Description |
-|------|----------|:--------------:|-------------|
-| **CS** | [Cybersecurity](./categories/cybersecurity) | 15 | Prompt injection, jailbreak, infrastructure attacks |
-| **DP** | [Data Privacy](./categories/data-privacy) | 3 | PII leakage, data retention, data protection |
-| **F** | [Fairness](./categories/fairness) | 3 | Bias, fairness, toxicity |
-| **VAR** | [Trustworthiness](./categories/trustworthiness) | 4 | Hallucination, misinformation, robustness, excessive agency |
-| **S** | [Safety](./categories/safety) | 4 | Illegal activity, graphic content, personal safety |
-| **OT/EI** | [Transparency](./categories/transparency) | 2 | Transparency, explainability |
-| **TPM** | [Third-Party](./categories/third-party) | 2 | Intellectual property, competition |
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
-:::tip Quick Start
-Jump to [Building an Evaluation Campaign](./evaluation-campaigns) to learn how to combine vulnerabilities, datasets, and attacks into a complete security assessment.
-:::
+<Tabs>
+  <TabItem value="input" label="Input Layer" default>
 
-## Quick Example
+- **PromptInjection** — Override system prompts
+  *OWASP LLM01: Prompt Injection*
+
+- **Jailbreak** — Bypass safety filters
+  *OWASP LLM01: Prompt Injection*
+
+- **InputManipulationAttack** — Encoding bypasses
+  *OWASP LLM03: Training Data Poisoning*
+
+- **SystemPromptLeakage** — Extract system instructions
+  *OWASP LLM06: Sensitive Information Disclosure*
+
+</TabItem>
+  <TabItem value="model" label="Model Layer">
+
+- **ModelEvasion** — Adversarial examples
+  *MITRE ATLAS: AML.T0043 - Evade ML Model*
+
+- **CraftAdversarialData** — Data poisoning
+  *MITRE ATLAS: AML.T0018 - Backdoor ML Model*
+
+</TabItem>
+  <TabItem value="data" label="Data Layer">
+
+- **SensitiveInformationDisclosure** — Training data extraction
+  *OWASP LLM06: Sensitive Information Disclosure*
+
+- **Misinformation** — Factual errors
+  *OWASP LLM09: Misinformation*
+
+</TabItem>
+  <TabItem value="agent" label="Agent Layer">
+
+- **ExcessiveAgency** — Unauthorized autonomy
+  *OWASP LLM08: Excessive Agency*
+
+- **MaliciousToolInvocation** — Tool misuse
+  *OWASP LLM07: Insecure Plugin Design*
+
+- **CredentialExposure** — Credential leakage
+  *OWASP LLM06: Sensitive Information Disclosure*
+
+- **PublicFacingApplicationExploitation** — API abuse
+  *OWASP LLM05: Supply Chain Vulnerabilities*
+
+- **VectorEmbeddingWeaknessesExploit** — Embedding attacks
+  *MITRE ATLAS: AML.T0051 - LLM Prompt Injection*
+
+</TabItem>
+</Tabs>
+
+Visit [Vulnerabilities](/risks/risk-categories) for complete reference including sub-types, usage examples, and import paths.
+
+## Framework Components
+
+<Tabs>
+  <TabItem value="vulnerabilities" label="Vulnerabilities" default>
+
+Each vulnerability class represents a specific AI security threat with typed sub-types:
 
 ```python
-from hackagent.risks import (
-    PromptInjection,
-    Jailbreak,
-    get_threat_profile,
-    get_profiles_by_risk,
-    RiskCategory,
-)
+from hackagent.risks import PromptInjection
+from hackagent.risks.prompt_injection.types import PromptInjectionType
 
-# Look up the evaluation profile for a specific vulnerability
-profile = get_threat_profile("PromptInjection")
-print(profile.dataset_presets)    # ['advbench', 'harmbench_contextual', ...]
-print(profile.attack_techniques)  # ['Baseline', 'PAIR', 'AdvPrefix']
-print(profile.objective)          # 'jailbreak'
-print(profile.metrics)            # ['asr', 'judge_score']
+# Instantiate with all sub-types (default)
+vuln = PromptInjection()
+print(vuln.get_values())
+# ['direct_injection', 'indirect_injection', 'context_manipulation']
 
-# Get all profiles for a risk category
-cs_profiles = get_profiles_by_risk(RiskCategory.CYBERSECURITY)
-print(f"{len(cs_profiles)} cybersecurity profiles")
-
-# Find vulnerabilities with no dataset coverage
-from hackagent.risks import get_uncovered_vulnerabilities
-gaps = get_uncovered_vulnerabilities()
-print(f"Uncovered: {gaps}")
+# Or specify particular sub-types
+vuln = PromptInjection(types=[
+    PromptInjectionType.DIRECT_INJECTION.value,
+    PromptInjectionType.INDIRECT_INJECTION.value,
+])
 ```
 
-## Package Structure
+**Key Features:**
+- Typed sub-types via enums
+- Extensible base class
+- Self-documenting with descriptions
+- Registry-based lookup
 
+</TabItem>
+<TabItem value="profiles" label="Threat Profiles">
+
+Profiles map vulnerabilities to evaluation parameters:
+
+```python
+from hackagent.risks.prompt_injection import PROMPT_INJECTION_PROFILE
+
+profile = PROMPT_INJECTION_PROFILE
+
+# Access recommendations
+print(f"Name: {profile.name}")
+print(f"Objective: {profile.objective}")
+print(f"Primary datasets: {[d.preset for d in profile.primary_datasets]}")
+print(f"Primary attacks: {[a.technique for a in profile.primary_attacks]}")
+print(f"Metrics: {profile.metrics}")
 ```
-hackagent/risks/
-├── threats/                  # Vulnerability taxonomy
-│   ├── categories.py         # RiskCategory enum + RISK_CATALOGUE
-│   ├── base.py               # BaseVulnerability abstract class
-│   ├── registry.py           # VULNERABILITY_REGISTRY (name → class)
-│   ├── utils.py              # Type validation helpers
-│   ├── cybersecurity/        # 15 CS vulnerability classes
-│   ├── data_privacy/         # 3 DP vulnerability classes
-│   ├── fairness/             # 3 F vulnerability classes
-│   ├── trustworthiness/      # 4 VAR vulnerability classes
-│   ├── safety/               # 4 S vulnerability classes
-│   ├── transparency/         # 2 OT/EI vulnerability classes
-│   ├── third_party/          # 2 TPM vulnerability classes
-│   └── custom/               # CustomVulnerability for user-defined threats
-│
-└── profiles/                 # Threat-to-evaluation mapping
-    ├── types.py              # ThreatProfile, DatasetRecommendation, etc.
-    ├── registry.py           # THREAT_PROFILES merged dict + helpers
-    ├── _helpers.py           # Shorthand builders (ds, atk, combos)
-    ├── cybersecurity.py      # 15 CS profiles
-    ├── data_privacy.py       # 3 DP profiles
-    ├── fairness.py           # 3 F profiles
-    ├── trustworthiness.py    # 4 VAR profiles
-    ├── safety.py             # 4 S profiles
-    ├── transparency.py       # 2 OT/EI profiles
-    └── third_party.py        # 2 TPM profiles
+
+**What Profiles Provide:**
+- **Dataset Recommendations** — Curated datasets for testing this vulnerability
+- **Attack Techniques** — Compatible attack methods with relevance levels
+- **Metrics** — Appropriate evaluation metrics (ASR, judge scores, etc.)
+- **Objectives** — Default attack objectives (jailbreak, harmful_behavior, policy_violation)
+
+</TabItem>
+<TabItem value="campaigns" label="Evaluation Campaigns">
+
+Systematic security assessments:
+
+```python
+from hackagent import HackAgent
+from hackagent.risks.jailbreak import JAILBREAK_PROFILE
+
+agent = HackAgent(endpoint="...", name="my-agent")
+
+# Campaign based on threat profile
+for attack in JAILBREAK_PROFILE.primary_attacks:
+    for dataset in JAILBREAK_PROFILE.primary_datasets:
+        print(f"Running {attack.technique} on {dataset.preset}")
+
+        result = agent.attack(
+            attack_type=attack.technique.lower(),
+            dataset=dataset.preset,
+            objective=JAILBREAK_PROFILE.objective,
+        )
+
+        print(f"ASR: {result.get('asr', 'N/A')}")
 ```
+
+</TabItem>
+</Tabs>
 
 ## Documentation Guide
 
-| Page | What you'll learn |
-|------|------------------|
-| [Risk Categories](./categories) | The 7 active risk categories and what each covers |
-| [Vulnerabilities](./vulnerabilities) | All 33 vulnerability classes, their sub-types, and usage |
-| [Threat Profiles](./threat-profiles) | How profiles map vulnerabilities to datasets, attacks, and metrics |
-| [Evaluation Campaigns](./evaluation-campaigns) | Step-by-step guide to building a complete evaluation |
-| [Custom Vulnerabilities](./custom-vulnerabilities) | How to define your own threat types |
+| Page | Description |
+|------|-------------|
+| [Vulnerabilities](/risks/risk-categories) | Vulnerability layers and organization patterns |
+| [Vulnerability Reference](/risks/vulnerabilities) | Complete reference for all vulnerability classes, sub-types, and usage |
+| [Threat Profiles](/risks/threat-profiles) | Dataset and attack mappings for each vulnerability |
+| [Evaluation Campaigns](/risks/evaluation-campaigns) | Step-by-step guide to building comprehensive assessments |
+| [Custom Vulnerabilities](/risks/custom-vulnerabilities) | Extend the framework with organization-specific threats |
+
+## Related Resources
+
+- [Datasets](/datasets) — 25+ curated security evaluation datasets
+- [Attacks](/attacks) — Adversarial attack techniques (PAIR, AdvPrefix, Baseline)
+- [CLI Reference](../cli/overview) — Command-line tools for automated testing
+- [API Reference](../api-index) — Complete programmatic API documentation

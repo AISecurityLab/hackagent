@@ -26,6 +26,83 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
+      label: 'AI Risks Assessment',
+      className: 'sidebar-icon sidebar-icon-shield-alert',
+      link: {
+        type: 'doc',
+        id: 'risks/index',
+      },
+      items: [
+        {
+          type: 'category',
+          label: 'Vulnerabilities',
+          link: {
+            type: 'doc',
+            id: 'risks/risk-categories',
+          },
+          items: [
+            'risks/vulnerabilities',
+            'risks/vulnerabilities/prompt-injection',
+            'risks/vulnerabilities/jailbreak',
+            'risks/vulnerabilities/input-manipulation-attack',
+            'risks/vulnerabilities/system-prompt-leakage',
+            'risks/vulnerabilities/model-evasion',
+            'risks/vulnerabilities/craft-adversarial-data',
+            'risks/vulnerabilities/sensitive-information-disclosure',
+            'risks/vulnerabilities/misinformation',
+            'risks/vulnerabilities/excessive-agency',
+            'risks/vulnerabilities/malicious-tool-invocation',
+            'risks/vulnerabilities/credential-exposure',
+            'risks/vulnerabilities/public-facing-application-exploitation',
+            'risks/vulnerabilities/vector-embedding-weaknesses-exploit',
+            {
+              type: 'doc',
+              id: 'risks/custom-vulnerabilities',
+              label: 'Custom',
+            },
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Threat Profiles',
+          link: {
+            type: 'doc',
+            id: 'risks/threat-profiles',
+          },
+          items: [
+            'risks/threat-profiles/prompt-injection',
+            'risks/threat-profiles/jailbreak',
+            'risks/threat-profiles/input-manipulation-attack',
+            'risks/threat-profiles/system-prompt-leakage',
+            'risks/threat-profiles/model-evasion',
+            'risks/threat-profiles/craft-adversarial-data',
+            'risks/threat-profiles/sensitive-information-disclosure',
+            'risks/threat-profiles/misinformation',
+            'risks/threat-profiles/excessive-agency',
+            'risks/threat-profiles/malicious-tool-invocation',
+            'risks/threat-profiles/credential-exposure',
+            'risks/threat-profiles/public-facing-application-exploitation',
+            'risks/threat-profiles/vector-embedding-weaknesses-exploit',
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Evaluation Campaigns',
+          link: {
+            type: 'doc',
+            id: 'risks/evaluation-campaigns',
+          },
+          items: [
+            'risks/evaluation-campaigns/quick-scan',
+            'risks/evaluation-campaigns/comprehensive-audit',
+            'risks/evaluation-campaigns/targeted-assessment',
+            'risks/evaluation-campaigns/custom-campaigns',
+          ],
+        },
+      ],
+    },
+    {
+      type: 'category',
       label: 'Attacks',
       className: 'sidebar-icon sidebar-icon-sword',
       link: {
@@ -77,38 +154,6 @@ const sidebars: SidebarsConfig = {
           id: 'agents/google-adk',
           label: 'Google ADK',
         },
-      ],
-    },
-    {
-      type: 'category',
-      label: 'Risks & Evaluation',
-      className: 'sidebar-icon sidebar-icon-shield-alert',
-      link: {
-        type: 'doc',
-        id: 'risks/index',
-      },
-      items: [
-        {
-          type: 'category',
-          label: 'Categories',
-          link: {
-            type: 'doc',
-            id: 'risks/categories/index',
-          },
-          items: [
-            'risks/categories/cybersecurity',
-            'risks/categories/data-privacy',
-            'risks/categories/fairness',
-            'risks/categories/trustworthiness',
-            'risks/categories/safety',
-            'risks/categories/transparency',
-            'risks/categories/third-party',
-          ],
-        },
-        'risks/vulnerabilities',
-        'risks/threat-profiles',
-        'risks/evaluation-campaigns',
-        'risks/custom-vulnerabilities',
       ],
     },
     {

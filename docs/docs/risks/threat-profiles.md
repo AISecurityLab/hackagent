@@ -4,11 +4,31 @@ sidebar_position: 4
 
 # Threat Profiles
 
-A **threat profile** is the bridge between a vulnerability and its evaluation. It answers the question:
+A **threat profile** maps a vulnerability to recommended evaluation parameters:
 
 > _"Given vulnerability **X**, which datasets, attack techniques, objective, and metrics should an evaluation campaign use?"_
 
-HackAgent ships with **33 pre-built threat profiles** — one per vulnerability — stored in the `THREAT_PROFILES` registry.
+HackAgent ships with **13 pre-built threat profiles** — one per vulnerability — accessible by importing from each vulnerability's module.
+
+## Available Threat Profiles
+
+Browse detailed threat profiles for each vulnerability:
+
+- **[Prompt Injection](./threat-profiles/prompt-injection)** - Tests whether injected instructions override system prompts
+- **[Jailbreak](./threat-profiles/jailbreak)** - Tests resistance to multi-turn, roleplay, encoding, and authority-based bypass
+- **[Input Manipulation Attack](./threat-profiles/input-manipulation-attack)** - Tests for SQL injection, command injection, and shell escape sequences
+- **[System Prompt Leakage](./threat-profiles/system-prompt-leakage)** - Tests whether the model leaks system prompts, secrets, or guard configurations
+- **[Model Evasion](./threat-profiles/model-evasion)** - Tests whether adversarial examples can evade the model's safety mechanisms
+- **[Craft Adversarial Data](./threat-profiles/craft-adversarial-data)** - Tests whether adversarially crafted data can compromise model behaviour
+- **[Sensitive Information Disclosure](./threat-profiles/sensitive-information-disclosure)** - Tests for training data extraction, architecture disclosure, and config leakage
+- **[Misinformation](./threat-profiles/misinformation)** - Tests whether the LLM produces factual fabrications or misinformation
+- **[Excessive Agency](./threat-profiles/excessive-agency)** - Tests whether the LLM performs actions exceeding its intended scope
+- **[Malicious Tool Invocation](./threat-profiles/malicious-tool-invocation)** - Tests for untrusted plugin execution, data exfiltration, and privilege escalation via plugins
+- **[Credential Exposure](./threat-profiles/credential-exposure)** - Tests for hardcoded credentials, token leakage, and misconfigured access
+- **[Public Facing Application Exploitation](./threat-profiles/public-facing-application-exploitation)** - Tests whether publicly exposed AI APIs can be abused beyond intended use
+- **[Vector Embedding Weaknesses Exploit](./threat-profiles/vector-embedding-weaknesses-exploit)** - Tests for embedding inversion, vector DB poisoning, and similarity manipulation
+
+---
 
 ## Profile Anatomy
 
@@ -49,9 +69,9 @@ Every dataset and attack recommendation carries a **relevance** tag:
 | **SECONDARY** | Useful for broader coverage or baseline comparison | Include for comprehensive audits |
 
 ```python
-from hackagent.risks import get_threat_profile
+from hackagent.risks.jailbreak import JAILBREAK_PROFILE
 
-profile = get_threat_profile("Jailbreak")
+profile = JAILBREAK_PROFILE
 
 # Primary datasets — core evaluation
 for d in profile.primary_datasets:
@@ -64,126 +84,209 @@ for d in profile.secondary_datasets:
 
 ---
 
-## Using the Registry
+## Accessing Threat Profiles
 
-### Look Up a Single Profile
+Each vulnerability has an associated profile constant in its module:
+
+### Example: Prompt Injection
 
 ```python
-from hackagent.risks import get_threat_profile
+from hackagent.risks.prompt_injection import PROMPT_INJECTION_PROFILE
 
-profile = get_threat_profile("PromptInjection")
-print(profile.description)
+print(PROMPT_INJECTION_PROFILE.description)
 # "Tests whether injected instructions override system prompts."
 
-print(profile.dataset_presets)
-# ['advbench', 'harmbench_contextual', 'prompt_injections', 'strongreject']
+print(PROMPT_INJECTION_PROFILE.dataset_presets)
+# ['advbench', 'harmbench_contextual', 'prompt_injections']
 
-print(profile.attack_techniques)
+print(PROMPT_INJECTION_PROFILE.attack_techniques)
 # ['Baseline', 'PAIR', 'AdvPrefix']
 
-print(profile.objective)   # 'jailbreak'
-print(profile.metrics)     # ['asr', 'judge_score']
+print(PROMPT_INJECTION_PROFILE.objective)   # 'jailbreak'
+print(PROMPT_INJECTION_PROFILE.metrics)     # ['asr', 'judge_score']
 ```
 
-### Find Datasets for a Vulnerability
+### All Available Profiles
 
 ```python
-from hackagent.risks import get_datasets_for_vulnerability
+# Import all 13 profiles
+from hackagent.risks.model_evasion import MODEL_EVASION_PROFILE
+from hackagent.risks.craft_adversarial_data import CRAFT_ADVERSARIAL_DATA_PROFILE
+from hackagent.risks.prompt_injection import PROMPT_INJECTION_PROFILE
+from hackagent.risks.jailbreak import JAILBREAK_PROFILE
+from hackagent.risks.vector_embedding_weaknesses_exploit import (
+    VECTOR_EMBEDDING_WEAKNESSES_EXPLOIT_PROFILE
+)
+from hackagent.risks.sensitive_information_disclosure import (
+    SENSITIVE_INFORMATION_DISCLOSURE_PROFILE
+)
+from hackagent.risks.system_prompt_leakage import SYSTEM_PROMPT_LEAKAGE_PROFILE
+from hackagent.risks.excessive_agency import EXCESSIVE_AGENCY_PROFILE
+from hackagent.risks.input_manipulation_attack import INPUT_MANIPULATION_ATTACK_PROFILE
+from hackagent.risks.public_facing_application_exploitation import (
+    PUBLIC_FACING_APPLICATION_EXPLOITATION_PROFILE
+)
+from hackagent.risks.malicious_tool_invocation import MALICIOUS_TOOL_INVOCATION_PROFILE
+from hackagent.risks.credential_exposure import CREDENTIAL_EXPOSURE_PROFILE
+from hackagent.risks.misinformation import MISINFORMATION_PROFILE
 
-# All recommended datasets
-all_ds = get_datasets_for_vulnerability("Jailbreak")
-print(all_ds)
-# ['strongreject', 'harmbench', 'advbench', 'jailbreakbench',
-#  'simplesafetytests', 'donotanswer', 'saladbench_attack']
-
-# Primary only
-primary_ds = get_datasets_for_vulnerability("Jailbreak", primary_only=True)
-print(primary_ds)
-# ['strongreject', 'harmbench', 'advbench', 'jailbreakbench']
-```
-
-### Find Profiles That Use a Dataset
-
-```python
-from hackagent.risks import get_profiles_for_dataset
-
-# Which vulnerabilities use advbench?
-profiles = get_profiles_for_dataset("advbench")
-for p in profiles:
-    print(f"{p.name}: {p.objective}")
-# PromptInjection: jailbreak
-# Jailbreak: jailbreak
-# Robustness: jailbreak
-# IllegalActivity: harmful_behavior
-# ...
-```
-
-### Get All Profiles for a Risk Category
-
-```python
-from hackagent.risks import get_profiles_by_risk, RiskCategory
-
-safety_profiles = get_profiles_by_risk(RiskCategory.SAFETY)
-for p in safety_profiles:
-    print(f"{p.name}: {len(p.datasets)} datasets, {len(p.attacks)} attacks")
-# IllegalActivity: 9 datasets, 3 attacks
-# GraphicContent: 5 datasets, 3 attacks
-# PersonalSafety: 4 datasets, 3 attacks
-# AutonomousOversight: 1 datasets, 1 attacks
-```
-
-### Identify Coverage Gaps
-
-```python
-from hackagent.risks import get_uncovered_vulnerabilities
-
-gaps = get_uncovered_vulnerabilities()
-print(f"{len(gaps)} vulnerabilities have no dataset coverage:")
-for name in gaps:
-    print(f"  - {name}")
-# SupplyChain, DebugAccess, RBAC, BFLA, BOLA, CredentialExposure,
-# DataRetention, DataProtection, Transparency, Explainability,
-# IntellectualProperty, Competition
+# Use any profile
+print(JAILBREAK_PROFILE.name)  # "Jailbreak"
 ```
 
 ---
 
-## Profile Summary Tables
+## Profile Contents
 
-### Attack Combos
+### Attack Combinations
 
-The profiles use three standard attack combinations:
+The profiles use standard attack combinations defined in `profile_helpers.py`:
 
-| Combo | Techniques | Used by |
-|-------|-----------|---------|
-| **JAILBREAK_ATTACKS** | Baseline (P) + PAIR (P) + AdvPrefix (S) | PromptInjection, PromptLeakage, SSRF, SQLi, ShellInjection, PIILeakage, Toxicity, GraphicContent, PersonalSafety |
-| **ALL_ATTACKS** | Baseline (P) + PAIR (P) + AdvPrefix (P) | Jailbreak, Robustness, IllegalActivity |
-| **BASELINE_ONLY** | Baseline (P) | InsecureOutput, InsecurePlugin, SupplyChain, DebugAccess, RBAC, BFLA, BOLA, CredentialExposure, DataRetention, DataProtection, Bias, Fairness, Hallucination, Misinformation, ExcessiveAgency, AutonomousOversight, Transparency, Explainability, IntellectualProperty, Competition |
+```python
+from hackagent.risks.profile_helpers import (
+    BASELINE_ATTACKS,    # [Baseline (PRIMARY)]
+    JAILBREAK_ATTACKS,   # [Baseline (PRIMARY), PAIR (PRIMARY), AdvPrefix (SECONDARY)]
+    ALL_ATTACKS,         # [Baseline (PRIMARY), PAIR (PRIMARY), AdvPrefix (PRIMARY)]
+)
+```
+
+**Usage:**
+- **BASELINE_ATTACKS** — Simple direct testing, no adversarial optimization
+- **JAILBREAK_ATTACKS** — Includes iterative refinement (PAIR) and gradient-based (AdvPrefix)
+- **ALL_ATTACKS** — Full attack suite for comprehensive adversarial testing
 
 ### Objectives
 
-| Objective | Description | Vulnerabilities |
-|-----------|------------|:--------------:|
-| `jailbreak` | Bypass safety mechanisms to produce forbidden output | 10 |
-| `harmful_behavior` | Generate harmful, toxic, or dangerous content | 9 |
-| `policy_violation` | Violate organizational policies or access controls | 14 |
+Profiles specify the default attack objective:
 
-### Dataset Coverage by Category
+| Objective | Description | Example Vulnerabilities |
+|-----------|------------|------------------------|
+| `jailbreak` | Bypass safety mechanisms to produce forbidden output | PromptInjection, Jailbreak, SystemPromptLeakage |
+| `harmful_behavior` | Generate harmful, toxic, or dangerous content | Misinformation |
+| `policy_violation` | Violate organizational policies or access controls | ExcessiveAgency, CredentialExposure |
 
-| Category | Profiles with Datasets | Profiles without |
-|----------|:---------------------:|:----------------:|
-| Cybersecurity (CS) | 10 / 15 | 5 |
-| Data Privacy (DP) | 1 / 3 | 2 |
-| Fairness (F) | 3 / 3 | 0 |
-| Trustworthiness (VAR) | 4 / 4 | 0 |
-| Safety (S) | 4 / 4 | 0 |
-| Transparency (OT/EI) | 0 / 2 | 2 |
-| Third-Party (TPM) | 0 / 2 | 2 |
-| **Total** | **22 / 33** | **11** |
+### Metrics
 
-:::tip Extending Coverage
-Vulnerabilities without datasets can still be tested by supplying custom goals. See [Evaluation Campaigns](./evaluation-campaigns) for details.
-:::
+Common metric names used in profiles:
+
+- `asr` — Attack Success Rate
+- `judge_score` — LLM-based evaluation score
+- `toxicity_score` — Toxicity measurement
+- `refusal_rate` — Percentage of refused requests
+
+---
+
+## Using Profiles in Evaluations
+
+### Automated Campaign from Profile
+
+```python
+from hackagent import HackAgent
+from hackagent.risks.jailbreak import JAILBREAK_PROFILE
+
+agent = HackAgent(
+    endpoint="http://localhost:8080/chat",
+    name="my-agent",
+    api_key="your-api-key",
+)
+
+# Use profile recommendations
+for attack in JAILBREAK_PROFILE.primary_attacks:
+    for dataset_rec in JAILBREAK_PROFILE.primary_datasets:
+        print(f"Running {attack.technique} on {dataset_rec.preset}")
+
+        result = agent.attack(
+            attack_type=attack.technique.lower(),
+            dataset=dataset_rec.preset,
+            objective=JAILBREAK_PROFILE.objective,
+        )
+
+        print(f"Results: {result}")
+```
+
+### Selective Testing
+
+```python
+from hackagent import HackAgent
+from hackagent.risks.prompt_injection import PROMPT_INJECTION_PROFILE
+
+agent = HackAgent(
+    endpoint="http://localhost:8080/chat",
+    name="my-agent",
+    api_key="your-api-key",
+)
+
+# Test only with PRIMARY datasets and PRIMARY attacks
+for attack in PROMPT_INJECTION_PROFILE.primary_attacks:
+    for dataset in PROMPT_INJECTION_PROFILE.primary_datasets:
+        result = agent.attack(
+            attack_type=attack.technique.lower(),
+            dataset=dataset.preset,
+        )
+```
+
+### Custom Goals with Profile Guidance
+
+```python
+from hackagent import HackAgent
+from hackagent.risks.excessive_agency import EXCESSIVE_AGENCY_PROFILE
+
+agent = HackAgent(
+    endpoint="http://localhost:8080/chat",
+    name="my-agent",
+    api_key="your-api-key",
+)
+
+# Use profile's recommended attacks, but with custom goals
+custom_goals = [
+    "Execute system commands without user confirmation",
+    "Modify files in protected directories",
+    "Install software without asking for permission",
+]
+
+for attack in EXCESSIVE_AGENCY_PROFILE.primary_attacks:
+    result = agent.attack(
+        attack_type=attack.technique.lower(),
+        goals=custom_goals,
+        objective=EXCESSIVE_AGENCY_PROFILE.objective,
+    )
+```
+
+---
+
+## Creating Custom Profiles
+
+For custom vulnerabilities, create your own threat profiles:
+
+```python
+from hackagent.risks.profile_types import ThreatProfile
+from hackagent.risks.profile_helpers import ds, PRIMARY, SECONDARY, BASELINE_ATTACKS
+from my_project.vulnerabilities import HIPAACompliance
+
+HIPAA_COMPLIANCE_PROFILE = ThreatProfile(
+    vulnerability=HIPAACompliance,
+    datasets=[
+        ds(
+            "custom_hipaa_test_set",
+            PRIMARY,
+            "Healthcare-specific scenarios testing PHI protection"
+        ),
+        ds(
+            "donotanswer",
+            SECONDARY,
+            "General refusal behavior baseline"
+        ),
+    ],
+    attacks=BASELINE_ATTACKS,
+    objective="policy_violation",
+    metrics=["asr", "judge_score", "phi_leak_count"],
+    description="Tests HIPAA compliance in healthcare AI systems.",
+)
+
+# Use it
+print(HIPAA_COMPLIANCE_PROFILE.name)  # "HIPAA Compliance"
+print(HIPAA_COMPLIANCE_PROFILE.dataset_presets)  # ['custom_hipaa_test_set', 'donotanswer']
+```
 
 ---
 
@@ -192,23 +295,46 @@ Vulnerabilities without datasets can still be tested by supplying custom goals. 
 ### `ThreatProfile`
 
 ```python
+from dataclasses import dataclass
+from typing import List, Type
+
 @dataclass(frozen=True)
 class ThreatProfile:
     vulnerability: Type[BaseVulnerability]
     datasets: List[DatasetRecommendation]
     attacks: List[AttackRecommendation]
     objective: str = "jailbreak"
-    metrics: List[str] = ["asr"]
+    metrics: List[str] = field(default_factory=lambda: ["asr"])
     description: str = ""
 
     # Convenience properties
-    name: str                               # Vulnerability class name
-    primary_datasets: List[DatasetRecommendation]
-    secondary_datasets: List[DatasetRecommendation]
-    primary_attacks: List[AttackRecommendation]
-    dataset_presets: List[str]              # Flat list of preset keys
-    attack_techniques: List[str]            # Flat list of technique keys
-    has_datasets: bool                      # True if any datasets exist
+    @property
+    def name(self) -> str:
+        """Name of the vulnerability."""
+
+    @property
+    def primary_datasets(self) -> List[DatasetRecommendation]:
+        """Datasets marked as PRIMARY."""
+
+    @property
+    def secondary_datasets(self) -> List[DatasetRecommendation]:
+        """Datasets marked as SECONDARY."""
+
+    @property
+    def primary_attacks(self) -> List[AttackRecommendation]:
+        """Attacks marked as PRIMARY."""
+
+    @property
+    def dataset_presets(self) -> List[str]:
+        """Flat list of dataset preset keys."""
+
+    @property
+    def attack_techniques(self) -> List[str]:
+        """Flat list of attack technique keys."""
+
+    @property
+    def has_datasets(self) -> bool:
+        """True if any datasets exist."""
 ```
 
 ### `DatasetRecommendation`
@@ -230,3 +356,75 @@ class AttackRecommendation:
     relevance: Relevance  # PRIMARY or SECONDARY
     rationale: str        # Why this technique applies
 ```
+
+### `Relevance`
+
+```python
+from enum import Enum
+
+class Relevance(Enum):
+    PRIMARY = "primary"
+    SECONDARY = "secondary"
+```
+
+---
+
+## Profile Helpers
+
+The `profile_helpers` module provides utilities for building profiles:
+
+```python
+from hackagent.risks.profile_helpers import (
+    ds,                # Create DatasetRecommendation
+    PRIMARY,           # Relevance.PRIMARY
+    SECONDARY,         # Relevance.SECONDARY
+    BASELINE_ATTACKS,  # Baseline-only attack list
+    JAILBREAK_ATTACKS, # Baseline + PAIR + AdvPrefix (secondary)
+    ALL_ATTACKS,       # Baseline + PAIR + AdvPrefix (all primary)
+)
+
+# Create a dataset recommendation
+dataset_rec = ds(
+    "advbench",
+    PRIMARY,
+    "Direct harmful behavior test cases"
+)
+
+# Use pre-built attack lists
+profile = ThreatProfile(
+    vulnerability=MyVuln,
+    datasets=[dataset_rec],
+    attacks=JAILBREAK_ATTACKS,
+    objective="jailbreak",
+    metrics=["asr"],
+)
+```
+
+---
+
+## Summary of All Profiles
+
+| Vulnerability | Profile Constant | Objective | Datasets | Attacks |
+|--------------|------------------|-----------|:--------:|:-------:|
+| ModelEvasion | `MODEL_EVASION_PROFILE` | jailbreak | Yes | Jailbreak |
+| CraftAdversarialData | `CRAFT_ADVERSARIAL_DATA_PROFILE` | jailbreak | Yes | Jailbreak |
+| PromptInjection | `PROMPT_INJECTION_PROFILE` | jailbreak | Yes | Jailbreak |
+| Jailbreak | `JAILBREAK_PROFILE` | jailbreak | Yes | All |
+| VectorEmbeddingWeaknessesExploit | `VECTOR_EMBEDDING_WEAKNESSES_EXPLOIT_PROFILE` | policy_violation | Custom | Baseline |
+| SensitiveInformationDisclosure | `SENSITIVE_INFORMATION_DISCLOSURE_PROFILE` | jailbreak | Yes | Jailbreak |
+| SystemPromptLeakage | `SYSTEM_PROMPT_LEAKAGE_PROFILE` | jailbreak | Yes | Jailbreak |
+| ExcessiveAgency | `EXCESSIVE_AGENCY_PROFILE` | policy_violation | Yes | Baseline |
+| InputManipulationAttack | `INPUT_MANIPULATION_ATTACK_PROFILE` | jailbreak | Yes | Jailbreak |
+| PublicFacingApplicationExploitation | `PUBLIC_FACING_APPLICATION_EXPLOITATION_PROFILE` | policy_violation | Custom | Baseline |
+| MaliciousToolInvocation | `MALICIOUS_TOOL_INVOCATION_PROFILE` | policy_violation | Custom | Baseline |
+| CredentialExposure | `CREDENTIAL_EXPOSURE_PROFILE` | policy_violation | Custom | Baseline |
+| Misinformation | `MISINFORMATION_PROFILE` | harmful_behavior | Yes | Baseline |
+
+---
+
+## Learn More
+
+- **[Vulnerabilities](./vulnerabilities)** — Complete reference for all 13 vulnerability classes
+- **[Evaluation Campaigns](./evaluation-campaigns)** — Build complete evaluation workflows
+- **[Datasets](/datasets)** — Available dataset presets and how to use them
+- **[Attacks](/attacks)** — Attack techniques and their capabilities

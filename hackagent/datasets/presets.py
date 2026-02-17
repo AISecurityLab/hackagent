@@ -74,15 +74,6 @@ PRESETS: Dict[str, Dict[str, Any]] = {
         "fallback_fields": ["behavior", "goal", "input"],
         "description": "HarmBench - 200 standard harmful behavior prompts",
     },
-    "harmbench_standard": {
-        "provider": "huggingface",
-        "path": "walledai/HarmBench",
-        "name": "standard",
-        "goal_field": "prompt",
-        "split": "train",
-        "fallback_fields": ["behavior", "goal", "input"],
-        "description": "HarmBench - 200 standard harmful behaviors",
-    },
     "harmbench_contextual": {
         "provider": "huggingface",
         "path": "walledai/HarmBench",
@@ -365,6 +356,24 @@ PRESETS: Dict[str, Dict[str, Any]] = {
             "SOS-Bench - 3,000 hazardous science prompts across 6 domains "
             "(biology, chemistry, pharmacy, physics, psychology, medical) "
             "for safety alignment evaluation (Inspect Evals)"
+        ),
+    },
+    # =========================================================================
+    # RAG Security - RAG/embedding security evaluation
+    # Note: SafeRAG benchmark is under development (arxiv:2501.18636)
+    # Using galileo-ai/ragbench as interim general RAG evaluation dataset
+    # Source: https://huggingface.co/datasets/galileo-ai/ragbench
+    # TODO: Replace with SafeRAG when available on HuggingFace
+    # =========================================================================
+    "rag_security": {
+        "provider": "huggingface",
+        "path": "galileo-ai/ragbench",
+        "goal_field": "question",
+        "split": "train",
+        "fallback_fields": ["query", "prompt", "input", "text"],
+        "description": (
+            "RAGBench - 100K RAG benchmark covering industry-specific domains, "
+            "used as interim for RAG security testing (pending SafeRAG release)"
         ),
     },
 }

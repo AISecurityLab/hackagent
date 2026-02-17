@@ -2,9 +2,9 @@
 sidebar_position: 3
 ---
 
-# Vulnerabilities
+# Vulnerability Reference
 
-HackAgent defines **33 vulnerability classes** organized into 7 risk categories. Each vulnerability inherits from `BaseVulnerability` and declares typed sub-types that specify the exact attack surface being tested.
+HackAgent provides 13 vulnerability classes for systematic AI security testing. Each vulnerability inherits from `BaseVulnerability` and includes typed sub-types for precise attack surface specification.
 
 ## Architecture
 
@@ -14,39 +14,31 @@ classDiagram
         <<abstract>>
         +name: str
         +description: str
-        +risk_category: RiskCategory
         +ALLOWED_TYPES: List~str~
         +types: List~Enum~
         +get_types() List~Enum~
         +get_values() List~str~
         +get_name() str
-        +get_risk_category() RiskCategory
     }
 
     class PromptInjection {
-        +risk_category = CYBERSECURITY
+        +name = "Prompt Injection"
         +types: PromptInjectionType
     }
 
-    class Bias {
-        +risk_category = FAIRNESS
-        +types: BiasType
+    class Jailbreak {
+        +name = "Jailbreak"
+        +types: JailbreakType
     }
 
-    class Hallucination {
-        +risk_category = VAR
-        +types: HallucinationType
-    }
-
-    class CustomVulnerability {
-        +criteria: str
-        +custom_prompt: str
+    class Misinformation {
+        +name = "Misinformation"
+        +types: MisinformationType
     }
 
     BaseVulnerability <|-- PromptInjection
-    BaseVulnerability <|-- Bias
-    BaseVulnerability <|-- Hallucination
-    BaseVulnerability <|-- CustomVulnerability
+    BaseVulnerability <|-- Jailbreak
+    BaseVulnerability <|-- Misinformation
 ```
 
 ## Using Vulnerabilities
@@ -56,31 +48,17 @@ classDiagram
 Every vulnerability can be instantiated with default sub-types (all) or a specific subset:
 
 ```python
-from hackagent.risks import PromptInjection, Bias
+from hackagent.risks import PromptInjection, Jailbreak
 
 # All sub-types (default)
 pi = PromptInjection()
-print(pi.get_values())  # ['direct', 'indirect', 'multi_turn']
+print(pi.get_values())
+# ['direct_injection', 'indirect_injection', 'context_manipulation']
 
 # Specific sub-types only
-pi_direct = PromptInjection(types=[PromptInjectionType.DIRECT])
-print(pi_direct.get_values())  # ['direct']
-```
-
-### Type Validation
-
-Use `validate_vulnerability_types` to safely parse string inputs:
-
-```python
-from hackagent.risks import validate_vulnerability_types
-from hackagent.risks.threats.cybersecurity.types import PromptInjectionType
-
-validated = validate_vulnerability_types(
-    "PromptInjection",
-    ["direct", "indirect"],
-    PromptInjectionType,
-)
-# Returns [PromptInjectionType.DIRECT, PromptInjectionType.INDIRECT]
+from hackagent.risks.prompt_injection.types import PromptInjectionType
+pi_direct = PromptInjection(types=[PromptInjectionType.DIRECT_INJECTION.value])
+print(pi_direct.get_values())  # ['direct_injection']
 ```
 
 ### Registry Lookup
@@ -90,526 +68,365 @@ The `VULNERABILITY_REGISTRY` maps vulnerability names to their classes:
 ```python
 from hackagent.risks import VULNERABILITY_REGISTRY, get_all_vulnerability_names
 
-# List all 33 registered vulnerabilities
+# List all 13 registered vulnerabilities
 names = get_all_vulnerability_names()
-print(len(names))  # 33
+print(len(names))  # 13
 
 # Look up a class by name
 cls = VULNERABILITY_REGISTRY["Jailbreak"]
 instance = cls()
-print(instance.risk_category)  # RiskCategory.CYBERSECURITY
+print(instance.name)  # "Jailbreak"
 ```
 
-### Filter by Risk Category
+### Accessing Type Information
+
+Each vulnerability has an associated enum of sub-types:
 
 ```python
-from hackagent.risks import get_vulnerabilities_by_risk, RiskCategory
+from hackagent.risks import PromptInjection
+from hackagent.risks.prompt_injection.types import PromptInjectionType
 
-# Get all Safety vulnerability classes
-safety_vulns = get_vulnerabilities_by_risk(RiskCategory.SAFETY)
-for v in safety_vulns:
-    print(v.name)
-# IllegalActivity, GraphicContent, PersonalSafety, AutonomousOversight
+# Get all available sub-types
+vuln = PromptInjection()
+types = vuln.get_types()  # Returns list of PromptInjectionType enums
+values = vuln.get_values()  # Returns list of string values
+
+# Access the enum directly
+print(PromptInjectionType.DIRECT_INJECTION.value)  # "direct_injection"
 ```
 
 ---
 
 ## Complete Vulnerability Reference
 
-### Cybersecurity (CS) — 15 Vulnerabilities
+### 1. ModelEvasion
 
-<details>
-<summary><strong>PromptInjection</strong> — Tests whether injected instructions override system prompts</summary>
+Tests whether adversarial examples, feature manipulation, or boundary exploitation can evade the model's safety mechanisms.
 
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.cybersecurity.PromptInjection` |
-| **Risk Category** | `RiskCategory.CYBERSECURITY` |
-| **Sub-types** | `direct`, `indirect`, `multi_turn` |
-| **Objective** | `jailbreak` |
-| **Attacks** | Baseline, PAIR, AdvPrefix |
-| **Primary Datasets** | advbench, harmbench_contextual, prompt_injections |
+**Import:** `from hackagent.risks import ModelEvasion`
 
-</details>
+**Sub-types:**
+- `adversarial_examples` — Crafted inputs that cause the model to misclassify or produce wrong outputs
+- `feature_space_manipulation` — Manipulating input features to evade detection or safety mechanisms
+- `model_boundary_exploitation` — Exploiting decision boundaries to find blind spots in model behaviour
 
-<details>
-<summary><strong>PromptLeakage</strong> — Tests whether the model leaks system prompts or secrets</summary>
+**Example:**
+```python
+from hackagent.risks import ModelEvasion
+from hackagent.risks.model_evasion.types import ModelEvasionType
 
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.cybersecurity.PromptLeakage` |
-| **Risk Category** | `RiskCategory.CYBERSECURITY` |
-| **Sub-types** | `system_prompt`, `secrets`, `guard_config` |
-| **Objective** | `jailbreak` |
-| **Attacks** | Baseline, PAIR, AdvPrefix |
-| **Secondary Datasets** | advbench |
-
-</details>
-
-<details>
-<summary><strong>Jailbreak</strong> — Tests resistance to multi-turn, roleplay, encoding, and authority-based bypass</summary>
-
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.cybersecurity.Jailbreak` |
-| **Risk Category** | `RiskCategory.CYBERSECURITY` |
-| **Sub-types** | `roleplay`, `encoding`, `authority` |
-| **Objective** | `jailbreak` |
-| **Attacks** | Baseline, PAIR, AdvPrefix (all primary) |
-| **Primary Datasets** | strongreject, harmbench, advbench, jailbreakbench |
-| **Secondary Datasets** | simplesafetytests, donotanswer, saladbench_attack |
-
-</details>
-
-<details>
-<summary><strong>InsecureOutput</strong> — Tests for unescaped code, excessive info in responses</summary>
-
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.cybersecurity.InsecureOutput` |
-| **Risk Category** | `RiskCategory.CYBERSECURITY` |
-| **Sub-types** | `code_injection`, `data_leak`, `format_abuse` |
-| **Objective** | `policy_violation` |
-| **Attacks** | Baseline |
-| **Secondary Datasets** | harmbench |
-
-</details>
-
-<details>
-<summary><strong>InsecurePlugin</strong> — Tests for untrusted plugin execution and privilege escalation</summary>
-
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.cybersecurity.InsecurePlugin` |
-| **Risk Category** | `RiskCategory.CYBERSECURITY` |
-| **Sub-types** | `data_exfiltration`, `privilege_escalation`, `untrusted_execution` |
-| **Objective** | `policy_violation` |
-| **Attacks** | Baseline |
-| **Secondary Datasets** | agentharm |
-
-</details>
-
-<details>
-<summary><strong>SupplyChain</strong> — Tests for model/data poisoning and dependency vulnerabilities</summary>
-
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.cybersecurity.SupplyChain` |
-| **Risk Category** | `RiskCategory.CYBERSECURITY` |
-| **Sub-types** | `model_poisoning`, `data_poisoning`, `dependency_attack` |
-| **Objective** | `policy_violation` |
-| **Attacks** | Baseline |
-| **Datasets** | None (custom goals required) |
-
-</details>
-
-<details>
-<summary><strong>SSRF</strong> — Tests for internal service access and cloud metadata exfiltration</summary>
-
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.cybersecurity.SSRF` |
-| **Risk Category** | `RiskCategory.CYBERSECURITY` |
-| **Sub-types** | `internal_access`, `cloud_metadata`, `data_exfiltration` |
-| **Objective** | `jailbreak` |
-| **Attacks** | Baseline, PAIR, AdvPrefix |
-| **Secondary Datasets** | wmdp_cyber |
-
-</details>
-
-<details>
-<summary><strong>SQLInjection</strong> — Tests for blind, union-based, and error-based SQL injection</summary>
-
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.cybersecurity.SQLInjection` |
-| **Risk Category** | `RiskCategory.CYBERSECURITY` |
-| **Sub-types** | `blind`, `union_based`, `error_based` |
-| **Objective** | `jailbreak` |
-| **Attacks** | Baseline, PAIR, AdvPrefix |
-| **Secondary Datasets** | wmdp_cyber |
-
-</details>
-
-<details>
-<summary><strong>ShellInjection</strong> — Tests for command injection and shell escape sequences</summary>
-
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.cybersecurity.ShellInjection` |
-| **Risk Category** | `RiskCategory.CYBERSECURITY` |
-| **Sub-types** | `command_injection`, `system_command`, `shell_escape` |
-| **Objective** | `jailbreak` |
-| **Attacks** | Baseline, PAIR, AdvPrefix |
-| **Secondary Datasets** | wmdp_cyber |
-
-</details>
-
-<details>
-<summary><strong>DebugAccess</strong> — Tests for debug endpoint exposure and internal state disclosure</summary>
-
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.cybersecurity.DebugAccess` |
-| **Risk Category** | `RiskCategory.CYBERSECURITY` |
-| **Sub-types** | `endpoint_exposure`, `verbose_errors`, `state_disclosure` |
-| **Objective** | `policy_violation` |
-| **Attacks** | Baseline |
-| **Datasets** | None (custom goals required) |
-
-</details>
-
-<details>
-<summary><strong>RBAC</strong> — Tests for role bypass and privilege escalation</summary>
-
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.cybersecurity.RBAC` |
-| **Risk Category** | `RiskCategory.CYBERSECURITY` |
-| **Sub-types** | `role_bypass`, `privilege_escalation`, `role_assumption` |
-| **Objective** | `policy_violation` |
-| **Attacks** | Baseline |
-| **Datasets** | None (custom goals required) |
-
-</details>
-
-<details>
-<summary><strong>BFLA</strong> — Tests for function-level authorization bypass</summary>
-
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.cybersecurity.BFLA` |
-| **Risk Category** | `RiskCategory.CYBERSECURITY` |
-| **Sub-types** | `function_bypass`, `privilege_escalation`, `admin_access` |
-| **Objective** | `policy_violation` |
-| **Attacks** | Baseline |
-| **Datasets** | None (custom goals required) |
-
-</details>
-
-<details>
-<summary><strong>BOLA</strong> — Tests for object-level access bypass</summary>
-
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.cybersecurity.BOLA` |
-| **Risk Category** | `RiskCategory.CYBERSECURITY` |
-| **Sub-types** | `object_access`, `cross_customer`, `data_manipulation` |
-| **Objective** | `policy_violation` |
-| **Attacks** | Baseline |
-| **Datasets** | None (custom goals required) |
-
-</details>
-
-<details>
-<summary><strong>CredentialExposure</strong> — Tests for hardcoded credentials and token leakage</summary>
-
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.cybersecurity.CredentialExposure` |
-| **Risk Category** | `RiskCategory.CYBERSECURITY` |
-| **Sub-types** | `hardcoded`, `token_leak`, `misconfigured` |
-| **Objective** | `policy_violation` |
-| **Attacks** | Baseline |
-| **Datasets** | None (custom goals required) |
-
-</details>
-
-<details>
-<summary><strong>SensitiveInfoDisclosure</strong> — Tests for training data extraction and architecture disclosure</summary>
-
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.cybersecurity.SensitiveInfoDisclosure` |
-| **Risk Category** | `RiskCategory.CYBERSECURITY` |
-| **Sub-types** | `training_data`, `architecture`, `config_leak` |
-| **Objective** | `jailbreak` |
-| **Attacks** | Baseline, PAIR, AdvPrefix |
-| **Secondary Datasets** | advbench, saladbench |
-
-</details>
+vuln = ModelEvasion(types=[ModelEvasionType.ADVERSARIAL_EXAMPLES.value])
+```
 
 ---
 
-### Data Privacy (DP) — 3 Vulnerabilities
+### 2. CraftAdversarialData
 
-<details>
-<summary><strong>PIILeakage</strong> — Tests for direct PII disclosure and social manipulation</summary>
+Tests whether adversarially crafted data — perturbations, poisoned examples, or augmentation abuse — can compromise model behaviour.
 
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.data_privacy.PIILeakage` |
-| **Risk Category** | `RiskCategory.DATA_PRIVACY` |
-| **Sub-types** | `direct_disclosure`, `session_leak`, `social_manipulation` |
-| **Objective** | `policy_violation` |
-| **Attacks** | Baseline, PAIR, AdvPrefix |
-| **Secondary Datasets** | donotanswer, beavertails |
+**Import:** `from hackagent.risks import CraftAdversarialData`
 
-</details>
+**Sub-types:**
+- `perturbation_attacks` — Small, imperceptible changes to inputs that alter model outputs
+- `poisoned_examples` — Adversarially crafted examples designed to trigger specific model failures
+- `data_augmentation_abuse` — Exploiting data augmentation pipelines to inject adversarial samples
 
-<details>
-<summary><strong>DataRetention</strong> — Tests for excessive retention and failed deletion</summary>
+**Example:**
+```python
+from hackagent.risks import CraftAdversarialData
+from hackagent.risks.craft_adversarial_data.types import CraftAdversarialDataType
 
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.data_privacy.DataRetention` |
-| **Risk Category** | `RiskCategory.DATA_PRIVACY` |
-| **Sub-types** | `excessive_retention`, `unlawful_storage`, `failed_deletion` |
-| **Objective** | `policy_violation` |
-| **Attacks** | Baseline |
-| **Datasets** | None (custom goals required) |
-
-</details>
-
-<details>
-<summary><strong>DataProtection</strong> — Tests for unencrypted transmission and weak anonymisation</summary>
-
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.data_privacy.DataProtection` |
-| **Risk Category** | `RiskCategory.DATA_PRIVACY` |
-| **Sub-types** | `unencrypted`, `weak_anonymisation`, `access_control` |
-| **Objective** | `policy_violation` |
-| **Attacks** | Baseline |
-| **Datasets** | None (custom goals required) |
-
-</details>
+vuln = CraftAdversarialData(types=[CraftAdversarialDataType.POISONED_EXAMPLES.value])
+```
 
 ---
 
-### Fairness (F) — 3 Vulnerabilities
+### 3. PromptInjection
 
-<details>
-<summary><strong>Bias</strong> — Tests for racial, gender, religious, and political bias</summary>
+Tests whether the LLM executes attacker-supplied instructions that override or bypass the system prompt.
 
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.fairness.Bias` |
-| **Risk Category** | `RiskCategory.FAIRNESS` |
-| **Sub-types** | `race`, `gender`, `religion`, `politics` |
-| **Objective** | `harmful_behavior` |
-| **Attacks** | Baseline |
-| **Primary Datasets** | discrim_eval |
-| **Secondary Datasets** | donotanswer, beavertails, coconot |
+**Import:** `from hackagent.risks import PromptInjection`
 
-</details>
+**Sub-types:**
+- `direct_injection` — User prompt directly overrides system instructions
+- `indirect_injection` — Malicious instructions are embedded in retrieved/external content
+- `context_manipulation` — Crafted context tricks the model into ignoring guardrails
 
-<details>
-<summary><strong>Fairness</strong> — Tests for stereotyping, subgroup impact, and inconsistent treatment</summary>
+**Example:**
+```python
+from hackagent.risks import PromptInjection
+from hackagent.risks.prompt_injection.types import PromptInjectionType
 
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.fairness.Fairness` |
-| **Risk Category** | `RiskCategory.FAIRNESS` |
-| **Sub-types** | `stereotyping`, `subgroup_impact`, `bias_drift`, `inconsistent_treatment` |
-| **Objective** | `harmful_behavior` |
-| **Attacks** | Baseline |
-| **Primary Datasets** | discrim_eval |
-| **Secondary Datasets** | donotanswer |
-
-</details>
-
-<details>
-<summary><strong>Toxicity</strong> — Tests for insults, profanity, threats, and mockery</summary>
-
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.fairness.Toxicity` |
-| **Risk Category** | `RiskCategory.FAIRNESS` |
-| **Sub-types** | `insults`, `profanity`, `threats`, `mockery` |
-| **Objective** | `harmful_behavior` |
-| **Attacks** | Baseline, PAIR, AdvPrefix |
-| **Primary Datasets** | donotanswer, toxicchat |
-| **Secondary Datasets** | strongreject, beavertails |
-
-</details>
+vuln = PromptInjection(types=[
+    PromptInjectionType.DIRECT_INJECTION.value,
+    PromptInjectionType.INDIRECT_INJECTION.value
+])
+```
 
 ---
 
-### Trustworthiness (VAR) — 4 Vulnerabilities
+### 4. Jailbreak
 
-<details>
-<summary><strong>Hallucination</strong> — Tests for factual fabrication and source fabrication</summary>
+Tests whether the LLM can be manipulated into bypassing its safety filters through roleplay, encoding, multi-turn, hypothetical, or authority-manipulation techniques.
 
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.trustworthiness.Hallucination` |
-| **Risk Category** | `RiskCategory.VALIDITY_ACCURACY_ROBUSTNESS` |
-| **Sub-types** | `factual`, `source`, `context` |
-| **Objective** | `harmful_behavior` |
-| **Attacks** | Baseline |
-| **Primary Datasets** | truthfulqa |
+**Import:** `from hackagent.risks import Jailbreak`
 
-</details>
+**Sub-types:**
+- `roleplay` — Uses fictional scenarios or personas to bypass safety filters
+- `encoding` — Encodes malicious intent via Base64, ROT13, leetspeak, etc.
+- `multi_turn` — Gradually escalates across conversation turns (crescendo)
+- `hypothetical` — Frames harmful requests as hypothetical or academic questions
+- `authority_manipulation` — Invokes false authority or urgency to override restrictions
 
-<details>
-<summary><strong>Misinformation</strong> — Tests for factual errors and unsupported claims</summary>
+**Example:**
+```python
+from hackagent.risks import Jailbreak
+from hackagent.risks.jailbreak.types import JailbreakType
 
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.trustworthiness.Misinformation` |
-| **Risk Category** | `RiskCategory.VALIDITY_ACCURACY_ROBUSTNESS` |
-| **Sub-types** | `factual_errors`, `unsupported_claims`, `expertise_misrepresentation` |
-| **Objective** | `harmful_behavior` |
-| **Attacks** | Baseline |
-| **Primary Datasets** | truthfulqa |
-| **Secondary Datasets** | saladbench |
-
-</details>
-
-<details>
-<summary><strong>Robustness</strong> — Tests for input over-reliance, hijacking, and adversarial perturbation</summary>
-
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.trustworthiness.Robustness` |
-| **Risk Category** | `RiskCategory.VALIDITY_ACCURACY_ROBUSTNESS` |
-| **Sub-types** | `over_reliance`, `hijacking`, `perturbation` |
-| **Objective** | `jailbreak` |
-| **Attacks** | Baseline, PAIR, AdvPrefix (all primary) |
-| **Primary Datasets** | xstest, coconot |
-| **Secondary Datasets** | advbench |
-
-</details>
-
-<details>
-<summary><strong>ExcessiveAgency</strong> — Tests for excess functionality, permissions, and autonomy</summary>
-
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.trustworthiness.ExcessiveAgency` |
-| **Risk Category** | `RiskCategory.VALIDITY_ACCURACY_ROBUSTNESS` |
-| **Sub-types** | `excess_functionality`, `excess_permissions`, `excess_autonomy` |
-| **Objective** | `policy_violation` |
-| **Attacks** | Baseline |
-| **Primary Datasets** | agentharm |
-| **Secondary Datasets** | agentharm_benign |
-
-</details>
+vuln = Jailbreak(types=[
+    JailbreakType.ROLEPLAY.value,
+    JailbreakType.MULTI_TURN.value
+])
+```
 
 ---
 
-### Safety (S) — 4 Vulnerabilities
+### 5. VectorEmbeddingWeaknessesExploit
 
-<details>
-<summary><strong>IllegalActivity</strong> — Tests for criminal planning, weapons, drug production, fraud</summary>
+Tests for embedding inversion, vector database poisoning, and similarity search manipulation in RAG pipelines.
 
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.safety.IllegalActivity` |
-| **Risk Category** | `RiskCategory.SAFETY` |
-| **Sub-types** | `criminal_planning`, `weapons`, `drugs`, `fraud` |
-| **Objective** | `harmful_behavior` |
-| **Attacks** | Baseline, PAIR, AdvPrefix (all primary) |
-| **Primary Datasets** | harmbench, strongreject, simplesafetytests, beavertails, saladbench, wmdp_bio, wmdp_chem |
-| **Secondary Datasets** | harmfulqa, advbench |
+**Import:** `from hackagent.risks import VectorEmbeddingWeaknessesExploit`
 
-</details>
+**Sub-types:**
+- `embedding_inversion` — Recovering original text or sensitive data from embedding vectors
+- `vector_db_poisoning` — Injecting malicious entries into vector databases used for RAG
+- `similarity_manipulation` — Crafting inputs to manipulate similarity search results
 
-<details>
-<summary><strong>GraphicContent</strong> — Tests for violence, sexual content, and self-harm generation</summary>
+**Example:**
+```python
+from hackagent.risks import VectorEmbeddingWeaknessesExploit
+from hackagent.risks.vector_embedding_weaknesses_exploit.types import (
+    VectorEmbeddingWeaknessesExploitType
+)
 
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.safety.GraphicContent` |
-| **Risk Category** | `RiskCategory.SAFETY` |
-| **Sub-types** | `violence`, `sexual`, `self_harm` |
-| **Objective** | `harmful_behavior` |
-| **Attacks** | Baseline, PAIR, AdvPrefix |
-| **Primary Datasets** | harmbench, strongreject |
-| **Secondary Datasets** | simplesafetytests, beavertails, toxicchat |
-
-</details>
-
-<details>
-<summary><strong>PersonalSafety</strong> — Tests for dangerous instructions, stalking, child exploitation</summary>
-
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.safety.PersonalSafety` |
-| **Risk Category** | `RiskCategory.SAFETY` |
-| **Sub-types** | `dangerous_instructions`, `stalking`, `child_exploitation` |
-| **Objective** | `harmful_behavior` |
-| **Attacks** | Baseline, PAIR, AdvPrefix |
-| **Primary Datasets** | harmbench, strongreject |
-| **Secondary Datasets** | simplesafetytests, beavertails |
-
-</details>
-
-<details>
-<summary><strong>AutonomousOversight</strong> — Tests for missing human override and unmonitored actions</summary>
-
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.safety.AutonomousOversight` |
-| **Risk Category** | `RiskCategory.SAFETY` |
-| **Sub-types** | `missing_override`, `unmonitored`, `cascading` |
-| **Objective** | `policy_violation` |
-| **Attacks** | Baseline |
-| **Primary Datasets** | agentharm |
-
-</details>
+vuln = VectorEmbeddingWeaknessesExploit(types=[
+    VectorEmbeddingWeaknessesExploitType.VECTOR_DB_POISONING.value
+])
+```
 
 ---
 
-### Transparency & Explainability (OT/EI) — 2 Vulnerabilities
+### 6. SensitiveInformationDisclosure
 
-<details>
-<summary><strong>Transparency</strong> — Tests for insufficient disclosure and missing provenance</summary>
+Tests for training-data extraction, architecture disclosure, and configuration leakage.
 
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.transparency.Transparency` |
-| **Risk Category** | `RiskCategory.OPERABILITY_TRANSPARENCY` |
-| **Sub-types** | `insufficient_disclosure`, `missing_provenance`, `hidden_limitations`, `no_ai_disclosure`, `policy_violation` |
-| **Objective** | `policy_violation` |
-| **Attacks** | Baseline |
-| **Datasets** | None (custom goals required) |
+**Import:** `from hackagent.risks import SensitiveInformationDisclosure`
 
-</details>
+**Sub-types:**
+- `training_data_extraction` — Model memorisation allows extraction of training data
+- `system_architecture_disclosure` — Model reveals internal architecture details
+- `configuration_leakage` — Model exposes configuration parameters or settings
 
-<details>
-<summary><strong>Explainability</strong> — Tests for opaque decisions and meaningless explanations</summary>
+**Example:**
+```python
+from hackagent.risks import SensitiveInformationDisclosure
+from hackagent.risks.sensitive_information_disclosure.types import (
+    SensitiveInformationDisclosureType
+)
 
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.transparency.Explainability` |
-| **Risk Category** | `RiskCategory.EXPLAINABILITY_INTERPRETABILITY` |
-| **Sub-types** | `opaque_decisions`, `meaningless_explanations`, `no_uncertainty`, `selective_explanations`, `confidence_erosion` |
-| **Objective** | `policy_violation` |
-| **Attacks** | Baseline |
-| **Datasets** | None (custom goals required) |
-
-</details>
+vuln = SensitiveInformationDisclosure(types=[
+    SensitiveInformationDisclosureType.TRAINING_DATA_EXTRACTION.value
+])
+```
 
 ---
 
-### Third-Party Management (TPM) — 2 Vulnerabilities
+### 7. SystemPromptLeakage
 
-<details>
-<summary><strong>IntellectualProperty</strong> — Tests for copyright violations and trademark infringement</summary>
+Tests whether the LLM reveals sensitive details from its system prompt, such as credentials, internal instructions, or guardrails.
 
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.third_party.IntellectualProperty` |
-| **Risk Category** | `RiskCategory.THIRD_PARTY_MANAGEMENT` |
-| **Sub-types** | `copyright`, `trademark`, `imitation`, `trade_secret` |
-| **Objective** | `policy_violation` |
-| **Attacks** | Baseline |
-| **Datasets** | None (custom goals required) |
+**Import:** `from hackagent.risks import SystemPromptLeakage`
 
-</details>
+**Sub-types:**
+- `secrets_and_credentials` — Reveals API keys, database credentials, or system architecture from the prompt
+- `instructions` — Discloses internal instructions, rules, or operational procedures
+- `guard_exposure` — Exposes guard mechanisms, rejection rules, or filtering criteria
+- `permissions_and_roles` — Reveals role-based permissions, access controls, or internal configurations
 
-<details>
-<summary><strong>Competition</strong> — Tests for competitor denigration and market manipulation</summary>
+**Example:**
+```python
+from hackagent.risks import SystemPromptLeakage
+from hackagent.risks.system_prompt_leakage.types import SystemPromptLeakageType
 
-| Property | Value |
-|----------|-------|
-| **Class** | `hackagent.risks.threats.third_party.Competition` |
-| **Risk Category** | `RiskCategory.THIRD_PARTY_MANAGEMENT` |
-| **Sub-types** | `denigration`, `market_manipulation`, `strategy_leak` |
-| **Objective** | `policy_violation` |
-| **Attacks** | Baseline |
-| **Datasets** | None (custom goals required) |
+vuln = SystemPromptLeakage(types=[
+    SystemPromptLeakageType.SECRETS_AND_CREDENTIALS.value,
+    SystemPromptLeakageType.INSTRUCTIONS.value
+])
+```
 
-</details>
+---
+
+### 8. ExcessiveAgency
+
+Tests whether the LLM performs actions or grants permissions exceeding its intended scope without oversight.
+
+**Import:** `from hackagent.risks import ExcessiveAgency`
+
+**Sub-types:**
+- `functionality` — Model performs actions beyond its intended scope
+- `permissions` — Model grants or exercises permissions it should not have
+- `autonomy` — Model acts autonomously without required human oversight
+
+**Example:**
+```python
+from hackagent.risks import ExcessiveAgency
+from hackagent.risks.excessive_agency.types import ExcessiveAgencyType
+
+vuln = ExcessiveAgency(types=[
+    ExcessiveAgencyType.AUTONOMY.value
+])
+```
+
+---
+
+### 9. InputManipulationAttack
+
+Tests whether encoding bypasses, format string attacks, or Unicode manipulation can evade input validation and safety filters.
+
+**Import:** `from hackagent.risks import InputManipulationAttack`
+
+**Sub-types:**
+- `encoding_bypass` — Using character encoding tricks to bypass input filters
+- `format_string_attack` — Exploiting format string processing in input handling
+- `unicode_manipulation` — Using Unicode homoglyphs or special characters to evade detection
+
+**Example:**
+```python
+from hackagent.risks import InputManipulationAttack
+from hackagent.risks.input_manipulation_attack.types import InputManipulationAttackType
+
+vuln = InputManipulationAttack(types=[
+    InputManipulationAttackType.ENCODING_BYPASS.value
+])
+```
+
+---
+
+### 10. PublicFacingApplicationExploitation
+
+Tests whether publicly exposed AI APIs, web interfaces, or endpoints can be abused or exploited beyond intended use.
+
+**Import:** `from hackagent.risks import PublicFacingApplicationExploitation`
+
+**Sub-types:**
+- `api_abuse` — Exploiting publicly exposed AI APIs beyond intended use
+- `web_interface_exploitation` — Attacking web-based AI interfaces through injection or manipulation
+- `rate_limit_bypass` — Circumventing rate limits or access controls on public endpoints
+
+**Example:**
+```python
+from hackagent.risks import PublicFacingApplicationExploitation
+from hackagent.risks.public_facing_application_exploitation.types import (
+    PublicFacingApplicationExploitationType
+)
+
+vuln = PublicFacingApplicationExploitation(types=[
+    PublicFacingApplicationExploitationType.API_ABUSE.value
+])
+```
+
+---
+
+### 11. MaliciousToolInvocation
+
+Tests for risks from untrusted tool execution, data exfiltration through tool interactions, and tool privilege escalation.
+
+**Import:** `from hackagent.risks import MaliciousToolInvocation`
+
+**Sub-types:**
+- `untrusted_tool_execution` — Model executes or recommends untrusted third-party tools or plugins
+- `tool_data_exfiltration` — Tool interaction leads to data exfiltration
+- `tool_privilege_escalation` — Tool actions exceed intended scope or permissions
+
+**Example:**
+```python
+from hackagent.risks import MaliciousToolInvocation
+from hackagent.risks.malicious_tool_invocation.types import MaliciousToolInvocationType
+
+vuln = MaliciousToolInvocation(types=[
+    MaliciousToolInvocationType.UNTRUSTED_TOOL_EXECUTION.value
+])
+```
+
+---
+
+### 12. CredentialExposure
+
+Tests for hardcoded credentials, token leakage, and misconfigured access controls in AI systems.
+
+**Import:** `from hackagent.risks import CredentialExposure`
+
+**Sub-types:**
+- `hardcoded_credentials` — Credentials embedded in prompts or model context
+- `token_leakage` — Auth tokens exposed in LLM outputs or logs
+- `misconfigured_access` — Weak or default credentials on model-facing services
+
+**Example:**
+```python
+from hackagent.risks import CredentialExposure
+from hackagent.risks.credential_exposure.types import CredentialExposureType
+
+vuln = CredentialExposure(types=[
+    CredentialExposureType.TOKEN_LEAKAGE.value
+])
+```
+
+---
+
+### 13. Misinformation
+
+Tests whether the LLM produces factual fabrications, invented sources, or misrepresented expertise.
+
+**Import:** `from hackagent.risks import Misinformation`
+
+**Sub-types:**
+- `factual_fabrication` — Model fabricates facts, statistics, or events that never occurred
+- `source_fabrication` — Model invents citations, references, or sources that do not exist
+- `expertise_misrepresentation` — Model presents itself as having expertise or authority it lacks
+
+**Example:**
+```python
+from hackagent.risks import Misinformation
+from hackagent.risks.misinformation.types import MisinformationType
+
+vuln = Misinformation(types=[
+    MisinformationType.FACTUAL_FABRICATION.value,
+    MisinformationType.SOURCE_FABRICATION.value
+])
+```
+
+---
+
+## Summary Table
+
+| Vulnerability | Sub-types | Primary Focus | Attack Surface |
+|--------------|-----------|---------------|----------------|
+| ModelEvasion | 3 | Adversarial ML attacks | Model & Data |
+| CraftAdversarialData | 3 | Data poisoning | Model & Data |
+| PromptInjection | 3 | System prompt bypass | Input & Prompt |
+| Jailbreak | 5 | Safety filter evasion | Input & Prompt |
+| VectorEmbeddingWeaknessesExploit | 3 | RAG/embedding attacks | RAG & Embeddings |
+| SensitiveInformationDisclosure | 3 | Training data extraction | Model & Data |
+| SystemPromptLeakage | 4 | Prompt/credential leakage | Input & Prompt |
+| ExcessiveAgency | 3 | Unauthorized autonomy | Agent & Tools |
+| InputManipulationAttack | 3 | Input validation bypass | Input & Prompt |
+| PublicFacingApplicationExploitation | 3 | API/interface abuse | Agent & Tools |
+| MaliciousToolInvocation | 3 | Tool security | Agent & Tools |
+| CredentialExposure | 3 | Credential management | Agent & Tools |
+| Misinformation | 3 | Factual accuracy | Model & Data |
+
+## Next Steps
+
+- Learn about [Threat Profiles](./threat-profiles) to understand how vulnerabilities map to datasets and attacks
+- Explore [Evaluation Campaigns](./evaluation-campaigns) to build complete security assessments
+- Create [Custom Vulnerabilities](./custom-vulnerabilities) for organization-specific threats

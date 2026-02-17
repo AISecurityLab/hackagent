@@ -2,201 +2,420 @@
 sidebar_position: 2
 ---
 
-# Risk Categories
+# Vulnerabilities
 
-HackAgent's risk taxonomy defines **13 macro areas** of AI risk, aligned with international standards including **NIST AI RMF**, **EU AI Act**, and **OWASP LLM Top 10**. Seven of these categories have active vulnerability implementations with corresponding evaluation profiles.
+HackAgent's vulnerability framework is organized into four distinct layers, each targeting different attack surfaces of AI systems.
 
-## Category Overview
+## Vulnerability Layers
+
+<div style={{textAlign: 'center', margin: '2rem 0'}}>
 
 ```mermaid
-graph TD
-    subgraph "Active Categories (33 vulnerabilities)"
-        CS[🔒 Cybersecurity - 15]
-        DP[🔐 Data Privacy - 3]
-        F[⚖️ Fairness - 3]
-        VAR[✅ Trustworthiness - 4]
-        S[🛡️ Safety - 4]
-        OT[🔍 Transparency - 2]
-        TPM[🤝 Third-Party - 2]
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#f5f5f5','primaryTextColor':'#333','primaryBorderColor':'#d1d5db','lineColor':'#6b7280'}}}%%
+graph TB
+    subgraph IL["<b>Input Layer</b>"]
+        direction LR
+        PI["PromptInjection"]
+        JB["Jailbreak"]
+        IMA["InputManipulationAttack"]
+        SPL["SystemPromptLeakage"]
     end
+
+    subgraph Row2[" "]
+        direction LR
+        subgraph ML["<b>Model Layer</b>"]
+            direction LR
+            ME["ModelEvasion"]
+            CAD["CraftAdversarialData"]
+        end
+        subgraph DL["<b>Data Layer</b>"]
+            direction LR
+            SID["SensitiveInformationDisclosure"]
+            MI["Misinformation"]
+        end
+    end
+
+    subgraph AL["<b>Agent Layer</b>"]
+        direction LR
+        EA["ExcessiveAgency"]
+        MTI["MaliciousToolInvocation"]
+        CE["CredentialExposure"]
+        PFA["PublicFacingApplicationExploitation"]
+        VEW["VectorEmbeddingWeaknessesExploit"]
+    end
+
+    IL ~~~ Row2
+    Row2 ~~~ AL
+
+    style IL fill:#f9fafb,stroke:#9ca3af,stroke-width:2px,color:#1f2937,rx:10,ry:10
+    style ML fill:#f3f4f6,stroke:#9ca3af,stroke-width:2px,color:#1f2937,rx:10,ry:10
+    style DL fill:#e5e7eb,stroke:#9ca3af,stroke-width:2px,color:#1f2937,rx:10,ry:10
+    style AL fill:#d1d5db,stroke:#9ca3af,stroke-width:2px,color:#1f2937,rx:10,ry:10
+    style Row2 fill:none,stroke:none
+
+    style PI fill:#ffffff,stroke:#9ca3af,stroke-width:1px,color:#1f2937
+    style JB fill:#ffffff,stroke:#9ca3af,stroke-width:1px,color:#1f2937
+    style IMA fill:#ffffff,stroke:#9ca3af,stroke-width:1px,color:#1f2937
+    style SPL fill:#ffffff,stroke:#9ca3af,stroke-width:1px,color:#1f2937
+    style ME fill:#ffffff,stroke:#9ca3af,stroke-width:1px,color:#1f2937
+    style CAD fill:#ffffff,stroke:#9ca3af,stroke-width:1px,color:#1f2937
+    style SID fill:#ffffff,stroke:#9ca3af,stroke-width:1px,color:#1f2937
+    style MI fill:#ffffff,stroke:#9ca3af,stroke-width:1px,color:#1f2937
+    style EA fill:#ffffff,stroke:#9ca3af,stroke-width:1px,color:#1f2937
+    style MTI fill:#ffffff,stroke:#9ca3af,stroke-width:1px,color:#1f2937
+    style CE fill:#ffffff,stroke:#9ca3af,stroke-width:1px,color:#1f2937
+    style PFA fill:#ffffff,stroke:#9ca3af,stroke-width:1px,color:#1f2937
+    style VEW fill:#ffffff,stroke:#9ca3af,stroke-width:1px,color:#1f2937
 ```
 
-Each category is represented by the `RiskCategory` enum and documented with a `RiskCategoryInfo` dataclass containing a short code, display name, description, and linked vulnerability codes.
+</div>
+
+## Organization Patterns
+
+Choose how to group vulnerabilities based on your needs:
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+<Tabs>
+  <TabItem value="attack-surface" label="By Attack Surface" default>
+
+Group vulnerabilities based on where they target your system:
+
+**Input Layer**
+- PromptInjection
+- Jailbreak
+- InputManipulationAttack
+- SystemPromptLeakage
+
+**Model Layer**
+- ModelEvasion
+- CraftAdversarialData
+
+**Data Layer**
+- SensitiveInformationDisclosure
+- Misinformation
+
+**Agent Layer**
+- ExcessiveAgency
+- MaliciousToolInvocation
+- CredentialExposure
+- PublicFacingApplicationExploitation
+- VectorEmbeddingWeaknessesExploit
+
+</TabItem>
+<TabItem value="severity" label="By Severity">
+
+Organize by potential business impact:
 
 ```python
-from hackagent.risks import RiskCategory, get_risk_info
+from hackagent.risks import *
 
-info = get_risk_info(RiskCategory.CYBERSECURITY)
-print(info.code)          # "CS"
-print(info.display_name)  # "Cybersecurity"
+CRITICAL = [
+    CredentialExposure,
+    SystemPromptLeakage,
+    ExcessiveAgency,
+    MaliciousToolInvocation,
+]
+
+HIGH = [
+    PromptInjection,
+    Jailbreak,
+    SensitiveInformationDisclosure,
+    PublicFacingApplicationExploitation,
+]
+
+MEDIUM = [
+    ModelEvasion,
+    CraftAdversarialData,
+    InputManipulationAttack,
+    VectorEmbeddingWeaknessesExploit,
+]
+
+LOW = [
+    Misinformation,
+]
 ```
 
----
+  </TabItem>
+  <TabItem value="technique" label="By Attack Technique">
 
-## Cybersecurity (CS)
-
-**Code:** `CS` · **Enum:** `RiskCategory.CYBERSECURITY` · **Vulnerabilities:** 15
-
-Covers threats where adversaries exploit LLM interfaces or infrastructure to bypass safety mechanisms, execute unauthorized actions, or exfiltrate data.
-
-| Vulnerability | Description | Sub-types |
-|--------------|-------------|-----------|
-| **PromptInjection** | Injected instructions override system prompts | direct, indirect, multi_turn |
-| **PromptLeakage** | Model leaks system prompts, secrets, or guard configs | system_prompt, secrets, guard_config |
-| **Jailbreak** | Multi-turn, roleplay, encoding, and authority-based bypass | roleplay, encoding, authority |
-| **InsecureOutput** | Unescaped code, excessive info, or sensitive data in responses | code_injection, data_leak, format_abuse |
-| **InsecurePlugin** | Untrusted plugin execution and privilege escalation | data_exfiltration, privilege_escalation, untrusted_execution |
-| **SupplyChain** | Model/data poisoning and dependency vulnerabilities | model_poisoning, data_poisoning, dependency_attack |
-| **SSRF** | Internal service access, cloud metadata, data exfiltration | internal_access, cloud_metadata, data_exfiltration |
-| **SQLInjection** | Blind, union-based, and error-based SQL injection | blind, union_based, error_based |
-| **ShellInjection** | Command injection and shell escape sequences | command_injection, system_command, shell_escape |
-| **DebugAccess** | Debug endpoint exposure and internal state disclosure | endpoint_exposure, verbose_errors, state_disclosure |
-| **RBAC** | Role bypass and privilege escalation | role_bypass, privilege_escalation, role_assumption |
-| **BFLA** | Function-level authorization bypass | function_bypass, privilege_escalation, admin_access |
-| **BOLA** | Object-level access bypass and cross-customer data access | object_access, cross_customer, data_manipulation |
-| **CredentialExposure** | Hardcoded credentials, token leakage, misconfigured access | hardcoded, token_leak, misconfigured |
-| **SensitiveInfoDisclosure** | Training data extraction, architecture disclosure | training_data, architecture, config_leak |
-
-:::info Attack Coverage
-Most cybersecurity vulnerabilities support the full attack suite (Baseline + PAIR + AdvPrefix). Key datasets include **advbench**, **harmbench**, **jailbreakbench**, **strongreject**, and **wmdp_cyber**.
-:::
-
----
-
-## Data Privacy (DP)
-
-**Code:** `DP` · **Enum:** `RiskCategory.DATA_PRIVACY` · **Vulnerabilities:** 3
-
-Covers threats related to the unauthorized exposure, retention, or mishandling of personal and sensitive data.
-
-| Vulnerability | Description | Sub-types |
-|--------------|-------------|-----------|
-| **PIILeakage** | Direct PII disclosure, session leaks, social manipulation | direct_disclosure, session_leak, social_manipulation |
-| **DataRetention** | Excessive retention, unlawful storage, failed deletion | excessive_retention, unlawful_storage, failed_deletion |
-| **DataProtection** | Unencrypted transmission, weak anonymisation, access control failures | unencrypted, weak_anonymisation, access_control |
-
-:::note
-DataRetention and DataProtection currently have **no standard public dataset** and require custom goals for evaluation. PIILeakage can be tested with **donotanswer** and **beavertails** datasets.
-:::
-
----
-
-## Fairness (F)
-
-**Code:** `F` · **Enum:** `RiskCategory.FAIRNESS` · **Vulnerabilities:** 3
-
-Covers threats where AI systems produce discriminatory, biased, or toxic outputs that harm specific groups.
-
-| Vulnerability | Description | Sub-types |
-|--------------|-------------|-----------|
-| **Bias** | Racial, gender, religious, and political bias | race, gender, religion, politics |
-| **Fairness** | Stereotyping, subgroup impact, bias drift | stereotyping, subgroup_impact, bias_drift, inconsistent_treatment |
-| **Toxicity** | Insults, profanity, threats, and mockery | insults, profanity, threats, mockery |
-
-:::info Key Datasets
-**discrim_eval** (9.4K Anthropic decision prompts) is the primary dataset for bias and fairness testing. **toxicchat** (10K real user prompts) and **donotanswer** are primary for toxicity.
-:::
-
----
-
-## Trustworthiness (VAR)
-
-**Code:** `VAR` · **Enum:** `RiskCategory.VALIDITY_ACCURACY_ROBUSTNESS` · **Vulnerabilities:** 4
-
-Covers threats to model reliability — factual accuracy, resistance to manipulation, and appropriate levels of autonomy.
-
-| Vulnerability | Description | Sub-types |
-|--------------|-------------|-----------|
-| **Hallucination** | Factual fabrication, source fabrication, context hallucination | factual, source, context |
-| **Misinformation** | Factual errors, unsupported claims, expertise misrepresentation | factual_errors, unsupported_claims, expertise_misrepresentation |
-| **Robustness** | Input over-reliance, hijacking, adversarial perturbation | over_reliance, hijacking, perturbation |
-| **ExcessiveAgency** | Excess functionality, permissions, and autonomy | excess_functionality, excess_permissions, excess_autonomy |
-
-:::info Key Datasets
-**truthfulqa** is the primary benchmark for hallucination and misinformation. **xstest** and **coconot** test robustness. **agentharm** tests excessive agency in agentic systems.
-:::
-
----
-
-## Safety (S)
-
-**Code:** `S` · **Enum:** `RiskCategory.SAFETY` · **Vulnerabilities:** 4
-
-Covers threats where AI systems generate content that could cause real-world harm — from criminal planning to graphic violence.
-
-| Vulnerability | Description | Sub-types |
-|--------------|-------------|-----------|
-| **IllegalActivity** | Criminal planning, weapons, drug production, fraud/scam | criminal_planning, weapons, drugs, fraud |
-| **GraphicContent** | Violence, sexual content, self-harm generation | violence, sexual, self_harm |
-| **PersonalSafety** | Dangerous instructions, stalking/harassment, child exploitation | dangerous_instructions, stalking, child_exploitation |
-| **AutonomousOversight** | Missing human override, unmonitored actions, cascading failures | missing_override, unmonitored, cascading |
-
-:::info Key Datasets
-Safety has the richest dataset coverage: **harmbench**, **strongreject**, **beavertails**, **saladbench**, **simplesafetytests**, **wmdp_bio**, **wmdp_chem**, **harmfulqa**, and **agentharm**.
-:::
-
----
-
-## Transparency & Explainability (OT/EI)
-
-**Code:** `OT` / `EI` · **Enum:** `RiskCategory.OPERABILITY_TRANSPARENCY` / `RiskCategory.EXPLAINABILITY_INTERPRETABILITY` · **Vulnerabilities:** 2
-
-Covers threats where AI systems fail to adequately disclose their nature, reasoning, or limitations.
-
-| Vulnerability | Description | Sub-types |
-|--------------|-------------|-----------|
-| **Transparency** | Insufficient disclosure, missing provenance, policy violations | insufficient_disclosure, missing_provenance, hidden_limitations, no_ai_disclosure, policy_violation |
-| **Explainability** | Opaque decisions, meaningless explanations, confidence erosion | opaque_decisions, meaningless_explanations, no_uncertainty, selective_explanations, confidence_erosion |
-
-:::note
-Both currently have **no standard public dataset** and require custom goals for evaluation.
-:::
-
----
-
-## Third-Party Management (TPM)
-
-**Code:** `TPM` · **Enum:** `RiskCategory.THIRD_PARTY_MANAGEMENT` · **Vulnerabilities:** 2
-
-Covers threats arising from intellectual property violations and anti-competitive behavior in AI outputs.
-
-| Vulnerability | Description | Sub-types |
-|--------------|-------------|-----------|
-| **IntellectualProperty** | Copyright violations, trademark infringement, imitation | copyright, trademark, imitation, trade_secret |
-| **Competition** | Competitor denigration, market manipulation, strategy leaks | denigration, market_manipulation, strategy_leak |
-
-:::note
-Both currently have **no standard public dataset** and require custom goals for evaluation.
-:::
-
----
-
-## Additional Risk Areas
-
-The following 6 macro areas are defined in the `RiskCategory` enum but do not yet have vulnerability implementations:
-
-| Code | Category | Status |
-|------|----------|--------|
-| DG | Data Governance | Planned |
-| PDI | People & Digital Impact | Planned |
-| LE | Legality | Planned |
-| SEI | Sustainability & Environmental Impact | Planned |
-| NDB | Non-Discrimination & Bias | Merged into Fairness |
-
-These can be extended by creating custom vulnerability classes. See [Custom Vulnerabilities](./custom-vulnerabilities).
-
----
-
-## Using the Catalogue
+Group by the attack methods they're vulnerable to:
 
 ```python
-from hackagent.risks import RISK_CATALOGUE, get_risk_info, RiskCategory
+from hackagent.risks import *
 
-# List all 13 macro areas
-for info in RISK_CATALOGUE:
-    print(f"[{info.code}] {info.display_name}: {info.description}")
+# Adversarial ML Attacks
+ADVERSARIAL_ML = [
+    ModelEvasion,
+    CraftAdversarialData,
+    VectorEmbeddingWeaknessesExploit,
+]
 
-# Get details for a specific category
-cs = get_risk_info(RiskCategory.CYBERSECURITY)
-print(cs.vulnerability_codes)  # List of vulnerability codes in this category
+# Prompt Manipulation
+PROMPT_ATTACKS = [
+    PromptInjection,
+    Jailbreak,
+    SystemPromptLeakage,
+]
+
+# Agent Exploitation
+AGENT_ATTACKS = [
+    ExcessiveAgency,
+    MaliciousToolInvocation,
+    PublicFacingApplicationExploitation,
+]
+
+# Data & Encoding Attacks
+DATA_ATTACKS = [
+    InputManipulationAttack,
+    SensitiveInformationDisclosure,
+    CredentialExposure,
+]
+
+# Content Generation Risks
+CONTENT_RISKS = [
+    Misinformation,
+]
 ```
+
+  </TabItem>
+  <TabItem value="compliance" label="By Compliance Framework">
+
+Map to regulatory requirements:
+
+**OWASP Top 10 for LLMs**
+- LLM01: PromptInjection
+- LLM02: SensitiveInformationDisclosure
+- LLM03: VectorEmbeddingWeaknessesExploit (Supply Chain)
+- LLM04: ModelEvasion (Model Denial of Service)
+- LLM06: SensitiveInformationDisclosure
+- LLM07: InputManipulationAttack
+- LLM08: ExcessiveAgency
+- LLM09: MaliciousToolInvocation
+- LLM10: Misinformation
+
+**EU AI Act (High-Risk Systems)**
+- Jailbreak (Safety Requirements)
+- Misinformation (Accuracy Requirements)
+- SensitiveInformationDisclosure (Data Governance)
+- ExcessiveAgency (Human Oversight)
+- CredentialExposure (Security)
+
+**NIST AI RMF**
+- **GOVERN**: CredentialExposure, ExcessiveAgency
+- **MAP**: ModelEvasion, CraftAdversarialData
+- **MEASURE**: Misinformation, SensitiveInformationDisclosure
+- **MANAGE**: All vulnerabilities with threat profiles
+
+</TabItem>
+</Tabs>
+
+## Industry-Specific Views
+
+<Tabs>
+  <TabItem value="healthcare" label="Healthcare AI" default>
+
+```python
+HEALTHCARE_PRIORITY = {
+    "PHI_Protection": [
+        SensitiveInformationDisclosure,
+        SystemPromptLeakage,
+        CredentialExposure,
+    ],
+    "Clinical_Safety": [
+        Misinformation,
+        ExcessiveAgency,
+        Jailbreak,
+    ],
+    "Diagnostic_Robustness": [
+        ModelEvasion,
+        CraftAdversarialData,
+    ],
+}
+```
+
+  </TabItem>
+  <TabItem value="financial" label="Financial Services">
+
+```python
+FINANCIAL_PRIORITY = {
+    "Data_Security": [
+        CredentialExposure,
+        SensitiveInformationDisclosure,
+        SystemPromptLeakage,
+    ],
+    "Transaction_Integrity": [
+        ExcessiveAgency,
+        MaliciousToolInvocation,
+        PromptInjection,
+    ],
+    "Regulatory_Compliance": [
+        Misinformation,
+        PublicFacingApplicationExploitation,
+    ],
+}
+```
+
+  </TabItem>
+  <TabItem value="support" label="Customer Support">
+
+```python
+SUPPORT_PRIORITY = {
+    "Brand_Safety": [
+        Jailbreak,
+        Misinformation,
+        PromptInjection,
+    ],
+    "Data_Privacy": [
+        SensitiveInformationDisclosure,
+        SystemPromptLeakage,
+    ],
+    "Service_Reliability": [
+        ExcessiveAgency,
+        ModelEvasion,
+    ],
+}
+```
+
+  </TabItem>
+</Tabs>
+
+## Creating Custom Groups
+
+Define your own vulnerability groups based on your organization's needs:
+
+```python
+from hackagent.risks import VULNERABILITY_REGISTRY
+
+class ThreatModel:
+    """Custom threat model for your organization."""
+
+    def __init__(self, name: str, vulnerabilities: list[str]):
+        self.name = name
+        self.vulnerabilities = [
+            VULNERABILITY_REGISTRY[v] for v in vulnerabilities
+        ]
+
+    def create_campaign(self, agent):
+        """Run evaluation campaign for this threat model."""
+        results = {}
+        for vuln_class in self.vulnerabilities:
+            vuln = vuln_class()
+            # Get threat profile and run evaluation
+            # ... implementation
+        return results
+
+# Define your custom threat models
+web_app_threats = ThreatModel(
+    name="Web Application AI",
+    vulnerabilities=[
+        "PromptInjection",
+        "Jailbreak",
+        "PublicFacingApplicationExploitation",
+        "InputManipulationAttack",
+    ]
+)
+
+rag_pipeline_threats = ThreatModel(
+    name="RAG Pipeline",
+    vulnerabilities=[
+        "VectorEmbeddingWeaknessesExploit",
+        "PromptInjection",
+        "SensitiveInformationDisclosure",
+        "Misinformation",
+    ]
+)
+```
+
+## Evaluation Campaign Templates
+
+<Tabs>
+  <TabItem value="quick" label="Quick Scan" default>
+
+Test the most common vulnerabilities first:
+
+```python
+from hackagent import HackAgent
+from hackagent.risks import (
+    PromptInjection,
+    Jailbreak,
+    SensitiveInformationDisclosure,
+    ExcessiveAgency,
+)
+
+QUICK_SCAN = [
+    PromptInjection,
+    Jailbreak,
+    SensitiveInformationDisclosure,
+    ExcessiveAgency,
+]
+
+agent = HackAgent(endpoint="...", name="my-agent")
+
+for vuln_class in QUICK_SCAN:
+    vuln = vuln_class()
+    print(f"Testing {vuln.name}...")
+    # Run evaluation
+```
+
+  </TabItem>
+  <TabItem value="comprehensive" label="Comprehensive Audit">
+
+Full security assessment:
+
+```python
+from hackagent.risks import get_all_vulnerability_names, VULNERABILITY_REGISTRY
+
+all_vuln_names = get_all_vulnerability_names()
+
+for name in all_vuln_names:
+    vuln_class = VULNERABILITY_REGISTRY[name]
+    vuln = vuln_class()
+    print(f"Evaluating {vuln.name}...")
+    # Run comprehensive tests
+```
+
+  </TabItem>
+  <TabItem value="targeted" label="Targeted Assessment">
+
+Focus on specific attack surfaces:
+
+```python
+# Example: RAG-specific evaluation
+from hackagent.risks import (
+    VectorEmbeddingWeaknessesExploit,
+    PromptInjection,
+    SensitiveInformationDisclosure,
+)
+
+RAG_FOCUSED = [
+    VectorEmbeddingWeaknessesExploit,
+    PromptInjection,
+    SensitiveInformationDisclosure,
+]
+```
+
+  </TabItem>
+</Tabs>
+
+## Best Practices
+
+:::tip Start with Your Threat Model
+Don't test all 13 vulnerabilities at once. Start by identifying which ones are most relevant to your use case, then expand your coverage over time.
+:::
+
+:::info Prioritize by Impact
+Organize vulnerabilities based on potential business impact rather than technical complexity. A critical credential leak is more urgent than a minor model evasion.
+:::
+
+:::warning Regular Reassessment
+Your threat landscape changes as your AI system evolves. Regularly review and update your vulnerability groupings.
+:::
+
+## Next Steps
+
+- [Vulnerabilities](./vulnerabilities) — Complete reference for all 13 vulnerability classes
+- [Threat Profiles](./threat-profiles) — Understand dataset and attack mappings
+- [Evaluation Campaigns](./evaluation-campaigns) — Build comprehensive security assessments
+- [Custom Vulnerabilities](./custom-vulnerabilities) — Extend with organization-specific threats
