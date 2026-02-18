@@ -53,11 +53,6 @@
           "label": "hackagent.router",
           "type": "category"
         },
-        {
-          "items": [],
-          "label": "hackagent.risks",
-          "type": "category"
-        },
         "reference/hackagent/agent",
         "reference/hackagent/client",
         "reference/hackagent/errors"
@@ -66,6 +61,6 @@
       "type": "category"
     }
   ],
-  "label": "\ud83d\udd17 API Reference",
+  "label": "\u00f0\u0178\u201d\u2014 API Reference",
   "type": "category"
 }

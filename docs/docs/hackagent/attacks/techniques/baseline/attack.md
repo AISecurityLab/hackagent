@@ -44,6 +44,8 @@ def run(goals: List[str]) -> Dict[str, Any]
 
 Execute baseline attack.
 
+Uses TrackingCoordinator for unified pipeline and goal tracking.
+
 **Arguments**:
 
 - `goals` - List of harmful goals to test

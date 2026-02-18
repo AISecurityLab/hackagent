@@ -119,7 +119,12 @@ def create_pydoc_config(output_dir):
         """
     ).strip()
 
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as f:
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        suffix=".yml",
+        delete=False,
+        encoding="utf-8",
+    ) as f:
         f.write(config)
         return f.name
 
