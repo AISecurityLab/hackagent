@@ -1,13 +1,15 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Unit tests for main CLI functionality.
 """
 
 from unittest.mock import MagicMock, patch
 
+
 # Note: These tests would normally import the CLI, but we'll create mocked versions
 # to avoid dependency issues during testing
-
-
 class TestMainCLI:
     """Test main CLI functionality"""
 

@@ -1,15 +1,14 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
-
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
-
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.user_api_key import UserAPIKey
-
-
 T = TypeVar("T", bound="PaginatedUserAPIKeyList")
 
 

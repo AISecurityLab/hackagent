@@ -56,7 +56,8 @@ Subclasses only need to:
 - `logger` - Logger instance for this attack
 - `run_id` - Unique run identifier
 - `run_dir` - Output directory for this run
-- `tracker` - StepTracker for execution tracking
+- `coordinator` - TrackingCoordinator for unified tracking
+- `tracker` - StepTracker for execution tracking (alias for coordinator.step_tracker)
 
 #### \_\_init\_\_
 

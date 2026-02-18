@@ -1,7 +1,9 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 import unittest
 import uuid
 from unittest.mock import MagicMock, patch
-
 from hackagent.client import AuthenticatedClient
 from hackagent.models import Agent as BackendAgentModel
 

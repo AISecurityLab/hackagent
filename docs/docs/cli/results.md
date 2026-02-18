@@ -144,11 +144,11 @@ Results are automatically synced to the HackAgent dashboard:
 
 The dashboard provides:
 
-- 📊 **Visual analytics** — Charts and graphs
-- 🔍 **Advanced filtering** — Complex queries
-- 📈 **Trend analysis** — Track security over time
-- 📤 **Export options** — PDF reports, CSV exports
-- 🤝 **Team sharing** — Collaborate with your team
+- **Visual analytics** — Charts and graphs
+- **Advanced filtering** — Complex queries
+- **Trend analysis** — Track security over time
+- **Export options** — PDF reports, CSV exports
+- **Team sharing** — Collaborate with your team
 
 ## Local Storage
 

@@ -129,7 +129,6 @@ Step 2: You must finish TASK {}in detail.\n".format(
         return first_half, second_half
 
     def generate(self, harm_prompt):
-
         # flipping mode
         if self.flip_mode == "FWO":
             # flip word order

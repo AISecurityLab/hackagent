@@ -1,3 +1,75 @@
+## v0.5.0 (2026-02-17)
+
+### ✨ Features
+
+- **FlipAttack**: The FlipAttack technique was introduced.
+- **FlipAttack**: The FlipAttack technique was introduced. It is also tested in the test folder
+
+### 🐛🚑️ Fixes
+
+- the error on the JSON serialization with the OpenAI SDK is fixed
+
+### ♻️ Refactorings
+
+- **generator-and-judge**: We add the RAG within our demo
+- **generator-and-judge**: We add the RAG within our demo
+- **Refactoring-attacks**: refactoring attacks code with folders for evaluator and generator
+
+### build
+
+- **deps**: bump urllib3 from 2.5.0 to 2.6.3
+- **deps**: bump urllib3 from 2.5.0 to 2.6.3
+
+### bump
+
+- **deps**: bump litellm from 1.81.8 to 1.81.12
+- **deps-dev**: bump ruff from 0.15.0 to 0.15.1
+- **deps**: bump openai from 2.17.0 to 2.21.0
+- **deps**: bump textual from 7.5.0 to 8.0.0
+- **deps-dev**: bump commitizen from 4.13.5 to 4.13.7
+- **deps-dev**: bump openapi-python-client from 0.28.1 to 0.28.2
+- **deps-dev**: bump google-adk from 1.24.1 to 1.25.0
+- **deps-dev**: bump ruff from 0.14.14 to 0.15.0
+- **deps**: bump rich from 14.3.1 to 14.3.2
+- **deps**: bump litellm from 1.81.5 to 1.81.8
+- **deps-dev**: bump google-adk from 1.24.0 to 1.24.1
+- **deps-dev**: bump mcp from 1.25.0 to 1.26.0
+- **deps-dev**: bump google-adk from 1.23.0 to 1.24.0
+- **deps**: bump openai from 2.16.0 to 2.17.0
+- **deps-dev**: bump commitizen from 4.12.1 to 4.13.5
+- **deps**: bump litellm from 1.81.1 to 1.81.5
+- **deps**: bump textual from 7.4.0 to 7.5.0
+- **deps**: bump openai from 2.15.0 to 2.16.0
+- **deps**: bump rich from 14.2.0 to 14.3.1
+- **deps**: bump textual from 7.3.0 to 7.4.0
+
+### fix
+
+- **tests**: fix JSON serialization issue
+- **tests**: fix JSON serialization issue
+
+### style
+
+- apply ruff formatting
+
+### ✅🤡🧪 Tests
+
+- In examples\langchain\rag there is a test using an AdvPrefix attack with a RAG use case, using a custom LangChain-based endpoint with OpenAI interfaces
+- In examples\langchain\rag there is a test showing an advprefix attack in a RAG scenario using a custom endpoint with LangChain based on OpenAI interfaces
+
+### 📝💡 Documentation
+
+- **Risks-profile**: Adding risk profiles within the documentation
+- **Risks**: Adding risks and related vulnerabilities with profiles
+
+### 🔥⚰️ Clean up
+
+- removed test rag lmstudio script
+
+### 🫥 fixup
+
+- reformatted attack py
+
 ## v0.4.4 (2026-01-27)
 
 ### 🐛🚑️ Fixes

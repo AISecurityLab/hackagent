@@ -9,7 +9,7 @@ import ThemedImage from '@theme/ThemedImage';
 
 Ollama is a lightweight framework for running large language models locally. HackAgent provides native support for testing agents running on Ollama, allowing you to assess the security of self-hosted LLMs.
 
-## 🔧 Setup
+## Setup
 
 ### Prerequisites
 
@@ -39,7 +39,7 @@ Ollama is a lightweight framework for running large language models locally. Hac
    # Should return JSON with your installed models
    ```
 
-## 🚀 Basic Usage
+## Basic Usage
 
 ### Initialize HackAgent Client
 
@@ -63,7 +63,7 @@ The adapter supports all Ollama features:
 - **Chat & Generate APIs**: Both `/api/chat` and `/api/generate` endpoints
 - **Model Discovery**: Automatic listing of available models
 
-## ⚔️ Running Security Tests
+## Running Security Tests
 
 ### Basic AdvPrefix Attack
 
@@ -158,7 +158,7 @@ attack_config = {
 }
 ```
 
-## 🔍 Available Models
+## Available Models
 
 To see which models you have installed:
 
@@ -172,7 +172,7 @@ Popular models for security testing:
 - `codellama` - Code-focused Llama variant
 - `llama2-uncensored` - Uncensored Llama 2 (useful for attack generation)
 
-## 🛠️ Troubleshooting
+## Troubleshooting
 
 ### Connection Refused
 
@@ -222,7 +222,7 @@ agent = HackAgent(
 )
 ```
 
-## 📚 Further Reading
+## Further Reading
 
 - [Ollama Documentation](https://ollama.ai)
 - [Ollama Model Library](https://ollama.ai/library)

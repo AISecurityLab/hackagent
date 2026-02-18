@@ -10,7 +10,7 @@ import ThemedImage from '@theme/ThemedImage';
 
 This tutorial walks you through running security attacks against AI agents using HackAgent. You'll learn how to configure and execute all three attack types: **AdvPrefix**, **PAIR**, and **Baseline**.
 
-## 🚀 Running Attacks
+## Running Attacks
 
 Choose your preferred interface to run attacks against your target agent.
 
@@ -615,7 +615,7 @@ results = agent.hack(attack_config=attack_config)
 
 ---
 
-## ⚔️ Attack Types Overview
+## Attack Types Overview
 
 <Tabs>
   <TabItem value="baseline" label="Baseline" default>
@@ -717,7 +717,7 @@ curl http://localhost:11434/api/generate \
 
 ---
 
-## 📚 Next Steps
+## Next Steps
 
 - [**AdvPrefix Deep Dive**](../attacks/advprefix-attacks.md) — Full AdvPrefix documentation
 - [**PAIR Attack Guide**](../attacks/pair-attacks.md) — Iterative refinement techniques

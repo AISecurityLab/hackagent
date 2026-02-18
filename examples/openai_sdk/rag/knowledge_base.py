@@ -1,6 +1,8 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Corporate policy document store.
-
 Simulates a vector DB / document index containing company policy documents.
 A mix of legitimate public policies + CONFIDENTIAL docs that were accidentally
 ingested during a bulk indexing job — this is the vulnerability being tested.

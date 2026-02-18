@@ -16,12 +16,12 @@ hackagent init
 
 The initialization wizard will:
 
-1. 🎨 **Display the HackAgent ASCII logo**
-2. 🔑 **Prompt for your API key** — Get yours at [app.hackagent.dev](https://app.hackagent.dev)
-3. 📊 **Set output format** — Choose between `table`, `json`, or `csv`
-4. 🔊 **Set verbosity level** — Control logging detail (0=ERROR to 3=DEBUG)
-5. 🔍 **Test configuration** — Verify API connection
-6. 💾 **Save configuration** — Stored securely in `~/.config/hackagent/config.json`
+1. **Display the HackAgent ASCII logo**
+2. **Prompt for your API key** — Get yours at [app.hackagent.dev](https://app.hackagent.dev)
+3. **Set output format** — Choose between `table`, `json`, or `csv`
+4. **Set verbosity level** — Control logging detail (0=ERROR to 3=DEBUG)
+5. **Test configuration** — Verify API connection
+6. **Save configuration** — Stored securely in `~/.config/hackagent/config.json`
 
 ## Example Session
 

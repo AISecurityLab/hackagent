@@ -6,18 +6,18 @@ sidebar_position: 2
 
 This document outlines the ethical framework and security best practices for using HackAgent responsibly in AI security research and testing.
 
-## 🎯 Ethical Framework
+## Ethical Framework
 
 ### The HackAgent Ethics Code
 
 As a HackAgent user, you commit to:
 
-1. **🛡️ Do No Harm**: Never use HackAgent to cause damage, disruption, or unauthorized access
-2. **📋 Get Permission**: Always obtain explicit authorization before testing
-3. **🤝 Act in Good Faith**: Use discoveries to improve security, not to exploit or profit maliciously
-4. **🔒 Protect Privacy**: Respect user data and privacy at all times
-5. **📢 Disclose Responsibly**: Report vulnerabilities through proper channels
-6. **📚 Share Knowledge**: Contribute to the collective security knowledge base
+1. **Do No Harm**: Never use HackAgent to cause damage, disruption, or unauthorized access
+2. **Get Permission**: Always obtain explicit authorization before testing
+3. **Act in Good Faith**: Use discoveries to improve security, not to exploit or profit maliciously
+4. **Protect Privacy**: Respect user data and privacy at all times
+5. **Disclose Responsibly**: Report vulnerabilities through proper channels
+6. **Share Knowledge**: Contribute to the collective security knowledge base
 
 ### Ethical Decision Framework
 
@@ -46,7 +46,7 @@ flowchart TD
     N --> H
 ```
 
-## 🔐 Security Best Practices
+## Security Best Practices
 
 ### Environment Security
 
@@ -138,7 +138,7 @@ class TestingScope:
         return True
 ```
 
-## 🧪 Research Ethics
+## Research Ethics
 
 ### Academic Research Guidelines
 
@@ -240,7 +240,7 @@ class ConsultingEthics:
         ]
 ```
 
-## 🌍 Global Considerations
+## Global Considerations
 
 ### Cross-Border Legal Compliance
 
@@ -291,7 +291,7 @@ class LegalComplianceChecker:
 - Respect different business practices and timelines
 - Be aware of geopolitical sensitivities
 
-## 📊 Impact Assessment
+## Impact Assessment
 
 ### Vulnerability Severity Scoring
 
@@ -366,7 +366,7 @@ class StakeholderCommunication:
         }
 ```
 
-## 🤝 Community Standards
+## Community Standards
 
 ### Open Source Contribution Ethics
 
@@ -422,7 +422,7 @@ class ContributionGuidelines:
 - [ ] Offensive details are appropriately limited
 ```
 
-## 📞 Getting Help
+## Getting Help
 
 ### Ethics Consultation
 

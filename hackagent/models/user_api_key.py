@@ -1,8 +1,10 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 import datetime
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
 from uuid import UUID
-
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 from dateutil.parser import isoparse
@@ -10,8 +12,6 @@ from dateutil.parser import isoparse
 if TYPE_CHECKING:
     from ..models.organization_minimal import OrganizationMinimal
     from ..models.user_profile_minimal import UserProfileMinimal
-
-
 T = TypeVar("T", bound="UserAPIKey")
 
 
