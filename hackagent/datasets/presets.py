@@ -1,16 +1,5 @@
-# Copyright 2025 - AI4I. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 """
 Pre-configured dataset presets for common AI safety evaluations.
@@ -84,15 +73,6 @@ PRESETS: Dict[str, Dict[str, Any]] = {
         "split": "train",
         "fallback_fields": ["behavior", "goal", "input"],
         "description": "HarmBench - 200 standard harmful behavior prompts",
-    },
-    "harmbench_standard": {
-        "provider": "huggingface",
-        "path": "walledai/HarmBench",
-        "name": "standard",
-        "goal_field": "prompt",
-        "split": "train",
-        "fallback_fields": ["behavior", "goal", "input"],
-        "description": "HarmBench - 200 standard harmful behaviors",
     },
     "harmbench_contextual": {
         "provider": "huggingface",
@@ -195,6 +175,206 @@ PRESETS: Dict[str, Dict[str, Any]] = {
         "split": "test",
         "fallback_fields": ["request", "input", "text"],
         "description": "CoCoNot - context-conditioned refusal evaluation",
+    },
+    # =========================================================================
+    # JailbreakBench - Curated jailbreak behaviors (NeurIPS 2024)
+    # Source: https://huggingface.co/datasets/JailbreakBench/JBB-Behaviors
+    # Available configs: 'behaviors' (harmful + benign splits)
+    # Paper: https://arxiv.org/abs/2404.01318
+    # =========================================================================
+    "jailbreakbench": {
+        "provider": "huggingface",
+        "path": "JailbreakBench/JBB-Behaviors",
+        "name": "behaviors",
+        "goal_field": "Goal",
+        "split": "harmful",
+        "fallback_fields": ["goal", "prompt", "input", "text"],
+        "description": (
+            "JailbreakBench - 100 curated misuse behaviors across 10 OpenAI "
+            "policy categories (NeurIPS 2024 Datasets & Benchmarks)"
+        ),
+    },
+    # =========================================================================
+    # BeaverTails - Multi-category safety QA dataset
+    # Source: https://huggingface.co/datasets/PKU-Alignment/BeaverTails
+    # 14 harm categories: animal abuse, child abuse, discrimination, drugs,
+    # financial crime, hate speech, misinformation, privacy, self-harm,
+    # sexual content, terrorism, violence, and more
+    # Paper: https://arxiv.org/abs/2307.04657
+    # =========================================================================
+    "beavertails": {
+        "provider": "huggingface",
+        "path": "PKU-Alignment/BeaverTails",
+        "goal_field": "prompt",
+        "split": "330k_test",
+        "fallback_fields": ["question", "input", "text"],
+        "description": (
+            "BeaverTails - 330K+ safety-labeled QA pairs across 14 harm "
+            "categories including discrimination, privacy, violence, and more"
+        ),
+    },
+    # =========================================================================
+    # HarmfulQA - Red-teaming harmful questions across 10 topics
+    # Source: https://huggingface.co/datasets/declare-lab/HarmfulQA
+    # Topics: science, history, math, literature, philosophy, social sciences,
+    # health, geography, education, business
+    # Paper: https://arxiv.org/abs/2308.09662
+    # =========================================================================
+    "harmfulqa": {
+        "provider": "huggingface",
+        "path": "declare-lab/HarmfulQA",
+        "goal_field": "question",
+        "split": "train",
+        "fallback_fields": ["prompt", "input", "text"],
+        "description": (
+            "HarmfulQA - 1,960 harmful questions across 10 topics with "
+            "red/blue conversations for safety benchmarking"
+        ),
+    },
+    # =========================================================================
+    # SALAD-Bench - Hierarchical safety benchmark
+    # Source: https://huggingface.co/datasets/OpenSafetyLab/Salad-Data
+    # Available configs: 'base_set', 'attack_enhanced_set',
+    #                    'defense_enhanced_set', 'mcq_set'
+    # Taxonomy: 3-level harm categories (representation, misinformation,
+    # malicious use, human autonomy, etc.)
+    # Paper: https://arxiv.org/abs/2402.05044
+    # =========================================================================
+    "saladbench": {
+        "provider": "huggingface",
+        "path": "OpenSafetyLab/Salad-Data",
+        "name": "base_set",
+        "goal_field": "question",
+        "split": "train",
+        "fallback_fields": ["prompt", "input", "text"],
+        "description": (
+            "SALAD-Bench base set - 21K harmful questions with hierarchical "
+            "3-level safety taxonomy"
+        ),
+    },
+    "saladbench_attack": {
+        "provider": "huggingface",
+        "path": "OpenSafetyLab/Salad-Data",
+        "name": "attack_enhanced_set",
+        "goal_field": "augq",
+        "split": "train",
+        "fallback_fields": ["question", "baseq", "prompt", "input"],
+        "description": (
+            "SALAD-Bench attack-enhanced set - 5K questions augmented with "
+            "jailbreak attack methods (GPTFuzzer, etc.)"
+        ),
+    },
+    # =========================================================================
+    # ToxicChat - Real-world toxic user prompts
+    # Source: https://huggingface.co/datasets/lmsys/toxic-chat
+    # Collected from Vicuna online demo, human-annotated
+    # ~7% toxic, ~2% jailbreaking attempts
+    # Paper: https://arxiv.org/abs/2310.17389
+    # =========================================================================
+    "toxicchat": {
+        "provider": "huggingface",
+        "path": "lmsys/toxic-chat",
+        "name": "toxicchat0124",
+        "goal_field": "user_input",
+        "split": "train",
+        "fallback_fields": ["prompt", "input", "text"],
+        "description": (
+            "ToxicChat - 10K real user prompts from Vicuna demo with "
+            "human-annotated toxicity and jailbreaking labels"
+        ),
+    },
+    # =========================================================================
+    # Discrim-Eval - Discrimination in LM decision-making
+    # Source: https://huggingface.co/datasets/Anthropic/discrim-eval
+    # 70 decision scenarios × 135 demographic combos (age, gender, race)
+    # Available configs: 'explicit', 'implicit'
+    # Paper: https://arxiv.org/abs/2312.03689
+    # =========================================================================
+    "discrim_eval": {
+        "provider": "huggingface",
+        "path": "Anthropic/discrim-eval",
+        "name": "explicit",
+        "goal_field": "filled_template",
+        "split": "train",
+        "fallback_fields": ["prompt", "input", "text"],
+        "description": (
+            "Discrim-Eval - 9.4K decision prompts testing for discrimination "
+            "by race, gender, and age across 70 scenarios (Anthropic)"
+        ),
+    },
+    # =========================================================================
+    # Prompt Injections - Injection attack samples
+    # Source: https://huggingface.co/datasets/deepset/prompt-injections
+    # Binary classification dataset for prompt injection detection
+    # =========================================================================
+    "prompt_injections": {
+        "provider": "huggingface",
+        "path": "deepset/prompt-injections",
+        "goal_field": "text",
+        "split": "train",
+        "fallback_fields": ["prompt", "input"],
+        "description": (
+            "Prompt Injections - 662 prompt injection samples for "
+            "injection attack detection and testing (deepset)"
+        ),
+    },
+    # =========================================================================
+    # AIR-Bench 2024 - Regulation-aligned safety evaluation
+    # Source: https://huggingface.co/datasets/stanford-crfm/air-bench-2024
+    # 5,690 prompts mapped to government AI regulation risk categories
+    # with hierarchical 4-level taxonomy (cate-idx, l2-name, l3-name, l4-name)
+    # From the Inspect Evals framework (UK AISI)
+    # Paper: https://arxiv.org/abs/2407.17436
+    # =========================================================================
+    "airbench": {
+        "provider": "huggingface",
+        "path": "stanford-crfm/air-bench-2024",
+        "goal_field": "prompt",
+        "split": "test",
+        "fallback_fields": ["input", "text"],
+        "description": (
+            "AIR-Bench 2024 - 5,690 regulation-aligned malicious prompts "
+            "with 4-level risk taxonomy from government AI regulations "
+            "(Stanford CRFM, Inspect Evals)"
+        ),
+    },
+    # =========================================================================
+    # SOS-Bench - Safety alignment on scientific knowledge
+    # Source: https://huggingface.co/datasets/SOSBench/SOSBench
+    # 3,000 prompts across 6 high-risk scientific domains:
+    # biology, chemistry, pharmacy, physics, psychology, medical
+    # From the Inspect Evals framework (UK AISI)
+    # Paper: https://arxiv.org/abs/2505.21605
+    # =========================================================================
+    "sosbench": {
+        "provider": "huggingface",
+        "path": "SOSBench/SOSBench",
+        "goal_field": "goal",
+        "split": "train",
+        "fallback_fields": ["prompt", "input", "text"],
+        "description": (
+            "SOS-Bench - 3,000 hazardous science prompts across 6 domains "
+            "(biology, chemistry, pharmacy, physics, psychology, medical) "
+            "for safety alignment evaluation (Inspect Evals)"
+        ),
+    },
+    # =========================================================================
+    # RAG Security - RAG/embedding security evaluation
+    # Note: SafeRAG benchmark is under development (arxiv:2501.18636)
+    # Using galileo-ai/ragbench as interim general RAG evaluation dataset
+    # Source: https://huggingface.co/datasets/galileo-ai/ragbench
+    # TODO: Replace with SafeRAG when available on HuggingFace
+    # =========================================================================
+    "rag_security": {
+        "provider": "huggingface",
+        "path": "galileo-ai/ragbench",
+        "goal_field": "question",
+        "split": "train",
+        "fallback_fields": ["query", "prompt", "input", "text"],
+        "description": (
+            "RAGBench - 100K RAG benchmark covering industry-specific domains, "
+            "used as interim for RAG security testing (pending SafeRAG release)"
+        ),
     },
 }
 

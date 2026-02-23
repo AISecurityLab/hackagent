@@ -1,10 +1,11 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from collections.abc import Mapping
 from typing import Any, TypeVar, Union, cast
 from uuid import UUID
-
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
-
 from ..models.evaluation_status_enum import EvaluationStatusEnum
 from ..types import UNSET, Unset
 

@@ -1,16 +1,5 @@
-# Copyright 2025 - AI4I. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 """
 Base class for attack technique implementations.
@@ -204,7 +193,7 @@ class BaseAttack(abc.ABC):
     def _initialize_coordinator(
         self,
         attack_type: str,
-        goals: List[str],
+        goals: Optional[List[str]] = None,
         initial_metadata: Optional[Dict[str, Any]] = None,
     ) -> TrackingCoordinator:
         """
@@ -214,9 +203,15 @@ class BaseAttack(abc.ABC):
         (pipeline-level) and Tracker (per-goal) in a single call.
         Also sets ``self.tracker`` for backward compatibility.
 
+        When *goals* is ``None``, the coordinator is created without
+        initialising goal Results.  Call ``coordinator.initialize_goals()``
+        or ``coordinator.initialize_goals_from_pipeline_data()`` later to
+        defer result creation until the surviving goals are known.
+
         Args:
             attack_type: Attack identifier (e.g., "advprefix", "pair")
-            goals: List of goals being attacked
+            goals: Optional list of goals. Pass ``None`` to defer goal
+                   result creation until after the Generation step.
             initial_metadata: Optional metadata for each goal result
 
         Returns:
@@ -275,7 +270,11 @@ class BaseAttack(abc.ABC):
         return args
 
     def _execute_pipeline(
-        self, pipeline_steps: List[Dict], initial_input: Any, start_step: int = 0
+        self,
+        pipeline_steps: List[Dict],
+        initial_input: Any,
+        start_step: int = 0,
+        end_step: Optional[int] = None,
     ) -> Any:
         """
         Execute a pipeline of steps with tracking.
@@ -284,13 +283,16 @@ class BaseAttack(abc.ABC):
             pipeline_steps: List of step configurations
             initial_input: Initial input data (usually goals)
             start_step: Step index to start from (0-based)
+            end_step: Step index to stop before (exclusive, 0-based).
+                      Defaults to ``len(pipeline_steps)`` (run all remaining).
 
         Returns:
             Output from final pipeline step
         """
         current_output = initial_input
+        _end = end_step if end_step is not None else len(pipeline_steps)
 
-        for i in range(start_step, len(pipeline_steps)):
+        for i in range(start_step, _end):
             step_info = pipeline_steps[i]
             step_name = step_info["name"]
             step_type = step_info["step_type_enum"]

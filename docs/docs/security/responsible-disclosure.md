@@ -6,7 +6,7 @@ sidebar_position: 1
 
 HackAgent is a powerful security testing framework designed to help identify vulnerabilities in AI systems. With this power comes responsibility. This guide outlines the ethical and legal considerations for using HackAgent responsibly.
 
-## 🛡️ Core Principles
+## Core Principles
 
 ### 1. Authorization First
 **NEVER test systems without explicit permission**
@@ -39,7 +39,7 @@ HackAgent is a powerful security testing framework designed to help identify vul
 - ❌ Don't store or share discovered sensitive data
 - ❌ Don't use real user data in tests
 
-## 📋 Pre-Testing Checklist
+## Pre-Testing Checklist
 
 Before using HackAgent, ensure you can answer **YES** to all these questions:
 
@@ -50,7 +50,7 @@ Before using HackAgent, ensure you can answer **YES** to all these questions:
 - [ ] Do I have a plan to minimize potential harm?
 - [ ] Am I complying with applicable laws and regulations?
 
-## 🔍 Vulnerability Discovery Process
+## Vulnerability Discovery Process
 
 ### Phase 1: Preparation
 1. **Document Permission**: Keep written authorization for your testing
@@ -70,7 +70,7 @@ Before using HackAgent, ensure you can answer **YES** to all these questions:
 3. **Suggest Fixes**: Offer remediation suggestions when possible
 4. **Follow Up**: Maintain communication throughout the process
 
-## 📧 Responsible Disclosure Process
+## Responsible Disclosure Process
 
 ### 1. Initial Discovery
 When you discover a vulnerability using HackAgent:
@@ -157,7 +157,7 @@ Best regards,
 - Specific system details that could aid attackers
 - Information that could compromise ongoing security measures
 
-## ⚖️ Legal Considerations
+## Legal Considerations
 
 ### Know Your Jurisdiction
 Security testing laws vary by location. Key legal frameworks include:
@@ -184,7 +184,7 @@ Security testing laws vary by location. Key legal frameworks include:
 4. **Respect Boundaries**: Stay within authorized scope
 5. **Report Responsibly**: Follow coordinated disclosure practices
 
-## 🏢 Organizational Guidelines
+## Organizational Guidelines
 
 ### For Security Teams
 If you're using HackAgent within an organization:
@@ -216,7 +216,7 @@ If you're participating in bug bounty programs:
 - Suggest remediation when possible
 - Follow up on vendor communications
 
-## 🔬 Research Ethics
+## Research Ethics
 
 ### Academic Research
 When using HackAgent for academic research:
@@ -248,7 +248,7 @@ For commercial security research:
 - Participate in security community standards
 - Contribute to defensive knowledge
 
-## 🚨 Emergency Procedures
+## Emergency Procedures
 
 ### If You Accidentally Access Sensitive Data
 1. **Stop immediately** - Cease all testing activities
@@ -271,7 +271,7 @@ For commercial security research:
 4. **Offer assistance** - Help remediate any damage caused
 5. **Learn and improve** - Adjust procedures to prevent recurrence
 
-## 📚 Additional Resources
+## Additional Resources
 
 ### Security Organizations
 - [Forum of Incident Response and Security Teams (FIRST)](https://www.first.org/)

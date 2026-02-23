@@ -1,3 +1,6 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """Contains all the data models used in inputs/outputs"""
 
 from .agent import Agent

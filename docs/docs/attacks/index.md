@@ -32,7 +32,7 @@ All attacks support loading goals from AI safety benchmarks like **AgentHarm**, 
 
 ---
 
-## 🎯 AdvPrefix — Advanced Prefix Optimization
+## AdvPrefix — Advanced Prefix Optimization
 
 The most sophisticated attack in HackAgent's arsenal. Uses a **9-step automated pipeline** to generate and optimize adversarial prefixes that bypass AI safety mechanisms.
 
@@ -61,7 +61,7 @@ attack_config = {
 
 ---
 
-## 🔄 PAIR — Prompt Automatic Iterative Refinement
+## PAIR — Prompt Automatic Iterative Refinement
 
 An LLM-powered attack that uses an **attacker model** to iteratively refine jailbreak prompts based on target responses and judge feedback.
 
@@ -93,7 +93,7 @@ attack_config = {
 
 ---
 
-## 📝 Baseline — Template-Based Attacks
+## Baseline — Template-Based Attacks
 
 A simpler but effective approach using **predefined prompt templates** combined with harmful goals. Great for quick vulnerability assessments.
 

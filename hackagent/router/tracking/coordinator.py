@@ -1,16 +1,5 @@
-# Copyright 2025 - AI4I. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 """
 Tracking coordinator for attack techniques.
@@ -250,6 +239,40 @@ class TrackingCoordinator:
             )
 
         self.logger.info(f"Initialized {len(goals)} goal results for tracking")
+
+    def initialize_goals_from_pipeline_data(
+        self,
+        pipeline_data: List[Dict[str, Any]],
+        initial_metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """
+        Create Result records only for goals that survived the Generation step.
+
+        Extracts unique goals from pipeline output data and initializes
+        tracking only for those goals. Goals that were filtered out during
+        Generation get no Result record.
+
+        Args:
+            pipeline_data: Output from the Generation step (list of dicts with "goal" key)
+            initial_metadata: Optional metadata to attach to each goal result
+        """
+        if not pipeline_data:
+            self.logger.warning("No pipeline data — no goals to initialize")
+            return
+
+        # Extract unique goals preserving insertion order
+        surviving_goals = list(
+            dict.fromkeys(row.get("goal", "") for row in pipeline_data if row.get("goal"))
+        )
+
+        if not surviving_goals:
+            self.logger.warning("No goals found in pipeline data")
+            return
+
+        self.logger.info(
+            f"Initializing {len(surviving_goals)} surviving goals from pipeline data"
+        )
+        self.initialize_goals(surviving_goals, initial_metadata)
 
     def get_goal_context(self, goal_index: int) -> Optional[Context]:
         """Get tracking context for a specific goal by index."""

@@ -115,7 +115,7 @@ hackagent attack advprefix \
 #### More Frameworks
 
 <Tabs groupId="framework-extra">
-  <TabItem value="langchain" label="🦜 LangChain" default>
+  <TabItem value="langchain" label="LangChain" default>
 
 <details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
   <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
@@ -135,7 +135,7 @@ hackagent attack advprefix \
 ```
 
   </TabItem>
-  <TabItem value="lmstudio" label="🖥️ LM Studio">
+  <TabItem value="lmstudio" label="LM Studio">
 
 <details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
   <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
@@ -156,7 +156,7 @@ hackagent attack advprefix \
 ```
 
   </TabItem>
-  <TabItem value="vllm" label="⚡ vLLM">
+  <TabItem value="vllm" label="vLLM">
 
 <details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
   <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
@@ -176,7 +176,7 @@ hackagent attack advprefix \
 ```
 
   </TabItem>
-  <TabItem value="custom" label="🔧 Custom">
+  <TabItem value="custom" label="Custom">
 
 <details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
   <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
@@ -309,7 +309,7 @@ agent.hack(attack_config=attack_config)
 #### More Frameworks
 
 <Tabs groupId="framework-extra">
-  <TabItem value="langchain" label="🦜 LangChain" default>
+  <TabItem value="langchain" label="LangChain" default>
 
 <details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
   <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
@@ -330,7 +330,7 @@ agent = HackAgent(
 ```
 
   </TabItem>
-  <TabItem value="lmstudio" label="🖥️ LM Studio">
+  <TabItem value="lmstudio" label="LM Studio">
 
 <details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
   <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
@@ -351,7 +351,7 @@ agent = HackAgent(
 ```
 
   </TabItem>
-  <TabItem value="vllm" label="⚡ vLLM">
+  <TabItem value="vllm" label="vLLM">
 
 <details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
   <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
@@ -372,7 +372,7 @@ agent = HackAgent(
 ```
 
   </TabItem>
-  <TabItem value="custom" label="🔧 Custom">
+  <TabItem value="custom" label="Custom">
 
 <details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
   <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>

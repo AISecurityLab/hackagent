@@ -1,6 +1,8 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 import ssl
 from typing import Any, Optional, Union
-
 import httpx
 from attrs import define, evolve, field
 
@@ -8,9 +10,7 @@ from attrs import define, evolve, field
 @define
 class Client:
     """A class for keeping track of data related to the API
-
     The following are accepted as keyword arguments and will be used to construct httpx Clients internally:
-
         ``base_url``: The base URL for the API, all requests are made to a relative path to this URL
 
         ``cookies``: A dictionary of cookies to be sent with every request

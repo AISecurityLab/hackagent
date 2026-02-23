@@ -6,7 +6,7 @@ sidebar_position: 1
 
 HackAgent is built as a comprehensive security testing platform with a modern, scalable architecture designed to handle enterprise-grade AI agent vulnerability assessments.
 
-## 🏗️ High-Level Architecture
+## High-Level Architecture
 
 ```mermaid
 graph TB
@@ -23,7 +23,7 @@ graph TB
     
     subgraph "Core Services"
         AGENT[Agent Management]
-        ATTACK[⚔️ Attack Engine]
+        ATTACK[Attack Engine]
         EVAL[Evaluation Service]
         BILLING[Billing Service]
     end
@@ -32,12 +32,12 @@ graph TB
         DB[(PostgreSQL)]
         CACHE[(Redis Cache)]
         FILES[File Storage]
-        DATASETS[📊 Datasets]
+        DATASETS[Datasets]
     end
     
     subgraph "External Integrations"
-        ADK[🔌 Google ADK]
-        OPENAI[🔌 OpenAI SDK]
+        ADK[Google ADK]
+        OPENAI[OpenAI SDK]
         LITELLM[LiteLLM]
         CUSTOM[Custom Agents]
     end
@@ -73,32 +73,32 @@ graph TB
     style OPENAI fill:#69db7c,stroke:#2f9e44,color:#fff
 ```
 
-### 🔗 Explore Components
+### Explore Components
 
 import Link from '@docusaurus/Link';
 
 <div className="row" style={{marginTop: '1rem'}}>
   <div className="col col--3" style={{marginBottom: '1rem'}}>
     <Link to="/attacks/" style={{textDecoration: 'none', display: 'block', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '2px solid var(--ifm-color-primary)'}}>
-      <h4 style={{margin: 0}}>⚔️ Attack Engine</h4>
+      <h4 style={{margin: 0}}>Attack Engine</h4>
       <p style={{margin: '0.5rem 0 0 0', fontSize: '0.9rem'}}>Learn about different attack types and techniques</p>
     </Link>
   </div>
   <div className="col col--3" style={{marginBottom: '1rem'}}>
     <Link to="/datasets/" style={{textDecoration: 'none', display: 'block', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '2px solid var(--ifm-color-primary)'}}>
-      <h4 style={{margin: 0}}>📊 Datasets</h4>
+      <h4 style={{margin: 0}}>Datasets</h4>
       <p style={{margin: '0.5rem 0 0 0', fontSize: '0.9rem'}}>Configure data sources for security testing</p>
     </Link>
   </div>
   <div className="col col--3" style={{marginBottom: '1rem'}}>
     <Link to="/agents/google-adk" style={{textDecoration: 'none', display: 'block', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '2px solid var(--ifm-color-primary)'}}>
-      <h4 style={{margin: 0}}>🔌 Google ADK</h4>
+      <h4 style={{margin: 0}}>Google ADK</h4>
       <p style={{margin: '0.5rem 0 0 0', fontSize: '0.9rem'}}>Test Google ADK-based agents</p>
     </Link>
   </div>
   <div className="col col--3" style={{marginBottom: '1rem'}}>
     <Link to="/agents/openai-sdk" style={{textDecoration: 'none', display: 'block', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '2px solid var(--ifm-color-primary)'}}>
-      <h4 style={{margin: 0}}>🔌 OpenAI SDK</h4>
+      <h4 style={{margin: 0}}>OpenAI SDK</h4>
       <p style={{margin: '0.5rem 0 0 0', fontSize: '0.9rem'}}>Test OpenAI SDK-based agents</p>
     </Link>
   </div>
@@ -107,7 +107,7 @@ import Link from '@docusaurus/Link';
     style OPENAI fill:#69db7c,stroke:#2f9e44,color:#fff
 ```
 
-## 🧩 Core Components
+## Core Components
 
 ### Frontend Layer
 
@@ -175,7 +175,7 @@ import Link from '@docusaurus/Link';
 - **Attack Results**: Temporary result caching
 - **Rate Limiting**: Token bucket implementation
 
-## 🔄 Data Flow Architecture
+## Data Flow Architecture
 
 ### Attack Execution Flow
 
@@ -243,7 +243,7 @@ graph TB
     DB --> RUN_B
 ```
 
-## 🔐 Security Architecture
+## Security Architecture
 
 ### Authentication Flow
 
@@ -274,7 +274,7 @@ sequenceDiagram
 - **Audit Logging**: Comprehensive audit trails for all actions
 - **Data Isolation**: Strict tenant data separation
 
-## 📈 Scalability Considerations
+## Scalability Considerations
 
 ### Horizontal Scaling
 
@@ -290,7 +290,7 @@ sequenceDiagram
 - **Database Indexing**: Optimized queries for large datasets
 - **CDN Integration**: Static asset delivery optimization
 
-## 🧪 Testing Architecture
+## Testing Architecture
 
 ### Test Isolation
 
@@ -323,7 +323,7 @@ graph TB
 - **Security Tests**: Vulnerability scanning and penetration testing
 - **Performance Tests**: Load testing and benchmarking
 
-## 🚀 Deployment Architecture
+## Deployment Architecture
 
 ### Container Strategy
 

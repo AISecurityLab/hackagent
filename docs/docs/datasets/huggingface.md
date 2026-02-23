@@ -4,7 +4,15 @@ sidebar_position: 3
 
 # HuggingFace Provider
 
-Load goals from any dataset on HuggingFace Hub.
+Load goals from any dataset on HuggingFace Hub — access thousands of datasets including safety benchmarks, question-answering datasets, and custom evaluations.
+
+:::tip When to Use
+Use the HuggingFace provider when you want to:
+- Load datasets not covered by presets
+- Use your own private HuggingFace datasets
+- Access the latest versions of datasets
+- Customize dataset configurations
+:::
 
 ## Configuration Options
 
@@ -82,6 +90,87 @@ attack_config = {
         "path": "some-org/custom-dataset",
         "trust_remote_code": True,  # ⚠️ Security risk - only for trusted sources
     }
+}
+```
+
+:::danger Security Warning
+Only set `trust_remote_code: True` for datasets from **trusted sources**. This allows arbitrary Python code execution from the dataset repository, which could be malicious.
+:::
+
+---
+
+## Practical Examples
+
+### Example 1: Testing with Different Splits
+
+```python
+# Test on public split
+public_results = agent.hack(attack_config={
+    "attack_type": "baseline",
+    "dataset": {
+        "provider": "huggingface",
+        "path": "ai-safety-institute/AgentHarm",
+        "name": "harmful",
+        "goal_field": "prompt",
+        "split": "test_public",
+        "limit": 50,
+    }
+})
+
+# Compare with held-out split (if you have access)
+held_out_results = agent.hack(attack_config={
+    "attack_type": "baseline",
+    "dataset": {
+        "provider": "huggingface",
+        "path": "ai-safety-institute/AgentHarm",
+        "name": "harmful",
+        "goal_field": "prompt",
+        "split": "test_held_out",
+        "limit": 50,
+    }
+})
+```
+
+### Example 2: Loading Private Datasets
+
+```python
+# First, authenticate with HuggingFace
+# huggingface-cli login
+
+attack_config = {
+    "attack_type": "advprefix",
+    "dataset": {
+        "provider": "huggingface",
+        "path": "your-org/private-safety-dataset",
+        "goal_field": "attack_prompt",
+        "split": "test",
+    }
+}
+```
+
+### Example 3: Sampling Strategy
+
+```python
+# Random sampling for diversity
+random_sample = {
+    "provider": "huggingface",
+    "path": "PKU-Alignment/BeaverTails",
+    "goal_field": "prompt",
+    "split": "330k_test",
+    "limit": 500,
+    "shuffle": True,
+    "seed": 42,
+}
+
+# Sequential sampling for systematic testing
+sequential_sample = {
+    "provider": "huggingface",
+    "path": "PKU-Alignment/BeaverTails",
+    "goal_field": "prompt",
+    "split": "330k_test",
+    "limit": 500,
+    "offset": 0,  # Start from beginning
+    "shuffle": False,
 }
 ```
 

@@ -7,7 +7,7 @@ slug: /agents/google-adk
 
 Google Agent Development Kit (ADK) is a framework for building conversational AI agents with tool-calling capabilities. HackAgent provides native support for testing ADK-based agents.
 
-## 🔧 Setup
+## Setup
 
 ### Prerequisites
 
@@ -46,7 +46,7 @@ Google Agent Development Kit (ADK) is a framework for building conversational AI
    pip install hackagent
    ```
 
-## 🚀 Basic Integration
+## Basic Integration
 
 ### Initialize HackAgent Client
 
@@ -71,7 +71,7 @@ The SDK automatically handles ADK-specific features:
 - **Response Parsing**: Extraction of agent responses and metadata
 - **Error Handling**: ADK-specific error scenarios
 
-## ⚔️ Running Security Tests
+## Running Security Tests
 
 ### Basic AdvPrefix Attack
 
@@ -141,7 +141,7 @@ def test_adk_security():
     agent.hack(attack_config=attack_config)
 ```
 
-## 🔍 ADK-Specific Security Concerns
+## ADK-Specific Security Concerns
 
 ### Tool Hijacking
 
@@ -180,7 +180,7 @@ multi_turn_goals = [
 ]
 ```
 
-## 🛠️ Advanced Configuration
+## Advanced Configuration
 
 ### Custom ADK Adapter Settings
 
@@ -217,7 +217,7 @@ The SDK automatically handles ADK sessions:
 3. **Request Routing**: Routes requests to proper session endpoints
 4. **Session Cleanup**: Handles session termination
 
-## 🔒 Security Best Practices
+## Security Best Practices
 
 ### ADK Agent Hardening
 
@@ -235,7 +235,7 @@ The SDK automatically handles ADK sessions:
 4. **Regular Assessment**: Run security tests regularly
 5. **Responsible Disclosure**: Report vulnerabilities responsibly
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -291,7 +291,7 @@ agent = HackAgent(
 )
 ```
 
-## 📊 Results and Reporting
+## Results and Reporting
 
 ### Viewing Results
 
@@ -323,7 +323,7 @@ attack_config = {
 2. **[Attack Tutorial](../getting-started/attack-tutorial.md)** - Getting started with attacks
 3. **[Security Guidelines](../security/responsible-disclosure.md)** - Responsible disclosure practices
 
-## 📞 Support
+## Support
 
 - **ADK Documentation**: [Google ADK Docs](https://google.github.io/adk-docs/)
 - **HackAgent Issues**: [GitHub Issues](https://github.com/AISecurityLab/hackagent/issues)

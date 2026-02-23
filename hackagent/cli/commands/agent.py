@@ -1,11 +1,12 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Agent Commands
-
 Manage AI agents registered with HackAgent.
 """
 
 import click
-
 from hackagent.cli.config import CLIConfig
 from hackagent.cli.utils import handle_errors, launch_tui
 

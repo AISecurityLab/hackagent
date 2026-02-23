@@ -6,7 +6,7 @@ sidebar_position: 3
 
 PAIR (Prompt Automatic Iterative Refinement) is an LLM-driven attack technique that uses an **attacker model** to iteratively generate and refine jailbreak prompts based on target responses and judge feedback.
 
-## 🎯 Overview
+## Overview
 
 Unlike static attacks, PAIR treats jailbreaking as a **conversation** between an attacker LLM and the target. The attacker learns from each failed attempt, adapting its strategy to find successful jailbreaks—often in fewer than 20 queries.
 
@@ -29,7 +29,7 @@ The technique demonstrates that LLMs can be used to systematically jailbreak oth
 
 ---
 
-## 🔄 How PAIR Works
+## How PAIR Works
 
 ```mermaid
 graph TD
@@ -62,7 +62,7 @@ graph TD
 
 ---
 
-## 🚀 Basic Usage
+## Basic Usage
 
 ### Simple Configuration
 
@@ -109,7 +109,7 @@ hackagent attack pair \
 
 ---
 
-## 🎛️ Advanced Configuration
+## Advanced Configuration
 
 ### Full Configuration Options
 
@@ -158,7 +158,7 @@ advanced_config = {
 
 ---
 
-## 🧠 Attacker System Prompt
+## Attacker System Prompt
 
 The attacker LLM operates with a specialized system prompt that instructs it to:
 
@@ -171,7 +171,7 @@ The attacker is essentially performing **adversarial prompt engineering** automa
 
 ---
 
-## 📊 Evaluation & Scoring
+## Evaluation & Scoring
 
 ### Judge Scoring System
 
@@ -194,7 +194,7 @@ An attack is considered successful when:
 
 ---
 
-## 🎯 Use Cases
+## Use Cases
 
 ### 1. Black-Box Security Testing
 
@@ -238,7 +238,7 @@ for target in targets:
 
 ---
 
-## 💡 Best Practices
+## Best Practices
 
 ### Choosing the Attacker Model
 
@@ -258,7 +258,7 @@ for target in targets:
 
 ---
 
-## 📈 Interpreting Results
+## Interpreting Results
 
 ### Result Structure
 
@@ -287,7 +287,7 @@ for target in targets:
 
 ---
 
-## ⚠️ Limitations
+## Limitations
 
 1. **Attacker Capability**: Success depends on attacker model quality
 2. **Cost**: Using GPT-4 as attacker can be expensive for many goals
@@ -296,7 +296,7 @@ for target in targets:
 
 ---
 
-## 🔗 Related
+## Related
 
 - [Attack Overview](./index.md) — Compare all attack types
 - [AdvPrefix Attacks](./advprefix-attacks) — Alternative sophisticated attack

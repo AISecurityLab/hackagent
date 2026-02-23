@@ -6,7 +6,7 @@ sidebar_position: 2
 
 AdvPrefix is HackAgent's most sophisticated attack technique, implementing a multi-step pipeline for generating optimized adversarial prefixes that can bypass AI safety mechanisms. This attack type is based on cutting-edge research and provides highly effective jailbreaking capabilities.
 
-## 🎯 Overview
+## Overview
 
 AdvPrefix attacks work by automatically generating and optimizing attack prefixes that are specifically tailored to the target model. Unlike simple prompt injection, AdvPrefix uses a sophisticated evaluation system to create prefixes that maximize attack success rates.
 
@@ -17,7 +17,7 @@ AdvPrefix attacks work by automatically generating and optimizing attack prefixe
 - **Model-Specific Optimization**: Tailors attacks to specific target models
 - **Research-Backed**: Based on academic research in adversarial ML
 
-## 🔄 Attack Pipeline
+## Attack Pipeline
 
 AdvPrefix implements a 9-step attack pipeline:
 
@@ -50,7 +50,7 @@ graph TD
 8. **Result Analysis**: Analyze attack patterns and success rates
 9. **Reporting**: Generate detailed attack reports and recommendations
 
-## 🚀 Basic AdvPrefix Attack
+## Basic AdvPrefix Attack
 
 ### Simple Configuration
 
@@ -88,7 +88,7 @@ attack_config = {
 results = agent.hack(attack_config=attack_config)
 ```
 
-## 🎛️ Advanced Configuration
+## Advanced Configuration
 
 ### Comprehensive Setup
 
@@ -151,7 +151,7 @@ advanced_config = {
 | `meta_prefix_samples` | Samples per meta prefix | 2 | 1-10 |
 | `n_prefixes_per_goal` | Final prefixes selected per goal | 2 | 1-10 |
 
-## 🔍 Understanding Components
+## Understanding Components
 
 ### Generator Models
 
@@ -209,7 +209,7 @@ Template prompts for initial prefix generation:
 ]
 ```
 
-## 📊 Attack Success Metrics
+## Attack Success Metrics
 
 ### Primary Metrics
 
@@ -241,7 +241,7 @@ def analyze_advprefix_results(results):
         print(f"  Best prefix: '{result.best_prefix}'")
 ```
 
-## 🎯 Attack Scenarios
+## Attack Scenarios
 
 ### Data Extraction
 
@@ -303,7 +303,7 @@ tool_manipulation_config = {
 }
 ```
 
-## 🔧 Optimization Strategies
+## Optimization Strategies
 
 ### Performance Tuning
 
@@ -344,7 +344,7 @@ quality_config = {
 4. **Temperature Tuning**: Adjust generator creativity
 5. **Goal Specificity**: Make goals more targeted and specific
 
-## 🛡️ Defense Considerations
+## Defense Considerations
 
 ### Detection Patterns
 
@@ -362,7 +362,7 @@ AdvPrefix attacks may exhibit these patterns:
 4. **Behavioral Analysis**: Monitor for unusual request patterns
 5. **Judge Integration**: Use similar evaluation models for defense
 
-## 🔄 Next Steps
+## Next Steps
 
 - **[Google ADK Integration](../agents/google-adk.md)** - Framework-specific testing
 - **[Attack Tutorial](../getting-started/attack-tutorial.md)** - Getting started with attacks
