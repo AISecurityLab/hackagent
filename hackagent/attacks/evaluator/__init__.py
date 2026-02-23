@@ -57,6 +57,7 @@ from hackagent.attacks.evaluator.judge_evaluators import (
     HarmBenchEvaluator,
     JailbreakBenchEvaluator,
     NuancedEvaluator,
+    OnTopicEvaluator,
 )
 from hackagent.attacks.evaluator.metrics import (
     calculate_confidence_score,
@@ -84,6 +85,7 @@ __all__ = [
     "NuancedEvaluator",
     "JailbreakBenchEvaluator",
     "HarmBenchEvaluator",
+    "OnTopicEvaluator",
     "EVALUATOR_MAP",
     # Pattern evaluators
     "PatternEvaluator",

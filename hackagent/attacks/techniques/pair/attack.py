@@ -25,7 +25,6 @@ Result Tracking:
 """
 
 import copy
-import json
 import logging
 import re
 from typing import Any, Dict, List, Optional
@@ -33,6 +32,7 @@ from typing import Any, Dict, List, Optional
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.objectives import OBJECTIVES
 from hackagent.attacks.shared.progress import create_progress_bar
+from hackagent.attacks.shared.prompt_parser import extract_prompt
 from hackagent.attacks.shared.response_utils import extract_response_content
 from hackagent.attacks.shared.router_factory import create_router
 from hackagent.attacks.shared.tui import with_tui_logging
@@ -152,80 +152,6 @@ class PAIRAttack(BaseAttack):
         """
         return []
 
-    def _extract_prompt_from_response(self, content: str) -> Optional[str]:
-        """
-        Extract the adversarial prompt from the attacker LLM's response.
-
-        Tries multiple strategies to parse the response:
-        1. Direct JSON parsing
-        2. JSON extraction from markdown code blocks
-        3. Regex extraction for "prompt" field
-        4. Plain text fallback (if content looks like a prompt)
-
-        Args:
-            content: The raw response content from the attacker LLM
-
-        Returns:
-            The extracted prompt string, or None if extraction failed
-        """
-        if not content:
-            return None
-
-        content = content.strip()
-
-        # Strategy 1: Direct JSON parsing
-        try:
-            parsed = json.loads(content)
-            prompt = parsed.get("prompt", "")
-            if prompt:
-                return prompt
-        except json.JSONDecodeError:
-            pass
-
-        # Strategy 2: Extract JSON from markdown code blocks (```json ... ```)
-        code_block_match = re.search(
-            r"```(?:json)?\s*\n?(.*?)\n?```", content, re.DOTALL
-        )
-        if code_block_match:
-            try:
-                parsed = json.loads(code_block_match.group(1).strip())
-                prompt = parsed.get("prompt", "")
-                if prompt:
-                    return prompt
-            except json.JSONDecodeError:
-                pass
-
-        # Strategy 3: Regex to extract "prompt" field value (handles multiline)
-        # Match "prompt": "value" or "prompt": 'value'
-        prompt_match = re.search(
-            r'"prompt"\s*:\s*"((?:[^"\\]|\\.)*)"|'
-            r"\"prompt\"\s*:\s*'((?:[^'\\]|\\.)*)'",
-            content,
-            re.DOTALL,
-        )
-        if prompt_match:
-            extracted = prompt_match.group(1) or prompt_match.group(2)
-            if extracted:
-                # Unescape common escape sequences
-                try:
-                    extracted = extracted.encode().decode("unicode_escape")
-                except Exception:
-                    pass
-                return extracted
-
-        # Strategy 4: If the content doesn't look like JSON at all,
-        # and is non-empty, use it as the prompt directly
-        # (some models may just output the prompt without JSON formatting)
-        if not content.startswith("{") and not content.startswith("["):
-            # Only use as fallback if it's substantial text
-            if len(content) > 20:
-                self.logger.debug(
-                    "Using raw response as prompt (no JSON structure detected)"
-                )
-                return content
-
-        return None
-
     def _query_attacker(
         self, goal: str, target_response: str, score: int, iteration: int
     ) -> Optional[str]:
@@ -269,8 +195,7 @@ SCORE: {score}"""
             content = extract_response_content(response, self.logger)
 
             if content:
-                # Parse JSON response - try multiple strategies
-                prompt = self._extract_prompt_from_response(content)
+                prompt = extract_prompt(content)
                 if prompt:
                     return prompt
 

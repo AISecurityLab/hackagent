@@ -35,8 +35,9 @@ from hackagent.attacks.techniques.advprefix import AdvPrefixAttack
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.techniques.pair import PAIRAttack
 from hackagent.attacks.techniques.baseline import BaselineAttack
-from hackagent.attacks.techniques.flipattack import (
-    FlipAttack,
+from hackagent.attacks.techniques.flipattack import FlipAttack
+from hackagent.attacks.techniques.tap import (
+    TAPAttack,
 )  # Placeholder for future implementation
 
 
@@ -82,9 +83,8 @@ def create_orchestrator(
 AdvPrefixOrchestrator = create_orchestrator("AdvPrefix", AdvPrefixAttack)
 BaselineOrchestrator = create_orchestrator("Baseline", BaselineAttack)
 PAIROrchestrator = create_orchestrator("PAIR", PAIRAttack)
-FlipAttackOrchestrator = create_orchestrator(
-    "FlipAttack", FlipAttack
-)  # Placeholder for future implementation
+FlipAttackOrchestrator = create_orchestrator("FlipAttack", FlipAttack)
+TAPOrchestrator = create_orchestrator("TAP", TAPAttack)
 
 # Registry of all available attacks
 ATTACK_REGISTRY = {
@@ -92,6 +92,7 @@ ATTACK_REGISTRY = {
     "Baseline": BaselineOrchestrator,
     "PAIR": PAIROrchestrator,
     "FlipAttack": FlipAttackOrchestrator,
+    "TAP": TAPOrchestrator,
 }
 
 __all__ = [
@@ -99,5 +100,6 @@ __all__ = [
     "BaselineOrchestrator",
     "PAIROrchestrator",
     "FlipAttackOrchestrator",
+    "TAPOrchestrator",
     "ATTACK_REGISTRY",
 ]
