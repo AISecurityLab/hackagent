@@ -15,14 +15,11 @@ cross-entropy computation into a cohesive class-based design that improves:
 import logging
 import os
 import re
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from hackagent.client import AuthenticatedClient
 from hackagent.router.router import AgentRouter
 from hackagent.router.types import AgentTypeEnum
-
-if TYPE_CHECKING:
-    from hackagent.router.tracking import Tracker
 
 from .config import CUSTOM_CHAT_TEMPLATES, PrefixGenerationConfig
 from .utils import REFUSAL_KEYWORDS, create_progress_bar, handle_empty_input, log_errors
@@ -80,19 +77,9 @@ class PrefixGenerationPipeline:
             client: Authenticated client for API access
             agent_router: Optional router for CE computation
         """
-        # Extract tracking context BEFORE converting to dataclass (which filters unknown fields)
-        self._run_id: Optional[str] = (
-            config.get("_run_id") if isinstance(config, dict) else None
-        )
-        self._tracking_client = (
-            config.get("_client") if isinstance(config, dict) else None
-        )
-        # Extract tracker for per-goal result tracking
-        self._tracker: Optional["Tracker"] = (
-            config.get("_tracker") if isinstance(config, dict) else None
-        )
-        # Goal index map will be built when execute() is called with goals
-        self._goal_index_map: Dict[str, int] = {}
+        # Extract the goal Tracker before converting config to dataclass
+        # (PrefixGenerationConfig doesn't have a _tracker field).
+        self._tracker = config.get("_tracker") if isinstance(config, dict) else None
 
         self.config = (
             PrefixGenerationConfig.from_dict(config)
@@ -129,6 +116,7 @@ class PrefixGenerationPipeline:
         2. Apply Phase 1 preprocessing
         3. Compute cross-entropy (if agent_router provided)
         4. Apply Phase 2 preprocessing
+        5. Write per-goal generation traces to each goal's Result
 
         Args:
             goals: List of target goals for prefix generation
@@ -138,9 +126,6 @@ class PrefixGenerationPipeline:
         """
         unique_goals = list(dict.fromkeys(goals)) if goals else []
 
-        # Build goal index map for Tracker lookups
-        self._goal_index_map = {goal: idx for idx, goal in enumerate(unique_goals)}
-
         # Generate raw prefixes
         self.logger.info(f"Starting generation for {len(unique_goals)} unique goals")
         raw_prefixes = self._generate_raw_prefixes(unique_goals)
@@ -148,6 +133,7 @@ class PrefixGenerationPipeline:
 
         if not raw_prefixes:
             self.logger.warning("No prefixes generated")
+            self._write_per_goal_generation_traces(unique_goals, [], [], [])
             return []
 
         # Apply Phase 1 filtering
@@ -159,6 +145,7 @@ class PrefixGenerationPipeline:
 
         if not phase1_results:
             self.logger.warning("All prefixes filtered out in Phase 1")
+            self._write_per_goal_generation_traces(unique_goals, raw_prefixes, [], [])
             return []
 
         # Optional CE computation and Phase 2 filtering
@@ -171,6 +158,9 @@ class PrefixGenerationPipeline:
 
             if not ce_results:
                 self.logger.warning("CE computation produced no results")
+                self._write_per_goal_generation_traces(
+                    unique_goals, raw_prefixes, phase1_results, []
+                )
                 return []
 
             self.logger.info(
@@ -181,17 +171,89 @@ class PrefixGenerationPipeline:
 
             if not final_results:
                 self.logger.warning("All prefixes filtered out in Phase 2")
+                self._write_per_goal_generation_traces(
+                    unique_goals, raw_prefixes, phase1_results, []
+                )
                 return []
         else:
             self.logger.info("Skipping CE computation (no agent_router provided)")
             final_results = phase1_results
 
         self._log_pipeline_statistics()
+        self._write_per_goal_generation_traces(
+            unique_goals, raw_prefixes, phase1_results, final_results
+        )
         return final_results
 
     def get_statistics(self) -> Dict[str, Any]:
         """Return execution statistics for monitoring and debugging."""
         return self._statistics.copy()
+
+    def _write_per_goal_generation_traces(
+        self,
+        goals: List[str],
+        raw_prefixes: List[Dict],
+        phase1_results: List[Dict],
+        final_results: List[Dict],
+    ) -> None:
+        """
+        Write a "Prefix Generation" trace to each goal's Result.
+
+        Each trace records how many candidates were generated, how many
+        survived each filter stage, and which prefix texts will be carried
+        forward to the Execution step.  This ensures every goal Result
+        contains the complete story of what was generated for that goal.
+
+        Args:
+            goals: Unique goals that were processed
+            raw_prefixes: All generated prefixes before any filtering
+            phase1_results: Prefixes surviving Phase 1 (pattern / length)
+            final_results: Prefixes surviving Phase 2 (CE / top-k)
+        """
+        if not self._tracker or not goals:
+            return
+
+        from collections import defaultdict
+
+        def _group(data: List[Dict]) -> dict:
+            groups: dict = defaultdict(list)
+            for row in data:
+                groups[row.get("goal", "")].append(row)
+            return groups
+
+        raw_by_goal = _group(raw_prefixes)
+        phase1_by_goal = _group(phase1_results)
+        final_by_goal = _group(final_results)
+
+        for goal in goals:
+            ctx = self._tracker.get_goal_context_by_goal(goal)
+            if not ctx:
+                self.logger.debug(
+                    f"No tracking context for goal during generation trace: {goal[:50]}"
+                )
+                continue
+
+            surviving = final_by_goal.get(goal, [])
+            content = {
+                "raw_generated": len(raw_by_goal.get(goal, [])),
+                "after_phase1_filtering": len(phase1_by_goal.get(goal, [])),
+                "after_phase2_filtering": len(surviving),
+                "candidates": [
+                    {
+                        "prefix": row.get("prefix", "")[:300],
+                        "meta_prefix": row.get("meta_prefix"),
+                        "prefix_nll": row.get("prefix_nll"),
+                    }
+                    for row in surviving
+                ],
+            }
+            self._tracker.add_custom_trace(ctx, "Prefix Generation", content)
+            self.logger.debug(
+                f"Wrote Prefix Generation trace for goal {ctx.goal_index}: "
+                f"{content['raw_generated']} generated → "
+                f"{content['after_phase1_filtering']} after phase1 → "
+                f"{content['after_phase2_filtering']} candidates"
+            )
 
     # ========================================================================
     # GENERATION METHODS
@@ -373,12 +435,6 @@ class PrefixGenerationPipeline:
 
         registration_key = next(iter(self._generation_router._agent_registry.keys()))  # type: ignore
 
-        # Log tracking context status
-        if self._tracker:
-            self.logger.info("📊 Generation tracking via Tracker enabled")
-        else:
-            self.logger.debug("Generation tracking disabled - no tracker available")
-
         progress_desc = f"[cyan]Generating ({mode})..."
 
         with create_progress_bar(progress_desc, total=len(prompts)) as (pbar, task):
@@ -399,33 +455,6 @@ class PrefixGenerationPipeline:
 
                 generated_text = self._extract_generated_text(response, prompt, goal)
                 final_prefix = meta_prefix + generated_text
-
-                # Add trace to goal's Result via Tracker
-                if self._tracker:
-                    goal_index = self._goal_index_map.get(goal)
-                    if goal_index is not None:
-                        goal_ctx = self._tracker.get_goal_context(goal_index)
-                        if goal_ctx:
-                            self._tracker.add_interaction_trace(
-                                ctx=goal_ctx,
-                                request=request_params,
-                                response={
-                                    "generated_text": generated_text,
-                                    "processed_response": response.get(
-                                        "processed_response"
-                                    ),
-                                    "error_message": response.get("error_message"),
-                                },
-                                step_name=f"Prefix Generation ({mode})",
-                                metadata={
-                                    "meta_prefix": meta_prefix,
-                                    "final_prefix": final_prefix,
-                                    "temperature": temperature,
-                                    "model_name": self.config.generator.get(
-                                        "identifier"
-                                    ),
-                                },
-                            )
 
                 results.append(
                     {
@@ -745,12 +774,6 @@ class PrefixGenerationPipeline:
         results = []
         victim_key = str(self.agent_router.backend_agent.id)
 
-        # Log tracking context status for CE computation
-        if self._tracker:
-            self.logger.info("📊 CE computation tracking via Tracker enabled")
-        else:
-            self.logger.debug("CE computation tracking disabled - no tracker available")
-
         progress_desc = (
             f"[blue]Computing CE via {self.agent_router.backend_agent.agent_type}..."
         )
@@ -758,7 +781,6 @@ class PrefixGenerationPipeline:
         with create_progress_bar(progress_desc, total=len(prefixes)) as (pbar, task):
             for record in prefixes:
                 prefix_text = record.get("prefix", "")
-                goal = record.get("goal", "")
 
                 # Initialize result with default values
                 result = record.copy()
@@ -796,30 +818,6 @@ class PrefixGenerationPipeline:
                 else:
                     result["prefix_nll"] = 0.0
                     result["error_message"] = None
-
-                # Add trace to goal's Result via Tracker
-                if self._tracker:
-                    goal_index = self._goal_index_map.get(goal)
-                    if goal_index is not None:
-                        goal_ctx = self._tracker.get_goal_context(goal_index)
-                        if goal_ctx:
-                            self._tracker.add_interaction_trace(
-                                ctx=goal_ctx,
-                                request=request_data,
-                                response={
-                                    "generated_text": generated_text,
-                                    "error_message": error_message,
-                                    "raw_response_status": response.get(
-                                        "raw_response_status"
-                                    ),
-                                },
-                                step_name="CE Computation",
-                                metadata={
-                                    "prefix": prefix_text,
-                                    "prefix_nll": result["prefix_nll"],
-                                    "accepted": result["prefix_nll"] == 0.0,
-                                },
-                            )
 
                 # Store response metadata
                 result["request_payload"] = response.get("raw_request") or {

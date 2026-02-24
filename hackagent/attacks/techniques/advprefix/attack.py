@@ -165,9 +165,7 @@ class AdvPrefixAttack(BaseAttack):
                     "max_token_segments",
                     "n_candidates_per_goal",
                     "surrogate_attack_prompt",
-                    "_run_id",  # For real-time result tracking
-                    "_client",  # For real-time result tracking
-                    "_tracker",  # For per-goal result tracking via Tracker
+                    "_tracker",  # For per-goal prefix generation traces
                 ],
                 "input_data_arg_name": "goals",
                 "required_args": ["logger", "client", "config", "agent_router"],
@@ -180,8 +178,6 @@ class AdvPrefixAttack(BaseAttack):
                     "batch_size",
                     "max_new_tokens_completion",
                     "n_samples",
-                    "_run_id",
-                    "_client",
                     "_tracker",  # For per-goal result tracking via Tracker
                 ],
                 "input_data_arg_name": "input_data",
@@ -202,9 +198,6 @@ class AdvPrefixAttack(BaseAttack):
                     "filter_len",
                     "n_prefixes_per_goal",
                     "max_ce",
-                    "_run_id",  # For real-time result tracking
-                    "_client",  # For real-time result tracking
-                    "_tracker",  # For per-goal result tracking via Tracker
                 ],
                 "input_data_arg_name": "input_data",
                 "required_args": ["logger", "client", "config"],
@@ -216,8 +209,10 @@ class AdvPrefixAttack(BaseAttack):
         """
         Executes the full prefix generation pipeline.
 
-        Uses TrackingCoordinator to manage both pipeline-level and
-        per-goal result tracking through a single unified interface.
+        Goal Results are created upfront (before any pipeline step) so the
+        dashboard shows all goals from the moment the run starts.  Goals that
+        are filtered out during Generation are marked with an explanatory note
+        during finalization rather than simply having no record.
 
         Args:
             goals: A list of goal strings to generate prefixes for.
@@ -229,29 +224,47 @@ class AdvPrefixAttack(BaseAttack):
         if not goals:
             return []
 
-        # Initialize unified coordinator (replaces separate StepTracker + Tracker)
+        # Phase 1: Create coordinator AND goal Results immediately so the
+        # dashboard shows all goals from the moment the run starts.
+        # Goals filtered out during Generation are marked as such during
+        # finalization rather than simply having no record.
+        goal_metadata = {
+            "n_candidates_per_goal": self.config.get("n_candidates_per_goal", 5),
+            "n_prefixes_per_goal": self.config.get("n_prefixes_per_goal", 2),
+        }
         coordinator = self._initialize_coordinator(
             attack_type="advprefix",
             goals=goals,
-            initial_metadata={
-                "n_candidates_per_goal": self.config.get("n_candidates_per_goal", 5),
-                "n_prefixes_per_goal": self.config.get("n_prefixes_per_goal", 2),
-            },
+            initial_metadata=goal_metadata,
         )
 
-        if coordinator.has_goal_tracking:
-            self.logger.info("📊 Using TrackingCoordinator for per-goal tracking")
-
-        # Pass goal_tracker through config for sub-modules that still need it
+        # Make the goal_tracker available to all pipeline steps via config
+        # so Execution and Evaluation can attach per-goal traces.
         if coordinator.goal_tracker:
             self.config["_tracker"] = coordinator.goal_tracker
 
-        # Execute pipeline using base class method
+        pipeline_steps = self._get_pipeline_steps()
         start_step = self.config.get("start_step", 1) - 1
 
         try:
+            # Phase 2: Run Generation step.
+            # Goal Results and the StepTracker are fully linked, so the
+            # Generation start/summary traces land on goal[0]'s Result.
+            generation_output = self._execute_pipeline(
+                pipeline_steps, goals, start_step=start_step, end_step=start_step + 1
+            )
+
+            if not generation_output:
+                self.logger.warning("Generation produced no output")
+                coordinator.finalize_pipeline([], lambda _: False)
+                return []
+
+            if coordinator.has_goal_tracking:
+                self.logger.info("📊 Using TrackingCoordinator for per-goal tracking")
+
+            # Phase 3: Run Execution + Evaluation steps.
             results = self._execute_pipeline(
-                self._get_pipeline_steps(), goals, start_step
+                pipeline_steps, generation_output, start_step=start_step + 1
             )
 
             # Finalize goal results via coordinator

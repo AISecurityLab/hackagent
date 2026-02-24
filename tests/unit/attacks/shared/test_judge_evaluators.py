@@ -18,6 +18,7 @@ from hackagent.attacks.evaluator import (
     NuancedEvaluator,
     JailbreakBenchEvaluator,
     HarmBenchEvaluator,
+    OnTopicEvaluator,
     EVALUATOR_MAP,
 )
 
@@ -115,8 +116,8 @@ class TestParseYesNoResponse:
 class TestEvaluatorMap:
     """Tests for the EVALUATOR_MAP registry."""
 
-    def test_map_has_three_entries(self):
-        assert len(EVALUATOR_MAP) == 3
+    def test_map_has_four_entries(self):
+        assert len(EVALUATOR_MAP) == 4
 
     def test_nuanced_in_map(self):
         assert "nuanced" in EVALUATOR_MAP
@@ -129,6 +130,10 @@ class TestEvaluatorMap:
     def test_harmbench_in_map(self):
         assert "harmbench" in EVALUATOR_MAP
         assert EVALUATOR_MAP["harmbench"] is HarmBenchEvaluator
+
+    def test_ontopic_in_map(self):
+        assert "on_topic" in EVALUATOR_MAP
+        assert EVALUATOR_MAP["on_topic"] is OnTopicEvaluator
 
 
 class TestEvaluatorClassAttributes:

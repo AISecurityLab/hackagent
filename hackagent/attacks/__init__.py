@@ -35,6 +35,8 @@ from .registry import (
     AdvPrefixOrchestrator,
     BaselineOrchestrator,
     PAIROrchestrator,
+    FlipAttackOrchestrator,
+    TAPOrchestrator,
 )
 
 __all__ = [
@@ -42,4 +44,6 @@ __all__ = [
     "AdvPrefixOrchestrator",
     "BaselineOrchestrator",
     "PAIROrchestrator",
+    "FlipAttackOrchestrator",
+    "TAPOrchestrator",
 ]

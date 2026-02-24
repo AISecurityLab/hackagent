@@ -125,6 +125,7 @@ class HackAgent:
                 BaselineOrchestrator,
                 PAIROrchestrator,
                 FlipAttackOrchestrator,
+                TAPOrchestrator,
             )
 
             self._attack_strategies = {
@@ -132,6 +133,7 @@ class HackAgent:
                 "baseline": BaselineOrchestrator(hack_agent=self),
                 "pair": PAIROrchestrator(hack_agent=self),
                 "flipattack": FlipAttackOrchestrator(hack_agent=self),
+                "tap": TAPOrchestrator(hack_agent=self),
             }
         return self._attack_strategies
 

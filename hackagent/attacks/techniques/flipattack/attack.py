@@ -176,8 +176,9 @@ class FlipAttack(BaseAttack):
         """
         Execute the full FlipAttack pipeline.
 
-        Uses TrackingCoordinator to manage both pipeline-level and
-        per-goal result tracking through a single unified interface.
+        Uses a split-phase approach: the coordinator is created without
+        goal Results upfront.  After the Generation step, Results are
+        created only for the surviving goals that will actually be tested.
 
         Args:
             goals: A list of goal strings to test.
@@ -189,40 +190,49 @@ class FlipAttack(BaseAttack):
         if not goals:
             return []
 
-        # Initialize unified coordinator (replaces separate StepTracker + Tracker)
-        coordinator = self._initialize_coordinator(
-            attack_type="flipattack",
-            goals=goals,
-            initial_metadata={
-                "flip_mode": self.config.get("flipattack_params", {}).get(
-                    "flip_mode", "FCS"
-                ),
-                "cot": self.config.get("flipattack_params", {}).get("cot", False),
-                "lang_gpt": self.config.get("flipattack_params", {}).get(
-                    "lang_gpt", False
-                ),
-                "few_shot": self.config.get("flipattack_params", {}).get(
-                    "few_shot", False
-                ),
-                "judge": self.config.get("flipattack_params", {}).get(
-                    "judge", "gpt-4-0613"
-                ),
-            },
-        )
+        # Phase 1: Create coordinator WITHOUT goal results — deferred until
+        # after Generation so we only create results for surviving goals.
+        coordinator = self._initialize_coordinator(attack_type="flipattack")
 
-        if coordinator.has_goal_tracking:
-            self.logger.info("📊 Using TrackingCoordinator for per-goal tracking")
-
-        # Pass goal_tracker through config for sub-modules that still need it
-        if coordinator.goal_tracker:
-            self.config["_tracker"] = coordinator.goal_tracker
-
-        # Execute pipeline using base class method
+        pipeline_steps = self._get_pipeline_steps()
         start_step = self.config.get("start_step", 1) - 1
 
         try:
+            # Phase 2: Run Generation step only (no goal results yet,
+            # generation traces are harmlessly skipped)
+            generation_output = self._execute_pipeline(
+                pipeline_steps, goals, start_step=start_step, end_step=start_step + 1
+            )
+
+            if not generation_output:
+                self.logger.warning("Generation produced no output")
+                coordinator.finalize_pipeline([], lambda _: False)
+                return []
+
+            # Phase 3: Create goal results ONLY for surviving goals
+            flipattack_params = self.config.get("flipattack_params", {})
+            goal_metadata = {
+                "flip_mode": flipattack_params.get("flip_mode", "FCS"),
+                "cot": flipattack_params.get("cot", False),
+                "lang_gpt": flipattack_params.get("lang_gpt", False),
+                "few_shot": flipattack_params.get("few_shot", False),
+                "judge": flipattack_params.get("judge", "gpt-4-0613"),
+            }
+            coordinator.initialize_goals_from_pipeline_data(
+                pipeline_data=generation_output,
+                initial_metadata=goal_metadata,
+            )
+
+            if coordinator.has_goal_tracking:
+                self.logger.info("📊 Using TrackingCoordinator for per-goal tracking")
+
+            # Pass goal_tracker through config for Evaluation step
+            if coordinator.goal_tracker:
+                self.config["_tracker"] = coordinator.goal_tracker
+
+            # Phase 4: Run remaining steps (Evaluation)
             results = self._execute_pipeline(
-                self._get_pipeline_steps(), goals, start_step
+                pipeline_steps, generation_output, start_step=start_step + 1
             )
 
             # Finalize goal results via coordinator

@@ -32,6 +32,25 @@ from hackagent.models import (
 from .context import TrackingContext
 
 
+def _deep_clean(obj: Any) -> Any:
+    """
+    Recursively convert Pydantic/OpenAI model objects to plain dicts/lists.
+
+    Handles objects with ``model_dump()`` (Pydantic v2) or ``dict()``
+    (Pydantic v1 / legacy), and recurses into dicts and lists.
+    All other values are returned as-is.
+    """
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump()
+    if hasattr(obj, "dict"):  # legacy Pydantic v1
+        return obj.dict()
+    if isinstance(obj, dict):
+        return {k: _deep_clean(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_deep_clean(v) for v in obj]
+    return obj
+
+
 class StepTracker:
     """
     Tracks pipeline step execution and synchronizes with backend API.
@@ -167,24 +186,6 @@ class StepTracker:
             Trace ID if successful, None otherwise
         """
 
-        def _deep_clean(obj):
-            # If OpenAI/Pydantic object -> convert to dict
-            if hasattr(obj, "model_dump"):
-                return obj.model_dump()
-            if hasattr(obj, "dict"):  # For legacy
-                return obj.dict()
-
-            # If dictionary -> clean each element recursively
-            if isinstance(obj, dict):
-                return {k: _deep_clean(v) for k, v in obj.items()}
-
-            # If it is a list -> clean each element recursively
-            if isinstance(obj, list):
-                return [_deep_clean(v) for v in obj]
-
-            # Otherwise return the object as-is (string, int, etc)
-            return obj
-
         try:
             sequence = self.context.increment_sequence()
 
@@ -220,8 +221,8 @@ class StepTracker:
             # Call API
             result_uuid = self.context.get_result_uuid()
             if not result_uuid:
-                self.logger.warning(
-                    f"Cannot create trace for '{step_name}': invalid result UUID"
+                self.logger.debug(
+                    f"Skipping trace for '{step_name}': StepTracker has no result target"
                 )
                 return None
 
@@ -374,6 +375,9 @@ class StepTracker:
 
             result_uuid = self.context.get_result_uuid()
             if not result_uuid:
+                self.logger.debug(
+                    f"Skipping summary trace for '{step_name}': StepTracker has no result target"
+                )
                 return None
 
             response = result_trace_create.sync_detailed(

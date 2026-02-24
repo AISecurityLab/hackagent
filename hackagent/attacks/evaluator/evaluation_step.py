@@ -64,18 +64,21 @@ JUDGE_TYPE_LABELS: Dict[str, str] = {
     "jailbreakbench": "JailbreakBench",
     "harmbench": "HarmBench",
     "nuanced": "Nuanced",
+    "on_topic": "OnTopic",
 }
 
 JUDGE_COLUMN_MAP: Dict[str, List[str]] = {
     "nuanced": ["eval_nj", "explanation_nj"],
     "jailbreakbench": ["eval_jb", "explanation_jb"],
     "harmbench": ["eval_hb", "explanation_hb"],
+    "on_topic": ["eval_on_topic", "explanation_on_topic"],
 }
 
 JUDGE_AGG_COLUMN_MAP: Dict[str, str] = {
     "nuanced": "eval_nj",
     "jailbreakbench": "eval_jb",
     "harmbench": "eval_hb",
+    "on_topic": "eval_on_topic",
 }
 
 JUDGE_MEAN_COLUMN_MAP: Dict[str, str] = {
@@ -83,6 +86,7 @@ JUDGE_MEAN_COLUMN_MAP: Dict[str, str] = {
     "jailbreakbench": "eval_jb_mean",
     "harmbench": "eval_hb_mean",
     "strongreject": "eval_sj_binary_mean",
+    "on_topic": "eval_on_topic_mean",
 }
 
 
@@ -598,7 +602,7 @@ class BaseEvaluationStep:
         """Sync evaluation results to the server (best per ``result_id``)."""
         return sync_evaluation_to_server(
             evaluated_data=evaluated_data,
-            client=self._tracking_client,
+            client=self._tracking_client or self.client,
             logger=self.logger,
             judge_keys=judge_keys,
         )
