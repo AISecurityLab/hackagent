@@ -144,6 +144,11 @@ class TestFlipAttackInitialization:
     @patch("hackagent.attacks.techniques.base.BaseAttack.__init__", return_value=None)
     def test_merges_config_with_defaults(self, mock_base_init):
         """Test that user config is merged with DEFAULT_FLIPATTACK_CONFIG."""
+        FlipAttack(
+            config={"flipattack_params": {"flip_mode": "FWO"}},
+            client=_make_mock_client(),
+            agent_router=_make_mock_router(),
+        )
 
         # The base __init__ should have been called with merged config
         call_args = mock_base_init.call_args

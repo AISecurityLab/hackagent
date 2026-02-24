@@ -310,6 +310,13 @@ class TestEvaluationModuleExecute:
             mock_instance.execute.return_value = gen_results
             MockClass.return_value = mock_instance
 
+            evaluation_execute(
+                input_data=gen_results,
+                config=config,
+                client=client,
+                logger=logger,
+            )
+
             MockClass.assert_called_once_with(
                 config=config, logger=logger, client=client
             )

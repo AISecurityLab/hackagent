@@ -602,7 +602,7 @@ class BaseEvaluationStep:
         """Sync evaluation results to the server (best per ``result_id``)."""
         return sync_evaluation_to_server(
             evaluated_data=evaluated_data,
-            client=self._tracking_client,
+            client=self._tracking_client or self.client,
             logger=self.logger,
             judge_keys=judge_keys,
         )
