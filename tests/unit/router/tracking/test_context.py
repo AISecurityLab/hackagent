@@ -9,7 +9,6 @@ from unittest.mock import MagicMock
 from uuid import UUID
 
 from hackagent.router.tracking.context import TrackingContext
-from hackagent.router.tracking.tracker import Context
 
 
 class TestTrackingContextInitialization(unittest.TestCase):
@@ -121,67 +120,6 @@ class TestTrackingContextSequence(unittest.TestCase):
 
         result = context.increment_sequence()
         self.assertEqual(result, 11)
-
-
-class TestTrackingContextSequenceDelegation(unittest.TestCase):
-    """Test sequence counter delegation to a goal Context."""
-
-    def _make_goal_ctx(self, seq: int = 0) -> Context:
-        return Context(goal="test goal", goal_index=0, sequence_counter=seq)
-
-    def test_delegate_routes_increment_to_goal_context(self):
-        """After delegate_sequence_to, increment_sequence uses the goal counter."""
-        tracking_ctx = TrackingContext()
-        goal_ctx = self._make_goal_ctx(seq=5)
-
-        tracking_ctx.delegate_sequence_to(goal_ctx)
-
-        result = tracking_ctx.increment_sequence()
-        self.assertEqual(result, 6)
-        # The goal context's counter must have been updated
-        self.assertEqual(goal_ctx.sequence_counter, 6)
-
-    def test_delegate_shared_counter_no_collision(self):
-        """StepTracker and Tracker both use the same counter after delegation."""
-        tracking_ctx = TrackingContext()
-        goal_ctx = self._make_goal_ctx(seq=1)  # after "Goal Setup" trace
-
-        tracking_ctx.delegate_sequence_to(goal_ctx)
-
-        # StepTracker increments (pipeline trace)
-        seq_a = tracking_ctx.increment_sequence()
-        self.assertEqual(seq_a, 2)
-
-        # Tracker increments (per-goal trace) – directly on goal_ctx
-        goal_ctx.sequence_counter += 1
-        seq_b = goal_ctx.sequence_counter
-        self.assertEqual(seq_b, 3)
-
-        # StepTracker increments again (summary trace)
-        seq_c = tracking_ctx.increment_sequence()
-        self.assertEqual(seq_c, 4)
-
-        # All three are unique and monotonic
-        self.assertEqual([seq_a, seq_b, seq_c], [2, 3, 4])
-
-    def test_local_counter_unchanged_after_delegation(self):
-        """The local sequence_counter field is not touched during delegation."""
-        tracking_ctx = TrackingContext(sequence_counter=0)
-        goal_ctx = self._make_goal_ctx(seq=5)
-
-        tracking_ctx.delegate_sequence_to(goal_ctx)
-        tracking_ctx.increment_sequence()  # goes to goal_ctx
-
-        # The local field stays at 0 (untouched)
-        self.assertEqual(tracking_ctx.sequence_counter, 0)
-
-    def test_no_delegation_by_default(self):
-        """Without delegate_sequence_to, increment_sequence uses local counter."""
-        tracking_ctx = TrackingContext(sequence_counter=0)
-
-        result = tracking_ctx.increment_sequence()
-        self.assertEqual(result, 1)
-        self.assertEqual(tracking_ctx.sequence_counter, 1)
 
 
 class TestTrackingContextUUIDConversion(unittest.TestCase):

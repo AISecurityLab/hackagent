@@ -61,6 +61,25 @@ def _sanitize_for_json(obj: Any) -> Any:
     return obj
 
 
+def _deep_clean(obj: Any) -> Any:
+    """
+    Recursively convert Pydantic/OpenAI model objects to plain dicts/lists.
+
+    Handles objects with ``model_dump()`` (Pydantic v2) or ``dict()``
+    (Pydantic v1 / legacy), and recurses into dicts and lists.
+    All other values are returned as-is.
+    """
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump()
+    if hasattr(obj, "dict"):  # legacy Pydantic v1
+        return obj.dict()
+    if isinstance(obj, dict):
+        return {k: _deep_clean(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_deep_clean(v) for v in obj]
+    return obj
+
+
 @dataclass
 class Context:
     """Context for tracking a single goal's attack execution."""
@@ -350,24 +369,6 @@ class Tracker:
             Trace ID if successful, None otherwise
         """
 
-        def _deep_clean(obj):
-            # If OpenAI/Pydantic object -> convert to dict
-            if hasattr(obj, "model_dump"):
-                return obj.model_dump()
-            if hasattr(obj, "dict"):  # For legacy
-                return obj.dict()
-
-            # If dictionary -> clean each element recursively
-            if isinstance(obj, dict):
-                return {k: _deep_clean(v) for k, v in obj.items()}
-
-            # If it is a list -> clean each element recursively
-            if isinstance(obj, list):
-                return [_deep_clean(v) for v in obj]
-
-            # Otherwise return the object as-is (string, int, etc)
-            return obj
-
         try:
             content = _deep_clean(content)
         except Exception as e:
@@ -609,11 +610,18 @@ class Tracker:
                 )
             raise
         finally:
-            # Auto-finalize if not already done
+            # Auto-finalize if the caller forgot to call finalize_goal().
+            # Using FAILED_JAILBREAK with an explanatory note is safer than
+            # leaving the backend result in NOT_EVALUATED indefinitely.
             if not ctx.is_finalized:
                 self.logger.warning(
-                    f"Goal {goal_index} not explicitly finalized - "
-                    "defaulting to NOT_EVALUATED"
+                    f"Goal {goal_index} not explicitly finalized — "
+                    "marking as NOT_EVALUATED on backend"
+                )
+                self.finalize_goal(
+                    ctx,
+                    success=False,
+                    evaluation_notes="Goal exited context manager without explicit finalization",
                 )
 
     def _extract_id(self, response) -> Optional[str]:
@@ -681,12 +689,10 @@ class Tracker:
             return [self._sanitize_for_json(item) for item in data]
 
         if isinstance(data, (str, int, float, bool)):
+            # Sanitize non-finite floats via the module-level helper
+            if isinstance(data, float):
+                return _sanitize_for_json(data)
             return data
-
-        # Handle special float values
-        if isinstance(data, float):
-            if data == float("inf") or data == float("-inf"):
-                return None
 
         # Fallback: try to convert, else stringify
         try:

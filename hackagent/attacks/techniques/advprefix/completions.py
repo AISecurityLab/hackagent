@@ -123,8 +123,6 @@ def _get_completion_via_router(
     n_samples: Optional[int],  # Number of samples to request
     logger_instance: logging.Logger,
     original_index: int,
-    run_id: Optional[str] = None,  # For result tracking
-    client: Optional[Any] = None,  # For result tracking
 ) -> Dict[str, Any]:
     """
     Generate a completion for a single adversarial prefix using the target agent.
@@ -340,19 +338,9 @@ def execute(
     victim_agent_reg_key = str(agent_router.backend_agent.id)
     victim_agent_type = agent_router.backend_agent.agent_type
 
-    # Extract tracking information from config
-    run_id = config.get("_run_id")
-    client = config.get("_client")
     tracker = config.get("_tracker")
-
-    logger.info(
-        f"📊 Tracking context: run_id={run_id}, client={'Present' if client else 'Missing'}"
-    )
-    if not run_id or not client:
-        logger.warning("⚠️ Missing tracking context - results will NOT be created!")
-
     if tracker:
-        logger.info("📊 Using Tracker for per-goal result tracking")
+        logger.debug("📊 Tracker present — per-goal result tracking active")
 
     # --- Completion Parameters from config ---
     request_timeout = 120
@@ -382,8 +370,6 @@ def execute(
                     n_samples=1,
                     logger_instance=logger,
                     original_index=index,
-                    run_id=run_id,  # Pass for real-time tracking
-                    client=client,  # Pass for real-time tracking
                 )
                 completion_results_list.append(result)
 
