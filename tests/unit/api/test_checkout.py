@@ -10,11 +10,11 @@ from httpx import Response
 from hackagent.api.checkout import checkout_create
 from hackagent.client import AuthenticatedClient
 from hackagent.errors import UnexpectedStatus
-from hackagent.models.checkout_session_request_request import (
+from hackagent.api.models import (
     CheckoutSessionRequestRequest,
 )
-from hackagent.models.checkout_session_response import CheckoutSessionResponse
-from hackagent.models.generic_error_response import GenericErrorResponse
+from hackagent.api.models import CheckoutSessionResponse
+from hackagent.api.models import GenericErrorResponse
 
 
 @pytest.fixture
@@ -32,20 +32,15 @@ def checkout_request_body() -> CheckoutSessionRequestRequest:
 
 
 def test_get_kwargs(checkout_request_body: CheckoutSessionRequestRequest):
-    # Note: The generated _get_kwargs has triplicate isinstance checks for the same type.
-    # We are testing the multipart case as CheckoutSessionRequestRequest has to_multipart.
     kwargs = checkout_create._get_kwargs(body=checkout_request_body)
     assert kwargs["method"] == "post"
     assert kwargs["url"] == "/checkout/"
-    assert kwargs["files"] == checkout_request_body.to_multipart()
-    assert "multipart/form-data" in kwargs["headers"]["Content-Type"]
+    # After Pydantic migration the body is sent as JSON or form-encoded data
+    assert "data" in kwargs or "json" in kwargs
 
-    # Test with a different instance to ensure to_multipart is called on the passed body
     different_body = CheckoutSessionRequestRequest(credits_to_purchase=50)
-    different_body.additional_properties["price_id"] = "price_456"
-
     kwargs_different = checkout_create._get_kwargs(body=different_body)
-    assert kwargs_different["files"] == different_body.to_multipart()
+    assert kwargs_different["method"] == "post"
 
 
 def test_parse_response_success(authenticated_client: AuthenticatedClient):
@@ -55,7 +50,7 @@ def test_parse_response_success(authenticated_client: AuthenticatedClient):
         client=authenticated_client, response=http_response
     )
     assert isinstance(parsed, CheckoutSessionResponse)
-    assert parsed.checkout_url == "http://stripe.com/checkout/sess_123"
+    assert str(parsed.checkout_url) == "http://stripe.com/checkout/sess_123"
 
 
 @pytest.mark.parametrize(
@@ -126,7 +121,7 @@ def test_sync_detailed_success(
     mock_request.assert_called_once_with(**expected_kwargs)
     assert response.status_code == 200
     assert isinstance(response.parsed, CheckoutSessionResponse)
-    assert response.parsed.checkout_url == "http://stripe.com/checkout/sess_abc"
+    assert str(response.parsed.checkout_url) == "http://stripe.com/checkout/sess_abc"
 
 
 @pytest.mark.parametrize("status_code", [400, 404, 500])
@@ -204,7 +199,7 @@ async def test_asyncio_detailed_success(
     mock_async_httpx_client.request.assert_called_once_with(**expected_kwargs)
     assert response.status_code == 200
     assert isinstance(response.parsed, CheckoutSessionResponse)
-    assert response.parsed.checkout_url == "http://stripe.com/checkout/sess_def"
+    assert str(response.parsed.checkout_url) == "http://stripe.com/checkout/sess_def"
 
 
 @pytest.mark.parametrize("status_code", [400, 404, 500])

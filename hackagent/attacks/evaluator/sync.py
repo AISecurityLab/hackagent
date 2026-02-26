@@ -30,7 +30,7 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from hackagent.api.result import result_partial_update
-from hackagent.models import EvaluationStatusEnum, PatchedResultRequest
+from hackagent.api.models import EvaluationStatusEnum, PatchedResultRequest
 
 logger = logging.getLogger("hackagent.attacks.evaluator.sync")
 

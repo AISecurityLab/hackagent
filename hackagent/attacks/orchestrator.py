@@ -23,7 +23,7 @@ Technique implementations remain pure algorithms, unaware of server integration.
 """
 
 import json
-import logging
+from hackagent.logger import get_logger
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 from uuid import UUID
 
@@ -33,16 +33,17 @@ from hackagent.api.attack.attack_create import (
     sync_detailed as attacks_create_sync_detailed,
 )
 from hackagent.api.run import run_run_tests_create
-from hackagent.api.run.run_update import sync_detailed as run_update
+from hackagent.api.run.run_partial_update import sync_detailed as run_status_update
 from hackagent.errors import HackAgentError
-from hackagent.models.attack_request import AttackRequest
-from hackagent.models.run_request import RunRequest
-from hackagent.models.status_enum import StatusEnum
+from hackagent.api.models import AttackRequest
+from hackagent.api.models import PatchedRunRequest
+from hackagent.api.models import RunRequest
+from hackagent.api.models import StatusEnum
 
 if TYPE_CHECKING:
     from hackagent.agent import HackAgent
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class AttackOrchestrator:
@@ -125,7 +126,7 @@ class AttackOrchestrator:
         }
 
         try:
-            attack_req_obj = AttackRequest.from_dict(payload)
+            attack_req_obj = AttackRequest.model_validate(payload)
             response = attacks_create_sync_detailed(
                 client=self.client, body=attack_req_obj
             )
@@ -398,12 +399,10 @@ class AttackOrchestrator:
         # 4. Update run status to RUNNING
         try:
             logger.info(f"Updating run {run_id} status to RUNNING")
-            run_update(
+            run_status_update(
                 id=run_id,
                 client=self.client,
-                body=RunRequest(
-                    agent=victim_agent_id,
-                    attack=attack_id,
+                body=PatchedRunRequest(
                     status=StatusEnum.RUNNING,
                 ),
             )
@@ -423,12 +422,10 @@ class AttackOrchestrator:
             # 6. Update run status to COMPLETED
             try:
                 logger.info(f"Updating run {run_id} status to COMPLETED")
-                run_update(
+                run_status_update(
                     id=run_id,
                     client=self.client,
-                    body=RunRequest(
-                        agent=victim_agent_id,
-                        attack=attack_id,
+                    body=PatchedRunRequest(
                         status=StatusEnum.COMPLETED,
                     ),
                 )
@@ -441,12 +438,10 @@ class AttackOrchestrator:
             # Update run status to FAILED on error
             try:
                 logger.error(f"Attack execution failed: {e}")
-                run_update(
+                run_status_update(
                     id=run_id,
                     client=self.client,
-                    body=RunRequest(
-                        agent=victim_agent_id,
-                        attack=attack_id,
+                    body=PatchedRunRequest(
                         status=StatusEnum.FAILED,
                         run_notes=f"Execution failed: {str(e)}",
                     ),

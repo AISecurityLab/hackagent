@@ -1,19 +1,19 @@
-# Copyright 2026 - AI4I. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
-
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+
 import httpx
+
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.paginated_agent_list import PaginatedAgentList
 from ...types import UNSET, Response, Unset
+from ..models import PaginatedAgentList
 
 
 def _get_kwargs(
     *,
-    page: Union[Unset, int] = UNSET,
+    page: int | Unset = UNSET,
 ) -> dict[str, Any]:
+
     params: dict[str, Any] = {}
 
     params["page"] = page
@@ -30,12 +30,13 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[PaginatedAgentList]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> PaginatedAgentList | None:
     if response.status_code == 200:
-        response_200 = PaginatedAgentList.from_dict(response.json())
+        response_200 = PaginatedAgentList.model_validate(response.json())
 
         return response_200
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -43,7 +44,7 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+    *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[PaginatedAgentList]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -56,7 +57,7 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = UNSET,
+    page: int | Unset = UNSET,
 ) -> Response[PaginatedAgentList]:
     """Provides CRUD operations for Agent instances.
 
@@ -82,7 +83,7 @@ def sync_detailed(
         lookup_field (str): The model field used for looking up individual instances (UUID 'id').
 
     Args:
-        page (Union[Unset, int]):
+        page (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -106,8 +107,8 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = UNSET,
-) -> Optional[PaginatedAgentList]:
+    page: int | Unset = UNSET,
+) -> PaginatedAgentList | None:
     """Provides CRUD operations for Agent instances.
 
     This ViewSet manages Agent records, ensuring that users can only interact
@@ -132,7 +133,7 @@ def sync(
         lookup_field (str): The model field used for looking up individual instances (UUID 'id').
 
     Args:
-        page (Union[Unset, int]):
+        page (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -151,7 +152,7 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = UNSET,
+    page: int | Unset = UNSET,
 ) -> Response[PaginatedAgentList]:
     """Provides CRUD operations for Agent instances.
 
@@ -177,7 +178,7 @@ async def asyncio_detailed(
         lookup_field (str): The model field used for looking up individual instances (UUID 'id').
 
     Args:
-        page (Union[Unset, int]):
+        page (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -199,8 +200,8 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = UNSET,
-) -> Optional[PaginatedAgentList]:
+    page: int | Unset = UNSET,
+) -> PaginatedAgentList | None:
     """Provides CRUD operations for Agent instances.
 
     This ViewSet manages Agent records, ensuring that users can only interact
@@ -225,7 +226,7 @@ async def asyncio(
         lookup_field (str): The model field used for looking up individual instances (UUID 'id').
 
     Args:
-        page (Union[Unset, int]):
+        page (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

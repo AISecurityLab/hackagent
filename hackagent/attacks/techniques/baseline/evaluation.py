@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional
 from hackagent.attacks.objectives import OBJECTIVES
 from hackagent.attacks.evaluator import PatternEvaluator, KeywordEvaluator
 from hackagent.api.result import result_partial_update
-from hackagent.models import EvaluationStatusEnum, PatchedResultRequest
+from hackagent.api.models import EvaluationStatusEnum, PatchedResultRequest
 from hackagent.router.tracking import Tracker
 
 

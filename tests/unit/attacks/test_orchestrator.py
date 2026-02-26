@@ -155,7 +155,7 @@ class TestAttackOrchestratorServerRecords(unittest.TestCase):
         mock_response.parsed.additional_properties = {"id": run_id}
         mock_run_create.sync_detailed.return_value = mock_response
 
-        attack_id = "attack-123"
+        attack_id = str(uuid4())
         agent_id = str(self.mock_hack_agent.agent_id)
 
         result_id = orchestrator._create_server_run_record(attack_id, agent_id, None)

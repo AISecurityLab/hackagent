@@ -1,30 +1,32 @@
-# Copyright 2026 - AI4I. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
-
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+from urllib.parse import quote
 from uuid import UUID
+
 import httpx
+
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.agent import Agent
-from ...models.patched_agent_request import PatchedAgentRequest
-from ...types import Response
+from ...types import UNSET, Response, Unset
+from ..models import Agent, PatchedAgentRequest
 
 
 def _get_kwargs(
     id: UUID,
     *,
-    body: PatchedAgentRequest,
+    body: PatchedAgentRequest | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "patch",
-        "url": f"/agent/{id}",
+        "url": "/agent/{id}".format(
+            id=quote(str(id), safe=""),
+        ),
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.model_dump(by_alias=True, mode="json", exclude_none=True)
 
     headers["Content-Type"] = "application/json"
 
@@ -33,12 +35,13 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[Agent]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Agent | None:
     if response.status_code == 200:
-        response_200 = Agent.from_dict(response.json())
+        response_200 = Agent.model_validate(response.json())
 
         return response_200
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -46,7 +49,7 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+    *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[Agent]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -60,7 +63,7 @@ def sync_detailed(
     id: UUID,
     *,
     client: AuthenticatedClient,
-    body: PatchedAgentRequest,
+    body: PatchedAgentRequest | Unset = UNSET,
 ) -> Response[Agent]:
     """Provides CRUD operations for Agent instances.
 
@@ -87,8 +90,8 @@ def sync_detailed(
 
     Args:
         id (UUID):
-        body (PatchedAgentRequest): Serializes Agent model instances to JSON and validates data
-            for creating
+        body (PatchedAgentRequest | Unset): Serializes Agent model instances to JSON and validates
+            data for creating
             or updating Agent instances.
 
             This serializer provides a comprehensive representation of an Agent,
@@ -139,8 +142,8 @@ def sync(
     id: UUID,
     *,
     client: AuthenticatedClient,
-    body: PatchedAgentRequest,
-) -> Optional[Agent]:
+    body: PatchedAgentRequest | Unset = UNSET,
+) -> Agent | None:
     """Provides CRUD operations for Agent instances.
 
     This ViewSet manages Agent records, ensuring that users can only interact
@@ -166,8 +169,8 @@ def sync(
 
     Args:
         id (UUID):
-        body (PatchedAgentRequest): Serializes Agent model instances to JSON and validates data
-            for creating
+        body (PatchedAgentRequest | Unset): Serializes Agent model instances to JSON and validates
+            data for creating
             or updating Agent instances.
 
             This serializer provides a comprehensive representation of an Agent,
@@ -213,7 +216,7 @@ async def asyncio_detailed(
     id: UUID,
     *,
     client: AuthenticatedClient,
-    body: PatchedAgentRequest,
+    body: PatchedAgentRequest | Unset = UNSET,
 ) -> Response[Agent]:
     """Provides CRUD operations for Agent instances.
 
@@ -240,8 +243,8 @@ async def asyncio_detailed(
 
     Args:
         id (UUID):
-        body (PatchedAgentRequest): Serializes Agent model instances to JSON and validates data
-            for creating
+        body (PatchedAgentRequest | Unset): Serializes Agent model instances to JSON and validates
+            data for creating
             or updating Agent instances.
 
             This serializer provides a comprehensive representation of an Agent,
@@ -290,8 +293,8 @@ async def asyncio(
     id: UUID,
     *,
     client: AuthenticatedClient,
-    body: PatchedAgentRequest,
-) -> Optional[Agent]:
+    body: PatchedAgentRequest | Unset = UNSET,
+) -> Agent | None:
     """Provides CRUD operations for Agent instances.
 
     This ViewSet manages Agent records, ensuring that users can only interact
@@ -317,8 +320,8 @@ async def asyncio(
 
     Args:
         id (UUID):
-        body (PatchedAgentRequest): Serializes Agent model instances to JSON and validates data
-            for creating
+        body (PatchedAgentRequest | Unset): Serializes Agent model instances to JSON and validates
+            data for creating
             or updating Agent instances.
 
             This serializer provides a comprehensive representation of an Agent,

@@ -22,7 +22,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from hackagent.models import EvaluationStatusEnum
+from hackagent.api.models import EvaluationStatusEnum
 
 
 class TestEvaluationStatusUpdates(unittest.TestCase):

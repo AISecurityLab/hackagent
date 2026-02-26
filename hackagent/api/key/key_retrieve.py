@@ -1,33 +1,37 @@
-# Copyright 2026 - AI4I. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
-
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+from urllib.parse import quote
+
 import httpx
+
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.user_api_key import UserAPIKey
 from ...types import Response
+from ..models import UserAPIKey
 
 
 def _get_kwargs(
     prefix: str,
 ) -> dict[str, Any]:
+
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": f"/key/{prefix}",
+        "url": "/key/{prefix}".format(
+            prefix=quote(str(prefix), safe=""),
+        ),
     }
 
     return _kwargs
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[UserAPIKey]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> UserAPIKey | None:
     if response.status_code == 200:
-        response_200 = UserAPIKey.from_dict(response.json())
+        response_200 = UserAPIKey.model_validate(response.json())
 
         return response_200
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -35,7 +39,7 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+    *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[UserAPIKey]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -81,7 +85,7 @@ def sync(
     prefix: str,
     *,
     client: AuthenticatedClient,
-) -> Optional[UserAPIKey]:
+) -> UserAPIKey | None:
     """ViewSet for managing User API Keys.
 
     Web-only endpoint - requires Auth0 authentication.
@@ -138,7 +142,7 @@ async def asyncio(
     prefix: str,
     *,
     client: AuthenticatedClient,
-) -> Optional[UserAPIKey]:
+) -> UserAPIKey | None:
     """ViewSet for managing User API Keys.
 
     Web-only endpoint - requires Auth0 authentication.

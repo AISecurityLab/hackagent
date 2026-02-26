@@ -12,20 +12,20 @@ _rich_handler_configured_for_package = False
 
 def setup_package_logging(
     logger_name: str = "hackagent", default_level_str: str = "WARNING"
-):
+) -> logging.Logger:
     """Configures RichHandler for the specified logger if not already set."""
     global _rich_handler_configured_for_package
 
     package_logger = logging.getLogger(logger_name)
 
     if logger_name == "hackagent" and _rich_handler_configured_for_package:
-        return
+        return package_logger
 
-    has_console_handler = any(
-        isinstance(h, logging.StreamHandler) for h in package_logger.handlers
-    )
+    # Use RichHandler specifically — StreamHandler is too broad since
+    # RichHandler is a subclass and would incorrectly match the guard.
+    has_rich_handler = any(isinstance(h, RichHandler) for h in package_logger.handlers)
 
-    if not has_console_handler:
+    if not has_rich_handler:
         log_level_env = os.getenv(
             f"{logger_name.upper()}_LOG_LEVEL", default_level_str
         ).upper()
@@ -43,21 +43,25 @@ def setup_package_logging(
         package_logger.addHandler(rich_handler)
         package_logger.propagate = False  # Avoid duplicate logs with root logger
 
-        if logger_name == "hackagent":
-            _rich_handler_configured_for_package = True
-            # Set default levels for common noisy libraries
-            logging.getLogger("httpx").setLevel(logging.WARNING)
-            logging.getLogger("litellm").setLevel(logging.WARNING)
-            # Add other libraries here if needed, e.g.:
-            # logging.getLogger("another_library").setLevel(logging.WARNING)
-
-        # package_logger.debug(f"RichHandler configured for '{logger_name}' logger at level {level}.")
-
-    elif any(isinstance(h, RichHandler) for h in package_logger.handlers):
-        if logger_name == "hackagent":
-            _rich_handler_configured_for_package = True
+    if logger_name == "hackagent":
+        _rich_handler_configured_for_package = True
 
     return package_logger
+
+
+def suppress_noisy_libraries(*names: str) -> None:
+    """
+    Silence chatty third-party loggers to WARNING.
+
+    This is opt-in so that applications embedding hackagent are not surprised
+    by their own library loggers being muted.
+
+    Example:
+        >>> from hackagent.logger import suppress_noisy_libraries
+        >>> suppress_noisy_libraries("httpx", "litellm", "urllib3")
+    """
+    for name in names:
+        logging.getLogger(name).setLevel(logging.WARNING)
 
 
 def get_logger(name: str) -> logging.Logger:

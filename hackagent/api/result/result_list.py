@@ -1,28 +1,27 @@
-# Copyright 2026 - AI4I. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
-
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
 from uuid import UUID
+
 import httpx
+
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.paginated_result_list import PaginatedResultList
-from ...models.result_list_evaluation_status import ResultListEvaluationStatus
 from ...types import UNSET, Response, Unset
+from ..models import PaginatedResultList, EvaluationStatusEnum
 
 
 def _get_kwargs(
     *,
-    evaluation_status: Union[Unset, ResultListEvaluationStatus] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    prompt: Union[Unset, UUID] = UNSET,
-    run: Union[Unset, UUID] = UNSET,
-    run_organization: Union[Unset, UUID] = UNSET,
+    evaluation_status: EvaluationStatusEnum | Unset = UNSET,
+    page: int | Unset = UNSET,
+    prompt: UUID | Unset = UNSET,
+    run: UUID | Unset = UNSET,
+    run_organization: UUID | Unset = UNSET,
 ) -> dict[str, Any]:
+
     params: dict[str, Any] = {}
 
-    json_evaluation_status: Union[Unset, str] = UNSET
+    json_evaluation_status: str | Unset = UNSET
     if not isinstance(evaluation_status, Unset):
         json_evaluation_status = evaluation_status.value
 
@@ -30,17 +29,17 @@ def _get_kwargs(
 
     params["page"] = page
 
-    json_prompt: Union[Unset, str] = UNSET
+    json_prompt: str | Unset = UNSET
     if not isinstance(prompt, Unset):
         json_prompt = str(prompt)
     params["prompt"] = json_prompt
 
-    json_run: Union[Unset, str] = UNSET
+    json_run: str | Unset = UNSET
     if not isinstance(run, Unset):
         json_run = str(run)
     params["run"] = json_run
 
-    json_run_organization: Union[Unset, str] = UNSET
+    json_run_organization: str | Unset = UNSET
     if not isinstance(run_organization, Unset):
         json_run_organization = str(run_organization)
     params["run__organization"] = json_run_organization
@@ -57,12 +56,13 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[PaginatedResultList]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> PaginatedResultList | None:
     if response.status_code == 200:
-        response_200 = PaginatedResultList.from_dict(response.json())
+        response_200 = PaginatedResultList.model_validate(response.json())
 
         return response_200
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -70,7 +70,7 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+    *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[PaginatedResultList]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -83,11 +83,11 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    evaluation_status: Union[Unset, ResultListEvaluationStatus] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    prompt: Union[Unset, UUID] = UNSET,
-    run: Union[Unset, UUID] = UNSET,
-    run_organization: Union[Unset, UUID] = UNSET,
+    evaluation_status: EvaluationStatusEnum | Unset = UNSET,
+    page: int | Unset = UNSET,
+    prompt: UUID | Unset = UNSET,
+    run: UUID | Unset = UNSET,
+    run_organization: UUID | Unset = UNSET,
 ) -> Response[PaginatedResultList]:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
 
@@ -96,11 +96,11 @@ def sync_detailed(
     Results are typically consumed by SDK for test result retrieval and analysis.
 
     Args:
-        evaluation_status (Union[Unset, ResultListEvaluationStatus]):
-        page (Union[Unset, int]):
-        prompt (Union[Unset, UUID]):
-        run (Union[Unset, UUID]):
-        run_organization (Union[Unset, UUID]):
+        evaluation_status (EvaluationStatusEnum | Unset):
+        page (int | Unset):
+        prompt (UUID | Unset):
+        run (UUID | Unset):
+        run_organization (UUID | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -128,12 +128,12 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    evaluation_status: Union[Unset, ResultListEvaluationStatus] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    prompt: Union[Unset, UUID] = UNSET,
-    run: Union[Unset, UUID] = UNSET,
-    run_organization: Union[Unset, UUID] = UNSET,
-) -> Optional[PaginatedResultList]:
+    evaluation_status: EvaluationStatusEnum | Unset = UNSET,
+    page: int | Unset = UNSET,
+    prompt: UUID | Unset = UNSET,
+    run: UUID | Unset = UNSET,
+    run_organization: UUID | Unset = UNSET,
+) -> PaginatedResultList | None:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.
@@ -141,11 +141,11 @@ def sync(
     Results are typically consumed by SDK for test result retrieval and analysis.
 
     Args:
-        evaluation_status (Union[Unset, ResultListEvaluationStatus]):
-        page (Union[Unset, int]):
-        prompt (Union[Unset, UUID]):
-        run (Union[Unset, UUID]):
-        run_organization (Union[Unset, UUID]):
+        evaluation_status (EvaluationStatusEnum | Unset):
+        page (int | Unset):
+        prompt (UUID | Unset):
+        run (UUID | Unset):
+        run_organization (UUID | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -168,11 +168,11 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    evaluation_status: Union[Unset, ResultListEvaluationStatus] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    prompt: Union[Unset, UUID] = UNSET,
-    run: Union[Unset, UUID] = UNSET,
-    run_organization: Union[Unset, UUID] = UNSET,
+    evaluation_status: EvaluationStatusEnum | Unset = UNSET,
+    page: int | Unset = UNSET,
+    prompt: UUID | Unset = UNSET,
+    run: UUID | Unset = UNSET,
+    run_organization: UUID | Unset = UNSET,
 ) -> Response[PaginatedResultList]:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
 
@@ -181,11 +181,11 @@ async def asyncio_detailed(
     Results are typically consumed by SDK for test result retrieval and analysis.
 
     Args:
-        evaluation_status (Union[Unset, ResultListEvaluationStatus]):
-        page (Union[Unset, int]):
-        prompt (Union[Unset, UUID]):
-        run (Union[Unset, UUID]):
-        run_organization (Union[Unset, UUID]):
+        evaluation_status (EvaluationStatusEnum | Unset):
+        page (int | Unset):
+        prompt (UUID | Unset):
+        run (UUID | Unset):
+        run_organization (UUID | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -211,12 +211,12 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    evaluation_status: Union[Unset, ResultListEvaluationStatus] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    prompt: Union[Unset, UUID] = UNSET,
-    run: Union[Unset, UUID] = UNSET,
-    run_organization: Union[Unset, UUID] = UNSET,
-) -> Optional[PaginatedResultList]:
+    evaluation_status: EvaluationStatusEnum | Unset = UNSET,
+    page: int | Unset = UNSET,
+    prompt: UUID | Unset = UNSET,
+    run: UUID | Unset = UNSET,
+    run_organization: UUID | Unset = UNSET,
+) -> PaginatedResultList | None:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.
@@ -224,11 +224,11 @@ async def asyncio(
     Results are typically consumed by SDK for test result retrieval and analysis.
 
     Args:
-        evaluation_status (Union[Unset, ResultListEvaluationStatus]):
-        page (Union[Unset, int]):
-        prompt (Union[Unset, UUID]):
-        run (Union[Unset, UUID]):
-        run_organization (Union[Unset, UUID]):
+        evaluation_status (EvaluationStatusEnum | Unset):
+        page (int | Unset):
+        prompt (UUID | Unset):
+        run (UUID | Unset):
+        run_organization (UUID | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

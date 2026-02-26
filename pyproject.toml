@@ -22,7 +22,7 @@ classifiers = [
 
 dependencies = [
     "requests>=2.31.0",
-    "pydantic>=2.0",
+    "pydantic[email]>=2.0",
     "litellm>=1.69.2",
     "openai>=1.0.0",
     "rich>=14.0.0",
@@ -40,6 +40,7 @@ datasets = [
 
 [dependency-groups]
 dev = [
+    "datamodel-code-generator[http,ruff]>=0.54.0",
     "openapi-python-client>=0.24.3,<0.29.0",
     "ruff>=0.11.9",
     "pytest>=8.3.5",
@@ -117,3 +118,22 @@ collect_ignore = [
 markers = [
     "google_adk: marks tests that require Google ADK server (deselect with '-m \"not google_adk\"')",
 ]
+
+[tool.datamodel-codegen]
+# Generation options – input/output are supplied at call time via scripts/generate_models.sh
+input-file-type = "openapi"
+output-model-type = "pydantic_v2.BaseModel"
+target-python-version = "3.10"
+capitalise-enum-members = true
+collapse-root-models = true
+enable-faux-immutability = true
+field-constraints = true
+formatters = ["ruff-format", "ruff-check"]
+reuse-model = true
+set-default-enum-member = true
+snake-case-field = true
+strict-nullable = true
+use-annotated = true
+use-double-quotes = true
+use-field-description = true
+use-standard-collections = true

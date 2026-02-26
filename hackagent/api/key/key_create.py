@@ -1,14 +1,12 @@
-# Copyright 2026 - AI4I. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
-
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+
 import httpx
+
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.user_api_key import UserAPIKey
-from ...models.user_api_key_request import UserAPIKeyRequest
 from ...types import Response
+from ..models import UserAPIKey, UserAPIKeyRequest
 
 
 def _get_kwargs(
@@ -22,7 +20,7 @@ def _get_kwargs(
         "url": "/key",
     }
 
-    _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.model_dump(by_alias=True, mode="json", exclude_none=True)
 
     headers["Content-Type"] = "application/json"
 
@@ -31,12 +29,13 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[UserAPIKey]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> UserAPIKey | None:
     if response.status_code == 201:
-        response_201 = UserAPIKey.from_dict(response.json())
+        response_201 = UserAPIKey.model_validate(response.json())
 
         return response_201
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -44,7 +43,7 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+    *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[UserAPIKey]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -92,7 +91,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: UserAPIKeyRequest,
-) -> Optional[UserAPIKey]:
+) -> UserAPIKey | None:
     """ViewSet for managing User API Keys.
 
     Web-only endpoint - requires Auth0 authentication.
@@ -153,7 +152,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: UserAPIKeyRequest,
-) -> Optional[UserAPIKey]:
+) -> UserAPIKey | None:
     """ViewSet for managing User API Keys.
 
     Web-only endpoint - requires Auth0 authentication.

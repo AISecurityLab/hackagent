@@ -7,10 +7,10 @@ from uuid import UUID
 
 from hackagent.api.agent import agent_create, agent_list, agent_partial_update
 from hackagent.client import AuthenticatedClient
-from hackagent.models import (
+from hackagent.api.models import (
     Agent as BackendAgentModel,
 )
-from hackagent.models import (
+from hackagent.api.models import (
     AgentRequest,
     PatchedAgentRequest,
 )
@@ -280,7 +280,7 @@ class AgentRouter:
                 f"Unsupported agent type: {agent_type}. Supported types: {list(AGENT_TYPE_TO_ADAPTER_MAP.keys())}"
             )
 
-        actual_metadata = metadata.copy() if metadata is not None else {}
+        actual_metadata = {k: v for k, v in (metadata or {}).items() if v is not None}
 
         current_adapter_op_config = (
             adapter_operational_config.copy() if adapter_operational_config else {}
@@ -355,7 +355,7 @@ class AgentRouter:
 
         if agent_type == AgentTypeEnum.GOOGLE_ADK:
             adapter_instance_config["name"] = self.backend_agent.name
-            adapter_instance_config["endpoint"] = self.backend_agent.endpoint
+            adapter_instance_config["endpoint"] = str(self.backend_agent.endpoint)
             if "user_id" not in adapter_instance_config:
                 logger.error(
                     f"CRITICAL: user_id not found in adapter_instance_config for ADK agent '{self.backend_agent.name}' just before adapter instantiation. This should have been set in __init__."
@@ -383,7 +383,7 @@ class AgentRouter:
                 "endpoint" not in adapter_instance_config
                 and self.backend_agent.endpoint
             ):
-                adapter_instance_config["endpoint"] = self.backend_agent.endpoint
+                adapter_instance_config["endpoint"] = str(self.backend_agent.endpoint)
 
             optional_litellm_keys = [
                 "api_key",
@@ -430,7 +430,7 @@ class AgentRouter:
                 "endpoint" not in adapter_instance_config
                 and self.backend_agent.endpoint
             ):
-                adapter_instance_config["endpoint"] = self.backend_agent.endpoint
+                adapter_instance_config["endpoint"] = str(self.backend_agent.endpoint)
 
             optional_openai_keys = [
                 "api_key",
@@ -469,7 +469,7 @@ class AgentRouter:
                 "endpoint" not in adapter_instance_config
                 and self.backend_agent.endpoint
             ):
-                adapter_instance_config["endpoint"] = self.backend_agent.endpoint
+                adapter_instance_config["endpoint"] = str(self.backend_agent.endpoint)
 
             optional_ollama_keys = [
                 "max_new_tokens",
@@ -625,13 +625,13 @@ class AgentRouter:
                         return agent_model
 
                 if (
-                    hasattr(paginated_result, "next_")
-                    and paginated_result.next_
-                    and not isinstance(paginated_result.next_, Unset)
+                    hasattr(paginated_result, "next")
+                    and paginated_result.next
+                    and not isinstance(paginated_result.next, Unset)
                 ):
-                    next_page_url = paginated_result.next_
+                    next_page_url = str(paginated_result.next)
                     try:
-                        if isinstance(next_page_url, str) and "page=" in next_page_url:
+                        if "page=" in next_page_url:
                             current_page = int(
                                 next_page_url.split("page=")[-1].split("&")[0]
                             )
@@ -838,7 +838,8 @@ class AgentRouter:
             if metadata_to_patch:
                 final_metadata = current_metadata.copy()
                 final_metadata.update(metadata_to_patch)
-                patch_kwargs["metadata"] = final_metadata
+                # Strip None values — Django JSONField rejects null entries
+                patch_kwargs["metadata"] = {k: v for k, v in final_metadata.items() if v is not None}
 
             # Check agent_type
             current_type_val = None
@@ -854,9 +855,11 @@ class AgentRouter:
                 patch_kwargs["agent_type"] = agent_type.value
                 needs_update = True
 
-            # Check endpoint
-            current_endpoint = existing_agent.endpoint
-            if current_endpoint != endpoint_for_backend:
+            # Check endpoint — normalize both sides to str so AnyUrl ≠ str
+            # false-positives don't trigger unnecessary PATCH calls.
+            current_endpoint = str(existing_agent.endpoint).rstrip("/") if existing_agent.endpoint else None
+            _normalized_requested = str(endpoint_for_backend).rstrip("/")
+            if current_endpoint != _normalized_requested:
                 logger.info(
                     f"Backend agent '{name}' exists but endpoint differs. Current: '{current_endpoint}', Requested: '{endpoint_for_backend}'. Will update."
                 )

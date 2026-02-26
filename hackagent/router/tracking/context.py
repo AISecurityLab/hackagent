@@ -10,6 +10,7 @@ configuration and state that can be passed between components.
 """
 
 import logging
+from hackagent.logger import get_logger
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 from uuid import UUID
@@ -55,7 +56,7 @@ class TrackingContext:
     def __post_init__(self):
         """Initialize default logger if not provided."""
         if self.logger is None:
-            self.logger = logging.getLogger(__name__)
+            self.logger = get_logger(__name__)
 
     @property
     def is_enabled(self) -> bool:

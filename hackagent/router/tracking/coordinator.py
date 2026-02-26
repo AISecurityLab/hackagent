@@ -42,9 +42,10 @@ Usage:
 """
 
 import logging
+from hackagent.logger import get_logger
 from typing import Any, Callable, Dict, List, Optional
 
-from hackagent.models import StatusEnum
+from hackagent.api.models import StatusEnum
 
 from .context import TrackingContext
 from .step import StepTracker
@@ -88,7 +89,7 @@ class TrackingCoordinator:
         """
         self.step_tracker = step_tracker
         self.goal_tracker = goal_tracker
-        self.logger = logger or logging.getLogger(__name__)
+        self.logger = logger or get_logger(__name__)
         self._goals: List[str] = []
 
     @classmethod
@@ -121,7 +122,7 @@ class TrackingCoordinator:
         Returns:
             Initialized TrackingCoordinator
         """
-        _logger = logger or logging.getLogger(__name__)
+        _logger = logger or get_logger(__name__)
 
         # Build goal Tracker
         goal_tracker = None
@@ -437,7 +438,21 @@ class TrackingCoordinator:
             results: Pipeline output (used only if success_check is provided)
             success_check: Optional callable to determine overall success
         """
-        self.step_tracker.update_run_status(StatusEnum.COMPLETED)
+        if success_check is not None:
+            try:
+                status = (
+                    StatusEnum.COMPLETED
+                    if success_check(results)
+                    else StatusEnum.FAILED
+                )
+            except Exception as e:
+                self.logger.warning(
+                    f"success_check raised an exception, marking FAILED: {e}"
+                )
+                status = StatusEnum.FAILED
+        else:
+            status = StatusEnum.COMPLETED
+        self.step_tracker.update_run_status(status)
 
     # ========================================================================
     # SUMMARY

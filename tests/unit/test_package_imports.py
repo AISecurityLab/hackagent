@@ -54,7 +54,7 @@ class TestPackageImports:
         This specifically tests for the python-dateutil dependency
         which is used in model serialization.
         """
-        from hackagent.models import Agent
+        from hackagent.api.models import Agent
 
         assert Agent is not None
 

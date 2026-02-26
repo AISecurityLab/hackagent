@@ -106,7 +106,7 @@ class TestUpdateSingleResult(unittest.TestCase):
         # Check PatchedResultRequest was constructed correctly
         call_kwargs = mock_update.sync_detailed.call_args
         body = call_kwargs.kwargs.get("body") or call_kwargs[1].get("body")
-        from hackagent.models import EvaluationStatusEnum
+        from hackagent.api.models import EvaluationStatusEnum
 
         self.assertEqual(
             body.evaluation_status, EvaluationStatusEnum.SUCCESSFUL_JAILBREAK
@@ -129,7 +129,7 @@ class TestUpdateSingleResult(unittest.TestCase):
 
         call_kwargs = mock_update.sync_detailed.call_args
         body = call_kwargs.kwargs.get("body") or call_kwargs[1].get("body")
-        from hackagent.models import EvaluationStatusEnum
+        from hackagent.api.models import EvaluationStatusEnum
 
         self.assertEqual(body.evaluation_status, EvaluationStatusEnum.FAILED_JAILBREAK)
 

@@ -31,7 +31,7 @@ from hackagent.attacks.shared.prompt_parser import extract_prompt_and_improvemen
 from hackagent.attacks.shared.response_utils import extract_response_content
 from hackagent.attacks.shared.router_factory import create_router
 from hackagent.client import AuthenticatedClient
-from hackagent.models import StepTypeEnum
+from hackagent.api.models import StepTypeEnum
 from hackagent.router.router import AgentRouter
 from hackagent.router.tracking import Context, Tracker
 

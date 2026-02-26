@@ -20,19 +20,19 @@ from hackagent.api.run import (
     run_run_tests_create,
     run_update,
 )  # Added run_run_tests_create
-from hackagent.models.evaluation_status_enum import (
+from hackagent.api.models import (
     EvaluationStatusEnum,
 )  # For nested Result.evaluation_status
-from hackagent.models.paginated_run_list import PaginatedRunList
-from hackagent.models.patched_run_request import PatchedRunRequest  # Added
-from hackagent.models.result import Result  # For nested results within a Run
-from hackagent.models.result_request import (
+from hackagent.api.models import PaginatedRunList
+from hackagent.api.models import PatchedRunRequest  # Added
+from hackagent.api.models import Result  # For nested results within a Run
+from hackagent.api.models import (
     ResultRequest as RunResultCreateRequest,
 )  # Alias to avoid confusion with main ResultRequest
-from hackagent.models.run import Run
-from hackagent.models.run_list_status import RunListStatus  # For run_list filter
-from hackagent.models.run_request import RunRequest  # Added
-from hackagent.models.status_enum import StatusEnum  # For Run status field
+from hackagent.api.models import Run
+from hackagent.api.models import StatusEnum  # For run_list filter
+from hackagent.api.models import RunRequest  # Added
+from hackagent.api.models import StatusEnum  # For Run status field
 from hackagent.types import UNSET
 
 
@@ -52,10 +52,10 @@ class TestRunListAPI(unittest.TestCase):
         # Mock for a Result within the Run's results list
         mock_result_id_in_run = uuid.uuid4()
         mock_trace_data_in_result = {
-            "id": str(uuid.uuid4()),
+            "id": 1,
             "result": str(mock_result_id_in_run),
             "sequence": 1,
-            "type_": "MESSAGE",
+            "type": "MESSAGE",
             "content": "Nested trace",
             "timestamp": timestamp_str,
             "metadata": {},
@@ -101,18 +101,18 @@ class TestRunListAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_object = PaginatedRunList.from_dict(mock_response_content)
+        mock_parsed_object = PaginatedRunList.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.run.run_list.PaginatedRunList.from_dict",
+            "hackagent.api.run.run_list.PaginatedRunList.model_validate",
             return_value=mock_parsed_object,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = run_list.sync_detailed(
                 client=mock_client_instance,
                 agent=mock_agent_id,
                 attack=mock_attack_id,
                 organization=mock_org_id,
-                status=RunListStatus.COMPLETED,  # Use RunListStatus for filter
+                status=StatusEnum.COMPLETED,  # Use StatusEnum for filter
                 page=1,
             )
 
@@ -141,13 +141,13 @@ class TestRunListAPI(unittest.TestCase):
                 retrieved_run.results[0].run_id, mock_run_id
             )  # Check nested Result's run_id
 
-            mock_from_dict.assert_called_once_with(mock_response_content)
+            mock_model_validate.assert_called_once_with(mock_response_content)
 
             expected_params = {
                 "agent": str(mock_agent_id),
                 "attack": str(mock_attack_id),
                 "organization": str(mock_org_id),
-                "status": RunListStatus.COMPLETED.value,
+                "status": StatusEnum.COMPLETED.value,
                 "page": 1,
                 # is_client_executed is not passed if UNSET (default) but we can test it if needed
             }
@@ -250,11 +250,11 @@ class TestRunCreateAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_run = Run.from_dict(mock_response_content)
+        mock_parsed_run = Run.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.run.run_create.Run.from_dict", return_value=mock_parsed_run
-        ) as mock_from_dict:
+            "hackagent.api.run.run_create.Run.model_validate", return_value=mock_parsed_run
+        ) as mock_model_validate:
             response = run_create.sync_detailed(
                 client=mock_client_instance, body=run_request_data
             )
@@ -267,12 +267,12 @@ class TestRunCreateAPI(unittest.TestCase):
             self.assertEqual(response.parsed.run_config, run_request_data.run_config)
             self.assertEqual(len(response.parsed.results), 0)  # Check for empty results
 
-            mock_from_dict.assert_called_once_with(mock_response_content)
+            mock_model_validate.assert_called_once_with(mock_response_content)
 
             expected_kwargs = {
                 "method": "post",
                 "url": "/run",
-                "json": run_request_data.to_dict(),
+                "json": run_request_data.model_dump(by_alias=True, mode="json", exclude_none=True),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -348,10 +348,10 @@ class TestRunRetrieveAPI(unittest.TestCase):
         # Mock for a Result within the retrieved Run's results list
         mock_result_id_retrieve = uuid.uuid4()
         mock_trace_data_retrieve = {
-            "id": str(uuid.uuid4()),
+            "id": 1,
             "result": str(mock_result_id_retrieve),
             "sequence": 1,
-            "type_": "INFO",
+            "type": "INFO",
             "content": "Retrieved trace",
             "timestamp": timestamp_retrieve_str,
             "metadata": {},
@@ -391,11 +391,11 @@ class TestRunRetrieveAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_run = Run.from_dict(mock_response_content)
+        mock_parsed_run = Run.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.run.run_retrieve.Run.from_dict", return_value=mock_parsed_run
-        ) as mock_from_dict:
+            "hackagent.api.run.run_retrieve.Run.model_validate", return_value=mock_parsed_run
+        ) as mock_model_validate:
             response = run_retrieve.sync_detailed(
                 client=mock_client_instance, id=run_id_to_retrieve
             )
@@ -413,7 +413,7 @@ class TestRunRetrieveAPI(unittest.TestCase):
                 response.parsed.results[0].traces[0].content, "Retrieved trace"
             )
 
-            mock_from_dict.assert_called_once_with(mock_response_content)
+            mock_model_validate.assert_called_once_with(mock_response_content)
 
             expected_kwargs = {
                 "method": "get",
@@ -496,10 +496,10 @@ class TestRunUpdateAPI(unittest.TestCase):
         # Assuming they are returned and unchanged for this test if not part of RunRequest.
         mock_result_id_update = uuid.uuid4()
         mock_trace_data_update = {
-            "id": str(uuid.uuid4()),
+            "id": 1,
             "result": str(mock_result_id_update),
             "sequence": 1,
-            "type_": "ERROR",
+            "type": "ERROR",
             "content": "Updated trace in result",
             "timestamp": timestamp_update_str,
             "metadata": {},
@@ -547,11 +547,11 @@ class TestRunUpdateAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_run = Run.from_dict(mock_updated_run_response_content)
+        mock_parsed_run = Run.model_validate(mock_updated_run_response_content)
 
         with patch(
-            "hackagent.api.run.run_update.Run.from_dict", return_value=mock_parsed_run
-        ) as mock_from_dict:
+            "hackagent.api.run.run_update.Run.model_validate", return_value=mock_parsed_run
+        ) as mock_model_validate:
             response = run_update.sync_detailed(
                 client=mock_client_instance,
                 id=run_id_to_update,
@@ -573,12 +573,12 @@ class TestRunUpdateAPI(unittest.TestCase):
                 response.parsed.timestamp, isoparse(original_run_timestamp_str)
             )
 
-            mock_from_dict.assert_called_once_with(mock_updated_run_response_content)
+            mock_model_validate.assert_called_once_with(mock_updated_run_response_content)
 
             expected_kwargs = {
                 "method": "put",
                 "url": f"/run/{run_id_to_update}",
-                "json": run_update_request_data.to_dict(),
+                "json": run_update_request_data.model_dump(by_alias=True, mode="json", exclude_none=True),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -679,12 +679,12 @@ class TestRunPartialUpdateAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_run = Run.from_dict(mock_patched_run_response_content)
+        mock_parsed_run = Run.model_validate(mock_patched_run_response_content)
 
         with patch(
-            "hackagent.api.run.run_partial_update.Run.from_dict",
+            "hackagent.api.run.run_partial_update.Run.model_validate",
             return_value=mock_parsed_run,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = run_partial_update.sync_detailed(
                 client=mock_client_instance,
                 id=run_id_to_patch,
@@ -702,19 +702,19 @@ class TestRunPartialUpdateAPI(unittest.TestCase):
                 response.parsed.run_config, original_run_config_patch_resp
             )  # Verify unpatched field
 
-            mock_from_dict.assert_called_once_with(mock_patched_run_response_content)
+            mock_model_validate.assert_called_once_with(mock_patched_run_response_content)
 
             expected_kwargs = {
                 "method": "patch",
                 "url": f"/run/{run_id_to_patch}",
-                "json": run_patch_request_data.to_dict(),
+                "json": run_patch_request_data.model_dump(by_alias=True, mode="json", exclude_none=True),
                 "headers": {"Content-Type": "application/json"},
             }
-            request_dict = run_patch_request_data.to_dict()
+            request_dict = run_patch_request_data.model_dump(by_alias=True, mode="json", exclude_none=True)
             self.assertIn("status", request_dict)
             self.assertIn("run_notes", request_dict)
-            self.assertNotIn("run_config", request_dict)
-            self.assertNotIn("agent", request_dict)
+            self.assertIsNone(request_dict.get("run_config"))  # Unset optional fields serialize as None
+            self.assertIsNone(request_dict.get("agent"))  # Unset optional fields serialize as None
 
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
@@ -873,19 +873,19 @@ class TestRunResultCreateAPI(unittest.TestCase):
             "id": 789,  # Trace ID is int
             "result": str(mock_created_result_id),
             "sequence": 1,
-            "type_": "SYSTEM",
+            "type": "SYSTEM",
             "content": "Trace for newly created result under run",
             "timestamp": timestamp_str_for_result,
             "metadata": {},
         }
 
         # This is the content the server would return for the created Result.
-        # It needs to be parsable by Result.from_dict
+        # It needs to be parsable by Result.model_validate
         mock_response_content_for_result = {
             "id": str(mock_created_result_id),
             "run": str(
                 parent_run_id
-            ),  # Ensure 'run' (UUID of parent Run) is present for Result.from_dict
+            ),  # Ensure 'run' (UUID of parent Run) is present for Result.model_validate
             "run_id": str(parent_run_id),  # run_id is also an attribute of Result model
             "prompt_name": "Prompt For Newly Created Result Under Run",  # Server might derive this
             "timestamp": timestamp_str_for_result,
@@ -907,30 +907,30 @@ class TestRunResultCreateAPI(unittest.TestCase):
             "agent_specific_data": {},
         }
         mock_httpx_response = MagicMock()
-        mock_httpx_response.status_code = (
-            200  # Changed from 201 to 200 to match client's parse logic
-        )
+        mock_httpx_response.status_code = 201  # POST create returns 201 Created
         mock_httpx_response.json.return_value = mock_response_content_for_result
         mock_httpx_response.content = b"{}"
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
         # The run_result_create API returns a Result model instance
-        mock_parsed_result_object = Result.from_dict(mock_response_content_for_result)
+        mock_parsed_result_object = Result.model_validate(mock_response_content_for_result)
         # Ensure raise_on_unexpected_status is True for this success test if not default
         mock_client_instance.raise_on_unexpected_status = True
 
         with patch(
-            "hackagent.api.run.run_result_create.Result.from_dict",
+            "hackagent.api.run.run_result_create.Result.model_validate",
             return_value=mock_parsed_result_object,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = run_result_create.sync_detailed(
                 client=mock_client_instance,
                 id=parent_run_id,  # This is the Run ID in the URL path
                 body=result_create_body,
             )
 
-            self.assertEqual(response.status_code, HTTPStatus.OK)  # Expect 200 now
+            self.assertEqual(
+                response.status_code, HTTPStatus.CREATED
+            )  # POST create returns 201
             self.assertIsNotNone(response.parsed)
             self.assertIsInstance(
                 response.parsed, Result
@@ -943,12 +943,12 @@ class TestRunResultCreateAPI(unittest.TestCase):
                 response.parsed.evaluation_status, result_create_body.evaluation_status
             )
 
-            mock_from_dict.assert_called_once_with(mock_response_content_for_result)
+            mock_model_validate.assert_called_once_with(mock_response_content_for_result)
 
             expected_kwargs = {
                 "method": "post",
                 "url": f"/run/{parent_run_id}/result",
-                "json": result_create_body.to_dict(),
+                "json": result_create_body.model_dump(by_alias=True, mode="json", exclude_none=True),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -1053,7 +1053,7 @@ class TestRunRunTestsCreateAPI(unittest.TestCase):
         expected_kwargs = {
             "method": "post",
             "url": "/run/run_tests",  # Matches _get_kwargs in the client file
-            "json": run_tests_request_body.to_dict(),
+            "json": run_tests_request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
             "headers": {"Content-Type": "application/json"},
         }
         mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -1072,7 +1072,7 @@ class TestRunRunTestsCreateAPI(unittest.TestCase):
         # It does NOT take an 'id' parameter according to the client file's signature for sync_detailed.
         # The original traceback showed TypeError for RunRequest init for this test, not for the API call itself.
         # So, this test is about passing a malformed RunRequest to the client function's `body`.
-        # The client function `_get_kwargs` calls `body.to_dict()`. If body is not a proper RunRequest,
+        # The client function `_get_kwargs` calls `body.model_dump(by_alias=True, mode="json", exclude_none=True)`. If body is not a proper RunRequest,
         # this could fail before an API call is even attempted, or if `agent` is missing and `to_dict` needs it.
         # However, RunRequest itself takes agent as a mandatory field in its __init__.
         # The TypeError was: RunRequest.__init__() missing 1 required positional argument: 'agent'

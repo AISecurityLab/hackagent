@@ -8,7 +8,7 @@ This adapter provides direct integration with Ollama for running local LLMs.
 It uses Ollama's native HTTP API for efficient communication.
 """
 
-import logging
+from hackagent.logger import get_logger
 import os
 from typing import Any, Dict, List, Optional
 
@@ -30,7 +30,7 @@ class OllamaConnectionError(AdapterInteractionError):
     pass
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class OllamaAgent(Agent):

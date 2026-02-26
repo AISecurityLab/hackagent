@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import json
-import logging
+from hackagent.logger import get_logger
 from pathlib import Path
 from typing import Optional, Union
 
@@ -12,7 +12,7 @@ from rich.text import Text
 
 from hackagent.router.types import AgentTypeEnum
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 HACKAGENT = """

@@ -28,7 +28,7 @@ config = {
     "attack_type": "advprefix",
     "dataset": {
         "preset": "harmbench",
-        "limit": 3,
+        "limit": 100,
     },
     "generator": {
         "identifier": "llama2-uncensored",

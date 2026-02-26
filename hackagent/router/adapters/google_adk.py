@@ -3,7 +3,7 @@
 
 
 import json
-import logging
+from hackagent.logger import get_logger
 from typing import Any, Dict, Optional, Tuple
 
 import requests
@@ -17,7 +17,7 @@ from hackagent.router.adapters.base import (
 )
 
 # Global logger for this module, can be used by utility functions too
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 # --- Custom Exceptions (subclass from base) ---

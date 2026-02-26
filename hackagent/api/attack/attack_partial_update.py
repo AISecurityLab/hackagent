@@ -1,30 +1,32 @@
-# Copyright 2026 - AI4I. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
-
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+from urllib.parse import quote
 from uuid import UUID
+
 import httpx
+
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.attack import Attack
-from ...models.patched_attack_request import PatchedAttackRequest
-from ...types import Response
+from ...types import UNSET, Response, Unset
+from ..models import Attack, PatchedAttackRequest
 
 
 def _get_kwargs(
     id: UUID,
     *,
-    body: PatchedAttackRequest,
+    body: PatchedAttackRequest | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "patch",
-        "url": f"/attack/{id}",
+        "url": "/attack/{id}".format(
+            id=quote(str(id), safe=""),
+        ),
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.model_dump(by_alias=True, mode="json", exclude_none=True)
 
     headers["Content-Type"] = "application/json"
 
@@ -33,12 +35,13 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[Attack]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Attack | None:
     if response.status_code == 200:
-        response_200 = Attack.from_dict(response.json())
+        response_200 = Attack.model_validate(response.json())
 
         return response_200
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -46,7 +49,7 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+    *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[Attack]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -60,7 +63,7 @@ def sync_detailed(
     id: UUID,
     *,
     client: AuthenticatedClient,
-    body: PatchedAttackRequest,
+    body: PatchedAttackRequest | Unset = UNSET,
 ) -> Response[Attack]:
     """Manages Attack configurations through standard CRUD operations.
 
@@ -90,8 +93,8 @@ def sync_detailed(
 
     Args:
         id (UUID):
-        body (PatchedAttackRequest): Serializer for the Attack model, which represents an Attack
-            configuration.
+        body (PatchedAttackRequest | Unset): Serializer for the Attack model, which represents an
+            Attack configuration.
 
             Handles the conversion of Attack configuration instances to JSON (and vice-versa)
             for API requests and responses. It includes read-only fields for related
@@ -121,8 +124,8 @@ def sync(
     id: UUID,
     *,
     client: AuthenticatedClient,
-    body: PatchedAttackRequest,
-) -> Optional[Attack]:
+    body: PatchedAttackRequest | Unset = UNSET,
+) -> Attack | None:
     """Manages Attack configurations through standard CRUD operations.
 
     This ViewSet allows clients to:
@@ -151,8 +154,8 @@ def sync(
 
     Args:
         id (UUID):
-        body (PatchedAttackRequest): Serializer for the Attack model, which represents an Attack
-            configuration.
+        body (PatchedAttackRequest | Unset): Serializer for the Attack model, which represents an
+            Attack configuration.
 
             Handles the conversion of Attack configuration instances to JSON (and vice-versa)
             for API requests and responses. It includes read-only fields for related
@@ -177,7 +180,7 @@ async def asyncio_detailed(
     id: UUID,
     *,
     client: AuthenticatedClient,
-    body: PatchedAttackRequest,
+    body: PatchedAttackRequest | Unset = UNSET,
 ) -> Response[Attack]:
     """Manages Attack configurations through standard CRUD operations.
 
@@ -207,8 +210,8 @@ async def asyncio_detailed(
 
     Args:
         id (UUID):
-        body (PatchedAttackRequest): Serializer for the Attack model, which represents an Attack
-            configuration.
+        body (PatchedAttackRequest | Unset): Serializer for the Attack model, which represents an
+            Attack configuration.
 
             Handles the conversion of Attack configuration instances to JSON (and vice-versa)
             for API requests and responses. It includes read-only fields for related
@@ -236,8 +239,8 @@ async def asyncio(
     id: UUID,
     *,
     client: AuthenticatedClient,
-    body: PatchedAttackRequest,
-) -> Optional[Attack]:
+    body: PatchedAttackRequest | Unset = UNSET,
+) -> Attack | None:
     """Manages Attack configurations through standard CRUD operations.
 
     This ViewSet allows clients to:
@@ -266,8 +269,8 @@ async def asyncio(
 
     Args:
         id (UUID):
-        body (PatchedAttackRequest): Serializer for the Attack model, which represents an Attack
-            configuration.
+        body (PatchedAttackRequest | Unset): Serializer for the Attack model, which represents an
+            Attack configuration.
 
             Handles the conversion of Attack configuration instances to JSON (and vice-versa)
             for API requests and responses. It includes read-only fields for related
