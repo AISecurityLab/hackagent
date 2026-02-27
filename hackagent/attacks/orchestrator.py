@@ -316,6 +316,12 @@ class AttackOrchestrator:
         """
         Execute attack locally using technique implementation.
 
+        If ``goal_batch_size`` is present in *attack_config*, goals are split
+        into batches of that size and ``run()`` is called once per batch on the
+        same attack instance.  Results from all batches are concatenated and
+        returned together.  When ``goal_batch_size`` is absent (or the goals
+        list is smaller than the batch size), the attack runs as before.
+
         Args:
             attack_id: Server-side attack record ID
             run_id: Server-side run record ID
@@ -334,8 +340,43 @@ class AttackOrchestrator:
             attack_config, run_config_override, run_id
         )
         attack_impl = self.attack_impl_class(**impl_kwargs)
-        results = attack_impl.run(**attack_params)
 
+        goals = attack_params.get("goals")
+        goal_batch_size = attack_config.get("goal_batch_size")
+
+        if (
+            goal_batch_size
+            and isinstance(goals, list)
+            and len(goals) > goal_batch_size
+        ):
+            batches = [
+                goals[i : i + goal_batch_size]
+                for i in range(0, len(goals), goal_batch_size)
+            ]
+            n_batches = len(batches)
+            logger.info(
+                f"Batching {len(goals)} goals into {n_batches} batch(es) "
+                f"of up to {goal_batch_size}"
+            )
+
+            all_results = []
+            for batch_idx, batch_goals in enumerate(batches):
+                logger.info(
+                    f"Running batch {batch_idx + 1}/{n_batches} "
+                    f"({len(batch_goals)} goals)"
+                )
+                batch_params = {**attack_params, "goals": batch_goals}
+                batch_results = attack_impl.run(**batch_params)
+                if batch_results:
+                    all_results.extend(batch_results)
+
+            logger.info(
+                f"{self.attack_type} attack completed "
+                f"({len(all_results)} total results from {n_batches} batches)"
+            )
+            return all_results
+
+        results = attack_impl.run(**attack_params)
         logger.info(f"{self.attack_type} attack completed")
         return results
 

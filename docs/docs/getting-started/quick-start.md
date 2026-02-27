@@ -411,4 +411,4 @@ agent.hack(attack_config=attack_config)
 ## Next Steps
 
 - [**Attack Tutorial**](./attack-tutorial) — Run your first security test
-- [**AdvPrefix Attacks**](../attacks/advprefix-attacks) — Deep dive into attack techniques
+- [**AdvPrefix Attacks**](../attacks/advprefix) — Deep dive into attack techniques

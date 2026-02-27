@@ -41,8 +41,40 @@ class PAIRAttack(BaseAttack):
     """
     PAIR (Prompt Automatic Iterative Refinement) attack.
 
-    Uses an attacker LLM to generate and iteratively refine adversarial
-    prompts based on target model responses and judge feedback.
+    Implements the PAIR algorithm from:
+        Chao et al., "Jailbreaking Black Box Large Language Models
+        in Twenty Queries" (2023)
+        https://arxiv.org/abs/2310.08419
+
+    PAIR uses an *attacker* LLM to iteratively refine an adversarial
+    prompt based on the *target* model's responses and a judge score:
+
+    1. The attacker generates an initial or refined jailbreak prompt.
+    2. The prompt is sent to the target model.
+    3. A judge rates the response on a 1–10 jailbreak success scale.
+    4. The score and response are fed back to the attacker as context
+       for the next refinement.
+    5. Steps 1–4 repeat for ``n_iterations`` rounds or until early stop.
+
+    Multiple independent ``n_streams`` are run in parallel (one per goal);
+    each stream maintains its own conversation history with the attacker.
+
+    The attack requires three separate model roles:
+
+    * **Attacker** (``config["attacker"]``) — an LLM that proposes prompt
+      improvements based on feedback.
+    * **Target** — the victim model reached via ``agent_router``.
+    * **Judge** — same router as attacker (called with the judge prompt
+      from :data:`~hackagent.attacks.techniques.pair.config.JUDGE_SYSTEM_PROMPT`).
+
+    Attributes:
+        config: Merged PAIR configuration dictionary.
+        client: Authenticated HackAgent API client.
+        agent_router: Router for the victim model.
+        attacker_router: Router for the attacker/judge LLM.
+        objective: Loaded :class:`~hackagent.attacks.objectives.base.ObjectiveConfig`
+            instance for the configured ``objective`` key.
+        logger: Hierarchical logger at ``hackagent.attacks.pair``.
     """
 
     def __init__(
@@ -51,7 +83,21 @@ class PAIRAttack(BaseAttack):
         client: Optional[AuthenticatedClient] = None,
         agent_router: Optional[AgentRouter] = None,
     ):
-        """Initialize PAIR attack."""
+        """
+        Initialize PAIR attack.
+
+        Args:
+            config: Optional configuration overrides merged into
+                :data:`~hackagent.attacks.techniques.pair.config.DEFAULT_PAIR_CONFIG`.
+            client: Authenticated HackAgent API client.
+            agent_router: Router for the victim model.
+
+        Raises:
+            ValueError: If ``client`` or ``agent_router`` is ``None``, if
+                the attacker router cannot be initialised, or if the
+                configured ``objective`` key is not in
+                :data:`~hackagent.attacks.objectives.OBJECTIVES`.
+        """
         if client is None:
             raise ValueError("AuthenticatedClient must be provided.")
         if agent_router is None:
@@ -124,7 +170,17 @@ class PAIRAttack(BaseAttack):
             return None
 
     def _validate_config(self):
-        """Validate configuration."""
+        """
+        Validate PAIR-specific configuration.
+
+        Checks that the required top-level keys are present.  Delegates to
+        :meth:`~hackagent.attacks.techniques.base.BaseAttack._validate_config`
+        for common validation first.
+
+        Raises:
+            ValueError: If any of ``"objective"``, ``"attacker"``,
+                ``"n_iterations"``, or ``"output_dir"`` are missing.
+        """
         super()._validate_config()
 
         required = ["objective", "attacker", "n_iterations", "output_dir"]
@@ -134,17 +190,37 @@ class PAIRAttack(BaseAttack):
 
     def _get_pipeline_steps(self) -> List[Dict]:
         """
-        Define attack pipeline steps.
+        Return an empty pipeline steps list.
 
-        PAIR uses a custom iterative approach rather than discrete pipeline steps,
-        so this returns an empty list. The actual logic is in run().
+        PAIR implements a fully custom iterative loop inside :meth:`run`
+        rather than discrete pipeline stages, so no step descriptors are
+        needed by :meth:`~hackagent.attacks.techniques.base.BaseAttack._execute_pipeline`.
+
+        Returns:
+            Empty list.
         """
         return []
 
-    def _query_attacker(
-        self, goal: str, target_response: str, score: int, iteration: int
-    ) -> Optional[str]:
-        """Query attacker LLM for improved prompt."""
+    def _query_attacker(self, goal: str, target_response: str, score: int, iteration: int) -> Optional[str]:
+        """
+        Ask the attacker LLM for an improved adversarial prompt.
+
+        On the first iteration (``iteration == 0``) only the goal is sent;
+        subsequent calls include the previous target response and judge
+        score as feedback context.
+
+        Args:
+            goal: The harmful goal the adversarial prompt should achieve.
+            target_response: The victim model's response from the previous
+                iteration (ignored on ``iteration == 0``).
+            score: Judge score (1–10) from the previous iteration
+                (ignored on ``iteration == 0``).
+            iteration: Zero-based iteration counter.
+
+        Returns:
+            Extracted adversarial prompt string, or ``None`` if the
+            attacker returns an unparseable response.
+        """
         try:
             system_prompt = ATTACKER_SYSTEM_PROMPT.format(goal=goal)
 
@@ -248,7 +324,23 @@ SCORE: {score}"""
         return None
 
     def _judge_response(self, goal: str, prompt: str, response: str) -> int:
-        """Judge response quality (1-10 scale)."""
+        """
+        Score a target response on a 1–10 jailbreak success scale.
+
+        Uses the attacker router with
+        :data:`~hackagent.attacks.techniques.pair.config.JUDGE_SYSTEM_PROMPT`
+        to query the judge LLM.  Parses the ``Rating: [[N]]`` pattern
+        first and falls back to a bare integer scan if the pattern is
+        absent.
+
+        Args:
+            goal: The original harmful goal (used to build the judge prompt).
+            prompt: The adversarial prompt that was sent to the target.
+            response: The target model's response to score.
+
+        Returns:
+            Integer score in [1, 10].  Returns 1 (failed) on any error.
+        """
         try:
             system_prompt = JUDGE_SYSTEM_PROMPT.format(goal=goal)
             user_prompt = f"""[PROMPT]: {prompt}

@@ -15,8 +15,9 @@
 """
 FlipAttack generation and execution module.
 
-Generates flipped prompts using original FlipAttack core implementation
-and executes them against the target model via hackagent's AgentRouter.
+Generates flipped prompts by calling :meth:`FlipAttack.generate` on the
+attack instance passed via ``config["_self"]``, then executes them against
+the target model via HackAgent's AgentRouter.
 
 Result Tracking:
     Uses Tracker (passed via config["_tracker"]) to add interaction traces
@@ -30,9 +31,6 @@ from hackagent.router.router import AgentRouter
 
 if TYPE_CHECKING:
     from hackagent.router.tracking import Tracker
-
-# Import original FlipAttack implementation
-from .flip_attack import FlipAttack as FlipAttackAlgorithm
 
 
 def execute(
@@ -53,7 +51,12 @@ def execute(
     Returns:
         List of dicts with goal, flipped prompt, and response
     """
-    # Extract parameters
+    # Retrieve the FlipAttack instance (carries all obfuscation methods).
+    fa = config.get("_self")
+    if fa is None:
+        raise RuntimeError("config['_self'] must be set to the FlipAttack instance.")
+
+    # Extract parameters (still needed for logging and result fields).
     fa_params = config.get("flipattack_params", {})
     flip_mode = fa_params.get("flip_mode", "FCS")
     cot = fa_params.get("cot", False)
@@ -69,14 +72,6 @@ def execute(
     if tracker:
         logger.info("📊 Generation tracking via Tracker enabled")
 
-    # Initialize original FlipAttack class
-    flip_attack = FlipAttackAlgorithm(
-        flip_mode=flip_mode,
-        cot=cot,
-        lang_gpt=lang_gpt,
-        few_shot=few_shot,
-    )
-
     results = []
     victim_key = str(agent_router.backend_agent.id)
 
@@ -85,7 +80,7 @@ def execute(
 
         # Step 1: Generate flipped prompt
         try:
-            log, attack_messages = flip_attack.generate(goal_text)
+            log, attack_messages = fa.generate(goal_text)
         except Exception as e:
             logger.error(f"Generation failed for goal {idx + 1}: {e}")
             results.append(
