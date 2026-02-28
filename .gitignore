@@ -4,6 +4,7 @@ logs/
 .ruff_cache/
 reports/
 .adk/
+slurm/
 
 # Editors
 .vscode/
