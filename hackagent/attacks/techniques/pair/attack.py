@@ -16,6 +16,8 @@ Result Tracking:
 import copy
 import logging
 import re
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional
 
 from hackagent.attacks.techniques.base import BaseAttack
@@ -201,7 +203,9 @@ class PAIRAttack(BaseAttack):
         """
         return []
 
-    def _query_attacker(self, goal: str, target_response: str, score: int, iteration: int) -> Optional[str]:
+    def _query_attacker(
+        self, goal: str, target_response: str, score: int, iteration: int
+    ) -> Optional[str]:
         """
         Ask the attacker LLM for an improved adversarial prompt.
 
@@ -574,15 +578,21 @@ SCORE: {score}"""
                 with create_progress_bar(
                     "[cyan]PAIR iterative refinement...", total_iterations
                 ) as (progress_bar, task):
-                    for i, goal in enumerate(goals):
-                        self.logger.info(f"Processing goal {i + 1}/{len(goals)}")
+                    # NOTE: the inner iteration loop within one goal is a
+                    # feedback refinement chain — inherently serial. Only the
+                    # *goal* level can be parallelised.
+                    n_parallel_goals = max(1, self.config.get("n_parallel_goals", 1))
+                    _lock = threading.Lock()
+                    results_map: Dict[int, Dict[str, Any]] = {}
 
+                    def _run_goal(i_goal: tuple) -> None:
+                        i, goal = i_goal
+                        self.logger.info(f"Processing goal {i + 1}/{len(goals)}")
                         goal_ctx = (
                             coordinator.get_goal_context(i)
                             if coordinator.has_goal_tracking
                             else None
                         )
-
                         result = self._run_single_goal(
                             goal=goal,
                             goal_index=i,
@@ -591,35 +601,38 @@ SCORE: {score}"""
                             progress_bar=progress_bar,
                             task=task,
                         )
-                        results.append(result)
+                        with _lock:
+                            results_map[i] = result
+                            if goal_tracker and goal_ctx:
+                                goal_tracker.add_evaluation_trace(
+                                    ctx=goal_ctx,
+                                    evaluation_result={
+                                        "best_score": result["best_score"],
+                                        "is_success": result["is_success"],
+                                        "iterations_completed": result[
+                                            "iterations_completed"
+                                        ],
+                                    },
+                                    score=result["best_score"],
+                                    explanation=f"Best score: {result['best_score']}/10 after {result['iterations_completed']} iterations",
+                                    evaluator_name="pair_judge",
+                                )
+                                goal_tracker.finalize_goal(
+                                    ctx=goal_ctx,
+                                    success=result["is_success"],
+                                    evaluation_notes=f"PAIR attack: score {result['best_score']}/10 ({'SUCCESS' if result['is_success'] else 'FAILED'})",
+                                    final_metadata={
+                                        "best_score": result["best_score"],
+                                        "iterations_completed": result[
+                                            "iterations_completed"
+                                        ],
+                                    },
+                                )
 
-                        # Finalize goal result with evaluation
-                        if goal_tracker and goal_ctx:
-                            goal_tracker.add_evaluation_trace(
-                                ctx=goal_ctx,
-                                evaluation_result={
-                                    "best_score": result["best_score"],
-                                    "is_success": result["is_success"],
-                                    "iterations_completed": result[
-                                        "iterations_completed"
-                                    ],
-                                },
-                                score=result["best_score"],
-                                explanation=f"Best score: {result['best_score']}/10 after {result['iterations_completed']} iterations",
-                                evaluator_name="pair_judge",
-                            )
+                    with ThreadPoolExecutor(max_workers=n_parallel_goals) as pool:
+                        list(pool.map(_run_goal, enumerate(goals)))
 
-                            goal_tracker.finalize_goal(
-                                ctx=goal_ctx,
-                                success=result["is_success"],
-                                evaluation_notes=f"PAIR attack: score {result['best_score']}/10 ({'SUCCESS' if result['is_success'] else 'FAILED'})",
-                                final_metadata={
-                                    "best_score": result["best_score"],
-                                    "iterations_completed": result[
-                                        "iterations_completed"
-                                    ],
-                                },
-                            )
+                    results = [results_map[i] for i in range(len(goals))]
 
             # Custom success check: count successful attacks
             success_count = sum(1 for r in results if r.get("is_success", False))

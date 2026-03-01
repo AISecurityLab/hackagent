@@ -424,6 +424,13 @@ class AgentRouter:
                         f"'name' (model string) in adapter_operational_config or backend metadata. "
                         f"Cannot configure OpenAIAgent."
                     )
+                else:
+                    # Fall back to the registered agent name (e.g. full local model path)
+                    logger.warning(
+                        f"Agent '{name}' (Type: {agent_type.value}) missing 'name' in metadata. "
+                        f"Defaulting to agent name '{self.backend_agent.name}'."
+                    )
+                    adapter_instance_config["name"] = self.backend_agent.name
 
             # Always use backend agent's endpoint if not already in config
             if (
@@ -839,7 +846,9 @@ class AgentRouter:
                 final_metadata = current_metadata.copy()
                 final_metadata.update(metadata_to_patch)
                 # Strip None values — Django JSONField rejects null entries
-                patch_kwargs["metadata"] = {k: v for k, v in final_metadata.items() if v is not None}
+                patch_kwargs["metadata"] = {
+                    k: v for k, v in final_metadata.items() if v is not None
+                }
 
             # Check agent_type
             current_type_val = None
@@ -857,7 +866,11 @@ class AgentRouter:
 
             # Check endpoint — normalize both sides to str so AnyUrl ≠ str
             # false-positives don't trigger unnecessary PATCH calls.
-            current_endpoint = str(existing_agent.endpoint).rstrip("/") if existing_agent.endpoint else None
+            current_endpoint = (
+                str(existing_agent.endpoint).rstrip("/")
+                if existing_agent.endpoint
+                else None
+            )
             _normalized_requested = str(endpoint_for_backend).rstrip("/")
             if current_endpoint != _normalized_requested:
                 logger.info(

@@ -26,7 +26,9 @@ Usage:
 
 import logging
 import re
+import threading
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
@@ -316,36 +318,37 @@ class BaseJudgeEvaluator(ABC):
             f"[blue]{self.config.agent_name}: "
             f"{progress_description.replace('[cyan]', '').strip()}"
         )
-        with create_progress_bar(task_desc, total=len(rows_to_process)) as (
-            progress_bar,
-            task,
-        ):
-            for idx, row in enumerate(rows_to_process):
-                original_index = row.get("_original_index", idx)
-                current_eval: Any = 0
-                current_expl: Optional[str] = "Evaluation failed or skipped"
-                request_data = None
 
-                try:
-                    request_data = self._get_request_data_for_row(row)
+        # ── Parallel judge evaluation ──────────────────────────────────────
+        # Each HTTP judge call is independent; fire batch_size rows at once.
+        _bs = getattr(self.config, "batch_size", 1)
+        batch_size = max(1, int(_bs) if isinstance(_bs, (int, float)) else 1)
+        _tracker_lock = threading.Lock()
+        results_map: Dict[int, tuple] = {}
 
-                    # ── DSPy-style assert-and-retry loop ──
-                    current_eval, current_expl = self._request_with_assertions(
-                        request_data=request_data,
-                        original_index=original_index,
-                        max_retries=max_retries,
-                    )
-
-                except Exception as e:
-                    current_expl = (
-                        f"Exception processing row {original_index}: {str(e)[:100]}"
-                    )
-                    self.logger.error(
-                        f"Exception processing row {original_index}: {e}",
-                        exc_info=True,
-                    )
-                finally:
-                    # Add trace to goal's Result via Tracker
+        def _process_row(idx_row: tuple) -> tuple:
+            idx, row = idx_row
+            original_index = row.get("_original_index", idx)
+            current_eval: Any = 0
+            current_expl: Optional[str] = "Evaluation failed or skipped"
+            request_data = None
+            try:
+                request_data = self._get_request_data_for_row(row)
+                current_eval, current_expl = self._request_with_assertions(
+                    request_data=request_data,
+                    original_index=original_index,
+                    max_retries=max_retries,
+                )
+            except Exception as e:
+                current_expl = (
+                    f"Exception processing row {original_index}: {str(e)[:100]}"
+                )
+                self.logger.error(
+                    f"Exception processing row {original_index}: {e}",
+                    exc_info=True,
+                )
+            finally:
+                with _tracker_lock:
                     if self._tracker and request_data is not None:
                         goal = row.get("goal", "")
                         if goal:
@@ -374,11 +377,24 @@ class BaseJudgeEvaluator(ABC):
                                         "judge_model": self.config.model_id,
                                     },
                                 )
+            return idx, original_index, current_eval, current_expl
 
-                    results_eval.append(current_eval)
-                    results_expl.append(current_expl)
-                    processed_indices.append(original_index)
+        with create_progress_bar(task_desc, total=len(rows_to_process)) as (
+            progress_bar,
+            task,
+        ):
+            with ThreadPoolExecutor(max_workers=batch_size) as pool:
+                for idx, original_index, current_eval, current_expl in pool.map(
+                    _process_row, enumerate(rows_to_process)
+                ):
+                    results_map[idx] = (original_index, current_eval, current_expl)
                     progress_bar.update(task, advance=1)
+
+        for idx in range(len(rows_to_process)):
+            original_index, current_eval, current_expl = results_map[idx]
+            results_eval.append(current_eval)
+            results_expl.append(current_expl)
+            processed_indices.append(original_index)
 
         return results_eval, results_expl, processed_indices
 
