@@ -107,7 +107,7 @@ class TestFlipAttackConfig:
             "goals": ["Test goal 1", "Test goal 2"],
             "flipattack_params": {"flip_mode": "FWO", "cot": True},
         }
-        config = FlipAttackConfig.model_validate(config_dict)
+        config = FlipAttackConfig.from_dict(config_dict)
 
         assert config.attack_type == "flipattack"
         assert config.goals == ["Test goal 1", "Test goal 2"]
@@ -124,7 +124,7 @@ class TestFlipAttackConfig:
                 {"identifier": "gpt-4-0613", "type": "jailbreakbench"},
             ],
         }
-        config = FlipAttackConfig.model_validate(config_dict)
+        config = FlipAttackConfig.from_dict(config_dict)
 
         assert len(config.judges) == 2
         assert config.judges[0]["type"] == "harmbench"
@@ -152,8 +152,8 @@ class TestFlipAttackConfig:
             "output_dir": "/tmp/test",
             "start_step": 2,
         }
-        config = FlipAttackConfig.model_validate(original)
-        result = config.model_dump(by_alias=True, mode="json", exclude_none=True)
+        config = FlipAttackConfig.from_dict(original)
+        result = config.to_dict()
 
         assert result["attack_type"] == "flipattack"
         assert result["flipattack_params"]["flip_mode"] == "FCW"
@@ -168,7 +168,7 @@ class TestFlipAttackConfig:
 
     def test_from_dict_missing_keys_uses_defaults(self):
         """Test that missing keys fallback to defaults."""
-        config = FlipAttackConfig.model_validate({})
+        config = FlipAttackConfig.from_dict({})
 
         assert config.attack_type == "flipattack"
         assert config.goals == []
@@ -182,7 +182,7 @@ class TestFlipAttackConfig:
             "unknown_key": "should_be_ignored",
             "another_unknown": 42,
         }
-        config = FlipAttackConfig.model_validate(config_dict)
+        config = FlipAttackConfig.from_dict(config_dict)
         assert config.attack_type == "flipattack"
 
 
@@ -238,7 +238,7 @@ class TestDefaultFlipAttackConfig:
 
     def test_default_config_valid_for_flipattack_config(self):
         """Test default config can be loaded into FlipAttackConfig."""
-        config = FlipAttackConfig.model_validate(DEFAULT_FLIPATTACK_CONFIG)
+        config = FlipAttackConfig.from_dict(DEFAULT_FLIPATTACK_CONFIG)
 
         assert config.attack_type == "flipattack"
         assert config.flipattack_params.flip_mode == "FCS"
