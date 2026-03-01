@@ -178,10 +178,14 @@ class TestCLIConfig:
         }
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            # Mock the default config path
-            default_config = Path(temp_dir) / "config.json"
-            with open(default_config, "w") as f:
-                json.dump(config_data, f)
+            # Create a writable fake home directory inside temp_dir
+            fake_home = Path(temp_dir) / "home"
+            fake_home.mkdir()
+
+            # Create the .config/hackagent directory structure inside fake_home
+            config_dir = fake_home / ".config" / "hackagent"
+            config_dir.mkdir(parents=True, exist_ok=True)
+            (config_dir / "config.json").write_text(json.dumps(config_data))
 
             with (
                 patch("pathlib.Path.home") as mock_home,
@@ -193,13 +197,8 @@ class TestCLIConfig:
                     },
                 ),
             ):
-                # Mock home directory to point to our temp dir
-                mock_home.return_value = Path(temp_dir).parent
-
-                # Create the .config/hackagent directory structure
-                config_dir = Path(temp_dir).parent / ".config" / "hackagent"
-                config_dir.mkdir(parents=True, exist_ok=True)
-                (config_dir / "config.json").write_text(json.dumps(config_data))
+                # Mock home directory to point to our writable fake home
+                mock_home.return_value = fake_home
 
                 config = CLIConfig()
 
