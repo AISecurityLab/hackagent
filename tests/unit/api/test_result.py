@@ -19,16 +19,16 @@ from hackagent.api.result import (
     result_trace_create,
     result_update,
 )
-from hackagent.models.evaluation_status_enum import EvaluationStatusEnum
-from hackagent.models.paginated_result_list import PaginatedResultList
-from hackagent.models.patched_result_request import PatchedResultRequest
-from hackagent.models.result import Result
-from hackagent.models.result_request import ResultRequest
-from hackagent.models.step_type_enum import (
+from hackagent.api.models import EvaluationStatusEnum
+from hackagent.api.models import PaginatedResultList
+from hackagent.api.models import PatchedResultRequest
+from hackagent.api.models import Result
+from hackagent.api.models import ResultRequest
+from hackagent.api.models import (
     StepTypeEnum,
 )  # Ensuring this import is present
-from hackagent.models.trace import Trace
-from hackagent.models.trace_request import TraceRequest  # For creating traces
+from hackagent.api.models import Trace
+from hackagent.api.models import TraceRequest  # For creating traces
 
 
 class TestResultListAPI(unittest.TestCase):
@@ -49,7 +49,7 @@ class TestResultListAPI(unittest.TestCase):
             "id": mock_trace_data_id_int,
             "result": str(mock_result_id),
             "sequence": 1,
-            "type_": "SYSTEM",
+            "type": "SYSTEM",
             "content": "Initial trace for result list",
             "timestamp": timestamp_str,
             "metadata": {},
@@ -89,12 +89,12 @@ class TestResultListAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_object = PaginatedResultList.from_dict(mock_response_content)
+        mock_parsed_object = PaginatedResultList.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.result.result_list.PaginatedResultList.from_dict",
+            "hackagent.api.result.result_list.PaginatedResultList.model_validate",
             return_value=mock_parsed_object,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = result_list.sync_detailed(
                 client=mock_client_instance,
                 run=mock_run_id,
@@ -127,7 +127,7 @@ class TestResultListAPI(unittest.TestCase):
                 retrieved_result.evaluation_status, EvaluationStatusEnum.NOT_EVALUATED
             )
 
-            mock_from_dict.assert_called_once_with(mock_response_content)
+            mock_model_validate.assert_called_once_with(mock_response_content)
 
             expected_params = {
                 "run": str(mock_run_id),
@@ -207,10 +207,10 @@ class TestResultCreateAPI(unittest.TestCase):
         timestamp_create_str = "2023-08-02T10:00:00Z"
         # Mock for Trace, assuming created result might have an initial trace or empty list
         mock_trace_data_create = {
-            "id": str(uuid.uuid4()),
+            "id": 1,
             "result": str(mock_created_result_id),
             "sequence": 1,
-            "type_": "SYSTEM",
+            "type": "SYSTEM",
             "content": "Result created",
             "timestamp": timestamp_create_str,
             "metadata": {},
@@ -246,12 +246,12 @@ class TestResultCreateAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_result = Result.from_dict(mock_response_content)
+        mock_parsed_result = Result.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.result.result_create.Result.from_dict",
+            "hackagent.api.result.result_create.Result.model_validate",
             return_value=mock_parsed_result,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = result_create.sync_detailed(
                 client=mock_client_instance, body=result_request_data
             )
@@ -267,12 +267,14 @@ class TestResultCreateAPI(unittest.TestCase):
                 response.parsed.response_body, result_request_data.response_body
             )
 
-            mock_from_dict.assert_called_once_with(mock_response_content)
+            mock_model_validate.assert_called_once_with(mock_response_content)
 
             expected_kwargs = {
                 "method": "post",
                 "url": "/result",
-                "json": result_request_data.to_dict(),
+                "json": result_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -315,8 +317,8 @@ class TestResultCreateAPI(unittest.TestCase):
         mock_client_instance.raise_on_unexpected_status = False
 
         error_request_data_false = ResultRequest(
-            run=uuid.uuid4(), latency_ms=-100
-        )  # Invalid data
+            run=uuid.uuid4(), latency_ms=0
+        )  # Valid data that will get a 401 from the server
 
         mock_httpx_response = MagicMock()
         mock_httpx_response.status_code = 401  # e.g. Unauthorized
@@ -343,10 +345,10 @@ class TestResultRetrieveAPI(unittest.TestCase):
         mock_run_id_retrieve = uuid.uuid4()
         timestamp_retrieve_str = "2023-08-03T10:00:00Z"
         mock_trace_data_retrieve = {
-            "id": str(uuid.uuid4()),
+            "id": 1,
             "result": str(result_id_to_retrieve),
             "sequence": 1,
-            "type_": "AGENT_ACTION",
+            "type": "AGENT_ACTION",
             "content": "Agent took action",
             "timestamp": timestamp_retrieve_str,
             "metadata": {"action": "tool_call"},
@@ -371,12 +373,12 @@ class TestResultRetrieveAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_result = Result.from_dict(mock_response_content)
+        mock_parsed_result = Result.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.result.result_retrieve.Result.from_dict",
+            "hackagent.api.result.result_retrieve.Result.model_validate",
             return_value=mock_parsed_result,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = result_retrieve.sync_detailed(
                 client=mock_client_instance, id=result_id_to_retrieve
             )
@@ -391,7 +393,7 @@ class TestResultRetrieveAPI(unittest.TestCase):
             )
             self.assertTrue(len(response.parsed.traces) > 0)
 
-            mock_from_dict.assert_called_once_with(mock_response_content)
+            mock_model_validate.assert_called_once_with(mock_response_content)
 
             expected_kwargs = {
                 "method": "get",
@@ -471,10 +473,10 @@ class TestResultUpdateAPI(unittest.TestCase):
             "2023-08-04T10:00:00Z"  # Original timestamp from creation
         )
         mock_trace_data_update = {
-            "id": str(uuid.uuid4()),
+            "id": 1,
             "result": str(result_id_to_update),
             "sequence": 1,
-            "type_": "EVALUATION",
+            "type": "EVALUATION",
             "content": "Evaluation updated",
             "timestamp": timestamp_update_str,
             "metadata": {},
@@ -510,12 +512,12 @@ class TestResultUpdateAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_result = Result.from_dict(mock_updated_result_response_content)
+        mock_parsed_result = Result.model_validate(mock_updated_result_response_content)
 
         with patch(
-            "hackagent.api.result.result_update.Result.from_dict",
+            "hackagent.api.result.result_update.Result.model_validate",
             return_value=mock_parsed_result,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = result_update.sync_detailed(
                 client=mock_client_instance,
                 id=result_id_to_update,
@@ -541,12 +543,16 @@ class TestResultUpdateAPI(unittest.TestCase):
                 response.parsed.timestamp, isoparse(original_timestamp_str)
             )
 
-            mock_from_dict.assert_called_once_with(mock_updated_result_response_content)
+            mock_model_validate.assert_called_once_with(
+                mock_updated_result_response_content
+            )
 
             expected_kwargs = {
                 "method": "put",
                 "url": f"/result/{result_id_to_update}",
-                "json": result_update_request_data.to_dict(),
+                "json": result_update_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -628,10 +634,10 @@ class TestResultPartialUpdateAPI(unittest.TestCase):
         # Traces might be complex, for patch, often the system creates a new trace or updates an existing one.
         # For simplicity, assume the response returns the state after patch.
         mock_trace_data_patch_resp = {
-            "id": str(uuid.uuid4()),
+            "id": 1,
             "result": str(result_id_to_patch),
             "sequence": 1,
-            "type_": "EVALUATION",
+            "type": "EVALUATION",
             "content": "Evaluation patched for error",
             "timestamp": "2023-08-05T14:00:00Z",
             "metadata": {},
@@ -665,12 +671,12 @@ class TestResultPartialUpdateAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_result = Result.from_dict(mock_patched_result_response_content)
+        mock_parsed_result = Result.model_validate(mock_patched_result_response_content)
 
         with patch(
-            "hackagent.api.result.result_partial_update.Result.from_dict",
+            "hackagent.api.result.result_partial_update.Result.model_validate",
             return_value=mock_parsed_result,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = result_partial_update.sync_detailed(
                 client=mock_client_instance,
                 id=result_id_to_patch,
@@ -696,19 +702,27 @@ class TestResultPartialUpdateAPI(unittest.TestCase):
                 response.parsed.response_body, "Original agent response before patch."
             )  # Verify unpatched field
 
-            mock_from_dict.assert_called_once_with(mock_patched_result_response_content)
+            mock_model_validate.assert_called_once_with(
+                mock_patched_result_response_content
+            )
 
             expected_kwargs = {
                 "method": "patch",
                 "url": f"/result/{result_id_to_patch}",
-                "json": result_patch_request_data.to_dict(),
+                "json": result_patch_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
-            request_dict = result_patch_request_data.to_dict()
+            request_dict = result_patch_request_data.model_dump(
+                by_alias=True, mode="json", exclude_none=True
+            )
             self.assertIn("evaluation_status", request_dict)
             self.assertIn("evaluation_notes", request_dict)
             self.assertIn("evaluation_metrics", request_dict)
-            self.assertNotIn("response_body", request_dict)
+            self.assertIsNone(
+                request_dict.get("response_body")
+            )  # Unset optional fields serialize as None
 
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
@@ -872,20 +886,19 @@ class TestResultTraceCreateAPI(unittest.TestCase):
             "timestamp": timestamp_trace_create_str,  # Server sets this
         }
         mock_httpx_response = MagicMock()
-        # Typical status for creating a sub-resource or action could be 200 or 201
-        # The API file result_trace_create.py _parse_response expects 200 for Trace.from_dict
-        mock_httpx_response.status_code = 200
+        # POST to create a sub-resource returns 201 Created
+        mock_httpx_response.status_code = 201
         mock_httpx_response.json.return_value = mock_response_content
         mock_httpx_response.content = b"{}"
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_trace = Trace.from_dict(mock_response_content)
+        mock_parsed_trace = Trace.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.result.result_trace_create.Trace.from_dict",
+            "hackagent.api.result.result_trace_create.Trace.model_validate",
             return_value=mock_parsed_trace,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = result_trace_create.sync_detailed(
                 client=mock_client_instance,
                 id=result_id_for_trace,
@@ -893,20 +906,22 @@ class TestResultTraceCreateAPI(unittest.TestCase):
             )
 
             self.assertEqual(
-                response.status_code, HTTPStatus.OK
-            )  # Matching the parse logic
+                response.status_code, HTTPStatus.CREATED
+            )  # POST create returns 201
             self.assertIsNotNone(response.parsed)
             self.assertEqual(response.parsed.id, mock_created_trace_id)
             self.assertEqual(response.parsed.result, result_id_for_trace)
             self.assertEqual(response.parsed.sequence, trace_request_data.sequence)
             self.assertEqual(response.parsed.step_type, trace_request_data.step_type)
 
-            mock_from_dict.assert_called_once_with(mock_response_content)
+            mock_model_validate.assert_called_once_with(mock_response_content)
 
             expected_kwargs = {
                 "method": "post",
                 "url": f"/result/{result_id_for_trace}/trace",
-                "json": trace_request_data.to_dict(),
+                "json": trace_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)

@@ -1,14 +1,12 @@
-# Copyright 2026 - AI4I. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
-
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+
 import httpx
+
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.run import Run
-from ...models.run_request import RunRequest
 from ...types import Response
+from ..models import Run, RunRequest
 
 
 def _get_kwargs(
@@ -22,7 +20,7 @@ def _get_kwargs(
         "url": "/run/run_tests",
     }
 
-    _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.model_dump(by_alias=True, mode="json", exclude_none=True)
 
     headers["Content-Type"] = "application/json"
 
@@ -31,12 +29,13 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[Run]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Run | None:
     if response.status_code == 200:
-        response_200 = Run.from_dict(response.json())
+        response_200 = Run.model_validate(response.json())
 
         return response_200
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -44,7 +43,7 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+    *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[Run]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -94,7 +93,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: RunRequest,
-) -> Optional[Run]:
+) -> Run | None:
     """ViewSet for managing Run instances.
     Primarily for listing/retrieving runs.
     Creation of server-side runs is handled by custom actions.
@@ -159,7 +158,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: RunRequest,
-) -> Optional[Run]:
+) -> Run | None:
     """ViewSet for managing Run instances.
     Primarily for listing/retrieving runs.
     Creation of server-side runs is handled by custom actions.

@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import patch
 
 import hackagent.logger as logger_module
-from hackagent.logger import get_logger, setup_package_logging
+from hackagent.logger import get_logger, setup_package_logging, suppress_noisy_libraries
 
 
 class TestSetupPackageLoggingExtended(unittest.TestCase):
@@ -52,12 +52,15 @@ class TestSetupPackageLoggingExtended(unittest.TestCase):
         self.assertEqual(logger.level, logging.WARNING)
 
     def test_setup_sets_noisy_library_levels(self):
-        """Test that httpx and litellm loggers are set to WARNING."""
-        setup_package_logging()
-        httpx_logger = logging.getLogger("httpx")
-        litellm_logger = logging.getLogger("litellm")
-        self.assertEqual(httpx_logger.level, logging.WARNING)
-        self.assertEqual(litellm_logger.level, logging.WARNING)
+        """suppress_noisy_libraries silences the given loggers (opt-in since Fix 2)."""
+        # Reset levels first so the test is not order-dependent
+        logging.getLogger("httpx").setLevel(logging.NOTSET)
+        logging.getLogger("litellm").setLevel(logging.NOTSET)
+
+        suppress_noisy_libraries("httpx", "litellm")
+
+        self.assertEqual(logging.getLogger("httpx").level, logging.WARNING)
+        self.assertEqual(logging.getLogger("litellm").level, logging.WARNING)
 
     def test_setup_custom_default_level(self):
         """Test setup with custom default_level_str."""

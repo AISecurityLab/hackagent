@@ -1,0 +1,11 @@
+# openapi-python-client config for hackagent
+# Used by hackagent/api/scripts/generate.py to regenerate the api/ call layer.
+# Only the api/ subdirectories are kept from the generated output;
+# models and client boilerplate are discarded in favour of
+# hackagent/api/models.py (Pydantic v2 via datamodel-code-generator).
+
+project_name_override: "hackagent"
+package_name_override: "hackagent"
+
+use_path_prefixes_for_title_model_names: false
+field_prefix: ""

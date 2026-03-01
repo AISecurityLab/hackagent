@@ -1,15 +1,14 @@
-# Copyright 2026 - AI4I. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
-
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+from urllib.parse import quote
 from uuid import UUID
+
 import httpx
+
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.attack import Attack
-from ...models.attack_request import AttackRequest
 from ...types import Response
+from ..models import Attack, AttackRequest
 
 
 def _get_kwargs(
@@ -21,10 +20,12 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "put",
-        "url": f"/attack/{id}",
+        "url": "/attack/{id}".format(
+            id=quote(str(id), safe=""),
+        ),
     }
 
-    _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.model_dump(by_alias=True, mode="json", exclude_none=True)
 
     headers["Content-Type"] = "application/json"
 
@@ -33,12 +34,13 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[Attack]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Attack | None:
     if response.status_code == 200:
-        response_200 = Attack.from_dict(response.json())
+        response_200 = Attack.model_validate(response.json())
 
         return response_200
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -46,7 +48,7 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+    *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[Attack]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -122,7 +124,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: AttackRequest,
-) -> Optional[Attack]:
+) -> Attack | None:
     """Manages Attack configurations through standard CRUD operations.
 
     This ViewSet allows clients to:
@@ -237,7 +239,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: AttackRequest,
-) -> Optional[Attack]:
+) -> Attack | None:
     """Manages Attack configurations through standard CRUD operations.
 
     This ViewSet allows clients to:

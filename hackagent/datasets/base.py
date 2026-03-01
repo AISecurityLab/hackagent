@@ -5,9 +5,10 @@
 
 import abc
 import logging
+from hackagent.logger import get_logger
 from typing import Any, Dict, List, Optional
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class DatasetProvider(abc.ABC):

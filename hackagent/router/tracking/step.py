@@ -14,13 +14,12 @@ StepTracker is designed for tracking high-level pipeline steps (e.g.,
 or per-datapoint tracking, use the Tracker class from tracker.py instead.
 """
 
-import json
 from contextlib import contextmanager
 from typing import Any, Dict, Optional
 
 from hackagent.api.result import result_partial_update, result_trace_create
 from hackagent.api.run import run_partial_update
-from hackagent.models import (
+from hackagent.api.models import (
     EvaluationStatusEnum,
     PatchedResultRequest,
     PatchedRunRequest,
@@ -30,25 +29,7 @@ from hackagent.models import (
 )
 
 from .context import TrackingContext
-
-
-def _deep_clean(obj: Any) -> Any:
-    """
-    Recursively convert Pydantic/OpenAI model objects to plain dicts/lists.
-
-    Handles objects with ``model_dump()`` (Pydantic v2) or ``dict()``
-    (Pydantic v1 / legacy), and recurses into dicts and lists.
-    All other values are returned as-is.
-    """
-    if hasattr(obj, "model_dump"):
-        return obj.model_dump()
-    if hasattr(obj, "dict"):  # legacy Pydantic v1
-        return obj.dict()
-    if isinstance(obj, dict):
-        return {k: _deep_clean(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_deep_clean(v) for v in obj]
-    return obj
+from .utils import deep_clean, sanitize_for_json
 
 
 class StepTracker:
@@ -196,11 +177,11 @@ class StepTracker:
             }
 
             if config is not None:
-                trace_content["config_snapshot"] = self._sanitize_config(config)
+                trace_content["config_snapshot"] = sanitize_for_json(config)
 
             if input_data is not None:
                 try:
-                    trace_content["input_data_sample"] = _deep_clean(input_data)
+                    trace_content["input_data_sample"] = deep_clean(input_data)
                 except Exception as e:
                     # If it fails, store error message instead
                     trace_content["input_data_sample"] = (
@@ -263,65 +244,9 @@ class StepTracker:
         Returns:
             Trace ID if found, None otherwise
         """
-        # Try parsed response first
         if response.parsed and hasattr(response.parsed, "id"):
             return str(response.parsed.id)
-
-        # Try parsing raw content
-        try:
-            response_data = json.loads(response.content.decode())
-            if "id" in response_data:
-                return str(response_data["id"])
-        except Exception as e:
-            self.logger.warning(f"Could not parse trace ID for '{step_name}': {e}")
-
         return None
-
-    def _sanitize_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Remove sensitive information from config before sending to API.
-
-        Args:
-            config: Configuration dictionary
-
-        Returns:
-            Sanitized configuration dictionary
-        """
-        sensitive_keys = {"api_key", "token", "secret", "password", "key"}
-        # Keys that contain non-serializable objects (like client instances)
-        skip_keys = {"_client", "client"}
-
-        sanitized = {}
-        for key, value in config.items():
-            # Skip non-serializable objects
-            if key in skip_keys:
-                sanitized[key] = f"<{type(value).__name__}>"
-                continue
-
-            key_lower = key.lower()
-            if any(sensitive in key_lower for sensitive in sensitive_keys):
-                sanitized[key] = "***REDACTED***"
-            elif isinstance(value, dict):
-                sanitized[key] = self._sanitize_config(value)
-            elif not self._is_json_serializable(value):
-                # Skip non-JSON-serializable values
-                sanitized[key] = f"<{type(value).__name__}>"
-            else:
-                sanitized[key] = value
-
-        return sanitized
-
-    def _sanitize_metadata_payload(self, payload: Any) -> Any:
-        """Sanitize step metadata payloads for JSON serialization."""
-        if payload is None:
-            return None
-        if isinstance(payload, dict):
-            return self._sanitize_config(payload)
-        if isinstance(payload, list):
-            return [self._sanitize_metadata_payload(item) for item in payload]
-        if self._is_json_serializable(payload):
-            return payload
-        return f"<{type(payload).__name__}>"
 
     def _drain_step_metadata(self) -> Dict[str, Any]:
         """Pop per-step metadata/progress logs from context."""
@@ -357,11 +282,7 @@ class StepTracker:
 
             drained = self._drain_step_metadata()
             if drained:
-                trace_content.update(
-                    self._sanitize_metadata_payload(drained)
-                    if isinstance(drained, dict)
-                    else drained
-                )
+                trace_content.update(sanitize_for_json(drained))
 
             if error_message:
                 trace_content["error_message"] = error_message
@@ -405,14 +326,6 @@ class StepTracker:
             )
 
         return None
-
-    def _is_json_serializable(self, value: Any) -> bool:
-        """Check if a value is JSON serializable."""
-        try:
-            json.dumps(value)
-            return True
-        except (TypeError, ValueError):
-            return False
 
     def _handle_step_error(self, step_name: str, error_message: str) -> None:
         """

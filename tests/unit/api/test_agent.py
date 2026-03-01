@@ -16,19 +16,18 @@ from hackagent.api.agent import (
     agent_update,
 )  # Added agent_partial_update
 from hackagent.router.types import AgentTypeEnum  # For AgentRequest body
-from hackagent.models.agent import (
+from hackagent.api.models import (
     Agent,
 )  # For agent_create, agent_retrieve, agent_update
-from hackagent.models.agent_request import (
+from hackagent.api.models import (
     AgentRequest,
 )  # For agent_create, agent_update
 
 # Assuming these are the correct import paths based on the project structure
-from hackagent.models.paginated_agent_list import PaginatedAgentList
-from hackagent.models.patched_agent_request import (
+from hackagent.api.models import PaginatedAgentList
+from hackagent.api.models import (
     PatchedAgentRequest,
 )  # For agent_partial_update
-from hackagent.types import UNSET  # Alias to avoid conflict, import UNSET
 
 
 class TestAgentListAPI(unittest.TestCase):
@@ -72,12 +71,12 @@ class TestAgentListAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_object = PaginatedAgentList.from_dict(mock_response_content)
+        mock_parsed_object = PaginatedAgentList.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.agent.agent_list.PaginatedAgentList.from_dict",
+            "hackagent.api.agent.agent_list.PaginatedAgentList.model_validate",
             return_value=mock_parsed_object,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = agent_list.sync_detailed(client=mock_client_instance, page=1)
 
             self.assertEqual(response.status_code, HTTPStatus.OK)
@@ -89,7 +88,7 @@ class TestAgentListAPI(unittest.TestCase):
                 and len(response.parsed.results) > 0
             )
             self.assertEqual(str(response.parsed.results[0].id), mock_agent_id)
-            mock_from_dict.assert_called_once_with(mock_response_content)
+            mock_model_validate.assert_called_once_with(mock_response_content)
 
             expected_kwargs = {
                 "method": "get",
@@ -152,8 +151,6 @@ class TestAgentCreateAPI(unittest.TestCase):
             name="New Test Agent",
             agent_type=AgentTypeEnum.GOOGLE_ADK.value,
             endpoint="http://example.com/adk",
-            metadata=UNSET,
-            description=UNSET,
         )
 
         mock_created_agent_id = uuid.uuid4()
@@ -183,12 +180,12 @@ class TestAgentCreateAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_agent = Agent.from_dict(mock_response_content)
+        mock_parsed_agent = Agent.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.agent.agent_create.Agent.from_dict",
+            "hackagent.api.agent.agent_create.Agent.model_validate",
             return_value=mock_parsed_agent,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = agent_create.sync_detailed(
                 client=mock_client_instance, body=agent_request_data
             )
@@ -197,12 +194,14 @@ class TestAgentCreateAPI(unittest.TestCase):
             self.assertIsNotNone(response.parsed)
             self.assertEqual(response.parsed.id, mock_created_agent_id)
             self.assertEqual(response.parsed.name, agent_request_data.name)
-            mock_from_dict.assert_called_once_with(mock_response_content)
+            mock_model_validate.assert_called_once_with(mock_response_content)
 
             expected_kwargs = {
                 "method": "post",
                 "url": "/agent",
-                "json": agent_request_data.to_dict(),
+                "json": agent_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -219,7 +218,7 @@ class TestAgentCreateAPI(unittest.TestCase):
         agent_request_data = AgentRequest(
             name="Error Agent",
             agent_type=AgentTypeEnum.GOOGLE_ADK.value,
-            endpoint="err",
+            endpoint="http://error-test.example.com",
         )
 
         mock_httpx_response = MagicMock()
@@ -248,7 +247,7 @@ class TestAgentCreateAPI(unittest.TestCase):
         agent_request_data = AgentRequest(
             name="Error Agent False",
             agent_type=AgentTypeEnum.GOOGLE_ADK.value,
-            endpoint="err_f",
+            endpoint="http://error-false-test.example.com",
         )
 
         mock_httpx_response = MagicMock()
@@ -299,12 +298,12 @@ class TestAgentRetrieveAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_agent = Agent.from_dict(mock_response_content)
+        mock_parsed_agent = Agent.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.agent.agent_retrieve.Agent.from_dict",
+            "hackagent.api.agent.agent_retrieve.Agent.model_validate",
             return_value=mock_parsed_agent,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = agent_retrieve.sync_detailed(
                 client=mock_client_instance, id=agent_id_to_retrieve
             )
@@ -313,7 +312,7 @@ class TestAgentRetrieveAPI(unittest.TestCase):
             self.assertIsNotNone(response.parsed)
             self.assertEqual(response.parsed.id, agent_id_to_retrieve)
             self.assertEqual(response.parsed.name, "Retrieved Agent")
-            mock_from_dict.assert_called_once_with(mock_response_content)
+            mock_model_validate.assert_called_once_with(mock_response_content)
 
             expected_kwargs = {
                 "method": "get",
@@ -381,7 +380,6 @@ class TestAgentUpdateAPI(unittest.TestCase):
             name="Updated Test Agent",
             agent_type=AgentTypeEnum.LITELLM.value,
             endpoint="http://example.com/updated-litellm",
-            metadata=UNSET,
             description="Updated description",
         )
 
@@ -412,12 +410,12 @@ class TestAgentUpdateAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_agent = Agent.from_dict(mock_updated_agent_response_content)
+        mock_parsed_agent = Agent.model_validate(mock_updated_agent_response_content)
 
         with patch(
-            "hackagent.api.agent.agent_update.Agent.from_dict",
+            "hackagent.api.agent.agent_update.Agent.model_validate",
             return_value=mock_parsed_agent,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = agent_update.sync_detailed(
                 client=mock_client_instance,
                 id=agent_id_to_update,
@@ -431,12 +429,16 @@ class TestAgentUpdateAPI(unittest.TestCase):
             self.assertEqual(
                 response.parsed.description, agent_update_request_data.description
             )
-            mock_from_dict.assert_called_once_with(mock_updated_agent_response_content)
+            mock_model_validate.assert_called_once_with(
+                mock_updated_agent_response_content
+            )
 
             expected_kwargs = {
                 "method": "put",
                 "url": f"/agent/{agent_id_to_update}",
-                "json": agent_update_request_data.to_dict(),
+                "json": agent_update_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -452,7 +454,7 @@ class TestAgentUpdateAPI(unittest.TestCase):
         agent_update_request_data = AgentRequest(
             name="NonExistent Update",
             agent_type=AgentTypeEnum.GOOGLE_ADK.value,
-            endpoint="err",
+            endpoint="http://error-test.example.com",
         )
 
         mock_httpx_response = MagicMock()
@@ -484,7 +486,7 @@ class TestAgentUpdateAPI(unittest.TestCase):
         agent_update_request_data = AgentRequest(
             name="Update Error False",
             agent_type=AgentTypeEnum.LITELLM.value,
-            endpoint="err_f",
+            endpoint="http://error-false-test.example.com",
         )
 
         mock_httpx_response = MagicMock()
@@ -618,12 +620,12 @@ class TestAgentPartialUpdateAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_agent = Agent.from_dict(mock_patched_agent_response_content)
+        mock_parsed_agent = Agent.model_validate(mock_patched_agent_response_content)
 
         with patch(
-            "hackagent.api.agent.agent_partial_update.Agent.from_dict",
+            "hackagent.api.agent.agent_partial_update.Agent.model_validate",
             return_value=mock_parsed_agent,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = agent_partial_update.sync_detailed(
                 client=mock_client_instance,
                 id=agent_id_to_patch,
@@ -636,12 +638,16 @@ class TestAgentPartialUpdateAPI(unittest.TestCase):
             self.assertEqual(
                 response.parsed.description, agent_patch_request_data.description
             )
-            mock_from_dict.assert_called_once_with(mock_patched_agent_response_content)
+            mock_model_validate.assert_called_once_with(
+                mock_patched_agent_response_content
+            )
 
             expected_kwargs = {
                 "method": "patch",
                 "url": f"/agent/{agent_id_to_patch}",
-                "json": agent_patch_request_data.to_dict(),
+                "json": agent_patch_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -684,7 +690,9 @@ class TestAgentPartialUpdateAPI(unittest.TestCase):
         mock_client_instance.raise_on_unexpected_status = False
 
         agent_id_error = uuid.uuid4()
-        agent_patch_request_data = PatchedAgentRequest(endpoint="invalid/url/for/patch")
+        agent_patch_request_data = PatchedAgentRequest(
+            endpoint="http://invalid.example.com/url/for/patch"
+        )
 
         mock_httpx_response = MagicMock()
         mock_httpx_response.status_code = 400  # Bad Request for example

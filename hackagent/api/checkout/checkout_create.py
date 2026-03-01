@@ -1,24 +1,24 @@
-# Copyright 2026 - AI4I. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
-
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+
 import httpx
+
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.checkout_session_request_request import CheckoutSessionRequestRequest
-from ...models.checkout_session_response import CheckoutSessionResponse
-from ...models.generic_error_response import GenericErrorResponse
-from ...types import Response
+from ...types import UNSET, Response, Unset
+from ..models import (
+    CheckoutSessionRequestRequest,
+    CheckoutSessionResponse,
+    GenericErrorResponse,
+)
 
 
 def _get_kwargs(
     *,
-    body: Union[
-        CheckoutSessionRequestRequest,
-        CheckoutSessionRequestRequest,
-        CheckoutSessionRequestRequest,
-    ],
+    body: CheckoutSessionRequestRequest
+    | CheckoutSessionRequestRequest
+    | CheckoutSessionRequestRequest
+    | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -28,41 +28,41 @@ def _get_kwargs(
     }
 
     if isinstance(body, CheckoutSessionRequestRequest):
-        _kwargs["json"] = body.to_dict()
+        _kwargs["json"] = body.model_dump(by_alias=True, mode="json", exclude_none=True)
 
         headers["Content-Type"] = "application/json"
     if isinstance(body, CheckoutSessionRequestRequest):
-        _kwargs["data"] = body.to_dict()
+        _kwargs["data"] = body.model_dump(by_alias=True, mode="json", exclude_none=True)
 
         headers["Content-Type"] = "application/x-www-form-urlencoded"
-    if isinstance(body, CheckoutSessionRequestRequest):
-        _kwargs["files"] = body.to_multipart()
-
-        headers["Content-Type"] = "multipart/form-data"
 
     _kwargs["headers"] = headers
     return _kwargs
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[Union[CheckoutSessionResponse, GenericErrorResponse]]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> CheckoutSessionResponse | GenericErrorResponse | None:
     if response.status_code == 200:
-        response_200 = CheckoutSessionResponse.from_dict(response.json())
+        response_200 = CheckoutSessionResponse.model_validate(response.json())
 
         return response_200
+
     if response.status_code == 400:
-        response_400 = GenericErrorResponse.from_dict(response.json())
+        response_400 = GenericErrorResponse.model_validate(response.json())
 
         return response_400
+
     if response.status_code == 404:
-        response_404 = GenericErrorResponse.from_dict(response.json())
+        response_404 = GenericErrorResponse.model_validate(response.json())
 
         return response_404
+
     if response.status_code == 500:
-        response_500 = GenericErrorResponse.from_dict(response.json())
+        response_500 = GenericErrorResponse.model_validate(response.json())
 
         return response_500
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -70,8 +70,8 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[Union[CheckoutSessionResponse, GenericErrorResponse]]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[CheckoutSessionResponse | GenericErrorResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -83,12 +83,11 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    body: Union[
-        CheckoutSessionRequestRequest,
-        CheckoutSessionRequestRequest,
-        CheckoutSessionRequestRequest,
-    ],
-) -> Response[Union[CheckoutSessionResponse, GenericErrorResponse]]:
+    body: CheckoutSessionRequestRequest
+    | CheckoutSessionRequestRequest
+    | CheckoutSessionRequestRequest
+    | Unset = UNSET,
+) -> Response[CheckoutSessionResponse | GenericErrorResponse]:
     """Create Stripe Checkout Session
 
      Initiates a Stripe Checkout session for purchasing API credits.
@@ -105,7 +104,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[CheckoutSessionResponse, GenericErrorResponse]]
+        Response[CheckoutSessionResponse | GenericErrorResponse]
     """
 
     kwargs = _get_kwargs(
@@ -122,12 +121,11 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    body: Union[
-        CheckoutSessionRequestRequest,
-        CheckoutSessionRequestRequest,
-        CheckoutSessionRequestRequest,
-    ],
-) -> Optional[Union[CheckoutSessionResponse, GenericErrorResponse]]:
+    body: CheckoutSessionRequestRequest
+    | CheckoutSessionRequestRequest
+    | CheckoutSessionRequestRequest
+    | Unset = UNSET,
+) -> CheckoutSessionResponse | GenericErrorResponse | None:
     """Create Stripe Checkout Session
 
      Initiates a Stripe Checkout session for purchasing API credits.
@@ -144,7 +142,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[CheckoutSessionResponse, GenericErrorResponse]
+        CheckoutSessionResponse | GenericErrorResponse
     """
 
     return sync_detailed(
@@ -156,12 +154,11 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    body: Union[
-        CheckoutSessionRequestRequest,
-        CheckoutSessionRequestRequest,
-        CheckoutSessionRequestRequest,
-    ],
-) -> Response[Union[CheckoutSessionResponse, GenericErrorResponse]]:
+    body: CheckoutSessionRequestRequest
+    | CheckoutSessionRequestRequest
+    | CheckoutSessionRequestRequest
+    | Unset = UNSET,
+) -> Response[CheckoutSessionResponse | GenericErrorResponse]:
     """Create Stripe Checkout Session
 
      Initiates a Stripe Checkout session for purchasing API credits.
@@ -178,7 +175,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[CheckoutSessionResponse, GenericErrorResponse]]
+        Response[CheckoutSessionResponse | GenericErrorResponse]
     """
 
     kwargs = _get_kwargs(
@@ -193,12 +190,11 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    body: Union[
-        CheckoutSessionRequestRequest,
-        CheckoutSessionRequestRequest,
-        CheckoutSessionRequestRequest,
-    ],
-) -> Optional[Union[CheckoutSessionResponse, GenericErrorResponse]]:
+    body: CheckoutSessionRequestRequest
+    | CheckoutSessionRequestRequest
+    | CheckoutSessionRequestRequest
+    | Unset = UNSET,
+) -> CheckoutSessionResponse | GenericErrorResponse | None:
     """Create Stripe Checkout Session
 
      Initiates a Stripe Checkout session for purchasing API credits.
@@ -215,7 +211,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[CheckoutSessionResponse, GenericErrorResponse]
+        CheckoutSessionResponse | GenericErrorResponse
     """
 
     return (

@@ -17,12 +17,12 @@ from hackagent.api.attack import (
     attack_retrieve,
     attack_update,
 )
-from hackagent.models.attack import Attack  # For individual attack items
-from hackagent.models.attack_request import AttackRequest
+from hackagent.api.models import Attack  # For individual attack items
+from hackagent.api.models import AttackRequest
 
 # Assuming these are the correct import paths based on the project structure
-from hackagent.models.paginated_attack_list import PaginatedAttackList
-from hackagent.models.patched_attack_request import (
+from hackagent.api.models import PaginatedAttackList
+from hackagent.api.models import (
     PatchedAttackRequest,
 )  # Added PatchedAttackRequest
 
@@ -72,12 +72,12 @@ class TestAttackListAPI(unittest.TestCase):
 
         # Create a PaginatedAttackList instance from the mock content
         # This helps ensure our mock_response_content matches the model's expectations
-        mock_parsed_object = PaginatedAttackList.from_dict(mock_response_content)
+        mock_parsed_object = PaginatedAttackList.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.attack.attack_list.PaginatedAttackList.from_dict",
+            "hackagent.api.attack.attack_list.PaginatedAttackList.model_validate",
             return_value=mock_parsed_object,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = attack_list.sync_detailed(client=mock_client_instance, page=1)
 
             self.assertEqual(response.status_code, HTTPStatus.OK)
@@ -91,14 +91,14 @@ class TestAttackListAPI(unittest.TestCase):
             # Access the first Attack object in the results
             retrieved_attack = response.parsed.results[0]
             self.assertEqual(retrieved_attack.id, mock_attack_id)
-            self.assertEqual(retrieved_attack.type_, "PREFIX_GENERATION")
+            self.assertEqual(retrieved_attack.type, "PREFIX_GENERATION")
             # We can also check datetime objects if from_dict correctly parses them
             self.assertEqual(
                 retrieved_attack.created_at,
                 datetime.datetime.fromisoformat(created_at_str.replace("Z", "+00:00")),
             )
 
-            mock_from_dict.assert_called_once_with(mock_response_content)
+            mock_model_validate.assert_called_once_with(mock_response_content)
 
             expected_kwargs = {
                 "method": "get",
@@ -158,7 +158,7 @@ class TestAttackCreateAPI(unittest.TestCase):
 
         mock_agent_id = uuid.uuid4()
         attack_request_data = AttackRequest(
-            type_="PROMPT_INJECTION",
+            type="PROMPT_INJECTION",
             agent=mock_agent_id,
             configuration={"level": 5, "target": "user_data"},
         )
@@ -172,7 +172,7 @@ class TestAttackCreateAPI(unittest.TestCase):
 
         mock_response_content = {
             "id": str(mock_created_attack_id),
-            "type": attack_request_data.type_,
+            "type": attack_request_data.type,
             "agent": str(attack_request_data.agent),
             "agent_name": "Agent For Created Attack",
             "owner": 2,  # Mock owner ID
@@ -190,12 +190,12 @@ class TestAttackCreateAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_attack = Attack.from_dict(mock_response_content)
+        mock_parsed_attack = Attack.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.attack.attack_create.Attack.from_dict",
+            "hackagent.api.attack.attack_create.Attack.model_validate",
             return_value=mock_parsed_attack,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = attack_create.sync_detailed(
                 client=mock_client_instance, body=attack_request_data
             )
@@ -203,17 +203,19 @@ class TestAttackCreateAPI(unittest.TestCase):
             self.assertEqual(response.status_code, HTTPStatus.CREATED)
             self.assertIsNotNone(response.parsed)
             self.assertEqual(response.parsed.id, mock_created_attack_id)
-            self.assertEqual(response.parsed.type_, attack_request_data.type_)
+            self.assertEqual(response.parsed.type, attack_request_data.type)
             self.assertEqual(response.parsed.agent, attack_request_data.agent)
             self.assertEqual(
                 response.parsed.configuration, attack_request_data.configuration
             )
-            mock_from_dict.assert_called_once_with(mock_response_content)
+            mock_model_validate.assert_called_once_with(mock_response_content)
 
             expected_kwargs = {
                 "method": "post",
                 "url": "/attack",
-                "json": attack_request_data.to_dict(),
+                "json": attack_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -228,7 +230,7 @@ class TestAttackCreateAPI(unittest.TestCase):
         mock_client_instance.raise_on_unexpected_status = True
 
         attack_request_data = AttackRequest(
-            type_="ERROR_CASE", agent=uuid.uuid4(), configuration={}
+            type="ERROR_CASE", agent=uuid.uuid4(), configuration={}
         )
 
         mock_httpx_response = MagicMock()
@@ -255,7 +257,7 @@ class TestAttackCreateAPI(unittest.TestCase):
         mock_client_instance.raise_on_unexpected_status = False
 
         attack_request_data = AttackRequest(
-            type_="ERROR_FALSE_CASE", agent=uuid.uuid4(), configuration={}
+            type="ERROR_FALSE_CASE", agent=uuid.uuid4(), configuration={}
         )
 
         mock_httpx_response = MagicMock()
@@ -305,12 +307,12 @@ class TestAttackRetrieveAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_attack = Attack.from_dict(mock_response_content)
+        mock_parsed_attack = Attack.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.attack.attack_retrieve.Attack.from_dict",
+            "hackagent.api.attack.attack_retrieve.Attack.model_validate",
             return_value=mock_parsed_attack,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = attack_retrieve.sync_detailed(
                 client=mock_client_instance, id=attack_id_to_retrieve
             )
@@ -318,12 +320,12 @@ class TestAttackRetrieveAPI(unittest.TestCase):
             self.assertEqual(response.status_code, HTTPStatus.OK)
             self.assertIsNotNone(response.parsed)
             self.assertEqual(response.parsed.id, attack_id_to_retrieve)
-            self.assertEqual(response.parsed.type_, "SQL_INJECTION")
+            self.assertEqual(response.parsed.type, "SQL_INJECTION")
             self.assertEqual(
                 response.parsed.created_at,
                 datetime.datetime.fromisoformat(created_at_str.replace("Z", "+00:00")),
             )
-            mock_from_dict.assert_called_once_with(mock_response_content)
+            mock_model_validate.assert_called_once_with(mock_response_content)
 
             expected_kwargs = {
                 "method": "get",
@@ -390,7 +392,7 @@ class TestAttackUpdateAPI(unittest.TestCase):
         mock_agent_id_update = uuid.uuid4()
 
         attack_update_request_data = AttackRequest(
-            type_="XSS_ATTACK",
+            type="XSS_ATTACK",
             agent=mock_agent_id_update,
             configuration={"payload": "<script>alert(1)</script>"},
         )
@@ -402,7 +404,7 @@ class TestAttackUpdateAPI(unittest.TestCase):
 
         mock_updated_attack_response_content = {
             "id": str(attack_id_to_update),
-            "type": attack_update_request_data.type_,
+            "type": attack_update_request_data.type,
             "agent": str(attack_update_request_data.agent),
             "agent_name": "Agent For Updated Attack",
             "owner": 4,
@@ -420,12 +422,12 @@ class TestAttackUpdateAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_attack = Attack.from_dict(mock_updated_attack_response_content)
+        mock_parsed_attack = Attack.model_validate(mock_updated_attack_response_content)
 
         with patch(
-            "hackagent.api.attack.attack_update.Attack.from_dict",
+            "hackagent.api.attack.attack_update.Attack.model_validate",
             return_value=mock_parsed_attack,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = attack_update.sync_detailed(
                 client=mock_client_instance,
                 id=attack_id_to_update,
@@ -435,7 +437,7 @@ class TestAttackUpdateAPI(unittest.TestCase):
             self.assertEqual(response.status_code, HTTPStatus.OK)
             self.assertIsNotNone(response.parsed)
             self.assertEqual(response.parsed.id, attack_id_to_update)
-            self.assertEqual(response.parsed.type_, attack_update_request_data.type_)
+            self.assertEqual(response.parsed.type, attack_update_request_data.type)
             self.assertEqual(
                 response.parsed.configuration, attack_update_request_data.configuration
             )
@@ -443,12 +445,16 @@ class TestAttackUpdateAPI(unittest.TestCase):
                 response.parsed.updated_at,
                 datetime.datetime.fromisoformat(updated_at_str.replace("Z", "+00:00")),
             )
-            mock_from_dict.assert_called_once_with(mock_updated_attack_response_content)
+            mock_model_validate.assert_called_once_with(
+                mock_updated_attack_response_content
+            )
 
             expected_kwargs = {
                 "method": "put",
                 "url": f"/attack/{attack_id_to_update}",
-                "json": attack_update_request_data.to_dict(),
+                "json": attack_update_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -462,7 +468,7 @@ class TestAttackUpdateAPI(unittest.TestCase):
 
         attack_id_not_found = uuid.uuid4()
         attack_update_request_data = AttackRequest(
-            type_="NON_EXISTENT_UPDATE", agent=uuid.uuid4(), configuration={}
+            type="NON_EXISTENT_UPDATE", agent=uuid.uuid4(), configuration={}
         )
 
         mock_httpx_response = MagicMock()
@@ -492,7 +498,7 @@ class TestAttackUpdateAPI(unittest.TestCase):
 
         attack_id_error = uuid.uuid4()
         attack_update_request_data = AttackRequest(
-            type_="UPDATE_ERROR_FALSE", agent=uuid.uuid4(), configuration={}
+            type="UPDATE_ERROR_FALSE", agent=uuid.uuid4(), configuration={}
         )
 
         mock_httpx_response = MagicMock()
@@ -552,12 +558,12 @@ class TestAttackPartialUpdateAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_attack = Attack.from_dict(mock_patched_attack_response_content)
+        mock_parsed_attack = Attack.model_validate(mock_patched_attack_response_content)
 
         with patch(
-            "hackagent.api.attack.attack_partial_update.Attack.from_dict",
+            "hackagent.api.attack.attack_partial_update.Attack.model_validate",
             return_value=mock_parsed_attack,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = attack_partial_update.sync_detailed(
                 client=mock_client_instance,
                 id=attack_id_to_patch,
@@ -569,7 +575,7 @@ class TestAttackPartialUpdateAPI(unittest.TestCase):
             self.assertEqual(response.parsed.id, attack_id_to_patch)
             # Check that unpatched fields (like type_) are present and unchanged from the mock server response
             self.assertEqual(
-                response.parsed.type_, "EXISTING_TYPE"
+                response.parsed.type, "EXISTING_TYPE"
             )  # Attribute access is still type_
             self.assertEqual(
                 response.parsed.configuration, attack_patch_request_data.configuration
@@ -578,12 +584,16 @@ class TestAttackPartialUpdateAPI(unittest.TestCase):
                 response.parsed.updated_at,
                 datetime.datetime.fromisoformat(updated_at_str.replace("Z", "+00:00")),
             )
-            mock_from_dict.assert_called_once_with(mock_patched_attack_response_content)
+            mock_model_validate.assert_called_once_with(
+                mock_patched_attack_response_content
+            )
 
             expected_kwargs = {
                 "method": "patch",
                 "url": f"/attack/{attack_id_to_patch}",
-                "json": attack_patch_request_data.to_dict(),
+                "json": attack_patch_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -598,7 +608,7 @@ class TestAttackPartialUpdateAPI(unittest.TestCase):
         mock_client_instance.raise_on_unexpected_status = True
 
         attack_id_not_found = uuid.uuid4()
-        attack_patch_request_data = PatchedAttackRequest(type_="NON_EXISTENT_PATCH")
+        attack_patch_request_data = PatchedAttackRequest(type="NON_EXISTENT_PATCH")
 
         mock_httpx_response = MagicMock()
         mock_httpx_response.status_code = 404

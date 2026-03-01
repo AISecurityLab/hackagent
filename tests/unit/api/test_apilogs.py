@@ -9,8 +9,8 @@ from httpx import Response
 from hackagent.api.apilogs import apilogs_list, apilogs_retrieve
 from hackagent.client import AuthenticatedClient
 from hackagent.errors import UnexpectedStatus
-from hackagent.models.api_token_log import APITokenLog
-from hackagent.models.paginated_api_token_log_list import PaginatedAPITokenLogList
+from hackagent.api.models import APITokenLog
+from hackagent.api.models import PaginatedAPITokenLogList
 
 
 @pytest.fixture
@@ -35,7 +35,7 @@ def test_sync_detailed_success(authenticated_client: AuthenticatedClient):
         "previous": None,
         "results": [
             {
-                "id": "test_id_sync_list",
+                "id": 1,
                 "timestamp": "2024-01-01T00:00:00Z",
                 "api_key_prefix": "sync_list_pref",
                 "user_username": "sync_list_user",
@@ -63,7 +63,7 @@ def test_sync_detailed_success(authenticated_client: AuthenticatedClient):
     assert response.status_code == 200
     assert isinstance(response.parsed, PaginatedAPITokenLogList)
     assert response.parsed.count == 1
-    assert response.parsed.results[0].id == "test_id_sync_list"
+    assert response.parsed.results[0].id == 1
 
 
 def test_sync_detailed_unexpected_status(authenticated_client: AuthenticatedClient):
@@ -124,7 +124,7 @@ async def test_asyncio_detailed_success(authenticated_client: AuthenticatedClien
         "previous": None,
         "results": [
             {
-                "id": "test_id_async_list",
+                "id": 2,
                 "timestamp": "2024-01-01T00:02:00Z",
                 "api_key_prefix": "async_list_pref",
                 "user_username": "async_list_user",
@@ -160,7 +160,7 @@ async def test_asyncio_detailed_success(authenticated_client: AuthenticatedClien
     assert response.status_code == 200
     assert isinstance(response.parsed, PaginatedAPITokenLogList)
     assert response.parsed.count == 1
-    assert response.parsed.results[0].id == "test_id_async_list"
+    assert response.parsed.results[0].id == 2
 
 
 @pytest.mark.asyncio
@@ -246,7 +246,7 @@ def test_retrieve_get_kwargs():
 
 def test_retrieve_sync_detailed_success(authenticated_client: AuthenticatedClient):
     mock_response_data = {
-        "id": "test_log_id_sync_retrieve",
+        "id": 3,
         "timestamp": "2024-01-01T00:01:00Z",
         "api_key_prefix": "sync_retrieve_pref",
         "user_username": "sync_retrieve_user",
@@ -269,7 +269,7 @@ def test_retrieve_sync_detailed_success(authenticated_client: AuthenticatedClien
     mock_request.assert_called_once_with(method="get", url="/apilogs/123")
     assert response.status_code == 200
     assert isinstance(response.parsed, APITokenLog)
-    assert response.parsed.id == "test_log_id_sync_retrieve"
+    assert response.parsed.id == 3
 
 
 def test_retrieve_sync_detailed_unexpected_status(
@@ -325,7 +325,7 @@ async def test_retrieve_asyncio_detailed_success(
     authenticated_client: AuthenticatedClient,
 ):
     mock_response_data = {
-        "id": "test_log_id_async_retrieve",
+        "id": 4,
         "timestamp": "2024-01-01T00:03:00Z",
         "api_key_prefix": "async_retrieve_pref",
         "user_username": "async_retrieve_user",
@@ -358,7 +358,7 @@ async def test_retrieve_asyncio_detailed_success(
     )
     assert response.status_code == 200
     assert isinstance(response.parsed, APITokenLog)
-    assert response.parsed.id == "test_log_id_async_retrieve"
+    assert response.parsed.id == 4
 
 
 @pytest.mark.asyncio

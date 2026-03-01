@@ -15,6 +15,8 @@ cross-entropy computation into a cohesive class-based design that improves:
 import logging
 import os
 import re
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional, Tuple
 
 from hackagent.client import AuthenticatedClient
@@ -437,37 +439,44 @@ class PrefixGenerationPipeline:
 
         progress_desc = f"[cyan]Generating ({mode})..."
 
-        with create_progress_bar(progress_desc, total=len(prompts)) as (pbar, task):
-            for prompt, goal, meta_prefix in zip(prompts, goals, meta_prefixes):
-                request_params = {
-                    "prompt": prompt,
-                    "max_new_tokens": self.config.max_new_tokens,
+        # Fire all generation requests in parallel; each is an independent HTTP call.
+        batch_size = max(1, getattr(self.config, "batch_size", 16))
+        _results_lock = threading.Lock()
+        results_map: Dict[int, Dict] = {}
+
+        def _generate_single(args: tuple) -> None:
+            idx, prompt, goal, meta_prefix = args
+            request_params = {
+                "prompt": prompt,
+                "max_new_tokens": self.config.max_new_tokens,
+                "temperature": temperature,
+                "top_p": self.config.top_p,
+            }
+            response = self._generation_router.route_request(
+                registration_key=registration_key,
+                request_data=request_params,
+            )
+            generated_text = self._extract_generated_text(response, prompt, goal)
+            final_prefix = meta_prefix + generated_text
+            with _results_lock:
+                results_map[idx] = {
+                    "goal": goal,
+                    "prefix": final_prefix,
+                    "meta_prefix": meta_prefix,
                     "temperature": temperature,
-                    "top_p": self.config.top_p,
+                    "model_name": self.config.generator.get("identifier"),
                 }
 
-                # Always use route_request (no auto result creation)
-                # Tracker handles per-goal result tracking instead
-                response = self._generation_router.route_request(
-                    registration_key=registration_key,
-                    request_data=request_params,
-                )
+        tasks = list(enumerate(zip(prompts, goals, meta_prefixes)))
+        with create_progress_bar(progress_desc, total=len(tasks)) as (pbar, task):
+            with ThreadPoolExecutor(max_workers=batch_size) as pool:
+                for _ in pool.map(
+                    _generate_single,
+                    [(i, p, g, m) for i, (p, g, m) in tasks],
+                ):
+                    pbar.update(task, advance=1)
 
-                generated_text = self._extract_generated_text(response, prompt, goal)
-                final_prefix = meta_prefix + generated_text
-
-                results.append(
-                    {
-                        "goal": goal,
-                        "prefix": final_prefix,
-                        "meta_prefix": meta_prefix,
-                        "temperature": temperature,
-                        "model_name": self.config.generator.get("identifier"),
-                    }
-                )
-
-                pbar.update(task, advance=1)
-
+        results = [results_map[i] for i in range(len(tasks))]
         return results
 
     def _extract_generated_text(self, response: Dict, prompt: str, goal: str) -> str:

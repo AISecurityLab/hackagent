@@ -21,6 +21,8 @@ determine attack success rates.
 """
 
 import logging
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional
 
 # --- Import AgentRouter and related components ---
@@ -347,83 +349,85 @@ def execute(
     max_new_tokens = config.get("max_new_tokens_completion", 256)
     temperature = config.get("temperature", 0.7)
 
-    # --- Prepare and run tasks (synchronously) ---
+    # --- Prepare and run tasks (parallel) ---
     completion_results_list: List[Dict[str, Any]] = []
+    batch_size = max(1, config.get("batch_size", 16))
+    _tracker_lock = threading.Lock()
+    results_map: Dict[int, Dict[str, Any]] = {}
+
+    def _complete_one(index_record: tuple) -> tuple:
+        index, record = index_record
+        prefix_text = record.get("prefix", "")
+        try:
+            result = _get_completion_via_router(
+                agent_router=agent_router,
+                agent_reg_key=victim_agent_reg_key,
+                prefix_text=prefix_text,
+                surrogate_prompt_template=actual_surrogate_prompt_str,
+                request_timeout=request_timeout,
+                max_new_tokens=max_new_tokens,
+                temperature=temperature,
+                n_samples=1,
+                logger_instance=logger,
+                original_index=index,
+            )
+        except Exception as e:
+            logger.error(
+                f"Exception during completion for original index {index}: {e}",
+                exc_info=e,
+            )
+            result = {
+                "completion": None,
+                "raw_request_payload": None,
+                "raw_response_status": None,
+                "raw_response_headers": None,
+                "raw_response_body": None,
+                "adapter_specific_events": None,
+                "error_message": f"Sync Task Exception: {type(e).__name__} - {str(e)}",
+                "log_message": None,
+            }
+        # Tracker writes are serialized via lock
+        with _tracker_lock:
+            goal = record.get("goal", "")
+            if tracker and goal:
+                goal_ctx = tracker.get_goal_context_by_goal(goal)
+                if goal_ctx:
+                    completion_text = result.get("completion")
+                    response_payload = {
+                        "generated_text": completion_text,
+                        "raw_response_body": result.get("raw_response_body"),
+                        "raw_response_status": result.get("raw_response_status"),
+                    }
+                    tracker.add_interaction_trace(
+                        ctx=goal_ctx,
+                        request=result.get("raw_request_payload") or {},
+                        response=response_payload,
+                        step_name="Target Completion",
+                        metadata={
+                            "prefix": prefix_text,
+                            "surrogate_attack_prompt": actual_surrogate_prompt_str,
+                            "error_message": result.get("error_message"),
+                            "adapter_specific_events": result.get(
+                                "adapter_specific_events"
+                            ),
+                            "agent_specific_data": result.get("agent_specific_data"),
+                            "raw_response_status": result.get("raw_response_status"),
+                        },
+                    )
+        return index, result
 
     # Create progress bar for agent interactions
     with create_progress_bar(
         f"[green]Execution: Getting completions from {victim_agent_type} agent...",
         total=len(input_data),
     ) as (progress_bar, task):
-        for index, record in enumerate(input_data):
-            prefix_text = record.get("prefix", "")
+        with ThreadPoolExecutor(max_workers=batch_size) as pool:
+            for index, result in pool.map(_complete_one, enumerate(input_data)):
+                results_map[index] = result
+                progress_bar.update(task, advance=1)
 
-            try:
-                result = _get_completion_via_router(
-                    agent_router=agent_router,
-                    agent_reg_key=victim_agent_reg_key,
-                    prefix_text=prefix_text,
-                    surrogate_prompt_template=actual_surrogate_prompt_str,
-                    request_timeout=request_timeout,
-                    max_new_tokens=max_new_tokens,
-                    temperature=temperature,
-                    n_samples=1,
-                    logger_instance=logger,
-                    original_index=index,
-                )
-                completion_results_list.append(result)
-
-                # Add trace to the correct goal's Result via Tracker
-                goal = record.get("goal", "")
-                if tracker and goal:
-                    goal_ctx = tracker.get_goal_context_by_goal(goal)
-                    if goal_ctx:
-                        completion_text = result.get("completion")
-                        response_payload = {
-                            "generated_text": completion_text,
-                            "raw_response_body": result.get("raw_response_body"),
-                            "raw_response_status": result.get("raw_response_status"),
-                        }
-                        tracker.add_interaction_trace(
-                            ctx=goal_ctx,
-                            request=result.get("raw_request_payload") or {},
-                            response=response_payload,
-                            step_name="Target Completion",
-                            metadata={
-                                "prefix": prefix_text,
-                                "surrogate_attack_prompt": actual_surrogate_prompt_str,
-                                "error_message": result.get("error_message"),
-                                "adapter_specific_events": result.get(
-                                    "adapter_specific_events"
-                                ),
-                                "agent_specific_data": result.get(
-                                    "agent_specific_data"
-                                ),
-                                "raw_response_status": result.get(
-                                    "raw_response_status"
-                                ),
-                            },
-                        )
-            except Exception as e:
-                logger.error(
-                    f"Exception during synchronous completion for original index {index}: {e}",
-                    exc_info=e,
-                )
-                completion_results_list.append(
-                    {
-                        "completion": None,
-                        "raw_request_payload": None,
-                        "raw_response_status": None,
-                        "raw_response_headers": None,
-                        "raw_response_body": None,
-                        "adapter_specific_events": None,
-                        "error_message": f"Sync Task Exception: {type(e).__name__} - {str(e)}",
-                        "log_message": None,
-                    }
-                )
-
-            # Update progress bar after each completion
-            progress_bar.update(task, advance=1)
+    # Reconstruct results in original order
+    completion_results_list = [results_map[i] for i in range(len(input_data))]
 
     # Update results with completion data
     results = []

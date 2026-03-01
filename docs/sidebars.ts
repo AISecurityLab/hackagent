@@ -110,9 +110,11 @@ const sidebars: SidebarsConfig = {
         id: 'attacks/index',
       },
       items: [
-        'attacks/advprefix-attacks',
-        'attacks/pair-attacks',
-        'attacks/baseline-attacks',
+        'attacks/advprefix',
+        'attacks/pair',
+        'attacks/tap',
+        'attacks/flipattack',
+        'attacks/baseline',
       ],
     },
     {

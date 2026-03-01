@@ -2,7 +2,7 @@
 sidebar_position: 3
 ---
 
-# PAIR Attacks
+# PAIR
 
 PAIR (Prompt Automatic Iterative Refinement) is an LLM-driven attack technique that uses an **attacker model** to iteratively generate and refine jailbreak prompts based on target responses and judge feedback.
 
@@ -299,5 +299,5 @@ for target in targets:
 ## Related
 
 - [Attack Overview](./index.md) — Compare all attack types
-- [AdvPrefix Attacks](./advprefix-attacks) — Alternative sophisticated attack
-- [Baseline Attacks](./baseline-attacks) — Quick template-based testing
+- [AdvPrefix Attacks](./advprefix) — Alternative sophisticated attack
+- [Baseline Attacks](./baseline) — Quick template-based testing

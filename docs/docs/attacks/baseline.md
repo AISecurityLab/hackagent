@@ -2,7 +2,7 @@
 sidebar_position: 4
 ---
 
-# Baseline Attacks
+# Baseline
 
 Baseline attacks use **predefined prompt templates** combined with harmful goals to attempt jailbreaks. While simpler than optimization-based approaches like AdvPrefix or adaptive methods like PAIR, baseline attacks are fast and effective for testing basic prompt injection defenses.
 
@@ -386,12 +386,12 @@ category_success = {
 3. **Template quality**: Effectiveness depends on template library
 4. **Simple evaluation**: May miss subtle jailbreaks
 
-For more sophisticated testing, consider [AdvPrefix](./advprefix-attacks) or [PAIR](./pair-attacks) attacks.
+For more sophisticated testing, consider [AdvPrefix](./advprefix) or [PAIR](./pair) attacks.
 
 ---
 
 ## Related
 
 - [Attack Overview](./index.md) — Compare all attack types
-- [AdvPrefix Attacks](./advprefix-attacks) — Sophisticated prefix optimization
-- [PAIR Attacks](./pair-attacks) — Adaptive iterative refinement
+- [AdvPrefix Attacks](./advprefix) — Sophisticated prefix optimization
+- [PAIR Attacks](./pair) — Adaptive iterative refinement

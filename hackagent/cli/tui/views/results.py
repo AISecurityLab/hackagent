@@ -1198,13 +1198,13 @@ class ResultsTab(Container):
             kwargs = {"client": client, "page_size": limit}
             if status_filter and status_filter != "all":
                 # Map filter values to API enum
-                from hackagent.models.run_list_status import RunListStatus
+                from hackagent.api.models import StatusEnum
 
                 status_map = {
-                    "pending": RunListStatus.PENDING,
-                    "running": RunListStatus.RUNNING,
-                    "completed": RunListStatus.COMPLETED,
-                    "failed": RunListStatus.FAILED,
+                    "pending": StatusEnum.PENDING,
+                    "running": StatusEnum.RUNNING,
+                    "completed": StatusEnum.COMPLETED,
+                    "failed": StatusEnum.FAILED,
                 }
                 if status_filter.lower() in status_map:
                     kwargs["status"] = status_map[status_filter.lower()]

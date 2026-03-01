@@ -15,8 +15,9 @@
 """
 FlipAttack generation and execution module.
 
-Generates flipped prompts using original FlipAttack core implementation
-and executes them against the target model via hackagent's AgentRouter.
+Generates flipped prompts by calling :meth:`FlipAttack.generate` on the
+attack instance passed via ``config["_self"]``, then executes them against
+the target model via HackAgent's AgentRouter.
 
 Result Tracking:
     Uses Tracker (passed via config["_tracker"]) to add interaction traces
@@ -24,15 +25,14 @@ Result Tracking:
 """
 
 import logging
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from hackagent.router.router import AgentRouter
 
 if TYPE_CHECKING:
     from hackagent.router.tracking import Tracker
-
-# Import original FlipAttack implementation
-from .flip_attack import FlipAttack as FlipAttackAlgorithm
 
 
 def execute(
@@ -53,7 +53,12 @@ def execute(
     Returns:
         List of dicts with goal, flipped prompt, and response
     """
-    # Extract parameters
+    # Retrieve the FlipAttack instance (carries all obfuscation methods).
+    fa = config.get("_self")
+    if fa is None:
+        raise RuntimeError("config['_self'] must be set to the FlipAttack instance.")
+
+    # Extract parameters (still needed for logging and result fields).
     fa_params = config.get("flipattack_params", {})
     flip_mode = fa_params.get("flip_mode", "FCS")
     cot = fa_params.get("cot", False)
@@ -69,43 +74,38 @@ def execute(
     if tracker:
         logger.info("📊 Generation tracking via Tracker enabled")
 
-    # Initialize original FlipAttack class
-    flip_attack = FlipAttackAlgorithm(
-        flip_mode=flip_mode,
-        cot=cot,
-        lang_gpt=lang_gpt,
-        few_shot=few_shot,
-    )
-
-    results = []
     victim_key = str(agent_router.backend_agent.id)
+    # All goals are independent — fire them in parallel so the victim GPU
+    # receives batch_size requests concurrently instead of one at a time.
+    batch_size = max(1, config.get("batch_size", 16))
+    _lock = threading.Lock()
+    results_map: Dict[int, Dict[str, Any]] = {}
 
-    for idx, goal_text in enumerate(goals):
+    def _process_goal(idx_goal: tuple) -> None:
+        idx, goal_text = idx_goal
         logger.info(f"Processing goal {idx + 1}/{len(goals)}")
 
-        # Step 1: Generate flipped prompt
+        # Step 1: Generate flipped prompt (pure Python — no HTTP, always fast)
         try:
-            log, attack_messages = flip_attack.generate(goal_text)
+            log, attack_messages = fa.generate(goal_text)
         except Exception as e:
             logger.error(f"Generation failed for goal {idx + 1}: {e}")
-            results.append(
-                {
+            with _lock:
+                results_map[idx] = {
                     "goal": goal_text,
                     "flip_mode": flip_mode,
                     "error": f"Generation failed: {str(e)}",
                     "response": None,
                 }
-            )
-            continue
+            return
 
         # Extract system and user prompts
         system_prompt = attack_messages[0]["content"] if attack_messages else ""
         user_prompt = attack_messages[1]["content"] if len(attack_messages) > 1 else ""
         full_prompt = f"{system_prompt}\n\n{user_prompt}".strip()
 
-        # Step 2: Execute against target model
+        # Step 2: Execute against target model (HTTP — parallelised here)
         request_data = {"prompt": full_prompt}
-
         try:
             response = agent_router.route_request(
                 registration_key=victim_key,
@@ -113,8 +113,8 @@ def execute(
             )
         except Exception as e:
             logger.error(f"Execution failed for goal {idx + 1}: {e}")
-            results.append(
-                {
+            with _lock:
+                results_map[idx] = {
                     "goal": goal_text,
                     "flip_mode": flip_mode,
                     "flip_log": log,
@@ -124,35 +124,32 @@ def execute(
                     "error": f"Execution failed: {str(e)}",
                     "response": None,
                 }
-            )
-            continue
+            return
 
         generated_text = response.get("generated_text")
         error_message = response.get("error_message")
 
-        # Add trace to goal's Result via Tracker
-        if tracker:
-            goal_ctx = tracker.get_goal_context(idx)
-            if goal_ctx:
-                tracker.add_interaction_trace(
-                    ctx=goal_ctx,
-                    request=request_data,
-                    response={
-                        "generated_text": generated_text,
-                        "error_message": error_message,
-                    },
-                    step_name=f"FlipAttack Generation ({flip_mode})",
-                    metadata={
-                        "flip_mode": flip_mode,
-                        "flip_log": log,
-                        "system_prompt": system_prompt,
-                        "user_prompt": user_prompt,
-                    },
-                )
-
-        # Store results
-        results.append(
-            {
+        with _lock:
+            # Add trace to goal's Result via Tracker
+            if tracker:
+                goal_ctx = tracker.get_goal_context(idx)
+                if goal_ctx:
+                    tracker.add_interaction_trace(
+                        ctx=goal_ctx,
+                        request=request_data,
+                        response={
+                            "generated_text": generated_text,
+                            "error_message": error_message,
+                        },
+                        step_name=f"FlipAttack Generation ({flip_mode})",
+                        metadata={
+                            "flip_mode": flip_mode,
+                            "flip_log": log,
+                            "system_prompt": system_prompt,
+                            "user_prompt": user_prompt,
+                        },
+                    )
+            results_map[idx] = {
                 "goal": goal_text,
                 "flip_mode": flip_mode,
                 "flip_log": log,
@@ -162,10 +159,13 @@ def execute(
                 "response": generated_text,
                 "error": error_message,
             }
-        )
 
         if error_message:
             logger.warning(f"Goal {idx + 1} failed: {error_message}")
 
+    with ThreadPoolExecutor(max_workers=batch_size) as pool:
+        list(pool.map(_process_goal, enumerate(goals)))
+
+    results = [results_map[i] for i in range(len(goals))]
     logger.info(f"Generated and executed {len(results)} attacks")
     return results

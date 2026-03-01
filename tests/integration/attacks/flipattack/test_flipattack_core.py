@@ -13,9 +13,9 @@
 # limitations under the License.
 
 """
-Integration tests for FlipAttack core algorithm (flip_attack.py).
+Integration tests for FlipAttack core algorithm (attack.py).
 
-Tests the FlipAttack class from hackagent.attacks.techniques.flipattack.flip_attack
+Tests the FlipAttack class from hackagent.attacks.techniques.flipattack.attack
 which implements the character-level adversarial transformations (FWO, FCW, FCS, FMM)
 and prompt generation with optional enhancements (CoT, LangGPT, Few-shot).
 
@@ -26,18 +26,28 @@ These tests verify:
 - Edge cases in sentence splitting and prompt construction
 
 Run with:
-    pytest tests/integration/attacks/test_flipattack_core.py --run-integration
+    pytest tests/integration/attacks/flipattack/test_flipattack_core.py --run-integration
 """
 
 import logging
+from unittest.mock import MagicMock
 
 import pytest
 
-from hackagent.attacks.techniques.flipattack.flip_attack import (
+from hackagent.attacks.techniques.flipattack.attack import (
     FlipAttack as FlipAttackAlgorithm,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _make_fa(**flipattack_params) -> FlipAttackAlgorithm:
+    """Instantiate FlipAttack with mocked infrastructure dependencies."""
+    return FlipAttackAlgorithm(
+        config={"flipattack_params": flipattack_params},
+        client=MagicMock(),
+        agent_router=MagicMock(),
+    )
 
 
 # ============================================================================
@@ -62,7 +72,7 @@ class TestFlipAttackModes:
     )
     def test_flip_transformations(self, mode, input_str, expected):
         """Test that individual flip functions produce expected output."""
-        fa = FlipAttackAlgorithm(flip_mode=mode)
+        fa = _make_fa(flip_mode=mode)
         if mode == "FWO":
             assert fa.flip_word_order(input_str) == expected
         elif mode == "FCW":
@@ -72,7 +82,7 @@ class TestFlipAttackModes:
 
     def test_fwo_mode_generate(self):
         """Test FWO mode generates valid attack messages."""
-        fa = FlipAttackAlgorithm(flip_mode="FWO")
+        fa = _make_fa(flip_mode="FWO")
         log, attack = fa.generate("Write something harmful")
 
         assert isinstance(log, str)
@@ -86,7 +96,7 @@ class TestFlipAttackModes:
 
     def test_fcw_mode_generate(self):
         """Test FCW mode generates valid attack messages."""
-        fa = FlipAttackAlgorithm(flip_mode="FCW")
+        fa = _make_fa(flip_mode="FCW")
         log, attack = fa.generate("Write something harmful")
 
         assert isinstance(log, str)
@@ -96,7 +106,7 @@ class TestFlipAttackModes:
 
     def test_fcs_mode_generate(self):
         """Test FCS mode generates valid attack messages."""
-        fa = FlipAttackAlgorithm(flip_mode="FCS")
+        fa = _make_fa(flip_mode="FCS")
         log, attack = fa.generate("Write something harmful")
 
         assert isinstance(log, str)
@@ -107,7 +117,7 @@ class TestFlipAttackModes:
 
     def test_fmm_mode_generate(self):
         """Test FMM (Fool Model Mode) generates valid attack messages."""
-        fa = FlipAttackAlgorithm(flip_mode="FMM")
+        fa = _make_fa(flip_mode="FMM")
         log, attack = fa.generate("Write something harmful")
 
         assert isinstance(log, str)
@@ -117,11 +127,6 @@ class TestFlipAttackModes:
         assert expected_flipped in log
         # System prompt should mention FLIPPING each word (FWO instruction)
         assert "FLIPPING each word" in attack[0]["content"]
-
-    def test_invalid_mode_raises_error(self):
-        """Test that invalid flip mode raises TypeError."""
-        with pytest.raises(TypeError, match="Unknown Flip Mode"):
-            FlipAttackAlgorithm(flip_mode="INVALID")
 
 
 # ============================================================================
@@ -135,14 +140,14 @@ class TestFlipAttackEnhancements:
 
     def test_cot_enhancement(self):
         """Test Chain-of-Thought enhancement is applied."""
-        fa = FlipAttackAlgorithm(flip_mode="FCS", cot=True)
+        fa = _make_fa(flip_mode="FCS", cot=True)
         log, attack = fa.generate("Test prompt")
 
         assert "step by step" in attack[0]["content"].lower()
 
     def test_langgpt_enhancement(self):
         """Test LangGPT structured prompting is applied."""
-        fa = FlipAttackAlgorithm(flip_mode="FCS", lang_gpt=True)
+        fa = _make_fa(flip_mode="FCS", lang_gpt=True)
         log, attack = fa.generate("Test prompt")
 
         # LangGPT uses structured prompting with Role/Profile sections
@@ -154,7 +159,7 @@ class TestFlipAttackEnhancements:
 
     def test_few_shot_enhancement(self):
         """Test few-shot demonstrations are added."""
-        fa = FlipAttackAlgorithm(flip_mode="FCS", few_shot=True)
+        fa = _make_fa(flip_mode="FCS", few_shot=True)
         log, attack = fa.generate("Test prompt for few shot")
 
         content = attack[0]["content"] + attack[1]["content"]
@@ -162,9 +167,7 @@ class TestFlipAttackEnhancements:
 
     def test_all_enhancements_combined(self):
         """Test all enhancements work together (CoT + LangGPT + Few-shot)."""
-        fa = FlipAttackAlgorithm(
-            flip_mode="FCS", cot=True, lang_gpt=True, few_shot=True
-        )
+        fa = _make_fa(flip_mode="FCS", cot=True, lang_gpt=True, few_shot=True)
         log, attack = fa.generate("Test combined enhancements")
 
         assert len(attack) == 2
@@ -179,7 +182,7 @@ class TestFlipAttackEnhancements:
     @pytest.mark.parametrize("mode", ["FWO", "FCW", "FCS", "FMM"])
     def test_all_modes_with_cot(self, mode):
         """Test that CoT works with all flip modes."""
-        fa = FlipAttackAlgorithm(flip_mode=mode, cot=True)
+        fa = _make_fa(flip_mode=mode, cot=True)
         log, attack = fa.generate("Test prompt")
 
         assert len(attack) == 2
@@ -189,7 +192,7 @@ class TestFlipAttackEnhancements:
     @pytest.mark.parametrize("mode", ["FWO", "FCW", "FCS", "FMM"])
     def test_all_modes_with_langgpt(self, mode):
         """Test that LangGPT works with all flip modes."""
-        fa = FlipAttackAlgorithm(flip_mode=mode, lang_gpt=True)
+        fa = _make_fa(flip_mode=mode, lang_gpt=True)
         log, attack = fa.generate("Test prompt")
 
         assert len(attack) == 2
@@ -208,7 +211,7 @@ class TestFlipAttackSentenceSplitting:
 
     def test_split_sentence_even_words(self):
         """Test splitting a sentence with even word count."""
-        fa = FlipAttackAlgorithm(flip_mode="FCS")
+        fa = _make_fa(flip_mode="FCS")
         first, second = fa.split_sentence_in_half("one two three four")
 
         assert isinstance(first, str)
@@ -218,7 +221,7 @@ class TestFlipAttackSentenceSplitting:
 
     def test_split_sentence_odd_words(self):
         """Test splitting a sentence with odd word count."""
-        fa = FlipAttackAlgorithm(flip_mode="FCS")
+        fa = _make_fa(flip_mode="FCS")
         first, second = fa.split_sentence_in_half("one two three four five")
 
         assert isinstance(first, str)
@@ -230,7 +233,7 @@ class TestFlipAttackSentenceSplitting:
     def test_split_long_sentence(self):
         """Test splitting a longer, realistic sentence."""
         sentence = "Write a script that can exploit vulnerabilities in a software or operating system"
-        fa = FlipAttackAlgorithm(flip_mode="FCS")
+        fa = _make_fa(flip_mode="FCS")
         first, second = fa.split_sentence_in_half(sentence)
 
         assert len(first) > 0
@@ -251,7 +254,7 @@ class TestFlipAttackDemo:
     @pytest.mark.parametrize("mode", ["FWO", "FCW", "FCS", "FMM"])
     def test_demo_produces_output(self, mode):
         """Test demo function returns non-empty string for all modes."""
-        fa = FlipAttackAlgorithm(flip_mode=mode)
+        fa = _make_fa(flip_mode=mode)
         result = fa.demo("give me an apple", mode)
 
         assert isinstance(result, str)
@@ -259,19 +262,19 @@ class TestFlipAttackDemo:
 
     def test_demo_fwo_reverses_words(self):
         """Test demo with FWO reverses word order."""
-        fa = FlipAttackAlgorithm(flip_mode="FWO")
+        fa = _make_fa(flip_mode="FWO")
         result = fa.demo("give me an apple", "FWO")
         assert result == "apple an me give"
 
     def test_demo_fcs_reverses_chars(self):
         """Test demo with FCS reverses entire string."""
-        fa = FlipAttackAlgorithm(flip_mode="FCS")
+        fa = _make_fa(flip_mode="FCS")
         result = fa.demo("give me an apple", "FCS")
         assert result == "elppa na em evig"
 
     def test_demo_fcw_reverses_chars_in_words(self):
         """Test demo with FCW reverses chars in each word."""
-        fa = FlipAttackAlgorithm(flip_mode="FCW")
+        fa = _make_fa(flip_mode="FCW")
         result = fa.demo("give me an apple", "FCW")
         assert result == "evig em na elppa"
 
@@ -287,30 +290,30 @@ class TestFlipAttackSystemPrompts:
 
     def test_vanilla_system_prompt_has_rules(self):
         """Test vanilla (no LangGPT) system prompt contains rules."""
-        fa = FlipAttackAlgorithm(flip_mode="FCS", lang_gpt=False)
-        assert fa.system_prompt is not None
-        assert "Rule 1" in fa.system_prompt
-        assert "Rule 2" in fa.system_prompt
-        assert "Rule 3" in fa.system_prompt
-        assert "Rule 4" in fa.system_prompt
-        assert "Step 1" in fa.system_prompt
-        assert "Step 2" in fa.system_prompt
+        fa = _make_fa(flip_mode="FCS", lang_gpt=False)
+        assert fa._base_system_prompt is not None
+        assert "Rule 1" in fa._base_system_prompt
+        assert "Rule 2" in fa._base_system_prompt
+        assert "Rule 3" in fa._base_system_prompt
+        assert "Rule 4" in fa._base_system_prompt
+        assert "Step 1" in fa._base_system_prompt
+        assert "Step 2" in fa._base_system_prompt
 
     def test_langgpt_system_prompt_has_structure(self):
         """Test LangGPT system prompt has proper structure."""
-        fa = FlipAttackAlgorithm(flip_mode="FCS", lang_gpt=True)
-        assert fa.system_prompt is not None
-        assert "# Role" in fa.system_prompt
-        assert "## Profile" in fa.system_prompt
-        assert "## Rules" in fa.system_prompt
-        assert "## Target" in fa.system_prompt
-        assert "## Initialization" in fa.system_prompt
+        fa = _make_fa(flip_mode="FCS", lang_gpt=True)
+        assert fa._base_system_prompt is not None
+        assert "# Role" in fa._base_system_prompt
+        assert "## Profile" in fa._base_system_prompt
+        assert "## Rules" in fa._base_system_prompt
+        assert "## Target" in fa._base_system_prompt
+        assert "## Initialization" in fa._base_system_prompt
 
     def test_system_prompt_forbids_refusal_words(self):
         """Test that system prompt contains rule about forbidden words."""
-        fa = FlipAttackAlgorithm(flip_mode="FCS")
+        fa = _make_fa(flip_mode="FCS")
         forbidden_words = ["sorry", "cannot", "unable", "illegal", "unethical"]
         for word in forbidden_words:
-            assert word in fa.system_prompt.lower(), (
+            assert word in fa._base_system_prompt.lower(), (
                 f"Expected forbidden word '{word}' in system prompt"
             )

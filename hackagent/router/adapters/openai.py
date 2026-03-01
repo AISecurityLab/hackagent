@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
-import logging
+from hackagent.logger import get_logger
 from typing import Any, Dict, List, Optional
 
 from .base import ChatCompletionsAgent, AdapterConfigurationError
@@ -77,7 +77,7 @@ class OpenAIConfigurationError(AdapterConfigurationError):
     pass
 
 
-logger = logging.getLogger(__name__)  # Module-level logger
+logger = get_logger(__name__)  # Module-level logger
 
 
 class OpenAIAgent(ChatCompletionsAgent):

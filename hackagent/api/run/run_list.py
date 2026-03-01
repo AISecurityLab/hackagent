@@ -1,42 +1,41 @@
-# Copyright 2026 - AI4I. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
-
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
 from uuid import UUID
+
 import httpx
+
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.paginated_run_list import PaginatedRunList
-from ...models.run_list_status import RunListStatus
 from ...types import UNSET, Response, Unset
+from ..models import PaginatedRunList, StatusEnum
 
 
 def _get_kwargs(
     *,
-    agent: Union[Unset, UUID] = UNSET,
-    attack: Union[Unset, UUID] = UNSET,
-    is_client_executed: Union[Unset, bool] = UNSET,
-    organization: Union[Unset, UUID] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
-    status: Union[Unset, RunListStatus] = UNSET,
+    agent: UUID | Unset = UNSET,
+    attack: UUID | Unset = UNSET,
+    is_client_executed: bool | Unset = UNSET,
+    organization: UUID | Unset = UNSET,
+    page: int | Unset = UNSET,
+    page_size: int | Unset = UNSET,
+    status: StatusEnum | Unset = UNSET,
 ) -> dict[str, Any]:
+
     params: dict[str, Any] = {}
 
-    json_agent: Union[Unset, str] = UNSET
+    json_agent: str | Unset = UNSET
     if not isinstance(agent, Unset):
         json_agent = str(agent)
     params["agent"] = json_agent
 
-    json_attack: Union[Unset, str] = UNSET
+    json_attack: str | Unset = UNSET
     if not isinstance(attack, Unset):
         json_attack = str(attack)
     params["attack"] = json_attack
 
     params["is_client_executed"] = is_client_executed
 
-    json_organization: Union[Unset, str] = UNSET
+    json_organization: str | Unset = UNSET
     if not isinstance(organization, Unset):
         json_organization = str(organization)
     params["organization"] = json_organization
@@ -45,7 +44,7 @@ def _get_kwargs(
 
     params["page_size"] = page_size
 
-    json_status: Union[Unset, str] = UNSET
+    json_status: str | Unset = UNSET
     if not isinstance(status, Unset):
         json_status = status.value
 
@@ -63,12 +62,13 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[PaginatedRunList]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> PaginatedRunList | None:
     if response.status_code == 200:
-        response_200 = PaginatedRunList.from_dict(response.json())
+        response_200 = PaginatedRunList.model_validate(response.json())
 
         return response_200
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -76,7 +76,7 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+    *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[PaginatedRunList]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -89,13 +89,13 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    agent: Union[Unset, UUID] = UNSET,
-    attack: Union[Unset, UUID] = UNSET,
-    is_client_executed: Union[Unset, bool] = UNSET,
-    organization: Union[Unset, UUID] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
-    status: Union[Unset, RunListStatus] = UNSET,
+    agent: UUID | Unset = UNSET,
+    attack: UUID | Unset = UNSET,
+    is_client_executed: bool | Unset = UNSET,
+    organization: UUID | Unset = UNSET,
+    page: int | Unset = UNSET,
+    page_size: int | Unset = UNSET,
+    status: StatusEnum | Unset = UNSET,
 ) -> Response[PaginatedRunList]:
     """ViewSet for managing Run instances.
     Primarily for listing/retrieving runs.
@@ -107,13 +107,13 @@ def sync_detailed(
     This is a core SDK operation for executing and monitoring security tests.
 
     Args:
-        agent (Union[Unset, UUID]):
-        attack (Union[Unset, UUID]):
-        is_client_executed (Union[Unset, bool]):
-        organization (Union[Unset, UUID]):
-        page (Union[Unset, int]):
-        page_size (Union[Unset, int]):
-        status (Union[Unset, RunListStatus]):
+        agent (UUID | Unset):
+        attack (UUID | Unset):
+        is_client_executed (bool | Unset):
+        organization (UUID | Unset):
+        page (int | Unset):
+        page_size (int | Unset):
+        status (StatusEnum | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -143,14 +143,14 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    agent: Union[Unset, UUID] = UNSET,
-    attack: Union[Unset, UUID] = UNSET,
-    is_client_executed: Union[Unset, bool] = UNSET,
-    organization: Union[Unset, UUID] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
-    status: Union[Unset, RunListStatus] = UNSET,
-) -> Optional[PaginatedRunList]:
+    agent: UUID | Unset = UNSET,
+    attack: UUID | Unset = UNSET,
+    is_client_executed: bool | Unset = UNSET,
+    organization: UUID | Unset = UNSET,
+    page: int | Unset = UNSET,
+    page_size: int | Unset = UNSET,
+    status: StatusEnum | Unset = UNSET,
+) -> PaginatedRunList | None:
     """ViewSet for managing Run instances.
     Primarily for listing/retrieving runs.
     Creation of server-side runs is handled by custom actions.
@@ -161,13 +161,13 @@ def sync(
     This is a core SDK operation for executing and monitoring security tests.
 
     Args:
-        agent (Union[Unset, UUID]):
-        attack (Union[Unset, UUID]):
-        is_client_executed (Union[Unset, bool]):
-        organization (Union[Unset, UUID]):
-        page (Union[Unset, int]):
-        page_size (Union[Unset, int]):
-        status (Union[Unset, RunListStatus]):
+        agent (UUID | Unset):
+        attack (UUID | Unset):
+        is_client_executed (bool | Unset):
+        organization (UUID | Unset):
+        page (int | Unset):
+        page_size (int | Unset):
+        status (StatusEnum | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -192,13 +192,13 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    agent: Union[Unset, UUID] = UNSET,
-    attack: Union[Unset, UUID] = UNSET,
-    is_client_executed: Union[Unset, bool] = UNSET,
-    organization: Union[Unset, UUID] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
-    status: Union[Unset, RunListStatus] = UNSET,
+    agent: UUID | Unset = UNSET,
+    attack: UUID | Unset = UNSET,
+    is_client_executed: bool | Unset = UNSET,
+    organization: UUID | Unset = UNSET,
+    page: int | Unset = UNSET,
+    page_size: int | Unset = UNSET,
+    status: StatusEnum | Unset = UNSET,
 ) -> Response[PaginatedRunList]:
     """ViewSet for managing Run instances.
     Primarily for listing/retrieving runs.
@@ -210,13 +210,13 @@ async def asyncio_detailed(
     This is a core SDK operation for executing and monitoring security tests.
 
     Args:
-        agent (Union[Unset, UUID]):
-        attack (Union[Unset, UUID]):
-        is_client_executed (Union[Unset, bool]):
-        organization (Union[Unset, UUID]):
-        page (Union[Unset, int]):
-        page_size (Union[Unset, int]):
-        status (Union[Unset, RunListStatus]):
+        agent (UUID | Unset):
+        attack (UUID | Unset):
+        is_client_executed (bool | Unset):
+        organization (UUID | Unset):
+        page (int | Unset):
+        page_size (int | Unset):
+        status (StatusEnum | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -244,14 +244,14 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    agent: Union[Unset, UUID] = UNSET,
-    attack: Union[Unset, UUID] = UNSET,
-    is_client_executed: Union[Unset, bool] = UNSET,
-    organization: Union[Unset, UUID] = UNSET,
-    page: Union[Unset, int] = UNSET,
-    page_size: Union[Unset, int] = UNSET,
-    status: Union[Unset, RunListStatus] = UNSET,
-) -> Optional[PaginatedRunList]:
+    agent: UUID | Unset = UNSET,
+    attack: UUID | Unset = UNSET,
+    is_client_executed: bool | Unset = UNSET,
+    organization: UUID | Unset = UNSET,
+    page: int | Unset = UNSET,
+    page_size: int | Unset = UNSET,
+    status: StatusEnum | Unset = UNSET,
+) -> PaginatedRunList | None:
     """ViewSet for managing Run instances.
     Primarily for listing/retrieving runs.
     Creation of server-side runs is handled by custom actions.
@@ -262,13 +262,13 @@ async def asyncio(
     This is a core SDK operation for executing and monitoring security tests.
 
     Args:
-        agent (Union[Unset, UUID]):
-        attack (Union[Unset, UUID]):
-        is_client_executed (Union[Unset, bool]):
-        organization (Union[Unset, UUID]):
-        page (Union[Unset, int]):
-        page_size (Union[Unset, int]):
-        status (Union[Unset, RunListStatus]):
+        agent (UUID | Unset):
+        attack (UUID | Unset):
+        is_client_executed (bool | Unset):
+        organization (UUID | Unset):
+        page (int | Unset):
+        page_size (int | Unset):
+        status (StatusEnum | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

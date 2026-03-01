@@ -319,7 +319,7 @@ attack_config = {
 
 ## �� Next Steps
 
-1. **[AdvPrefix Attacks](../attacks/advprefix-attacks.md)** - Advanced attack techniques
+1. **[AdvPrefix Attacks](../attacks/advprefix.md)** - Advanced attack techniques
 2. **[Attack Tutorial](../getting-started/attack-tutorial.md)** - Getting started with attacks
 3. **[Security Guidelines](../security/responsible-disclosure.md)** - Responsible disclosure practices
 

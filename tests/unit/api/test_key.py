@@ -11,9 +11,9 @@ from dateutil.parser import isoparse
 
 from hackagent import errors
 from hackagent.api.key import key_create, key_destroy, key_list, key_retrieve
-from hackagent.models.paginated_user_api_key_list import PaginatedUserAPIKeyList
-from hackagent.models.user_api_key import UserAPIKey
-from hackagent.models.user_api_key_request import UserAPIKeyRequest
+from hackagent.api.models import PaginatedUserAPIKeyList
+from hackagent.api.models import UserAPIKey
+from hackagent.api.models import UserAPIKeyRequest
 
 
 class TestKeyListAPI(unittest.TestCase):
@@ -63,12 +63,14 @@ class TestKeyListAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_object = PaginatedUserAPIKeyList.from_dict(mock_response_content)
+        mock_parsed_object = PaginatedUserAPIKeyList.model_validate(
+            mock_response_content
+        )
 
         with patch(
-            "hackagent.api.key.key_list.PaginatedUserAPIKeyList.from_dict",
+            "hackagent.api.key.key_list.PaginatedUserAPIKeyList.model_validate",
             return_value=mock_parsed_object,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = key_list.sync_detailed(client=mock_client_instance, page=1)
 
             self.assertEqual(response.status_code, HTTPStatus.OK)
@@ -98,7 +100,7 @@ class TestKeyListAPI(unittest.TestCase):
             if expiry_date_str and retrieved_key.expiry_date:
                 self.assertEqual(retrieved_key.expiry_date, isoparse(expiry_date_str))
 
-            mock_from_dict.assert_called_once_with(mock_response_content)
+            mock_model_validate.assert_called_once_with(mock_response_content)
 
             expected_kwargs = {
                 "method": "get",
@@ -198,7 +200,7 @@ class TestKeyCreateAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        # For UserAPIKey.from_dict to work, it needs the 'key' field if present in src_dict.
+        # For UserAPIKey.model_validate to work, it needs the 'key' field if present in src_dict.
         # The UserAPIKey model itself doesn't list 'key' as a direct attribute in its __init__,
         # but from_dict might handle it if it's in the source dictionary.
         # Let's ensure our UserAPIKey model definition can handle this or adjust mock.
@@ -207,17 +209,17 @@ class TestKeyCreateAPI(unittest.TestCase):
 
         # We also need to add 'key' to the UserAPIKey model for from_dict to parse it correctly if it is there.
         # However, the provided UserAPIKey model doesn't have 'key' as an attribute.
-        # This is a potential inconsistency. For now, we assume UserAPIKey.from_dict
+        # This is a potential inconsistency. For now, we assume UserAPIKey.model_validate
         # will correctly parse it if it's in the dict, and it becomes an additional_property.
         # Alternatively, the server might return a different model for creation that includes the key.
         # Given the current models, the 'key' will likely go into additional_properties.
 
-        mock_parsed_key = UserAPIKey.from_dict(mock_response_content)
+        mock_parsed_key = UserAPIKey.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.key.key_create.UserAPIKey.from_dict",
+            "hackagent.api.key.key_create.UserAPIKey.model_validate",
             return_value=mock_parsed_key,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = key_create.sync_detailed(
                 client=mock_client_instance, body=key_request_data
             )
@@ -231,7 +233,7 @@ class TestKeyCreateAPI(unittest.TestCase):
             # Assert that the full key is part of the parsed object, likely via additional_properties
             # if UserAPIKey model doesn't explicitly define it.
             # We need to check how UserAPIKey is defined or how from_dict handles extra fields.
-            # Based on UserAPIKey.from_dict, it should store extra fields in additional_properties
+            # Based on UserAPIKey.model_validate, it should store extra fields in additional_properties
             self.assertIn("key", response.parsed.additional_properties)
             self.assertEqual(
                 response.parsed.additional_properties["key"], mock_full_key_value
@@ -248,12 +250,14 @@ class TestKeyCreateAPI(unittest.TestCase):
             )
             self.assertEqual(response.parsed.organization_detail.id, mock_org_id_create)
 
-            mock_from_dict.assert_called_once_with(mock_response_content)
+            mock_model_validate.assert_called_once_with(mock_response_content)
 
             expected_kwargs = {
                 "method": "post",
                 "url": "/key",
-                "json": key_request_data.to_dict(),
+                "json": key_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -350,12 +354,12 @@ class TestKeyRetrieveAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_key = UserAPIKey.from_dict(mock_response_content)
+        mock_parsed_key = UserAPIKey.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.key.key_retrieve.UserAPIKey.from_dict",
+            "hackagent.api.key.key_retrieve.UserAPIKey.model_validate",
             return_value=mock_parsed_key,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = key_retrieve.sync_detailed(
                 client=mock_client_instance, prefix=key_prefix_to_retrieve
             )
@@ -382,7 +386,7 @@ class TestKeyRetrieveAPI(unittest.TestCase):
                 response.parsed.organization_detail.id, mock_org_id_retrieve
             )
 
-            mock_from_dict.assert_called_once_with(mock_response_content)
+            mock_model_validate.assert_called_once_with(mock_response_content)
 
             expected_kwargs = {
                 "method": "get",

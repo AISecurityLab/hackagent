@@ -233,7 +233,7 @@ class EvaluatorConfig:
     """
 
     agent_name: str
-    agent_type: Any  # AgentTypeEnum from hackagent.models
+    agent_type: Any  # AgentTypeEnum from hackagent.api.models
     model_id: str
     agent_endpoint: Optional[str] = None
     organization_id: Optional[int] = None

@@ -38,7 +38,7 @@ def _make_orchestrator():
 class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
     """Test full execute flow including status updates."""
 
-    @patch("hackagent.attacks.orchestrator.run_update")
+    @patch("hackagent.attacks.orchestrator.run_status_update")
     @patch.object(AttackOrchestrator, "_create_server_run_record", return_value="run-1")
     @patch.object(
         AttackOrchestrator, "_create_server_attack_record", return_value="atk-1"
@@ -61,7 +61,7 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
         calls = mock_run_update.call_args_list
         self.assertTrue(len(calls) >= 1)
 
-    @patch("hackagent.attacks.orchestrator.run_update")
+    @patch("hackagent.attacks.orchestrator.run_status_update")
     @patch.object(AttackOrchestrator, "_create_server_run_record", return_value="run-1")
     @patch.object(
         AttackOrchestrator, "_create_server_attack_record", return_value="atk-1"
@@ -83,7 +83,7 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
         # Should have called run_update at least twice (RUNNING and COMPLETED)
         self.assertGreaterEqual(mock_run_update.call_count, 2)
 
-    @patch("hackagent.attacks.orchestrator.run_update")
+    @patch("hackagent.attacks.orchestrator.run_status_update")
     @patch.object(AttackOrchestrator, "_create_server_run_record", return_value="run-1")
     @patch.object(
         AttackOrchestrator, "_create_server_attack_record", return_value="atk-1"
@@ -109,7 +109,7 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
         self.assertTrue(mock_run_update.call_count >= 1)
 
     @patch(
-        "hackagent.attacks.orchestrator.run_update",
+        "hackagent.attacks.orchestrator.run_status_update",
         side_effect=Exception("Update failed"),
     )
     @patch.object(AttackOrchestrator, "_create_server_run_record", return_value="run-1")

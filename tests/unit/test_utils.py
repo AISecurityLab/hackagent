@@ -4,6 +4,7 @@
 """Tests for hackagent/utils.py — resolve_agent_type, resolve_api_token, display."""
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -64,6 +65,7 @@ class TestResolveApiToken(unittest.TestCase):
         result = resolve_api_token(direct_api_key_param="direct-key")
         self.assertEqual(result, "direct-key")
 
+    @patch.dict(os.environ, {"HACKAGENT_API_KEY": ""})
     def test_config_file_fallback(self):
         """Test config file is used when no direct parameter."""
         config = {"api_key": "config-key"}
@@ -76,6 +78,7 @@ class TestResolveApiToken(unittest.TestCase):
         finally:
             Path(path).unlink()
 
+    @patch.dict(os.environ, {"HACKAGENT_API_KEY": ""})
     def test_no_sources_raises_value_error(self):
         """Test ValueError when no token source available."""
         with self.assertRaises(ValueError) as ctx:

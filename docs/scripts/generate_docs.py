@@ -85,7 +85,6 @@ def create_pydoc_config(output_dir):
               - hackagent.agent
               - hackagent.client
               - hackagent.errors
-              - hackagent.models
               - hackagent.router
               - hackagent.router.types
               - hackagent.attacks

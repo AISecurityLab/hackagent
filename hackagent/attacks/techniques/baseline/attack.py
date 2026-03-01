@@ -23,10 +23,32 @@ from .config import DEFAULT_TEMPLATE_CONFIG
 
 class BaselineAttack(BaseAttack):
     """
-    Baseline attack using predefined prompt patterns.
+    Baseline attack using predefined prompt templates.
 
-    Combines templates with goals to generate jailbreak attempts,
-    then evaluates responses using objective-based criteria.
+    Combines a library of prompt templates across several jailbreak
+    categories with each goal string to produce attack prompts, sends
+    them to the target model, and evaluates responses using a
+    configurable evaluator (pattern-matching, keyword, or LLM judge).
+
+    Pipeline stages
+    ---------------
+    1. **Generation** (:func:`~hackagent.attacks.techniques.baseline.generation.execute`) —
+       selects up to ``templates_per_category`` templates from each
+       category in ``template_categories``, injects each goal, and
+       collects target-model responses.
+    2. **Evaluation** (:func:`~hackagent.attacks.techniques.baseline.evaluation.execute`) —
+       scores responses for jailbreak success using the configured
+       ``evaluator_type`` (``"pattern"``, ``"keyword"``, or ``"llm_judge"``).
+
+    This attack is useful as a **sanity-check baseline**: it requires no
+    additional LLM (unlike PAIR/TAP/AdvPrefix) and surfaces naive template
+    weaknesses in the target model.
+
+    Attributes:
+        config: Merged baseline configuration dictionary.
+        client: Authenticated HackAgent API client.
+        agent_router: Router for the victim model.
+        logger: Hierarchical logger at ``hackagent.attacks.baseline``.
     """
 
     def __init__(
@@ -39,9 +61,13 @@ class BaselineAttack(BaseAttack):
         Initialize baseline attack.
 
         Args:
-            config: Configuration dictionary
-            client: Authenticated client for API calls
-            agent_router: Target agent router
+            config: Configuration override dictionary merged into
+                :data:`~hackagent.attacks.techniques.baseline.config.DEFAULT_TEMPLATE_CONFIG`.
+            client: Authenticated HackAgent API client.
+            agent_router: Router for the victim model.
+
+        Raises:
+            ValueError: If ``client`` or ``agent_router`` is ``None``.
         """
         if client is None:
             raise ValueError("AuthenticatedClient must be provided")
@@ -60,7 +86,17 @@ class BaselineAttack(BaseAttack):
         super().__init__(current_config, client, agent_router)
 
     def _validate_config(self):
-        """Validate configuration."""
+        """
+        Validate baseline-specific configuration.
+
+        Checks presence of all required top-level keys and verifies that
+        the configured ``objective`` exists in the
+        :data:`~hackagent.attacks.objectives.OBJECTIVES` registry.
+
+        Raises:
+            ValueError: If any required key is missing or the ``objective``
+                is not a registered objective name.
+        """
         super()._validate_config()
 
         required_keys = [
@@ -85,7 +121,25 @@ class BaselineAttack(BaseAttack):
             )
 
     def _get_pipeline_steps(self) -> List[Dict]:
-        """Define attack pipeline."""
+        """
+        Define the two baseline pipeline stage descriptors.
+
+        Stage 1 — **Generation**
+            (:func:`~hackagent.attacks.techniques.baseline.generation.execute`):
+            Selects templates, injects goals, and collects target responses.
+            Configurable via ``template_categories``, ``templates_per_category``,
+            ``max_new_tokens``, ``temperature``, and ``n_samples_per_template``.
+
+        Stage 2 — **Evaluation**
+            (:func:`~hackagent.attacks.techniques.baseline.evaluation.execute`):
+            Scores responses for jailbreak success using the configured
+            ``evaluator_type``.  Short responses (``< min_response_length``
+            tokens) are skipped.
+
+        Returns:
+            List of pipeline-step configuration dicts compatible with
+            :meth:`~hackagent.attacks.techniques.base.BaseAttack._execute_pipeline`.
+        """
         return [
             {
                 "name": "Generation: Generate and Execute Baseline Prompts",

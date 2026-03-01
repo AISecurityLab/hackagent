@@ -1,33 +1,37 @@
-# Copyright 2026 - AI4I. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
-
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+from urllib.parse import quote
+
 import httpx
+
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.api_token_log import APITokenLog
 from ...types import Response
+from ..models import APITokenLog
 
 
 def _get_kwargs(
     id: int,
 ) -> dict[str, Any]:
+
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": f"/apilogs/{id}",
+        "url": "/apilogs/{id}".format(
+            id=quote(str(id), safe=""),
+        ),
     }
 
     return _kwargs
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[APITokenLog]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> APITokenLog | None:
     if response.status_code == 200:
-        response_200 = APITokenLog.from_dict(response.json())
+        response_200 = APITokenLog.model_validate(response.json())
 
         return response_200
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -35,7 +39,7 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+    *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[APITokenLog]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -81,7 +85,7 @@ def sync(
     id: int,
     *,
     client: AuthenticatedClient,
-) -> Optional[APITokenLog]:
+) -> APITokenLog | None:
     """Provides read-only access to APITokenLog entries for the user's organization.
 
     Web-only endpoint - requires Auth0 authentication.
@@ -138,7 +142,7 @@ async def asyncio(
     id: int,
     *,
     client: AuthenticatedClient,
-) -> Optional[APITokenLog]:
+) -> APITokenLog | None:
     """Provides read-only access to APITokenLog entries for the user's organization.
 
     Web-only endpoint - requires Auth0 authentication.
