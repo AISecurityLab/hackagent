@@ -22,12 +22,16 @@ def _get_kwargs(
 
     if isinstance(body, UserProfileRequest):
         if not isinstance(body, Unset):
-            _kwargs["json"] = body.model_dump(by_alias=True, mode="json", exclude_none=True)
+            _kwargs["json"] = body.model_dump(
+                by_alias=True, mode="json", exclude_none=True
+            )
 
         headers["Content-Type"] = "application/json"
     if isinstance(body, UserProfileRequest):
         if not isinstance(body, Unset):
-            _kwargs["data"] = body.model_dump(by_alias=True, mode="json", exclude_none=True)
+            _kwargs["data"] = body.model_dump(
+                by_alias=True, mode="json", exclude_none=True
+            )
 
         headers["Content-Type"] = "application/x-www-form-urlencoded"
 

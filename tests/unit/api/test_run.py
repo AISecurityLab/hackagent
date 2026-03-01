@@ -32,7 +32,6 @@ from hackagent.api.models import (
 from hackagent.api.models import Run
 from hackagent.api.models import StatusEnum  # For run_list filter
 from hackagent.api.models import RunRequest  # Added
-from hackagent.api.models import StatusEnum  # For Run status field
 from hackagent.types import UNSET
 
 
@@ -253,7 +252,8 @@ class TestRunCreateAPI(unittest.TestCase):
         mock_parsed_run = Run.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.run.run_create.Run.model_validate", return_value=mock_parsed_run
+            "hackagent.api.run.run_create.Run.model_validate",
+            return_value=mock_parsed_run,
         ) as mock_model_validate:
             response = run_create.sync_detailed(
                 client=mock_client_instance, body=run_request_data
@@ -272,7 +272,9 @@ class TestRunCreateAPI(unittest.TestCase):
             expected_kwargs = {
                 "method": "post",
                 "url": "/run",
-                "json": run_request_data.model_dump(by_alias=True, mode="json", exclude_none=True),
+                "json": run_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -394,7 +396,8 @@ class TestRunRetrieveAPI(unittest.TestCase):
         mock_parsed_run = Run.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.run.run_retrieve.Run.model_validate", return_value=mock_parsed_run
+            "hackagent.api.run.run_retrieve.Run.model_validate",
+            return_value=mock_parsed_run,
         ) as mock_model_validate:
             response = run_retrieve.sync_detailed(
                 client=mock_client_instance, id=run_id_to_retrieve
@@ -550,7 +553,8 @@ class TestRunUpdateAPI(unittest.TestCase):
         mock_parsed_run = Run.model_validate(mock_updated_run_response_content)
 
         with patch(
-            "hackagent.api.run.run_update.Run.model_validate", return_value=mock_parsed_run
+            "hackagent.api.run.run_update.Run.model_validate",
+            return_value=mock_parsed_run,
         ) as mock_model_validate:
             response = run_update.sync_detailed(
                 client=mock_client_instance,
@@ -573,12 +577,16 @@ class TestRunUpdateAPI(unittest.TestCase):
                 response.parsed.timestamp, isoparse(original_run_timestamp_str)
             )
 
-            mock_model_validate.assert_called_once_with(mock_updated_run_response_content)
+            mock_model_validate.assert_called_once_with(
+                mock_updated_run_response_content
+            )
 
             expected_kwargs = {
                 "method": "put",
                 "url": f"/run/{run_id_to_update}",
-                "json": run_update_request_data.model_dump(by_alias=True, mode="json", exclude_none=True),
+                "json": run_update_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -702,19 +710,29 @@ class TestRunPartialUpdateAPI(unittest.TestCase):
                 response.parsed.run_config, original_run_config_patch_resp
             )  # Verify unpatched field
 
-            mock_model_validate.assert_called_once_with(mock_patched_run_response_content)
+            mock_model_validate.assert_called_once_with(
+                mock_patched_run_response_content
+            )
 
             expected_kwargs = {
                 "method": "patch",
                 "url": f"/run/{run_id_to_patch}",
-                "json": run_patch_request_data.model_dump(by_alias=True, mode="json", exclude_none=True),
+                "json": run_patch_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
-            request_dict = run_patch_request_data.model_dump(by_alias=True, mode="json", exclude_none=True)
+            request_dict = run_patch_request_data.model_dump(
+                by_alias=True, mode="json", exclude_none=True
+            )
             self.assertIn("status", request_dict)
             self.assertIn("run_notes", request_dict)
-            self.assertIsNone(request_dict.get("run_config"))  # Unset optional fields serialize as None
-            self.assertIsNone(request_dict.get("agent"))  # Unset optional fields serialize as None
+            self.assertIsNone(
+                request_dict.get("run_config")
+            )  # Unset optional fields serialize as None
+            self.assertIsNone(
+                request_dict.get("agent")
+            )  # Unset optional fields serialize as None
 
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
@@ -914,7 +932,9 @@ class TestRunResultCreateAPI(unittest.TestCase):
         mock_httpx_client.request.return_value = mock_httpx_response
 
         # The run_result_create API returns a Result model instance
-        mock_parsed_result_object = Result.model_validate(mock_response_content_for_result)
+        mock_parsed_result_object = Result.model_validate(
+            mock_response_content_for_result
+        )
         # Ensure raise_on_unexpected_status is True for this success test if not default
         mock_client_instance.raise_on_unexpected_status = True
 
@@ -943,12 +963,16 @@ class TestRunResultCreateAPI(unittest.TestCase):
                 response.parsed.evaluation_status, result_create_body.evaluation_status
             )
 
-            mock_model_validate.assert_called_once_with(mock_response_content_for_result)
+            mock_model_validate.assert_called_once_with(
+                mock_response_content_for_result
+            )
 
             expected_kwargs = {
                 "method": "post",
                 "url": f"/run/{parent_run_id}/result",
-                "json": result_create_body.model_dump(by_alias=True, mode="json", exclude_none=True),
+                "json": result_create_body.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -1053,7 +1077,9 @@ class TestRunRunTestsCreateAPI(unittest.TestCase):
         expected_kwargs = {
             "method": "post",
             "url": "/run/run_tests",  # Matches _get_kwargs in the client file
-            "json": run_tests_request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
+            "json": run_tests_request_body.model_dump(
+                by_alias=True, mode="json", exclude_none=True
+            ),
             "headers": {"Content-Type": "application/json"},
         }
         mock_httpx_client.request.assert_called_once_with(**expected_kwargs)

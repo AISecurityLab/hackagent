@@ -344,11 +344,7 @@ class AttackOrchestrator:
         goals = attack_params.get("goals")
         goal_batch_size = attack_config.get("goal_batch_size")
 
-        if (
-            goal_batch_size
-            and isinstance(goals, list)
-            and len(goals) > goal_batch_size
-        ):
+        if goal_batch_size and isinstance(goals, list) and len(goals) > goal_batch_size:
             batches = [
                 goals[i : i + goal_batch_size]
                 for i in range(0, len(goals), goal_batch_size)

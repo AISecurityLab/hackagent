@@ -213,7 +213,9 @@ class TestAttackCreateAPI(unittest.TestCase):
             expected_kwargs = {
                 "method": "post",
                 "url": "/attack",
-                "json": attack_request_data.model_dump(by_alias=True, mode="json", exclude_none=True),
+                "json": attack_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -443,12 +445,16 @@ class TestAttackUpdateAPI(unittest.TestCase):
                 response.parsed.updated_at,
                 datetime.datetime.fromisoformat(updated_at_str.replace("Z", "+00:00")),
             )
-            mock_model_validate.assert_called_once_with(mock_updated_attack_response_content)
+            mock_model_validate.assert_called_once_with(
+                mock_updated_attack_response_content
+            )
 
             expected_kwargs = {
                 "method": "put",
                 "url": f"/attack/{attack_id_to_update}",
-                "json": attack_update_request_data.model_dump(by_alias=True, mode="json", exclude_none=True),
+                "json": attack_update_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -578,12 +584,16 @@ class TestAttackPartialUpdateAPI(unittest.TestCase):
                 response.parsed.updated_at,
                 datetime.datetime.fromisoformat(updated_at_str.replace("Z", "+00:00")),
             )
-            mock_model_validate.assert_called_once_with(mock_patched_attack_response_content)
+            mock_model_validate.assert_called_once_with(
+                mock_patched_attack_response_content
+            )
 
             expected_kwargs = {
                 "method": "patch",
                 "url": f"/attack/{attack_id_to_patch}",
-                "json": attack_patch_request_data.model_dump(by_alias=True, mode="json", exclude_none=True),
+                "json": attack_patch_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)

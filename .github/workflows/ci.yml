@@ -86,9 +86,6 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
 
-      - name: Generate API code
-        run: uv run python hackagent/api/scripts/generate.py
-
       - name: Run tests with coverage
         run: uv run pytest --cov --cov-report=xml:reports/coverage.xml -m "not google_adk"
 
@@ -121,9 +118,6 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --group dev
-
-      - name: Generate API code
-        run: uv run python hackagent/api/scripts/generate.py
 
       - name: Run tests with coverage
         run: uv run pytest --cov --cov-report=xml:reports/coverage.xml -m "not google_adk"
@@ -181,9 +175,6 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --group dev
-
-      - name: Generate API code
-        run: uv run python hackagent/api/scripts/generate.py
 
       - name: Run integration tests with coverage
         # Note: --cov-fail-under=0 disables the threshold since integration tests

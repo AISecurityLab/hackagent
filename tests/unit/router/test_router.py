@@ -261,7 +261,9 @@ class TestAgentRouterInitialization(unittest.TestCase):
         self.assertEqual(router.backend_agent, updated_backend_agent_mock)
         self.assertEqual(router.backend_agent.id, existing_agent_id)
         self.assertEqual(router.backend_agent.metadata, new_metadata_from_router_init)
-        self.assertEqual(str(router.backend_agent.endpoint), agent_endpoint_from_router_init)
+        self.assertEqual(
+            str(router.backend_agent.endpoint), agent_endpoint_from_router_init
+        )
 
         expected_registry_key = str(existing_agent_id)
         self.assertIn(expected_registry_key, router._agent_registry)
@@ -749,8 +751,12 @@ class TestAnyUrlEndpointConversion(unittest.TestCase):
         mock_initial.owner = mock_user_id
         mock_initial.name = "seed_agent"
         return [
-            MagicMock(status_code=200, parsed=MagicMock(results=[mock_initial], next=None)),
-            MagicMock(status_code=200, parsed=MagicMock(results=[mock_initial], next=None)),
+            MagicMock(
+                status_code=200, parsed=MagicMock(results=[mock_initial], next=None)
+            ),
+            MagicMock(
+                status_code=200, parsed=MagicMock(results=[mock_initial], next=None)
+            ),
             MagicMock(status_code=200, parsed=MagicMock(results=[], next=None)),
         ]
 
@@ -796,7 +802,7 @@ class TestAnyUrlEndpointConversion(unittest.TestCase):
         mock_create_response.parsed = mock_backend_agent
         mock_agent_create.sync_detailed.return_value = mock_create_response
 
-        router = AgentRouter(
+        _ = AgentRouter(
             client=mock_client,
             name="TestADKAgent",
             agent_type=AgentTypeEnum.GOOGLE_ADK,
@@ -808,8 +814,11 @@ class TestAnyUrlEndpointConversion(unittest.TestCase):
         MockADKAdapter.assert_called_once()
         adapter_config = MockADKAdapter.call_args[1]["config"]
         endpoint_value = adapter_config["endpoint"]
-        self.assertIsInstance(endpoint_value, str,
-            "endpoint passed to ADKAgent must be a plain str, not AnyUrl")
+        self.assertIsInstance(
+            endpoint_value,
+            str,
+            "endpoint passed to ADKAgent must be a plain str, not AnyUrl",
+        )
         self.assertEqual(endpoint_value, "http://adk-endpoint.com/")
 
     @patch("hackagent.router.router.agent_list")
@@ -853,7 +862,7 @@ class TestAnyUrlEndpointConversion(unittest.TestCase):
         mock_create_response.parsed = mock_backend_agent
         mock_agent_create.sync_detailed.return_value = mock_create_response
 
-        router = AgentRouter(
+        _ = AgentRouter(
             client=mock_client,
             name="TestLiteLLMAgent",
             agent_type=AgentTypeEnum.LITELLM,
@@ -864,8 +873,11 @@ class TestAnyUrlEndpointConversion(unittest.TestCase):
         MockLiteLLMAdapter.assert_called_once()
         adapter_config = MockLiteLLMAdapter.call_args[1]["config"]
         endpoint_value = adapter_config["endpoint"]
-        self.assertIsInstance(endpoint_value, str,
-            "endpoint passed to LiteLLMAgent must be a plain str, not AnyUrl")
+        self.assertIsInstance(
+            endpoint_value,
+            str,
+            "endpoint passed to LiteLLMAgent must be a plain str, not AnyUrl",
+        )
         self.assertEqual(endpoint_value, "http://litellm-endpoint.com/")
 
     @patch("hackagent.router.router.agent_list")
@@ -909,7 +921,7 @@ class TestAnyUrlEndpointConversion(unittest.TestCase):
         mock_create_response.parsed = mock_backend_agent
         mock_agent_create.sync_detailed.return_value = mock_create_response
 
-        router = AgentRouter(
+        _ = AgentRouter(
             client=mock_client,
             name="TestOpenAIAgent",
             agent_type=AgentTypeEnum.OPENAI_SDK,
@@ -920,8 +932,11 @@ class TestAnyUrlEndpointConversion(unittest.TestCase):
         MockOpenAIAdapter.assert_called_once()
         adapter_config = MockOpenAIAdapter.call_args[1]["config"]
         endpoint_value = adapter_config["endpoint"]
-        self.assertIsInstance(endpoint_value, str,
-            "endpoint passed to OpenAIAgent must be a plain str, not AnyUrl")
+        self.assertIsInstance(
+            endpoint_value,
+            str,
+            "endpoint passed to OpenAIAgent must be a plain str, not AnyUrl",
+        )
         self.assertEqual(endpoint_value, "http://openai-endpoint.com/v1/")
 
     @patch("hackagent.router.router.agent_list")
@@ -965,7 +980,7 @@ class TestAnyUrlEndpointConversion(unittest.TestCase):
         mock_create_response.parsed = mock_backend_agent
         mock_agent_create.sync_detailed.return_value = mock_create_response
 
-        router = AgentRouter(
+        _ = AgentRouter(
             client=mock_client,
             name="TestOllamaAgent",
             agent_type=AgentTypeEnum.OLLAMA,
@@ -976,8 +991,11 @@ class TestAnyUrlEndpointConversion(unittest.TestCase):
         MockOllamaAdapter.assert_called_once()
         adapter_config = MockOllamaAdapter.call_args[1]["config"]
         endpoint_value = adapter_config["endpoint"]
-        self.assertIsInstance(endpoint_value, str,
-            "endpoint passed to OllamaAgent must be a plain str, not AnyUrl")
+        self.assertIsInstance(
+            endpoint_value,
+            str,
+            "endpoint passed to OllamaAgent must be a plain str, not AnyUrl",
+        )
         self.assertEqual(endpoint_value, "http://ollama-endpoint.com/")
 
 
@@ -994,8 +1012,12 @@ class TestMetadataNoneStripping(unittest.TestCase):
         mock_initial.owner = mock_user_id
         mock_initial.name = "seed_agent"
         return [
-            MagicMock(status_code=200, parsed=MagicMock(results=[mock_initial], next=None)),
-            MagicMock(status_code=200, parsed=MagicMock(results=[mock_initial], next=None)),
+            MagicMock(
+                status_code=200, parsed=MagicMock(results=[mock_initial], next=None)
+            ),
+            MagicMock(
+                status_code=200, parsed=MagicMock(results=[mock_initial], next=None)
+            ),
             MagicMock(status_code=200, parsed=MagicMock(results=[], next=None)),
         ]
 
@@ -1030,7 +1052,10 @@ class TestMetadataNoneStripping(unittest.TestCase):
         mock_backend_agent.name = "llama2-uncensored"
         mock_backend_agent.agent_type = AgentTypeEnum.OLLAMA
         mock_backend_agent.endpoint = "http://localhost:11434"
-        mock_backend_agent.metadata = {"name": "llama2-uncensored", "endpoint": "http://localhost:11434"}
+        mock_backend_agent.metadata = {
+            "name": "llama2-uncensored",
+            "endpoint": "http://localhost:11434",
+        }
         mock_backend_agent.organization = mock_org_id
 
         mock_create_response = MagicMock()
@@ -1048,7 +1073,7 @@ class TestMetadataNoneStripping(unittest.TestCase):
             "top_p": None,
         }
 
-        router = AgentRouter(
+        _ = AgentRouter(
             client=mock_client,
             name="llama2-uncensored",
             agent_type=AgentTypeEnum.OLLAMA,
@@ -1064,6 +1089,7 @@ class TestMetadataNoneStripping(unittest.TestCase):
 
         # Serialize the body the same way the API layer does
         from hackagent.api.models import AgentRequest
+
         self.assertIsInstance(body, AgentRequest)
         payload = body.model_dump(by_alias=True, mode="json", exclude_none=True)
 
@@ -1071,8 +1097,9 @@ class TestMetadataNoneStripping(unittest.TestCase):
         sent_metadata = payload.get("metadata", {})
         null_keys = [k for k, v in sent_metadata.items() if v is None]
         self.assertEqual(
-            null_keys, [],
-            f"metadata in HTTP payload must have no null values; found nulls for: {null_keys}"
+            null_keys,
+            [],
+            f"metadata in HTTP payload must have no null values; found nulls for: {null_keys}",
         )
 
         # Only keys with real values should be present
@@ -1118,8 +1145,12 @@ class TestMetadataNoneStripping(unittest.TestCase):
         mock_initial.owner = 1
         mock_initial.name = "seed_agent"
         mock_agent_list.sync_detailed.side_effect = [
-            MagicMock(status_code=200, parsed=MagicMock(results=[mock_initial], next=None)),
-            MagicMock(status_code=200, parsed=MagicMock(results=[mock_initial], next=None)),
+            MagicMock(
+                status_code=200, parsed=MagicMock(results=[mock_initial], next=None)
+            ),
+            MagicMock(
+                status_code=200, parsed=MagicMock(results=[mock_initial], next=None)
+            ),
             MagicMock(
                 status_code=200,
                 parsed=MagicMock(results=[mock_existing_agent], next=None),
@@ -1146,7 +1177,7 @@ class TestMetadataNoneStripping(unittest.TestCase):
             "temperature": None,
         }
 
-        router = AgentRouter(
+        _ = AgentRouter(
             client=mock_client,
             name="llama2-uncensored",
             agent_type=AgentTypeEnum.OLLAMA,
@@ -1161,6 +1192,7 @@ class TestMetadataNoneStripping(unittest.TestCase):
         body = patch_kwargs["body"]
 
         from hackagent.api.models import PatchedAgentRequest
+
         self.assertIsInstance(body, PatchedAgentRequest)
         payload = body.model_dump(by_alias=True, mode="json", exclude_none=True)
 
@@ -1168,8 +1200,9 @@ class TestMetadataNoneStripping(unittest.TestCase):
             sent_metadata = payload["metadata"]
             null_keys = [k for k, v in sent_metadata.items() if v is None]
             self.assertEqual(
-                null_keys, [],
-                f"metadata in PATCH payload must have no null values; found nulls for: {null_keys}"
+                null_keys,
+                [],
+                f"metadata in PATCH payload must have no null values; found nulls for: {null_keys}",
             )
             self.assertNotIn("api_key", sent_metadata)
             self.assertNotIn("temperature", sent_metadata)
@@ -1220,9 +1253,13 @@ class TestAgentPagination(unittest.TestCase):
 
         mock_agent_list.sync_detailed.side_effect = [
             # _fetch_organization_id
-            MagicMock(status_code=200, parsed=MagicMock(results=[org_agent], next=None)),
+            MagicMock(
+                status_code=200, parsed=MagicMock(results=[org_agent], next=None)
+            ),
             # _fetch_user_id_str
-            MagicMock(status_code=200, parsed=MagicMock(results=[org_agent], next=None)),
+            MagicMock(
+                status_code=200, parsed=MagicMock(results=[org_agent], next=None)
+            ),
             # _find_existing_agent page 1: other agent, next points to page 2
             MagicMock(
                 status_code=200,

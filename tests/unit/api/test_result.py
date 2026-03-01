@@ -272,7 +272,9 @@ class TestResultCreateAPI(unittest.TestCase):
             expected_kwargs = {
                 "method": "post",
                 "url": "/result",
-                "json": result_request_data.model_dump(by_alias=True, mode="json", exclude_none=True),
+                "json": result_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -541,12 +543,16 @@ class TestResultUpdateAPI(unittest.TestCase):
                 response.parsed.timestamp, isoparse(original_timestamp_str)
             )
 
-            mock_model_validate.assert_called_once_with(mock_updated_result_response_content)
+            mock_model_validate.assert_called_once_with(
+                mock_updated_result_response_content
+            )
 
             expected_kwargs = {
                 "method": "put",
                 "url": f"/result/{result_id_to_update}",
-                "json": result_update_request_data.model_dump(by_alias=True, mode="json", exclude_none=True),
+                "json": result_update_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -696,19 +702,27 @@ class TestResultPartialUpdateAPI(unittest.TestCase):
                 response.parsed.response_body, "Original agent response before patch."
             )  # Verify unpatched field
 
-            mock_model_validate.assert_called_once_with(mock_patched_result_response_content)
+            mock_model_validate.assert_called_once_with(
+                mock_patched_result_response_content
+            )
 
             expected_kwargs = {
                 "method": "patch",
                 "url": f"/result/{result_id_to_patch}",
-                "json": result_patch_request_data.model_dump(by_alias=True, mode="json", exclude_none=True),
+                "json": result_patch_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
-            request_dict = result_patch_request_data.model_dump(by_alias=True, mode="json", exclude_none=True)
+            request_dict = result_patch_request_data.model_dump(
+                by_alias=True, mode="json", exclude_none=True
+            )
             self.assertIn("evaluation_status", request_dict)
             self.assertIn("evaluation_notes", request_dict)
             self.assertIn("evaluation_metrics", request_dict)
-            self.assertIsNone(request_dict.get("response_body"))  # Unset optional fields serialize as None
+            self.assertIsNone(
+                request_dict.get("response_body")
+            )  # Unset optional fields serialize as None
 
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
@@ -905,7 +919,9 @@ class TestResultTraceCreateAPI(unittest.TestCase):
             expected_kwargs = {
                 "method": "post",
                 "url": f"/result/{result_id_for_trace}/trace",
-                "json": trace_request_data.model_dump(by_alias=True, mode="json", exclude_none=True),
+                "json": trace_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)

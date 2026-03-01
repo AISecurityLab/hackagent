@@ -28,7 +28,6 @@ from hackagent.api.models import PaginatedAgentList
 from hackagent.api.models import (
     PatchedAgentRequest,
 )  # For agent_partial_update
-from hackagent.types import UNSET  # Alias to avoid conflict, import UNSET
 
 
 class TestAgentListAPI(unittest.TestCase):
@@ -200,7 +199,9 @@ class TestAgentCreateAPI(unittest.TestCase):
             expected_kwargs = {
                 "method": "post",
                 "url": "/agent",
-                "json": agent_request_data.model_dump(by_alias=True, mode="json", exclude_none=True),
+                "json": agent_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -428,12 +429,16 @@ class TestAgentUpdateAPI(unittest.TestCase):
             self.assertEqual(
                 response.parsed.description, agent_update_request_data.description
             )
-            mock_model_validate.assert_called_once_with(mock_updated_agent_response_content)
+            mock_model_validate.assert_called_once_with(
+                mock_updated_agent_response_content
+            )
 
             expected_kwargs = {
                 "method": "put",
                 "url": f"/agent/{agent_id_to_update}",
-                "json": agent_update_request_data.model_dump(by_alias=True, mode="json", exclude_none=True),
+                "json": agent_update_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -633,12 +638,16 @@ class TestAgentPartialUpdateAPI(unittest.TestCase):
             self.assertEqual(
                 response.parsed.description, agent_patch_request_data.description
             )
-            mock_model_validate.assert_called_once_with(mock_patched_agent_response_content)
+            mock_model_validate.assert_called_once_with(
+                mock_patched_agent_response_content
+            )
 
             expected_kwargs = {
                 "method": "patch",
                 "url": f"/agent/{agent_id_to_patch}",
-                "json": agent_patch_request_data.model_dump(by_alias=True, mode="json", exclude_none=True),
+                "json": agent_patch_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -681,7 +690,9 @@ class TestAgentPartialUpdateAPI(unittest.TestCase):
         mock_client_instance.raise_on_unexpected_status = False
 
         agent_id_error = uuid.uuid4()
-        agent_patch_request_data = PatchedAgentRequest(endpoint="http://invalid.example.com/url/for/patch")
+        agent_patch_request_data = PatchedAgentRequest(
+            endpoint="http://invalid.example.com/url/for/patch"
+        )
 
         mock_httpx_response = MagicMock()
         mock_httpx_response.status_code = 400  # Bad Request for example

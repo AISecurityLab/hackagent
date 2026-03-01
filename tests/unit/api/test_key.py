@@ -63,7 +63,9 @@ class TestKeyListAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_object = PaginatedUserAPIKeyList.model_validate(mock_response_content)
+        mock_parsed_object = PaginatedUserAPIKeyList.model_validate(
+            mock_response_content
+        )
 
         with patch(
             "hackagent.api.key.key_list.PaginatedUserAPIKeyList.model_validate",
@@ -253,7 +255,9 @@ class TestKeyCreateAPI(unittest.TestCase):
             expected_kwargs = {
                 "method": "post",
                 "url": "/key",
-                "json": key_request_data.model_dump(by_alias=True, mode="json", exclude_none=True),
+                "json": key_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)

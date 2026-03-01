@@ -29,6 +29,10 @@ import tempfile
 import urllib.request
 from pathlib import Path
 
+# Ensure UTF-8 output on Windows terminals (cp1252 can't encode →, ✓, etc.)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[2]
 API_DIR = REPO_ROOT / "hackagent" / "api"
@@ -80,7 +84,15 @@ def step1_models(schema: Path) -> None:
 
     try:
         subprocess.run(
-            ["uv", "run", "datamodel-codegen", "--input", str(schema), "--output", str(raw_models)],
+            [
+                "uv",
+                "run",
+                "datamodel-codegen",
+                "--input",
+                str(schema),
+                "--output",
+                str(raw_models),
+            ],
             check=True,
         )
 
@@ -99,10 +111,16 @@ def step2_client(schema: Path, opc_tmp: Path) -> None:
     gen_out = opc_tmp / "gen"
     subprocess.run(
         [
-            "uv", "run", "openapi-python-client", "generate",
-            "--path", str(schema),
-            "--config", str(OPC_CONFIG),
-            "--output-path", str(gen_out),
+            "uv",
+            "run",
+            "openapi-python-client",
+            "generate",
+            "--path",
+            str(schema),
+            "--config",
+            str(OPC_CONFIG),
+            "--output-path",
+            str(gen_out),
             "--overwrite",
         ],
         check=True,
@@ -112,7 +130,10 @@ def step2_client(schema: Path, opc_tmp: Path) -> None:
     candidates = list(gen_out.glob("*/api"))
     candidates = [c for c in candidates if c.is_dir()]
     if not candidates:
-        print(f"ERROR: could not find generated api/ directory in {gen_out}", file=sys.stderr)
+        print(
+            f"ERROR: could not find generated api/ directory in {gen_out}",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     gen_api = candidates[0]
@@ -155,7 +176,16 @@ def step3_rewrite_imports() -> None:
     ruff_args_base = ["uv", "run", "ruff"]
     exclude = str(API_DIR / "scripts")
     subprocess.run(
-        [*ruff_args_base, "check", "--select", "I", "--fix", str(API_DIR), "--exclude", exclude],
+        [
+            *ruff_args_base,
+            "check",
+            "--select",
+            "I",
+            "--fix",
+            str(API_DIR),
+            "--exclude",
+            exclude,
+        ],
         check=False,
     )
     subprocess.run(

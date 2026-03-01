@@ -1002,7 +1002,9 @@ def test_update_sync_success(
     organization_request_body: OrganizationRequest,
     full_updated_organization_response_data: dict,
 ):
-    mock_organization = Organization.model_validate(full_updated_organization_response_data)
+    mock_organization = Organization.model_validate(
+        full_updated_organization_response_data
+    )
     mock_detailed_response = MagicMock()
     mock_detailed_response.parsed = mock_organization
 
@@ -1061,7 +1063,9 @@ async def test_update_asyncio_success(
     organization_request_body: OrganizationRequest,
     full_updated_organization_response_data: dict,
 ):
-    mock_organization = Organization.model_validate(full_updated_organization_response_data)
+    mock_organization = Organization.model_validate(
+        full_updated_organization_response_data
+    )
     mock_detailed_response = MagicMock()
     mock_detailed_response.parsed = mock_organization
 

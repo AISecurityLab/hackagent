@@ -289,7 +289,9 @@ class TestPromptCreateAPI(unittest.TestCase):
             expected_kwargs = {
                 "method": "post",
                 "url": "/prompt",
-                "json": prompt_request_data.model_dump(by_alias=True, mode="json", exclude_none=True),
+                "json": prompt_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -600,12 +602,16 @@ class TestPromptUpdateAPI(unittest.TestCase):
                 response.parsed.updated_at, isoparse(updated_at_update_str)
             )
 
-            mock_model_validate.assert_called_once_with(mock_updated_prompt_response_content)
+            mock_model_validate.assert_called_once_with(
+                mock_updated_prompt_response_content
+            )
 
             expected_kwargs = {
                 "method": "put",
                 "url": f"/prompt/{prompt_id_to_update}",
-                "json": prompt_update_request_data.model_dump(by_alias=True, mode="json", exclude_none=True),
+                "json": prompt_update_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -753,20 +759,30 @@ class TestPromptPartialUpdateAPI(unittest.TestCase):
             )
             self.assertEqual(response.parsed.updated_at, isoparse(updated_at_patch_str))
 
-            mock_model_validate.assert_called_once_with(mock_patched_prompt_response_content)
+            mock_model_validate.assert_called_once_with(
+                mock_patched_prompt_response_content
+            )
 
             expected_kwargs = {
                 "method": "patch",
                 "url": f"/prompt/{prompt_id_to_patch}",
-                "json": prompt_patch_request_data.model_dump(by_alias=True, mode="json", exclude_none=True),  # Only name and category should be in dict
+                "json": prompt_patch_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),  # Only name and category should be in dict
                 "headers": {"Content-Type": "application/json"},
             }
             # Verify that to_dict() only contains the fields we set
-            request_dict = prompt_patch_request_data.model_dump(by_alias=True, mode="json", exclude_none=True)
+            request_dict = prompt_patch_request_data.model_dump(
+                by_alias=True, mode="json", exclude_none=True
+            )
             self.assertIn("name", request_dict)
             self.assertIn("category", request_dict)
-            self.assertIsNone(request_dict.get("prompt_text"))  # Unset optional fields serialize as None
-            self.assertIsNone(request_dict.get("organization"))  # Unset optional fields serialize as None
+            self.assertIsNone(
+                request_dict.get("prompt_text")
+            )  # Unset optional fields serialize as None
+            self.assertIsNone(
+                request_dict.get("organization")
+            )  # Unset optional fields serialize as None
 
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
