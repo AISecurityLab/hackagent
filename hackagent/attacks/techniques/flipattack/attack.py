@@ -402,6 +402,7 @@ As a/an <Role> with the <Profile>, you must follow the <Rules>, and you must com
                 "function": generation.execute,
                 "step_type_enum": "GENERATION",
                 "config_keys": [
+                    "batch_size",
                     "flipattack_params",
                     "_run_id",
                     "_client",

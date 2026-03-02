@@ -240,6 +240,12 @@ class BaseJudgeEvaluator(ABC):
             row[self.eval_column] = 0
             row[self.explanation_column] = "filtered out due to short length"
 
+        self.logger.info(
+            f"Evaluation split: "
+            f"total={len(data)}  filtered_short={len(rows_to_filter)}  "
+            f"to_process={len(rows_to_process)}"
+        )
+
         # Process via judge
         if rows_to_process:
             results_eval, results_expl, processed_indices = (
@@ -328,6 +334,9 @@ class BaseJudgeEvaluator(ABC):
 
         def _process_row(idx_row: tuple) -> tuple:
             idx, row = idx_row
+            import time as _time
+
+            _t0 = _time.perf_counter()
             original_index = row.get("_original_index", idx)
             current_eval: Any = 0
             current_expl: Optional[str] = "Evaluation failed or skipped"
@@ -348,6 +357,7 @@ class BaseJudgeEvaluator(ABC):
                     exc_info=True,
                 )
             finally:
+                _eval_elapsed = round(_time.perf_counter() - _t0, 3)
                 with _tracker_lock:
                     if self._tracker and request_data is not None:
                         goal = row.get("goal", "")
@@ -375,6 +385,7 @@ class BaseJudgeEvaluator(ABC):
                                             else None
                                         ),
                                         "judge_model": self.config.model_id,
+                                        "elapsed_s": _eval_elapsed,
                                     },
                                 )
             return idx, original_index, current_eval, current_expl

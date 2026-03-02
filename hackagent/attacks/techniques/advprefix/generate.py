@@ -16,6 +16,7 @@ import logging
 import os
 import re
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -780,41 +781,43 @@ class PrefixGenerationPipeline:
             self.logger.warning("No agent_router available for CE computation")
             return prefixes
 
-        results = []
         victim_key = str(self.agent_router.backend_agent.id)
+        batch_size = max(1, int(getattr(self.config, "batch_size", 1) or 1))
+        effective_workers = min(batch_size, len(prefixes)) if prefixes else 1
 
         progress_desc = (
             f"[blue]Computing CE via {self.agent_router.backend_agent.agent_type}..."
         )
+        self.logger.info(
+            f"CE parallel workers: {effective_workers} (configured batch_size={batch_size}, prefixes={len(prefixes)})"
+        )
 
-        with create_progress_bar(progress_desc, total=len(prefixes)) as (pbar, task):
-            for record in prefixes:
-                prefix_text = record.get("prefix", "")
+        results_map: Dict[int, Dict] = {}
+        _ce_t0 = time.perf_counter()
 
-                # Initialize result with default values
-                result = record.copy()
-                result["prefix_nll"] = float("inf")
+        def _compute_one(index_record: Tuple[int, Dict]) -> Tuple[int, Dict]:
+            index, record = index_record
+            prefix_text = record.get("prefix", "")
+            _row_t0 = time.perf_counter()
 
-                # Skip invalid prefixes
-                if (
-                    not prefix_text
-                    or not isinstance(prefix_text, str)
-                    or prefix_text.isspace()
-                ):
-                    result["error_message"] = "Empty or invalid prefix"
-                    results.append(result)
-                    pbar.update(task, advance=1)
-                    continue
+            result = record.copy()
+            result["prefix_nll"] = float("inf")
 
-                # Always use route_request (no auto result creation)
-                # Tracker handles per-goal result tracking instead
+            if (
+                not prefix_text
+                or not isinstance(prefix_text, str)
+                or prefix_text.isspace()
+            ):
+                result["error_message"] = "Empty or invalid prefix"
+                result["ce_elapsed_s"] = round(time.perf_counter() - _row_t0, 3)
+                return index, result
+            try:
                 request_data = {"prompt": prefix_text}
                 response = self.agent_router.route_request(
                     registration_key=victim_key,
                     request_data=request_data,
                 )
 
-                # Evaluate response
                 generated_text = response.get("generated_text")
                 error_message = response.get("error_message")
 
@@ -828,7 +831,6 @@ class PrefixGenerationPipeline:
                     result["prefix_nll"] = 0.0
                     result["error_message"] = None
 
-                # Store response metadata
                 result["request_payload"] = response.get("raw_request") or {
                     "prompt": prefix_text
                 }
@@ -839,14 +841,35 @@ class PrefixGenerationPipeline:
                 agent_specific = response.get("agent_specific_data", {})
                 if agent_specific:
                     result["events_list"] = agent_specific.get("events_list")
+            except Exception as e:
+                result["prefix_nll"] = float("inf")
+                result["error_message"] = (
+                    f"CE worker exception: {type(e).__name__}: {e}"
+                )
+                self.logger.error(
+                    f"CE exception for prefix index {index}: {e}",
+                    exc_info=e,
+                )
 
-                results.append(result)
-                pbar.update(task, advance=1)
+            result["ce_elapsed_s"] = round(time.perf_counter() - _row_t0, 3)
+
+            return index, result
+
+        with create_progress_bar(progress_desc, total=len(prefixes)) as (pbar, task):
+            with ThreadPoolExecutor(max_workers=batch_size) as pool:
+                for index, result in pool.map(_compute_one, enumerate(prefixes)):
+                    results_map[index] = result
+                    pbar.update(task, advance=1)
+
+        results = [results_map[i] for i in range(len(prefixes))]
 
         # Log statistics
         accepted = sum(1 for r in results if r.get("prefix_nll") == 0.0)
+        ce_elapsed = round(time.perf_counter() - _ce_t0, 3)
+        ce_avg = ce_elapsed / len(results) if results else 0.0
         self.logger.info(
-            f"CE computation: {accepted}/{len(results)} prefixes accepted by target agent"
+            f"CE computation: {accepted}/{len(results)} prefixes accepted by target agent, "
+            f"elapsed={ce_elapsed:.1f}s (avg={ce_avg:.2f}s/item)"
         )
 
         return results

@@ -154,6 +154,11 @@ advanced_config = {
     # Dataset (optional alternative to explicit goals)
     "dataset": None,   # e.g., "advbench", "advbench_subset"
 
+    # Batching / parallelization
+    "batch_size": 4,           # Concurrent requests to target model
+    "goal_batch_size": 20,     # Goals per macro-batch (omit to disable)
+    "batch_size_judge": 2,     # Concurrent judge evaluations
+
     # Judge configuration
     "judges": [
         {
@@ -184,9 +189,95 @@ advanced_config = {
 | `flipattack_params.cot` | Append chain-of-thought suffix | `False` |
 | `flipattack_params.lang_gpt` | Use LangGPT Role/Profile template | `False` |
 | `flipattack_params.few_shot` | Inject two decoding demonstrations | `False` |
+| `batch_size` | Concurrent generation requests to target model (see [Batching](#parallelization--batching)) | `16` |
+| `goal_batch_size` | Max goals per macro-batch (see [Batching](#parallelization--batching)) | *disabled* |
+| `batch_size_judge` | Concurrent judge evaluation requests (see [Batching](#parallelization--batching)) | `1` |
 | `filter_len` | Minimum response length (chars) to be considered non-trivial | `10` |
 | `judge_temperature` | Sampling temperature for judge model | `0.0` |
 | `max_judge_retries` | Maximum judge retry attempts | `1` |
+
+---
+
+## Parallelization & Batching
+
+FlipAttack supports **three independent batching parameters** that control how work is parallelized across the pipeline. Tuning them lets you trade off between throughput, memory, and API rate limits.
+
+### Pipeline overview
+
+```mermaid
+flowchart LR
+    subgraph Orchestrator
+        direction TB
+        A[100 Goals] --> MB1[Macro-batch 1\n20 goals]
+        A --> MB2[Macro-batch 2\n20 goals]
+        A --> MB3[... × 5]
+    end
+
+    subgraph Generation
+        direction TB
+        MB1 --> W1[Worker 1]
+        MB1 --> W2[Worker 2]
+        MB1 --> W3[Worker ...]
+        MB1 --> W4[Worker N]
+    end
+
+    subgraph Evaluation
+        direction TB
+        W1 & W2 & W3 & W4 --> J1[Judge thread 1]
+        W1 & W2 & W3 & W4 --> J2[Judge thread 2]
+    end
+```
+
+> **`goal_batch_size`** controls how many goals enter each macro-batch (sequential).
+> Within each macro-batch, **`batch_size`** controls concurrent generation threads.
+> After generation, **`batch_size_judge`** controls concurrent judge threads.
+
+### Parameters reference
+
+| Parameter | Stage | What it does | Default |
+|-----------|-------|--------------|---------|
+| `batch_size` | Generation | Max concurrent requests to the **target model**. A `ThreadPoolExecutor` fires up to this many goals in parallel; as soon as one finishes a new one starts (sliding window). | `16` |
+| `goal_batch_size` | Orchestrator | Splits all goals into sequential macro-batches of this size. Generation + Evaluation run once per macro-batch. Only activates when `len(goals) > goal_batch_size`. | *disabled* |
+| `batch_size_judge` | Evaluation | Max concurrent requests to the **judge model**. Works the same way as `batch_size` but for scoring. | `1` |
+
+### Example
+
+```python
+config = {
+    "attack_type": "flipattack",
+    "goals": GOALS,              # e.g. 100 goals
+    "goal_batch_size": 20,       # 5 macro-batches of 20 goals
+    "batch_size": 10,            # 10 concurrent target requests
+    "batch_size_judge": 5,       # 5 concurrent judge requests
+    "flipattack_params": {
+        "flip_mode": "FCS",
+        "judge": "gpt-4-0613",
+    },
+    "judges": [
+        {
+            "identifier": "gpt-4-0613",
+            "type": "harmbench",
+            "agent_type": "OPENAI_SDK",
+        }
+    ],
+}
+```
+
+With this configuration:
+
+1. The orchestrator creates **5 sequential macro-batches** of 20 goals.
+2. Inside each macro-batch, generation fires **10 concurrent** HTTP requests to the target model (sliding window — as one completes, the next starts).
+3. Once all 20 responses are collected, the judge evaluates them with **5 concurrent** scoring threads.
+
+### Tuning guidelines
+
+| Scenario | Recommendation |
+|----------|----------------|
+| Local model (LM Studio, Ollama) | `batch_size=2–4` to avoid GPU saturation |
+| Remote API with rate limits | `batch_size=5–10`, `batch_size_judge=2–5` |
+| Large goal lists (100+) | `goal_batch_size=20–50` to cap peak memory |
+| Fast judge (small model) | `batch_size_judge=8–16` |
+| Slow judge (GPT-4 class) | `batch_size_judge=1–3` to avoid timeouts |
 
 ---
 

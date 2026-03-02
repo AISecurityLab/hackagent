@@ -13,7 +13,6 @@ from ..models import UserAPIKey
 def _get_kwargs(
     prefix: str,
 ) -> dict[str, Any]:
-
     _kwargs: dict[str, Any] = {
         "method": "get",
         "url": "/key/{prefix}".format(

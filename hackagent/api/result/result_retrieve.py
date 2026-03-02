@@ -14,7 +14,6 @@ from ..models import Result
 def _get_kwargs(
     id: UUID,
 ) -> dict[str, Any]:
-
     _kwargs: dict[str, Any] = {
         "method": "get",
         "url": "/result/{id}".format(

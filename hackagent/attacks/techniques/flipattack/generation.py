@@ -26,6 +26,7 @@ Result Tracking:
 
 import logging
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
@@ -83,6 +84,7 @@ def execute(
 
     def _process_goal(idx_goal: tuple) -> None:
         idx, goal_text = idx_goal
+        _t0 = time.perf_counter()
         logger.info(f"Processing goal {idx + 1}/{len(goals)}")
 
         # Step 1: Generate flipped prompt (pure Python — no HTTP, always fast)
@@ -130,6 +132,7 @@ def execute(
         error_message = response.get("error_message")
 
         with _lock:
+            _goal_elapsed = round(time.perf_counter() - _t0, 3)
             # Add trace to goal's Result via Tracker
             if tracker:
                 goal_ctx = tracker.get_goal_context(idx)
@@ -147,6 +150,7 @@ def execute(
                             "flip_log": log,
                             "system_prompt": system_prompt,
                             "user_prompt": user_prompt,
+                            "elapsed_s": _goal_elapsed,
                         },
                     )
             results_map[idx] = {
@@ -158,6 +162,7 @@ def execute(
                 "full_prompt": full_prompt,
                 "response": generated_text,
                 "error": error_message,
+                "generation_elapsed_s": _goal_elapsed,
             }
 
         if error_message:

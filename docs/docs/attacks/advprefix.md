@@ -105,10 +105,10 @@ advanced_config = {
     "generator": {
         "identifier": "ollama/llama2-uncensored",
         "endpoint": "http://localhost:11434/api/generate",
-        "batch_size": 4,
         "max_new_tokens": 100,
         "temperature": 0.8
     },
+    "batch_size": 4,
     
     # Multiple judges for robust evaluation
     "judges": [
@@ -150,6 +150,19 @@ advanced_config = {
 | `n_candidates_per_goal` | Candidates generated per goal | 5 | 1-50 |
 | `meta_prefix_samples` | Samples per meta prefix | 2 | 1-10 |
 | `n_prefixes_per_goal` | Final prefixes selected per goal | 2 | 1-10 |
+| `batch_size` | Parallel workers for generation + target completions | 2 | 1-64 |
+| `goal_batch_size` | Macro-batch size for goals at orchestrator level | disabled | 1-N |
+| `batch_size_judge` | Parallel workers for judge evaluation | 1 | 1-64 |
+
+### Batching Parameters (Practical Mapping)
+
+For `advprefix`, batching is controlled by three top-level keys in `attack_config`:
+
+- `batch_size`: used by Generation and Execution stages (`ThreadPoolExecutor(max_workers=batch_size)`).
+- `goal_batch_size`: used by the orchestrator to split goals into macro-batches.
+- `batch_size_judge`: mapped to evaluator `batch_size` and used by judge parallel evaluation.
+
+> Note: set these at top level of `attack_config` (not inside `generator`).
 
 ## Understanding Components
 
@@ -161,10 +174,12 @@ Generators create attack prefixes using less restricted models:
 "generator": {
     "identifier": "ollama/llama2-uncensored",  # Model identifier
     "endpoint": "http://localhost:11434/api/generate",
-    "batch_size": 2,                           # Parallel generation
     "max_new_tokens": 50,                      # Prefix length
     "temperature": 0.7                         # Creativity level
 }
+
+# Top-level attack setting
+"batch_size": 2,                               # Parallel generation + completions
 ```
 
 **Recommended Generator Models:**
@@ -312,8 +327,8 @@ tool_manipulation_config = {
 fast_config = {
     "attack_type": "advprefix",
     "goals": ["Your goals"],
+    "batch_size": 8,               # Larger batches
     "generator": {
-        "batch_size": 8,               # Larger batches
         "max_new_tokens": 30           # Shorter prefixes
     },
     "n_candidates_per_goal": 3,        # Fewer candidates
@@ -325,8 +340,8 @@ fast_config = {
 quality_config = {
     "attack_type": "advprefix", 
     "goals": ["Your goals"],
+    "batch_size": 2,               # Smaller batches
     "generator": {
-        "batch_size": 2,               # Smaller batches
         "max_new_tokens": 100,         # Longer prefixes
         "temperature": 0.9             # More creative
     },
@@ -343,6 +358,24 @@ quality_config = {
 3. **Multiple Judges**: Use different evaluation models
 4. **Temperature Tuning**: Adjust generator creativity
 5. **Goal Specificity**: Make goals more targeted and specific
+
+## Quick Local Test (same LLMs as FlipAttack)
+
+A minimal runnable example is available at:
+
+- `tests/test_advprefix.py`
+
+It uses:
+
+- target agent: local `corpbot_rag` (`http://localhost:8000/v1`)
+- generator: `google/gemma-3n-e4b-it` via OpenRouter
+- judge: `google/gemma-3n-e4b-it` via OpenRouter (`harmbench`)
+
+Run it with:
+
+```bash
+python tests/test_advprefix.py
+```
 
 ## Defense Considerations
 

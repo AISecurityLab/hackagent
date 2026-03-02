@@ -20,6 +20,7 @@ use the StepTracker class from step.py instead.
 """
 
 import logging
+import time
 from hackagent.logger import get_logger
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -50,11 +51,20 @@ class Context:
     traces: List[Dict[str, Any]] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
     is_finalized: bool = False
+    final_success: Optional[bool] = None
+    _start_time: float = field(default_factory=time.perf_counter)
+    _end_time: Optional[float] = None
 
     def increment_sequence(self) -> int:
         """Atomically increment and return the next sequence number."""
         self.sequence_counter += 1
         return self.sequence_counter
+
+    @property
+    def elapsed_s(self) -> float:
+        """Wall-clock seconds since context creation (or until finalized)."""
+        end = self._end_time if self._end_time is not None else time.perf_counter()
+        return end - self._start_time
 
 
 class Tracker:
@@ -350,6 +360,8 @@ class Tracker:
                 step_type.value if hasattr(step_type, "value") else str(step_type)
             ),
             "content": sanitized_content,
+            "timestamp": time.time(),
+            "elapsed_s": round(ctx.elapsed_s, 3),
         }
         ctx.traces.append(trace_record)
 
@@ -416,12 +428,15 @@ class Tracker:
             return False
 
         ctx.is_finalized = True
+        ctx.final_success = bool(success)
+        ctx._end_time = time.perf_counter()
 
         # Update local metadata
         if final_metadata:
             ctx.metadata.update(final_metadata)
-        ctx.metadata["success"] = success
+        ctx.metadata["success"] = bool(success)
         ctx.metadata["total_traces"] = len(ctx.traces)
+        ctx.metadata["elapsed_s"] = round(ctx.elapsed_s, 3)
 
         if not self.is_enabled or not ctx.result_id:
             return False
@@ -516,13 +531,57 @@ class Tracker:
     def get_summary(self) -> Dict[str, Any]:
         """Get summary statistics for all tracked goals."""
         total = len(self._goal_contexts)
+
+        def _to_success_bool(value: Any) -> bool:
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, (int, float)):
+                return value > 0
+            if isinstance(value, str):
+                return value.strip().lower() in {
+                    "true",
+                    "1",
+                    "yes",
+                    "success",
+                    "successful",
+                }
+            return False
+
         successful = sum(
             1
             for ctx in self._goal_contexts.values()
-            if ctx.metadata.get("success", False)
+            if _to_success_bool(
+                ctx.final_success
+                if ctx.final_success is not None
+                else ctx.metadata.get("success", False)
+            )
         )
         finalized = sum(1 for ctx in self._goal_contexts.values() if ctx.is_finalized)
         total_traces = sum(len(ctx.traces) for ctx in self._goal_contexts.values())
+
+        # Latency stats
+        goal_durations = [
+            ctx.elapsed_s for ctx in self._goal_contexts.values() if ctx.is_finalized
+        ]
+        trace_durations = [
+            t.get("elapsed_s", 0.0)
+            for ctx in self._goal_contexts.values()
+            for t in ctx.traces
+            if "elapsed_s" in t
+        ]
+
+        latency: Dict[str, Any] = {}
+        if goal_durations:
+            latency["goal_avg_s"] = round(sum(goal_durations) / len(goal_durations), 3)
+            latency["goal_min_s"] = round(min(goal_durations), 3)
+            latency["goal_max_s"] = round(max(goal_durations), 3)
+            latency["goal_total_s"] = round(sum(goal_durations), 3)
+        if trace_durations:
+            latency["trace_avg_s"] = round(
+                sum(trace_durations) / len(trace_durations), 3
+            )
+            latency["trace_min_s"] = round(min(trace_durations), 3)
+            latency["trace_max_s"] = round(max(trace_durations), 3)
 
         return {
             "total_goals": total,
@@ -531,6 +590,7 @@ class Tracker:
             "total_traces": total_traces,
             "success_rate": (successful / total * 100) if total > 0 else 0,
             "avg_traces_per_goal": (total_traces / total) if total > 0 else 0,
+            "latency": latency,
         }
 
     @contextmanager

@@ -18,7 +18,6 @@ def _get_kwargs(
     run: UUID | Unset = UNSET,
     run_organization: UUID | Unset = UNSET,
 ) -> dict[str, Any]:
-
     params: dict[str, Any] = {}
 
     json_evaluation_status: str | Unset = UNSET

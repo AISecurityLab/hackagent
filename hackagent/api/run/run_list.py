@@ -20,7 +20,6 @@ def _get_kwargs(
     page_size: int | Unset = UNSET,
     status: StatusEnum | Unset = UNSET,
 ) -> dict[str, Any]:
-
     params: dict[str, Any] = {}
 
     json_agent: str | Unset = UNSET

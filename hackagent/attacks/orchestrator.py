@@ -23,8 +23,9 @@ Technique implementations remain pure algorithms, unaware of server integration.
 """
 
 import json
+import time
 from hackagent.logger import get_logger
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 import httpx
@@ -355,16 +356,33 @@ class AttackOrchestrator:
                 f"of up to {goal_batch_size}"
             )
 
-            all_results = []
+            all_results: List[Dict[str, Any]] = []
+            batch_timings: List[float] = []
             for batch_idx, batch_goals in enumerate(batches):
                 logger.info(
                     f"Running batch {batch_idx + 1}/{n_batches} "
                     f"({len(batch_goals)} goals)"
                 )
+                _batch_t0 = time.perf_counter()
                 batch_params = {**attack_params, "goals": batch_goals}
                 batch_results = attack_impl.run(**batch_params)
+                _batch_elapsed = round(time.perf_counter() - _batch_t0, 3)
+                batch_timings.append(_batch_elapsed)
+                logger.info(
+                    f"Batch {batch_idx + 1}/{n_batches} completed in "
+                    f"{_batch_elapsed:.1f}s ({len(batch_results) if batch_results else 0} results)"
+                )
                 if batch_results:
                     all_results.extend(batch_results)
+
+            # Log goal-batch latency summary
+            if batch_timings:
+                avg_bt = sum(batch_timings) / len(batch_timings)
+                logger.info(
+                    f"Goal-batch latency: avg={avg_bt:.1f}s "
+                    f"[{min(batch_timings):.1f}–{max(batch_timings):.1f}s], "
+                    f"total={sum(batch_timings):.1f}s"
+                )
 
             logger.info(
                 f"{self.attack_type} attack completed "
@@ -448,6 +466,7 @@ class AttackOrchestrator:
 
         # 5. Execute locally
         try:
+            _total_t0 = time.perf_counter()
             results = self._execute_local_attack(
                 attack_id=attack_id,
                 run_id=run_id,
@@ -455,6 +474,8 @@ class AttackOrchestrator:
                 attack_config=attack_config,
                 run_config_override=run_config_override,
             )
+            _total_elapsed = round(time.perf_counter() - _total_t0, 3)
+            logger.info(f"Total run time: {_total_elapsed:.1f}s")
 
             # 6. Update run status to COMPLETED
             try:

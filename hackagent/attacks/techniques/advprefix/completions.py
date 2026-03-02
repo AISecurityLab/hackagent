@@ -22,6 +22,7 @@ determine attack success rates.
 
 import logging
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional
 
@@ -305,9 +306,9 @@ def execute(
         either predefined templates (accessed by index) or custom strings with
         optional `{prefix}` placeholders for dynamic formatting.
 
-        Completions are processed sequentially with progress tracking, and
-            errors are captured gracefully to allow the pipeline to continue
-            processing remaining prefixes.
+        Completions are processed in parallel with progress tracking, and
+        errors are captured gracefully to allow the pipeline to continue
+        processing remaining prefixes.
     """
     # Decorators handle: empty input, agent_router validation, error logging
 
@@ -352,12 +353,19 @@ def execute(
     # --- Prepare and run tasks (parallel) ---
     completion_results_list: List[Dict[str, Any]] = []
     batch_size = max(1, config.get("batch_size", 16))
+    effective_workers = min(batch_size, len(input_data)) if input_data else 1
+    logger.info(
+        f"Completion parallel workers: {effective_workers} "
+        f"(configured batch_size={batch_size}, items={len(input_data)})"
+    )
     _tracker_lock = threading.Lock()
     results_map: Dict[int, Dict[str, Any]] = {}
+    _comp_t0 = time.perf_counter()
 
     def _complete_one(index_record: tuple) -> tuple:
         index, record = index_record
         prefix_text = record.get("prefix", "")
+        _row_t0 = time.perf_counter()
         try:
             result = _get_completion_via_router(
                 agent_router=agent_router,
@@ -386,6 +394,7 @@ def execute(
                 "error_message": f"Sync Task Exception: {type(e).__name__} - {str(e)}",
                 "log_message": None,
             }
+        result["completion_elapsed_s"] = round(time.perf_counter() - _row_t0, 3)
         # Tracker writes are serialized via lock
         with _tracker_lock:
             goal = record.get("goal", "")
@@ -412,6 +421,7 @@ def execute(
                             ),
                             "agent_specific_data": result.get("agent_specific_data"),
                             "raw_response_status": result.get("raw_response_status"),
+                            "elapsed_s": result.get("completion_elapsed_s"),
                         },
                     )
         return index, result
@@ -445,6 +455,7 @@ def execute(
             "adapter_specific_events"
         )
         result["error_message"] = completion_result.get("error_message")
+        result["completion_elapsed_s"] = completion_result.get("completion_elapsed_s")
 
         # Inject result_id from Tracker so downstream evaluation can sync to server
         if tracker:
@@ -455,6 +466,11 @@ def execute(
 
         results.append(result)
 
-    logger.info(f"📊 Completions execute returning {len(results)} results")
+    comp_elapsed = round(time.perf_counter() - _comp_t0, 3)
+    comp_avg = comp_elapsed / len(results) if results else 0.0
+    logger.info(
+        f"📊 Completions execute returning {len(results)} results, "
+        f"elapsed={comp_elapsed:.1f}s (avg={comp_avg:.2f}s/item)"
+    )
 
     return results

@@ -23,7 +23,6 @@ DEFAULT_PREFIX_GENERATION_CONFIG: Dict[str, Any] = {
     "generator": {
         "identifier": "hackagent-generator",
         "endpoint": "https://api.hackagent.dev/v1",
-        "batch_size": 2,
         "max_new_tokens": 50,
         "guided_topk": 50,
         "temperature": 0.7,
