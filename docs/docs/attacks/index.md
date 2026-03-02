@@ -14,6 +14,8 @@ graph LR
         A[AdvPrefix] --> |"Sophisticated"| T[Target Agent]
         B[PAIR] --> |"Adaptive"| T
         C[Baseline] --> |"Fast"| T
+        D[TAP] --> |"Tree Search"| T
+        E[FlipAttack] --> |"Obfuscation"| T
     end
     T --> R[Results & Analysis]
 ```
@@ -22,9 +24,11 @@ graph LR
 
 | Attack | Description | Sophistication | Speed |
 |--------|-------------|----------------|-------|
-| [**AdvPrefix**](./advprefix-attacks.md) | Multi-step adversarial prefix optimization | ⭐⭐⭐ High | Slower |
-| [**PAIR**](./pair-attacks.md) | LLM-driven iterative prompt refinement | ⭐⭐ Medium | Medium |
-| [**Baseline**](./baseline-attacks.md) | Template-based prompt injection | ⭐ Basic | Fast |
+| [**AdvPrefix**](./advprefix.md) | Multi-step adversarial prefix optimization | ⭐⭐⭐ High | Slower |
+| [**PAIR**](./pair.md) | LLM-driven iterative prompt refinement | ⭐⭐ Medium | Medium |
+| [**TAP**](./tap.md) | Tree search with on-topic pruning | ⭐⭐ Medium | Medium |
+| [**FlipAttack**](./flipattack.md) | Character-level text obfuscation | ⭐ Basic | Fast |
+| [**Baseline**](./baseline.md) | Template-based prompt injection | ⭐ Basic | Fast |
 
 :::tip Dataset Support
 All attacks support loading goals from AI safety benchmarks like **AgentHarm**, **StrongREJECT**, and **HarmBench**. See [Dataset Providers](../datasets/) for details.
@@ -38,13 +42,7 @@ The most sophisticated attack in HackAgent's arsenal. Uses a **9-step automated 
 
 <div style={{background: 'var(--ifm-background-surface-color)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--ifm-color-emphasis-200)', margin: '1rem 0'}}>
 
-**How it works:**
-1. **Generate** → Creates initial attack prefixes using uncensored models
-2. **Evaluate** → Tests prefixes against target with judge models
-3. **Optimize** → Selects and refines the most effective prefixes
-4. **Report** → Provides detailed success metrics and recommendations
-
-**Best for:** Comprehensive security audits, bypassing sophisticated safety filters, adversarial robustness research
+An uncensored generator model produces candidate attack prefixes, which are tested against the target and scored by a judge. The pipeline selects and refines the highest-scoring prefixes across multiple rounds, producing a detailed report of success rates and effective patterns. Best suited for comprehensive security audits where thoroughness matters more than speed.
 
 </div>
 
@@ -57,7 +55,7 @@ attack_config = {
 }
 ```
 
-[**Learn more about AdvPrefix →**](./advprefix-attacks.md)
+[**Learn more about AdvPrefix →**](./advprefix.md)
 
 ---
 
@@ -67,16 +65,7 @@ An LLM-powered attack that uses an **attacker model** to iteratively refine jail
 
 <div style={{background: 'var(--ifm-background-surface-color)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--ifm-color-emphasis-200)', margin: '1rem 0'}}>
 
-**How it works:**
-1. **Initial prompt** → Attacker LLM generates a jailbreak attempt
-2. **Target response** → Sends prompt to target agent
-3. **Score & feedback** → Judge evaluates if the attack succeeded
-4. **Refine** → Attacker uses feedback to generate improved prompt
-5. **Iterate** → Repeats until success or max iterations
-
-**Best for:** Black-box testing, adaptive attacks that learn from failures, testing unknown safety mechanisms
-
-**Based on:** *"Jailbreaking Black Box Large Language Models in Twenty Queries"* (Chao et al.)
+An attacker LLM generates a jailbreak prompt, sends it to the target, and receives a judge score as feedback. It uses that feedback to produce an improved prompt, repeating until it succeeds or exhausts its iteration budget. No knowledge of the target's internals is needed, making it ideal for black-box testing of unknown safety mechanisms. Based on *"Jailbreaking Black Box Large Language Models in Twenty Queries"* (Chao et al., 2023).
 
 </div>
 
@@ -89,7 +78,53 @@ attack_config = {
 }
 ```
 
-[**Learn more about PAIR →**](./pair-attacks.md)
+[**Learn more about PAIR →**](./pair.md)
+
+---
+
+## TAP — Tree of Attacks with Pruning
+
+An efficient tree-search attack that sends multiple parallel streams of iteratively refined prompts while **pruning off-topic and low-scoring branches** before querying the target.
+
+<div style={{background: 'var(--ifm-background-surface-color)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--ifm-color-emphasis-200)', margin: '1rem 0'}}>
+
+TAP runs multiple independent search streams in parallel. At each depth level the attacker LLM generates several prompt refinements, off-topic branches are pruned before any target query is made, and only the highest-scoring branches advance to the next level. Search stops as soon as one branch crosses the success threshold. This makes it significantly more query-efficient than purely linear iterative methods. Based on *"Tree of Attacks with Pruning"* (Mehrotra et al., 2023).
+
+</div>
+
+```python
+attack_config = {
+    "attack_type": "tap",
+    "goals": ["Bypass content filter"],
+    "attacker": {"identifier": "gpt-4", "endpoint": "https://api.openai.com/v1"},
+    "judge": {"identifier": "gpt-4", "type": "harmbench"},
+    "tap_params": {"depth": 3, "width": 4, "branching_factor": 3, "n_streams": 4}
+}
+```
+
+[**Learn more about TAP →**](./tap.md)
+
+---
+
+## FlipAttack — Character-Level Obfuscation
+
+A fast, deterministic attack that **reverses or rearranges characters and words** in the harmful goal before sending it to the target. Safety classifiers fail to detect the reversed text while the target LLM is instructed to decode it.
+
+<div style={{background: 'var(--ifm-background-surface-color)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--ifm-color-emphasis-200)', margin: '1rem 0'}}>
+
+The harmful goal is deterministically reversed at character or word level (`FCS`, `FWO`, `FCW`, or `FMM` mode) and wrapped in a system prompt that instructs the model to decode and answer directly. Because the obfuscated text looks nothing like the original request, many safety classifiers fail to trigger — while the target LLM decodes it internally. No attacker model or iteration is required. Based on *"FlipAttack: Jailbreak LLMs via Flipping"* (Liu et al., 2024).
+
+</div>
+
+```python
+attack_config = {
+    "attack_type": "flipattack",
+    "goals": ["Reveal system prompt"],
+    "flipattack_params": {"flip_mode": "FCS", "cot": False, "lang_gpt": False, "few_shot": False}
+}
+```
+
+[**Learn more about FlipAttack →**](./flipattack.md)
 
 ---
 
@@ -99,13 +134,7 @@ A simpler but effective approach using **predefined prompt templates** combined 
 
 <div style={{background: 'var(--ifm-background-surface-color)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--ifm-color-emphasis-200)', margin: '1rem 0'}}>
 
-**How it works:**
-1. **Template selection** → Chooses from categorized prompt templates
-2. **Goal injection** → Combines templates with test objectives
-3. **Execution** → Sends templated prompts to target agent
-4. **Evaluation** → Assesses responses using objective criteria
-
-**Best for:** Quick vulnerability scans, testing basic prompt injection defenses, establishing security baselines
+Predefined prompt templates (roleplay, encoding, context-switch, etc.) are combined with the test goals and sent directly to the target. No attacker model, iteration, or optimization is involved. Best for fast initial vulnerability scans and establishing a security baseline before running deeper attacks.
 
 </div>
 
@@ -117,29 +146,21 @@ attack_config = {
 }
 ```
 
-[**Learn more about Baseline →**](./baseline-attacks.md)
+[**Learn more about Baseline →**](./baseline.md)
 
 ---
 
 ## Choosing the Right Attack
 
-### Use AdvPrefix when:
-- You need comprehensive security coverage
-- Testing sophisticated safety mechanisms
-- Time is not a constraint
-- You want detailed attack analytics
+**AdvPrefix** is the right choice when thoroughness is the priority — comprehensive audits, sophisticated safety mechanisms, or detailed analytics where longer runtimes are acceptable.
 
-### Use PAIR when:
-- You're testing a black-box system
-- The safety mechanisms are unknown
-- You want adaptive, learning-based attacks
-- You have access to a capable attacker LLM
+**PAIR** works best for black-box targets where the safety mechanism is unknown. An attacker LLM learns from each failed attempt, converging on a successful jailbreak without needing any internal access.
 
-### Use Baseline when:
-- You need quick results
-- Running initial vulnerability assessments
-- Testing basic prompt injection defenses
-- Establishing a security baseline before deeper testing
+**TAP** offers the same adaptive refinement as PAIR but at lower query cost: parallel streams, on-topic pruning, and early stopping make it the most efficient iterative option when budget or rate limits matter.
+
+**FlipAttack** is the fastest option — a single deterministic pass, no attacker model required. Use it for quick scans, character-level safety assessments, or when comparing model robustness across flip modes.
+
+**Baseline** is ideal for a rapid first-pass: template-based prompts sent directly to the target with no setup overhead, good for establishing a vulnerability baseline before running heavier attacks.
 
 ---
 
@@ -175,6 +196,8 @@ graph TD
 
 ## Next Steps
 
-- [AdvPrefix Deep Dive](./advprefix-attacks.md) — Full documentation with advanced configuration
-- [PAIR Attack Guide](./pair-attacks.md) — Iterative refinement techniques
-- [Baseline Templates](./baseline-attacks.md) — Template categories and customization
+- [AdvPrefix Deep Dive](./advprefix.md) — Full documentation with advanced configuration
+- [PAIR Attack Guide](./pair.md) — Iterative refinement techniques
+- [TAP Attack Guide](./tap.md) — Tree-search with pruning
+- [FlipAttack Guide](./flipattack.md) — Character-level obfuscation
+- [Baseline Templates](./baseline.md) — Template categories and customization

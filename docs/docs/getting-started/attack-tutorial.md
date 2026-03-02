@@ -634,7 +634,7 @@ Baseline attacks use predefined prompt templates combined with your test goals. 
 | `instruction_override` | Override system instructions |
 | `hypothetical` | Frame as fictional/hypothetical |
 
-[**Full Baseline Documentation →**](../attacks/baseline-attacks)
+[**Full Baseline Documentation →**](../attacks/baseline)
 
   </TabItem>
   <TabItem value="pair" label="PAIR">
@@ -651,7 +651,7 @@ PAIR (Prompt Automatic Iterative Refinement) uses an attacker LLM to iteratively
 4. **Attacker refines** based on feedback
 5. **Repeat** until success or max iterations
 
-[**Full PAIR Documentation →**](../attacks/pair-attacks)
+[**Full PAIR Documentation →**](../attacks/pair)
 
   </TabItem>
   <TabItem value="advprefix" label="AdvPrefix">
@@ -689,7 +689,7 @@ advanced_config = {
 }
 ```
 
-[**Full AdvPrefix Documentation →**](../attacks/advprefix-attacks)
+[**Full AdvPrefix Documentation →**](../attacks/advprefix)
 
   </TabItem>
 </Tabs>
@@ -719,9 +719,9 @@ curl http://localhost:11434/api/generate \
 
 ## Next Steps
 
-- [**AdvPrefix Deep Dive**](../attacks/advprefix-attacks.md) — Full AdvPrefix documentation
-- [**PAIR Attack Guide**](../attacks/pair-attacks.md) — Iterative refinement techniques
-- [**Baseline Templates**](../attacks/baseline-attacks.md) — Template customization
+- [**AdvPrefix Deep Dive**](../attacks/advprefix.md) — Full AdvPrefix documentation
+- [**PAIR Attack Guide**](../attacks/pair.md) — Iterative refinement techniques
+- [**Baseline Templates**](../attacks/baseline.md) — Template customization
 - [**CLI Documentation**](../cli/overview.md) — All CLI commands
 
 ---

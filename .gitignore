@@ -4,6 +4,7 @@ logs/
 .ruff_cache/
 reports/
 .adk/
+slurm/
 
 # Editors
 .vscode/
@@ -130,3 +131,5 @@ venv.bak/
 .mypy_cache/
 .dmypy.json
 dmypy.json
+
+db_index/

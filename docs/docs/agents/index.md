@@ -20,17 +20,15 @@ Ollama is a lightweight framework for running large language models locally. Hac
 ### Prerequisites
 
 1. **Install Ollama**:
-   ```bash
-   curl -fsSL https://ollama.com/install.sh | sh
-   ```
-2. **Start Ollama** (runs on `localhost:11434` by default):
-   ```bash
-   ollama serve
-   ```
-3. **Pull a model**:
+  Follow the official installation guide: [Ollama Documentation](https://ollama.com/docs)
+2. **Pull a model**:
    ```bash
    ollama pull llama3
    ```
+3. **Start Ollama** (runs on `localhost:11434` by default):
+  ```bash
+  ollama serve
+  ```
 4. **Verify** it's running:
    ```bash
    curl http://localhost:11434/api/tags

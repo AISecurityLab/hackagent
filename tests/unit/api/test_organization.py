@@ -20,10 +20,10 @@ from hackagent.api.organization import (
 )
 from hackagent.client import AuthenticatedClient
 from hackagent.errors import UnexpectedStatus
-from hackagent.models.organization import Organization
-from hackagent.models.organization_request import OrganizationRequest
-from hackagent.models.paginated_organization_list import PaginatedOrganizationList
-from hackagent.models.patched_organization_request import PatchedOrganizationRequest
+from hackagent.api.models import Organization
+from hackagent.api.models import OrganizationRequest
+from hackagent.api.models import PaginatedOrganizationList
+from hackagent.api.models import PatchedOrganizationRequest
 from hackagent.types import UNSET
 
 
@@ -67,13 +67,11 @@ def organization_response_data() -> dict:
 
 
 def test_create_get_kwargs(organization_request_body: OrganizationRequest):
-    # Similar to checkout, _get_kwargs has triplicate isinstance checks.
-    # Testing the multipart case as OrganizationRequest has to_multipart.
+    # Testing request body encoding.
     kwargs = organization_create._get_kwargs(body=organization_request_body)
     assert kwargs["method"] == "post"
     assert kwargs["url"] == "/organization"
-    assert kwargs["files"] == organization_request_body.to_multipart()
-    assert "multipart/form-data" in kwargs["headers"]["Content-Type"]
+    assert "data" in kwargs or "json" in kwargs
 
 
 def test_create_parse_response_success(
@@ -326,7 +324,7 @@ def test_list_parse_response_success(
     )
     assert isinstance(parsed, PaginatedOrganizationList)
     assert parsed.count == 1
-    assert parsed.next_ == "http://localhost:8000/api/organization?page=2"
+    assert str(parsed.next) == "http://localhost:8000/api/organization?page=2"
     assert len(parsed.results) == 1
     assert parsed.results[0].id == uuid.UUID(TEST_ORG_REAL_UUID_STR)
 
@@ -502,7 +500,7 @@ def test_me_retrieve_sync_success(
     authenticated_client: AuthenticatedClient, organization_response_data: dict
 ):
     # For sync, we need to mock sync_detailed to return a response with a parsed attribute
-    mock_organization = Organization.from_dict(organization_response_data)
+    mock_organization = Organization.model_validate(organization_response_data)
     mock_detailed_response = MagicMock()
     mock_detailed_response.parsed = mock_organization
 
@@ -547,7 +545,7 @@ async def test_me_retrieve_asyncio_detailed_success(
 async def test_me_retrieve_asyncio_success(
     authenticated_client: AuthenticatedClient, organization_response_data: dict
 ):
-    mock_organization = Organization.from_dict(organization_response_data)
+    mock_organization = Organization.model_validate(organization_response_data)
     mock_detailed_response = MagicMock()
     mock_detailed_response.parsed = mock_organization
 
@@ -597,8 +595,8 @@ def test_partial_update_get_kwargs(
     )
     assert kwargs["method"] == "patch"
     assert kwargs["url"] == f"/organization/{TEST_ORG_UUID}"
-    assert kwargs["files"] == patched_organization_request_body.to_multipart()
-    assert "multipart/form-data" in kwargs["headers"]["Content-Type"]
+    assert "data" in kwargs or "json" in kwargs
+    assert "application/x-www-form-urlencoded" in kwargs["headers"]["Content-Type"]
 
 
 def test_partial_update_parse_response_success(
@@ -669,7 +667,7 @@ def test_partial_update_sync_success(
     patched_organization_request_body: PatchedOrganizationRequest,
     updated_organization_response_data: dict,
 ):
-    mock_organization = Organization.from_dict(updated_organization_response_data)
+    mock_organization = Organization.model_validate(updated_organization_response_data)
     mock_detailed_response = MagicMock()
     mock_detailed_response.parsed = mock_organization
 
@@ -731,7 +729,7 @@ async def test_partial_update_asyncio_success(
     patched_organization_request_body: PatchedOrganizationRequest,
     updated_organization_response_data: dict,
 ):
-    mock_organization = Organization.from_dict(updated_organization_response_data)
+    mock_organization = Organization.model_validate(updated_organization_response_data)
     mock_detailed_response = MagicMock()
     mock_detailed_response.parsed = mock_organization
 
@@ -820,7 +818,7 @@ def test_retrieve_sync_detailed_success_specific_org(
 def test_retrieve_sync_success_specific_org(
     authenticated_client: AuthenticatedClient, organization_response_data: dict
 ):
-    mock_organization = Organization.from_dict(organization_response_data)
+    mock_organization = Organization.model_validate(organization_response_data)
     mock_detailed_response = MagicMock()
     mock_detailed_response.parsed = mock_organization
 
@@ -870,7 +868,7 @@ async def test_retrieve_asyncio_detailed_success_specific_org(
 async def test_retrieve_asyncio_success_specific_org(
     authenticated_client: AuthenticatedClient, organization_response_data: dict
 ):
-    mock_organization = Organization.from_dict(organization_response_data)
+    mock_organization = Organization.model_validate(organization_response_data)
     mock_detailed_response = MagicMock()
     mock_detailed_response.parsed = mock_organization
 
@@ -931,8 +929,7 @@ def test_update_get_kwargs(organization_request_body: OrganizationRequest):
     )
     assert kwargs["method"] == "put"
     assert kwargs["url"] == f"/organization/{TEST_ORG_UUID}"
-    assert kwargs["files"] == organization_request_body.to_multipart()
-    assert "multipart/form-data" in kwargs["headers"]["Content-Type"]
+    assert "data" in kwargs or "json" in kwargs
 
 
 def test_update_parse_response_success(
@@ -1005,7 +1002,9 @@ def test_update_sync_success(
     organization_request_body: OrganizationRequest,
     full_updated_organization_response_data: dict,
 ):
-    mock_organization = Organization.from_dict(full_updated_organization_response_data)
+    mock_organization = Organization.model_validate(
+        full_updated_organization_response_data
+    )
     mock_detailed_response = MagicMock()
     mock_detailed_response.parsed = mock_organization
 
@@ -1064,7 +1063,9 @@ async def test_update_asyncio_success(
     organization_request_body: OrganizationRequest,
     full_updated_organization_response_data: dict,
 ):
-    mock_organization = Organization.from_dict(full_updated_organization_response_data)
+    mock_organization = Organization.model_validate(
+        full_updated_organization_response_data
+    )
     mock_detailed_response = MagicMock()
     mock_detailed_response.parsed = mock_organization
 

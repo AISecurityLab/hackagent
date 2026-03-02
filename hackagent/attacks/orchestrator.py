@@ -23,8 +23,9 @@ Technique implementations remain pure algorithms, unaware of server integration.
 """
 
 import json
-import logging
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
+import time
+from hackagent.logger import get_logger
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 import httpx
@@ -33,16 +34,17 @@ from hackagent.api.attack.attack_create import (
     sync_detailed as attacks_create_sync_detailed,
 )
 from hackagent.api.run import run_run_tests_create
-from hackagent.api.run.run_update import sync_detailed as run_update
+from hackagent.api.run.run_partial_update import sync_detailed as run_status_update
 from hackagent.errors import HackAgentError
-from hackagent.models.attack_request import AttackRequest
-from hackagent.models.run_request import RunRequest
-from hackagent.models.status_enum import StatusEnum
+from hackagent.api.models import AttackRequest
+from hackagent.api.models import PatchedRunRequest
+from hackagent.api.models import RunRequest
+from hackagent.api.models import StatusEnum
 
 if TYPE_CHECKING:
     from hackagent.agent import HackAgent
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class AttackOrchestrator:
@@ -125,7 +127,7 @@ class AttackOrchestrator:
         }
 
         try:
-            attack_req_obj = AttackRequest.from_dict(payload)
+            attack_req_obj = AttackRequest.model_validate(payload)
             response = attacks_create_sync_detailed(
                 client=self.client, body=attack_req_obj
             )
@@ -315,6 +317,12 @@ class AttackOrchestrator:
         """
         Execute attack locally using technique implementation.
 
+        If ``goal_batch_size`` is present in *attack_config*, goals are split
+        into batches of that size and ``run()`` is called once per batch on the
+        same attack instance.  Results from all batches are concatenated and
+        returned together.  When ``goal_batch_size`` is absent (or the goals
+        list is smaller than the batch size), the attack runs as before.
+
         Args:
             attack_id: Server-side attack record ID
             run_id: Server-side run record ID
@@ -333,8 +341,56 @@ class AttackOrchestrator:
             attack_config, run_config_override, run_id
         )
         attack_impl = self.attack_impl_class(**impl_kwargs)
-        results = attack_impl.run(**attack_params)
 
+        goals = attack_params.get("goals")
+        goal_batch_size = attack_config.get("goal_batch_size")
+
+        if goal_batch_size and isinstance(goals, list) and len(goals) > goal_batch_size:
+            batches = [
+                goals[i : i + goal_batch_size]
+                for i in range(0, len(goals), goal_batch_size)
+            ]
+            n_batches = len(batches)
+            logger.info(
+                f"Batching {len(goals)} goals into {n_batches} batch(es) "
+                f"of up to {goal_batch_size}"
+            )
+
+            all_results: List[Dict[str, Any]] = []
+            batch_timings: List[float] = []
+            for batch_idx, batch_goals in enumerate(batches):
+                logger.info(
+                    f"Running batch {batch_idx + 1}/{n_batches} "
+                    f"({len(batch_goals)} goals)"
+                )
+                _batch_t0 = time.perf_counter()
+                batch_params = {**attack_params, "goals": batch_goals}
+                batch_results = attack_impl.run(**batch_params)
+                _batch_elapsed = round(time.perf_counter() - _batch_t0, 3)
+                batch_timings.append(_batch_elapsed)
+                logger.info(
+                    f"Batch {batch_idx + 1}/{n_batches} completed in "
+                    f"{_batch_elapsed:.1f}s ({len(batch_results) if batch_results else 0} results)"
+                )
+                if batch_results:
+                    all_results.extend(batch_results)
+
+            # Log goal-batch latency summary
+            if batch_timings:
+                avg_bt = sum(batch_timings) / len(batch_timings)
+                logger.info(
+                    f"Goal-batch latency: avg={avg_bt:.1f}s "
+                    f"[{min(batch_timings):.1f}–{max(batch_timings):.1f}s], "
+                    f"total={sum(batch_timings):.1f}s"
+                )
+
+            logger.info(
+                f"{self.attack_type} attack completed "
+                f"({len(all_results)} total results from {n_batches} batches)"
+            )
+            return all_results
+
+        results = attack_impl.run(**attack_params)
         logger.info(f"{self.attack_type} attack completed")
         return results
 
@@ -398,12 +454,10 @@ class AttackOrchestrator:
         # 4. Update run status to RUNNING
         try:
             logger.info(f"Updating run {run_id} status to RUNNING")
-            run_update(
+            run_status_update(
                 id=run_id,
                 client=self.client,
-                body=RunRequest(
-                    agent=victim_agent_id,
-                    attack=attack_id,
+                body=PatchedRunRequest(
                     status=StatusEnum.RUNNING,
                 ),
             )
@@ -412,6 +466,7 @@ class AttackOrchestrator:
 
         # 5. Execute locally
         try:
+            _total_t0 = time.perf_counter()
             results = self._execute_local_attack(
                 attack_id=attack_id,
                 run_id=run_id,
@@ -419,16 +474,16 @@ class AttackOrchestrator:
                 attack_config=attack_config,
                 run_config_override=run_config_override,
             )
+            _total_elapsed = round(time.perf_counter() - _total_t0, 3)
+            logger.info(f"Total run time: {_total_elapsed:.1f}s")
 
             # 6. Update run status to COMPLETED
             try:
                 logger.info(f"Updating run {run_id} status to COMPLETED")
-                run_update(
+                run_status_update(
                     id=run_id,
                     client=self.client,
-                    body=RunRequest(
-                        agent=victim_agent_id,
-                        attack=attack_id,
+                    body=PatchedRunRequest(
                         status=StatusEnum.COMPLETED,
                     ),
                 )
@@ -441,12 +496,10 @@ class AttackOrchestrator:
             # Update run status to FAILED on error
             try:
                 logger.error(f"Attack execution failed: {e}")
-                run_update(
+                run_status_update(
                     id=run_id,
                     client=self.client,
-                    body=RunRequest(
-                        agent=victim_agent_id,
-                        attack=attack_id,
+                    body=PatchedRunRequest(
                         status=StatusEnum.FAILED,
                         run_notes=f"Execution failed: {str(e)}",
                     ),

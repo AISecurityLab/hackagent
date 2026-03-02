@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
-import logging
+from hackagent.logger import get_logger
 import os
 from typing import Any, Dict, List, Optional
 
@@ -85,7 +85,7 @@ class LiteLLMConfigurationError(AdapterConfigurationError):
     pass
 
 
-logger = logging.getLogger(__name__)  # Module-level logger
+logger = get_logger(__name__)  # Module-level logger
 
 
 class LiteLLMAgent(ChatCompletionsAgent):

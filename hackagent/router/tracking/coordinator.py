@@ -42,9 +42,11 @@ Usage:
 """
 
 import logging
+import time
+from hackagent.logger import get_logger
 from typing import Any, Callable, Dict, List, Optional
 
-from hackagent.models import StatusEnum
+from hackagent.api.models import StatusEnum
 
 from .context import TrackingContext
 from .step import StepTracker
@@ -88,8 +90,9 @@ class TrackingCoordinator:
         """
         self.step_tracker = step_tracker
         self.goal_tracker = goal_tracker
-        self.logger = logger or logging.getLogger(__name__)
+        self.logger = logger or get_logger(__name__)
         self._goals: List[str] = []
+        self._run_start_time: float = time.perf_counter()
 
     @classmethod
     def create(
@@ -121,7 +124,7 @@ class TrackingCoordinator:
         Returns:
             Initialized TrackingCoordinator
         """
-        _logger = logger or logging.getLogger(__name__)
+        _logger = logger or get_logger(__name__)
 
         # Build goal Tracker
         goal_tracker = None
@@ -437,7 +440,21 @@ class TrackingCoordinator:
             results: Pipeline output (used only if success_check is provided)
             success_check: Optional callable to determine overall success
         """
-        self.step_tracker.update_run_status(StatusEnum.COMPLETED)
+        if success_check is not None:
+            try:
+                status = (
+                    StatusEnum.COMPLETED
+                    if success_check(results)
+                    else StatusEnum.FAILED
+                )
+            except Exception as e:
+                self.logger.warning(
+                    f"success_check raised an exception, marking FAILED: {e}"
+                )
+                status = StatusEnum.FAILED
+        else:
+            status = StatusEnum.COMPLETED
+        self.step_tracker.update_run_status(status)
 
     # ========================================================================
     # SUMMARY
@@ -445,7 +462,11 @@ class TrackingCoordinator:
 
     def get_summary(self) -> Dict[str, Any]:
         """Get combined summary from both tracking systems."""
-        summary = {"step_tracking_enabled": self.is_enabled}
+        run_elapsed = round(time.perf_counter() - self._run_start_time, 3)
+        summary: Dict[str, Any] = {
+            "step_tracking_enabled": self.is_enabled,
+            "run_elapsed_s": run_elapsed,
+        }
 
         if self.has_goal_tracking:
             summary.update(self.goal_tracker.get_summary())
@@ -462,13 +483,28 @@ class TrackingCoordinator:
     def log_summary(self) -> None:
         """Log a human-readable summary."""
         summary = self.get_summary()
+        run_elapsed = summary.get("run_elapsed_s", 0)
+        latency = summary.get("latency", {})
+
         if self.has_goal_tracking:
-            self.logger.info(
-                f"Tracking summary: "
+            parts = [
                 f"{summary.get('successful_attacks', 0)}/{summary.get('total_goals', 0)} "
-                f"successful ({summary.get('success_rate', 0):.1f}%), "
-                f"{summary.get('total_traces', 0)} total traces"
-            )
+                f"successful ({summary.get('success_rate', 0):.1f}%)",
+                f"{summary.get('total_traces', 0)} total traces",
+                f"run={run_elapsed:.1f}s",
+            ]
+            if latency.get("goal_avg_s") is not None:
+                parts.append(
+                    f"goal avg={latency['goal_avg_s']:.1f}s "
+                    f"[{latency['goal_min_s']:.1f}–{latency['goal_max_s']:.1f}s]"
+                )
+            if latency.get("trace_avg_s") is not None:
+                parts.append(
+                    f"tracker(trace) avg={latency['trace_avg_s']:.1f}s "
+                    f"[{latency['trace_min_s']:.1f}–{latency['trace_max_s']:.1f}s]"
+                )
+
+            self.logger.info(f"Tracking summary: {', '.join(parts)}")
 
     # ========================================================================
     # INTERNAL HELPERS
@@ -487,6 +523,10 @@ class TrackingCoordinator:
             "best_score",
         ]
         for row in goal_data:
+            # Direct boolean check — covers cases where enrichment set
+            # ``success=True`` even if numeric columns are absent.
+            if row.get("success") is True:
+                return True
             for col in eval_columns:
                 score = row.get(col, 0)
                 if isinstance(score, (int, float)) and score >= threshold:

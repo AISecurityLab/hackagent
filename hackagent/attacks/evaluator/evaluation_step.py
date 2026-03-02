@@ -683,7 +683,14 @@ class BaseEvaluationStep:
             judges_used = list(self._statistics.get("successful_judges", []))
 
         for idx, item in enumerate(data):
-            goal_ctx = self._tracker.get_goal_context(idx)
+            # Look up context by goal text (not item index) so that
+            # duplicate goals all map to the correct tracker context.
+            goal_text = item.get("goal", "")
+            goal_ctx = (
+                self._tracker.get_goal_context_by_goal(goal_text)
+                if goal_text
+                else self._tracker.get_goal_context(idx)
+            )
             if not goal_ctx:
                 continue
 

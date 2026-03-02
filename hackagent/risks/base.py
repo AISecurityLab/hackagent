@@ -16,11 +16,11 @@ Each concrete vulnerability:
 """
 
 import abc
-import logging
+from hackagent.logger import get_logger
 from enum import Enum
 from typing import Any, Dict, List, Optional, Type
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class BaseVulnerability(abc.ABC):

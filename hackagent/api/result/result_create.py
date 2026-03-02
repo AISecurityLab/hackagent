@@ -1,14 +1,12 @@
-# Copyright 2026 - AI4I. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
-
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+
 import httpx
+
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.result import Result
-from ...models.result_request import ResultRequest
 from ...types import Response
+from ..models import Result, ResultRequest
 
 
 def _get_kwargs(
@@ -22,7 +20,7 @@ def _get_kwargs(
         "url": "/result",
     }
 
-    _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.model_dump(by_alias=True, mode="json", exclude_none=True)
 
     headers["Content-Type"] = "application/json"
 
@@ -31,12 +29,13 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[Result]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Result | None:
     if response.status_code == 201:
-        response_201 = Result.from_dict(response.json())
+        response_201 = Result.model_validate(response.json())
 
         return response_201
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -44,7 +43,7 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+    *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[Result]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -91,7 +90,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: ResultRequest,
-) -> Optional[Result]:
+) -> Result | None:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.
@@ -150,7 +149,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: ResultRequest,
-) -> Optional[Result]:
+) -> Result | None:
     """ViewSet for managing Result instances. Allows creation of Traces via an action.
 
     SDK-primary endpoint - API Key authentication is recommended for programmatic access.

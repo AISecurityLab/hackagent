@@ -23,7 +23,6 @@ DEFAULT_PREFIX_GENERATION_CONFIG: Dict[str, Any] = {
     "generator": {
         "identifier": "hackagent-generator",
         "endpoint": "https://api.hackagent.dev/v1",
-        "batch_size": 2,
         "max_new_tokens": 50,
         "guided_topk": 50,
         "temperature": 0.7,
@@ -233,7 +232,7 @@ class EvaluatorConfig:
     """
 
     agent_name: str
-    agent_type: Any  # AgentTypeEnum from hackagent.models
+    agent_type: Any  # AgentTypeEnum from hackagent.api.models
     model_id: str
     agent_endpoint: Optional[str] = None
     organization_id: Optional[int] = None

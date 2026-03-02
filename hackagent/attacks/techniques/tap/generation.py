@@ -24,6 +24,7 @@ import json
 import logging
 import random
 import string
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional, Tuple
 
 from hackagent.attacks.shared.progress import create_progress_bar
@@ -31,7 +32,7 @@ from hackagent.attacks.shared.prompt_parser import extract_prompt_and_improvemen
 from hackagent.attacks.shared.response_utils import extract_response_content
 from hackagent.attacks.shared.router_factory import create_router
 from hackagent.client import AuthenticatedClient
-from hackagent.models import StepTypeEnum
+from hackagent.api.models import StepTypeEnum
 from hackagent.router.router import AgentRouter
 from hackagent.router.tracking import Context, Tracker
 
@@ -318,6 +319,59 @@ class TapExecutor:
         )
         return extract_response_content(response, self.logger)
 
+    def _expand_one_branch(
+        self,
+        branch_index: int,
+        stream_index: int,
+        conv: Dict[str, Any],
+        user_message: str,
+        max_attempts: int,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Run attacker query for one (branch_index, stream_index) pair.
+
+        Designed to be called concurrently from a ThreadPoolExecutor so that
+        all branches of a depth level are expanded in parallel instead of
+        sequentially.
+
+        Args:
+            branch_index: Which branching-factor slot this expansion belongs to.
+            stream_index: Which n_streams slot this expansion belongs to.
+            conv: Current conversation state for this stream (will be deep-copied).
+            user_message: The user turn to append before querying the attacker.
+            max_attempts: Maximum attacker query retries on parse failure.
+
+        Returns:
+            Dict with keys ``attack_dict``, ``conv_copy``, ``branch_index``,
+            ``stream_index`` on success; ``None`` when all attempts fail.
+        """
+        conv_copy = copy.deepcopy(conv)
+        conv_copy["parent_id"] = conv.get("self_id")
+        conv_copy["self_id"] = _random_id()
+        conv_copy["messages"].append({"role": "user", "content": user_message})
+
+        attack_dict = None
+        for _ in range(max_attempts):
+            attack_dict = self._query_attacker(conv_copy["messages"])
+            if attack_dict is not None:
+                break
+
+        if attack_dict is None:
+            return None
+
+        conv_copy["messages"].append(
+            {
+                "role": "assistant",
+                "content": json.dumps(attack_dict, ensure_ascii=True),
+            }
+        )
+        return {
+            "attack_dict": attack_dict,
+            "conv_copy": conv_copy,
+            "branch_index": branch_index,
+            "stream_index": stream_index,
+        }
+
     def run_single_goal(
         self,
         goal: str,
@@ -385,69 +439,72 @@ class TapExecutor:
             extracted_attack_list: List[Dict[str, Any]] = []
             convs_list_new: List[Dict[str, Any]] = []
 
-            for branch_index in range(branching_factor):
+            # --- Parallel attacker expansion ---
+            # All (branch_index, stream_index) pairs are independent; fire them
+            # all at once so the attacker GPU processes every branch in parallel.
+            _exp_tasks = [
+                (bi, si, conv, processed_response_list[si])
+                for bi in range(branching_factor)
+                for si, conv in enumerate(convs_list)
+            ]
+            if verbose:
+                self.logger.info(
+                    "Depth %s/%s: expanding %s branches × %s streams "
+                    "= %s attacker calls in parallel",
+                    iteration,
+                    depth,
+                    branching_factor,
+                    len(convs_list),
+                    len(_exp_tasks),
+                )
+
+            _exp_futures: Dict = {}
+            with ThreadPoolExecutor(max_workers=max(1, len(_exp_tasks))) as _exp_pool:
+                for _bi, _si, _conv, _msg in _exp_tasks:
+                    _f = _exp_pool.submit(
+                        self._expand_one_branch, _bi, _si, _conv, _msg, max_attempts
+                    )
+                    _exp_futures[_f] = (_bi, _si)
+            # All futures complete when the pool shuts down (wait=True default)
+
+            _exp_results: List[Dict[str, Any]] = []
+            for _f in _exp_futures:
+                _res = _f.result()
+                if _res is not None:
+                    _exp_results.append(_res)
+            # Restore deterministic (branch_index, stream_index) ordering
+            _exp_results.sort(key=lambda r: (r["branch_index"], r["stream_index"]))
+
+            for _res in _exp_results:
+                attack_dict = _res["attack_dict"]
+                conv_copy = _res["conv_copy"]
+                branch_index = _res["branch_index"]
+                stream_index = _res["stream_index"]
+                extracted_attack_list.append(
+                    {
+                        **attack_dict,
+                        "self_id": conv_copy["self_id"],
+                        "parent_id": conv_copy["parent_id"],
+                        "branch_index": branch_index,
+                        "stream_index": stream_index,
+                    }
+                )
+                convs_list_new.append(conv_copy)
                 if verbose:
-                    self.logger.info(
-                        "Depth %s/%s, branch %s/%s: expanding %s streams",
-                        iteration,
-                        depth,
-                        branch_index + 1,
-                        branching_factor,
-                        len(convs_list),
+                    _log_colored(
+                        self.logger,
+                        "[GENERATED PROMPT] Depth %s/%s, branch %s/%s, stream %s/%s: %s"
+                        % (
+                            iteration,
+                            depth,
+                            branch_index + 1,
+                            branching_factor,
+                            stream_index + 1,
+                            len(convs_list),
+                            attack_dict.get("prompt", ""),
+                        ),
+                        "cyan",
                     )
-                for stream_index, conv in enumerate(convs_list):
-                    conv_copy = copy.deepcopy(conv)
-                    conv_copy["parent_id"] = conv.get("self_id")
-                    conv_copy["self_id"] = _random_id()
-
-                    conv_copy["messages"].append(
-                        {
-                            "role": "user",
-                            "content": processed_response_list[stream_index],
-                        }
-                    )
-
-                    attack_dict = None
-                    for _ in range(max_attempts):
-                        attack_dict = self._query_attacker(conv_copy["messages"])
-                        if attack_dict is not None:
-                            break
-
-                    if attack_dict is None:
-                        continue
-
-                    conv_copy["messages"].append(
-                        {
-                            "role": "assistant",
-                            "content": json.dumps(attack_dict, ensure_ascii=True),
-                        }
-                    )
-
-                    extracted_attack_list.append(
-                        {
-                            **attack_dict,
-                            "self_id": conv_copy["self_id"],
-                            "parent_id": conv_copy["parent_id"],
-                            "branch_index": branch_index,
-                            "stream_index": stream_index,
-                        }
-                    )
-                    convs_list_new.append(conv_copy)
-                    if verbose:
-                        _log_colored(
-                            self.logger,
-                            "[GENERATED PROMPT] Depth %s/%s, branch %s/%s, stream %s/%s: %s"
-                            % (
-                                iteration,
-                                depth,
-                                branch_index + 1,
-                                branching_factor,
-                                stream_index + 1,
-                                len(convs_list),
-                                attack_dict.get("prompt", ""),
-                            ),
-                            "cyan",
-                        )
 
             if not extracted_attack_list:
                 self.logger.warning("No valid attacker outputs; stopping early.")
@@ -520,10 +577,23 @@ class TapExecutor:
             convs_list = list(convs_list)
             extracted_attack_list = list(extracted_attack_list)
 
-            target_response_list: List[str] = []
-            for prompt in adv_prompt_list:
-                response_text = self._query_target(prompt)
-                target_response_list.append(response_text or "")
+            # --- Parallel victim queries ---
+            # Each prompt in the surviving candidate set is independent;
+            # send them all to the victim simultaneously.
+            _vn = len(adv_prompt_list)
+            if _vn > 1:
+                _vfutures: Dict[Any, int] = {}
+                with ThreadPoolExecutor(max_workers=_vn) as _vpool:
+                    for _j, _p in enumerate(adv_prompt_list):
+                        _vfutures[_vpool.submit(self._query_target, _p)] = _j
+                _vmap: Dict[int, str] = {}
+                for _vf in _vfutures:
+                    _vmap[_vfutures[_vf]] = _vf.result() or ""
+                target_response_list: List[str] = [_vmap[_j] for _j in range(_vn)]
+            else:
+                target_response_list = (
+                    [self._query_target(adv_prompt_list[0]) or ""] if _vn else []
+                )
 
             judge_scores = self.evaluator.score_candidates(
                 goal,
@@ -643,7 +713,7 @@ class TapExecutor:
                     advance=len(adv_prompt_list),
                     description=(
                         f"[cyan]TAP depth {iteration}/{depth}, "
-                        f"branch {branch_index + 1}/{branching_factor}[/cyan]"
+                        f"{len(extracted_attack_list)} branches[/cyan]"
                     ),
                 )
 
@@ -749,31 +819,67 @@ def execute(
     )
 
     total_estimate = max(1, depth * width * branching_factor)
-    results: List[Dict[str, Any]] = []
+    # n_parallel_goals: run multiple goals concurrently (set in tap_params,
+    # default 1 = serial for backward compatibility).  Each goal already
+    # parallelises its own attacker / victim calls internally, so even
+    # n_parallel_goals=1 is much faster than the original serial code.
+    n_parallel_goals = max(1, tap_params.get("n_parallel_goals", 1))
+    results_map: Dict[int, Dict[str, Any]] = {}
 
     with create_progress_bar(
         "[cyan]TAP search...",
         total_estimate * len(goals),
     ) as (progress_bar, task):
-        for i, goal in enumerate(goals):
-            goal_ctx = tracker.get_goal_context(i) if tracker else None
+        if n_parallel_goals > 1:
+            with ThreadPoolExecutor(max_workers=n_parallel_goals) as _goal_pool:
+                _goal_futures = {
+                    _goal_pool.submit(
+                        executor.run_single_goal,
+                        goal=goal,
+                        goal_index=i,
+                        goal_tracker=tracker,
+                        goal_ctx=tracker.get_goal_context(i) if tracker else None,
+                        progress_bar=progress_bar,
+                        task=task,
+                    ): i
+                    for i, goal in enumerate(goals)
+                }
+            for _gf, i in _goal_futures.items():
+                try:
+                    results_map[i] = _gf.result()
+                except Exception as _exc:
+                    logger.error("Goal %d raised: %s", i, _exc, exc_info=True)
+                    results_map[i] = {
+                        "goal": goals[i],
+                        "goal_index": i,
+                        "best_prompt": "",
+                        "best_response": "",
+                        "best_score": 0,
+                        "is_success": False,
+                        "iterations_completed": 0,
+                        "depth": depth,
+                    }
+        else:
+            for i, goal in enumerate(goals):
+                goal_ctx = tracker.get_goal_context(i) if tracker else None
+                results_map[i] = executor.run_single_goal(
+                    goal=goal,
+                    goal_index=i,
+                    goal_tracker=tracker,
+                    goal_ctx=goal_ctx,
+                    progress_bar=progress_bar,
+                    task=task,
+                )
 
-            result = executor.run_single_goal(
-                goal=goal,
-                goal_index=i,
-                goal_tracker=tracker,
-                goal_ctx=goal_ctx,
-                progress_bar=progress_bar,
-                task=task,
-            )
-            results.append(result)
+    results = [results_map[i] for i in range(len(goals))]
 
     logger.info(
-        "TAP completed with depth=%s width=%s branching=%s streams=%s",
+        "TAP completed with depth=%s width=%s branching=%s streams=%s n_parallel_goals=%s",
         depth,
         width,
         branching_factor,
         n_streams,
+        n_parallel_goals,
     )
 
     return results

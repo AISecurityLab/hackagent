@@ -34,6 +34,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from hackagent.attacks.techniques.flipattack import generation
+from hackagent.attacks.techniques.flipattack.attack import FlipAttack
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,19 @@ def _make_mock_router(response_text="This is a mocked LLM response."):
 
 
 def _make_config(flip_mode="FCS", cot=False, lang_gpt=False, few_shot=False):
-    """Create a minimal config dictionary for generation."""
+    """Create a minimal config dictionary for generation, including a real FlipAttack instance."""
+    fa = FlipAttack(
+        config={
+            "flipattack_params": {
+                "flip_mode": flip_mode,
+                "cot": cot,
+                "lang_gpt": lang_gpt,
+                "few_shot": few_shot,
+            }
+        },
+        client=MagicMock(),
+        agent_router=MagicMock(),
+    )
     return {
         "flipattack_params": {
             "flip_mode": flip_mode,
@@ -64,6 +77,7 @@ def _make_config(flip_mode="FCS", cot=False, lang_gpt=False, few_shot=False):
             "lang_gpt": lang_gpt,
             "few_shot": few_shot,
         },
+        "_self": fa,
     }
 
 
