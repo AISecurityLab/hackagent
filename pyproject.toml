@@ -37,6 +37,10 @@ dependencies = [
 datasets = [
     "datasets>=2.14.0",  # HuggingFace datasets library
 ]
+autodan-turbo = [
+    "faiss-cpu>=1.7.0",
+    "numpy>=1.24.0",
+]
 
 [dependency-groups]
 dev = [
