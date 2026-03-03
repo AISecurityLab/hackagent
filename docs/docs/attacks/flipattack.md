@@ -157,6 +157,7 @@ advanced_config = {
     # Batching / parallelization
     "batch_size": 4,           # Concurrent requests to target model
     "goal_batch_size": 20,     # Goals per macro-batch (omit to disable)
+    "goal_batch_workers": 2,   # Concurrent macro-batches
     "batch_size_judge": 2,     # Concurrent judge evaluations
 
     # Judge configuration
@@ -191,6 +192,7 @@ advanced_config = {
 | `flipattack_params.few_shot` | Inject two decoding demonstrations | `False` |
 | `batch_size` | Concurrent generation requests to target model (see [Batching](#parallelization--batching)) | `16` |
 | `goal_batch_size` | Max goals per macro-batch (see [Batching](#parallelization--batching)) | *disabled* |
+| `goal_batch_workers` | Concurrent macro-batch workers (see [Batching](#parallelization--batching)) | `1` |
 | `batch_size_judge` | Concurrent judge evaluation requests (see [Batching](#parallelization--batching)) | `1` |
 | `filter_len` | Minimum response length (chars) to be considered non-trivial | `10` |
 | `judge_temperature` | Sampling temperature for judge model | `0.0` |
@@ -229,6 +231,7 @@ flowchart LR
 ```
 
 > **`goal_batch_size`** controls how many goals enter each macro-batch (sequential).
+> **`goal_batch_workers`** controls how many macro-batches run in parallel.
 > Within each macro-batch, **`batch_size`** controls concurrent generation threads.
 > After generation, **`batch_size_judge`** controls concurrent judge threads.
 
@@ -238,6 +241,7 @@ flowchart LR
 |-----------|-------|--------------|---------|
 | `batch_size` | Generation | Max concurrent requests to the **target model**. A `ThreadPoolExecutor` fires up to this many goals in parallel; as soon as one finishes a new one starts (sliding window). | `16` |
 | `goal_batch_size` | Orchestrator | Splits all goals into sequential macro-batches of this size. Generation + Evaluation run once per macro-batch. Only activates when `len(goals) > goal_batch_size`. | *disabled* |
+| `goal_batch_workers` | Orchestrator | Runs multiple macro-batches in parallel. Increase when you have many goals and enough API budget to process batches concurrently. | `1` |
 | `batch_size_judge` | Evaluation | Max concurrent requests to the **judge model**. Works the same way as `batch_size` but for scoring. | `1` |
 
 ### Example
@@ -247,6 +251,7 @@ config = {
     "attack_type": "flipattack",
     "goals": GOALS,              # e.g. 100 goals
     "goal_batch_size": 20,       # 5 macro-batches of 20 goals
+    "goal_batch_workers": 2,     # 2 macro-batches in parallel
     "batch_size": 10,            # 10 concurrent target requests
     "batch_size_judge": 5,       # 5 concurrent judge requests
     "flipattack_params": {
