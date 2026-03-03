@@ -219,6 +219,8 @@ class TestGenerateSummaryReport(unittest.TestCase):
             "overall_confidence",
             "per_goal_metrics",
             "unique_goals",
+            "fleiss_kappa",
+            "majority_vote_asr",
         }
         self.assertEqual(set(report.keys()), expected_keys)
 
