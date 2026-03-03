@@ -137,7 +137,8 @@ class AutoDANTurboAttack(BaseAttack):
 
         role_models = {
             role: (
-                (self.config.get(role, {}) or {}).get("model")
+                (self.config.get(role, {}) or {}).get("identifier")
+                or (self.config.get(role, {}) or {}).get("model")
                 or (self.config.get(role, {}) or {}).get("name")
                 or "unknown-model"
             )

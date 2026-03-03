@@ -24,7 +24,11 @@ Technique implementations remain pure algorithms, unaware of server integration.
 
 import json
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
+import time
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from hackagent.logger import get_logger
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 import httpx
@@ -33,16 +37,34 @@ from hackagent.api.attack.attack_create import (
     sync_detailed as attacks_create_sync_detailed,
 )
 from hackagent.api.run import run_run_tests_create
-from hackagent.api.run.run_update import sync_detailed as run_update
+from hackagent.api.run.run_partial_update import sync_detailed as run_status_update
 from hackagent.errors import HackAgentError
-from hackagent.models.attack_request import AttackRequest
-from hackagent.models.run_request import RunRequest
-from hackagent.models.status_enum import StatusEnum
+from hackagent.api.models import AttackRequest
+from hackagent.api.models import PatchedRunRequest
+from hackagent.api.models import RunRequest
+from hackagent.api.models import StatusEnum
 
 if TYPE_CHECKING:
     from hackagent.agent import HackAgent
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
+
+
+class _BatchContextFilter(logging.Filter):
+    """
+    Logging filter that prepends ``[Batchindex/total]`` to every log record
+    emitted from a goal-batch worker thread.
+
+    It reads the current thread name (set to ``B{idx}/{n}`` by the worker
+    before the attack runs) and prefixes the message **only** for non-main
+    threads, so sequential runs are unaffected.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003
+        t = threading.current_thread()
+        if t.name != "MainThread":
+            record.msg = f"[{t.name}] {record.msg}"
+        return True
 
 
 class AttackOrchestrator:
@@ -125,7 +147,7 @@ class AttackOrchestrator:
         }
 
         try:
-            attack_req_obj = AttackRequest.from_dict(payload)
+            attack_req_obj = AttackRequest.model_validate(payload)
             response = attacks_create_sync_detailed(
                 client=self.client, body=attack_req_obj
             )
@@ -315,6 +337,17 @@ class AttackOrchestrator:
         """
         Execute attack locally using technique implementation.
 
+        If ``goal_batch_size`` is present in *attack_config*, goals are split
+        into sequential batches of that size.  Within each batch, every goal
+        is executed in its own thread (up to ``goal_batch_workers`` threads)
+        so goals inside the same batch run in parallel.
+
+        Batches are processed **sequentially** — batch *N+1* starts only
+        after all goals in batch *N* have completed.
+
+        When ``goal_batch_size`` is absent (or the goals list is smaller
+        than the batch size), the attack runs as a single call to ``run()``.
+
         Args:
             attack_id: Server-side attack record ID
             run_id: Server-side run record ID
@@ -333,8 +366,125 @@ class AttackOrchestrator:
             attack_config, run_config_override, run_id
         )
         attack_impl = self.attack_impl_class(**impl_kwargs)
-        results = attack_impl.run(**attack_params)
 
+        goals = attack_params.get("goals")
+        goal_batch_size = attack_config.get("goal_batch_size")
+        raw_goal_batch_workers = attack_config.get("goal_batch_workers", 1)
+        try:
+            goal_batch_workers = max(1, int(raw_goal_batch_workers))
+        except (TypeError, ValueError):
+            logger.warning(
+                f"Invalid goal_batch_workers={raw_goal_batch_workers!r}; defaulting to 1"
+            )
+            goal_batch_workers = 1
+
+        if (
+            goal_batch_size
+            and isinstance(goals, list)
+            and len(goals) >= goal_batch_size
+        ):
+            batches = [
+                goals[i : i + goal_batch_size]
+                for i in range(0, len(goals), goal_batch_size)
+            ]
+            n_batches = len(batches)
+            logger.info(
+                f"Batching {len(goals)} goals into {n_batches} sequential batch(es) "
+                f"of up to {goal_batch_size}, "
+                f"goal_batch_workers={goal_batch_workers} (parallel goals per batch)"
+            )
+
+            all_results: List[Dict[str, Any]] = []
+            batch_timings: List[float] = []
+
+            for batch_idx, batch_goals in enumerate(batches):
+                batch_label = f"B{batch_idx + 1}/{n_batches}"
+                n_goals_in_batch = len(batch_goals)
+                logger.info(f"[{batch_label}] Starting ({n_goals_in_batch} goals)")
+                _batch_t0 = time.perf_counter()
+
+                if goal_batch_workers <= 1:
+                    # Sequential: pass all goals at once to a single run()
+                    batch_params = {**attack_params, "goals": batch_goals}
+                    batch_results = attack_impl.run(**batch_params) or []
+                else:
+                    # Parallel: one thread per goal inside this batch
+                    effective_workers = min(goal_batch_workers, n_goals_in_batch)
+
+                    def _run_single_goal(
+                        goal_idx_goal: Tuple[int, str],
+                        _batch_label: str = batch_label,
+                    ) -> Tuple[int, List[Dict[str, Any]]]:
+                        goal_idx, goal = goal_idx_goal
+
+                        # Label thread for _BatchContextFilter
+                        threading.current_thread().name = (
+                            f"{_batch_label} G{goal_idx + 1}/{n_goals_in_batch}"
+                        )
+                        logger.info(f"Processing goal: {goal[:60]}...")
+
+                        # Each goal gets its own attack instance to avoid
+                        # shared mutable state across threads.
+                        local_impl = self.attack_impl_class(**impl_kwargs)
+                        goal_params = {**attack_params, "goals": [goal]}
+                        goal_results = local_impl.run(**goal_params) or []
+
+                        logger.info(f"Goal done ({len(goal_results)} results)")
+                        return goal_idx, goal_results
+
+                    per_goal_results: Dict[int, List[Dict[str, Any]]] = {}
+
+                    # Install a LogRecordFactory so *all* log records,
+                    # regardless of logger/handler routing, get the batch
+                    # label injected directly into the message.
+                    _previous_factory = logging.getLogRecordFactory()
+
+                    def _batch_record_factory(*args, **kwargs):
+                        record = _previous_factory(*args, **kwargs)
+                        tname = threading.current_thread().name
+                        if tname != "MainThread":
+                            record.msg = f"[{tname}] {record.msg}"
+                        return record
+
+                    logging.setLogRecordFactory(_batch_record_factory)
+                    try:
+                        with ThreadPoolExecutor(max_workers=effective_workers) as pool:
+                            for goal_idx, goal_results in pool.map(
+                                _run_single_goal, enumerate(batch_goals)
+                            ):
+                                per_goal_results[goal_idx] = goal_results
+                    finally:
+                        logging.setLogRecordFactory(_previous_factory)
+
+                    # Reassemble in original goal order
+                    batch_results = []
+                    for goal_idx in range(n_goals_in_batch):
+                        batch_results.extend(per_goal_results.get(goal_idx, []))
+
+                _batch_elapsed = round(time.perf_counter() - _batch_t0, 3)
+                batch_timings.append(_batch_elapsed)
+                logger.info(
+                    f"[{batch_label}] Completed in {_batch_elapsed:.1f}s "
+                    f"({len(batch_results)} results)"
+                )
+                all_results.extend(batch_results)
+
+            # Log goal-batch latency summary
+            if batch_timings:
+                avg_bt = sum(batch_timings) / len(batch_timings)
+                logger.info(
+                    f"Goal-batch latency: avg={avg_bt:.1f}s "
+                    f"[{min(batch_timings):.1f}–{max(batch_timings):.1f}s], "
+                    f"total={sum(batch_timings):.1f}s"
+                )
+
+            logger.info(
+                f"{self.attack_type} attack completed "
+                f"({len(all_results)} total results from {n_batches} batches)"
+            )
+            return all_results
+
+        results = attack_impl.run(**attack_params)
         logger.info(f"{self.attack_type} attack completed")
         return results
 
@@ -398,12 +548,10 @@ class AttackOrchestrator:
         # 4. Update run status to RUNNING
         try:
             logger.info(f"Updating run {run_id} status to RUNNING")
-            run_update(
+            run_status_update(
                 id=run_id,
                 client=self.client,
-                body=RunRequest(
-                    agent=victim_agent_id,
-                    attack=attack_id,
+                body=PatchedRunRequest(
                     status=StatusEnum.RUNNING,
                 ),
             )
@@ -412,6 +560,7 @@ class AttackOrchestrator:
 
         # 5. Execute locally
         try:
+            _total_t0 = time.perf_counter()
             results = self._execute_local_attack(
                 attack_id=attack_id,
                 run_id=run_id,
@@ -419,16 +568,16 @@ class AttackOrchestrator:
                 attack_config=attack_config,
                 run_config_override=run_config_override,
             )
+            _total_elapsed = round(time.perf_counter() - _total_t0, 3)
+            logger.info(f"Total run time: {_total_elapsed:.1f}s")
 
             # 6. Update run status to COMPLETED
             try:
                 logger.info(f"Updating run {run_id} status to COMPLETED")
-                run_update(
+                run_status_update(
                     id=run_id,
                     client=self.client,
-                    body=RunRequest(
-                        agent=victim_agent_id,
-                        attack=attack_id,
+                    body=PatchedRunRequest(
                         status=StatusEnum.COMPLETED,
                     ),
                 )
@@ -441,12 +590,10 @@ class AttackOrchestrator:
             # Update run status to FAILED on error
             try:
                 logger.error(f"Attack execution failed: {e}")
-                run_update(
+                run_status_update(
                     id=run_id,
                     client=self.client,
-                    body=RunRequest(
-                        agent=victim_agent_id,
-                        attack=attack_id,
+                    body=PatchedRunRequest(
                         status=StatusEnum.FAILED,
                         run_notes=f"Execution failed: {str(e)}",
                     ),

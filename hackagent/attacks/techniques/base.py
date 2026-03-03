@@ -28,11 +28,12 @@ allowing techniques to focus solely on attack algorithms.
 
 import abc
 import logging
+from hackagent.logger import get_logger
 from typing import Any, Dict, List, Optional
 
 from hackagent.router.tracking import StepTracker, TrackingCoordinator
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class BaseAttack(abc.ABC):
@@ -138,7 +139,7 @@ class BaseAttack(abc.ABC):
         """
         # Logger should be set by subclass with appropriate name
         if not hasattr(self, "logger"):
-            self.logger = logging.getLogger(__name__)
+            self.logger = get_logger(__name__)
 
         self.logger.propagate = False
         self.logger.setLevel(logging.INFO)

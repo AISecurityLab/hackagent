@@ -1,57 +1,60 @@
-# Copyright 2026 - AI4I. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
-
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+from urllib.parse import quote
 from uuid import UUID
+
 import httpx
+
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.organization import Organization
-from ...models.patched_organization_request import PatchedOrganizationRequest
-from ...types import Response
+from ...types import UNSET, Response, Unset
+from ..models import Organization, PatchedOrganizationRequest
 
 
 def _get_kwargs(
     id: UUID,
     *,
-    body: Union[
-        PatchedOrganizationRequest,
-        PatchedOrganizationRequest,
-        PatchedOrganizationRequest,
-    ],
+    body: PatchedOrganizationRequest
+    | PatchedOrganizationRequest
+    | PatchedOrganizationRequest
+    | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "patch",
-        "url": f"/organization/{id}",
+        "url": "/organization/{id}".format(
+            id=quote(str(id), safe=""),
+        ),
     }
 
     if isinstance(body, PatchedOrganizationRequest):
-        _kwargs["json"] = body.to_dict()
+        if not isinstance(body, Unset):
+            _kwargs["json"] = body.model_dump(
+                by_alias=True, mode="json", exclude_none=True
+            )
 
         headers["Content-Type"] = "application/json"
     if isinstance(body, PatchedOrganizationRequest):
-        _kwargs["data"] = body.to_dict()
+        if not isinstance(body, Unset):
+            _kwargs["data"] = body.model_dump(
+                by_alias=True, mode="json", exclude_none=True
+            )
 
         headers["Content-Type"] = "application/x-www-form-urlencoded"
-    if isinstance(body, PatchedOrganizationRequest):
-        _kwargs["files"] = body.to_multipart()
-
-        headers["Content-Type"] = "multipart/form-data"
 
     _kwargs["headers"] = headers
     return _kwargs
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[Organization]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Organization | None:
     if response.status_code == 200:
-        response_200 = Organization.from_dict(response.json())
+        response_200 = Organization.model_validate(response.json())
 
         return response_200
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -59,7 +62,7 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+    *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[Organization]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -73,11 +76,10 @@ def sync_detailed(
     id: UUID,
     *,
     client: AuthenticatedClient,
-    body: Union[
-        PatchedOrganizationRequest,
-        PatchedOrganizationRequest,
-        PatchedOrganizationRequest,
-    ],
+    body: PatchedOrganizationRequest
+    | PatchedOrganizationRequest
+    | PatchedOrganizationRequest
+    | Unset = UNSET,
 ) -> Response[Organization]:
     """Provides access to Organization details for the authenticated user.
 
@@ -86,9 +88,9 @@ def sync_detailed(
 
     Args:
         id (UUID):
-        body (PatchedOrganizationRequest):
-        body (PatchedOrganizationRequest):
-        body (PatchedOrganizationRequest):
+        body (PatchedOrganizationRequest | Unset):
+        body (PatchedOrganizationRequest | Unset):
+        body (PatchedOrganizationRequest | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -114,12 +116,11 @@ def sync(
     id: UUID,
     *,
     client: AuthenticatedClient,
-    body: Union[
-        PatchedOrganizationRequest,
-        PatchedOrganizationRequest,
-        PatchedOrganizationRequest,
-    ],
-) -> Optional[Organization]:
+    body: PatchedOrganizationRequest
+    | PatchedOrganizationRequest
+    | PatchedOrganizationRequest
+    | Unset = UNSET,
+) -> Organization | None:
     """Provides access to Organization details for the authenticated user.
 
     Web-only endpoint - requires Auth0 authentication.
@@ -127,9 +128,9 @@ def sync(
 
     Args:
         id (UUID):
-        body (PatchedOrganizationRequest):
-        body (PatchedOrganizationRequest):
-        body (PatchedOrganizationRequest):
+        body (PatchedOrganizationRequest | Unset):
+        body (PatchedOrganizationRequest | Unset):
+        body (PatchedOrganizationRequest | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -150,11 +151,10 @@ async def asyncio_detailed(
     id: UUID,
     *,
     client: AuthenticatedClient,
-    body: Union[
-        PatchedOrganizationRequest,
-        PatchedOrganizationRequest,
-        PatchedOrganizationRequest,
-    ],
+    body: PatchedOrganizationRequest
+    | PatchedOrganizationRequest
+    | PatchedOrganizationRequest
+    | Unset = UNSET,
 ) -> Response[Organization]:
     """Provides access to Organization details for the authenticated user.
 
@@ -163,9 +163,9 @@ async def asyncio_detailed(
 
     Args:
         id (UUID):
-        body (PatchedOrganizationRequest):
-        body (PatchedOrganizationRequest):
-        body (PatchedOrganizationRequest):
+        body (PatchedOrganizationRequest | Unset):
+        body (PatchedOrganizationRequest | Unset):
+        body (PatchedOrganizationRequest | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -189,12 +189,11 @@ async def asyncio(
     id: UUID,
     *,
     client: AuthenticatedClient,
-    body: Union[
-        PatchedOrganizationRequest,
-        PatchedOrganizationRequest,
-        PatchedOrganizationRequest,
-    ],
-) -> Optional[Organization]:
+    body: PatchedOrganizationRequest
+    | PatchedOrganizationRequest
+    | PatchedOrganizationRequest
+    | Unset = UNSET,
+) -> Organization | None:
     """Provides access to Organization details for the authenticated user.
 
     Web-only endpoint - requires Auth0 authentication.
@@ -202,9 +201,9 @@ async def asyncio(
 
     Args:
         id (UUID):
-        body (PatchedOrganizationRequest):
-        body (PatchedOrganizationRequest):
-        body (PatchedOrganizationRequest):
+        body (PatchedOrganizationRequest | Unset):
+        body (PatchedOrganizationRequest | Unset):
+        body (PatchedOrganizationRequest | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

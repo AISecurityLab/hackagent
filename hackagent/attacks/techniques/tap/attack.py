@@ -1,4 +1,48 @@
-"""TAP (Tree of Attacks with Pruning) implementation."""
+# Copyright 2025 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+"""
+TAP (Tree of Attacks with Pruning) attack implementation.
+
+Implements the TAP algorithm from:
+    Mehrotra et al., "Tree of Attacks with Pruning: Efficient
+    Adversarial Prompting of Large Language Models" (2023)
+    https://arxiv.org/abs/2312.02119
+
+Algorithm overview
+------------------
+TAP performs a bounded tree search where each node represents an
+attacker-generated prompt candidate:
+
+1. **Branching** — an attacker LLM generates ``branching_factor``
+   refinements of the current prompt in parallel ``n_streams`` streams.
+2. **On-topic pruning** — a judge (or the main judge) discards branches
+   whose prompts have drifted off-topic (``min_on_topic_score`` threshold).
+3. **Target query** — surviving prompts are sent to the victim model.
+4. **Score pruning** — only the top-``width`` branches by jailbreak score
+   are kept for the next depth level.
+5. **Termination** — search stops when ``depth`` levels are exhausted or
+   a branch exceeds ``success_score_threshold``.
+
+Key parameters (``tap_params`` in config)
+-----------------------------------------
+depth
+    Maximum tree depth (number of refinement rounds per stream).
+width
+    Maximum branches kept after scoring at each depth level.
+branching_factor
+    Prompt refinements generated per active branch at each step.
+n_streams
+    Number of independent root-to-leaf searches run in parallel.
+keep_last_n
+    Conversation history window per stream (controls attacker context size).
+early_stop_on_success
+    Stop all streams as soon as one branch crosses the success threshold.
+min_on_topic_score
+    Minimum on-topic score (0 or 1) to retain a branch after on-topic pruning.
+success_score_threshold
+    Judge score that signals a successful jailbreak (default 1 for binary judges).
+"""
 
 import copy
 import logging
@@ -37,10 +81,37 @@ def _recursive_update(target_dict: Dict[str, Any], source_dict: Dict[str, Any]) 
 
 class TAPAttack(BaseAttack):
     """
-    TAP (Tree of Attacks with Pruning).
+    TAP (Tree of Attacks with Pruning) attack.
 
-    Uses an attacker LLM to generate candidate prompts, prunes off-topic
-    prompts, queries the target, and prunes to the top-scoring branches.
+    Orchestrates the TAP tree search by delegating to
+    :mod:`~hackagent.attacks.techniques.tap.generation` (attacker loop
+    and target queries) and
+    :mod:`~hackagent.attacks.techniques.tap.evaluation` (judge scoring).
+
+    The attack expects three collaborating models configured via
+    ``config``:
+
+    * **Attacker** (``config["attacker"]``) — LLM that proposes prompt
+      refinements from conversation history.
+    * **Target** — the victim model reached via ``agent_router``.
+    * **Judge** (``config["judge"]``) — LLM that rates jailbreak success
+      0–10 (or 0/1 for binary judges such as HarmBench).
+    * **On-topic judge** (``config["on_topic_judge"]``, optional) —
+      separate evaluator that checks whether a prompt stays on-topic.
+      When ``None``, the configured judge is reused with the on-topic
+      evaluation type.
+
+    The :meth:`run` method manages the full pipeline via
+    :class:`~hackagent.router.tracking.TrackingCoordinator`:
+    a coordinator handles per-goal :class:`~hackagent.router.tracking.Tracker`
+    lifecycle and pipeline-level :class:`~hackagent.router.tracking.StepTracker`
+    checkpointing.
+
+    Attributes:
+        config: Merged TAP configuration dictionary.
+        client: Authenticated HackAgent API client.
+        agent_router: Router for the victim model.
+        logger: Hierarchical logger at ``hackagent.attacks.tap``.
     """
 
     def __init__(
@@ -53,12 +124,15 @@ class TAPAttack(BaseAttack):
         Initialize TAP with configuration and routers.
 
         Args:
-            config: Optional config overrides merged into defaults.
+            config: Optional config overrides merged into
+                :data:`~hackagent.attacks.techniques.tap.config.DEFAULT_TAP_CONFIG`.
+                Keys from ``config`` win over defaults; nested dicts are
+                deep-merged via :func:`_recursive_update`.
             client: Authenticated API client.
             agent_router: Router for the victim model.
 
         Raises:
-            ValueError: If required dependencies are missing.
+            ValueError: If ``client`` or ``agent_router`` is ``None``.
         """
         if client is None:
             raise ValueError("AuthenticatedClient must be provided to TAPAttack.")
@@ -77,10 +151,16 @@ class TAPAttack(BaseAttack):
 
     def _validate_config(self) -> None:
         """
-        Validate TAP parameters needed by the search algorithm.
+        Validate TAP-specific configuration.
+
+        Checks that the required top-level keys are present **and** that
+        the numeric ``tap_params`` values satisfy the algorithm constraints
+        (all of ``depth``, ``width``, ``branching_factor``, ``n_streams``
+        must be ≥ 1).
 
         Raises:
-            ValueError: If required keys or parameter constraints are missing.
+            ValueError: If any required key is missing or a ``tap_params``
+                integer is less than 1.
         """
         super()._validate_config()
 
@@ -99,10 +179,19 @@ class TAPAttack(BaseAttack):
 
     def _get_pipeline_steps(self) -> List[Dict]:
         """
-        Describe the TAP pipeline: generation/search then evaluation.
+        Define the two TAP pipeline stages.
+
+        Stage 1 — **Generation** (:func:`~hackagent.attacks.techniques.tap.generation.execute`):
+            Runs the full tree-of-attacks-with-pruning search and collects
+            the best adversarial prompt found per goal.
+
+        Stage 2 — **Evaluation** (:func:`~hackagent.attacks.techniques.tap.evaluation.execute`):
+            Runs all configured judges on the generation output and computes
+            ``best_score`` / ``success`` columns.
 
         Returns:
-            Pipeline step list compatible with BaseAttack._execute_pipeline.
+            List of pipeline-step configuration dicts compatible with
+            :meth:`~hackagent.attacks.techniques.base.BaseAttack._execute_pipeline`.
         """
         return [
             {

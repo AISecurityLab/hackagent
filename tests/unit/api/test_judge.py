@@ -12,7 +12,7 @@ import httpx
 
 from hackagent.api.judge.judge_create import asyncio_detailed, sync_detailed
 from hackagent.client import AuthenticatedClient
-from hackagent.models import (
+from hackagent.api.models import (
     GenerateErrorResponse,
     GenerateRequestRequest,
     MessageRequest,
@@ -57,7 +57,7 @@ class TestJudgeAPI(unittest.TestCase):
         self.mock_httpx_client.request.return_value = mock_response
 
         messages_data = [{"role": "user", "content": "Hello"}]
-        messages_items = [MessageRequest.from_dict(m) for m in messages_data]
+        messages_items = [MessageRequest.model_validate(m) for m in messages_data]
         request_body = GenerateRequestRequest(
             model="test-model", messages=messages_items
         )
@@ -66,10 +66,9 @@ class TestJudgeAPI(unittest.TestCase):
         self.mock_httpx_client.request.assert_called_once_with(
             method="post",
             url="/judge",
-            json=request_body.to_dict(),
-            data=request_body.to_dict(),
-            files=request_body.to_multipart(),
-            headers={"Content-Type": "multipart/form-data"},
+            json=request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
+            data=request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
         self.assertIsInstance(response, Response)
         self.assertEqual(response.status_code, HTTPStatus.OK)
@@ -88,7 +87,7 @@ class TestJudgeAPI(unittest.TestCase):
         self.mock_httpx_client.request.return_value = mock_response
 
         messages_data = [{"role": "user", "content": "Hello"}]
-        messages_items = [MessageRequest.from_dict(m) for m in messages_data]
+        messages_items = [MessageRequest.model_validate(m) for m in messages_data]
         request_body = GenerateRequestRequest(
             model="test-model", messages=messages_items
         )
@@ -101,10 +100,9 @@ class TestJudgeAPI(unittest.TestCase):
         self.mock_httpx_client.request.assert_called_once_with(
             method="post",
             url="/judge",
-            json=request_body.to_dict(),
-            data=request_body.to_dict(),
-            files=request_body.to_multipart(),
-            headers={"Content-Type": "multipart/form-data"},
+            json=request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
+            data=request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
 
     def test_sync_detailed_unexpected_status_no_raise(self):
@@ -119,7 +117,7 @@ class TestJudgeAPI(unittest.TestCase):
         self.mock_httpx_client.request.return_value = mock_response
 
         messages_data = [{"role": "user", "content": "Hello"}]
-        messages_items = [MessageRequest.from_dict(m) for m in messages_data]
+        messages_items = [MessageRequest.model_validate(m) for m in messages_data]
         request_body = GenerateRequestRequest(
             model="test-model", messages=messages_items
         )
@@ -128,10 +126,9 @@ class TestJudgeAPI(unittest.TestCase):
         self.mock_httpx_client.request.assert_called_once_with(
             method="post",
             url="/judge",
-            json=request_body.to_dict(),
-            data=request_body.to_dict(),
-            files=request_body.to_multipart(),
-            headers={"Content-Type": "multipart/form-data"},
+            json=request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
+            data=request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
         self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
         self.assertIsInstance(response.parsed, GenerateErrorResponse)
@@ -165,7 +162,7 @@ class TestJudgeAPI(unittest.TestCase):
 
         # Define request_body in the outer scope
         messages_data = [{"role": "user", "content": "Hello"}]
-        messages_items = [MessageRequest.from_dict(m) for m in messages_data]
+        messages_items = [MessageRequest.model_validate(m) for m in messages_data]
         request_body = GenerateRequestRequest(
             model="test-model", messages=messages_items
         )
@@ -178,10 +175,9 @@ class TestJudgeAPI(unittest.TestCase):
         self.mock_async_httpx_client.request.assert_called_once_with(
             method="post",
             url="/judge",
-            json=request_body.to_dict(),
-            data=request_body.to_dict(),
-            files=request_body.to_multipart(),
-            headers={"Content-Type": "multipart/form-data"},
+            json=request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
+            data=request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
         self.assertIsInstance(response, Response)
         self.assertEqual(response.status_code, HTTPStatus.OK)
@@ -203,7 +199,7 @@ class TestJudgeAPI(unittest.TestCase):
 
         # Define request_body in the outer scope
         messages_data = [{"role": "user", "content": "Hello"}]
-        messages_items = [MessageRequest.from_dict(m) for m in messages_data]
+        messages_items = [MessageRequest.model_validate(m) for m in messages_data]
         request_body = GenerateRequestRequest(
             model="test-model", messages=messages_items
         )
@@ -221,10 +217,9 @@ class TestJudgeAPI(unittest.TestCase):
         self.mock_async_httpx_client.request.assert_called_once_with(
             method="post",
             url="/judge",
-            json=request_body.to_dict(),
-            data=request_body.to_dict(),
-            files=request_body.to_multipart(),
-            headers={"Content-Type": "multipart/form-data"},
+            json=request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
+            data=request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
 
     def test_asyncio_detailed_unexpected_status_no_raise(self):
@@ -242,7 +237,7 @@ class TestJudgeAPI(unittest.TestCase):
 
         # Define request_body in the outer scope
         messages_data = [{"role": "user", "content": "Hello"}]
-        messages_items = [MessageRequest.from_dict(m) for m in messages_data]
+        messages_items = [MessageRequest.model_validate(m) for m in messages_data]
         request_body = GenerateRequestRequest(
             model="test-model", messages=messages_items
         )
@@ -255,10 +250,9 @@ class TestJudgeAPI(unittest.TestCase):
         self.mock_async_httpx_client.request.assert_called_once_with(
             method="post",
             url="/judge",
-            json=request_body.to_dict(),
-            data=request_body.to_dict(),
-            files=request_body.to_multipart(),
-            headers={"Content-Type": "multipart/form-data"},
+            json=request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
+            data=request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
         self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
         self.assertIsInstance(response.parsed, GenerateErrorResponse)

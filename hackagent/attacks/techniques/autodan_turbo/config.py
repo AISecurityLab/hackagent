@@ -65,7 +65,6 @@ DEFAULT_AUTODAN_TURBO_CONFIG: Dict[str, Any] = {
         "identifier": "hackagent-attacker",
         "endpoint": "https://api.hackagent.dev/v1",
         "agent_type": "OPENAI_SDK",
-        "model": "gpt-4",
         "api_key": None,
     },
     # Scorer LLM configuration (evaluates jailbreak success 1-10)
@@ -73,7 +72,6 @@ DEFAULT_AUTODAN_TURBO_CONFIG: Dict[str, Any] = {
         "identifier": "hackagent-scorer",
         "endpoint": "https://api.hackagent.dev/v1",
         "agent_type": "OPENAI_SDK",
-        "model": "gpt-4",
         "api_key": None,
     },
     # Summarizer LLM configuration (extracts strategies from prompt pairs)
@@ -81,7 +79,6 @@ DEFAULT_AUTODAN_TURBO_CONFIG: Dict[str, Any] = {
         "identifier": "hackagent-summarizer",
         "endpoint": "https://api.hackagent.dev/v1",
         "agent_type": "OPENAI_SDK",
-        "model": "gpt-4",
         "api_key": None,
     },
     # Final evaluation judges (used for standardized hackagent evaluation)
@@ -94,6 +91,8 @@ DEFAULT_AUTODAN_TURBO_CONFIG: Dict[str, Any] = {
             "endpoint": None,
         }
     ],
+    # Batch size for parallelization (top-level, like AdvPrefix/FlipAttack)
+    "batch_size": 1,
     "batch_size_judge": 1,
     "max_new_tokens_eval": 256,
     "filter_len": 10,

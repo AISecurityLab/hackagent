@@ -19,8 +19,9 @@ For step-level tracking (pipeline steps like "Generation", "Evaluation"),
 use the StepTracker class from step.py instead.
 """
 
-import json
 import logging
+import time
+from hackagent.logger import get_logger
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
@@ -28,7 +29,7 @@ from uuid import UUID
 
 from hackagent.api.result import result_partial_update, result_trace_create
 from hackagent.api.run import run_result_create
-from hackagent.models import (
+from hackagent.api.models import (
     EvaluationStatusEnum,
     PatchedResultRequest,
     ResultRequest,
@@ -36,48 +37,7 @@ from hackagent.models import (
     TraceRequest,
 )
 
-import math
-
-
-def _sanitize_for_json(obj: Any) -> Any:
-    """
-    Recursively sanitize an object for JSON serialization.
-
-    Converts inf/-inf to "Infinity"/"-Infinity" strings and NaN to "NaN".
-    This prevents JSON serialization errors for non-compliant float values.
-    """
-    if isinstance(obj, float):
-        if math.isinf(obj):
-            return "Infinity" if obj > 0 else "-Infinity"
-        if math.isnan(obj):
-            return "NaN"
-        return obj
-    elif isinstance(obj, dict):
-        return {k: _sanitize_for_json(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [_sanitize_for_json(item) for item in obj]
-    elif isinstance(obj, tuple):
-        return tuple(_sanitize_for_json(item) for item in obj)
-    return obj
-
-
-def _deep_clean(obj: Any) -> Any:
-    """
-    Recursively convert Pydantic/OpenAI model objects to plain dicts/lists.
-
-    Handles objects with ``model_dump()`` (Pydantic v2) or ``dict()``
-    (Pydantic v1 / legacy), and recurses into dicts and lists.
-    All other values are returned as-is.
-    """
-    if hasattr(obj, "model_dump"):
-        return obj.model_dump()
-    if hasattr(obj, "dict"):  # legacy Pydantic v1
-        return obj.dict()
-    if isinstance(obj, dict):
-        return {k: _deep_clean(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_deep_clean(v) for v in obj]
-    return obj
+from .utils import deep_clean, sanitize_for_json
 
 
 @dataclass
@@ -91,6 +51,20 @@ class Context:
     traces: List[Dict[str, Any]] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
     is_finalized: bool = False
+    final_success: Optional[bool] = None
+    _start_time: float = field(default_factory=time.perf_counter)
+    _end_time: Optional[float] = None
+
+    def increment_sequence(self) -> int:
+        """Atomically increment and return the next sequence number."""
+        self.sequence_counter += 1
+        return self.sequence_counter
+
+    @property
+    def elapsed_s(self) -> float:
+        """Wall-clock seconds since context creation (or until finalized)."""
+        end = self._end_time if self._end_time is not None else time.perf_counter()
+        return end - self._start_time
 
 
 class Tracker:
@@ -153,7 +127,7 @@ class Tracker:
         """
         self.client = client
         self.run_id = run_id
-        self.logger = logger or logging.getLogger(__name__)
+        self.logger = logger or get_logger(__name__)
         self.attack_type = attack_type
 
         # Track all goal contexts for batch operations
@@ -287,7 +261,7 @@ class Tracker:
 
         content = {
             "step_name": step_name,
-            "request": self._sanitize_for_json(request),
+            "request": sanitize_for_json(request),
             "response": response_content,
         }
 
@@ -319,7 +293,7 @@ class Tracker:
         content = {
             "step_name": "Evaluation",
             "evaluator": evaluator_name,
-            "result": self._sanitize_for_json(evaluation_result),
+            "result": sanitize_for_json(evaluation_result),
         }
 
         if score is not None:
@@ -327,7 +301,7 @@ class Tracker:
         if explanation:
             content["explanation"] = explanation
         if metadata:
-            content["metadata"] = self._sanitize_for_json(metadata)
+            content["metadata"] = sanitize_for_json(metadata)
 
         self._add_trace(ctx, "Evaluation", StepTypeEnum.OTHER, content)
 
@@ -370,22 +344,24 @@ class Tracker:
         """
 
         try:
-            content = _deep_clean(content)
+            content = deep_clean(content)
         except Exception as e:
             self.logger.warning(f"Deep clean failed: {e}")
             content["serialization_error"] = str(e)
 
-        sanitized_content = _sanitize_for_json(content)
+        sanitized_content = sanitize_for_json(content)
 
         # Always track locally
-        ctx.sequence_counter += 1
+        seq = ctx.increment_sequence()
         trace_record = {
-            "sequence": ctx.sequence_counter,
+            "sequence": seq,
             "step_name": step_name,
             "step_type": (
                 step_type.value if hasattr(step_type, "value") else str(step_type)
             ),
             "content": sanitized_content,
+            "timestamp": time.time(),
+            "elapsed_s": round(ctx.elapsed_s, 3),
         }
         ctx.traces.append(trace_record)
 
@@ -397,7 +373,7 @@ class Tracker:
             result_uuid = UUID(ctx.result_id)
 
             trace_request = TraceRequest(
-                sequence=ctx.sequence_counter,
+                sequence=seq,
                 step_type=step_type,
                 content=sanitized_content,
             )
@@ -411,7 +387,7 @@ class Tracker:
             if response.status_code == 201:
                 trace_id = self._extract_id(response)
                 self.logger.debug(
-                    f"Created trace {ctx.sequence_counter} for goal {ctx.goal_index}: {trace_id}"
+                    f"Created trace {seq} for goal {ctx.goal_index}: {trace_id}"
                 )
                 return trace_id
             else:
@@ -452,12 +428,15 @@ class Tracker:
             return False
 
         ctx.is_finalized = True
+        ctx.final_success = bool(success)
+        ctx._end_time = time.perf_counter()
 
         # Update local metadata
         if final_metadata:
             ctx.metadata.update(final_metadata)
-        ctx.metadata["success"] = success
+        ctx.metadata["success"] = bool(success)
         ctx.metadata["total_traces"] = len(ctx.traces)
+        ctx.metadata["elapsed_s"] = round(ctx.elapsed_s, 3)
 
         if not self.is_enabled or not ctx.result_id:
             return False
@@ -552,13 +531,57 @@ class Tracker:
     def get_summary(self) -> Dict[str, Any]:
         """Get summary statistics for all tracked goals."""
         total = len(self._goal_contexts)
+
+        def _to_success_bool(value: Any) -> bool:
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, (int, float)):
+                return value > 0
+            if isinstance(value, str):
+                return value.strip().lower() in {
+                    "true",
+                    "1",
+                    "yes",
+                    "success",
+                    "successful",
+                }
+            return False
+
         successful = sum(
             1
             for ctx in self._goal_contexts.values()
-            if ctx.metadata.get("success", False)
+            if _to_success_bool(
+                ctx.final_success
+                if ctx.final_success is not None
+                else ctx.metadata.get("success", False)
+            )
         )
         finalized = sum(1 for ctx in self._goal_contexts.values() if ctx.is_finalized)
         total_traces = sum(len(ctx.traces) for ctx in self._goal_contexts.values())
+
+        # Latency stats
+        goal_durations = [
+            ctx.elapsed_s for ctx in self._goal_contexts.values() if ctx.is_finalized
+        ]
+        trace_durations = [
+            t.get("elapsed_s", 0.0)
+            for ctx in self._goal_contexts.values()
+            for t in ctx.traces
+            if "elapsed_s" in t
+        ]
+
+        latency: Dict[str, Any] = {}
+        if goal_durations:
+            latency["goal_avg_s"] = round(sum(goal_durations) / len(goal_durations), 3)
+            latency["goal_min_s"] = round(min(goal_durations), 3)
+            latency["goal_max_s"] = round(max(goal_durations), 3)
+            latency["goal_total_s"] = round(sum(goal_durations), 3)
+        if trace_durations:
+            latency["trace_avg_s"] = round(
+                sum(trace_durations) / len(trace_durations), 3
+            )
+            latency["trace_min_s"] = round(min(trace_durations), 3)
+            latency["trace_max_s"] = round(max(trace_durations), 3)
 
         return {
             "total_goals": total,
@@ -567,6 +590,7 @@ class Tracker:
             "total_traces": total_traces,
             "success_rate": (successful / total * 100) if total > 0 else 0,
             "avg_traces_per_goal": (total_traces / total) if total > 0 else 0,
+            "latency": latency,
         }
 
     @contextmanager
@@ -628,14 +652,6 @@ class Tracker:
         """Extract ID from API response."""
         if response.parsed and hasattr(response.parsed, "id"):
             return str(response.parsed.id)
-
-        try:
-            response_data = json.loads(response.content.decode())
-            if "id" in response_data:
-                return str(response_data["id"])
-        except Exception:
-            pass
-
         return None
 
     def _extract_response_content(self, response: Any) -> Any:
@@ -664,39 +680,3 @@ class Tracker:
 
         # Fallback: convert to string
         return str(response)
-
-    def _sanitize_for_json(self, data: Any) -> Any:
-        """Sanitize data for JSON serialization."""
-        if data is None:
-            return None
-
-        if isinstance(data, dict):
-            sanitized = {}
-            for k, v in data.items():
-                # Skip non-serializable keys
-                if k in ("_client", "client"):
-                    sanitized[k] = f"<{type(v).__name__}>"
-                    continue
-                # Redact sensitive keys
-                if any(s in k.lower() for s in ("key", "token", "secret", "password")):
-                    sanitized[k] = "***REDACTED***"
-                    continue
-                # Recurse
-                sanitized[k] = self._sanitize_for_json(v)
-            return sanitized
-
-        if isinstance(data, list):
-            return [self._sanitize_for_json(item) for item in data]
-
-        if isinstance(data, (str, int, float, bool)):
-            # Sanitize non-finite floats via the module-level helper
-            if isinstance(data, float):
-                return _sanitize_for_json(data)
-            return data
-
-        # Fallback: try to convert, else stringify
-        try:
-            json.dumps(data)
-            return data
-        except (TypeError, ValueError):
-            return str(data)

@@ -5,7 +5,7 @@
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from hackagent.models import StepTypeEnum
+from hackagent.api.models import StepTypeEnum
 
 
 def emit_phase_trace(

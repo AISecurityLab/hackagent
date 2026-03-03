@@ -10,6 +10,7 @@ declarative way to add tracking without modifying function bodies.
 """
 
 import functools
+import inspect
 from typing import Any, Callable, Dict, Optional, TypeVar
 
 from .step import StepTracker
@@ -205,11 +206,14 @@ def track_pipeline(tracker_param: str = "tracker"):
             if not callable(attr):
                 continue
 
-            # Check if method has tracker parameter
-            if hasattr(attr, "__code__"):
-                param_names = attr.__code__.co_varnames
-                if tracker_param in param_names:
+            # Check if method has tracker parameter (use inspect.signature
+            # to examine only declared parameters, not all local variables)
+            try:
+                sig = inspect.signature(attr)
+                if tracker_param in sig.parameters:
                     original_methods[attr_name] = attr
+            except (ValueError, TypeError):
+                pass
 
         # Wrap methods to inject tracker from self
         for method_name, original_method in original_methods.items():

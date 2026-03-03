@@ -113,7 +113,8 @@ def execute(
     role_models = (
         {
             role: (
-                (config.get(role, {}) or {}).get("model")
+                (config.get(role, {}) or {}).get("identifier")
+                or (config.get(role, {}) or {}).get("model")
                 or (config.get(role, {}) or {}).get("name")
                 or "unknown-model"
             )

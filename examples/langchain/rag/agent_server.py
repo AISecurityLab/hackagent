@@ -16,7 +16,7 @@ from langchain_core.prompts import ChatPromptTemplate
 DB_INDEX_PATH = "db_index"
 
 # RAG MODEL SETUP
-print("--- RAG server startup ---")
+print("--- RAG server startup (async, multi-worker) ---")
 
 try:
     llm = ChatOpenAI(
@@ -154,4 +154,15 @@ async def chat_completions(request: ChatCompletionRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-uvicorn.run(app, host="0.0.0.0", port=8000)
+if __name__ == "__main__":
+    # Avvia Uvicorn con più worker per gestire richieste parallele
+    import multiprocessing
+
+    num_workers = max(2, multiprocessing.cpu_count() // 4)
+    uvicorn.run(
+        "agent_server:app",
+        host="0.0.0.0",
+        port=8000,
+        workers=num_workers,
+        reload=False,
+    )

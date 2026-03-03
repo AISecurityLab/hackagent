@@ -13,6 +13,8 @@ Result Tracking:
 """
 
 import logging
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional
 
 from hackagent.attacks.shared.response_utils import extract_response_content
@@ -122,7 +124,6 @@ def execute_prompts(
     else:
         logger.warning("⚠️ Missing tracking context - results will NOT be created!")
 
-    completions = []
     total_requests = len(data) * n_samples
 
     # Group data by goal for organized tracking
@@ -147,35 +148,34 @@ def execute_prompts(
             )
             goal_contexts[goal] = ctx
 
-    # Use progress bar for visual feedback
-    with create_progress_bar("[cyan]Executing baseline prompts...", total_requests) as (
-        progress_bar,
-        task,
-    ):
-        for idx, row in enumerate(data):
-            goal = row.get("goal", "unknown")
-            goal_ctx = goal_contexts.get(goal) if goal_tracker else None
+    # Parallel execution: each row's HTTP calls are independent.
+    # n_samples inner loop stays sequential per row (usually 1; ordering matters).
+    batch_size = max(1, config.get("batch_size", 16))
+    _lock = threading.Lock()
+    # results_map[row_idx] = list of completion dicts for that row
+    results_map: Dict[int, List[Dict[str, Any]]] = {}
+    goals_keys = list(goals_data.keys())
 
-            try:
-                # Prepare request
-                request_data = {
-                    "messages": [{"role": "user", "content": row["attack_prompt"]}],
-                    "max_tokens": max_tokens,
-                    "temperature": temperature,
-                }
+    def _execute_row(idx_row: tuple) -> None:
+        idx, row = idx_row
+        goal = row.get("goal", "unknown")
+        goal_ctx = goal_contexts.get(goal) if goal_tracker else None
+        row_completions: List[Dict[str, Any]] = []
+        goal_index = goals_keys.index(goal) if goal in goals_data else idx
 
-                # Get completion(s)
-                for sample_idx in range(n_samples):
-                    # Route request WITHOUT automatic result creation
-                    # (we're using Tracker for organized tracking instead)
-                    response = agent_router.route_request(
-                        registration_key=list(agent_router._agent_registry.keys())[0],
-                        request_data=request_data,
-                    )
-
-                    completion = extract_response_content(response, logger) or ""
-
-                    # Add trace for this interaction if tracking
+        try:
+            request_data = {
+                "messages": [{"role": "user", "content": row["attack_prompt"]}],
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+            }
+            for sample_idx in range(n_samples):
+                response = agent_router.route_request(
+                    registration_key=list(agent_router._agent_registry.keys())[0],
+                    request_data=request_data,
+                )
+                completion = extract_response_content(response, logger) or ""
+                with _lock:
                     if goal_tracker and goal_ctx:
                         goal_tracker.add_interaction_trace(
                             ctx=goal_ctx,
@@ -188,25 +188,17 @@ def execute_prompts(
                                 "response_length": len(completion),
                             },
                         )
-
-                    completions.append(
-                        {
-                            **row,
-                            "completion": completion,
-                            "response_length": len(completion),
-                            "goal_index": list(goals_data.keys()).index(goal)
-                            if goal in goals_data
-                            else idx,
-                        }
-                    )
-
-                    # Update progress bar
-                    progress_bar.update(task, advance=1)
-
-            except Exception as e:
-                logger.warning(f"Error executing prompt {idx}: {e}")
-
-                # Add error trace if tracking
+                row_completions.append(
+                    {
+                        **row,
+                        "completion": completion,
+                        "response_length": len(completion),
+                        "goal_index": goal_index,
+                    }
+                )
+        except Exception as e:
+            logger.warning(f"Error executing prompt {idx}: {e}")
+            with _lock:
                 if goal_tracker and goal_ctx:
                     goal_tracker.add_custom_trace(
                         ctx=goal_ctx,
@@ -217,20 +209,30 @@ def execute_prompts(
                             "attack_prompt": row.get("attack_prompt", "")[:200],
                         },
                     )
+            row_completions.append(
+                {
+                    **row,
+                    "completion": "",
+                    "response_length": 0,
+                    "error": str(e),
+                    "goal_index": goal_index,
+                }
+            )
+        with _lock:
+            results_map[idx] = row_completions
 
-                completions.append(
-                    {
-                        **row,
-                        "completion": "",
-                        "response_length": 0,
-                        "error": str(e),
-                        "goal_index": list(goals_data.keys()).index(goal)
-                        if goal in goals_data
-                        else idx,
-                    }
-                )
-                # Still advance progress on error
+    with create_progress_bar("[cyan]Executing baseline prompts...", total_requests) as (
+        progress_bar,
+        task,
+    ):
+        with ThreadPoolExecutor(max_workers=batch_size) as pool:
+            for _ in pool.map(_execute_row, enumerate(data)):
                 progress_bar.update(task, advance=n_samples)
+
+    # Reconstruct completions in original row order
+    completions = []
+    for i in range(len(data)):
+        completions.extend(results_map.get(i, []))
 
     logger.info(f"Execution complete. Got {len(completions)} completions")
 

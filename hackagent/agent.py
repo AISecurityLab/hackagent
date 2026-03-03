@@ -1,7 +1,7 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import logging
+from hackagent.logger import get_logger
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 from hackagent import utils
@@ -14,7 +14,7 @@ from hackagent.router.types import AgentTypeEnum
 if TYPE_CHECKING:
     pass
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class HackAgent:

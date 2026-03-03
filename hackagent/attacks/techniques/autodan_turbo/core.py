@@ -250,6 +250,27 @@ def query_target(agent_router, victim_key, prompt, config, logger, role_label="t
         },
     )
     target_response = extract_response_content(resp, logger) or ""
+    if not target_response:
+        if isinstance(resp, dict):
+            error_message = resp.get("error_message")
+            status_code = resp.get("status_code") or resp.get("raw_response_status")
+            agent_data = resp.get("agent_specific_data") or {}
+            finish_reason = agent_data.get("finish_reason")
+            model_name = agent_data.get("model_name")
+            if error_message:
+                logger.warning(
+                    format_phase_message(
+                        "target",
+                        f"[Role:{role_label}] empty response (error={error_message}, status={status_code})",
+                    )
+                )
+            if finish_reason:
+                logger.info(
+                    format_phase_message(
+                        "target",
+                        f"[Role:{role_label}] empty response (finish_reason={finish_reason}, model={model_name})",
+                    )
+                )
     logger.info(
         format_phase_message(
             "target",

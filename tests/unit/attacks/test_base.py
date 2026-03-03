@@ -59,8 +59,7 @@ class TestBaseAttackInfrastructure(unittest.TestCase):
 
         self.assertIn("output_dir", str(context.exception).lower())
 
-    @patch("hackagent.attacks.techniques.base.logging")
-    def test_setup_logging_creates_console_handler(self, mock_logging_module):
+    def test_setup_logging_creates_console_handler(self):
         """Test that logging setup creates a console handler."""
 
         class TestAttack(BaseAttack):
@@ -201,8 +200,7 @@ class TestBaseAttackPipelineExecution(unittest.TestCase):
         self.assertEqual(args["input_data"], input_data)
         self.assertEqual(args["client"], self.mock_client)
 
-    @patch("hackagent.attacks.techniques.base.logging")
-    def test_execute_pipeline_runs_all_steps(self, mock_logging):
+    def test_execute_pipeline_runs_all_steps(self):
         """Test that pipeline executes all steps in sequence."""
 
         class TestAttack(BaseAttack):

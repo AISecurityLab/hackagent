@@ -1,3 +1,35 @@
+# Copyright 2025 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+"""
+Configuration for FlipAttack attacks.
+
+Provides both the plain-dict ``DEFAULT_FLIPATTACK_CONFIG`` (used internally
+by :class:`~hackagent.attacks.techniques.flipattack.attack.FlipAttack`) and
+typed dataclasses (``FlipAttackParams``, ``FlipAttackConfig``) for users who
+prefer structured configuration.
+
+Flip modes
+----------
+FWO
+    Flip Word Order — reverses the word sequence of the sentence.
+FCW
+    Flip Chars in Word — reverses characters within each individual word.
+FCS  *(default)*
+    Flip Chars in Sentence — reverses all characters in the whole sentence.
+FMM
+    Fool Model Mode — FCS obfuscation with FWO decoding instruction.
+
+Enhancements
+------------
+cot
+    Appends a chain-of-thought instruction to encourage step-by-step answers.
+lang_gpt
+    Wraps the system prompt in a LangGPT Role/Profile/Rules template.
+few_shot
+    Injects two task-oriented decoding demonstrations into the prompt.
+"""
+
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -42,7 +74,20 @@ DEFAULT_FLIPATTACK_CONFIG: Dict[str, Any] = {
 
 @dataclass
 class FlipAttackParams:
-    """FlipAttack-specific parameters."""
+    """Hyperparameters controlling the FlipAttack obfuscation strategy.
+
+    Attributes:
+        flip_mode: Obfuscation mode.  One of ``"FWO"`` (flip word order),
+            ``"FCW"`` (flip chars in word), ``"FCS"`` (flip chars in sentence,
+            default), or ``"FMM"`` (fool model mode — FCS transform with
+            FWO decoding instruction).
+        cot: When ``True``, adds a chain-of-thought suffix to the decoding
+            instruction so the model answers step by step.
+        lang_gpt: When ``True``, wraps the system prompt in a structured
+            LangGPT Role/Profile/Rules template instead of the plain prompt.
+        few_shot: When ``True``, injects two task-oriented decoding
+            demonstrations into the prompt.
+    """
 
     flip_mode: str = "FCS"
     cot: bool = False
@@ -59,7 +104,34 @@ class FlipAttackParams:
 
 @dataclass
 class FlipAttackConfig:
-    """Complete FlipAttack configuration for use with HackAgent.hack()."""
+    """Complete FlipAttack configuration for use with :meth:`HackAgent.hack`.
+
+    This dataclass mirrors ``DEFAULT_FLIPATTACK_CONFIG`` and is provided as
+    a typed alternative.  Pass ``asdict(config)`` (or call
+    :meth:`FlipAttackConfig.from_dict`) when you need to convert to/from the
+    plain dict expected by the attack pipeline.
+
+    Attributes:
+        attack_type: Always ``"flipattack"`` (required by the orchestrator).
+        flipattack_params: Obfuscation hyperparameters (:class:`FlipAttackParams`).
+        goals: List of harmful goal strings to test against the target model.
+        judges: List of judge configuration dicts used for success evaluation.
+            Each dict is expected to have at minimum ``"identifier"`` and
+            ``"type"`` keys (e.g., ``"harmbench"``, ``"jailbreakbench"``).
+        batch_size_judge: Number of responses sent per judge request.
+        max_new_tokens_eval: Max tokens the judge generates per evaluation.
+        filter_len: Minimum number of tokens a response must contain to be
+            evaluated (shorter responses are skipped as trivial refusals).
+        judge_request_timeout: Seconds to wait for each judge API call.
+        judge_temperature: Sampling temperature for judge queries (0.0 for
+            deterministic outputs).
+        max_judge_retries: Number of retries when a judge response cannot be
+            parsed.
+        dataset: Optional named dataset (e.g. ``"advbench"``).  When set the
+            pipeline loads goals from the dataset instead of ``goals``.
+        output_dir: Directory for result artefacts.
+        start_step: Pipeline step to resume from (1 = beginning).
+    """
 
     attack_type: str = "flipattack"
     flipattack_params: FlipAttackParams = field(default_factory=FlipAttackParams)
@@ -77,7 +149,17 @@ class FlipAttackConfig:
 
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> "FlipAttackConfig":
-        """Create config from dictionary."""
+        """Create a :class:`FlipAttackConfig` from a plain dictionary.
+
+        Args:
+            config_dict: Dictionary with the same keys as the dataclass
+                fields.  ``flipattack_params`` may be a nested dict and
+                will be automatically converted to :class:`FlipAttackParams`.
+
+        Returns:
+            Populated :class:`FlipAttackConfig` instance.
+        """
+        # Parse flipattack_params from dict to dataclass
         # Parse flipattack_params from dict to dataclass
         fa_params_dict = config_dict.get("flipattack_params", {})
         flipattack_params = (
