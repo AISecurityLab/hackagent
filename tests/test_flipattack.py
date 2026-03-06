@@ -28,6 +28,7 @@ config = {
         "judge": "google/gemma-3n-e4b-it",
     },
     "goal_batch_size": 4,
+    "goal_batch_workers": 4,  # 2 batches in parallel (limited to actual batch count)
     "judges": [
         {
             "identifier": "google/gemma-3n-e4b-it",

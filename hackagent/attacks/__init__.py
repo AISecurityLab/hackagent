@@ -33,6 +33,7 @@ The module integrates with the HackAgent backend for result tracking and reporti
 from .registry import (
     ATTACK_REGISTRY,
     AdvPrefixOrchestrator,
+    AutoDANTurboOrchestrator,
     BaselineOrchestrator,
     PAIROrchestrator,
     FlipAttackOrchestrator,
@@ -42,6 +43,7 @@ from .registry import (
 __all__ = [
     "ATTACK_REGISTRY",
     "AdvPrefixOrchestrator",
+    "AutoDANTurboOrchestrator",
     "BaselineOrchestrator",
     "PAIROrchestrator",
     "FlipAttackOrchestrator",

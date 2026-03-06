@@ -132,4 +132,10 @@ venv.bak/
 .dmypy.json
 dmypy.json
 
+tests/test_with_cineca_judge
+
 db_index/
+# BoN reference codebase (cloned repo, not imported)
+hackagent/attacks/techniques/bon/original_codebase/
+
+ATTACK_INTEGRATION_HANDOUT.md

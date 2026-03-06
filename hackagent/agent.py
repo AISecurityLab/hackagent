@@ -122,7 +122,9 @@ class HackAgent:
             # Import here to avoid circular imports and improve startup time
             from hackagent.attacks.registry import (
                 AdvPrefixOrchestrator,
+                AutoDANTurboOrchestrator,
                 BaselineOrchestrator,
+                BoNOrchestrator,
                 PAIROrchestrator,
                 FlipAttackOrchestrator,
                 TAPOrchestrator,
@@ -130,7 +132,9 @@ class HackAgent:
 
             self._attack_strategies = {
                 "advprefix": AdvPrefixOrchestrator(hack_agent=self),
+                "autodan_turbo": AutoDANTurboOrchestrator(hack_agent=self),
                 "baseline": BaselineOrchestrator(hack_agent=self),
+                "bon": BoNOrchestrator(hack_agent=self),
                 "pair": PAIROrchestrator(hack_agent=self),
                 "flipattack": FlipAttackOrchestrator(hack_agent=self),
                 "tap": TAPOrchestrator(hack_agent=self),

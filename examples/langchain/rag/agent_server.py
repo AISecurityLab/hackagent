@@ -158,7 +158,7 @@ if __name__ == "__main__":
     # Avvia Uvicorn con più worker per gestire richieste parallele
     import multiprocessing
 
-    num_workers = max(2, multiprocessing.cpu_count() // 2)
+    num_workers = max(2, multiprocessing.cpu_count() // 4)
     uvicorn.run(
         "agent_server:app",
         host="0.0.0.0",
