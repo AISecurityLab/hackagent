@@ -29,6 +29,7 @@ from hackagent.attacks.techniques.tap import (
     TAPAttack,
 )  # Placeholder for future implementation
 from hackagent.attacks.techniques.autodan_turbo import AutoDANTurboAttack
+from hackagent.attacks.techniques.bon import BoNAttack
 
 
 def create_orchestrator(
@@ -76,6 +77,7 @@ PAIROrchestrator = create_orchestrator("PAIR", PAIRAttack)
 FlipAttackOrchestrator = create_orchestrator("FlipAttack", FlipAttack)
 TAPOrchestrator = create_orchestrator("TAP", TAPAttack)
 AutoDANTurboOrchestrator = create_orchestrator("AutoDANTurbo", AutoDANTurboAttack)
+BoNOrchestrator = create_orchestrator("bon", BoNAttack)
 
 # Registry of all available attacks
 ATTACK_REGISTRY = {
@@ -85,6 +87,7 @@ ATTACK_REGISTRY = {
     "FlipAttack": FlipAttackOrchestrator,
     "TAP": TAPOrchestrator,
     "AutoDANTurbo": AutoDANTurboOrchestrator,
+    "bon": BoNOrchestrator,
 }
 
 __all__ = [
@@ -94,5 +97,6 @@ __all__ = [
     "FlipAttackOrchestrator",
     "TAPOrchestrator",
     "AutoDANTurboOrchestrator",
+    "BoNOrchestrator",
     "ATTACK_REGISTRY",
 ]

@@ -111,9 +111,11 @@ const sidebars: SidebarsConfig = {
       },
       items: [
         'attacks/advprefix',
+        'attacks/autodan_turbo',
         'attacks/pair',
         'attacks/tap',
         'attacks/flipattack',
+        'attacks/bon',
         'attacks/baseline',
       ],
     },
