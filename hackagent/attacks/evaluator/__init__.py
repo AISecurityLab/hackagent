@@ -33,10 +33,13 @@ Usage:
         calculate_success_rate,
         calculate_per_goal_metrics,
         generate_summary_report,
+        calculate_confidence_score,
+        calculate_majority_vote_asr,
+        calculate_fleiss_kappa,
+        calculate_per_judge_strictness,
         # Server sync
         sync_evaluation_to_server,
         update_single_result,
-        calculate_majority_vote_asr,
     )
 """
 
@@ -56,6 +59,8 @@ from hackagent.attacks.evaluator.metrics import (
     generate_summary_report,
     group_by_goal,
     calculate_majority_vote_asr,
+    calculate_fleiss_kappa,
+    calculate_per_judge_strictness,
 )
 from hackagent.attacks.evaluator.pattern_evaluators import (
     KeywordEvaluator,
@@ -88,7 +93,9 @@ __all__ = [
     "calculate_per_goal_metrics",
     "generate_summary_report",
     "group_by_goal",
-    "calculate_majority_vote_asr"
+    "calculate_majority_vote_asr",
+    "calculate_fleiss_kappa",
+    "calculate_per_judge_strictness",
     # Sync
     "sync_evaluation_to_server",
     "update_single_result",
