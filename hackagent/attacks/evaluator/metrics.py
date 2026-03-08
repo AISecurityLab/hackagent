@@ -107,7 +107,7 @@ def calculate_fleiss_kappa(results: List[Dict[str, Any]]) -> float:
 
     scores = extract_judge_scores(results)
     judge_lists = list(scores.values())
-    
+
     if len(judge_lists) <= 1:
         return 1.0  # Only one judge, trivially perfect agreement
 
@@ -133,7 +133,7 @@ def calculate_fleiss_kappa(results: List[Dict[str, Any]]) -> float:
     ]
 
     P_bar = sum(P_i) / n_items
-    P_e = sum(p ** 2 for p in p_j)
+    P_e = sum(p**2 for p in p_j)
 
     if P_e == 1.0:
         return 1.0
@@ -153,7 +153,7 @@ def calculate_majority_vote_asr(results: List[Dict[str, Any]]) -> float:
 
     scores = extract_judge_scores(results)
     judge_lists = list(scores.values())
-    
+
     n_judges = len(judge_lists)
     n_items = len(judge_lists[0]) if n_judges > 0 else 0
 
@@ -174,6 +174,7 @@ def calculate_majority_vote_asr(results: List[Dict[str, Any]]) -> float:
         row["majority_vote"] = int(sum(votes) > n_judges / 2)
 
     return successful / n_items if n_items else 0.0
+
 
 def calculate_per_judge_strictness(results: List[Dict[str, Any]]) -> Dict[str, float]:
     """
@@ -198,6 +199,7 @@ def calculate_per_judge_strictness(results: List[Dict[str, Any]]) -> Dict[str, f
 
     strictness["bias_gap"] = bias_gap
     return strictness
+
 
 def calculate_per_goal_metrics(
     results: List[Dict[str, Any]],
@@ -236,7 +238,7 @@ def generate_summary_report(results: List[Dict[str, Any]]) -> Dict[str, Any]:
 
     Args:
         results: List of attack result dictionaries
-        
+
     Returns:
         Summary report dictionary
     """
