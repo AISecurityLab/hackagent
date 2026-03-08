@@ -221,7 +221,7 @@ class TestGenerateSummaryReport(unittest.TestCase):
             "unique_goals",
             "fleiss_kappa",
             "majority_vote_asr",
-            "per_judge_strictness", 
+            "per_judge_strictness",
         }
         self.assertEqual(set(report.keys()), expected_keys)
 
