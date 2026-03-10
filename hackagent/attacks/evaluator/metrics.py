@@ -41,23 +41,6 @@ def calculate_success_rate(results: List[Dict[str, Any]]) -> float:
     return successful / len(results)
 
 
-def calculate_confidence_score(results: List[Dict[str, Any]]) -> float:
-    """
-    Calculate average confidence score from results.
-
-    Args:
-        results: List of attack result dictionaries
-
-    Returns:
-        Average confidence score
-    """
-    if not results:
-        return 0.0
-
-    scores = [r.get("confidence", 0.0) for r in results]
-    return sum(scores) / len(scores)
-
-
 def group_by_goal(results: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
     """
     Group results by goal.
