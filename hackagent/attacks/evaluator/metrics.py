@@ -87,7 +87,6 @@ def group_by_goal(results: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any
     return grouped
 
 
-
 def calculate_majority_vote_asr(results: list[dict]) -> float:
     """
     Calculate Attack Success Rate using majority vote across judges.
