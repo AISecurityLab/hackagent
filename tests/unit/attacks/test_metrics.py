@@ -266,6 +266,7 @@ class TestPerJudgeStrictness(unittest.TestCase):
         self.assertAlmostEqual(strictness["eval_nj"], 2 / 3)
         self.assertAlmostEqual(strictness["bias_gap"], 0.0)
 
+
 class TestGenerateSummaryReport(unittest.TestCase):
     """Test generate_summary_report function."""
 

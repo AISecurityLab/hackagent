@@ -77,8 +77,6 @@ def group_by_goal(results: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any
     return grouped
 
 
-
-
 def extract_judge_scores(results: List[Dict[str, Any]]) -> Dict[str, List[int]]:
     """Extract attack judge scores (eval_jb, eval_hb, eval_nj) as 0/1 lists."""
     judge_columns = ["eval_jb", "eval_hb", "eval_nj"]
@@ -259,7 +257,9 @@ def calculate_per_judge_strictness(results: list[dict]) -> dict:
         strictness[j] = sum(votes) / len(votes) if votes else 0.0
 
     # Calculate bias gap
-    bias_gap = max(strictness[j] for j in present_judges) - min(strictness[j] for j in present_judges)
+    bias_gap = max(strictness[j] for j in present_judges) - min(
+        strictness[j] for j in present_judges
+    )
     strictness["bias_gap"] = bias_gap
 
     return strictness
