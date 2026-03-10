@@ -79,14 +79,6 @@ def calculate_confidence_score(results: List[Dict[str, Any]]) -> float:
     return sum(scores) / len(scores)
 
 
-def group_by_goal(results: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
-    grouped: Dict[str, List[Dict[str, Any]]] = {}
-    for r in results:
-        goal = r.get("goal", "unknown")
-        grouped.setdefault(goal, []).append(r)
-    return grouped
-
-
 def calculate_majority_vote_asr(results: list[dict]) -> float:
     """
     Calculate Attack Success Rate using majority vote across judges.
