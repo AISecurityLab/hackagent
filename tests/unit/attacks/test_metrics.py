@@ -11,6 +11,9 @@ from hackagent.attacks.evaluator.metrics import (
     calculate_success_rate,
     generate_summary_report,
     group_by_goal,
+    calculate_majority_vote_asr,
+    calculate_fleiss_kappa,
+    calculate_per_judge_strictness,
 )
 
 
@@ -174,11 +177,99 @@ class TestCalculatePerGoalMetrics(unittest.TestCase):
         self.assertEqual(metrics["g1"]["successful_attacks"], 2)
 
 
+class TestMajorityVoteASR(unittest.TestCase):
+    """Tests for calculate_majority_vote_asr function."""
+
+    def test_empty_results(self):
+        self.assertEqual(calculate_majority_vote_asr([]), 0.0)
+
+    def test_single_judge(self):
+        results = [{"eval_jb": 1}, {"eval_jb": 0}]
+        self.assertAlmostEqual(calculate_majority_vote_asr(results), 0.5)
+
+    def test_multiple_judges_majority_yes(self):
+        results = [
+            {"eval_jb": 1, "eval_hb": 1, "eval_nj": 0},
+            {"eval_jb": 0, "eval_hb": 1, "eval_nj": 1},
+        ]
+        # Row1 votes = 1+1+0=2 → majority yes (3/2 = 1.5), Row2 votes = 0+1+1=2 → majority yes
+        self.assertAlmostEqual(calculate_majority_vote_asr(results), 1.0)
+        # Check majority_vote field filled
+        self.assertEqual(results[0]["majority_vote"], 1)
+        self.assertEqual(results[1]["majority_vote"], 1)
+
+    def test_multiple_judges_majority_no(self):
+        results = [
+            {"eval_jb": 0, "eval_hb": 0, "eval_nj": 1},
+            {"eval_jb": 0, "eval_hb": 0, "eval_nj": 0},
+        ]
+        self.assertAlmostEqual(calculate_majority_vote_asr(results), 0.0)
+        self.assertEqual(results[0]["majority_vote"], 0)
+        self.assertEqual(results[1]["majority_vote"], 0)
+
+
+class TestFleissKappa(unittest.TestCase):
+    """Tests for calculate_fleiss_kappa function."""
+
+    def test_empty_results(self):
+        self.assertEqual(calculate_fleiss_kappa([]), 0.0)
+
+    def test_single_judge(self):
+        results = [{"eval_jb": 1}, {"eval_jb": 0}]
+        self.assertEqual(calculate_fleiss_kappa(results), 1.0)
+
+    def test_perfect_agreement(self):
+        results = [
+            {"eval_jb": 1, "eval_hb": 1, "eval_nj": 1},
+            {"eval_jb": 1, "eval_hb": 1, "eval_nj": 1},
+        ]
+        self.assertAlmostEqual(calculate_fleiss_kappa(results), 1.0)
+
+    def test_partial_agreement(self):
+        results = [
+            {"eval_jb": 1, "eval_hb": 0, "eval_nj": 1},
+            {"eval_jb": 0, "eval_hb": 1, "eval_nj": 1},
+            {"eval_jb": 1, "eval_hb": 0, "eval_nj": 0},
+        ]
+        kappa = calculate_fleiss_kappa(results)
+        self.assertTrue(-1.0 <= kappa <= 1.0)  # Kappa should be in valid range
+
+
+class TestPerJudgeStrictness(unittest.TestCase):
+    """Tests for calculate_per_judge_strictness function."""
+
+    def test_empty_results(self):
+        strictness = calculate_per_judge_strictness([])
+        self.assertEqual(strictness["bias_gap"], 0.0)
+        for judge in ["eval_jb", "eval_hb", "eval_nj"]:
+            self.assertEqual(strictness[judge], 0.0)
+
+    def test_all_zero_votes(self):
+        results = [
+            {"eval_jb": 0, "eval_hb": 0, "eval_nj": 0},
+            {"eval_jb": 0, "eval_hb": 0, "eval_nj": 0},
+        ]
+        strictness = calculate_per_judge_strictness(results)
+        self.assertEqual(strictness["bias_gap"], 0.0)
+        for judge in ["eval_jb", "eval_hb", "eval_nj"]:
+            self.assertEqual(strictness[judge], 0.0)
+
+    def test_mixed_votes(self):
+        results = [
+            {"eval_jb": 1, "eval_hb": 0, "eval_nj": 1},
+            {"eval_jb": 0, "eval_hb": 1, "eval_nj": 1},
+            {"eval_jb": 1, "eval_hb": 1, "eval_nj": 0},
+        ]
+        strictness = calculate_per_judge_strictness(results)
+        self.assertAlmostEqual(strictness["eval_jb"], 2 / 3)
+        self.assertAlmostEqual(strictness["eval_hb"], 2 / 3)
+        self.assertAlmostEqual(strictness["eval_nj"], 2 / 3)
+        self.assertAlmostEqual(strictness["bias_gap"], 0.0)
+
 class TestGenerateSummaryReport(unittest.TestCase):
     """Test generate_summary_report function."""
 
     def test_empty_results(self):
-        """Empty list returns zeroed report."""
         report = generate_summary_report([])
         self.assertEqual(report["total_attacks"], 0)
         self.assertAlmostEqual(report["overall_success_rate"], 0.0)
@@ -187,7 +278,6 @@ class TestGenerateSummaryReport(unittest.TestCase):
         self.assertEqual(report["unique_goals"], 0)
 
     def test_full_report(self):
-        """Full report with mixed data."""
         results = [
             {"goal": "g1", "success": True, "confidence": 0.9},
             {"goal": "g1", "success": False, "confidence": 0.3},
@@ -202,7 +292,6 @@ class TestGenerateSummaryReport(unittest.TestCase):
         self.assertIn("g2", report["per_goal_metrics"])
 
     def test_single_result_report(self):
-        """Report with a single result."""
         results = [{"goal": "g1", "success": True, "confidence": 1.0}]
         report = generate_summary_report(results)
         self.assertEqual(report["total_attacks"], 1)
@@ -210,7 +299,6 @@ class TestGenerateSummaryReport(unittest.TestCase):
         self.assertEqual(report["unique_goals"], 1)
 
     def test_report_structure(self):
-        """Report has all expected keys."""
         results = [{"goal": "g1", "success": True, "confidence": 0.5}]
         report = generate_summary_report(results)
         expected_keys = {
