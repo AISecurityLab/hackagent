@@ -116,6 +116,7 @@ const sidebars: SidebarsConfig = {
         'attacks/tap',
         'attacks/flipattack',
         'attacks/bon',
+        'attacks/h4rm3l',
         'attacks/baseline',
       ],
     },

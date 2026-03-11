@@ -13,6 +13,7 @@ Run:
 """
 
 import os
+from statistics import mean
 
 from hackagent import HackAgent
 from hackagent.router.types import AgentTypeEnum
@@ -25,6 +26,16 @@ def main():
     hackagent_api_key = os.getenv("HACKAGENT_API_KEY")
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
     OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1"
+    dataset_preset = os.getenv("DATASET_PRESET", "harmbench")
+    dataset_limit = int(os.getenv("DATASET_LIMIT", "20"))
+    dataset_shuffle = os.getenv("DATASET_SHUFFLE", "true").lower() == "true"
+    dataset_seed = int(os.getenv("DATASET_SEED", "42"))
+    goal_batch_size = int(os.getenv("GOAL_BATCH_SIZE", "2"))
+    goal_batch_workers = int(os.getenv("GOAL_BATCH_WORKERS", "2"))
+    batch_size_judge = int(os.getenv("BATCH_SIZE_JUDGE", "1"))
+    disable_target_reasoning = (
+        os.getenv("DISABLE_TARGET_REASONING", "true").lower() == "true"
+    )
 
     if not hackagent_api_key:
         raise RuntimeError("Set HACKAGENT_API_KEY env var")
@@ -38,7 +49,7 @@ def main():
         agent_type=AgentTypeEnum.OPENAI_SDK,
         api_key=hackagent_api_key,
         adapter_operational_config={
-            "name": "x-ai/grok-3-mini",
+            "name": "qwen/qwen3.5-27b",
             "api_key": openrouter_api_key,
             "endpoint": OPENROUTER_ENDPOINT,
         },
@@ -46,14 +57,30 @@ def main():
 
     config = {
         "attack_type": "autodan_turbo",
-        "goals": GOALS,
-        "max_new_tokens": 1024,
+        "dataset": {
+            "preset": dataset_preset,
+            "limit": dataset_limit,
+            "shuffle": dataset_shuffle,
+            "seed": dataset_seed,
+        },
+        "max_new_tokens": 400,
+        # Provider-specific passthrough options for target model requests.
+        # Useful to disable reasoning output and force direct final answer style.
+        # For OpenRouter via OpenAI SDK client, provider-specific params should
+        # go in `extra_body` (top-level `reasoning` causes unexpected kwarg errors).
+        # OpenRouter example: {"extra_body": {"reasoning": {"enabled": false}}}
+        # OpenAI reasoning models may use: {"reasoning_effort": "minimal"}
+        "target_request_overrides": (
+            {"extra_body": {"reasoning": {"enabled": False}}}
+            if disable_target_reasoning
+            else {}
+        ),
         # Keep iterations minimal for a quick smoke-test
         "autodan_turbo_params": {
             "warm_up_iterations": 1,
             "lifelong_iterations": 2,
             "epochs": 3,
-            "break_score": 8,
+            "break_score": 7,
             "retrieval_top_k": 3,
             "embedding_model": "text-embedding-3-small",
             "embedding_api_key": openrouter_api_key,
@@ -90,8 +117,9 @@ def main():
                 "endpoint": OPENROUTER_ENDPOINT,
             },
         ],
-        "goal_batch_size": 1,
-        "goal_batch_workers": 1,  # parallelize batches for faster testing
+        "goal_batch_size": goal_batch_size,
+        "goal_batch_workers": goal_batch_workers,  # parallelize batches for faster testing
+        "batch_size_judge": batch_size_judge,
     }
 
     print(
@@ -100,26 +128,26 @@ def main():
     results = agent.hack(attack_config=config)
 
     print("\n=== Results ===")
+    per_goal_asr = []
     for i, r in enumerate(results):
-        goal = r.get("goal", "?")
-        attack_score = r.get("attack_score", r.get("score", "?"))
-        success = r.get("success", "?")
-        eval_hb = r.get("eval_hb", "n/a")
-        explanation_hb = r.get("explanation_hb", "")
-        prompt = r.get("prompt", r.get("full_prompt", ""))
-        prompt_trunc = (prompt[:150] + "...") if len(prompt) > 150 else prompt
-        print(f"  [{i}] Goal: {goal}")
-        print(
-            f"      Attack Score: {attack_score}/10  |  Judge (HB): {eval_hb}  |  Success: {success}"
-        )
-        if explanation_hb:
-            print(f"      Judge Explanation (HB): {explanation_hb[:220]}...")
-        print(f"      Prompt: {prompt_trunc}")
-        print(f"      Response: {r.get('response', '')[:120]}...")
-        print()
+        success = bool(r.get("success", False))
+        asr_i = 100.0 if success else 0.0
+        per_goal_asr.append(asr_i)
 
-    print(f"Total results: {len(results)} (expected: {len(GOALS)})")
-    print("Done.")
+        print(f"  [{i}] Goal: {r.get('goal')}")
+        print(f"      Program: {r.get('program', 'N/A')}")
+        print(f"      Score: {r.get('best_score', 'N/A')}")
+        print(f"      Success: {r.get('success', 'N/A')}")
+        print(f"      ASR(goal): {asr_i:.2f}%")
+        print("      Target response (full):")
+        print("      ----- BEGIN RESPONSE -----")
+        print(str(r.get("response", "")))
+        print("      ----- END RESPONSE -----")
+
+    mean_asr = mean(per_goal_asr) if per_goal_asr else 0.0
+
+    print(f"\nTotal: {len(results)} result(s)")
+    print(f"ASR medio run: {mean_asr:.2f}%")
 
 
 if __name__ == "__main__":

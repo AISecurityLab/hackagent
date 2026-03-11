@@ -1,0 +1,44 @@
+# Virtual environment
+.venv/
+
+# Byte-compiled / cached
+__pycache__/
+*.py[cod]
+*.pyc
+
+# Coverage reports
+coverage.json
+coverage_autodan.json
+
+# Lock files
+uv.lock
+
+# FAISS index
+db_index/
+
+# Docusaurus site (not project source)
+docs/node_modules/
+docs/build/
+docs/static/gifs/
+docs/package-lock.json
+docs/.docusaurus/
+
+# Caches
+.ruff_cache/
+.pytest_cache/
+
+# Binary / large assets
+*.gif
+*.pdf
+*.jpeg
+*.png
+*.ico
+*.faiss
+*.pkl
+
+# Git
+.git/
+
+# Logs
+logs/
+*.log

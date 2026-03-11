@@ -241,13 +241,25 @@ def query_target(agent_router, victim_key, prompt, config, logger, role_label="t
             f"[Role:{role_label}] prompt='{_truncate_for_log(prompt)}'",
         )
     )
+    request_data = {
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": config.get("max_new_tokens", 4096),
+        "temperature": config.get("temperature", 0.6),
+    }
+
+    target_overrides = config.get("target_request_overrides", {})
+    if isinstance(target_overrides, dict) and target_overrides:
+        request_data.update(target_overrides)
+        logger.info(
+            format_phase_message(
+                "target",
+                f"[Role:{role_label}] target_request_overrides keys={list(target_overrides.keys())}",
+            )
+        )
+
     resp = agent_router.route_request(
         registration_key=victim_key,
-        request_data={
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": config.get("max_new_tokens", 4096),
-            "temperature": config.get("temperature", 0.6),
-        },
+        request_data=request_data,
     )
     target_response = extract_response_content(resp, logger) or ""
     if not target_response:

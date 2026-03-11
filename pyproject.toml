@@ -33,6 +33,7 @@ dependencies = [
     "attrs>=21.0.0",
     "faiss-cpu>=1.13.2",
     "pypdf>=6.7.5",
+    "datasets>=4.6.1",
 ]
 
 [project.optional-dependencies]
