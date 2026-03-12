@@ -240,9 +240,7 @@ class TestPerJudgeStrictness(unittest.TestCase):
 
     def test_empty_results(self):
         strictness = calculate_per_judge_strictness([])
-        self.assertEqual(strictness["bias_gap"], 0.0)
-        for judge in ["eval_jb", "eval_hb", "eval_nj"]:
-            self.assertEqual(strictness[judge], 0.0)
+        self.assertEqual(strictness, {"bias_gap": 0.0})
 
     def test_all_zero_votes(self):
         results = [
@@ -253,6 +251,17 @@ class TestPerJudgeStrictness(unittest.TestCase):
         self.assertEqual(strictness["bias_gap"], 0.0)
         for judge in ["eval_jb", "eval_hb", "eval_nj"]:
             self.assertEqual(strictness[judge], 0.0)
+
+    def test_only_present_judges_returned(self):
+        results = [
+            {"eval_hb": 1},
+            {"eval_hb": 0},
+        ]
+        strictness = calculate_per_judge_strictness(results)
+        self.assertIn("eval_hb", strictness)
+        self.assertNotIn("eval_jb", strictness)
+        self.assertNotIn("eval_nj", strictness)
+        self.assertIn("bias_gap", strictness)
 
     def test_mixed_votes(self):
         results = [
@@ -274,7 +283,7 @@ class TestGenerateSummaryReport(unittest.TestCase):
         report = generate_summary_report([])
         self.assertEqual(report["total_attacks"], 0)
         self.assertAlmostEqual(report["overall_success_rate"], 0.0)
-        self.assertAlmostEqual(report["overall_confidence"], 0.0)
+        self.assertNotIn("overall_confidence", report)
         self.assertEqual(report["per_goal_metrics"], {})
         self.assertEqual(report["unique_goals"], 0)
 
@@ -313,6 +322,12 @@ class TestGenerateSummaryReport(unittest.TestCase):
             "per_judge_strictness",
         }
         self.assertEqual(set(report.keys()), expected_keys)
+
+    def test_report_without_confidence(self):
+        results = [{"goal": "g1", "success": True, "eval_hb": 1}]
+        report = generate_summary_report(results)
+        self.assertNotIn("overall_confidence", report)
+        self.assertNotIn("avg_confidence", report["per_goal_metrics"]["g1"])
 
 
 if __name__ == "__main__":

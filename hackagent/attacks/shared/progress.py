@@ -37,6 +37,9 @@ class NullProgress:
     def update(self, *args, **kwargs):
         pass
 
+    def refresh(self):
+        pass
+
     def __enter__(self):
         return self
 
@@ -98,6 +101,10 @@ def create_progress_bar(description: str, total: int):
             MofNCompleteColumn(),
             TextColumn("[progress.percentage]{task.percentage:>3.1f}%"),
             TimeRemainingColumn(),
+            transient=False,
+            refresh_per_second=30,
         ) as progress_bar:
             task = progress_bar.add_task(description, total=total)
+            # Force first paint so very short tasks still display.
+            progress_bar.refresh()
             yield progress_bar, task
