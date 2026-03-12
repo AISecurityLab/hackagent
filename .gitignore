@@ -133,3 +133,5 @@ venv.bak/
 dmypy.json
 
 db_index/
+
+ATTACK_INTEGRATION_HANDOUT.md
