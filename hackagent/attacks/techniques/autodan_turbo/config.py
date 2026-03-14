@@ -40,15 +40,15 @@ DEFAULT_AUTODAN_TURBO_CONFIG: Dict[str, Any] = {
         # Attacker LLM generation parameters
         "attacker_temperature": 1.0,
         "attacker_top_p": 1.0,
-        "attacker_max_tokens": 4096,
+        "attacker_max_tokens": 512,
         # Scorer LLM generation parameters
         "scorer_temperature": 0.7,
         "scorer_top_p": 0.9,
-        "scorer_max_tokens": 4096,
+        "scorer_max_tokens": 512,
         # Summarizer LLM generation parameters
         "summarizer_temperature": 0.6,
         "summarizer_top_p": 0.9,
-        "summarizer_max_tokens": 4096,
+        "summarizer_max_tokens": 512,
         # Maximum retries for scorer/summarizer wrapper parsing
         "max_parse_retries": 5,
         # Whether to skip warm-up and go straight to lifelong
@@ -57,8 +57,14 @@ DEFAULT_AUTODAN_TURBO_CONFIG: Dict[str, Any] = {
         "strategy_library_path": None,
         # Whether to run only warm-up phase
         "warm_up_only": False,
-        # Litellm embedding model for strategy library FAISS retrieval
-        "embedding_model": "text-embedding-3-small",
+        # Embedding model for strategy library FAISS retrieval.
+        # "local/bag-of-words" (default) uses the built-in no-API hashing-trick
+        # embedder.  Any model ID starting with "local/" routes to a local
+        # backend; all other IDs are treated as OpenAI-compatible REST models
+        # and require embedding_api_key + embedding_api_base.
+        "embedding_model": "local/bag-of-words",
+        "embedding_api_key": None,
+        "embedding_api_base": None,
     },
     # Attacker LLM configuration (generates jailbreak prompts)
     "attacker": {
@@ -100,7 +106,7 @@ DEFAULT_AUTODAN_TURBO_CONFIG: Dict[str, Any] = {
     "judge_temperature": 0.0,
     "max_judge_retries": 1,
     # Target model generation settings
-    "max_new_tokens": 4096,
+    "max_new_tokens": 512,
     "temperature": 0.6,
     "top_p": 0.9,
     "request_timeout": 120,
