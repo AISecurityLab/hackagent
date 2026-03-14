@@ -42,6 +42,14 @@ from hackagent.router.types import AgentTypeEnum
 
 logger = logging.getLogger("hackagent.attacks.shared.router_factory")
 
+# Common aliases for agent_type strings accepted in configs.  These are mapped
+# to the canonical AgentTypeEnum value before enum lookup so that e.g.
+# ``"agent_type": "openai"`` (the most natural shorthand) works without warnings.
+_AGENT_TYPE_ALIASES: Dict[str, str] = {
+    "OPENAI": "OPENAI_SDK",
+    "OPENAI-SDK": "OPENAI_SDK",
+}
+
 
 def create_router(
     client: AuthenticatedClient,
@@ -136,9 +144,10 @@ def create_router(
             operational_config[key] = value
 
     # ---- Agent type resolution ----
-    agent_type_str = config.get("agent_type", "OPENAI_SDK")
+    agent_type_str = config.get("agent_type", "openai")
+    normalized = _AGENT_TYPE_ALIASES.get(agent_type_str.upper(), agent_type_str.upper())
     try:
-        agent_type = AgentTypeEnum(agent_type_str.upper())
+        agent_type = AgentTypeEnum(normalized)
     except ValueError:
         log.warning(
             f"Invalid agent_type '{agent_type_str}' for {name}, "

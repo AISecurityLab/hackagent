@@ -31,12 +31,14 @@ dependencies = [
     "textual>=1.0.0",
     "python-dateutil>=2.8.0",
     "attrs>=21.0.0",
+    "faiss-cpu>=1.13.2",
 ]
 
 [project.optional-dependencies]
 datasets = [
     "datasets>=2.14.0",  # HuggingFace datasets library
 ]
+
 
 [dependency-groups]
 dev = [
@@ -55,7 +57,7 @@ dev = [
     "flask>=3.1.2",
     "mcp>=1.21.2",
     "vllm>=0.11.0; sys_platform != 'win32'",
-    "transformers>=4.40,<6.0; sys_platform != 'win32'",
+    "transformers>=4.40,<5.0; sys_platform != 'win32'",
 ]
 docs = [
     "pydoc-markdown>=4.8.2",

@@ -12,10 +12,11 @@ HackAgent provides multiple attack strategies, each designed for different secur
 graph LR
     subgraph "Attack Types"
         A[AdvPrefix] --> |"Sophisticated"| T[Target Agent]
-        B[PAIR] --> |"Adaptive"| T
-        C[Baseline] --> |"Fast"| T
-        D[TAP] --> |"Tree Search"| T
-        E[FlipAttack] --> |"Obfuscation"| T
+        B[AutoDAN-Turbo] --> |"Sophisticated"| T
+        C[PAIR] --> |"Adaptive"| T
+        D[Baseline] --> |"Fast"| T
+        E[TAP] --> |"Tree Search"| T
+        F[FlipAttack] --> |"Obfuscation"| T
     end
     T --> R[Results & Analysis]
 ```
@@ -25,6 +26,7 @@ graph LR
 | Attack | Description | Sophistication | Speed |
 |--------|-------------|----------------|-------|
 | [**AdvPrefix**](./advprefix.md) | Multi-step adversarial prefix optimization | ⭐⭐⭐ High | Slower |
+| [**AutoDAN-Turbo**](./autodan_turbo.md) | Lifelong strategy discovery and reuse | ⭐⭐⭐ High | Slower |
 | [**PAIR**](./pair.md) | LLM-driven iterative prompt refinement | ⭐⭐ Medium | Medium |
 | [**TAP**](./tap.md) | Tree search with on-topic pruning | ⭐⭐ Medium | Medium |
 | [**FlipAttack**](./flipattack.md) | Character-level text obfuscation | ⭐ Basic | Fast |
@@ -79,6 +81,31 @@ attack_config = {
 ```
 
 [**Learn more about PAIR →**](./pair.md)
+
+---
+
+## AutoDAN-Turbo — Lifelong Strategy Attack
+
+AutoDAN-Turbo is a lifelong red-teaming attack that **discovers and reuses jailbreak strategies** across attempts. It runs a warm-up exploration phase to build a strategy library, then reuses those strategies in a lifelong phase to improve success rates.
+
+<div style={{background: 'var(--ifm-background-surface-color)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--ifm-color-emphasis-200)', margin: '1rem 0'}}>
+
+An attacker model explores prompts, a scorer rates target responses, and a summarizer extracts reusable strategies. These strategies are stored in a library and retrieved in later iterations, turning the attack into a strategy-guided lifelong loop.
+
+</div>
+
+```python
+attack_config = {
+    "attack_type": "autodan_turbo",
+    "goals": ["Bypass content filter"],
+    "attacker": {"identifier": "gpt-4", "endpoint": "https://api.openai.com/v1"},
+    "scorer": {"identifier": "gpt-4o-mini", "endpoint": "https://api.openai.com/v1"},
+    "summarizer": {"identifier": "gpt-4", "endpoint": "https://api.openai.com/v1"},
+    "judges": [{"identifier": "gpt-4o-mini", "type": "harmbench"}]
+}
+```
+
+[**Learn more about AutoDAN-Turbo →**](./autodan_turbo.md)
 
 ---
 

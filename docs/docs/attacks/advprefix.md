@@ -152,14 +152,16 @@ advanced_config = {
 | `n_prefixes_per_goal` | Final prefixes selected per goal | 2 | 1-10 |
 | `batch_size` | Parallel workers for generation + target completions | 2 | 1-64 |
 | `goal_batch_size` | Macro-batch size for goals at orchestrator level | disabled | 1-N |
+| `goal_batch_workers` | Concurrent macro-batch workers (orchestrator) | `1` | 1-64 |
 | `batch_size_judge` | Parallel workers for judge evaluation | 1 | 1-64 |
 
 ### Batching Parameters (Practical Mapping)
 
-For `advprefix`, batching is controlled by three top-level keys in `attack_config`:
+For `advprefix`, batching is controlled by four top-level keys in `attack_config`:
 
 - `batch_size`: used by Generation and Execution stages (`ThreadPoolExecutor(max_workers=batch_size)`).
 - `goal_batch_size`: used by the orchestrator to split goals into macro-batches.
+- `goal_batch_workers`: used by the orchestrator to process multiple macro-batches in parallel.
 - `batch_size_judge`: mapped to evaluator `batch_size` and used by judge parallel evaluation.
 
 > Note: set these at top level of `attack_config` (not inside `generator`).
