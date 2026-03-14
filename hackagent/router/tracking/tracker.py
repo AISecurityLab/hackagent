@@ -27,8 +27,11 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from hackagent.api.result import result_partial_update, result_trace_create
-from hackagent.api.run import run_result_create
+from hackagent.api.result import (
+    result_create,
+    result_partial_update,
+    result_trace_create,
+)
 from hackagent.api.models import (
     EvaluationStatusEnum,
     PatchedResultRequest,
@@ -197,9 +200,8 @@ class Tracker:
                 },
             )
 
-            response = run_result_create.sync_detailed(
+            response = result_create.sync_detailed(
                 client=self.client,
-                id=run_uuid,
                 body=result_request,
             )
 
@@ -225,7 +227,7 @@ class Tracker:
             else:
                 self.logger.warning(
                     f"Failed to create result for goal {goal_index}: "
-                    f"status={response.status_code}"
+                    f"status={response.status_code} body={response.content!r}"
                 )
 
         except Exception as e:

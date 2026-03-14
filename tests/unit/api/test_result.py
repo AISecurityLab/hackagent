@@ -61,7 +61,6 @@ class TestResultListAPI(unittest.TestCase):
                 mock_run_id
             ),  # This field seems to be the same as run_id in the model but API might use 'run'
             "run_id": str(mock_run_id),  # Present in Result model
-            "prompt_name": "Test Prompt For Result",
             "timestamp": timestamp_str,
             "traces": [mock_trace_data],
             "prompt": str(mock_prompt_id),
@@ -114,7 +113,6 @@ class TestResultListAPI(unittest.TestCase):
             self.assertEqual(retrieved_result.id, mock_result_id)
             self.assertEqual(retrieved_result.run_id, mock_run_id)
             # self.assertEqual(retrieved_result.run, mock_run_id) # Check if 'run' attribute exists after from_dict
-            self.assertEqual(retrieved_result.prompt_name, "Test Prompt For Result")
             self.assertEqual(retrieved_result.timestamp, isoparse(timestamp_str))
             self.assertTrue(
                 isinstance(retrieved_result.traces, list)
@@ -220,12 +218,8 @@ class TestResultCreateAPI(unittest.TestCase):
             "id": str(mock_created_result_id),
             "run": str(result_request_data.run),  # Should match request
             "run_id": str(result_request_data.run),  # Model uses run_id
-            "prompt_name": "Prompt For Created Result",  # Server might populate this based on prompt ID
             "timestamp": timestamp_create_str,  # Server sets this
             "traces": [mock_trace_data_create],  # Server might add an initial trace
-            "prompt": str(result_request_data.prompt)
-            if result_request_data.prompt
-            else None,
             "request_payload": result_request_data.request_payload,
             "response_status_code": 200,  # Assuming default or server determined
             "response_headers": {"Content-Type": "application/json"},  # Example headers
@@ -358,7 +352,6 @@ class TestResultRetrieveAPI(unittest.TestCase):
             "id": str(result_id_to_retrieve),
             "run": str(mock_run_id_retrieve),  # API might return 'run' field
             "run_id": str(mock_run_id_retrieve),  # Model has 'run_id'
-            "prompt_name": "Retrieved Result's Prompt",
             "timestamp": timestamp_retrieve_str,
             "traces": [mock_trace_data_retrieve],
             "prompt": str(uuid.uuid4()),  # Example prompt ID
@@ -486,7 +479,6 @@ class TestResultUpdateAPI(unittest.TestCase):
             "id": str(result_id_to_update),
             "run": str(result_update_request_data.run),
             "run_id": str(result_update_request_data.run),
-            "prompt_name": "Updated Result's Prompt",
             "timestamp": original_timestamp_str,  # Timestamp of creation should remain
             "traces": [mock_trace_data_update],  # Traces might be updated or appended
             "prompt": str(uuid.uuid4()),  # Assuming it was set or remains
@@ -647,7 +639,6 @@ class TestResultPartialUpdateAPI(unittest.TestCase):
             "id": str(result_id_to_patch),
             "run": str(mock_run_id_patch_resp),  # Original/current run
             "run_id": str(mock_run_id_patch_resp),
-            "prompt_name": "Result Before Patch Prompt Name",
             "timestamp": original_timestamp_patch_str,  # Original creation timestamp
             "traces": [mock_trace_data_patch_resp],
             "prompt": str(uuid.uuid4()),  # Original/current prompt

@@ -110,16 +110,6 @@ class _StepJudge:
             expected_fields = {f.name for f in fields(EvaluatorConfig)}
             filtered = {k: v for k, v in sub_cfg.items() if k in expected_fields}
 
-            # Resolve agent_type enum
-            raw_at = filtered.get("agent_type")
-            if isinstance(raw_at, str):
-                from hackagent.router.types import AgentTypeEnum
-
-                try:
-                    filtered["agent_type"] = AgentTypeEnum(raw_at)
-                except ValueError:
-                    filtered["agent_type"] = AgentTypeEnum[raw_at]
-
             try:
                 ev_config = EvaluatorConfig(**filtered)
                 evaluator = evaluator_class(
@@ -432,6 +422,13 @@ def execute(
 
         elapsed = round(time.perf_counter() - t0, 3)
         best_result["generation_elapsed_s"] = elapsed
+
+        # Inject result_id from tracker so the evaluation step can sync to server
+        if tracker:
+            goal_ctx = tracker.get_goal_context(goal_idx)
+            if goal_ctx and goal_ctx.result_id:
+                best_result["result_id"] = goal_ctx.result_id
+
         results.append(best_result)
 
         success = best_result.get("success", False)

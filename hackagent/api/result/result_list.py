@@ -7,14 +7,13 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...types import UNSET, Response, Unset
-from ..models import PaginatedResultList, EvaluationStatusEnum
+from ..models import PaginatedResultList, ResultListEvaluationStatus
 
 
 def _get_kwargs(
     *,
-    evaluation_status: EvaluationStatusEnum | Unset = UNSET,
+    evaluation_status: ResultListEvaluationStatus | Unset = UNSET,
     page: int | Unset = UNSET,
-    prompt: UUID | Unset = UNSET,
     run: UUID | Unset = UNSET,
     run_organization: UUID | Unset = UNSET,
 ) -> dict[str, Any]:
@@ -27,11 +26,6 @@ def _get_kwargs(
     params["evaluation_status"] = json_evaluation_status
 
     params["page"] = page
-
-    json_prompt: str | Unset = UNSET
-    if not isinstance(prompt, Unset):
-        json_prompt = str(prompt)
-    params["prompt"] = json_prompt
 
     json_run: str | Unset = UNSET
     if not isinstance(run, Unset):
@@ -82,9 +76,8 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    evaluation_status: EvaluationStatusEnum | Unset = UNSET,
+    evaluation_status: ResultListEvaluationStatus | Unset = UNSET,
     page: int | Unset = UNSET,
-    prompt: UUID | Unset = UNSET,
     run: UUID | Unset = UNSET,
     run_organization: UUID | Unset = UNSET,
 ) -> Response[PaginatedResultList]:
@@ -95,9 +88,8 @@ def sync_detailed(
     Results are typically consumed by SDK for test result retrieval and analysis.
 
     Args:
-        evaluation_status (EvaluationStatusEnum | Unset):
+        evaluation_status (ResultListEvaluationStatus | Unset):
         page (int | Unset):
-        prompt (UUID | Unset):
         run (UUID | Unset):
         run_organization (UUID | Unset):
 
@@ -112,7 +104,6 @@ def sync_detailed(
     kwargs = _get_kwargs(
         evaluation_status=evaluation_status,
         page=page,
-        prompt=prompt,
         run=run,
         run_organization=run_organization,
     )
@@ -127,9 +118,8 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    evaluation_status: EvaluationStatusEnum | Unset = UNSET,
+    evaluation_status: ResultListEvaluationStatus | Unset = UNSET,
     page: int | Unset = UNSET,
-    prompt: UUID | Unset = UNSET,
     run: UUID | Unset = UNSET,
     run_organization: UUID | Unset = UNSET,
 ) -> PaginatedResultList | None:
@@ -140,9 +130,8 @@ def sync(
     Results are typically consumed by SDK for test result retrieval and analysis.
 
     Args:
-        evaluation_status (EvaluationStatusEnum | Unset):
+        evaluation_status (ResultListEvaluationStatus | Unset):
         page (int | Unset):
-        prompt (UUID | Unset):
         run (UUID | Unset):
         run_organization (UUID | Unset):
 
@@ -158,7 +147,6 @@ def sync(
         client=client,
         evaluation_status=evaluation_status,
         page=page,
-        prompt=prompt,
         run=run,
         run_organization=run_organization,
     ).parsed
@@ -167,9 +155,8 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    evaluation_status: EvaluationStatusEnum | Unset = UNSET,
+    evaluation_status: ResultListEvaluationStatus | Unset = UNSET,
     page: int | Unset = UNSET,
-    prompt: UUID | Unset = UNSET,
     run: UUID | Unset = UNSET,
     run_organization: UUID | Unset = UNSET,
 ) -> Response[PaginatedResultList]:
@@ -180,9 +167,8 @@ async def asyncio_detailed(
     Results are typically consumed by SDK for test result retrieval and analysis.
 
     Args:
-        evaluation_status (EvaluationStatusEnum | Unset):
+        evaluation_status (ResultListEvaluationStatus | Unset):
         page (int | Unset):
-        prompt (UUID | Unset):
         run (UUID | Unset):
         run_organization (UUID | Unset):
 
@@ -197,7 +183,6 @@ async def asyncio_detailed(
     kwargs = _get_kwargs(
         evaluation_status=evaluation_status,
         page=page,
-        prompt=prompt,
         run=run,
         run_organization=run_organization,
     )
@@ -210,9 +195,8 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    evaluation_status: EvaluationStatusEnum | Unset = UNSET,
+    evaluation_status: ResultListEvaluationStatus | Unset = UNSET,
     page: int | Unset = UNSET,
-    prompt: UUID | Unset = UNSET,
     run: UUID | Unset = UNSET,
     run_organization: UUID | Unset = UNSET,
 ) -> PaginatedResultList | None:
@@ -223,9 +207,8 @@ async def asyncio(
     Results are typically consumed by SDK for test result retrieval and analysis.
 
     Args:
-        evaluation_status (EvaluationStatusEnum | Unset):
+        evaluation_status (ResultListEvaluationStatus | Unset):
         page (int | Unset):
-        prompt (UUID | Unset):
         run (UUID | Unset):
         run_organization (UUID | Unset):
 
@@ -242,7 +225,6 @@ async def asyncio(
             client=client,
             evaluation_status=evaluation_status,
             page=page,
-            prompt=prompt,
             run=run,
             run_organization=run_organization,
         )
