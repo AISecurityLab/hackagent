@@ -51,6 +51,7 @@ class StrategyLibrary:
         self.embedding_api_key = embedding_api_key
         self.embedding_api_base = embedding_api_base
         self.logger = logger or logging.getLogger(__name__)
+        self._embedding_disabled_reason: Optional[str] = None
 
         # Build OpenAI client for embeddings (works with any OpenAI-compatible endpoint)
         client_kwargs: Dict[str, Any] = {}
@@ -72,6 +73,9 @@ class StrategyLibrary:
         Returns:
             Float32 numpy vector if successful, otherwise ``None``.
         """
+        if self._embedding_disabled_reason is not None:
+            return None
+
         try:
             response = self._embed_client.embeddings.create(
                 model=self.embedding_model,
@@ -79,7 +83,20 @@ class StrategyLibrary:
             )
             return np.array(response.data[0].embedding, dtype=np.float32)
         except Exception as e:
-            self.logger.error(f"Embedding failed: {e}")
+            message = str(e)
+            if "No embedding data received" in message:
+                self._embedding_disabled_reason = (
+                    "Embedding endpoint returned no vectors; the selected model "
+                    "likely does not support /v1/embeddings."
+                )
+                self.logger.error(
+                    "Embedding disabled for this run: %s (model=%s, base=%s)",
+                    self._embedding_disabled_reason,
+                    self.embedding_model,
+                    self.embedding_api_base or "<provider-default>",
+                )
+            else:
+                self.logger.error(f"Embedding failed: {message}")
             return None
 
     def add(self, strategy: Dict[str, Any], notify: bool = True) -> None:
@@ -161,8 +178,8 @@ class StrategyLibrary:
         # Build FAISS index and search
         matrix = np.array(all_embeddings, dtype=np.float32)
         index = faiss.IndexFlatL2(matrix.shape[1])
-        index.add(matrix)
-        distances, indices = index.search(
+        index.add(matrix)  # type: ignore[arg-type]
+        distances, indices = index.search(  # type: ignore[call-arg]
             query_embedding.reshape(1, -1), len(all_embeddings)
         )
         distances, indices = distances[0], indices[0]
