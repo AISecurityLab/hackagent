@@ -128,7 +128,7 @@ def conditional_generate(
     logger,
     temp=1.0,
     top_p=1.0,
-    max_tokens=4096,
+    max_tokens=512,
     role_label="attacker",
 ):
     """Generate an attacker candidate prompt using conditional generation.
@@ -245,7 +245,7 @@ def query_target(agent_router, victim_key, prompt, config, logger, role_label="t
         registration_key=victim_key,
         request_data={
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": config.get("max_new_tokens", 4096),
+            "max_tokens": config.get("max_new_tokens", 512),
             "temperature": config.get("temperature", 0.6),
         },
     )
@@ -287,6 +287,7 @@ def score_response(
     target_response,
     logger,
     max_retries=5,
+    scorer_max_tokens=512,
     role_label="scorer",
 ):
     """Score target output using the two-step scorer/wrapper protocol.
@@ -324,7 +325,7 @@ def score_response(
                 registration_key=scorer_key,
                 request_data={
                     "messages": msgs,
-                    "max_tokens": 4096,
+                    "max_tokens": scorer_max_tokens,
                     "temperature": 0.7,
                     "top_p": 0.9,
                 },
