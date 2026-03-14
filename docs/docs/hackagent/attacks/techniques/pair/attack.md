@@ -8,6 +8,11 @@ PAIR attack implementation.
 Implements the Prompt Automatic Iterative Refinement (PAIR) attack using
 an attacker LLM to iteratively refine jailbreak prompts.
 
+Result Tracking:
+    Uses TrackingCoordinator to manage both pipeline-level StepTracker
+    and per-goal Tracker. The coordinator handles goal lifecycle,
+    crash-safe finalization, and summary logging.
+
 ## PAIRAttack Objects
 
 ```python
@@ -24,8 +29,7 @@ prompts based on target model responses and judge feedback.
 ```python
 def __init__(config: Optional[Dict[str, Any]] = None,
              client: Optional[AuthenticatedClient] = None,
-             agent_router: Optional[AgentRouter] = None,
-             attacker_router: Optional[AgentRouter] = None)
+             agent_router: Optional[AgentRouter] = None)
 ```
 
 Initialize PAIR attack.
@@ -38,6 +42,9 @@ def run(goals: List[str]) -> List[Dict[str, Any]]
 ```
 
 Execute PAIR attack on goals.
+
+Uses TrackingCoordinator to manage both pipeline-level and
+per-goal result tracking through a single unified interface.
 
 **Arguments**:
 

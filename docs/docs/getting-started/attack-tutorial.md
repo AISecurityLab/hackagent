@@ -10,7 +10,7 @@ import ThemedImage from '@theme/ThemedImage';
 
 This tutorial walks you through running security attacks against AI agents using HackAgent. You'll learn how to configure and execute all three attack types: **AdvPrefix**, **PAIR**, and **Baseline**.
 
-## 🚀 Running Attacks
+## Running Attacks
 
 Choose your preferred interface to run attacks against your target agent.
 
@@ -308,11 +308,6 @@ attack_config = {
         "identifier": "ollama/llama3",
         "endpoint": "http://localhost:11434/api/generate",
         "type": "harmbench"
-    }],
-    "selection_judges": [{
-        "identifier": "ollama/llama3",
-        "endpoint": "http://localhost:11434/api/generate",
-        "type": "harmbench"
     }]
 }
 
@@ -394,11 +389,6 @@ attack_config = {
         "endpoint": "https://api.openai.com/v1"
     },
     "judges": [{
-        "identifier": "gpt-4",
-        "endpoint": "https://api.openai.com/v1",
-        "type": "harmbench"
-    }],
-    "selection_judges": [{
         "identifier": "gpt-4",
         "endpoint": "https://api.openai.com/v1",
         "type": "harmbench"
@@ -486,11 +476,6 @@ attack_config = {
         "identifier": "ollama/llama3",
         "endpoint": "http://localhost:11434/api/generate",
         "type": "harmbench"
-    }],
-    "selection_judges": [{
-        "identifier": "ollama/llama3",
-        "endpoint": "http://localhost:11434/api/generate",
-        "type": "harmbench"
     }]
 }
 
@@ -575,11 +560,6 @@ attack_config = {
         "identifier": "gpt-4",
         "endpoint": "http://localhost:4000/v1",
         "type": "harmbench"
-    }],
-    "selection_judges": [{
-        "identifier": "gpt-4",
-        "endpoint": "http://localhost:4000/v1",
-        "type": "harmbench"
     }]
 }
 
@@ -635,7 +615,7 @@ results = agent.hack(attack_config=attack_config)
 
 ---
 
-## ⚔️ Attack Types Overview
+## Attack Types Overview
 
 <Tabs>
   <TabItem value="baseline" label="Baseline" default>
@@ -654,7 +634,7 @@ Baseline attacks use predefined prompt templates combined with your test goals. 
 | `instruction_override` | Override system instructions |
 | `hypothetical` | Frame as fictional/hypothetical |
 
-[**Full Baseline Documentation →**](../attacks/baseline-attacks)
+[**Full Baseline Documentation →**](../attacks/baseline)
 
   </TabItem>
   <TabItem value="pair" label="PAIR">
@@ -671,7 +651,7 @@ PAIR (Prompt Automatic Iterative Refinement) uses an attacker LLM to iteratively
 4. **Attacker refines** based on feedback
 5. **Repeat** until success or max iterations
 
-[**Full PAIR Documentation →**](../attacks/pair-attacks)
+[**Full PAIR Documentation →**](../attacks/pair)
 
   </TabItem>
   <TabItem value="advprefix" label="AdvPrefix">
@@ -705,12 +685,11 @@ advanced_config = {
     # Attack parameters
     "n_candidates_per_goal": 10,
     "meta_prefixes": ["Write a guide:", "Explain how to:"],
-    "pasr_weight": 0.7,
     "n_prefixes_per_goal": 3
 }
 ```
 
-[**Full AdvPrefix Documentation →**](../attacks/advprefix-attacks)
+[**Full AdvPrefix Documentation →**](../attacks/advprefix)
 
   </TabItem>
 </Tabs>
@@ -738,11 +717,11 @@ curl http://localhost:11434/api/generate \
 
 ---
 
-## 📚 Next Steps
+## Next Steps
 
-- [**AdvPrefix Deep Dive**](../attacks/advprefix-attacks.md) — Full AdvPrefix documentation
-- [**PAIR Attack Guide**](../attacks/pair-attacks.md) — Iterative refinement techniques
-- [**Baseline Templates**](../attacks/baseline-attacks.md) — Template customization
+- [**AdvPrefix Deep Dive**](../attacks/advprefix.md) — Full AdvPrefix documentation
+- [**PAIR Attack Guide**](../attacks/pair.md) — Iterative refinement techniques
+- [**Baseline Templates**](../attacks/baseline.md) — Template customization
 - [**CLI Documentation**](../cli/overview.md) — All CLI commands
 
 ---

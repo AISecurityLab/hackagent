@@ -1,16 +1,5 @@
-# Copyright 2025 - AI4I. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 """
 Utility functions for AdvPrefix attacks.
@@ -31,7 +20,6 @@ different stages of the AdvPrefix attack pipeline.
 
 import functools
 import logging
-from contextlib import contextmanager
 from typing import (
     Any,
     Callable,
@@ -40,15 +28,8 @@ from typing import (
     TypeVar,
 )
 
-# Import Rich progress bar components
-from rich.progress import (
-    BarColumn,
-    MofNCompleteColumn,
-    Progress,
-    SpinnerColumn,
-    TextColumn,
-    TimeRemainingColumn,
-)
+# Re-export shared progress bar for backward compatibility
+from hackagent.attacks.shared.progress import create_progress_bar  # noqa: F401
 
 # Use hierarchical logger name for TUI handler inheritance
 logger = logging.getLogger("hackagent.attacks.advprefix.utils")
@@ -68,84 +49,6 @@ REFUSAL_KEYWORDS = [
     "i am programmed",
     "violates my guidelines",
 ]
-
-
-@contextmanager
-def create_progress_bar(description: str, total: int):
-    """
-    Create a standardized progress bar for AdvPrefix pipeline steps.
-
-    This context manager provides a consistent progress bar configuration
-    across all pipeline stages, eliminating code duplication and ensuring
-    uniform progress reporting UX throughout the attack execution.
-
-    The progress bar includes:
-    - Spinner animation for visual feedback
-    - Task description with formatting support
-    - Visual progress bar
-    - Completion counter (M of N complete)
-    - Percentage complete
-    - Estimated time remaining
-
-    Args:
-        description: Human-readable description of the task being tracked.
-            Supports Rich markup formatting (e.g., "[cyan]Processing...[/cyan]").
-        total: Total number of items/iterations to process for completion tracking.
-
-    Yields:
-        Tuple of (progress_bar, task_id):
-        - progress_bar: Progress instance for manual control if needed
-        - task_id: Task identifier for progress updates via progress_bar.update(task_id)
-
-    Example:
-        >>> with create_progress_bar("[cyan]Processing prefixes...", len(data)) as (progress, task):
-        ...     for item in data:
-        ...         # Process item
-        ...         progress.update(task, advance=1)
-
-    Note:
-        The progress bar automatically starts and stops when entering/exiting
-        the context manager. All pipeline steps should use this utility for
-        consistent progress reporting.
-    """
-    # Check if running in TUI mode (NO_COLOR env var is set by TUI)
-    import os
-
-    in_tui_mode = os.environ.get("NO_COLOR") == "1"
-
-    if in_tui_mode:
-        # In TUI mode: use a null progress bar that does nothing
-        class NullProgress:
-            def add_task(self, *args, **kwargs):
-                return 0
-
-            def update(self, *args, **kwargs):
-                pass
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *args):
-                pass
-
-        progress_bar = NullProgress()
-        task = 0
-        yield progress_bar, task
-    else:
-        # Normal mode: use Rich progress bar
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            MofNCompleteColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.1f}%"),
-            TimeRemainingColumn(),
-        ) as progress_bar:
-            task = progress_bar.add_task(description, total=total)
-            yield progress_bar, task
-
-
-# Checkpoint functionality removed - all tracking via API
 
 
 # ============================================================================

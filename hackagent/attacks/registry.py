@@ -1,16 +1,5 @@
-# Copyright 2025 - AI4I. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 """
 Attack technique registry.
@@ -35,6 +24,11 @@ from hackagent.attacks.techniques.advprefix import AdvPrefixAttack
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.techniques.pair import PAIRAttack
 from hackagent.attacks.techniques.baseline import BaselineAttack
+from hackagent.attacks.techniques.flipattack import FlipAttack
+from hackagent.attacks.techniques.tap import (
+    TAPAttack,
+)  # Placeholder for future implementation
+from hackagent.attacks.techniques.autodan_turbo import AutoDANTurboAttack
 
 
 def create_orchestrator(
@@ -79,18 +73,26 @@ def create_orchestrator(
 AdvPrefixOrchestrator = create_orchestrator("AdvPrefix", AdvPrefixAttack)
 BaselineOrchestrator = create_orchestrator("Baseline", BaselineAttack)
 PAIROrchestrator = create_orchestrator("PAIR", PAIRAttack)
-
+FlipAttackOrchestrator = create_orchestrator("FlipAttack", FlipAttack)
+TAPOrchestrator = create_orchestrator("TAP", TAPAttack)
+AutoDANTurboOrchestrator = create_orchestrator("AutoDANTurbo", AutoDANTurboAttack)
 
 # Registry of all available attacks
 ATTACK_REGISTRY = {
     "AdvPrefix": AdvPrefixOrchestrator,
     "Baseline": BaselineOrchestrator,
     "PAIR": PAIROrchestrator,
+    "FlipAttack": FlipAttackOrchestrator,
+    "TAP": TAPOrchestrator,
+    "AutoDANTurbo": AutoDANTurboOrchestrator,
 }
 
 __all__ = [
     "AdvPrefixOrchestrator",
     "BaselineOrchestrator",
     "PAIROrchestrator",
+    "FlipAttackOrchestrator",
+    "TAPOrchestrator",
+    "AutoDANTurboOrchestrator",
     "ATTACK_REGISTRY",
 ]

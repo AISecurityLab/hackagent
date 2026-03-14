@@ -7,7 +7,7 @@ slug: /agents/openai-sdk
 
 OpenAI SDK is the official Python library for interacting with OpenAI's API, including GPT-4, GPT-3.5, and other models. HackAgent provides native support for testing agents built with the OpenAI SDK, including those using function calling and tool use.
 
-## 🔧 Setup
+## Setup
 
 ### Prerequisites
 
@@ -38,7 +38,7 @@ OpenAI SDK is the official Python library for interacting with OpenAI's API, inc
    export OPENAI_API_BASE="https://your-resource.openai.azure.com"
    ```
 
-## 🚀 Basic Integration
+## Basic Integration
 
 ### Initialize HackAgent Client
 
@@ -65,7 +65,7 @@ The adapter supports all OpenAI SDK features:
 - **Custom Endpoints**: Azure OpenAI, local models, etc.
 - **Message History**: Multi-turn conversation testing
 
-## ⚔️ Running Security Tests
+## Running Security Tests
 
 ### Basic AdvPrefix Attack
 
@@ -128,7 +128,7 @@ for agent_name in agents:
     print(f"Results for {agent_name}: {results}")
 ```
 
-## 🌐 Azure OpenAI Integration
+## Azure OpenAI Integration
 
 HackAgent supports Azure OpenAI Service out of the box:
 
@@ -142,7 +142,7 @@ agent = HackAgent(
 
 **Note:** Make sure your `AZURE_OPENAI_API_KEY` environment variable is set. The adapter will use your Azure endpoint configuration.
 
-## 📊 Understanding Results
+## Understanding Results
 
 After running tests, check your HackAgent dashboard for:
 
@@ -151,7 +151,7 @@ After running tests, check your HackAgent dashboard for:
 3. **Token Usage**: API cost analysis
 4. **Response Patterns**: Common vulnerabilities across models
 
-## 🛡️ Best Practices
+## Best Practices
 
 ### Rate Limiting
 ```python
@@ -184,7 +184,7 @@ export OPENAI_API_KEY_TEST="sk-test-..."
 export OPENAI_API_KEY_PROD="sk-prod-..."
 ```
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### "OpenAI SDK is not installed"
 ```bash
@@ -215,14 +215,14 @@ except Exception as e:
     # Check dashboard for partial results
 ```
 
-## 📚 Additional Resources
+## Additional Resources
 
 - [OpenAI API Documentation](https://platform.openai.com/docs)
 - [OpenAI SDK GitHub](https://github.com/openai/openai-python)
 - [HackAgent Attack Tutorial](../getting-started/attack-tutorial.md)
 - [Function Calling Guide](https://platform.openai.com/docs/guides/function-calling)
 
-## 🔄 Next Steps
+## Next Steps
 
 1. Review results on your [HackAgent Dashboard](https://app.hackagent.dev)
 2. Try different models and configurations

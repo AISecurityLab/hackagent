@@ -1,16 +1,5 @@
-# Copyright 2025 - AI4I. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 """
 Step-level tracking functionality.
@@ -25,23 +14,22 @@ StepTracker is designed for tracking high-level pipeline steps (e.g.,
 or per-datapoint tracking, use the Tracker class from tracker.py instead.
 """
 
-import json
 from contextlib import contextmanager
 from typing import Any, Dict, Optional
 
 from hackagent.api.result import result_partial_update, result_trace_create
-from hackagent.api.run import run_partial_update, run_result_create
-from hackagent.models import (
+from hackagent.api.run import run_partial_update
+from hackagent.api.models import (
     EvaluationStatusEnum,
     PatchedResultRequest,
     PatchedRunRequest,
-    ResultRequest,
     StatusEnum,
     StepTypeEnum,
     TraceRequest,
 )
 
 from .context import TrackingContext
+from .utils import deep_clean, sanitize_for_json
 
 
 class StepTracker:
@@ -178,6 +166,7 @@ class StepTracker:
         Returns:
             Trace ID if successful, None otherwise
         """
+
         try:
             sequence = self.context.increment_sequence()
 
@@ -188,10 +177,16 @@ class StepTracker:
             }
 
             if config is not None:
-                trace_content["config_snapshot"] = self._sanitize_config(config)
+                trace_content["config_snapshot"] = sanitize_for_json(config)
 
             if input_data is not None:
-                trace_content["input_data_sample"] = input_data
+                try:
+                    trace_content["input_data_sample"] = deep_clean(input_data)
+                except Exception as e:
+                    # If it fails, store error message instead
+                    trace_content["input_data_sample"] = (
+                        f"Serialization Error: {str(e)}"
+                    )
 
             # Add any additional metadata
             if self.context.metadata:
@@ -207,8 +202,8 @@ class StepTracker:
             # Call API
             result_uuid = self.context.get_result_uuid()
             if not result_uuid:
-                self.logger.warning(
-                    f"Cannot create trace for '{step_name}': invalid result UUID"
+                self.logger.debug(
+                    f"Skipping trace for '{step_name}': StepTracker has no result target"
                 )
                 return None
 
@@ -249,65 +244,9 @@ class StepTracker:
         Returns:
             Trace ID if found, None otherwise
         """
-        # Try parsed response first
         if response.parsed and hasattr(response.parsed, "id"):
             return str(response.parsed.id)
-
-        # Try parsing raw content
-        try:
-            response_data = json.loads(response.content.decode())
-            if "id" in response_data:
-                return str(response_data["id"])
-        except Exception as e:
-            self.logger.warning(f"Could not parse trace ID for '{step_name}': {e}")
-
         return None
-
-    def _sanitize_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Remove sensitive information from config before sending to API.
-
-        Args:
-            config: Configuration dictionary
-
-        Returns:
-            Sanitized configuration dictionary
-        """
-        sensitive_keys = {"api_key", "token", "secret", "password", "key"}
-        # Keys that contain non-serializable objects (like client instances)
-        skip_keys = {"_client", "client"}
-
-        sanitized = {}
-        for key, value in config.items():
-            # Skip non-serializable objects
-            if key in skip_keys:
-                sanitized[key] = f"<{type(value).__name__}>"
-                continue
-
-            key_lower = key.lower()
-            if any(sensitive in key_lower for sensitive in sensitive_keys):
-                sanitized[key] = "***REDACTED***"
-            elif isinstance(value, dict):
-                sanitized[key] = self._sanitize_config(value)
-            elif not self._is_json_serializable(value):
-                # Skip non-JSON-serializable values
-                sanitized[key] = f"<{type(value).__name__}>"
-            else:
-                sanitized[key] = value
-
-        return sanitized
-
-    def _sanitize_metadata_payload(self, payload: Any) -> Any:
-        """Sanitize step metadata payloads for JSON serialization."""
-        if payload is None:
-            return None
-        if isinstance(payload, dict):
-            return self._sanitize_config(payload)
-        if isinstance(payload, list):
-            return [self._sanitize_metadata_payload(item) for item in payload]
-        if self._is_json_serializable(payload):
-            return payload
-        return f"<{type(payload).__name__}>"
 
     def _drain_step_metadata(self) -> Dict[str, Any]:
         """Pop per-step metadata/progress logs from context."""
@@ -343,11 +282,7 @@ class StepTracker:
 
             drained = self._drain_step_metadata()
             if drained:
-                trace_content.update(
-                    self._sanitize_metadata_payload(drained)
-                    if isinstance(drained, dict)
-                    else drained
-                )
+                trace_content.update(sanitize_for_json(drained))
 
             if error_message:
                 trace_content["error_message"] = error_message
@@ -361,6 +296,9 @@ class StepTracker:
 
             result_uuid = self.context.get_result_uuid()
             if not result_uuid:
+                self.logger.debug(
+                    f"Skipping summary trace for '{step_name}': StepTracker has no result target"
+                )
                 return None
 
             response = result_trace_create.sync_detailed(
@@ -388,14 +326,6 @@ class StepTracker:
             )
 
         return None
-
-    def _is_json_serializable(self, value: Any) -> bool:
-        """Check if a value is JSON serializable."""
-        try:
-            json.dumps(value)
-            return True
-        except (TypeError, ValueError):
-            return False
 
     def _handle_step_error(self, step_name: str, error_message: str) -> None:
         """
@@ -571,114 +501,3 @@ class StepTracker:
             self.context.metadata["progress_log"] = self.context.metadata[
                 "progress_log"
             ][-20:]
-
-    def create_result(
-        self,
-        request_payload: Dict[str, Any],
-        response_body: Dict[str, Any],
-        evaluation_status: Optional[EvaluationStatusEnum] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Optional[str]:
-        """
-        Create a Result record for an agent interaction.
-
-        This method creates individual result records (test results) that are
-        associated with the current run. These results represent individual
-        agent calls and their outcomes during attack execution.
-
-        Args:
-            request_payload: The request sent to the agent
-            response_body: The response received from the agent
-            evaluation_status: Evaluation status (defaults to PENDING)
-            metadata: Additional metadata to store with the result
-
-        Returns:
-            Result ID if successful, None otherwise
-
-        Example:
-            >>> result_id = tracker.create_result(
-            ...     request_payload={"prompt": "test prompt"},
-            ...     response_body={"content": "test response"},
-            ...     evaluation_status=EvaluationStatusEnum.PENDING,
-            ...     metadata={"model": "gpt-4"}
-            ... )
-        """
-        if not self.context.can_create_results:
-            self.logger.warning(
-                "Tracking context is disabled for results - cannot create result "
-                "(missing client, run_id, or parent_result_id)"
-            )
-            return None
-
-        self.logger.info(
-            f"Creating result for run_id={self.context.run_id}, "
-            f"parent_result_id={self.context.parent_result_id}"
-        )
-
-        try:
-            run_uuid = self.context.get_run_uuid()
-            if not run_uuid:
-                self.logger.warning("Cannot create result: invalid run UUID")
-                return None
-
-            self.logger.info(f"Run UUID validated: {run_uuid}")
-
-            # Default to PENDING if not specified
-            if evaluation_status is None:
-                evaluation_status = EvaluationStatusEnum.PENDING
-
-            # Create result request
-            result_request = ResultRequest(
-                request_payload=request_payload,
-                response_body=response_body,
-                evaluation_status=evaluation_status,
-                agent_specific_data=metadata,
-            )
-
-            # Call API to create result under this run
-            response = run_result_create.sync_detailed(
-                client=self.context.client,
-                id=run_uuid,
-                body=result_request,
-            )
-
-            # Parse response
-            if response.status_code == 201:
-                result_id = self._extract_result_id(response)
-                if result_id:
-                    self.logger.info(f"Created result record (ID: {result_id})")
-                    return result_id
-            else:
-                self.logger.error(
-                    f"Failed to create result: status={response.status_code}, "
-                    f"body={response.content}"
-                )
-
-        except Exception as e:
-            self.logger.error(f"Exception creating result: {e}", exc_info=True)
-
-        return None
-
-    def _extract_result_id(self, response) -> Optional[str]:
-        """
-        Extract result ID from API response.
-
-        Args:
-            response: API response object
-
-        Returns:
-            Result ID if found, None otherwise
-        """
-        # Try parsed response first
-        if response.parsed and hasattr(response.parsed, "id"):
-            return str(response.parsed.id)
-
-        # Try parsing raw content
-        try:
-            response_data = json.loads(response.content.decode())
-            if "id" in response_data:
-                return str(response_data["id"])
-        except Exception as e:
-            self.logger.warning(f"Could not parse result ID: {e}")
-
-        return None

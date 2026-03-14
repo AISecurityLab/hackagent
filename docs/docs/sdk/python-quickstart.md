@@ -30,7 +30,7 @@ For the interactive HTTP API documentation, visit: **[https://api.hackagent.dev/
 from hackagent import HackAgent, AgentTypeEnum
 ```
 
-## 🎯 Basic Usage
+## Basic Usage
 
 ### Your First Security Test
 
@@ -59,13 +59,6 @@ attack_config = {
     "judges": [
         {
             "identifier": "ollama/llama3",
-            "endpoint": "http://localhost:11434/api/generate",
-            "type": "harmbench"
-        }
-    ],
-    "selection_judges": [
-        {
-            "identifier": "ollama/llama3", 
             "endpoint": "http://localhost:11434/api/generate",
             "type": "harmbench"
         }
@@ -108,20 +101,13 @@ def test_adk_attack_scenario():
                 "type": "harmbench",
             }
         ],
-        "selection_judges": [
-            {
-                "identifier": "ollama/llama3",
-                "endpoint": f"{os.getenv('HACKAGENT_API_BASE_URL')}/api/generate",
-                "type": "harmbench",
-            }
-        ],
     }
 
     # Execute the attack
     agent.hack(attack_config=attack_config)
 ```
 
-## 🔧 Agent Configuration
+## Agent Configuration
 
 ### Supported Agent Types
 
@@ -177,7 +163,7 @@ agent = HackAgent(
 )
 ```
 
-## ⚔️ Attack Types & Configurations
+## Attack Types & Configurations
 
 ### AdvPrefix Attack (Primary Implementation)
 
@@ -209,15 +195,6 @@ attack_config = {
             "identifier": "ollama/llama3",
             "endpoint": "http://localhost:11434/api/generate",
             "type": "harmbench"  # Evaluation type
-        }
-    ],
-    
-    # Selection judges (for final prefix selection)
-    "selection_judges": [
-        {
-            "identifier": "ollama/llama3",
-            "endpoint": "http://localhost:11434/api/generate", 
-            "type": "harmbench"
         }
     ],
     
@@ -272,14 +249,13 @@ DEFAULT_CONFIG = {
     "batch_size_judge": 1,
     "max_new_tokens_eval": 60,
     "filter_len": 10,
-    "pasr_weight": 0.6,
     "n_prefixes_per_goal": 2,
     "start_step": 1,
     "request_timeout": 120
 }
 ```
 
-## 🛠️ Error Handling
+## Error Handling
 
 ### Exception Hierarchy
 
@@ -319,7 +295,7 @@ logging.getLogger('hackagent').setLevel(logging.DEBUG)
 # The SDK automatically configures Rich handlers for beautiful output
 ```
 
-## 🔄 Advanced Usage
+## Advanced Usage
 
 ### Custom Run Configuration
 
@@ -377,7 +353,7 @@ results = agent.hack(attack_config=attack_config)
 # Access your results at https://app.hackagent.dev
 ```
 
-## 🧪 Development Setup
+## Development Setup
 
 ### Running Tests
 
@@ -410,7 +386,7 @@ poetry run ruff check .
 mypy hackagent/
 ```
 
-## 📚 SDK Architecture
+## SDK Architecture
 
 ### Core Components
 
@@ -428,16 +404,16 @@ mypy hackagent/
 4. `AttackStrategy` executes multi-step attack process
 5. Results automatically uploaded to platform
 
-## 🔄 Next Steps
+## Next Steps
 
 Explore these advanced topics:
 
-1. **[AdvPrefix Attacks](../attacks/advprefix-attacks.md)** - Advanced attack techniques
+1. **[AdvPrefix Attacks](../attacks/advprefix.md)** - Advanced attack techniques
 2. **[Google ADK Integration](../agents/google-adk.md)** - Framework-specific setup
 3. **[Attack Tutorial](../getting-started/attack-tutorial.md)** - Getting started with attacks
 4. **[Security Guidelines](../security/responsible-disclosure.md)** - Responsible disclosure and ethics
 
-## 📞 Support
+## Support
 
 - **GitHub Issues**: [Report bugs and request features](https://github.com/AISecurityLab/hackagent/issues)
 - **Documentation**: [Complete documentation](https://docs.hackagent.dev)

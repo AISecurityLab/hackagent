@@ -1,19 +1,9 @@
-# Copyright 2025 - AI4I. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 
-import logging
+from hackagent.logger import get_logger
+import re
 from typing import Any, Dict, List, Optional
 
 from .base import ChatCompletionsAgent, AdapterConfigurationError
@@ -88,7 +78,12 @@ class OpenAIConfigurationError(AdapterConfigurationError):
     pass
 
 
-logger = logging.getLogger(__name__)  # Module-level logger
+logger = get_logger(__name__)  # Module-level logger
+
+_CONTEXT_LIMIT_ERROR_RE = re.compile(
+    r"maximum context length is\s*(\d+)\s*tokens\s*and\s*your request has\s*(\d+)\s*input tokens",
+    flags=re.IGNORECASE,
+)
 
 
 class OpenAIAgent(ChatCompletionsAgent):
@@ -262,8 +257,22 @@ class OpenAIAgent(ChatCompletionsAgent):
                 f"extra_kwargs={list(kwargs.keys())}"
             )
 
-            # Make the API call
-            response = self.client.chat.completions.create(**openai_params)
+            # Make the API call (with one automatic retry for context-limit token errors)
+            try:
+                response = self.client.chat.completions.create(**openai_params)
+            except Exception as first_error:
+                adjusted_max_tokens = self._get_adjusted_max_tokens_from_error(
+                    first_error, openai_params.get("max_tokens")
+                )
+                if adjusted_max_tokens is not None:
+                    self.logger.warning(
+                        "OpenAI request exceeded context window; retrying with "
+                        f"max_tokens={adjusted_max_tokens} for model '{self.model_name}'"
+                    )
+                    openai_params["max_tokens"] = adjusted_max_tokens
+                    response = self.client.chat.completions.create(**openai_params)
+                else:
+                    raise first_error
 
             # Extract response data
             message = response.choices[0].message
@@ -371,6 +380,32 @@ class OpenAIAgent(ChatCompletionsAgent):
                     "error_type": "unexpected",
                     "error_message": f"{type(e).__name__}: {str(e)}",
                 }
+
+    def _get_adjusted_max_tokens_from_error(
+        self, error: Exception, current_max_tokens: Any
+    ) -> Optional[int]:
+        """Parse context-limit errors and return a safe reduced max_tokens value."""
+        if current_max_tokens is None:
+            return None
+
+        message = str(error)
+        match = _CONTEXT_LIMIT_ERROR_RE.search(message)
+        if not match:
+            return None
+
+        try:
+            max_context = int(match.group(1))
+            input_tokens = int(match.group(2))
+            current = int(current_max_tokens)
+        except (TypeError, ValueError):
+            return None
+
+        available = max_context - input_tokens
+        # Keep a small safety margin to avoid repeated boundary errors.
+        safe_max_tokens = max(1, available - 8)
+        if safe_max_tokens >= current:
+            return None
+        return safe_max_tokens
 
     def _build_agent_specific_data(
         self,

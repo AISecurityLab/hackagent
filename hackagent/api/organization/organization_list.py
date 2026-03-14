@@ -1,17 +1,17 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
 
 import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.paginated_organization_list import PaginatedOrganizationList
 from ...types import UNSET, Response, Unset
+from ..models import PaginatedOrganizationList
 
 
 def _get_kwargs(
     *,
-    page: Union[Unset, int] = UNSET,
+    page: int | Unset = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
@@ -29,12 +29,13 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[PaginatedOrganizationList]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> PaginatedOrganizationList | None:
     if response.status_code == 200:
-        response_200 = PaginatedOrganizationList.from_dict(response.json())
+        response_200 = PaginatedOrganizationList.model_validate(response.json())
 
         return response_200
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -42,7 +43,7 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+    *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[PaginatedOrganizationList]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -55,7 +56,7 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = UNSET,
+    page: int | Unset = UNSET,
 ) -> Response[PaginatedOrganizationList]:
     """Provides access to Organization details for the authenticated user.
 
@@ -63,7 +64,7 @@ def sync_detailed(
     Organization management and billing operations require browser context.
 
     Args:
-        page (Union[Unset, int]):
+        page (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -87,15 +88,15 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = UNSET,
-) -> Optional[PaginatedOrganizationList]:
+    page: int | Unset = UNSET,
+) -> PaginatedOrganizationList | None:
     """Provides access to Organization details for the authenticated user.
 
     Web-only endpoint - requires Auth0 authentication.
     Organization management and billing operations require browser context.
 
     Args:
-        page (Union[Unset, int]):
+        page (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -114,7 +115,7 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = UNSET,
+    page: int | Unset = UNSET,
 ) -> Response[PaginatedOrganizationList]:
     """Provides access to Organization details for the authenticated user.
 
@@ -122,7 +123,7 @@ async def asyncio_detailed(
     Organization management and billing operations require browser context.
 
     Args:
-        page (Union[Unset, int]):
+        page (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -144,15 +145,15 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    page: Union[Unset, int] = UNSET,
-) -> Optional[PaginatedOrganizationList]:
+    page: int | Unset = UNSET,
+) -> PaginatedOrganizationList | None:
     """Provides access to Organization details for the authenticated user.
 
     Web-only endpoint - requires Auth0 authentication.
     Organization management and billing operations require browser context.
 
     Args:
-        page (Union[Unset, int]):
+        page (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

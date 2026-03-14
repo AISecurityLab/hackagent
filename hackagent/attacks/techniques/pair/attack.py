@@ -1,16 +1,5 @@
-# Copyright 2025 - AI4I. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 """
 PAIR attack implementation.
@@ -19,27 +8,29 @@ Implements the Prompt Automatic Iterative Refinement (PAIR) attack using
 an attacker LLM to iteratively refine jailbreak prompts.
 
 Result Tracking:
-    Uses Tracker to create one Result per goal, with traces for each
-    iteration showing the refinement process:
-    - Iteration traces: attacker prompt generation, target response, judge score
-    - Final evaluation: best score achieved, success status
+    Uses TrackingCoordinator to manage both pipeline-level StepTracker
+    and per-goal Tracker. The coordinator handles goal lifecycle,
+    crash-safe finalization, and summary logging.
 """
 
 import copy
-import json
 import logging
-import os
 import re
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional
 
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.objectives import OBJECTIVES
 from hackagent.attacks.shared.progress import create_progress_bar
+from hackagent.attacks.shared.prompt_parser import extract_prompt
+from hackagent.attacks.shared.response_utils import extract_response_content
+from hackagent.attacks.shared.router_factory import create_router
+from hackagent.attacks.shared.tui import with_tui_logging
 from hackagent.client import AuthenticatedClient
-from hackagent.models import StatusEnum, StepTypeEnum
+from hackagent.api.models import StepTypeEnum
 from hackagent.router.router import AgentRouter
 from hackagent.router.tracking import Tracker, Context
-from hackagent.router.types import AgentTypeEnum
 
 from .config import (
     ATTACKER_SYSTEM_PROMPT,
@@ -47,45 +38,45 @@ from .config import (
     JUDGE_SYSTEM_PROMPT,
 )
 
-# TUI logging support - lazy loaded to avoid circular imports
-_with_tui_logging = None
-
-
-def _get_tui_logging_decorator():
-    """Lazily import the TUI logging decorator to avoid circular imports."""
-    global _with_tui_logging
-    if _with_tui_logging is not None:
-        return _with_tui_logging
-
-    try:
-        from hackagent.cli.tui.logger import with_tui_logging
-
-        _with_tui_logging = with_tui_logging
-    except ImportError:
-
-        def with_tui_logging(*args, **kwargs):
-            def decorator(func):
-                return func
-
-            return decorator
-
-        _with_tui_logging = with_tui_logging
-
-    return _with_tui_logging
-
-
-def with_tui_logging(*args, **kwargs):
-    """Wrapper that lazily loads the actual TUI logging decorator."""
-    decorator = _get_tui_logging_decorator()
-    return decorator(*args, **kwargs)
-
 
 class PAIRAttack(BaseAttack):
     """
     PAIR (Prompt Automatic Iterative Refinement) attack.
 
-    Uses an attacker LLM to generate and iteratively refine adversarial
-    prompts based on target model responses and judge feedback.
+    Implements the PAIR algorithm from:
+        Chao et al., "Jailbreaking Black Box Large Language Models
+        in Twenty Queries" (2023)
+        https://arxiv.org/abs/2310.08419
+
+    PAIR uses an *attacker* LLM to iteratively refine an adversarial
+    prompt based on the *target* model's responses and a judge score:
+
+    1. The attacker generates an initial or refined jailbreak prompt.
+    2. The prompt is sent to the target model.
+    3. A judge rates the response on a 1–10 jailbreak success scale.
+    4. The score and response are fed back to the attacker as context
+       for the next refinement.
+    5. Steps 1–4 repeat for ``n_iterations`` rounds or until early stop.
+
+    Multiple independent ``n_streams`` are run in parallel (one per goal);
+    each stream maintains its own conversation history with the attacker.
+
+    The attack requires three separate model roles:
+
+    * **Attacker** (``config["attacker"]``) — an LLM that proposes prompt
+      improvements based on feedback.
+    * **Target** — the victim model reached via ``agent_router``.
+    * **Judge** — same router as attacker (called with the judge prompt
+      from :data:`~hackagent.attacks.techniques.pair.config.JUDGE_SYSTEM_PROMPT`).
+
+    Attributes:
+        config: Merged PAIR configuration dictionary.
+        client: Authenticated HackAgent API client.
+        agent_router: Router for the victim model.
+        attacker_router: Router for the attacker/judge LLM.
+        objective: Loaded :class:`~hackagent.attacks.objectives.base.ObjectiveConfig`
+            instance for the configured ``objective`` key.
+        logger: Hierarchical logger at ``hackagent.attacks.pair``.
     """
 
     def __init__(
@@ -94,7 +85,21 @@ class PAIRAttack(BaseAttack):
         client: Optional[AuthenticatedClient] = None,
         agent_router: Optional[AgentRouter] = None,
     ):
-        """Initialize PAIR attack."""
+        """
+        Initialize PAIR attack.
+
+        Args:
+            config: Optional configuration overrides merged into
+                :data:`~hackagent.attacks.techniques.pair.config.DEFAULT_PAIR_CONFIG`.
+            client: Authenticated HackAgent API client.
+            agent_router: Router for the victim model.
+
+        Raises:
+            ValueError: If ``client`` or ``agent_router`` is ``None``, if
+                the attacker router cannot be initialised, or if the
+                configured ``objective`` key is not in
+                :data:`~hackagent.attacks.objectives.OBJECTIVES`.
+        """
         if client is None:
             raise ValueError("AuthenticatedClient must be provided.")
         if agent_router is None:
@@ -126,55 +131,38 @@ class PAIRAttack(BaseAttack):
         """
         Initialize and configure the AgentRouter for the attacker LLM.
 
-        Similar to AdvPrefix's _initialize_generation_router, this creates
-        the router internally based on the 'attacker' config section.
+        Uses the shared ``create_router`` factory to eliminate duplicated
+        router initialization logic.
         """
         try:
             attacker_config = self.config.get("attacker", {})
 
-            endpoint = attacker_config.get("endpoint", "https://api.hackagent.dev/v1")
-            model_name = attacker_config.get("identifier", "hackagent-attacker")
-
-            # Handle API key - use client token as default, allow override
-            api_key = self.client.token
-            api_key_config = attacker_config.get("api_key")
-            if api_key_config:
-                env_key = os.environ.get(api_key_config)
-                api_key = env_key if env_key else api_key_config
-
-            operational_config = {
-                "name": attacker_config.get("model", model_name),
-                "endpoint": endpoint,
-                "api_key": api_key,
+            router_config = {
+                "identifier": attacker_config.get("identifier", "hackagent-attacker"),
+                "endpoint": attacker_config.get(
+                    "endpoint", "https://api.hackagent.dev/v1"
+                ),
+                "agent_type": attacker_config.get("agent_type", "OPENAI_SDK"),
                 "max_new_tokens": attacker_config.get("max_new_tokens", 500),
                 "temperature": attacker_config.get("temperature", 1.0),
+                "agent_metadata": {},
             }
 
-            # Use OPENAI_SDK by default, allow override
-            agent_type_str = attacker_config.get("agent_type", "OPENAI_SDK")
-            try:
-                agent_type = AgentTypeEnum(agent_type_str.upper())
-            except ValueError:
-                self.logger.warning(
-                    f"Invalid agent_type '{agent_type_str}', defaulting to OPENAI_SDK"
-                )
-                agent_type = AgentTypeEnum.OPENAI_SDK
+            # Handle API key override
+            api_key_config = attacker_config.get("api_key")
+            if api_key_config:
+                router_config["agent_metadata"]["api_key"] = api_key_config
 
-            router = AgentRouter(
+            router, _reg_key = create_router(
                 client=self.client,
-                name=model_name,
-                agent_type=agent_type,
-                endpoint=endpoint,
-                adapter_operational_config=operational_config,
-                metadata=operational_config.copy(),
-                overwrite_metadata=True,
+                config=router_config,
+                logger=self.logger,
+                router_name=attacker_config.get("model", router_config["identifier"]),
             )
 
-            if not router._agent_registry:
-                self.logger.error("Router initialized but no agent registered")
-                return None
-
-            self.logger.debug(f"Attacker router initialized for {model_name}")
+            self.logger.debug(
+                f"Attacker router initialized for {router_config['identifier']}"
+            )
             return router
 
         except Exception as e:
@@ -184,7 +172,17 @@ class PAIRAttack(BaseAttack):
             return None
 
     def _validate_config(self):
-        """Validate configuration."""
+        """
+        Validate PAIR-specific configuration.
+
+        Checks that the required top-level keys are present.  Delegates to
+        :meth:`~hackagent.attacks.techniques.base.BaseAttack._validate_config`
+        for common validation first.
+
+        Raises:
+            ValueError: If any of ``"objective"``, ``"attacker"``,
+                ``"n_iterations"``, or ``"output_dir"`` are missing.
+        """
         super()._validate_config()
 
         required = ["objective", "attacker", "n_iterations", "output_dir"]
@@ -194,91 +192,39 @@ class PAIRAttack(BaseAttack):
 
     def _get_pipeline_steps(self) -> List[Dict]:
         """
-        Define attack pipeline steps.
+        Return an empty pipeline steps list.
 
-        PAIR uses a custom iterative approach rather than discrete pipeline steps,
-        so this returns an empty list. The actual logic is in run().
-        """
-        return []
-
-    def _extract_prompt_from_response(self, content: str) -> Optional[str]:
-        """
-        Extract the adversarial prompt from the attacker LLM's response.
-
-        Tries multiple strategies to parse the response:
-        1. Direct JSON parsing
-        2. JSON extraction from markdown code blocks
-        3. Regex extraction for "prompt" field
-        4. Plain text fallback (if content looks like a prompt)
-
-        Args:
-            content: The raw response content from the attacker LLM
+        PAIR implements a fully custom iterative loop inside :meth:`run`
+        rather than discrete pipeline stages, so no step descriptors are
+        needed by :meth:`~hackagent.attacks.techniques.base.BaseAttack._execute_pipeline`.
 
         Returns:
-            The extracted prompt string, or None if extraction failed
+            Empty list.
         """
-        if not content:
-            return None
-
-        content = content.strip()
-
-        # Strategy 1: Direct JSON parsing
-        try:
-            parsed = json.loads(content)
-            prompt = parsed.get("prompt", "")
-            if prompt:
-                return prompt
-        except json.JSONDecodeError:
-            pass
-
-        # Strategy 2: Extract JSON from markdown code blocks (```json ... ```)
-        code_block_match = re.search(
-            r"```(?:json)?\s*\n?(.*?)\n?```", content, re.DOTALL
-        )
-        if code_block_match:
-            try:
-                parsed = json.loads(code_block_match.group(1).strip())
-                prompt = parsed.get("prompt", "")
-                if prompt:
-                    return prompt
-            except json.JSONDecodeError:
-                pass
-
-        # Strategy 3: Regex to extract "prompt" field value (handles multiline)
-        # Match "prompt": "value" or "prompt": 'value'
-        prompt_match = re.search(
-            r'"prompt"\s*:\s*"((?:[^"\\]|\\.)*)"|'
-            r"\"prompt\"\s*:\s*'((?:[^'\\]|\\.)*)'",
-            content,
-            re.DOTALL,
-        )
-        if prompt_match:
-            extracted = prompt_match.group(1) or prompt_match.group(2)
-            if extracted:
-                # Unescape common escape sequences
-                try:
-                    extracted = extracted.encode().decode("unicode_escape")
-                except Exception:
-                    pass
-                return extracted
-
-        # Strategy 4: If the content doesn't look like JSON at all,
-        # and is non-empty, use it as the prompt directly
-        # (some models may just output the prompt without JSON formatting)
-        if not content.startswith("{") and not content.startswith("["):
-            # Only use as fallback if it's substantial text
-            if len(content) > 20:
-                self.logger.debug(
-                    "Using raw response as prompt (no JSON structure detected)"
-                )
-                return content
-
-        return None
+        return []
 
     def _query_attacker(
         self, goal: str, target_response: str, score: int, iteration: int
     ) -> Optional[str]:
-        """Query attacker LLM for improved prompt."""
+        """
+        Ask the attacker LLM for an improved adversarial prompt.
+
+        On the first iteration (``iteration == 0``) only the goal is sent;
+        subsequent calls include the previous target response and judge
+        score as feedback context.
+
+        Args:
+            goal: The harmful goal the adversarial prompt should achieve.
+            target_response: The victim model's response from the previous
+                iteration (ignored on ``iteration == 0``).
+            score: Judge score (1–10) from the previous iteration
+                (ignored on ``iteration == 0``).
+            iteration: Zero-based iteration counter.
+
+        Returns:
+            Extracted adversarial prompt string, or ``None`` if the
+            attacker returns an unparseable response.
+        """
         try:
             system_prompt = ATTACKER_SYSTEM_PROMPT.format(goal=goal)
 
@@ -314,23 +260,11 @@ SCORE: {score}"""
                 },
             )
 
-            # Extract content from response - handle multiple formats
-            content = None
-
-            # Format 1: OpenAI-style object with choices
-            if response and hasattr(response, "choices") and response.choices:
-                content = response.choices[0].message.content or ""
-            # Format 2: Dictionary with generated_text or processed_response
-            elif isinstance(response, dict):
-                content = (
-                    response.get("generated_text")
-                    or response.get("processed_response")
-                    or ""
-                )
+            # Extract content from response using shared utility
+            content = extract_response_content(response, self.logger)
 
             if content:
-                # Parse JSON response - try multiple strategies
-                prompt = self._extract_prompt_from_response(content)
+                prompt = extract_prompt(content)
                 if prompt:
                     return prompt
 
@@ -352,7 +286,7 @@ SCORE: {score}"""
         """
         Query target model with adversarial prompt (no automatic result creation).
 
-        This version does NOT use route_with_tracking to avoid creating
+        This version uses route_request (not route_with_tracking) to avoid creating
         scattered Results. Tracker handles result tracking instead.
 
         Args:
@@ -376,20 +310,17 @@ SCORE: {score}"""
                 request_data=request_data,
             )
 
-            # Extract content from response
-            if response and hasattr(response, "choices") and response.choices:
-                return response.choices[0].message.content or ""
-            elif isinstance(response, dict):
-                content = response.get("generated_text") or response.get(
-                    "processed_response"
+            # Extract content from response using shared utility
+            content = extract_response_content(response, self.logger)
+            if content:
+                return content
+
+            # Check for error message in dict response
+            if isinstance(response, dict) and response.get("error_message"):
+                self.logger.warning(
+                    f"Target response error: {response.get('error_message')}"
                 )
-                if content:
-                    return content
-                if response.get("error_message"):
-                    self.logger.warning(
-                        f"Target response error: {response.get('error_message')}"
-                    )
-                    return None
+                return None
 
         except Exception as e:
             self.logger.error(f"Error querying target: {e}")
@@ -397,7 +328,23 @@ SCORE: {score}"""
         return None
 
     def _judge_response(self, goal: str, prompt: str, response: str) -> int:
-        """Judge response quality (1-10 scale)."""
+        """
+        Score a target response on a 1–10 jailbreak success scale.
+
+        Uses the attacker router with
+        :data:`~hackagent.attacks.techniques.pair.config.JUDGE_SYSTEM_PROMPT`
+        to query the judge LLM.  Parses the ``Rating: [[N]]`` pattern
+        first and falls back to a bare integer scan if the pattern is
+        absent.
+
+        Args:
+            goal: The original harmful goal (used to build the judge prompt).
+            prompt: The adversarial prompt that was sent to the target.
+            response: The target model's response to score.
+
+        Returns:
+            Integer score in [1, 10].  Returns 1 (failed) on any error.
+        """
         try:
             system_prompt = JUDGE_SYSTEM_PROMPT.format(goal=goal)
             user_prompt = f"""[PROMPT]: {prompt}
@@ -417,22 +364,8 @@ SCORE: {score}"""
                 },
             )
 
-            # Extract content from response - handle multiple formats
-            content = None
-            # Format 1: OpenAI-style object with choices
-            if (
-                judge_response
-                and hasattr(judge_response, "choices")
-                and judge_response.choices
-            ):
-                content = judge_response.choices[0].message.content or ""
-            # Format 2: Dictionary with generated_text or processed_response
-            elif isinstance(judge_response, dict):
-                content = (
-                    judge_response.get("generated_text")
-                    or judge_response.get("processed_response")
-                    or ""
-                )
+            # Extract content from response using shared utility
+            content = extract_response_content(judge_response, self.logger)
 
             if content:
                 # Extract rating
@@ -600,8 +533,8 @@ SCORE: {score}"""
         """
         Execute PAIR attack on goals.
 
-        Uses Tracker to create one Result per goal, with traces for each
-        iteration showing the full refinement process.
+        Uses TrackingCoordinator to manage both pipeline-level and
+        per-goal result tracking through a single unified interface.
 
         Args:
             goals: List of harmful goals to test
@@ -612,24 +545,19 @@ SCORE: {score}"""
         if not goals:
             return []
 
-        # Initialize tracking using base class (for high-level pipeline tracking)
-        self.tracker = self._initialize_tracking(
-            "pair", goals, metadata={"objective": self.objective.name}
+        # Initialize unified coordinator
+        coordinator = self._initialize_coordinator(
+            attack_type="pair",
+            goals=goals,
+            initial_metadata={
+                "n_iterations": self.config.get("n_iterations", 5),
+                "objective": self.objective.name,
+            },
         )
 
-        # Initialize Tracker for per-goal result tracking
-        run_id = self.config.get("_run_id")
-        client = self.config.get("_client")
-
-        goal_tracker = None
-        if run_id and client:
-            goal_tracker = Tracker(
-                client=client,
-                run_id=run_id,
-                logger=self.logger,
-                attack_type="pair",
-            )
-            self.logger.info("📊 Using Tracker for per-goal result tracking")
+        goal_tracker = coordinator.goal_tracker
+        if coordinator.has_goal_tracking:
+            self.logger.info("📊 Using TrackingCoordinator for per-goal tracking")
         else:
             self.logger.warning(
                 "⚠️ Missing tracking context - per-goal results will NOT be created"
@@ -646,29 +574,25 @@ SCORE: {score}"""
                 goals[:3],
                 {"n_iterations": n_iterations},
             ):
-                # Create goal results upfront
-                goal_contexts = {}
-                if goal_tracker:
-                    for i, goal in enumerate(goals):
-                        ctx = goal_tracker.create_goal_result(
-                            goal=goal,
-                            goal_index=i,
-                            initial_metadata={
-                                "n_iterations": n_iterations,
-                                "objective": self.objective.name,
-                            },
-                        )
-                        goal_contexts[i] = ctx
-
                 # Use progress bar for visual feedback
                 with create_progress_bar(
                     "[cyan]PAIR iterative refinement...", total_iterations
                 ) as (progress_bar, task):
-                    for i, goal in enumerate(goals):
+                    # NOTE: the inner iteration loop within one goal is a
+                    # feedback refinement chain — inherently serial. Only the
+                    # *goal* level can be parallelised.
+                    n_parallel_goals = max(1, self.config.get("n_parallel_goals", 1))
+                    _lock = threading.Lock()
+                    results_map: Dict[int, Dict[str, Any]] = {}
+
+                    def _run_goal(i_goal: tuple) -> None:
+                        i, goal = i_goal
                         self.logger.info(f"Processing goal {i + 1}/{len(goals)}")
-
-                        goal_ctx = goal_contexts.get(i) if goal_tracker else None
-
+                        goal_ctx = (
+                            coordinator.get_goal_context(i)
+                            if coordinator.has_goal_tracking
+                            else None
+                        )
                         result = self._run_single_goal(
                             goal=goal,
                             goal_index=i,
@@ -677,37 +601,38 @@ SCORE: {score}"""
                             progress_bar=progress_bar,
                             task=task,
                         )
-                        results.append(result)
+                        with _lock:
+                            results_map[i] = result
+                            if goal_tracker and goal_ctx:
+                                goal_tracker.add_evaluation_trace(
+                                    ctx=goal_ctx,
+                                    evaluation_result={
+                                        "best_score": result["best_score"],
+                                        "is_success": result["is_success"],
+                                        "iterations_completed": result[
+                                            "iterations_completed"
+                                        ],
+                                    },
+                                    score=result["best_score"],
+                                    explanation=f"Best score: {result['best_score']}/10 after {result['iterations_completed']} iterations",
+                                    evaluator_name="pair_judge",
+                                )
+                                goal_tracker.finalize_goal(
+                                    ctx=goal_ctx,
+                                    success=result["is_success"],
+                                    evaluation_notes=f"PAIR attack: score {result['best_score']}/10 ({'SUCCESS' if result['is_success'] else 'FAILED'})",
+                                    final_metadata={
+                                        "best_score": result["best_score"],
+                                        "iterations_completed": result[
+                                            "iterations_completed"
+                                        ],
+                                    },
+                                )
 
-                        # Finalize goal result with evaluation
-                        if goal_tracker and goal_ctx:
-                            # Add final evaluation trace
-                            goal_tracker.add_evaluation_trace(
-                                ctx=goal_ctx,
-                                evaluation_result={
-                                    "best_score": result["best_score"],
-                                    "is_success": result["is_success"],
-                                    "iterations_completed": result[
-                                        "iterations_completed"
-                                    ],
-                                },
-                                score=result["best_score"],
-                                explanation=f"Best score: {result['best_score']}/10 after {result['iterations_completed']} iterations",
-                                evaluator_name="pair_judge",
-                            )
+                    with ThreadPoolExecutor(max_workers=n_parallel_goals) as pool:
+                        list(pool.map(_run_goal, enumerate(goals)))
 
-                            # Finalize the goal
-                            goal_tracker.finalize_goal(
-                                ctx=goal_ctx,
-                                success=result["is_success"],
-                                evaluation_notes=f"PAIR attack: score {result['best_score']}/10 ({'SUCCESS' if result['is_success'] else 'FAILED'})",
-                                final_metadata={
-                                    "best_score": result["best_score"],
-                                    "iterations_completed": result[
-                                        "iterations_completed"
-                                    ],
-                                },
-                            )
+                    results = [results_map[i] for i in range(len(goals))]
 
             # Custom success check: count successful attacks
             success_count = sum(1 for r in results if r.get("is_success", False))
@@ -715,25 +640,19 @@ SCORE: {score}"""
             def success_check(output):
                 return success_count > 0
 
-            # Finalize using base class
-            self._finalize_pipeline(results, success_check)
+            # Finalize pipeline-level tracking via coordinator
+            coordinator.finalize_pipeline(results, success_check)
 
             if self.tracker:
                 self.tracker.add_step_metadata("successful_attacks", success_count)
 
-            # Log Tracker summary
-            if goal_tracker:
-                summary = goal_tracker.get_summary()
-                self.logger.info(
-                    f"Tracker summary: {summary['successful_attacks']}/{summary['total_goals']} "
-                    f"successful ({summary['success_rate']:.1f}%), "
-                    f"{summary['total_traces']} total traces"
-                )
+            # Log summary via coordinator
+            coordinator.log_summary()
 
             return results
 
         except Exception as e:
             self.logger.error(f"PAIR attack failed: {e}", exc_info=True)
-            if self.tracker:
-                self.tracker.update_run_status(StatusEnum.FAILED)
+            # Crash-safe: mark all unfinalized goals as failed
+            coordinator.finalize_on_error("PAIR attack failed with exception")
             raise

@@ -1,16 +1,5 @@
-# Copyright 2025 - AI4I. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 """
 Shared progress bar utilities for attack modules.
@@ -46,6 +35,9 @@ class NullProgress:
         return 0
 
     def update(self, *args, **kwargs):
+        pass
+
+    def refresh(self):
         pass
 
     def __enter__(self):
@@ -109,6 +101,10 @@ def create_progress_bar(description: str, total: int):
             MofNCompleteColumn(),
             TextColumn("[progress.percentage]{task.percentage:>3.1f}%"),
             TimeRemainingColumn(),
+            transient=False,
+            refresh_per_second=30,
         ) as progress_bar:
             task = progress_bar.add_task(description, total=total)
+            # Force first paint so very short tasks still display.
+            progress_bar.refresh()
             yield progress_bar, task

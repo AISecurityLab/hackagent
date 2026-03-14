@@ -1,9 +1,11 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """Contains some shared types for properties"""
 
 from collections.abc import Mapping, MutableMapping
 from http import HTTPStatus
 from typing import IO, BinaryIO, Generic, Literal, Optional, TypeVar, Union
-
 from attrs import define
 
 

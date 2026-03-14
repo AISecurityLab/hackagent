@@ -32,7 +32,7 @@ hide_title: true
 
 ---
 
-## 🎯 What is HackAgent?
+## What is HackAgent?
 
 **HackAgent** is a comprehensive Python SDK and CLI designed to help security researchers, developers, and AI safety practitioners **evaluate and strengthen the security of AI agents**. 
 
@@ -58,37 +58,37 @@ As AI agents become more powerful and autonomous, they face unique security chal
 
 | Threat | Description |
 |--------|-------------|
-| 🎭 **Prompt Injection** | Malicious inputs that hijack agent behavior |
-| 🔓 **Jailbreaking** | Bypassing safety guardrails and content filters |
-| 🎯 **Goal Hijacking** | Manipulating agents to pursue unintended objectives |
-| 🔧 **Tool Misuse** | Exploiting agent capabilities for unauthorized actions |
+| **Prompt Injection** | Malicious inputs that hijack agent behavior |
+| **Jailbreaking** | Bypassing safety guardrails and content filters |
+| **Goal Hijacking** | Manipulating agents to pursue unintended objectives |
+| **Tool Misuse** | Exploiting agent capabilities for unauthorized actions |
 
 HackAgent automates testing for these vulnerabilities using **research-backed attack techniques**, helping you identify and fix security issues before they're exploited in the real world.
 
 ---
 
-## 🚀 Get Started Now
+## Get Started Now
 
 <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem', margin: '2rem 0'}}>
 
 <div style={{minWidth: '300px', maxWidth: '600px', width: '100%', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '1px solid var(--ifm-color-emphasis-300)', textAlign: 'center'}}>
-  <div style={{fontSize: '1.1rem', marginBottom: '0.75rem'}}>🖥️ <strong>Quick Install</strong></div>
+  <div style={{fontSize: '1.1rem', marginBottom: '0.75rem'}}><strong>Quick Install</strong></div>
   <code style={{padding: '0.5rem 1rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.9rem'}}>pip install hackagent && hackagent init</code>
 </div>
 
 <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center'}}>
-  <a href="https://app.hackagent.dev" style={{padding: '0.5rem 1rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.85rem', textDecoration: 'none', color: 'inherit'}}>🚀 Try the Platform</a>
-  <a href="./getting-started/quick-start" style={{padding: '0.5rem 1rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.85rem', textDecoration: 'none', color: 'inherit'}}>📚 Quick Start</a>
-  <a href="https://github.com/AISecurityLab/hackagent" style={{padding: '0.5rem 1rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.85rem', textDecoration: 'none', color: 'inherit'}}>⭐ Star on GitHub</a>
+  <a href="https://app.hackagent.dev" style={{padding: '0.5rem 1rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.85rem', textDecoration: 'none', color: 'inherit'}}>Try the Platform</a>
+  <a href="./getting-started/quick-start" style={{padding: '0.5rem 1rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.85rem', textDecoration: 'none', color: 'inherit'}}>Quick Start</a>
+  <a href="https://github.com/AISecurityLab/hackagent" style={{padding: '0.5rem 1rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.85rem', textDecoration: 'none', color: 'inherit'}}>Star on GitHub</a>
 </div>
 
 <div style={{minWidth: '300px', maxWidth: '600px', width: '100%', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '1px solid var(--ifm-color-emphasis-300)'}}>
-  <div style={{fontSize: '1.1rem', marginBottom: '0.75rem', textAlign: 'center'}}>📚 <strong>Next Steps</strong></div>
+  <div style={{fontSize: '1.1rem', marginBottom: '0.75rem', textAlign: 'center'}}><strong>Next Steps</strong></div>
   <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center'}}>
-    <a href="./getting-started/installation" style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem', textDecoration: 'none', color: 'inherit'}}>📖 Installation</a>
-    <a href="./cli/overview" style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem', textDecoration: 'none', color: 'inherit'}}>🖥️ CLI Reference</a>
-    <a href="./attacks" style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem', textDecoration: 'none', color: 'inherit'}}>⚔️ Attack Techniques</a>
-    <a href="./agents/google-adk" style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem', textDecoration: 'none', color: 'inherit'}}>🔌 Integrations</a>
+    <a href="./getting-started/installation" style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem', textDecoration: 'none', color: 'inherit'}}>Installation</a>
+    <a href="./cli/overview" style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem', textDecoration: 'none', color: 'inherit'}}>CLI Reference</a>
+    <a href="./attacks" style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem', textDecoration: 'none', color: 'inherit'}}>Attack Techniques</a>
+    <a href="./agents/google-adk" style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem', textDecoration: 'none', color: 'inherit'}}>Integrations</a>
   </div>
 </div>
 
@@ -101,18 +101,18 @@ HackAgent automates testing for these vulnerabilities using **research-backed at
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 HackAgent is built with a modular architecture that makes it easy to test any AI agent:
 
 <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', margin: '2rem 0'}}>
 
 <div style={{minWidth: '300px', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '1px solid var(--ifm-color-emphasis-300)'}}>
-  <div style={{fontSize: '1.1rem', marginBottom: '0.75rem', textAlign: 'center'}}>📥 <strong>Inputs</strong></div>
+  <div style={{fontSize: '1.1rem', marginBottom: '0.75rem', textAlign: 'center'}}><strong>Inputs</strong></div>
   <div style={{marginBottom: '0.5rem'}}>
     <div style={{fontSize: '0.75rem', marginBottom: '0.3rem'}}>Goals</div>
     <div style={{display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'center'}}>
-      <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem'}}>🎯 Custom Goals</span>
+      <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem'}}>Custom Goals</span>
     </div>
   </div>
   <div>
@@ -129,7 +129,7 @@ HackAgent is built with a modular architecture that makes it easy to test any AI
 
 <div style={{display: 'flex', gap: '1rem', alignItems: 'stretch', flexWrap: 'wrap', justifyContent: 'center'}}>
   <div style={{minWidth: '280px', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '1px solid var(--ifm-color-emphasis-300)'}}>
-    <div style={{fontSize: '1.1rem', marginBottom: '0.75rem', textAlign: 'center'}}>⚡ <strong>HackAgent</strong></div>
+    <div style={{fontSize: '1.1rem', marginBottom: '0.75rem', textAlign: 'center'}}><strong>HackAgent</strong></div>
     <div style={{marginBottom: '0.5rem'}}>
       <div style={{fontSize: '0.75rem', marginBottom: '0.3rem'}}>Attack Engine</div>
       <div style={{display: 'flex', gap: '0.4rem', flexWrap: 'wrap'}}>
@@ -141,8 +141,8 @@ HackAgent is built with a modular architecture that makes it easy to test any AI
     <div>
       <div style={{fontSize: '0.75rem', marginBottom: '0.3rem'}}>LLM Models</div>
       <div style={{display: 'flex', gap: '0.4rem', flexWrap: 'wrap'}}>
-        <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem'}}>🤖 Generator</span>
-        <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem'}}>⚖️ Judge</span>
+        <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem'}}>Generator</span>
+        <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem'}}>Judge</span>
       </div>
     </div>
   </div>
@@ -150,7 +150,7 @@ HackAgent is built with a modular architecture that makes it easy to test any AI
   <div style={{display: 'flex', alignItems: 'center', fontSize: '1.2rem'}}>⇄</div>
   
   <div style={{minWidth: '200px', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '1px solid var(--ifm-color-emphasis-300)'}}>
-    <div style={{fontSize: '1.1rem', marginBottom: '0.75rem', textAlign: 'center'}}>🎯 <strong>Your Agent</strong></div>
+    <div style={{fontSize: '1.1rem', marginBottom: '0.75rem', textAlign: 'center'}}><strong>Your Agent</strong></div>
     <div style={{display: 'flex', flexDirection: 'column', gap: '0.4rem'}}>
       <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>Google ADK</span>
       <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>OpenAI SDK</span>
@@ -163,11 +163,11 @@ HackAgent is built with a modular architecture that makes it easy to test any AI
 <div style={{fontSize: '1.2rem'}}>↓</div>
 
 <div style={{minWidth: '300px', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '1px solid var(--ifm-color-emphasis-300)'}}>
-  <div style={{fontSize: '1.1rem', marginBottom: '0.75rem', textAlign: 'center'}}>📤 <strong>Output</strong></div>
+  <div style={{fontSize: '1.1rem', marginBottom: '0.75rem', textAlign: 'center'}}><strong>Output</strong></div>
   <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center'}}>
-    <span style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem'}}>📈 Results</span>
-    <span style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem'}}>📊 Reports</span>
-    <span style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem'}}>🖥️ Dashboard</span>
+    <span style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem'}}>Results</span>
+    <span style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem'}}>Reports</span>
+    <span style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem'}}>Dashboard</span>
   </div>
 </div>
 
@@ -184,7 +184,7 @@ HackAgent is built with a modular architecture that makes it easy to test any AI
 
 ---
 
-## 🔌 Supported Frameworks
+## Supported Frameworks
 
 <div style={{display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap', margin: '1.5rem 0'}}>
   <a href="https://google.github.io/adk-docs/">
@@ -203,7 +203,7 @@ HackAgent is built with a modular architecture that makes it easy to test any AI
 
 ---
 
-## ⚠️ Responsible Use
+## Responsible Use
 
 HackAgent is designed for **authorized security testing only**. Always obtain explicit permission before testing any AI system.
 

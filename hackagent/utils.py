@@ -1,19 +1,9 @@
-# Copyright 2025 - AI4I. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 import json
-import logging
+import os
+from hackagent.logger import get_logger
 from pathlib import Path
 from typing import Optional, Union
 
@@ -23,7 +13,7 @@ from rich.text import Text
 
 from hackagent.router.types import AgentTypeEnum
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 HACKAGENT = """
@@ -84,8 +74,9 @@ def resolve_api_token(
 
     Priority order:
     1. Direct api_key parameter (highest priority)
-    2. Config file (~/.config/hackagent/config.json or specified path)
-    3. Error if not found
+    2. HACKAGENT_API_KEY environment variable
+    3. Config file (~/.config/hackagent/config.json or specified path)
+    4. Error if not found
 
     Args:
         direct_api_key_param: API key provided directly as parameter
@@ -102,18 +93,25 @@ def resolve_api_token(
         logger.debug("Using API token provided directly via 'api_key' parameter.")
         return direct_api_key_param
 
-    # Priority 2: Config file
+    # Priority 2: Environment variable
+    api_token_from_env = os.environ.get("HACKAGENT_API_KEY")
+    if api_token_from_env:
+        logger.debug("Using API token from HACKAGENT_API_KEY environment variable.")
+        return api_token_from_env
+
+    # Priority 3: Config file
     api_token_from_config = _load_api_key_from_config(config_file_path)
     if api_token_from_config:
         logger.debug("Using API token from config file.")
         return api_token_from_config
 
-    # Priority 3: Error - no token found
+    # Priority 4: Error - no token found
     error_message = (
         "API token not found from any source. Tried:\n"
         "1. Direct 'api_key' parameter\n"
-        "2. Config file (~/.config/hackagent/config.json)\n"
-        "\nTo fix: Create config file with 'hackagent init' or pass api_key directly."
+        "2. HACKAGENT_API_KEY environment variable\n"
+        "3. Config file (~/.config/hackagent/config.json)\n"
+        "\nTo fix: set HACKAGENT_API_KEY env var, run 'hackagent init', or pass api_key directly."
     )
     raise ValueError(error_message)
 

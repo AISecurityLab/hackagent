@@ -25,10 +25,6 @@ attack methodologies.
 **Attributes**:
 
 - `client` - An `AuthenticatedClient` instance for API communication.
-- `prompts` - A dictionary of default prompts. This dictionary is a copy of
-  `DEFAULT_PROMPTS` and can be modified after instantiation if needed,
-  though the primary mechanism for custom prompts is usually via attack
-  configurations.
 - `router` - An `AgentRouter` instance managing the agent&#x27;s representation
   in the HackAgent backend.
 - `attack_strategies` - A dictionary mapping strategy names to their
@@ -73,15 +69,23 @@ attack strategies.
 - `api_key` - The API key for authenticating with the HackAgent API.
   If omitted, the client will attempt to retrieve it from the
   config file (~/.config/hackagent/config.json).
-- `raise_on_unexpected_status` - If set to `True`, the API client will
+- `raise_on_unexpected_status` - If set to `name`0, the API client will
   raise an exception for any HTTP status codes that are not typically
-  expected for a successful operation. Defaults to `False`.
-- `name`4 - The timeout duration in seconds for API requests made by the
-  authenticated client. Defaults to `name`5 (which might mean a
+  expected for a successful operation. Defaults to `name`1.
+- `name`2 - The timeout duration in seconds for API requests made by the
+  authenticated client. Defaults to `name`3 (which might mean a
   default timeout from the underlying HTTP library is used).
-- `name`0 - An optional path to a .env file. If provided, environment
-  variables (such as `HACKAGENT_API_KEY`) will be loaded from this
-  file if not already present in the environment.
+- `name`4 - Optional dictionary containing agent-specific metadata.
+- `name`5 - Optional configuration for the agent adapter.
+
+#### attack\_strategies
+
+```python
+@property
+def attack_strategies() -> Dict[str, Any]
+```
+
+Lazy-loaded attack strategies dictionary.
 
 #### hack
 

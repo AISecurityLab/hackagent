@@ -1,16 +1,5 @@
-# Copyright 2025 - AI4I. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 """
 Target model completion generation module.
@@ -32,6 +21,9 @@ determine attack success rates.
 """
 
 import logging
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional
 
 # --- Import AgentRouter and related components ---
@@ -134,8 +126,6 @@ def _get_completion_via_router(
     n_samples: Optional[int],  # Number of samples to request
     logger_instance: logging.Logger,
     original_index: int,
-    run_id: Optional[str] = None,  # For result tracking
-    client: Optional[Any] = None,  # For result tracking
 ) -> Dict[str, Any]:
     """
     Generate a completion for a single adversarial prefix using the target agent.
@@ -316,9 +306,9 @@ def execute(
         either predefined templates (accessed by index) or custom strings with
         optional `{prefix}` placeholders for dynamic formatting.
 
-        Completions are processed sequentially with progress tracking, and
-            errors are captured gracefully to allow the pipeline to continue
-            processing remaining prefixes.
+        Completions are processed in parallel with progress tracking, and
+        errors are captured gracefully to allow the pipeline to continue
+        processing remaining prefixes.
     """
     # Decorators handle: empty input, agent_router validation, error logging
 
@@ -351,104 +341,103 @@ def execute(
     victim_agent_reg_key = str(agent_router.backend_agent.id)
     victim_agent_type = agent_router.backend_agent.agent_type
 
-    # Extract tracking information from config
-    run_id = config.get("_run_id")
-    client = config.get("_client")
     tracker = config.get("_tracker")
-
-    logger.info(
-        f"📊 Tracking context: run_id={run_id}, client={'Present' if client else 'Missing'}"
-    )
-    if not run_id or not client:
-        logger.warning("⚠️ Missing tracking context - results will NOT be created!")
-
     if tracker:
-        logger.info("📊 Using Tracker for per-goal result tracking")
+        logger.debug("📊 Tracker present — per-goal result tracking active")
 
     # --- Completion Parameters from config ---
     request_timeout = 120
     max_new_tokens = config.get("max_new_tokens_completion", 256)
     temperature = config.get("temperature", 0.7)
 
-    # --- Prepare and run tasks (synchronously) ---
+    # --- Prepare and run tasks (parallel) ---
     completion_results_list: List[Dict[str, Any]] = []
+    batch_size = max(1, config.get("batch_size", 16))
+    effective_workers = min(batch_size, len(input_data)) if input_data else 1
+    logger.info(
+        f"Completion parallel workers: {effective_workers} "
+        f"(configured batch_size={batch_size}, items={len(input_data)})"
+    )
+    _tracker_lock = threading.Lock()
+    results_map: Dict[int, Dict[str, Any]] = {}
+    _comp_t0 = time.perf_counter()
+
+    def _complete_one(index_record: tuple) -> tuple:
+        index, record = index_record
+        prefix_text = record.get("prefix", "")
+        _row_t0 = time.perf_counter()
+        try:
+            result = _get_completion_via_router(
+                agent_router=agent_router,
+                agent_reg_key=victim_agent_reg_key,
+                prefix_text=prefix_text,
+                surrogate_prompt_template=actual_surrogate_prompt_str,
+                request_timeout=request_timeout,
+                max_new_tokens=max_new_tokens,
+                temperature=temperature,
+                n_samples=1,
+                logger_instance=logger,
+                original_index=index,
+            )
+        except Exception as e:
+            logger.error(
+                f"Exception during completion for original index {index}: {e}",
+                exc_info=e,
+            )
+            result = {
+                "completion": None,
+                "raw_request_payload": None,
+                "raw_response_status": None,
+                "raw_response_headers": None,
+                "raw_response_body": None,
+                "adapter_specific_events": None,
+                "error_message": f"Sync Task Exception: {type(e).__name__} - {str(e)}",
+                "log_message": None,
+            }
+        result["completion_elapsed_s"] = round(time.perf_counter() - _row_t0, 3)
+        # Tracker writes are serialized via lock
+        with _tracker_lock:
+            goal = record.get("goal", "")
+            if tracker and goal:
+                goal_ctx = tracker.get_goal_context_by_goal(goal)
+                if goal_ctx:
+                    completion_text = result.get("completion")
+                    response_payload = {
+                        "generated_text": completion_text,
+                        "raw_response_body": result.get("raw_response_body"),
+                        "raw_response_status": result.get("raw_response_status"),
+                    }
+                    tracker.add_interaction_trace(
+                        ctx=goal_ctx,
+                        request=result.get("raw_request_payload") or {},
+                        response=response_payload,
+                        step_name="Target Completion",
+                        metadata={
+                            "prefix": prefix_text,
+                            "surrogate_attack_prompt": actual_surrogate_prompt_str,
+                            "error_message": result.get("error_message"),
+                            "adapter_specific_events": result.get(
+                                "adapter_specific_events"
+                            ),
+                            "agent_specific_data": result.get("agent_specific_data"),
+                            "raw_response_status": result.get("raw_response_status"),
+                            "elapsed_s": result.get("completion_elapsed_s"),
+                        },
+                    )
+        return index, result
 
     # Create progress bar for agent interactions
     with create_progress_bar(
         f"[green]Execution: Getting completions from {victim_agent_type} agent...",
         total=len(input_data),
     ) as (progress_bar, task):
-        for index, record in enumerate(input_data):
-            prefix_text = record.get("prefix", "")
+        with ThreadPoolExecutor(max_workers=batch_size) as pool:
+            for index, result in pool.map(_complete_one, enumerate(input_data)):
+                results_map[index] = result
+                progress_bar.update(task, advance=1)
 
-            try:
-                result = _get_completion_via_router(
-                    agent_router=agent_router,
-                    agent_reg_key=victim_agent_reg_key,
-                    prefix_text=prefix_text,
-                    surrogate_prompt_template=actual_surrogate_prompt_str,
-                    request_timeout=request_timeout,
-                    max_new_tokens=max_new_tokens,
-                    temperature=temperature,
-                    n_samples=1,
-                    logger_instance=logger,
-                    original_index=index,
-                    run_id=run_id,  # Pass for real-time tracking
-                    client=client,  # Pass for real-time tracking
-                )
-                completion_results_list.append(result)
-
-                # Add trace to the correct goal's Result via Tracker
-                goal = record.get("goal", "")
-                if tracker and goal:
-                    goal_ctx = tracker.get_goal_context_by_goal(goal)
-                    if goal_ctx:
-                        completion_text = result.get("completion")
-                        response_payload = {
-                            "generated_text": completion_text,
-                            "raw_response_body": result.get("raw_response_body"),
-                            "raw_response_status": result.get("raw_response_status"),
-                        }
-                        tracker.add_interaction_trace(
-                            ctx=goal_ctx,
-                            request=result.get("raw_request_payload") or {},
-                            response=response_payload,
-                            step_name="Target Completion",
-                            metadata={
-                                "prefix": prefix_text,
-                                "surrogate_attack_prompt": actual_surrogate_prompt_str,
-                                "error_message": result.get("error_message"),
-                                "adapter_specific_events": result.get(
-                                    "adapter_specific_events"
-                                ),
-                                "agent_specific_data": result.get(
-                                    "agent_specific_data"
-                                ),
-                                "raw_response_status": result.get(
-                                    "raw_response_status"
-                                ),
-                            },
-                        )
-            except Exception as e:
-                logger.error(
-                    f"Exception during synchronous completion for original index {index}: {e}",
-                    exc_info=e,
-                )
-                completion_results_list.append(
-                    {
-                        "completion": None,
-                        "raw_request_payload": None,
-                        "raw_response_status": None,
-                        "raw_response_headers": None,
-                        "raw_response_body": None,
-                        "adapter_specific_events": None,
-                        "error_message": f"Sync Task Exception: {type(e).__name__} - {str(e)}",
-                        "log_message": None,
-                    }
-                )
-
-            # Update progress bar after each completion
-            progress_bar.update(task, advance=1)
+    # Reconstruct results in original order
+    completion_results_list = [results_map[i] for i in range(len(input_data))]
 
     # Update results with completion data
     results = []
@@ -466,8 +455,22 @@ def execute(
             "adapter_specific_events"
         )
         result["error_message"] = completion_result.get("error_message")
+        result["completion_elapsed_s"] = completion_result.get("completion_elapsed_s")
+
+        # Inject result_id from Tracker so downstream evaluation can sync to server
+        if tracker:
+            goal = record.get("goal", "")
+            goal_ctx = tracker.get_goal_context_by_goal(goal)
+            if goal_ctx and goal_ctx.result_id:
+                result["result_id"] = goal_ctx.result_id
+
         results.append(result)
 
-    logger.info(f"📊 Completions execute returning {len(results)} results")
+    comp_elapsed = round(time.perf_counter() - _comp_t0, 3)
+    comp_avg = comp_elapsed / len(results) if results else 0.0
+    logger.info(
+        f"📊 Completions execute returning {len(results)} results, "
+        f"elapsed={comp_elapsed:.1f}s (avg={comp_avg:.2f}s/item)"
+    )
 
     return results

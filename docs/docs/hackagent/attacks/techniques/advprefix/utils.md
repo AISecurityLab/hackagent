@@ -18,55 +18,6 @@ The module provides:
 These utilities promote code reuse and maintain consistency across the
 different stages of the AdvPrefix attack pipeline.
 
-#### create\_progress\_bar
-
-```python
-@contextmanager
-def create_progress_bar(description: str, total: int)
-```
-
-Create a standardized progress bar for AdvPrefix pipeline steps.
-
-This context manager provides a consistent progress bar configuration
-across all pipeline stages, eliminating code duplication and ensuring
-uniform progress reporting UX throughout the attack execution.
-
-The progress bar includes:
-- Spinner animation for visual feedback
-- Task description with formatting support
-- Visual progress bar
-- Completion counter (M of N complete)
-- Percentage complete
-- Estimated time remaining
-
-**Arguments**:
-
-- `description` - Human-readable description of the task being tracked.
-  Supports Rich markup formatting (e.g., &quot;[cyan]Processing...[/cyan]&quot;).
-- `total` - Total number of items/iterations to process for completion tracking.
-  
-
-**Yields**:
-
-  Tuple of (progress_bar, task_id):
-  - progress_bar: Progress instance for manual control if needed
-  - task_id: Task identifier for progress updates via progress_bar.update(task_id)
-  
-
-**Example**:
-
-  &gt;&gt;&gt; with create_progress_bar(&quot;[cyan]Processing prefixes...&quot;, len(data)) as (progress, task):
-  ...     for item in data:
-  ...         # Process item
-  ...         progress.update(task, advance=1)
-  
-
-**Notes**:
-
-  The progress bar automatically starts and stops when entering/exiting
-  the context manager. All pipeline steps should use this utility for
-  consistent progress reporting.
-
 #### handle\_empty\_input
 
 ```python

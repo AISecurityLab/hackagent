@@ -1,0 +1,102 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+"""
+Evaluator module for HackAgent attack framework.
+
+This package contains all reusable evaluation components for determining
+attack success across different techniques. It centralizes evaluation
+logic that was previously scattered across ``shared/`` and individual
+technique folders.
+
+Architecture:
+    base.py               — BaseJudgeEvaluator ABC + AssertionResult
+    judge_evaluators.py   — NuancedEvaluator, JailbreakBenchEvaluator, HarmBenchEvaluator
+    pattern_evaluators.py — PatternEvaluator, KeywordEvaluator, LengthEvaluator
+    metrics.py            — Success rate, per-goal metrics, summary reports
+    sync.py               — Server sync utilities (PATCH Result records)
+
+Usage:
+    from hackagent.attacks.evaluator import (
+        # LLM-based judge evaluators
+        BaseJudgeEvaluator,
+        NuancedEvaluator,
+        JailbreakBenchEvaluator,
+        HarmBenchEvaluator,
+        EVALUATOR_MAP,
+        AssertionResult,
+        # Pattern-based evaluators
+        PatternEvaluator,
+        KeywordEvaluator,
+        LengthEvaluator,
+        # Metrics
+        calculate_success_rate,
+        calculate_per_goal_metrics,
+        generate_summary_report,
+        calculate_confidence_score,
+        calculate_majority_vote_asr,
+        calculate_fleiss_kappa,
+        calculate_per_judge_strictness,
+        # Server sync
+        sync_evaluation_to_server,
+        update_single_result,
+    )
+"""
+
+from hackagent.attacks.evaluator.base import AssertionResult, BaseJudgeEvaluator
+from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
+from hackagent.attacks.evaluator.judge_evaluators import (
+    EVALUATOR_MAP,
+    HarmBenchEvaluator,
+    JailbreakBenchEvaluator,
+    NuancedEvaluator,
+    OnTopicEvaluator,
+)
+from hackagent.attacks.evaluator.metrics import (
+    calculate_confidence_score,
+    calculate_per_goal_metrics,
+    calculate_success_rate,
+    generate_summary_report,
+    group_by_goal,
+    calculate_majority_vote_asr,
+    calculate_fleiss_kappa,
+    calculate_per_judge_strictness,
+)
+from hackagent.attacks.evaluator.pattern_evaluators import (
+    KeywordEvaluator,
+    LengthEvaluator,
+    PatternEvaluator,
+)
+from hackagent.attacks.evaluator.sync import (
+    sync_evaluation_to_server,
+    update_single_result,
+)
+
+__all__ = [
+    # Base
+    "AssertionResult",
+    "BaseJudgeEvaluator",
+    "BaseEvaluationStep",
+    # Judge evaluators
+    "NuancedEvaluator",
+    "JailbreakBenchEvaluator",
+    "HarmBenchEvaluator",
+    "OnTopicEvaluator",
+    "EVALUATOR_MAP",
+    # Pattern evaluators
+    "PatternEvaluator",
+    "KeywordEvaluator",
+    "LengthEvaluator",
+    # Metrics
+    "calculate_success_rate",
+    "calculate_confidence_score",
+    "calculate_per_goal_metrics",
+    "generate_summary_report",
+    "group_by_goal",
+    "calculate_majority_vote_asr",
+    "calculate_fleiss_kappa",
+    "calculate_per_judge_strictness",
+    # Sync
+    "sync_evaluation_to_server",
+    "update_single_result",
+]

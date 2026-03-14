@@ -1,12 +1,13 @@
-"""Test that all package modules can be imported correctly.
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
+"""Test that all package modules can be imported correctly.
 This test ensures that all dependencies are properly declared in pyproject.toml
 and the package can be installed and used without import errors.
 """
 
 import importlib
 import pkgutil
-
 import pytest
 
 
@@ -53,7 +54,7 @@ class TestPackageImports:
         This specifically tests for the python-dateutil dependency
         which is used in model serialization.
         """
-        from hackagent.models import Agent
+        from hackagent.api.models import Agent
 
         assert Agent is not None
 

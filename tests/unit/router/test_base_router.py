@@ -1,6 +1,8 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 import unittest
 from typing import Any, Dict
-
 from hackagent.router.router import Agent
 
 

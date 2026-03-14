@@ -4,6 +4,7 @@ logs/
 .ruff_cache/
 reports/
 .adk/
+slurm/
 
 # Editors
 .vscode/
@@ -130,3 +131,8 @@ venv.bak/
 .mypy_cache/
 .dmypy.json
 dmypy.json
+
+tests/test_with_cineca_judge/
+db_index/
+
+ATTACK_INTEGRATION_HANDOUT.md

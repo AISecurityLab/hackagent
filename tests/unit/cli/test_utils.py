@@ -1,15 +1,17 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Unit tests for CLI utilities and helper functions.
 """
 
 import json
+import os
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
-
 import pytest
 from rich.console import Console
-
 from hackagent.cli.utils import (
     console,
     display_error,
@@ -322,6 +324,7 @@ output_format: table
         finally:
             Path(config_file).unlink()
 
+    @patch.dict(os.environ, {"HACKAGENT_API_KEY": ""})
     def test_resolve_api_token_config_file(self):
         """Test config file is used when no direct parameter"""
         config_data = {"api_key": "config-key"}
@@ -338,6 +341,7 @@ output_format: table
         finally:
             Path(config_file).unlink()
 
+    @patch.dict(os.environ, {"HACKAGENT_API_KEY": ""})
     def test_resolve_api_token_default_config_path(self):
         """Test using default config path when not specified"""
         config_data = {"api_key": "default-config-key"}
@@ -357,6 +361,7 @@ output_format: table
                 result = resolve_api_token(direct_api_key_param=None)
                 assert result == "default-config-key"
 
+    @patch.dict(os.environ, {"HACKAGENT_API_KEY": ""})
     def test_resolve_api_token_error_no_sources(self):
         """Test error when no API token found from any source"""
         with pytest.raises(ValueError) as exc_info:
@@ -370,6 +375,7 @@ output_format: table
         assert "Direct 'api_key' parameter" in error_msg
         assert "Config file" in error_msg
 
+    @patch.dict(os.environ, {"HACKAGENT_API_KEY": ""})
     def test_resolve_api_token_comprehensive_priority_matrix(self):
         """Comprehensive test of priority scenarios (direct > config)"""
         scenarios = [
@@ -480,6 +486,7 @@ class TestUtilityIntegration:
         # This would verify styling consistency
         assert True
 
+    @patch.dict(os.environ, {"HACKAGENT_API_KEY": ""})
     def test_full_integration_workflow(self):
         """Test complete workflow integration"""
         # Test a complete workflow using multiple utility functions
@@ -502,6 +509,7 @@ class TestUtilityIntegration:
         finally:
             Path(config_file).unlink()
 
+    @patch.dict(os.environ, {"HACKAGENT_API_KEY": ""})
     def test_error_scenarios_integration(self):
         """Test error handling across integrated utilities"""
         # Should handle missing config gracefully

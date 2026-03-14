@@ -22,6 +22,7 @@ Endpoint Requirements by Type:
 - GOOGLE_ADK: Google Agent Development Kit endpoint (custom protocol)
 - LITELLM: Any LLM endpoint via LiteLLM (multi-provider support)
 - OPENAI_SDK: OpenAI-compatible endpoint (should end with /v1 base path)
+- OLLAMA: Ollama local LLM endpoint (default: http://localhost:11434)
 - LANGCHAIN: LangServe endpoint (typically /invoke or /stream)
 - MCP: Model Context Protocol endpoint (MCP-specific protocol)
 - A2A: Agent-to-Agent protocol endpoint (A2A-specific protocol)
@@ -30,4 +31,7 @@ Endpoint Requirements by Type:
 Note: For OpenAI-compatible endpoints (OPENAI_SDK, LITELLM with custom endpoints),
 provide the base URL ending in /v1 (e.g., http://localhost:8000/v1).
 The OpenAI client will automatically append /chat/completions.
+
+For Ollama endpoints, provide the base URL (e.g., http://localhost:11434).
+The adapter will automatically use /api/generate or /api/chat as appropriate.
 

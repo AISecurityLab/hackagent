@@ -11,7 +11,6 @@ using a factory function to eliminate boilerplate code.
 The factory dynamically creates orchestrator classes that configure:
 - attack_type: String identifier for the attack
 - attack_impl_class: BaseAttack subclass implementing the algorithm
-- Custom methods: Optional specialized behavior (e.g., PAIR&#x27;s attacker setup)
 
 To add a new attack:
 1. Implement BaseAttack subclass in techniques/your_attack/
@@ -50,4 +49,8 @@ architecture separation between orchestration and attack algorithms.
   &gt;&gt;&gt; MyOrchestrator = create_orchestrator(&quot;MyAttack&quot;, MyAttackClass)
   &gt;&gt;&gt; orchestrator = MyOrchestrator(hack_agent)
   &gt;&gt;&gt; results = orchestrator.execute(attack_config)
+
+#### FlipAttackOrchestrator
+
+Placeholder for future implementation
 

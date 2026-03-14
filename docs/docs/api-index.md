@@ -17,7 +17,7 @@ This section provides detailed documentation for all classes, methods, and funct
 
 This documentation covers the **Python SDK API** - the classes and methods you use when writing Python code with HackAgent. If you're looking for information about raw HTTP endpoints, those are accessed through the SDK and not documented separately at this time.
 
-For practical usage examples and getting started guides, see the [Attack Tutorial](./getting-started/attack-tutorial.md).
+For practical usage examples and getting started guides, see the [Python SDK Quickstart](./sdk/python-quickstart.md).
 
 ---
 

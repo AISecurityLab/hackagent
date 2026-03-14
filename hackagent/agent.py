@@ -1,18 +1,7 @@
-# Copyright 2025 - AI4I. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
-import logging
+from hackagent.logger import get_logger
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 from hackagent import utils
@@ -20,13 +9,12 @@ from hackagent.client import AuthenticatedClient
 from hackagent.errors import HackAgentError
 from hackagent.router import AgentRouter
 from hackagent.router.types import AgentTypeEnum
-from hackagent.vulnerabilities.prompts import DEFAULT_PROMPTS
 
 # Lazy import for attack orchestrators to avoid ~0.5s startup delay
 if TYPE_CHECKING:
     pass
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class HackAgent:
@@ -46,10 +34,6 @@ class HackAgent:
 
     Attributes:
         client: An `AuthenticatedClient` instance for API communication.
-        prompts: A dictionary of default prompts. This dictionary is a copy of
-            `DEFAULT_PROMPTS` and can be modified after instantiation if needed,
-            though the primary mechanism for custom prompts is usually via attack
-            configurations.
         router: An `AgentRouter` instance managing the agent's representation
             in the HackAgent backend.
         attack_strategies: A dictionary mapping strategy names to their
@@ -117,8 +101,6 @@ class HackAgent:
             timeout=timeout,
         )
 
-        self.prompts = DEFAULT_PROMPTS.copy()
-
         processed_agent_type = utils.resolve_agent_type(agent_type)
 
         self.router = AgentRouter(
@@ -140,14 +122,20 @@ class HackAgent:
             # Import here to avoid circular imports and improve startup time
             from hackagent.attacks.registry import (
                 AdvPrefixOrchestrator,
+                AutoDANTurboOrchestrator,
                 BaselineOrchestrator,
                 PAIROrchestrator,
+                FlipAttackOrchestrator,
+                TAPOrchestrator,
             )
 
             self._attack_strategies = {
                 "advprefix": AdvPrefixOrchestrator(hack_agent=self),
+                "autodan_turbo": AutoDANTurboOrchestrator(hack_agent=self),
                 "baseline": BaselineOrchestrator(hack_agent=self),
                 "pair": PAIROrchestrator(hack_agent=self),
+                "flipattack": FlipAttackOrchestrator(hack_agent=self),
+                "tap": TAPOrchestrator(hack_agent=self),
             }
         return self._attack_strategies
 

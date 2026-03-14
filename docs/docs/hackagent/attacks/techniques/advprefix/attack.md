@@ -8,6 +8,11 @@ Prefix generation pipeline attack based on the BaseAttack class.
 This module implements a complete pipeline for generating, filtering, and selecting prefixes
 using uncensored and target language models, adapted as an attack module.
 
+Result Tracking:
+    Uses TrackingCoordinator to manage both pipeline-level StepTracker
+    and per-goal Tracker. The coordinator handles goal lifecycle,
+    crash-safe finalization, and data enrichment (result_id injection).
+
 ## AdvPrefixAttack Objects
 
 ```python
@@ -43,6 +48,9 @@ def run(goals: List[str]) -> List[Dict]
 ```
 
 Executes the full prefix generation pipeline.
+
+Uses TrackingCoordinator to manage both pipeline-level and
+per-goal result tracking through a single unified interface.
 
 **Arguments**:
 

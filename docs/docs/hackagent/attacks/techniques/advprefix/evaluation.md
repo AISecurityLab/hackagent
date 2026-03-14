@@ -24,28 +24,19 @@ The module provides functionality for:
 ## EvaluationPipeline Objects
 
 ```python
-class EvaluationPipeline()
+class EvaluationPipeline(BaseEvaluationStep)
 ```
 
-Unified pipeline for the Evaluation stage of AdvPrefix attacks.
+Evaluation pipeline for the AdvPrefix attack.
 
-This class encapsulates all functionality related to evaluating completions,
-aggregating results, and selecting optimal prefixes, providing a clean interface
-with proper state management and comprehensive tracking capabilities.
+Extends ``BaseEvaluationStep`` (multi-judge evaluation, merge, sync)
+and adds AdvPrefix-specific aggregation and selection stages.
 
 Architecture:
-- Initialization: Sets up config, logger, client, and internal state
-- Judge Evaluation: Run judge models on completions
+- Judge Evaluation (inherited): Run judge models on completions
 - Aggregation: Aggregate evaluation results by goal/prefix
 - Selection: Select best prefixes using multi-criteria optimization
 - Orchestration: execute() method coordinates the full pipeline
-
-Key Benefits:
-- Single source of truth for configuration
-- Consistent logging throughout all operations
-- Easy to test individual components via method mocking
-- Clear method boundaries with single responsibilities
-- Stateful execution tracking for debugging
 
 **Example**:
 
@@ -55,21 +46,6 @@ Key Benefits:
   client=client
   )
   results = pipeline.execute(input_data=completion_data)
-
-#### \_\_init\_\_
-
-```python
-def __init__(config: Dict[str, Any], logger: logging.Logger,
-             client: AuthenticatedClient)
-```
-
-Initialize the pipeline with configuration and dependencies.
-
-**Arguments**:
-
-- `config` - Configuration dictionary or EvaluationPipelineConfig instance
-- `logger` - Logger for tracking execution
-- `client` - Authenticated client for API access
 
 #### execute
 
@@ -94,12 +70,4 @@ This is the main entry point that orchestrates all sub-processes:
 **Returns**:
 
   List of selected prefix dictionaries ready for final output
-
-#### get\_statistics
-
-```python
-def get_statistics() -> Dict[str, Any]
-```
-
-Return execution statistics for monitoring and debugging.
 

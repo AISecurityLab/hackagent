@@ -1,16 +1,5 @@
-# Copyright 2025 - AI4I. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 import logging
 from typing import Any, Dict, Optional, Type, Union
@@ -18,10 +7,10 @@ from uuid import UUID
 
 from hackagent.api.agent import agent_create, agent_list, agent_partial_update
 from hackagent.client import AuthenticatedClient
-from hackagent.models import (
+from hackagent.api.models import (
     Agent as BackendAgentModel,
 )
-from hackagent.models import (
+from hackagent.api.models import (
     AgentRequest,
     PatchedAgentRequest,
 )
@@ -291,7 +280,7 @@ class AgentRouter:
                 f"Unsupported agent type: {agent_type}. Supported types: {list(AGENT_TYPE_TO_ADAPTER_MAP.keys())}"
             )
 
-        actual_metadata = metadata.copy() if metadata is not None else {}
+        actual_metadata = {k: v for k, v in (metadata or {}).items() if v is not None}
 
         current_adapter_op_config = (
             adapter_operational_config.copy() if adapter_operational_config else {}
@@ -366,7 +355,7 @@ class AgentRouter:
 
         if agent_type == AgentTypeEnum.GOOGLE_ADK:
             adapter_instance_config["name"] = self.backend_agent.name
-            adapter_instance_config["endpoint"] = self.backend_agent.endpoint
+            adapter_instance_config["endpoint"] = str(self.backend_agent.endpoint)
             if "user_id" not in adapter_instance_config:
                 logger.error(
                     f"CRITICAL: user_id not found in adapter_instance_config for ADK agent '{self.backend_agent.name}' just before adapter instantiation. This should have been set in __init__."
@@ -394,7 +383,7 @@ class AgentRouter:
                 "endpoint" not in adapter_instance_config
                 and self.backend_agent.endpoint
             ):
-                adapter_instance_config["endpoint"] = self.backend_agent.endpoint
+                adapter_instance_config["endpoint"] = str(self.backend_agent.endpoint)
 
             optional_litellm_keys = [
                 "api_key",
@@ -435,13 +424,20 @@ class AgentRouter:
                         f"'name' (model string) in adapter_operational_config or backend metadata. "
                         f"Cannot configure OpenAIAgent."
                     )
+                else:
+                    # Fall back to the registered agent name (e.g. full local model path)
+                    logger.warning(
+                        f"Agent '{name}' (Type: {agent_type.value}) missing 'name' in metadata. "
+                        f"Defaulting to agent name '{self.backend_agent.name}'."
+                    )
+                    adapter_instance_config["name"] = self.backend_agent.name
 
             # Always use backend agent's endpoint if not already in config
             if (
                 "endpoint" not in adapter_instance_config
                 and self.backend_agent.endpoint
             ):
-                adapter_instance_config["endpoint"] = self.backend_agent.endpoint
+                adapter_instance_config["endpoint"] = str(self.backend_agent.endpoint)
 
             optional_openai_keys = [
                 "api_key",
@@ -480,7 +476,7 @@ class AgentRouter:
                 "endpoint" not in adapter_instance_config
                 and self.backend_agent.endpoint
             ):
-                adapter_instance_config["endpoint"] = self.backend_agent.endpoint
+                adapter_instance_config["endpoint"] = str(self.backend_agent.endpoint)
 
             optional_ollama_keys = [
                 "max_new_tokens",
@@ -636,13 +632,13 @@ class AgentRouter:
                         return agent_model
 
                 if (
-                    hasattr(paginated_result, "next_")
-                    and paginated_result.next_
-                    and not isinstance(paginated_result.next_, Unset)
+                    hasattr(paginated_result, "next")
+                    and paginated_result.next
+                    and not isinstance(paginated_result.next, Unset)
                 ):
-                    next_page_url = paginated_result.next_
+                    next_page_url = str(paginated_result.next)
                     try:
-                        if isinstance(next_page_url, str) and "page=" in next_page_url:
+                        if "page=" in next_page_url:
                             current_page = int(
                                 next_page_url.split("page=")[-1].split("&")[0]
                             )
@@ -849,7 +845,10 @@ class AgentRouter:
             if metadata_to_patch:
                 final_metadata = current_metadata.copy()
                 final_metadata.update(metadata_to_patch)
-                patch_kwargs["metadata"] = final_metadata
+                # Strip None values — Django JSONField rejects null entries
+                patch_kwargs["metadata"] = {
+                    k: v for k, v in final_metadata.items() if v is not None
+                }
 
             # Check agent_type
             current_type_val = None
@@ -865,9 +864,15 @@ class AgentRouter:
                 patch_kwargs["agent_type"] = agent_type.value
                 needs_update = True
 
-            # Check endpoint
-            current_endpoint = existing_agent.endpoint
-            if current_endpoint != endpoint_for_backend:
+            # Check endpoint — normalize both sides to str so AnyUrl ≠ str
+            # false-positives don't trigger unnecessary PATCH calls.
+            current_endpoint = (
+                str(existing_agent.endpoint).rstrip("/")
+                if existing_agent.endpoint
+                else None
+            )
+            _normalized_requested = str(endpoint_for_backend).rstrip("/")
+            if current_endpoint != _normalized_requested:
                 logger.info(
                     f"Backend agent '{name}' exists but endpoint differs. Current: '{current_endpoint}', Requested: '{endpoint_for_backend}'. Will update."
                 )
@@ -1028,276 +1033,3 @@ class AgentRouter:
                 raw_request=request_data,
                 registration_key=registration_key,
             )
-
-    def route_with_tracking(
-        self,
-        registration_key: str,
-        request_data: Dict[str, Any],
-        run_id: str,
-        client,
-        evaluation_status=None,
-        raise_on_error: bool = False,
-    ) -> Dict[str, Any]:
-        # NOTE: Returns {"response": <agent_response>, "result_id": <uuid_string_or_None>}
-        """
-        Route a request to an agent and automatically create a Result record.
-
-        This method combines routing with automatic result tracking. After the agent
-        processes the request, a Result record is automatically created in the backend
-        with the request/response data.
-
-        Args:
-            registration_key: The key identifying the target adapter
-            request_data: Data to send to the agent's handle_request method
-            run_id: Run ID to associate the result with
-            client: Authenticated client for API calls
-            evaluation_status: Optional evaluation status (defaults to NOT_EVALUATED)
-            raise_on_error: If True, raises exceptions for errors
-
-        Returns:
-            Response dictionary from the agent adapter
-
-        Example:
-            >>> response = router.route_with_tracking(
-            ...     registration_key=agent_id,
-            ...     request_data={"prompt": "test"},
-            ...     run_id=run_id,
-            ...     client=client
-            ... )
-        """
-        logger.info(
-            f"route_with_tracking called: run_id={run_id}, registration_key={registration_key}"
-        )
-
-        # Route the request
-        response = self.route_request(
-            registration_key=registration_key,
-            request_data=request_data,
-            raise_on_error=raise_on_error,
-        )
-
-        logger.info("Agent response received, creating Result record...")
-
-        # Create Result record directly under Run
-        try:
-            from ..api.run import run_result_create
-            from ..models import ResultRequest, EvaluationStatusEnum
-            from uuid import UUID
-
-            # Prepare result request
-            if evaluation_status is None:
-                evaluation_status = EvaluationStatusEnum.NOT_EVALUATED
-
-            run_uuid = UUID(run_id)
-
-            # Convert response to string if it's a dict
-            response_str = response if isinstance(response, str) else str(response)
-
-            result_req = ResultRequest(
-                run=run_uuid,
-                request_payload=request_data,
-                response_body=response_str,  # Must be string
-                evaluation_status=evaluation_status,
-            )
-
-            # Create result under run
-            result_response = run_result_create.sync_detailed(
-                id=run_uuid,
-                client=client,
-                body=result_req,
-            )
-
-            result_id = None
-            if result_response.status_code == 201:
-                # First try the parsed response
-                if result_response.parsed and hasattr(result_response.parsed, "id"):
-                    result_id = str(result_response.parsed.id)
-                    logger.info(f"✅ Result record created successfully: {result_id}")
-                else:
-                    # Fallback: extract ID from raw JSON content
-                    # (workaround for API client parsing issue)
-                    import json
-
-                    try:
-                        content_json = json.loads(result_response.content)
-                        if "id" in content_json:
-                            result_id = str(content_json["id"])
-                            logger.info(f"✅ Result record created: {result_id}")
-                        else:
-                            logger.warning("Result created but no 'id' in response")
-                    except Exception as parse_err:
-                        logger.warning(
-                            f"Result created but failed to parse response: {parse_err}"
-                        )
-            else:
-                logger.warning(
-                    f"⚠️ Result creation failed: status={result_response.status_code}"
-                )
-
-            # Create traces for this result if we have a result_id
-            if result_id:
-                self._create_traces_for_result(
-                    result_id=result_id,
-                    client=client,
-                    request_data=request_data,
-                    response=response,
-                )
-
-        except Exception as e:
-            logger.error(f"❌ Failed to create Result record: {e}", exc_info=True)
-            result_id = None
-
-        # Return both response and result_id for tracking
-        return {"response": response, "result_id": result_id}
-
-    def _create_traces_for_result(
-        self,
-        result_id: str,
-        client,
-        request_data: Dict[str, Any],
-        response: Any,
-    ) -> None:
-        """
-        Create trace records for a result capturing the agent execution details.
-
-        Args:
-            result_id: The UUID of the result to attach traces to
-            client: Authenticated client for API calls
-            request_data: The original request data sent to the agent
-            response: The response from the agent
-        """
-        from ..api.result import result_trace_create
-        from ..models import TraceRequest, StepTypeEnum
-
-        sequence = 0
-
-        try:
-            result_uuid = UUID(result_id)
-
-            # Trace 1: Capture the user input/request
-            sequence += 1
-            input_trace = TraceRequest(
-                sequence=sequence,
-                step_type=StepTypeEnum.OTHER,
-                content={
-                    "step_name": "User Request",
-                    "messages": request_data.get("messages", []),
-                    "prompt": request_data.get("prompt", ""),
-                },
-            )
-            result_trace_create.sync_detailed(
-                id=result_uuid,
-                client=client,
-                body=input_trace,
-            )
-            logger.debug(f"Created input trace for result {result_id}")
-
-            # Trace 2: Capture tool calls if present
-            if hasattr(response, "tool_calls") and response.tool_calls:
-                for tool_call in response.tool_calls:
-                    sequence += 1
-                    tool_trace = TraceRequest(
-                        sequence=sequence,
-                        step_type=StepTypeEnum.TOOL_CALL,
-                        content={
-                            "step_name": "Tool Call",
-                            "tool_name": tool_call.get("function", {}).get(
-                                "name", "unknown"
-                            )
-                            if isinstance(tool_call, dict)
-                            else getattr(
-                                getattr(tool_call, "function", None), "name", "unknown"
-                            ),
-                            "tool_id": tool_call.get("id", "")
-                            if isinstance(tool_call, dict)
-                            else getattr(tool_call, "id", ""),
-                            "arguments": tool_call.get("function", {}).get(
-                                "arguments", ""
-                            )
-                            if isinstance(tool_call, dict)
-                            else getattr(
-                                getattr(tool_call, "function", None), "arguments", ""
-                            ),
-                        },
-                    )
-                    result_trace_create.sync_detailed(
-                        id=result_uuid,
-                        client=client,
-                        body=tool_trace,
-                    )
-                logger.debug(f"Created {len(response.tool_calls)} tool call traces")
-
-            # Check dict response for tool_calls
-            elif isinstance(response, dict) and response.get("tool_calls"):
-                for tool_call in response["tool_calls"]:
-                    sequence += 1
-                    tool_trace = TraceRequest(
-                        sequence=sequence,
-                        step_type=StepTypeEnum.TOOL_CALL,
-                        content={
-                            "step_name": "Tool Call",
-                            "tool_name": tool_call.get("function", {}).get(
-                                "name", "unknown"
-                            ),
-                            "tool_id": tool_call.get("id", ""),
-                            "arguments": tool_call.get("function", {}).get(
-                                "arguments", ""
-                            ),
-                        },
-                    )
-                    result_trace_create.sync_detailed(
-                        id=result_uuid,
-                        client=client,
-                        body=tool_trace,
-                    )
-                logger.debug(f"Created {len(response['tool_calls'])} tool call traces")
-
-            # Trace 3: Capture the agent response
-            sequence += 1
-            response_content = ""
-            if hasattr(response, "choices") and response.choices:
-                choice = response.choices[0]
-                if hasattr(choice, "message") and choice.message:
-                    response_content = getattr(choice.message, "content", "") or ""
-            elif isinstance(response, dict):
-                if "choices" in response and response["choices"]:
-                    response_content = (
-                        response["choices"][0].get("message", {}).get("content", "")
-                    )
-                elif "generated_text" in response:
-                    response_content = response["generated_text"]
-                elif "content" in response:
-                    response_content = response["content"]
-
-            response_trace = TraceRequest(
-                sequence=sequence,
-                step_type=StepTypeEnum.AGENT_RESPONSE_CHUNK,
-                content={
-                    "step_name": "Agent Response",
-                    "response": response_content[:5000]
-                    if response_content
-                    else "",  # Truncate large responses
-                    "finish_reason": self._extract_finish_reason(response),
-                },
-            )
-            result_trace_create.sync_detailed(
-                id=result_uuid,
-                client=client,
-                body=response_trace,
-            )
-            logger.info(f"✅ Created {sequence} traces for result {result_id}")
-
-        except Exception as e:
-            logger.warning(f"Failed to create traces for result {result_id}: {e}")
-
-    def _extract_finish_reason(self, response: Any) -> str:
-        """Extract finish_reason from response."""
-        if hasattr(response, "choices") and response.choices:
-            choice = response.choices[0]
-            if hasattr(choice, "finish_reason"):
-                return choice.finish_reason or "unknown"
-        elif isinstance(response, dict) and "choices" in response:
-            choices = response.get("choices", [])
-            if choices:
-                return choices[0].get("finish_reason", "unknown")
-        return "unknown"

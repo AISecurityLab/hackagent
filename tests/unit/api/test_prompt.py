@@ -1,16 +1,5 @@
-# Copyright 2025 - AI4I. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 
 import unittest
@@ -29,10 +18,10 @@ from hackagent.api.prompt import (
     prompt_retrieve,
     prompt_update,
 )
-from hackagent.models.paginated_prompt_list import PaginatedPromptList
-from hackagent.models.patched_prompt_request import PatchedPromptRequest
-from hackagent.models.prompt import Prompt
-from hackagent.models.prompt_request import PromptRequest
+from hackagent.api.models import PaginatedPromptList
+from hackagent.api.models import PatchedPromptRequest
+from hackagent.api.models import Prompt
+from hackagent.api.models import PromptRequest
 
 
 class TestPromptListAPI(unittest.TestCase):
@@ -87,12 +76,12 @@ class TestPromptListAPI(unittest.TestCase):
         mock_httpx_client.request.return_value = mock_httpx_response
 
         # Create a PaginatedPromptList instance from the mock content
-        mock_parsed_object = PaginatedPromptList.from_dict(mock_response_content)
+        mock_parsed_object = PaginatedPromptList.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.prompt.prompt_list.PaginatedPromptList.from_dict",
+            "hackagent.api.prompt.prompt_list.PaginatedPromptList.model_validate",
             return_value=mock_parsed_object,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = prompt_list.sync_detailed(
                 client=mock_client_instance, category="TestCategory", page=1
             )
@@ -135,7 +124,7 @@ class TestPromptListAPI(unittest.TestCase):
             )
             self.assertEqual(retrieved_prompt.owner, mock_owner_id)
 
-            mock_from_dict.assert_called_once_with(mock_response_content)
+            mock_model_validate.assert_called_once_with(mock_response_content)
 
             expected_kwargs = {
                 "method": "get",
@@ -245,12 +234,12 @@ class TestPromptCreateAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_prompt = Prompt.from_dict(mock_response_content)
+        mock_parsed_prompt = Prompt.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.prompt.prompt_create.Prompt.from_dict",
+            "hackagent.api.prompt.prompt_create.Prompt.model_validate",
             return_value=mock_parsed_prompt,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = prompt_create.sync_detailed(
                 client=mock_client_instance, body=prompt_request_data
             )
@@ -295,12 +284,14 @@ class TestPromptCreateAPI(unittest.TestCase):
                 response.parsed.updated_at, isoparse(updated_at_create_str)
             )
 
-            mock_from_dict.assert_called_once_with(mock_response_content)
+            mock_model_validate.assert_called_once_with(mock_response_content)
 
             expected_kwargs = {
                 "method": "post",
                 "url": "/prompt",
-                "json": prompt_request_data.to_dict(),
+                "json": prompt_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -401,12 +392,12 @@ class TestPromptRetrieveAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_prompt = Prompt.from_dict(mock_response_content)
+        mock_parsed_prompt = Prompt.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.prompt.prompt_retrieve.Prompt.from_dict",
+            "hackagent.api.prompt.prompt_retrieve.Prompt.model_validate",
             return_value=mock_parsed_prompt,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = prompt_retrieve.sync_detailed(
                 client=mock_client_instance, id=prompt_id_to_retrieve
             )
@@ -446,7 +437,7 @@ class TestPromptRetrieveAPI(unittest.TestCase):
                 response.parsed.updated_at, isoparse(updated_at_retrieve_str)
             )
 
-            mock_from_dict.assert_called_once_with(mock_response_content)
+            mock_model_validate.assert_called_once_with(mock_response_content)
 
             expected_kwargs = {
                 "method": "get",
@@ -557,12 +548,12 @@ class TestPromptUpdateAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_prompt = Prompt.from_dict(mock_updated_prompt_response_content)
+        mock_parsed_prompt = Prompt.model_validate(mock_updated_prompt_response_content)
 
         with patch(
-            "hackagent.api.prompt.prompt_update.Prompt.from_dict",
+            "hackagent.api.prompt.prompt_update.Prompt.model_validate",
             return_value=mock_parsed_prompt,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = prompt_update.sync_detailed(
                 client=mock_client_instance,
                 id=prompt_id_to_update,
@@ -611,12 +602,16 @@ class TestPromptUpdateAPI(unittest.TestCase):
                 response.parsed.updated_at, isoparse(updated_at_update_str)
             )
 
-            mock_from_dict.assert_called_once_with(mock_updated_prompt_response_content)
+            mock_model_validate.assert_called_once_with(
+                mock_updated_prompt_response_content
+            )
 
             expected_kwargs = {
                 "method": "put",
                 "url": f"/prompt/{prompt_id_to_update}",
-                "json": prompt_update_request_data.to_dict(),
+                "json": prompt_update_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),
                 "headers": {"Content-Type": "application/json"},
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
@@ -729,12 +724,12 @@ class TestPromptPartialUpdateAPI(unittest.TestCase):
         mock_httpx_response.headers = {}
         mock_httpx_client.request.return_value = mock_httpx_response
 
-        mock_parsed_prompt = Prompt.from_dict(mock_patched_prompt_response_content)
+        mock_parsed_prompt = Prompt.model_validate(mock_patched_prompt_response_content)
 
         with patch(
-            "hackagent.api.prompt.prompt_partial_update.Prompt.from_dict",
+            "hackagent.api.prompt.prompt_partial_update.Prompt.model_validate",
             return_value=mock_parsed_prompt,
-        ) as mock_from_dict:
+        ) as mock_model_validate:
             response = prompt_partial_update.sync_detailed(
                 client=mock_client_instance,
                 id=prompt_id_to_patch,
@@ -764,20 +759,30 @@ class TestPromptPartialUpdateAPI(unittest.TestCase):
             )
             self.assertEqual(response.parsed.updated_at, isoparse(updated_at_patch_str))
 
-            mock_from_dict.assert_called_once_with(mock_patched_prompt_response_content)
+            mock_model_validate.assert_called_once_with(
+                mock_patched_prompt_response_content
+            )
 
             expected_kwargs = {
                 "method": "patch",
                 "url": f"/prompt/{prompt_id_to_patch}",
-                "json": prompt_patch_request_data.to_dict(),  # Only name and category should be in dict
+                "json": prompt_patch_request_data.model_dump(
+                    by_alias=True, mode="json", exclude_none=True
+                ),  # Only name and category should be in dict
                 "headers": {"Content-Type": "application/json"},
             }
             # Verify that to_dict() only contains the fields we set
-            request_dict = prompt_patch_request_data.to_dict()
+            request_dict = prompt_patch_request_data.model_dump(
+                by_alias=True, mode="json", exclude_none=True
+            )
             self.assertIn("name", request_dict)
             self.assertIn("category", request_dict)
-            self.assertNotIn("prompt_text", request_dict)
-            self.assertNotIn("organization", request_dict)
+            self.assertIsNone(
+                request_dict.get("prompt_text")
+            )  # Unset optional fields serialize as None
+            self.assertIsNone(
+                request_dict.get("organization")
+            )  # Unset optional fields serialize as None
 
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 

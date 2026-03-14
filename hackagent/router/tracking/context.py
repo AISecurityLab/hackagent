@@ -1,16 +1,5 @@
-# Copyright 2025 - AI4I. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 """
 Tracking context management.
@@ -21,6 +10,7 @@ configuration and state that can be passed between components.
 """
 
 import logging
+from hackagent.logger import get_logger
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 from uuid import UUID
@@ -34,15 +24,15 @@ class TrackingContext:
     Shared context for operation tracking.
 
     This class encapsulates all the state needed for tracking operations
-    and synchronizing with the backend API. It provides a clean interface
-    for passing tracking configuration between components.
+    and synchronizing with the backend API.  Each instance owns its own
+    monotonically increasing sequence counter used to order traces for
+    the ``parent_result_id`` Result it is attached to.
 
     Attributes:
         client: Authenticated client for API communication
         run_id: Server-generated run ID for this execution
-        parent_result_id: ID of the parent result record
+        parent_result_id: ID of the Result record that traces are written to
         logger: Logger instance for tracking operations
-        enabled: Whether tracking is enabled
         sequence_counter: Counter for trace sequence numbers
         metadata: Additional metadata for tracking
 
@@ -66,7 +56,7 @@ class TrackingContext:
     def __post_init__(self):
         """Initialize default logger if not provided."""
         if self.logger is None:
-            self.logger = logging.getLogger(__name__)
+            self.logger = get_logger(__name__)
 
     @property
     def is_enabled(self) -> bool:
@@ -80,18 +70,6 @@ class TrackingContext:
             True if basic tracking is enabled (can create traces), False otherwise
         """
         return bool(self.client is not None and self.run_id is not None)
-
-    @property
-    def can_create_results(self) -> bool:
-        """
-        Check if we can create Result records.
-
-        Result creation requires parent_result_id in addition to basic tracking.
-
-        Returns:
-            True if result creation is enabled, False otherwise
-        """
-        return self.is_enabled and self.parent_result_id is not None
 
     def increment_sequence(self) -> int:
         """

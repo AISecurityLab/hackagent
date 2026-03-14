@@ -1,16 +1,5 @@
-# Copyright 2025 - AI4I. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 """
 Results Tab
@@ -1209,13 +1198,13 @@ class ResultsTab(Container):
             kwargs = {"client": client, "page_size": limit}
             if status_filter and status_filter != "all":
                 # Map filter values to API enum
-                from hackagent.models.run_list_status import RunListStatus
+                from hackagent.api.models import StatusEnum
 
                 status_map = {
-                    "pending": RunListStatus.PENDING,
-                    "running": RunListStatus.RUNNING,
-                    "completed": RunListStatus.COMPLETED,
-                    "failed": RunListStatus.FAILED,
+                    "pending": StatusEnum.PENDING,
+                    "running": StatusEnum.RUNNING,
+                    "completed": StatusEnum.COMPLETED,
+                    "failed": StatusEnum.FAILED,
                 }
                 if status_filter.lower() in status_map:
                     kwargs["status"] = status_map[status_filter.lower()]

@@ -1,16 +1,5 @@
-# Copyright 2025 - AI4I. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 """
 Decorators for automatic operation tracking.
@@ -21,6 +10,7 @@ declarative way to add tracking without modifying function bodies.
 """
 
 import functools
+import inspect
 from typing import Any, Callable, Dict, Optional, TypeVar
 
 from .step import StepTracker
@@ -216,11 +206,14 @@ def track_pipeline(tracker_param: str = "tracker"):
             if not callable(attr):
                 continue
 
-            # Check if method has tracker parameter
-            if hasattr(attr, "__code__"):
-                param_names = attr.__code__.co_varnames
-                if tracker_param in param_names:
+            # Check if method has tracker parameter (use inspect.signature
+            # to examine only declared parameters, not all local variables)
+            try:
+                sig = inspect.signature(attr)
+                if tracker_param in sig.parameters:
                     original_methods[attr_name] = attr
+            except (ValueError, TypeError):
+                pass
 
         # Wrap methods to inject tracker from self
         for method_name, original_method in original_methods.items():

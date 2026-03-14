@@ -1,16 +1,5 @@
-# Copyright 2025 - AI4I. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 """Tests for BaseAttack class and its infrastructure."""
 
@@ -18,7 +7,6 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from hackagent.attacks.techniques.base import BaseAttack
-from hackagent.models import StatusEnum, EvaluationStatusEnum
 
 
 class TestBaseAttackInfrastructure(unittest.TestCase):
@@ -71,8 +59,7 @@ class TestBaseAttackInfrastructure(unittest.TestCase):
 
         self.assertIn("output_dir", str(context.exception).lower())
 
-    @patch("hackagent.attacks.techniques.base.logging")
-    def test_setup_logging_creates_console_handler(self, mock_logging_module):
+    def test_setup_logging_creates_console_handler(self):
         """Test that logging setup creates a console handler."""
 
         class TestAttack(BaseAttack):
@@ -92,9 +79,9 @@ class TestBaseAttackInfrastructure(unittest.TestCase):
         # Verify logger was configured
         mock_logger.setLevel.assert_called()
 
-    @patch("hackagent.attacks.techniques.base.run_result_create")
-    def test_create_parent_result_success(self, mock_result_create):
-        """Test successful parent result creation."""
+    @patch("hackagent.router.tracking.coordinator.TrackingCoordinator.create")
+    def test_initialize_coordinator_creates_coordinator(self, mock_create):
+        """Test that coordinator is properly initialized."""
 
         class TestAttack(BaseAttack):
             def _get_pipeline_steps(self):
@@ -103,37 +90,27 @@ class TestBaseAttackInfrastructure(unittest.TestCase):
             def run(self, **kwargs):
                 pass
 
-        # Setup mock response
-        mock_result_id = "result-123"
-        mock_response = MagicMock()
-        mock_response.status_code = 201
-        mock_response.parsed = MagicMock()
-        mock_response.parsed.id = mock_result_id
-        mock_result_create.sync_detailed.return_value = mock_response
+        mock_coordinator = MagicMock()
+        mock_coordinator.step_tracker = MagicMock()
+        mock_create.return_value = mock_coordinator
 
         attack = TestAttack(self.test_config, self.mock_client, self.mock_agent_router)
-        result_id = attack._create_parent_result()
+        goals = ["goal1", "goal2"]
+        metadata = {"key": "value"}
 
-        self.assertEqual(result_id, mock_result_id)
-        mock_result_create.sync_detailed.assert_called_once()
+        coordinator = attack._initialize_coordinator("test_attack", goals, metadata)
 
-    @patch("hackagent.attacks.techniques.base.run_result_create")
-    def test_create_parent_result_no_run_id(self, mock_result_create):
-        """Test that parent result is not created without run_id."""
+        # Verify coordinator was created
+        mock_create.assert_called_once()
+        call_kwargs = mock_create.call_args
+        self.assertEqual(call_kwargs.kwargs["attack_type"], "test_attack")
+        self.assertEqual(call_kwargs.kwargs["goals"], goals)
+        self.assertEqual(call_kwargs.kwargs["initial_metadata"], metadata)
 
-        class TestAttack(BaseAttack):
-            def _get_pipeline_steps(self):
-                return []
-
-            def run(self, **kwargs):
-                pass
-
-        config_no_run_id = {"output_dir": "/tmp/test"}
-        attack = TestAttack(config_no_run_id, self.mock_client, self.mock_agent_router)
-        result_id = attack._create_parent_result()
-
-        self.assertIsNone(result_id)
-        mock_result_create.sync_detailed.assert_not_called()
+        # Verify self.tracker was set for backward compatibility
+        self.assertEqual(attack.tracker, mock_coordinator.step_tracker)
+        self.assertEqual(attack.coordinator, mock_coordinator)
+        self.assertEqual(coordinator, mock_coordinator)
 
     def test_prepare_input_sample_limits_size(self):
         """Test that input sample is limited to 5 items."""
@@ -176,43 +153,6 @@ class TestBaseAttackInfrastructure(unittest.TestCase):
         self.assertIsNone(sample[0]["value"])
         self.assertIsNone(sample[1]["value"])
         self.assertEqual(sample[2]["value"], 42)
-
-    @patch("hackagent.attacks.techniques.base.StepTracker")
-    @patch("hackagent.attacks.techniques.base.TrackingContext")
-    def test_initialize_tracking_creates_tracker(
-        self, mock_context_class, mock_tracker_class
-    ):
-        """Test that tracking is properly initialized."""
-
-        class TestAttack(BaseAttack):
-            def _get_pipeline_steps(self):
-                return []
-
-            def run(self, **kwargs):
-                pass
-
-        mock_context = MagicMock()
-        mock_context_class.return_value = mock_context
-        mock_tracker = MagicMock()
-        mock_tracker_class.return_value = mock_tracker
-
-        attack = TestAttack(self.test_config, self.mock_client, self.mock_agent_router)
-        goals = ["goal1", "goal2"]
-        metadata = {"key": "value"}
-
-        tracker = attack._initialize_tracking("test_attack", goals, metadata)
-
-        # Verify context was created with correct parameters
-        mock_context_class.assert_called_once()
-        mock_context.add_metadata.assert_any_call("attack_type", "test_attack")
-        mock_context.add_metadata.assert_any_call("num_goals", 2)
-        mock_context.add_metadata.assert_any_call("key", "value")
-
-        # Verify tracker was created and status updated
-        mock_tracker_class.assert_called_once_with(mock_context)
-        mock_tracker.update_run_status.assert_called_once_with(StatusEnum.RUNNING)
-
-        self.assertEqual(tracker, mock_tracker)
 
 
 class TestBaseAttackPipelineExecution(unittest.TestCase):
@@ -260,8 +200,7 @@ class TestBaseAttackPipelineExecution(unittest.TestCase):
         self.assertEqual(args["input_data"], input_data)
         self.assertEqual(args["client"], self.mock_client)
 
-    @patch("hackagent.attacks.techniques.base.logging")
-    def test_execute_pipeline_runs_all_steps(self, mock_logging):
+    def test_execute_pipeline_runs_all_steps(self):
         """Test that pipeline executes all steps in sequence."""
 
         class TestAttack(BaseAttack):
@@ -310,77 +249,6 @@ class TestBaseAttackPipelineExecution(unittest.TestCase):
 
         # Verify final output
         self.assertEqual(result, "output2")
-
-    def test_finalize_pipeline_success(self):
-        """Test pipeline finalization with successful results."""
-
-        class TestAttack(BaseAttack):
-            def _get_pipeline_steps(self):
-                return []
-
-            def run(self, **kwargs):
-                pass
-
-        attack = TestAttack(self.test_config, self.mock_client, self.mock_agent_router)
-        attack.tracker = MagicMock()
-
-        results = ["result1", "result2"]
-        attack._finalize_pipeline(results)
-
-        # Verify successful status was set
-        attack.tracker.update_result_status.assert_called_once_with(
-            EvaluationStatusEnum.PASSED_CRITERIA, "Pipeline completed successfully."
-        )
-        attack.tracker.update_run_status.assert_called_once_with(StatusEnum.COMPLETED)
-
-    def test_finalize_pipeline_failure(self):
-        """Test pipeline finalization with failed results."""
-
-        class TestAttack(BaseAttack):
-            def _get_pipeline_steps(self):
-                return []
-
-            def run(self, **kwargs):
-                pass
-
-        attack = TestAttack(self.test_config, self.mock_client, self.mock_agent_router)
-        attack.tracker = MagicMock()
-
-        results = []  # Empty results = failure
-        attack._finalize_pipeline(results)
-
-        # Verify failed status was set
-        attack.tracker.update_result_status.assert_called_once()
-        call_args = attack.tracker.update_result_status.call_args
-        self.assertEqual(call_args[0][0], EvaluationStatusEnum.FAILED_CRITERIA)
-        self.assertIsNotNone(call_args[0][1])  # Should have error notes
-
-        attack.tracker.update_run_status.assert_called_once_with(StatusEnum.COMPLETED)
-
-    def test_finalize_pipeline_custom_success_check(self):
-        """Test pipeline finalization with custom success check."""
-
-        class TestAttack(BaseAttack):
-            def _get_pipeline_steps(self):
-                return []
-
-            def run(self, **kwargs):
-                pass
-
-        attack = TestAttack(self.test_config, self.mock_client, self.mock_agent_router)
-        attack.tracker = MagicMock()
-
-        results = {"status": "success", "count": 5}
-
-        def custom_check(output):
-            return output.get("count", 0) > 3
-
-        attack._finalize_pipeline(results, custom_check)
-
-        # Verify custom check was used (count > 3 = success)
-        attack.tracker.update_result_status.assert_called_once_with(
-            EvaluationStatusEnum.PASSED_CRITERIA, "Pipeline completed successfully."
-        )
 
 
 class TestBaseAttackKwargsHandling(unittest.TestCase):

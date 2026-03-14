@@ -1,16 +1,5 @@
-# Copyright 2025 - AI4I. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 """
 Baseline attack implementation.
@@ -24,52 +13,42 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from hackagent.client import AuthenticatedClient
-from hackagent.models import StatusEnum
 from hackagent.router.router import AgentRouter
 from hackagent.attacks.techniques.base import BaseAttack
+from hackagent.attacks.shared.tui import with_tui_logging
 
 from . import generation, evaluation
 from .config import DEFAULT_TEMPLATE_CONFIG
 
-# TUI logging support - lazy loaded to avoid circular imports
-_with_tui_logging = None
-
-
-def _get_tui_logging_decorator():
-    """Lazily import the TUI logging decorator to avoid circular imports."""
-    global _with_tui_logging
-    if _with_tui_logging is not None:
-        return _with_tui_logging
-
-    try:
-        from hackagent.cli.tui.logger import with_tui_logging
-
-        _with_tui_logging = with_tui_logging
-    except ImportError:
-
-        def with_tui_logging(*args, **kwargs):
-            def decorator(func):
-                return func
-
-            return decorator
-
-        _with_tui_logging = with_tui_logging
-
-    return _with_tui_logging
-
-
-def with_tui_logging(*args, **kwargs):
-    """Wrapper that lazily loads the actual TUI logging decorator."""
-    decorator = _get_tui_logging_decorator()
-    return decorator(*args, **kwargs)
-
 
 class BaselineAttack(BaseAttack):
     """
-    Baseline attack using predefined prompt patterns.
+    Baseline attack using predefined prompt templates.
 
-    Combines templates with goals to generate jailbreak attempts,
-    then evaluates responses using objective-based criteria.
+    Combines a library of prompt templates across several jailbreak
+    categories with each goal string to produce attack prompts, sends
+    them to the target model, and evaluates responses using a
+    configurable evaluator (pattern-matching, keyword, or LLM judge).
+
+    Pipeline stages
+    ---------------
+    1. **Generation** (:func:`~hackagent.attacks.techniques.baseline.generation.execute`) —
+       selects up to ``templates_per_category`` templates from each
+       category in ``template_categories``, injects each goal, and
+       collects target-model responses.
+    2. **Evaluation** (:func:`~hackagent.attacks.techniques.baseline.evaluation.execute`) —
+       scores responses for jailbreak success using the configured
+       ``evaluator_type`` (``"pattern"``, ``"keyword"``, or ``"llm_judge"``).
+
+    This attack is useful as a **sanity-check baseline**: it requires no
+    additional LLM (unlike PAIR/TAP/AdvPrefix) and surfaces naive template
+    weaknesses in the target model.
+
+    Attributes:
+        config: Merged baseline configuration dictionary.
+        client: Authenticated HackAgent API client.
+        agent_router: Router for the victim model.
+        logger: Hierarchical logger at ``hackagent.attacks.baseline``.
     """
 
     def __init__(
@@ -82,9 +61,13 @@ class BaselineAttack(BaseAttack):
         Initialize baseline attack.
 
         Args:
-            config: Configuration dictionary
-            client: Authenticated client for API calls
-            agent_router: Target agent router
+            config: Configuration override dictionary merged into
+                :data:`~hackagent.attacks.techniques.baseline.config.DEFAULT_TEMPLATE_CONFIG`.
+            client: Authenticated HackAgent API client.
+            agent_router: Router for the victim model.
+
+        Raises:
+            ValueError: If ``client`` or ``agent_router`` is ``None``.
         """
         if client is None:
             raise ValueError("AuthenticatedClient must be provided")
@@ -103,7 +86,17 @@ class BaselineAttack(BaseAttack):
         super().__init__(current_config, client, agent_router)
 
     def _validate_config(self):
-        """Validate configuration."""
+        """
+        Validate baseline-specific configuration.
+
+        Checks presence of all required top-level keys and verifies that
+        the configured ``objective`` exists in the
+        :data:`~hackagent.attacks.objectives.OBJECTIVES` registry.
+
+        Raises:
+            ValueError: If any required key is missing or the ``objective``
+                is not a registered objective name.
+        """
         super()._validate_config()
 
         required_keys = [
@@ -128,7 +121,25 @@ class BaselineAttack(BaseAttack):
             )
 
     def _get_pipeline_steps(self) -> List[Dict]:
-        """Define attack pipeline."""
+        """
+        Define the two baseline pipeline stage descriptors.
+
+        Stage 1 — **Generation**
+            (:func:`~hackagent.attacks.techniques.baseline.generation.execute`):
+            Selects templates, injects goals, and collects target responses.
+            Configurable via ``template_categories``, ``templates_per_category``,
+            ``max_new_tokens``, ``temperature``, and ``n_samples_per_template``.
+
+        Stage 2 — **Evaluation**
+            (:func:`~hackagent.attacks.techniques.baseline.evaluation.execute`):
+            Scores responses for jailbreak success using the configured
+            ``evaluator_type``.  Short responses (``< min_response_length``
+            tokens) are skipped.
+
+        Returns:
+            List of pipeline-step configuration dicts compatible with
+            :meth:`~hackagent.attacks.techniques.base.BaseAttack._execute_pipeline`.
+        """
         return [
             {
                 "name": "Generation: Generate and Execute Baseline Prompts",
@@ -167,6 +178,8 @@ class BaselineAttack(BaseAttack):
         """
         Execute baseline attack.
 
+        Uses TrackingCoordinator for unified pipeline and goal tracking.
+
         Args:
             goals: List of harmful goals to test
 
@@ -176,11 +189,11 @@ class BaselineAttack(BaseAttack):
         if not goals:
             return {"evaluated": [], "summary": []}
 
-        # Initialize tracking using base class
-        self.tracker = self._initialize_tracking(
-            "baseline",
-            goals,
-            metadata={"objective": self.config.get("objective")},
+        # Initialize unified coordinator
+        coordinator = self._initialize_coordinator(
+            attack_type="baseline",
+            goals=goals,
+            initial_metadata={"objective": self.config.get("objective")},
         )
 
         try:
@@ -191,13 +204,13 @@ class BaselineAttack(BaseAttack):
             def success_check(output):
                 return output and isinstance(output, dict)
 
-            # Finalize using base class
-            self._finalize_pipeline(results, success_check)
+            # Finalize pipeline-level tracking via coordinator
+            coordinator.finalize_pipeline(results, success_check)
 
             return results if results else {"evaluated": [], "summary": []}
 
         except Exception as e:
             self.logger.error(f"Pipeline failed: {e}", exc_info=True)
-            if self.tracker:
-                self.tracker.update_run_status(StatusEnum.FAILED)
+            # Crash-safe: finalize all tracking on error
+            coordinator.finalize_on_error("Baseline pipeline failed with exception")
             raise

@@ -1,16 +1,5 @@
-# Copyright 2025 - AI4I. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 
 """
@@ -236,13 +225,17 @@ def summary(ctx, status, agent, attack_type, days):
 
 def _generate_result_statistics(results, days: int) -> dict:
     """Generate statistics from results list"""
-
     total_results = len(results)
 
-    # Count by status
+    # Count by status, agent, attack type
     status_counts = {}
     agent_counts = {}
     attack_counts = {}
+
+    # For new metrics
+    majority_vote_sum = 0.0
+    fleiss_kappa_sum = 0.0
+    metrics_count = 0  # Number of results with valid metrics
 
     for result in results:
         # Status statistics
@@ -264,19 +257,35 @@ def _generate_result_statistics(results, days: int) -> dict:
             attack = result.attack_type
             attack_counts[attack] = attack_counts.get(attack, 0) + 1
 
+        # Collect metrics if available
+        if hasattr(result, "data") and result.data:
+            data = result.data
+            if "overall_majority_vote_asr" in data:
+                majority_vote_sum += data["overall_majority_vote_asr"]
+            if "overall_fleiss_kappa" in data:
+                fleiss_kappa_sum += data["overall_fleiss_kappa"]
+            metrics_count += 1
+
+    # Compute averages
+    avg_majority_vote_asr = (
+        majority_vote_sum / metrics_count if metrics_count > 0 else 0.0
+    )
+    avg_fleiss_kappa = fleiss_kappa_sum / metrics_count if metrics_count > 0 else 0.0
+
     return {
         "period_days": days,
         "total_results": total_results,
         "status_breakdown": status_counts,
         "agent_breakdown": agent_counts,
         "attack_type_breakdown": attack_counts,
+        "avg_majority_vote_asr": avg_majority_vote_asr,
+        "avg_fleiss_kappa": avg_fleiss_kappa,
         "generated_at": str(datetime.now()),
     }
 
 
 def _display_result_summary(stats: dict) -> None:
     """Display result statistics summary"""
-
     console.print(f"\n[bold cyan]📊 Results Summary (Last {stats['period_days']} days)")
     console.print(f"[green]Total Results: {stats['total_results']}")
 
@@ -325,3 +334,14 @@ def _display_result_summary(stats: dict) -> None:
             attack_table.add_row(attack_type, str(count))
 
         console.print(attack_table)
+
+    # NEW: Show average metrics
+    console.print("\n[bold cyan]📊 Average Evaluation Metrics Across Results:")
+    metrics_table = Table(show_header=True, header_style="bold cyan")
+    metrics_table.add_column("Metric", style="cyan")
+    metrics_table.add_column("Average", style="green")
+
+    metrics_table.add_row("Majority Vote ASR", f"{stats['avg_majority_vote_asr']:.3f}")
+    metrics_table.add_row("Fleiss' Kappa", f"{stats['avg_fleiss_kappa']:.3f}")
+
+    console.print(metrics_table)

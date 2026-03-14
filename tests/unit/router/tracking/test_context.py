@@ -1,16 +1,5 @@
-# Copyright 2025 - AI4I. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 """Tests for TrackingContext class."""
 
@@ -106,42 +95,6 @@ class TestTrackingContextIsEnabled(unittest.TestCase):
         )
 
         self.assertTrue(context.is_enabled)
-
-
-class TestTrackingContextCanCreateResults(unittest.TestCase):
-    """Test can_create_results property."""
-
-    def test_can_create_results_false_when_not_enabled(self):
-        """Test can_create_results returns False when tracking not enabled."""
-        context = TrackingContext(
-            client=None,
-            run_id="run-123",
-            parent_result_id="result-456",
-        )
-
-        self.assertFalse(context.can_create_results)
-
-    def test_can_create_results_false_without_parent_result_id(self):
-        """Test can_create_results returns False without parent_result_id."""
-        mock_client = MagicMock()
-        context = TrackingContext(
-            client=mock_client,
-            run_id="run-123",
-            parent_result_id=None,
-        )
-
-        self.assertFalse(context.can_create_results)
-
-    def test_can_create_results_true_when_fully_configured(self):
-        """Test can_create_results returns True when fully configured."""
-        mock_client = MagicMock()
-        context = TrackingContext(
-            client=mock_client,
-            run_id="run-123",
-            parent_result_id="result-456",
-        )
-
-        self.assertTrue(context.can_create_results)
 
 
 class TestTrackingContextSequence(unittest.TestCase):
@@ -282,7 +235,6 @@ class TestTrackingContextCreateDisabled(unittest.TestCase):
         self.assertIsNone(context.run_id)
         self.assertIsNone(context.parent_result_id)
         self.assertFalse(context.is_enabled)
-        self.assertFalse(context.can_create_results)
 
 
 if __name__ == "__main__":

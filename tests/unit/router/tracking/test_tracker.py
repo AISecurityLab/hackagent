@@ -1,16 +1,5 @@
-# Copyright 2025 - AI4I. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 """Tests for StepTracker class."""
 
@@ -19,9 +8,10 @@ import logging
 import unittest
 from unittest.mock import MagicMock, patch
 
-from hackagent.models import EvaluationStatusEnum, StatusEnum
+from hackagent.api.models import EvaluationStatusEnum, StatusEnum
 from hackagent.router.tracking.context import TrackingContext
 from hackagent.router.tracking.step import StepTracker
+from hackagent.router.tracking.utils import sanitize_for_json
 
 
 class TestStepTrackerInitialization(unittest.TestCase):
@@ -132,13 +122,10 @@ class TestStepTrackerTrackStep(unittest.TestCase):
 
 
 class TestStepTrackerSanitizeConfig(unittest.TestCase):
-    """Test _sanitize_config method."""
+    """Test sanitize_for_json utility (formerly StepTracker._sanitize_config)."""
 
     def test_sanitize_config_removes_sensitive_keys(self):
         """Test that sensitive keys are redacted."""
-        context = TrackingContext.create_disabled()
-        tracker = StepTracker(context)
-
         config = {
             "api_key": "secret123",
             "api_token": "token456",
@@ -148,7 +135,7 @@ class TestStepTrackerSanitizeConfig(unittest.TestCase):
             "model": "gpt-4",
         }
 
-        sanitized = tracker._sanitize_config(config)
+        sanitized = sanitize_for_json(config)
 
         self.assertEqual(sanitized["api_key"], "***REDACTED***")
         self.assertEqual(sanitized["api_token"], "***REDACTED***")
@@ -159,9 +146,6 @@ class TestStepTrackerSanitizeConfig(unittest.TestCase):
 
     def test_sanitize_config_nested(self):
         """Test that nested configs are also sanitized."""
-        context = TrackingContext.create_disabled()
-        tracker = StepTracker(context)
-
         config = {
             "outer_setting": "visible",
             "nested": {
@@ -170,7 +154,7 @@ class TestStepTrackerSanitizeConfig(unittest.TestCase):
             },
         }
 
-        sanitized = tracker._sanitize_config(config)
+        sanitized = sanitize_for_json(config)
 
         self.assertEqual(sanitized["outer_setting"], "visible")
         self.assertEqual(sanitized["nested"]["api_key"], "***REDACTED***")
@@ -178,16 +162,13 @@ class TestStepTrackerSanitizeConfig(unittest.TestCase):
 
     def test_sanitize_config_case_insensitive(self):
         """Test that sensitive key detection is case-insensitive."""
-        context = TrackingContext.create_disabled()
-        tracker = StepTracker(context)
-
         config = {
             "API_KEY": "secret1",
             "ApiToken": "secret2",
             "PASSWORD": "secret3",
         }
 
-        sanitized = tracker._sanitize_config(config)
+        sanitized = sanitize_for_json(config)
 
         self.assertEqual(sanitized["API_KEY"], "***REDACTED***")
         self.assertEqual(sanitized["ApiToken"], "***REDACTED***")
@@ -373,7 +354,7 @@ class TestStepTrackerExtractTraceId(unittest.TestCase):
         self.assertEqual(result, "trace-123")
 
     def test_extract_trace_id_from_content(self):
-        """Test extracting trace ID from raw content."""
+        """JSON fallback was removed: when parsed is None, result is None."""
         context = TrackingContext.create_disabled()
         tracker = StepTracker(context)
 
@@ -383,7 +364,7 @@ class TestStepTrackerExtractTraceId(unittest.TestCase):
 
         result = tracker._extract_trace_id(mock_response, "Test Step")
 
-        self.assertEqual(result, "trace-456")
+        self.assertIsNone(result)
 
     def test_extract_trace_id_not_found(self):
         """Test extract_trace_id returns None when ID not found."""
