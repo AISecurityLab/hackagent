@@ -30,18 +30,23 @@ def _get_kwargs(
 
     if isinstance(body, PatchedUserProfileRequest):
         if not isinstance(body, Unset):
-            _kwargs["json"] = body.model_dump(
-                by_alias=True, mode="json", exclude_none=True
-            )
+            _kwargs["json"] = body.model_dump(mode="json", exclude_unset=True)
 
         headers["Content-Type"] = "application/json"
-    if isinstance(body, PatchedUserProfileRequest):
+    elif isinstance(body, PatchedUserProfileRequest):
         if not isinstance(body, Unset):
-            _kwargs["data"] = body.model_dump(
-                by_alias=True, mode="json", exclude_none=True
-            )
+            _kwargs["data"] = body.model_dump(mode="json", exclude_unset=True)
 
         headers["Content-Type"] = "application/x-www-form-urlencoded"
+    elif isinstance(body, PatchedUserProfileRequest):
+        if not isinstance(body, Unset):
+            _kwargs["files"] = {
+                k: (None, str(v))
+                for k, v in body.model_dump(mode="json", exclude_unset=True).items()
+                if v is not None
+            }
+
+        headers["Content-Type"] = "multipart/form-data"
 
     _kwargs["headers"] = headers
     return _kwargs

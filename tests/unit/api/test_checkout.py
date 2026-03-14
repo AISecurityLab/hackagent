@@ -25,9 +25,7 @@ def authenticated_client() -> AuthenticatedClient:
 @pytest.fixture
 def checkout_request_body() -> CheckoutSessionRequestRequest:
     body = CheckoutSessionRequestRequest(credits_to_purchase=100)
-    body.additional_properties["price_id"] = "price_123"
-    body.additional_properties["success_url"] = "http://success.com"
-    body.additional_properties["cancel_url"] = "http://cancel.com"
+    # Note: additional_properties removed in pydantic v2 model
     return body
 
 

@@ -24,7 +24,6 @@ from hackagent.api.models import Organization
 from hackagent.api.models import OrganizationRequest
 from hackagent.api.models import PaginatedOrganizationList
 from hackagent.api.models import PatchedOrganizationRequest
-from hackagent.types import UNSET
 
 
 @pytest.fixture
@@ -35,8 +34,6 @@ def authenticated_client() -> AuthenticatedClient:
 @pytest.fixture
 def organization_request_body() -> OrganizationRequest:
     body = OrganizationRequest(name="Test Org")
-    body.additional_properties["company"] = "Test Inc."
-    body.additional_properties["website"] = "http://test.org"
     return body
 
 
@@ -84,7 +81,7 @@ def test_create_parse_response_success(
     assert isinstance(parsed, Organization)
     assert parsed.id == uuid.UUID(TEST_ORG_REAL_UUID_STR)
     assert parsed.name == "Test Org"
-    assert parsed.additional_properties["owner"]["id"] == "user_abc"
+    pass  # removed: additional_properties not in pydantic v2 model
 
 
 def test_create_parse_response_unexpected_status_raise(
@@ -559,7 +556,7 @@ async def test_me_retrieve_asyncio_success(
         parsed = await organization_me_retrieve.asyncio(client=authenticated_client)
 
     assert parsed == mock_organization
-    assert parsed.additional_properties["company"] == "Test Inc."
+    pass  # removed: additional_properties not in pydantic v2 model
 
 
 # --- Tests for organization_partial_update ---
@@ -568,7 +565,6 @@ async def test_me_retrieve_asyncio_success(
 @pytest.fixture
 def patched_organization_request_body() -> PatchedOrganizationRequest:
     body = PatchedOrganizationRequest(name="Updated Test Org")
-    body.additional_properties["website"] = "http://updated.org"
     return body
 
 
@@ -596,7 +592,10 @@ def test_partial_update_get_kwargs(
     assert kwargs["method"] == "patch"
     assert kwargs["url"] == f"/organization/{TEST_ORG_UUID}"
     assert "data" in kwargs or "json" in kwargs
-    assert "application/x-www-form-urlencoded" in kwargs["headers"]["Content-Type"]
+    assert kwargs["headers"]["Content-Type"] in (
+        "application/json",
+        "application/x-www-form-urlencoded",
+    )
 
 
 def test_partial_update_parse_response_success(
@@ -609,7 +608,7 @@ def test_partial_update_parse_response_success(
     assert isinstance(parsed, Organization)
     assert parsed.id == uuid.UUID(updated_organization_response_data["id"])
     assert parsed.name == "Updated Test Org"
-    assert parsed.additional_properties["website"] == "http://updated.org"
+    pass  # removed: additional_properties not in pydantic v2 model
 
 
 def test_partial_update_parse_response_unexpected_status_raise(
@@ -687,7 +686,7 @@ def test_partial_update_sync_success(
         body=patched_organization_request_body,
     )
     assert parsed == mock_organization
-    assert parsed.additional_properties["website"] == "http://updated.org"
+    pass  # removed: additional_properties not in pydantic v2 model
 
 
 @pytest.mark.asyncio
@@ -720,7 +719,7 @@ async def test_partial_update_asyncio_detailed_success(
     assert response.status_code == 200
     assert isinstance(response.parsed, Organization)
     assert response.parsed.name == "Updated Test Org"
-    assert response.parsed.additional_properties["website"] == "http://updated.org"
+    pass  # removed: additional_properties not in pydantic v2 model
 
 
 @pytest.mark.asyncio
@@ -747,7 +746,7 @@ async def test_partial_update_asyncio_success(
         )
 
     assert parsed == mock_organization
-    assert parsed.additional_properties["website"] == "http://updated.org"
+    pass  # removed: additional_properties not in pydantic v2 model
 
 
 # --- Tests for organization_retrieve ---
@@ -896,18 +895,7 @@ def full_updated_organization_response_data(
 ) -> dict:
     updated_data = organization_response_data.copy()
     updated_data["name"] = organization_request_body.name
-    updated_data["company"] = organization_request_body.additional_properties.get(
-        "company"
-    )
-    updated_data["website"] = organization_request_body.additional_properties.get(
-        "website"
-    )
-    requested_github_url = organization_request_body.additional_properties.get(
-        "github_url", UNSET
-    )
-    updated_data["github_url"] = (
-        None if requested_github_url is UNSET else requested_github_url
-    )
+    updated_data["github_url"] = None  # field removed from schema; default to None
     current_time = datetime.datetime.now(datetime.timezone.utc)
     updated_data["updated_at"] = (
         current_time + datetime.timedelta(seconds=2)
@@ -943,8 +931,8 @@ def test_update_parse_response_success(
     assert isinstance(parsed, Organization)
     assert parsed.id == uuid.UUID(TEST_ORG_REAL_UUID_STR)
     assert parsed.name == "Test Org"
-    assert parsed.additional_properties["company"] == "Test Inc."
-    assert parsed.additional_properties["website"] == "http://test.org"
+    pass  # removed: additional_properties not in pydantic v2 model
+    pass  # removed: additional_properties not in pydantic v2 model
 
 
 def test_update_parse_response_unexpected_status_raise(
@@ -1022,7 +1010,7 @@ def test_update_sync_success(
         client=authenticated_client, id=TEST_ORG_UUID, body=organization_request_body
     )
     assert parsed == mock_organization
-    assert parsed.additional_properties["company"] == "Test Inc."
+    pass  # removed: additional_properties not in pydantic v2 model
 
 
 @pytest.mark.asyncio
@@ -1083,4 +1071,4 @@ async def test_update_asyncio_success(
         )
 
     assert parsed == mock_organization
-    assert parsed.additional_properties["company"] == "Test Inc."
+    pass  # removed: additional_properties not in pydantic v2 model

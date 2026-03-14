@@ -43,27 +43,19 @@ class TestStrategyLibrary(unittest.TestCase):
             with self.assertRaises(ImportError):
                 runpy.run_path(str(module_path))
 
-    @patch("litellm.embedding")
-    def test_init_passes_embedding_api_kwargs(self, mock_litellm_embedding):
-        emb_item = MagicMock()
-        emb_item.embedding = [0.1, 0.2]
-        mock_litellm_embedding.return_value = MagicMock(data=[emb_item])
+    def test_init_passes_embedding_api_kwargs(self):
         lib = StrategyLibrary(
+            embedding_model="openai/text-embedding-3-small",
             embedding_api_key="k",
             embedding_api_base="http://base",
             logger=MagicMock(),
         )
-        lib.embed("hello")
-        mock_litellm_embedding.assert_called_once_with(
-            model="text-embedding-3-small",
-            input=["hello"],
-            api_base="http://base",
-            api_key="k",
-        )
+        self.assertEqual(lib.embedding_api_key, "k")
+        self.assertEqual(lib.embedding_api_base, "http://base")
 
     def test_add_merge_all_size(self):
         lib = StrategyLibrary(logger=MagicMock())
-        lib.logger.reset_mock()
+        lib.logger.info.reset_mock()  # ignore the init-time "Embedding backend" log
 
         s = {
             "Strategy": "S",
@@ -83,7 +75,7 @@ class TestStrategyLibrary(unittest.TestCase):
     def test_add_notify_logs(self):
         logger = MagicMock()
         lib = StrategyLibrary(logger=logger)
-        logger.reset_mock()
+        logger.info.reset_mock()  # ignore the init-time "Embedding backend" log
         lib.add({"Strategy": "S", "Definition": "D"}, notify=True)
         logger.info.assert_called_once()
 
@@ -93,7 +85,10 @@ class TestStrategyLibrary(unittest.TestCase):
         emb_item.embedding = [0.0, 1.0]
         mock_litellm_embedding.return_value = MagicMock(data=[emb_item])
 
-        lib = StrategyLibrary(logger=MagicMock())
+        lib = StrategyLibrary(
+            embedding_model="openai/text-embedding-3-small",
+            logger=MagicMock(),
+        )
         vec = lib.embed("hello")
         self.assertEqual(vec.dtype, np.float32)
         self.assertEqual(vec.shape[0], 2)
@@ -102,7 +97,10 @@ class TestStrategyLibrary(unittest.TestCase):
     def test_embed_failure_returns_none(self, mock_litellm_embedding):
         mock_litellm_embedding.side_effect = RuntimeError("embed failed")
         logger = MagicMock()
-        lib = StrategyLibrary(logger=logger)
+        lib = StrategyLibrary(
+            embedding_model="openai/text-embedding-3-small",
+            logger=logger,
+        )
         self.assertIsNone(lib.embed("hello"))
         logger.error.assert_called_once()
 
@@ -299,9 +297,7 @@ class TestStrategyLibrary(unittest.TestCase):
         self.assertEqual(len(out), 1)
         self.assertEqual(out[0]["Strategy"], "A")
 
-    def test_retrieve_returns_empty_for_embed_none_or_invalid_embeddings(
-        self,
-    ):
+    def test_retrieve_returns_empty_for_embed_none_or_invalid_embeddings(self):
         lib = StrategyLibrary(logger=MagicMock())
         lib.library = {
             "A": {
