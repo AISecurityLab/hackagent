@@ -29,9 +29,49 @@
                 },
                 {
                   "items": [
+                    "reference/hackagent/attacks/techniques/flipattack/attack",
+                    "reference/hackagent/attacks/techniques/flipattack/config",
+                    "reference/hackagent/attacks/techniques/flipattack/evaluation",
+                    "reference/hackagent/attacks/techniques/flipattack/generation"
+                  ],
+                  "label": "hackagent.attacks.techniques.flipattack",
+                  "type": "category"
+                },
+                {
+                  "items": [
+                    "reference/hackagent/attacks/techniques/tap/attack"
+                  ],
+                  "label": "hackagent.attacks.techniques.tap",
+                  "type": "category"
+                },
+                {
+                  "items": [
+                    "reference/hackagent/attacks/techniques/autodan_turbo/attack",
+                    "reference/hackagent/attacks/techniques/autodan_turbo/config",
+                    "reference/hackagent/attacks/techniques/autodan_turbo/evaluation",
+                    "reference/hackagent/attacks/techniques/autodan_turbo/warm_up",
+                    "reference/hackagent/attacks/techniques/autodan_turbo/lifelong",
+                    "reference/hackagent/attacks/techniques/autodan_turbo/strategy_library",
+                    "reference/hackagent/attacks/techniques/autodan_turbo/summarizer"
+                  ],
+                  "label": "hackagent.attacks.techniques.autodan_turbo",
+                  "type": "category"
+                },
+                {
+                  "items": [
                     "reference/hackagent/attacks/techniques/pair/attack"
                   ],
                   "label": "hackagent.attacks.techniques.pair",
+                  "type": "category"
+                },
+                {
+                  "items": [
+                    "reference/hackagent/attacks/techniques/bon/attack",
+                    "reference/hackagent/attacks/techniques/bon/config",
+                    "reference/hackagent/attacks/techniques/bon/evaluation",
+                    "reference/hackagent/attacks/techniques/bon/generation"
+                  ],
+                  "label": "hackagent.attacks.techniques.bon",
                   "type": "category"
                 },
                 "reference/hackagent/attacks/techniques/base"

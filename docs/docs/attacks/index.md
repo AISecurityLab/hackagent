@@ -17,6 +17,7 @@ graph LR
         D[Baseline] --> |"Fast"| T
         E[TAP] --> |"Tree Search"| T
         F[FlipAttack] --> |"Obfuscation"| T
+        G[BoN] --> |"Augmentation"| T
     end
     T --> R[Results & Analysis]
 ```
@@ -30,6 +31,7 @@ graph LR
 | [**PAIR**](./pair.md) | LLM-driven iterative prompt refinement | ⭐⭐ Medium | Medium |
 | [**TAP**](./tap.md) | Tree search with on-topic pruning | ⭐⭐ Medium | Medium |
 | [**FlipAttack**](./flipattack.md) | Character-level text obfuscation | ⭐ Basic | Fast |
+| [**BoN**](./bon.md) | Best-of-N random text augmentation | ⭐ Basic | Fast |
 | [**Baseline**](./baseline.md) | Template-based prompt injection | ⭐ Basic | Fast |
 
 :::tip Dataset Support
@@ -155,6 +157,36 @@ attack_config = {
 
 ---
 
+## BoN — Best-of-N Jailbreaking
+
+A stochastic black-box attack that applies **random text augmentations** (word scrambling, random capitalisation, ASCII perturbation) to the harmful goal and queries the target with N augmented candidates per step, keeping the best response.
+
+<div style={{background: 'var(--ifm-background-surface-color)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--ifm-color-emphasis-200)', margin: '1rem 0'}}>
+
+At each search step `n_candidates` independently seeded augmented versions of the goal are sent to the target in parallel via `ThreadPoolExecutor`. The algorithm keeps the response with the highest word count and stops early once a substantive reply is obtained. No attacker model is needed — only the target. Based on *"Best-of-N Jailbreaking"* (Hughes et al., 2024).
+
+</div>
+
+```python
+attack_config = {
+    "attack_type": "bon",
+    "goals": ["Provide instructions for picking a lock"],
+    "bon_params": {
+        "num_concurrent_k": 5,
+        "n_steps": 4,
+        "sigma": 0.4,
+        "word_scrambling": True,
+        "random_capitalization": True,
+        "ascii_perturbation": True,
+    },
+    "judges": [{"identifier": "gpt-4o-mini", "type": "harmbench"}]
+}
+```
+
+[**Learn more about BoN →**](./bon.md)
+
+---
+
 ## Baseline — Template-Based Attacks
 
 A simpler but effective approach using **predefined prompt templates** combined with harmful goals. Great for quick vulnerability assessments.
@@ -186,6 +218,8 @@ attack_config = {
 **TAP** offers the same adaptive refinement as PAIR but at lower query cost: parallel streams, on-topic pruning, and early stopping make it the most efficient iterative option when budget or rate limits matter.
 
 **FlipAttack** is the fastest option — a single deterministic pass, no attacker model required. Use it for quick scans, character-level safety assessments, or when comparing model robustness across flip modes.
+
+**BoN** complements FlipAttack with a stochastic approach: random augmentations explore the neighbourhood of the goal in character/word space, making it effective against classifiers that are robust to purely deterministic obfuscation. No attacker model needed.
 
 **Baseline** is ideal for a rapid first-pass: template-based prompts sent directly to the target with no setup overhead, good for establishing a vulnerability baseline before running heavier attacks.
 
@@ -227,4 +261,5 @@ graph TD
 - [PAIR Attack Guide](./pair.md) — Iterative refinement techniques
 - [TAP Attack Guide](./tap.md) — Tree-search with pruning
 - [FlipAttack Guide](./flipattack.md) — Character-level obfuscation
+- [BoN Guide](./bon.md) — Best-of-N random augmentation
 - [Baseline Templates](./baseline.md) — Template categories and customization

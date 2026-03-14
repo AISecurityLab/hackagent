@@ -317,6 +317,7 @@ class TrackingCoordinator:
         results: Optional[List[Dict]],
         scorer: Optional[Callable[[List[Dict]], bool]] = None,
         success_threshold: float = 0.5,
+        include_evaluation_trace: bool = True,
     ) -> None:
         """
         Finalize all goal results based on pipeline output.
@@ -328,6 +329,8 @@ class TrackingCoordinator:
             results: Pipeline output (list of prefix/result dicts)
             scorer: Optional function (goal_results) -> bool for success
             success_threshold: Default threshold for eval score success
+            include_evaluation_trace: Whether to emit a generic "Evaluation"
+                trace for each goal during finalization.
         """
         if not self.has_goal_tracking:
             return
@@ -379,18 +382,21 @@ class TrackingCoordinator:
 
             best_score = self._get_best_score(goal_data)
 
-            # Add evaluation trace
-            self.goal_tracker.add_evaluation_trace(
-                ctx=ctx,
-                evaluation_result={
-                    "num_results": len(goal_data),
-                    "best_score": best_score,
-                    "is_success": is_success,
-                },
-                score=best_score,
-                explanation=f"{len(goal_data)} results, best score: {best_score:.2f}",
-                evaluator_name="tracking_coordinator",
-            )
+            # Add optional generic evaluation trace
+            if include_evaluation_trace:
+                self.goal_tracker.add_evaluation_trace(
+                    ctx=ctx,
+                    evaluation_result={
+                        "num_results": len(goal_data),
+                        "best_score": best_score,
+                        "is_success": is_success,
+                    },
+                    score=best_score,
+                    explanation=(
+                        f"{len(goal_data)} results, best score: {best_score:.2f}"
+                    ),
+                    evaluator_name="tracking_coordinator",
+                )
 
             self.goal_tracker.finalize_goal(
                 ctx=ctx,

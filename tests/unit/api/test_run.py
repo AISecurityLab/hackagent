@@ -63,7 +63,6 @@ class TestRunListAPI(unittest.TestCase):
             "id": str(mock_result_id_in_run),
             "run": str(mock_run_id),
             "run_id": str(mock_run_id),
-            "prompt_name": "Prompt in Run's Result",
             "timestamp": timestamp_str,
             "traces": [mock_trace_data_in_result],
             "prompt": str(uuid.uuid4()),
@@ -362,7 +361,6 @@ class TestRunRetrieveAPI(unittest.TestCase):
             "id": str(mock_result_id_retrieve),
             "run": str(run_id_to_retrieve),
             "run_id": str(run_id_to_retrieve),
-            "prompt_name": "Prompt in Retrieved Run's Result",
             "timestamp": timestamp_retrieve_str,
             "traces": [mock_trace_data_retrieve],
             "prompt": str(uuid.uuid4()),
@@ -511,7 +509,6 @@ class TestRunUpdateAPI(unittest.TestCase):
             "id": str(mock_result_id_update),
             "run": str(run_id_to_update),
             "run_id": str(run_id_to_update),
-            "prompt_name": "Prompt in Updated Run's Result",
             "timestamp": original_run_timestamp_str,  # Result timestamp is its own creation time
             "traces": [mock_trace_data_update],
             "prompt": str(uuid.uuid4()),
@@ -905,12 +902,8 @@ class TestRunResultCreateAPI(unittest.TestCase):
                 parent_run_id
             ),  # Ensure 'run' (UUID of parent Run) is present for Result.model_validate
             "run_id": str(parent_run_id),  # run_id is also an attribute of Result model
-            "prompt_name": "Prompt For Newly Created Result Under Run",  # Server might derive this
             "timestamp": timestamp_str_for_result,
             "traces": [mock_trace_data_in_result_create],
-            "prompt": str(result_create_body.prompt)
-            if result_create_body.prompt
-            else None,
             "request_payload": result_create_body.request_payload,
             "response_status_code": 200,  # Example
             "response_headers": {"Content-Type": "application/json"},  # Example

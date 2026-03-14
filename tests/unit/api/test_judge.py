@@ -66,15 +66,17 @@ class TestJudgeAPI(unittest.TestCase):
         self.mock_httpx_client.request.assert_called_once_with(
             method="post",
             url="/judge",
-            json=request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
-            data=request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            json=request_body.model_dump(mode="json", exclude_unset=True),
+            headers={"Content-Type": "application/json"},
         )
         self.assertIsInstance(response, Response)
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.content, json.dumps(success_payload).encode())
         self.assertIsInstance(response.parsed, GenerateSuccessResponse)
-        self.assertEqual(response.parsed["text"], success_payload["text"])
+        self.assertEqual(
+            response.parsed.choices[0].message.content,
+            success_payload["choices"][0]["message"]["content"],
+        )
 
     def test_sync_detailed_unexpected_status(self):
         error_payload = {"error": "Error"}
@@ -100,9 +102,8 @@ class TestJudgeAPI(unittest.TestCase):
         self.mock_httpx_client.request.assert_called_once_with(
             method="post",
             url="/judge",
-            json=request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
-            data=request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            json=request_body.model_dump(mode="json", exclude_unset=True),
+            headers={"Content-Type": "application/json"},
         )
 
     def test_sync_detailed_unexpected_status_no_raise(self):
@@ -126,9 +127,8 @@ class TestJudgeAPI(unittest.TestCase):
         self.mock_httpx_client.request.assert_called_once_with(
             method="post",
             url="/judge",
-            json=request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
-            data=request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            json=request_body.model_dump(mode="json", exclude_unset=True),
+            headers={"Content-Type": "application/json"},
         )
         self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
         self.assertIsInstance(response.parsed, GenerateErrorResponse)
@@ -175,15 +175,17 @@ class TestJudgeAPI(unittest.TestCase):
         self.mock_async_httpx_client.request.assert_called_once_with(
             method="post",
             url="/judge",
-            json=request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
-            data=request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            json=request_body.model_dump(mode="json", exclude_unset=True),
+            headers={"Content-Type": "application/json"},
         )
         self.assertIsInstance(response, Response)
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.content, json.dumps(success_payload).encode())
         self.assertIsInstance(response.parsed, GenerateSuccessResponse)
-        self.assertEqual(response.parsed["text"], success_payload["text"])
+        self.assertEqual(
+            response.parsed.choices[0].message.content,
+            success_payload["choices"][0]["message"]["content"],
+        )
 
     def test_asyncio_detailed_unexpected_status(self):
         error_payload = {"error": "Async Error"}
@@ -217,9 +219,8 @@ class TestJudgeAPI(unittest.TestCase):
         self.mock_async_httpx_client.request.assert_called_once_with(
             method="post",
             url="/judge",
-            json=request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
-            data=request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            json=request_body.model_dump(mode="json", exclude_unset=True),
+            headers={"Content-Type": "application/json"},
         )
 
     def test_asyncio_detailed_unexpected_status_no_raise(self):
@@ -250,9 +251,8 @@ class TestJudgeAPI(unittest.TestCase):
         self.mock_async_httpx_client.request.assert_called_once_with(
             method="post",
             url="/judge",
-            json=request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
-            data=request_body.model_dump(by_alias=True, mode="json", exclude_none=True),
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            json=request_body.model_dump(mode="json", exclude_unset=True),
+            headers={"Content-Type": "application/json"},
         )
         self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
         self.assertIsInstance(response.parsed, GenerateErrorResponse)

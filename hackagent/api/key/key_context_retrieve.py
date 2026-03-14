@@ -1,24 +1,18 @@
 from http import HTTPStatus
 from typing import Any
-from urllib.parse import quote
-from uuid import UUID
 
 import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ..models import KeyContextRetrieveResponse200
 from ...types import Response
-from ..models import Prompt
 
 
-def _get_kwargs(
-    id: UUID,
-) -> dict[str, Any]:
+def _get_kwargs() -> dict[str, Any]:
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/prompt/{id}".format(
-            id=quote(str(id), safe=""),
-        ),
+        "url": "/key/context",
     }
 
     return _kwargs
@@ -26,9 +20,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Prompt | None:
+) -> KeyContextRetrieveResponse200 | None:
     if response.status_code == 200:
-        response_200 = Prompt.model_validate(response.json())
+        response_200 = KeyContextRetrieveResponse200.model_validate(response.json())
 
         return response_200
 
@@ -40,7 +34,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[Prompt]:
+) -> Response[KeyContextRetrieveResponse200]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -50,29 +44,24 @@ def _build_response(
 
 
 def sync_detailed(
-    id: UUID,
     *,
     client: AuthenticatedClient,
-) -> Response[Prompt]:
-    """ViewSet for managing Prompt instances.
+) -> Response[KeyContextRetrieveResponse200]:
+    """Caller identity context
 
-    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
-
-    Args:
-        id (UUID):
+     Returns the caller's user ID, username, and organization details. Accessible with both API Key and
+    Auth0 bearer tokens. The SDK uses this endpoint to bootstrap organization context without needing to
+    page through the agent list.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Prompt]
+        Response[KeyContextRetrieveResponse200]
     """
 
-    kwargs = _get_kwargs(
-        id=id,
-    )
+    kwargs = _get_kwargs()
 
     response = client.get_httpx_client().request(
         **kwargs,
@@ -82,56 +71,47 @@ def sync_detailed(
 
 
 def sync(
-    id: UUID,
     *,
     client: AuthenticatedClient,
-) -> Prompt | None:
-    """ViewSet for managing Prompt instances.
+) -> KeyContextRetrieveResponse200 | None:
+    """Caller identity context
 
-    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
-
-    Args:
-        id (UUID):
+     Returns the caller's user ID, username, and organization details. Accessible with both API Key and
+    Auth0 bearer tokens. The SDK uses this endpoint to bootstrap organization context without needing to
+    page through the agent list.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Prompt
+        KeyContextRetrieveResponse200
     """
 
     return sync_detailed(
-        id=id,
         client=client,
     ).parsed
 
 
 async def asyncio_detailed(
-    id: UUID,
     *,
     client: AuthenticatedClient,
-) -> Response[Prompt]:
-    """ViewSet for managing Prompt instances.
+) -> Response[KeyContextRetrieveResponse200]:
+    """Caller identity context
 
-    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
-
-    Args:
-        id (UUID):
+     Returns the caller's user ID, username, and organization details. Accessible with both API Key and
+    Auth0 bearer tokens. The SDK uses this endpoint to bootstrap organization context without needing to
+    page through the agent list.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Prompt]
+        Response[KeyContextRetrieveResponse200]
     """
 
-    kwargs = _get_kwargs(
-        id=id,
-    )
+    kwargs = _get_kwargs()
 
     response = await client.get_async_httpx_client().request(**kwargs)
 
@@ -139,29 +119,25 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    id: UUID,
     *,
     client: AuthenticatedClient,
-) -> Prompt | None:
-    """ViewSet for managing Prompt instances.
+) -> KeyContextRetrieveResponse200 | None:
+    """Caller identity context
 
-    SDK-primary endpoint - API Key authentication is recommended for programmatic access.
-    Auth0 authentication is supported as fallback for web dashboard use.
-
-    Args:
-        id (UUID):
+     Returns the caller's user ID, username, and organization details. Accessible with both API Key and
+    Auth0 bearer tokens. The SDK uses this endpoint to bootstrap organization context without needing to
+    page through the agent list.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Prompt
+        KeyContextRetrieveResponse200
     """
 
     return (
         await asyncio_detailed(
-            id=id,
             client=client,
         )
     ).parsed

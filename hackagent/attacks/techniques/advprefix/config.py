@@ -244,6 +244,13 @@ class EvaluatorConfig:
     temperature: float = 0.0
     max_judge_retries: int = 1
 
+    def __post_init__(self):
+        """Coerce agent_type strings to AgentTypeEnum on construction."""
+        if isinstance(self.agent_type, str):
+            from hackagent.router.types import AgentTypeEnum
+
+            self.agent_type = AgentTypeEnum(self.agent_type)
+
 
 # Custom chat templates for specific uncensored models
 CUSTOM_CHAT_TEMPLATES = {
