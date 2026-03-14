@@ -122,7 +122,7 @@ def execute(
         )
     )
     strategy_lib = StrategyLibrary(
-        embedding_model=params.get("embedding_model", "text-embedding-3-small"),
+        embedding_model=params.get("embedding_model", "local/bag-of-words"),
         embedding_api_key=params.get("embedding_api_key"),
         embedding_api_base=params.get("embedding_api_base"),
         logger=logger,

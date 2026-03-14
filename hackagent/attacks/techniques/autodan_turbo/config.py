@@ -57,10 +57,12 @@ DEFAULT_AUTODAN_TURBO_CONFIG: Dict[str, Any] = {
         "strategy_library_path": None,
         # Whether to run only warm-up phase
         "warm_up_only": False,
-        # Litellm embedding model for strategy library FAISS retrieval.
-        # When using a local vLLM setup, override with the attacker model ID
-        # and set embedding_api_key="EMPTY" + embedding_api_base to the vLLM URL.
-        "embedding_model": "text-embedding-3-small",
+        # Embedding model for strategy library FAISS retrieval.
+        # "local/bag-of-words" (default) uses the built-in no-API hashing-trick
+        # embedder.  Any model ID starting with "local/" routes to a local
+        # backend; all other IDs are treated as OpenAI-compatible REST models
+        # and require embedding_api_key + embedding_api_base.
+        "embedding_model": "local/bag-of-words",
         "embedding_api_key": None,
         "embedding_api_base": None,
     },
