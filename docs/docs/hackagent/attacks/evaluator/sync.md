@@ -62,19 +62,19 @@ def sync_evaluation_to_server(
 
 Sync evaluation results to the server, aggregating the best per result_id.
 
-Multiple completion rows may share the same `result_id` (one per goal).
+Multiple completion rows may share the same ``result_id`` (one per goal).
 This function aggregates to find the best (success wins over failure)
-evaluation per `result_id`, then PATCHes the server once per goal.
+evaluation per ``result_id``, then PATCHes the server once per goal.
 
 **Arguments**:
 
 - `evaluated_data` - List of dicts with evaluation results. Each dict
-  should contain `result_id` and evaluation score keys.
+  should contain ``result_id`` and evaluation score keys.
 - `client` - Authenticated client for API calls.
 - `logger` - Optional logger instance.
 - `judge_keys` - Optional list of dicts mapping judge types to their
-  column names, e.g. ``[&#123;&quot;key&quot;: &quot;eval_jb&quot;, &quot;explanation&quot;: &quot;explanation_jb&quot;,
-- `1 - &quot;JailbreakBench&quot;}]`. If None, auto-detects from
+  column names, e.g. ``[{&quot;key&quot;: &quot;eval_jb&quot;, &quot;explanation&quot;: &quot;explanation_jb&quot;,
+- ``1 - &quot;JailbreakBench&quot;}]``. If None, auto-detects from
   known column patterns.
   
 

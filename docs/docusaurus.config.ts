@@ -35,6 +35,10 @@ const config: Config = {
   // Enable Mermaid diagrams
   markdown: {
     mermaid: true,
+    // Treat .md files as CommonMark (not MDX) so that literal { } in
+    // generated API docs are not misinterpreted as JSX expressions.
+    // Files using MDX features should use the .mdx extension.
+    format: 'detect',
     hooks: {
       onBrokenMarkdownLinks: 'warn',
     },

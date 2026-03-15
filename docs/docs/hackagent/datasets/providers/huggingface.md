@@ -18,12 +18,12 @@ from specified fields. It supports filtering, splitting, and limiting samples.
 
 **Example**:
 
-  provider = HuggingFaceDatasetProvider(&#123;
+  provider = HuggingFaceDatasetProvider({
 - `"path"` - &quot;ai-safety-institute/AgentHarm&quot;,
 - `"name"` - &quot;harmful&quot;,
 - `"goal_field"` - &quot;prompt&quot;,
 - `"split"` - &quot;test_public&quot;,
-  &#125;)
+  })
   goals = provider.load_goals(limit=100)
 
 #### \_\_init\_\_
