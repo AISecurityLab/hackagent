@@ -4,7 +4,7 @@
 """Tests for shared evaluation_sync module."""
 
 import logging
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
@@ -91,20 +91,17 @@ class TestEvaluateRow:
 class TestUpdateSingleResult:
     """Tests for the update_single_result function."""
 
-    @patch("hackagent.attacks.evaluator.sync.result_partial_update")
-    def test_successful_update(self, mock_api, mock_client, logger):
-        mock_api.sync_detailed.return_value = MagicMock(status_code=200)
+    def test_successful_update(self, mock_client, logger):
         result_id = str(uuid4())
 
         result = update_single_result(
             result_id, True, "success notes", mock_client, logger
         )
         assert result is True
-        mock_api.sync_detailed.assert_called_once()
+        mock_client.update_result.assert_called_once()
 
-    @patch("hackagent.attacks.evaluator.sync.result_partial_update")
-    def test_failed_update_status_code(self, mock_api, mock_client, logger):
-        mock_api.sync_detailed.return_value = MagicMock(status_code=400)
+    def test_failed_update_status_code(self, mock_client, logger):
+        mock_client.update_result.side_effect = Exception("400 bad request")
         result_id = str(uuid4())
 
         result = update_single_result(
@@ -112,9 +109,8 @@ class TestUpdateSingleResult:
         )
         assert result is False
 
-    @patch("hackagent.attacks.evaluator.sync.result_partial_update")
-    def test_exception_returns_false(self, mock_api, mock_client, logger):
-        mock_api.sync_detailed.side_effect = Exception("connection error")
+    def test_exception_returns_false(self, mock_client, logger):
+        mock_client.update_result.side_effect = Exception("connection error")
         result_id = str(uuid4())
 
         result = update_single_result(result_id, True, "notes", mock_client, logger)
@@ -124,22 +120,17 @@ class TestUpdateSingleResult:
 class TestSyncEvaluationToServer:
     """Tests for the sync_evaluation_to_server function."""
 
-    @patch("hackagent.attacks.evaluator.sync.result_partial_update")
-    def test_empty_data(self, mock_api, mock_client, logger):
+    def test_empty_data(self, mock_client, logger):
         count = sync_evaluation_to_server([], mock_client, logger)
         assert count == 0
 
-    @patch("hackagent.attacks.evaluator.sync.result_partial_update")
-    def test_no_result_ids(self, mock_api, mock_client, logger):
+    def test_no_result_ids(self, mock_client, logger):
         data = [{"success": True, "evaluation_notes": "ok"}]
         count = sync_evaluation_to_server(data, mock_client, logger)
         assert count == 0
 
-    @patch("hackagent.attacks.evaluator.sync.result_partial_update")
-    def test_aggregates_best_per_result_id(self, mock_api, mock_client, logger):
+    def test_aggregates_best_per_result_id(self, mock_client, logger):
         """Multiple rows with same result_id: best (success) should win."""
-        mock_api.sync_detailed.return_value = MagicMock(status_code=200)
-
         rid = str(uuid4())
         data = [
             {"result_id": rid, "success": False, "evaluation_notes": "fail"},
@@ -148,21 +139,19 @@ class TestSyncEvaluationToServer:
 
         count = sync_evaluation_to_server(data, mock_client, logger)
         assert count == 1
-        # Should be called once with success=True
-        call_args = mock_api.sync_detailed.call_args
-        body = (
-            call_args[1]["body"] if "body" in call_args[1] else call_args.kwargs["body"]
-        )
-        assert body.evaluation_status.value in (
+        # Should be called once with success=True (SUCCESSFUL_JAILBREAK)
+        mock_client.update_result.assert_called_once()
+        call_args = mock_client.update_result.call_args
+        evaluation_status = call_args.kwargs.get("evaluation_status") or call_args[
+            1
+        ].get("evaluation_status")
+        assert evaluation_status in (
             "SUCCESSFUL_JAILBREAK",
             "successful_jailbreak",
         )
 
-    @patch("hackagent.attacks.evaluator.sync.result_partial_update")
-    def test_judge_keys(self, mock_api, mock_client, logger):
+    def test_judge_keys(self, mock_client, logger):
         """Rows with judge keys are evaluated using those keys."""
-        mock_api.sync_detailed.return_value = MagicMock(status_code=200)
-
         rid = str(uuid4())
         data = [
             {"result_id": rid, "eval_jb": 1, "eval_hb": 0},

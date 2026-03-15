@@ -17,15 +17,10 @@ or per-datapoint tracking, use the Tracker class from tracker.py instead.
 from contextlib import contextmanager
 from typing import Any, Dict, Optional
 
-from hackagent.api.result import result_partial_update, result_trace_create
-from hackagent.api.run import run_partial_update
-from hackagent.api.models import (
+from hackagent.server.api.models import (
     EvaluationStatusEnum,
-    PatchedResultRequest,
-    PatchedRunRequest,
     StatusEnum,
     StepTypeEnum,
-    TraceRequest,
 )
 
 from .context import TrackingContext
@@ -192,14 +187,6 @@ class StepTracker:
             if self.context.metadata:
                 trace_content["context_metadata"] = self.context.metadata
 
-            # Create trace request
-            trace_request = TraceRequest(
-                sequence=sequence,
-                step_type=StepTypeEnum.OTHER,
-                content=trace_content,
-            )
-
-            # Call API
             result_uuid = self.context.get_result_uuid()
             if not result_uuid:
                 self.logger.debug(
@@ -207,24 +194,18 @@ class StepTracker:
                 )
                 return None
 
-            response = result_trace_create.sync_detailed(
-                client=self.context.client,
-                id=result_uuid,
-                body=trace_request,
+            trace_record = self.context.backend.create_trace(
+                result_uuid,
+                sequence=sequence,
+                step_type=StepTypeEnum.OTHER.value,
+                content=trace_content,
             )
 
-            # Parse response
-            if response.status_code == 201:
-                trace_id = self._extract_trace_id(response, step_name)
-                if trace_id:
-                    self.logger.info(
-                        f"Created trace for '{step_name}' (ID: {trace_id}, seq: {sequence})"
-                    )
-                    return trace_id
-            else:
-                self.logger.error(
-                    f"Failed to create trace for '{step_name}': status={response.status_code}, body={response.content}"
-                )
+            trace_id = str(trace_record.id)
+            self.logger.info(
+                f"Created trace for '{step_name}' (ID: {trace_id}, seq: {sequence})"
+            )
+            return trace_id
 
         except Exception as e:
             self.logger.error(
@@ -287,13 +268,6 @@ class StepTracker:
             if error_message:
                 trace_content["error_message"] = error_message
 
-            # Create trace request
-            trace_request = TraceRequest(
-                sequence=sequence,
-                step_type=StepTypeEnum.OTHER,
-                content=trace_content,
-            )
-
             result_uuid = self.context.get_result_uuid()
             if not result_uuid:
                 self.logger.debug(
@@ -301,23 +275,17 @@ class StepTracker:
                 )
                 return None
 
-            response = result_trace_create.sync_detailed(
-                client=self.context.client,
-                id=result_uuid,
-                body=trace_request,
+            trace_record = self.context.backend.create_trace(
+                result_uuid,
+                sequence=sequence,
+                step_type=StepTypeEnum.OTHER.value,
+                content=trace_content,
             )
-
-            if response.status_code == 201:
-                trace_id = self._extract_trace_id(response, step_name)
-                if trace_id:
-                    self.logger.info(
-                        f"Created summary trace for '{step_name}' (ID: {trace_id}, seq: {sequence})"
-                    )
-                    return trace_id
-            else:
-                self.logger.error(
-                    f"Failed to create summary trace for '{step_name}': status={response.status_code}, body={response.content}"
-                )
+            trace_id = str(trace_record.id)
+            self.logger.info(
+                f"Created summary trace for '{step_name}' (ID: {trace_id}, seq: {sequence})"
+            )
+            return trace_id
 
         except Exception as e:
             self.logger.error(
@@ -343,17 +311,11 @@ class StepTracker:
             if not result_uuid:
                 return
 
-            error_request = PatchedResultRequest(
-                evaluation_status=EvaluationStatusEnum.ERROR_TEST_FRAMEWORK,
+            self.context.backend.update_result(
+                result_uuid,
+                evaluation_status=EvaluationStatusEnum.ERROR_TEST_FRAMEWORK.value,
                 evaluation_notes=f"Pipeline failed at '{step_name}': {error_message}",
             )
-
-            result_partial_update.sync_detailed(
-                client=self.context.client,
-                id=result_uuid,
-                body=error_request,
-            )
-
             self.logger.info(f"Updated result with error status for '{step_name}'")
 
         except Exception as e:
@@ -378,23 +340,12 @@ class StepTracker:
                 self.logger.warning("Cannot update run status: invalid run UUID")
                 return False
 
-            run_request = PatchedRunRequest(status=status)
-
-            response = run_partial_update.sync_detailed(
-                client=self.context.client,
-                id=run_uuid,
-                body=run_request,
+            self.context.backend.update_run(
+                run_uuid,
+                status=status.value,
             )
-
-            if response.status_code < 300:
-                self.logger.info(f"Updated run {self.context.run_id} to {status.value}")
-                return True
-            else:
-                self.logger.error(
-                    f"Failed to update run status: status={response.status_code}, body={response.content}"
-                )
-                return False
-
+            self.logger.info(f"Updated run {self.context.run_id} to {status.value}")
+            return True
         except Exception as e:
             self.logger.error(f"Exception updating run status: {e}", exc_info=True)
             return False
@@ -427,29 +378,16 @@ class StepTracker:
 
             # Backend requires non-null evaluation_notes
             notes = evaluation_notes if evaluation_notes else "Status updated"
-            result_request = PatchedResultRequest(
-                evaluation_status=evaluation_status,
+            self.context.backend.update_result(
+                result_uuid,
+                evaluation_status=evaluation_status.value,
                 evaluation_notes=notes,
                 agent_specific_data=agent_specific_data,
             )
-
-            response = result_partial_update.sync_detailed(
-                client=self.context.client,
-                id=result_uuid,
-                body=result_request,
+            self.logger.info(
+                f"Updated result {self.context.parent_result_id} to {evaluation_status.value}"
             )
-
-            if response.status_code < 300:
-                self.logger.info(
-                    f"Updated result {self.context.parent_result_id} to {evaluation_status.value}"
-                )
-                return True
-            else:
-                self.logger.error(
-                    f"Failed to update result status: status={response.status_code}, body={response.content}"
-                )
-                return False
-
+            return True
         except Exception as e:
             self.logger.error(f"Exception updating result status: {e}", exc_info=True)
             return False

@@ -206,7 +206,7 @@ def validate(ctx):
         # Test API connection
         if cli_config.should_show_info():
             with console.status("[bold green]Testing API connection..."):
-                from hackagent.client import AuthenticatedClient
+                from hackagent.server.client import AuthenticatedClient
 
                 client = AuthenticatedClient(
                     base_url=cli_config.base_url,
@@ -215,16 +215,16 @@ def validate(ctx):
                 )
 
                 # Try to make a simple API call to test connection
-                from hackagent.api.key import key_list
+                from hackagent.server.api.key import key_list
 
                 response = key_list.sync_detailed(client=client)
         else:
-            from hackagent.client import AuthenticatedClient
+            from hackagent.server.client import AuthenticatedClient
 
             client = AuthenticatedClient(
                 base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
             )
-            from hackagent.api.key import key_list
+            from hackagent.server.api.key import key_list
 
             response = key_list.sync_detailed(client=client)
 

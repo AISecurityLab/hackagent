@@ -3,6 +3,9 @@
 # Only the api/ subdirectories are kept from the generated output;
 # models and client boilerplate are discarded in favour of
 # hackagent/api/models.py (Pydantic v2 via datamodel-code-generator).
+#
+# openapi-python-client >= 0.23 generates Pydantic v2 code natively
+# (model_validate / model_dump) — no attrs-style translation is needed.
 
 project_name_override: "hackagent"
 package_name_override: "hackagent"

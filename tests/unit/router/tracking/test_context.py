@@ -18,7 +18,7 @@ class TestTrackingContextInitialization(unittest.TestCase):
         """Test default TrackingContext initialization."""
         context = TrackingContext()
 
-        self.assertIsNone(context.client)
+        self.assertIsNone(context.backend)
         self.assertIsNone(context.run_id)
         self.assertIsNone(context.parent_result_id)
         self.assertIsNotNone(context.logger)
@@ -27,11 +27,11 @@ class TestTrackingContextInitialization(unittest.TestCase):
 
     def test_initialization_with_values(self):
         """Test TrackingContext initialization with all values."""
-        mock_client = MagicMock()
+        mock_backend = MagicMock()
         mock_logger = MagicMock(spec=logging.Logger)
 
         context = TrackingContext(
-            client=mock_client,
+            backend=mock_backend,
             run_id="run-123",
             parent_result_id="result-456",
             logger=mock_logger,
@@ -39,7 +39,7 @@ class TestTrackingContextInitialization(unittest.TestCase):
             metadata={"key": "value"},
         )
 
-        self.assertEqual(context.client, mock_client)
+        self.assertEqual(context.backend, mock_backend)
         self.assertEqual(context.run_id, "run-123")
         self.assertEqual(context.parent_result_id, "result-456")
         self.assertEqual(context.logger, mock_logger)
@@ -57,9 +57,9 @@ class TestTrackingContextIsEnabled(unittest.TestCase):
     """Test is_enabled property."""
 
     def test_is_enabled_false_when_client_none(self):
-        """Test is_enabled returns False when client is None."""
+        """Test is_enabled returns False when backend is None."""
         context = TrackingContext(
-            client=None,
+            backend=None,
             run_id="run-123",
         )
 
@@ -67,19 +67,19 @@ class TestTrackingContextIsEnabled(unittest.TestCase):
 
     def test_is_enabled_false_when_run_id_none(self):
         """Test is_enabled returns False when run_id is None."""
-        mock_client = MagicMock()
+        mock_backend = MagicMock()
         context = TrackingContext(
-            client=mock_client,
+            backend=mock_backend,
             run_id=None,
         )
 
         self.assertFalse(context.is_enabled)
 
     def test_is_enabled_true_when_client_and_run_id_set(self):
-        """Test is_enabled returns True when both client and run_id are set."""
-        mock_client = MagicMock()
+        """Test is_enabled returns True when both backend and run_id are set."""
+        mock_backend = MagicMock()
         context = TrackingContext(
-            client=mock_client,
+            backend=mock_backend,
             run_id="run-123",
         )
 
@@ -87,9 +87,9 @@ class TestTrackingContextIsEnabled(unittest.TestCase):
 
     def test_is_enabled_true_without_parent_result_id(self):
         """Test is_enabled returns True even without parent_result_id."""
-        mock_client = MagicMock()
+        mock_backend = MagicMock()
         context = TrackingContext(
-            client=mock_client,
+            backend=mock_backend,
             run_id="run-123",
             parent_result_id=None,
         )
@@ -231,7 +231,7 @@ class TestTrackingContextCreateDisabled(unittest.TestCase):
         """Test create_disabled creates a disabled context."""
         context = TrackingContext.create_disabled()
 
-        self.assertIsNone(context.client)
+        self.assertIsNone(context.backend)
         self.assertIsNone(context.run_id)
         self.assertIsNone(context.parent_result_id)
         self.assertFalse(context.is_enabled)

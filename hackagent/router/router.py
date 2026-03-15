@@ -2,22 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-from typing import Any, Dict, Optional, Type, Union
-from uuid import UUID
+from typing import Any, Dict, Optional, Type
 
-from hackagent.api.agent import agent_create, agent_list, agent_partial_update
-from hackagent.client import AuthenticatedClient
-from hackagent.api.models import (
-    Agent as BackendAgentModel,
-)
-from hackagent.api.models import (
-    AgentRequest,
-    PatchedAgentRequest,
-)
+from hackagent.server.storage.base import AgentRecord, StorageBackend
 from hackagent.router.adapters.base import Agent
 from hackagent.router.types import AgentTypeEnum
-
-from ..types import UNSET, Unset
 
 # Adapter imports - these are imported at module level for backwards compatibility
 # with test patching (tests patch hackagent.router.router.LiteLLMAgent etc.)
@@ -46,238 +35,61 @@ class AgentRouter:
     Manages the configuration and request routing for a single agent instance.
 
     The `AgentRouter` is responsible for initializing an agent, which includes:
-    1.  Fetching necessary contextual information like Organization ID and User ID
-        based on the provided authenticated client's API key.
-    2.  Ensuring the agent is registered in the HackAgent backend. This involves
-        checking if an agent with the specified name, type, and organization
-        already exists. If not, it creates a new agent. If it exists, it may
-        update its metadata based on the `overwrite_metadata` flag.
-    3.  Instantiating the appropriate adapter (e.g., `ADKAgent`,
-        `LiteLLMAgent`) based on the `agent_type`.
+    1.  Resolving organizational context via the storage backend.
+    2.  Ensuring the agent is registered in the storage backend.
+    3.  Instantiating the appropriate adapter (e.g., `ADKAgent`, `LiteLLMAgent`)
+        based on the `agent_type`.
     4.  Storing this adapter for subsequent request routing.
 
-    Once initialized, the router uses the adapter to handle requests directed
-    to the managed agent.
-
     Attributes:
-        client: An `AuthenticatedClient` instance for API communication.
-        organization_id: The UUID of the organization associated with the API key.
-        user_id_str: The string representation of the user ID associated with the API key.
-        backend_agent: The `BackendAgentModel` instance representing the agent
-            in the HackAgent backend (after creation or retrieval).
-        _agent_registry: A dictionary mapping agent registration keys (backend ID)
-            to their instantiated adapter `Agent` objects.
+        backend: The StorageBackend (RemoteBackend or LocalBackend).
+        organization_id: The UUID of the organization associated with the backend.
+        user_id_str: The string user ID associated with the backend context.
+        backend_agent: The `AgentRecord` representing this agent in storage.
+        _agent_registry: Dict mapping agent ID → instantiated adapter `Agent` objects.
     """
-
-    def _fetch_organization_id(self) -> UUID:
-        """
-        Fetches the organization ID (UUID) associated with the API key.
-
-        This method lists agents accessible by the current client's token and
-        extracts the organization ID from any agent. All agents for a given API key
-        belong to the same organization, so we can use any agent's organization field.
-
-        Note: We use the /agent endpoint instead of /key because /key is Auth0-only
-        for security reasons (prevents API keys from managing other API keys).
-
-        Returns:
-            The UUID of the organization.
-
-        Raises:
-            RuntimeError: If the organization ID cannot be determined (e.g., no agents
-                exist, organization field missing, or API call fails).
-        """
-        try:
-            logger.debug(
-                "AgentRouter: Attempting to retrieve Organization ID by listing agents..."
-            )
-            agents_response = agent_list.sync_detailed(client=self.client)
-
-            if (
-                agents_response.status_code == 200
-                and agents_response.parsed
-                and agents_response.parsed.results
-            ):
-                first_agent = agents_response.parsed.results[0]
-                if hasattr(first_agent, "organization") and isinstance(
-                    first_agent.organization, UUID
-                ):
-                    logger.info(
-                        f"AgentRouter: Successfully determined Organization ID: {first_agent.organization} from agent '{first_agent.name}'."
-                    )
-                    return first_agent.organization
-                else:
-                    org_type = (
-                        type(first_agent.organization).__name__
-                        if hasattr(first_agent, "organization")
-                        else "Missing"
-                    )
-                    logger.error(
-                        f"AgentRouter: Agent '{first_agent.name}' has invalid organization field (type: {org_type})."
-                    )
-                    raise RuntimeError(
-                        f"AgentRouter: Could not determine Organization ID (invalid type: {org_type})."
-                    )
-            elif agents_response.parsed and not agents_response.parsed.results:
-                logger.error(
-                    "AgentRouter: No agents found. Cannot determine Organization ID."
-                )
-                raise RuntimeError(
-                    "AgentRouter: No agents exist for Organization ID retrieval. Create an agent first."
-                )
-            else:
-                content = (
-                    agents_response.content.decode()
-                    if agents_response.content
-                    else "N/A"
-                )
-                logger.error(
-                    f"AgentRouter: Failed to list agents for Org ID. Status: {agents_response.status_code}, Body: {content}"
-                )
-                raise RuntimeError(
-                    f"AgentRouter: Agent list failed for Organization ID (status {agents_response.status_code})."
-                )
-        except RuntimeError:
-            raise
-        except Exception as e:
-            logger.error(
-                f"AgentRouter: Exception fetching Organization ID: {e}", exc_info=True
-            )
-            raise RuntimeError(f"AgentRouter: Exception fetching Organization ID: {e}")
-
-    def _fetch_user_id_str(self) -> str:
-        """
-        Fetches the user ID associated with the API key and returns it as a string.
-
-        This method lists agents accessible by the current client's token and
-        extracts the owner (user ID) from any agent. All agents for a given API key
-        belong to the same user, so we can use any agent's owner field.
-
-        Note: We use the /agent endpoint instead of /key because /key is Auth0-only
-        for security reasons (prevents API keys from managing other API keys).
-
-        Returns:
-            The string representation of the user ID.
-
-        Raises:
-            RuntimeError: If the user ID cannot be determined (e.g., no agents
-                exist, owner field missing/null, or API call fails).
-        """
-        try:
-            logger.debug(
-                "AgentRouter: Attempting to retrieve User ID by listing agents..."
-            )
-            agents_response = agent_list.sync_detailed(client=self.client)
-
-            if (
-                agents_response.status_code == 200
-                and agents_response.parsed
-                and agents_response.parsed.results
-            ):
-                first_agent = agents_response.parsed.results[0]
-                if hasattr(first_agent, "owner") and isinstance(first_agent.owner, int):
-                    user_id_as_str = str(first_agent.owner)
-                    logger.info(
-                        f"AgentRouter: Successfully determined User ID (str): {user_id_as_str} from agent '{first_agent.name}'."
-                    )
-                    return user_id_as_str
-                else:
-                    owner_type = (
-                        type(first_agent.owner).__name__
-                        if hasattr(first_agent, "owner")
-                        else "Missing"
-                    )
-                    logger.error(
-                        f"AgentRouter: Agent '{first_agent.name}' has invalid owner field (type: {owner_type})."
-                    )
-                    raise RuntimeError(
-                        f"AgentRouter: Could not determine User ID (invalid type: {owner_type})."
-                    )
-            elif agents_response.parsed and not agents_response.parsed.results:
-                logger.error("AgentRouter: No agents found. Cannot determine User ID.")
-                raise RuntimeError(
-                    "AgentRouter: No agents exist for User ID retrieval. Create an agent first."
-                )
-            else:
-                content = (
-                    agents_response.content.decode()
-                    if agents_response.content
-                    else "N/A"
-                )
-                logger.error(
-                    f"AgentRouter: Failed to list agents for User ID. Status: {agents_response.status_code}, Body: {content}"
-                )
-                raise RuntimeError(
-                    f"AgentRouter: Agent list failed for User ID (status {agents_response.status_code})."
-                )
-        except RuntimeError:
-            raise
-        except Exception as e:
-            logger.error(f"AgentRouter: Exception fetching User ID: {e}", exc_info=True)
-            raise RuntimeError(f"AgentRouter: Exception fetching User ID: {e}")
 
     def __init__(
         self,
-        client: AuthenticatedClient,
+        backend: StorageBackend,
         name: str,
         agent_type: AgentTypeEnum,
         endpoint: str,
-        metadata: Optional[Dict[str, Any]] = None,
-        adapter_operational_config: Optional[Dict[str, Any]] = None,
+        metadata=None,
+        adapter_operational_config=None,
         overwrite_metadata: bool = True,
     ):
         """
         Initializes the AgentRouter and configures a single agent.
 
-        This constructor performs several key setup steps:
-        1. Fetches the organization and user IDs using the provided client.
-        2. Validates the `agent_type` against supported adapters.
-        3. Prepares metadata and operational configurations for the agent and its adapter.
-           For `AgentTypeEnum.GOOGLE_ADK`, it ensures `user_id` is set in the
-           adapter's operational config, using the fetched User ID if not provided.
-        4. Calls `ensure_agent_in_backend` to create or update the agent's record
-           in the HackAgent backend.
-        5. Calls `_configure_and_instantiate_adapter` to set up the specific adapter
-           for the agent type.
-
         Args:
-            client: An `AuthenticatedClient` for backend API interactions.
-            name: The desired name for the agent in the backend.
-            agent_type: The type of the agent (e.g., `AgentTypeEnum.GOOGLE_ADK`).
-            endpoint: The API endpoint URL for the agent service itself. This is used
-                for backend registration and can also be used by the adapter.
-            metadata: Optional. Metadata to be stored with the agent's record in the
-                backend. Structure can vary by agent type. For example, for
-                `AgentTypeEnum.LITELLM`, this might include `{'model_name': ..., 'api_key_env_var': ...}`.
-            adapter_operational_config: Optional. Runtime configuration specific to the
-                adapter instance. This can override or augment values derived from
-                the backend agent's metadata. For `AgentTypeEnum.GOOGLE_ADK`, this might
-                include `{'user_id': ..., 'session_id': ...}`. For `AgentTypeEnum.LITELLM`,
-                it must provide the model string ('name') if not in backend metadata.
-            overwrite_metadata: If `True` (default), and an agent with the same name,
-                type, and organization already exists in the backend, its metadata
-                will be updated with the provided `metadata`. If `False`, existing
-                metadata is preserved.
+            backend: StorageBackend (RemoteBackend or LocalBackend).
+            name: Name for the agent in storage.
+            agent_type: The type of agent (e.g., AgentTypeEnum.LITELLM).
+            endpoint: API endpoint URL for the agent service.
+            metadata: Optional metadata to store with the agent record.
+            adapter_operational_config: Runtime config for the adapter.
+            overwrite_metadata: If True, update agent metadata when it differs.
 
         Raises:
-            ValueError: If the `agent_type` is unsupported, if adapter instantiation fails,
-                or if critical configuration for an adapter type (e.g., model name for LiteLLM)
-                is missing.
-            RuntimeError: If backend communication (e.g., fetching org/user ID, creating/
-                updating agent) fails.
+            ValueError: If the agent_type is unsupported or adapter init fails.
+            RuntimeError: If backend communication fails.
         """
-        self.client = client
-        self._agent_registry: Dict[str, Agent] = {}
+        self.backend = backend
+        self._agent_registry: dict = {}
 
-        self.organization_id = self._fetch_organization_id()
-        self.user_id_str = self._fetch_user_id_str()
+        context = self.backend.get_context()
+        self.organization_id = context.org_id
+        self.user_id_str = context.user_id
         logger.info(
-            f"AgentRouter initialized with Organization ID (UUID): {self.organization_id} and User ID (str): {self.user_id_str}"
+            f"AgentRouter context: Organization ID={self.organization_id}, "
+            f"User ID={self.user_id_str}"
         )
 
         if agent_type not in AGENT_TYPE_TO_ADAPTER_MAP:
             raise ValueError(
-                f"Unsupported agent type: {agent_type}. Supported types: {list(AGENT_TYPE_TO_ADAPTER_MAP.keys())}"
+                f"Unsupported agent type: {agent_type}. "
+                f"Supported types: {list(AGENT_TYPE_TO_ADAPTER_MAP.keys())}"
             )
 
         actual_metadata = {k: v for k, v in (metadata or {}).items() if v is not None}
@@ -294,15 +106,16 @@ class AgentRouter:
                 )
             else:
                 logger.warning(
-                    f"ADK Agent: 'user_id' was already present in adapter_operational_config ('{current_adapter_op_config['user_id']}'). Using that value instead of fetched one."
+                    f"ADK Agent: 'user_id' was already present in adapter_operational_config "
+                    f"('{current_adapter_op_config['user_id']}'). Using that value instead of fetched one."
                 )
 
-        self.backend_agent = self.ensure_agent_in_backend(
+        self.backend_agent: AgentRecord = self.backend.create_or_update_agent(
             name=name,
-            agent_type=agent_type,
-            endpoint_for_backend=endpoint,
-            metadata_for_backend=actual_metadata,
-            update_metadata_if_exists=overwrite_metadata,
+            agent_type=agent_type.value,
+            endpoint=endpoint,
+            metadata=actual_metadata,
+            overwrite_metadata=overwrite_metadata,
         )
 
         registration_key = str(self.backend_agent.id)
@@ -402,7 +215,9 @@ class AgentRouter:
             # For hackagent/* models, pass the HackAgent API key for authentication
             model_name = adapter_instance_config.get("name", "")
             if model_name.startswith("hackagent/"):
-                adapter_instance_config["hackagent_api_key"] = self.client.token
+                adapter_instance_config["hackagent_api_key"] = (
+                    self.backend.get_api_key() or ""
+                )
 
         elif agent_type == AgentTypeEnum.OPENAI_SDK:
             if "name" not in adapter_instance_config:
@@ -519,390 +334,6 @@ class AgentRouter:
             raise ValueError(
                 f"Failed to instantiate adapter {adapter_class.__name__}: {e}"
             ) from e
-
-    def _find_existing_agent(
-        self,
-        name: str,
-    ) -> Optional[BackendAgentModel]:
-        """
-        Finds an existing agent in the backend by its name and organization.
-
-        This method paginates through the list of all agents accessible via the
-        client's API key. It matches agents based on the provided `name`
-        and the `self.organization_id` (UUID) of the router instance.
-        The organization ID match is crucial for ensuring the correct agent is
-        identified in a multi-tenant environment.
-
-        The method checks both `agent_model.organization` (expected to be a UUID)
-        and falls back to `agent_model.organization_detail.id` if necessary.
-
-        Args:
-            name: The name of the agent to find.
-
-        Returns:
-            A `BackendAgentModel` instance if a matching agent is found, otherwise `None`.
-        """
-        logger.debug(
-            f"SYNC_DEBUG: Entered _find_existing_agent for Name='{name}', OrgID='{self.organization_id}' (UUID)"
-        )
-
-        current_page: Union[Unset, int] = UNSET
-        agents_processed_count = 0
-
-        while True:
-            list_response = None
-            try:
-                list_response = agent_list.sync_detailed(
-                    client=self.client, page=current_page
-                )
-                logger.debug(
-                    f"SYNC_DEBUG: Fetched page of agents. Status: {list_response.status_code if list_response else 'N/A'}"
-                )
-
-            except Exception as e:
-                logger.error(
-                    f"SYNC_DEBUG: An unexpected error occurred during 'agents_list.sync_detailed' while fetching page {current_page if not isinstance(current_page, Unset) else 'initial'}: {e}",
-                    exc_info=True,
-                )
-                return None
-
-            if (
-                list_response
-                and list_response.status_code == 200
-                and list_response.parsed
-            ):
-                paginated_result = list_response.parsed
-                results_list = getattr(paginated_result, "results", [])
-                logger.debug(
-                    f"SYNC_DEBUG: Page {current_page if not isinstance(current_page, Unset) else 'initial'} - Number of results on page: {len(results_list) if results_list else 0}"
-                )
-                if not isinstance(results_list, list):
-                    logger.warning(
-                        f"SYNC_DEBUG: Expected 'results' to be a list, but got {type(results_list)}. Full parsed response: {paginated_result}"
-                    )
-                    results_list = []
-
-                for agent_model in results_list:
-                    agents_processed_count += 1
-                    logger.debug(
-                        f"SYNC_DEBUG: Checking agent: ID={agent_model.id}, Name={getattr(agent_model, 'name', 'N/A')}, Type={getattr(agent_model, 'agent_type', getattr(agent_model, 'type', 'N/A'))}, Org={getattr(agent_model, 'organization', 'N/A')}"
-                    )
-
-                    name_matches = (
-                        hasattr(agent_model, "name") and agent_model.name == name
-                    )
-
-                    org_matches = False
-                    if hasattr(agent_model, "organization") and isinstance(
-                        agent_model.organization, UUID
-                    ):
-                        if agent_model.organization == self.organization_id:
-                            org_matches = True
-                    elif (
-                        hasattr(agent_model, "organization_detail")
-                        and hasattr(agent_model.organization_detail, "id")
-                        and isinstance(agent_model.organization_detail.id, UUID)
-                    ):
-                        if agent_model.organization_detail.id == self.organization_id:
-                            org_matches = True
-                            logger.debug(
-                                f"SYNC_DEBUG: Matched OrgID via organization_detail.id for agent '{agent_model.name}'"
-                            )
-                    elif hasattr(agent_model, "organization") and isinstance(
-                        agent_model.organization, int
-                    ):
-                        logger.warning(
-                            f"SYNC_DEBUG: agent_model.organization is an int ('{agent_model.organization}') for agent '{agent_model.name}'. Schema mismatch with expected UUID ('{self.organization_id}')."
-                        )
-
-                    if not name_matches:
-                        logger.debug(
-                            f"SYNC_DEBUG: Agent ID '{agent_model.id}' ('{agent_model.name}') failed name match (expected '{name}')"
-                        )
-                    elif not org_matches:
-                        logger.debug(
-                            f"SYNC_DEBUG: Agent ID '{agent_model.id}' ('{agent_model.name}') failed organization match (expected UUID '{self.organization_id}', found '{getattr(agent_model, 'organization', 'N/A')}' or detail '{getattr(agent_model.organization_detail, 'id', 'N/A') if hasattr(agent_model, 'organization_detail') else 'N/A'}')"
-                        )
-
-                    if name_matches and org_matches:
-                        logger.info(
-                            f"SYNC_DEBUG: Found existing backend agent '{name}' (OrgID: {self.organization_id}) "
-                            f"with ID {agent_model.id} on page {current_page if not isinstance(current_page, Unset) else 'initial'}. Processed {agents_processed_count} agents total so far."
-                        )
-                        return agent_model
-
-                if (
-                    hasattr(paginated_result, "next")
-                    and paginated_result.next
-                    and not isinstance(paginated_result.next, Unset)
-                ):
-                    next_page_url = str(paginated_result.next)
-                    try:
-                        if "page=" in next_page_url:
-                            current_page = int(
-                                next_page_url.split("page=")[-1].split("&")[0]
-                            )
-                        elif isinstance(next_page_url, int):
-                            current_page = next_page_url
-                        else:
-                            current_page = (
-                                current_page if isinstance(current_page, int) else 1
-                            ) + 1
-                    except ValueError:
-                        logger.warning(
-                            f"Could not parse next page number from URL: {next_page_url}. Using simple increment."
-                        )
-                        current_page = (
-                            current_page if isinstance(current_page, int) else 1
-                        ) + 1
-
-                    logger.debug(
-                        f"SYNC_DEBUG: Moving to next page of agents: {current_page}"
-                    )
-                else:
-                    logger.debug(
-                        f"SYNC_DEBUG: No more pages of agents to fetch. Processed {agents_processed_count} agents in total."
-                    )
-                    break
-
-            elif list_response and list_response.status_code != 200:
-                logger.error(
-                    f"SYNC_DEBUG: Failed to list agents on page {current_page if not isinstance(current_page, Unset) else 'initial'}. Status: {list_response.status_code}, "
-                    f"Body: {list_response.content.decode() if list_response.content else 'N/A'}"
-                )
-                return None
-            elif not list_response:
-                logger.error(
-                    f"SYNC_DEBUG: Failed to get any response from agents_list API for page {current_page if not isinstance(current_page, Unset) else 'initial'}."
-                )
-                return None
-            else:
-                logger.warning(
-                    f"SYNC_DEBUG: Unexpected state after trying to fetch page {current_page if not isinstance(current_page, Unset) else 'initial'}. list_response: {list_response}"
-                )
-                return None
-
-        logger.debug(
-            f"SYNC_DEBUG: No existing backend agent found matching Name='{name}', OrgID='{self.organization_id}' after searching all pages."
-        )
-        return None
-
-    def _update_agent(self, agent_id: UUID, **kwargs) -> BackendAgentModel:
-        """
-        Updates an existing agent in the backend.
-
-        Args:
-            agent_id: The UUID of the agent to update.
-            **kwargs: Fields to update (e.g., metadata, agent_type).
-        """
-        logger.info(
-            f"Attempting to update backend agent ID: {agent_id} with fields: {list(kwargs.keys())}"
-        )
-        patch_body = PatchedAgentRequest(**kwargs)
-        try:
-            update_response = agent_partial_update.sync_detailed(
-                client=self.client, id=agent_id, body=patch_body
-            )
-            if update_response.status_code == 200 and update_response.parsed:
-                logger.info(f"Successfully updated backend agent ID: {agent_id}.")
-                return update_response.parsed
-            else:
-                err_msg = (
-                    f"Failed to update backend agent ID: {agent_id}. "
-                    f"Status: {update_response.status_code}, "
-                    f"Body: {update_response.content.decode() if update_response.content else 'N/A'}"
-                )
-                logger.error(err_msg)
-                raise RuntimeError(err_msg)
-        except Exception as e:
-            err_msg_ex = (
-                f"Exception during backend agent update for ID: {agent_id}: {e}"
-            )
-            logger.error(err_msg_ex, exc_info=True)
-            raise RuntimeError(err_msg_ex) from e
-
-    def _create_new_agent(
-        self,
-        name: str,
-        agent_type: AgentTypeEnum,
-        endpoint: str,
-        metadata: Dict[str, Any],
-        description: str,
-    ) -> BackendAgentModel:
-        """
-        Creates a new agent in the backend.
-
-        The new agent is associated with the `self.organization_id` (UUID) of the router.
-
-        Args:
-            name: The name for the new agent.
-            agent_type: The `AgentTypeEnum` for the new agent.
-            endpoint: The endpoint URL for the new agent.
-            metadata: A dictionary of metadata for the new agent.
-            description: A descriptive string for the new agent.
-
-        Returns:
-            The created `BackendAgentModel` instance.
-
-        Raises:
-            RuntimeError: If the API call to create the agent fails.
-        """
-        logger.info(
-            f"Creating new backend agent: Name='{name}', Type='{agent_type.value}', OrgID='{self.organization_id}' (UUID)"
-        )
-
-        agent_req_body = AgentRequest(
-            name=name,
-            endpoint=endpoint,
-            agent_type=agent_type.value,
-            metadata=metadata,
-            description=description,
-        )
-
-        try:
-            create_response = agent_create.sync_detailed(
-                client=self.client, body=agent_req_body
-            )
-            if create_response.status_code == 201 and create_response.parsed:
-                logger.info(
-                    f"Created backend agent '{name}' (Type: {agent_type.value}) with ID {create_response.parsed.id}."
-                )
-                return create_response.parsed
-            else:
-                body_content = (
-                    create_response.content.decode()
-                    if create_response.content
-                    else "N/A"
-                )
-                err_msg = (
-                    f"Failed to create backend agent '{name}'. Status: {create_response.status_code}, "
-                    f"Body: {body_content}"
-                )
-                logger.error(err_msg)
-                raise RuntimeError(err_msg)
-        except Exception as e:
-            err_msg_ex = (
-                f"Exception during backend agent creation for Name='{name}': {e}"
-            )
-            logger.error(err_msg_ex, exc_info=True)
-            raise RuntimeError(err_msg_ex) from e
-
-    def ensure_agent_in_backend(
-        self,
-        name: str,
-        agent_type: AgentTypeEnum,
-        endpoint_for_backend: str,
-        metadata_for_backend: Dict[str, Any],
-        description_prefix: str = "Agent managed by router",
-        update_metadata_if_exists: bool = True,
-    ) -> BackendAgentModel:
-        """
-        Ensures an agent with the given specifications exists in the backend.
-
-        This method first attempts to find an existing agent matching the name,
-        type, and the router's `self.organization_id`. If found, it checks if its
-        metadata needs updating based on `metadata_for_backend`. If an update is
-        needed and `update_metadata_if_exists` is `True`, it performs the update.
-        If the agent is not found, a new one is created.
-
-        Args:
-            name: The name of the agent.
-            agent_type: The `AgentTypeEnum` of the agent.
-            endpoint_for_backend: The endpoint URL for the agent.
-            metadata_for_backend: The desired metadata for the agent in the backend.
-            description_prefix: A prefix for the description of a newly created agent.
-                The agent's name will be appended to this prefix.
-            update_metadata_if_exists: If `True` and the agent exists, its metadata
-                will be updated if it differs from `metadata_for_backend`.
-
-        Returns:
-            The `BackendAgentModel` of the existing (possibly updated) or newly
-            created agent.
-        """
-        logger.info(
-            f"Ensuring backend agent presence: Name='{name}', Type='{agent_type.value}', OrgID='{self.organization_id}' (UUID)"
-        )
-
-        existing_agent = self._find_existing_agent(name=name)
-
-        if existing_agent:
-            needs_update = False
-            patch_kwargs: Dict[str, Any] = {}
-
-            # Check metadata
-            current_metadata = (
-                existing_agent.metadata
-                if isinstance(existing_agent.metadata, dict)
-                else {}
-            )
-            metadata_to_patch = {}
-
-            for key, value_for_backend in metadata_for_backend.items():
-                if current_metadata.get(key) != value_for_backend:
-                    metadata_to_patch[key] = value_for_backend
-                    needs_update = True
-
-            if metadata_to_patch:
-                final_metadata = current_metadata.copy()
-                final_metadata.update(metadata_to_patch)
-                # Strip None values — Django JSONField rejects null entries
-                patch_kwargs["metadata"] = {
-                    k: v for k, v in final_metadata.items() if v is not None
-                }
-
-            # Check agent_type
-            current_type_val = None
-            if isinstance(existing_agent.agent_type, AgentTypeEnum):
-                current_type_val = existing_agent.agent_type.value
-            elif isinstance(existing_agent.agent_type, str):
-                current_type_val = existing_agent.agent_type
-
-            if current_type_val != agent_type.value:
-                logger.info(
-                    f"Backend agent '{name}' exists but type differs. Current: '{current_type_val}', Requested: '{agent_type.value}'. Will update."
-                )
-                patch_kwargs["agent_type"] = agent_type.value
-                needs_update = True
-
-            # Check endpoint — normalize both sides to str so AnyUrl ≠ str
-            # false-positives don't trigger unnecessary PATCH calls.
-            current_endpoint = (
-                str(existing_agent.endpoint).rstrip("/")
-                if existing_agent.endpoint
-                else None
-            )
-            _normalized_requested = str(endpoint_for_backend).rstrip("/")
-            if current_endpoint != _normalized_requested:
-                logger.info(
-                    f"Backend agent '{name}' exists but endpoint differs. Current: '{current_endpoint}', Requested: '{endpoint_for_backend}'. Will update."
-                )
-                patch_kwargs["endpoint"] = endpoint_for_backend
-                needs_update = True
-
-            if needs_update and update_metadata_if_exists:
-                logger.info(
-                    f"Backend agent '{name}' exists and needs update. Proceeding with update."
-                )
-                return self._update_agent(agent_id=existing_agent.id, **patch_kwargs)
-            else:
-                if needs_update and not update_metadata_if_exists:
-                    logger.info(
-                        f"Backend agent '{name}' exists and differs, but update_metadata_if_exists is False. Skipping update."
-                    )
-                else:
-                    logger.info(
-                        f"Backend agent '{name}' exists and is current or update is skipped."
-                    )
-                return existing_agent
-
-        description = f"{description_prefix}: {name}"
-        return self._create_new_agent(
-            name=name,
-            agent_type=agent_type,
-            endpoint=endpoint_for_backend,
-            metadata=metadata_for_backend,
-            description=description,
-        )
 
     def get_agent_instance(self, registration_key: str) -> Optional[Agent]:
         """

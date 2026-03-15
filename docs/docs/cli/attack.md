@@ -115,7 +115,9 @@ Attack results are:
 
 1. **Displayed in the terminal** — Progress and summary
 2. **Saved locally** — In `./logs/runs/` directory
-3. **Uploaded to dashboard** — View at [app.hackagent.dev](https://app.hackagent.dev)
+3. **Stored in the backend** — Depends on your configuration:
+   - **Local mode** (no API key): stored in `~/.local/share/hackagent/hackagent.db` and viewable via `hackagent results list` or the TUI
+   - **Remote mode** (API key configured): uploaded to [app.hackagent.dev](https://app.hackagent.dev) dashboard
 
 ### JSON Output
 

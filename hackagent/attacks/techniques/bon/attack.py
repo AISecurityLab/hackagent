@@ -36,7 +36,7 @@ import copy
 import logging
 from typing import Any, Dict, List, Optional
 
-from hackagent.client import AuthenticatedClient
+from hackagent.server.client import AuthenticatedClient
 from hackagent.router.router import AgentRouter
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.shared.tui import with_tui_logging

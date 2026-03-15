@@ -6,7 +6,8 @@
 from collections.abc import Mapping, MutableMapping
 from http import HTTPStatus
 from typing import IO, BinaryIO, Generic, Literal, Optional, TypeVar, Union
-from attrs import define
+
+from pydantic import BaseModel, ConfigDict
 
 
 class Unset:
@@ -27,9 +28,10 @@ FileTypes = Union[
 RequestFiles = list[tuple[str, FileTypes]]
 
 
-@define
-class File:
+class File(BaseModel):
     """Contains information for file uploads"""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     payload: BinaryIO
     file_name: Optional[str] = None
@@ -43,9 +45,10 @@ class File:
 T = TypeVar("T")
 
 
-@define
-class Response(Generic[T]):
+class Response(BaseModel, Generic[T]):
     """A response from an endpoint"""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     status_code: HTTPStatus
     content: bytes

@@ -201,8 +201,8 @@ def init(ctx):
         cli_config.validate()
 
         # Test API connection
-        from hackagent.api.agent import agent_list
-        from hackagent.client import AuthenticatedClient
+        from hackagent.server.api.agent import agent_list
+        from hackagent.server.client import AuthenticatedClient
 
         client = AuthenticatedClient(
             base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
@@ -372,8 +372,8 @@ def doctor(ctx):
     console.print("\n[cyan]🌐 API Connection")
     if cli_config.api_key:
         try:
-            from hackagent.api.agent import agent_list
-            from hackagent.client import AuthenticatedClient
+            from hackagent.server.api.agent import agent_list
+            from hackagent.server.client import AuthenticatedClient
 
             client = AuthenticatedClient(
                 base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"

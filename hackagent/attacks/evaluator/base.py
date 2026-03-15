@@ -34,7 +34,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from hackagent.attacks.shared.progress import create_progress_bar
 from hackagent.attacks.shared.router_factory import create_router
-from hackagent.client import AuthenticatedClient
+from hackagent.server.client import AuthenticatedClient
 
 if TYPE_CHECKING:
     from hackagent.router.tracking import Tracker
@@ -137,8 +137,12 @@ class BaseJudgeEvaluator(ABC):
             "agent_metadata": config.agent_metadata or {},
         }
 
-        # Handle API key from client
-        api_key = self.client.token
+        # Handle API key from client (supports both AuthenticatedClient and StorageBackend)
+        api_key = (
+            self.client.get_api_key()
+            if hasattr(self.client, "get_api_key")
+            else getattr(self.client, "token", None)
+        )
         api_key_config = (
             config.agent_metadata.get("api_key") if config.agent_metadata else None
         )
@@ -154,7 +158,7 @@ class BaseJudgeEvaluator(ABC):
         )
 
         self.agent_router, self.agent_registration_key = create_router(
-            client=self.client,
+            backend=self.client,
             config=router_config,
             logger=self.logger,
             router_name=f"judge-{config.agent_name}",

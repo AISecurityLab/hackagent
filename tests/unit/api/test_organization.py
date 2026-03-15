@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from httpx import Response
 
-from hackagent.api.organization import (
+from hackagent.server.api.organization import (
     organization_create,
     organization_destroy,
     organization_list,
@@ -18,12 +18,12 @@ from hackagent.api.organization import (
     organization_retrieve,
     organization_update,
 )
-from hackagent.client import AuthenticatedClient
+from hackagent.server.client import AuthenticatedClient
 from hackagent.errors import UnexpectedStatus
-from hackagent.api.models import Organization
-from hackagent.api.models import OrganizationRequest
-from hackagent.api.models import PaginatedOrganizationList
-from hackagent.api.models import PatchedOrganizationRequest
+from hackagent.server.api.models import Organization
+from hackagent.server.api.models import OrganizationRequest
+from hackagent.server.api.models import PaginatedOrganizationList
+from hackagent.server.api.models import PatchedOrganizationRequest
 
 
 @pytest.fixture
@@ -139,7 +139,7 @@ def test_create_sync_success(
     mock_detailed_response.parsed = mock_parsed_response
 
     with patch(
-        "hackagent.api.organization.organization_create.sync_detailed",
+        "hackagent.server.api.organization.organization_create.sync_detailed",
         return_value=mock_detailed_response,
     ) as mock_sync_detailed:
         parsed = organization_create.sync(
@@ -193,7 +193,7 @@ async def test_create_asyncio_success(
         return mock_detailed_response
 
     with patch(
-        "hackagent.api.organization.organization_create.asyncio_detailed",
+        "hackagent.server.api.organization.organization_create.asyncio_detailed",
         new=mock_asyncio_detailed_func,
     ) as _:
         parsed = await organization_create.asyncio(
@@ -375,7 +375,7 @@ def test_list_sync_success(authenticated_client: AuthenticatedClient):
     mock_detailed_response.parsed = mock_parsed_response
 
     with patch(
-        "hackagent.api.organization.organization_list.sync_detailed",
+        "hackagent.server.api.organization.organization_list.sync_detailed",
         return_value=mock_detailed_response,
     ) as mock_sync_detailed:
         parsed = organization_list.sync(client=authenticated_client, page=1)
@@ -421,7 +421,7 @@ async def test_list_asyncio_success(authenticated_client: AuthenticatedClient):
         return mock_detailed_response
 
     with patch(
-        "hackagent.api.organization.organization_list.asyncio_detailed",
+        "hackagent.server.api.organization.organization_list.asyncio_detailed",
         new=mock_asyncio_detailed_func,
     ) as _:
         parsed = await organization_list.asyncio(client=authenticated_client, page=1)
@@ -502,7 +502,7 @@ def test_me_retrieve_sync_success(
     mock_detailed_response.parsed = mock_organization
 
     with patch(
-        "hackagent.api.organization.organization_me_retrieve.sync_detailed",
+        "hackagent.server.api.organization.organization_me_retrieve.sync_detailed",
         return_value=mock_detailed_response,
     ) as mock_sync_detailed:
         parsed = organization_me_retrieve.sync(client=authenticated_client)
@@ -550,7 +550,7 @@ async def test_me_retrieve_asyncio_success(
         return mock_detailed_response
 
     with patch(
-        "hackagent.api.organization.organization_me_retrieve.asyncio_detailed",
+        "hackagent.server.api.organization.organization_me_retrieve.asyncio_detailed",
         new=mock_asyncio_detailed_func,
     ) as _:
         parsed = await organization_me_retrieve.asyncio(client=authenticated_client)
@@ -671,7 +671,7 @@ def test_partial_update_sync_success(
     mock_detailed_response.parsed = mock_organization
 
     with patch(
-        "hackagent.api.organization.organization_partial_update.sync_detailed",
+        "hackagent.server.api.organization.organization_partial_update.sync_detailed",
         return_value=mock_detailed_response,
     ) as mock_sync_detailed:
         parsed = organization_partial_update.sync(
@@ -736,7 +736,7 @@ async def test_partial_update_asyncio_success(
         return mock_detailed_response
 
     with patch(
-        "hackagent.api.organization.organization_partial_update.asyncio_detailed",
+        "hackagent.server.api.organization.organization_partial_update.asyncio_detailed",
         new=mock_asyncio_detailed_func,
     ) as _:
         parsed = await organization_partial_update.asyncio(
@@ -822,7 +822,7 @@ def test_retrieve_sync_success_specific_org(
     mock_detailed_response.parsed = mock_organization
 
     with patch(
-        "hackagent.api.organization.organization_retrieve.sync_detailed",
+        "hackagent.server.api.organization.organization_retrieve.sync_detailed",
         return_value=mock_detailed_response,
     ) as mock_sync_detailed:
         parsed = organization_retrieve.sync(
@@ -875,7 +875,7 @@ async def test_retrieve_asyncio_success_specific_org(
         return mock_detailed_response
 
     with patch(
-        "hackagent.api.organization.organization_retrieve.asyncio_detailed",
+        "hackagent.server.api.organization.organization_retrieve.asyncio_detailed",
         new=mock_asyncio_detailed_func,
     ) as _:
         parsed = await organization_retrieve.asyncio(
@@ -997,7 +997,7 @@ def test_update_sync_success(
     mock_detailed_response.parsed = mock_organization
 
     with patch(
-        "hackagent.api.organization.organization_update.sync_detailed",
+        "hackagent.server.api.organization.organization_update.sync_detailed",
         return_value=mock_detailed_response,
     ) as mock_sync_detailed:
         parsed = organization_update.sync(
@@ -1061,7 +1061,7 @@ async def test_update_asyncio_success(
         return mock_detailed_response
 
     with patch(
-        "hackagent.api.organization.organization_update.asyncio_detailed",
+        "hackagent.server.api.organization.organization_update.asyncio_detailed",
         new=mock_asyncio_detailed_func,
     ) as _:
         parsed = await organization_update.asyncio(

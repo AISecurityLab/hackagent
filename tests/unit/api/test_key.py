@@ -10,14 +10,14 @@ from unittest.mock import MagicMock, patch
 from dateutil.parser import isoparse
 
 from hackagent import errors
-from hackagent.api.key import key_create, key_destroy, key_list, key_retrieve
-from hackagent.api.models import PaginatedUserAPIKeyList
-from hackagent.api.models import UserAPIKey
-from hackagent.api.models import UserAPIKeyRequest
+from hackagent.server.api.key import key_create, key_destroy, key_list, key_retrieve
+from hackagent.server.api.models import PaginatedUserAPIKeyList
+from hackagent.server.api.models import UserAPIKey
+from hackagent.server.api.models import UserAPIKeyRequest
 
 
 class TestKeyListAPI(unittest.TestCase):
-    @patch("hackagent.api.key.key_list.AuthenticatedClient")
+    @patch("hackagent.server.api.key.key_list.AuthenticatedClient")
     def test_key_list_sync_detailed_success(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()
@@ -68,7 +68,7 @@ class TestKeyListAPI(unittest.TestCase):
         )
 
         with patch(
-            "hackagent.api.key.key_list.PaginatedUserAPIKeyList.model_validate",
+            "hackagent.server.api.key.key_list.PaginatedUserAPIKeyList.model_validate",
             return_value=mock_parsed_object,
         ) as mock_model_validate:
             response = key_list.sync_detailed(client=mock_client_instance, page=1)
@@ -109,7 +109,7 @@ class TestKeyListAPI(unittest.TestCase):
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
-    @patch("hackagent.api.key.key_list.AuthenticatedClient")
+    @patch("hackagent.server.api.key.key_list.AuthenticatedClient")
     def test_key_list_sync_detailed_error_raise_on_unexpected_status_true(
         self, MockAuthenticatedClient
     ):
@@ -130,7 +130,7 @@ class TestKeyListAPI(unittest.TestCase):
         self.assertEqual(cm.exception.status_code, 500)
         self.assertEqual(cm.exception.content, b"Server Error For Key List")
 
-    @patch("hackagent.api.key.key_list.AuthenticatedClient")
+    @patch("hackagent.server.api.key.key_list.AuthenticatedClient")
     def test_key_list_sync_detailed_error_raise_on_unexpected_status_false(
         self, MockAuthenticatedClient
     ):
@@ -152,7 +152,7 @@ class TestKeyListAPI(unittest.TestCase):
 
 
 class TestKeyCreateAPI(unittest.TestCase):
-    @patch("hackagent.api.key.key_create.AuthenticatedClient")
+    @patch("hackagent.server.api.key.key_create.AuthenticatedClient")
     def test_key_create_sync_detailed_success(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()
@@ -217,7 +217,7 @@ class TestKeyCreateAPI(unittest.TestCase):
         mock_parsed_key = UserAPIKey.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.key.key_create.UserAPIKey.model_validate",
+            "hackagent.server.api.key.key_create.UserAPIKey.model_validate",
             return_value=mock_parsed_key,
         ) as mock_model_validate:
             response = key_create.sync_detailed(
@@ -259,7 +259,7 @@ class TestKeyCreateAPI(unittest.TestCase):
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
-    @patch("hackagent.api.key.key_create.AuthenticatedClient")
+    @patch("hackagent.server.api.key.key_create.AuthenticatedClient")
     def test_key_create_sync_detailed_error_raise_on_unexpected_status_true(
         self, MockAuthenticatedClient
     ):
@@ -282,7 +282,7 @@ class TestKeyCreateAPI(unittest.TestCase):
         self.assertEqual(cm.exception.status_code, 400)
         self.assertEqual(cm.exception.content, b"Bad Key Request Data")
 
-    @patch("hackagent.api.key.key_create.AuthenticatedClient")
+    @patch("hackagent.server.api.key.key_create.AuthenticatedClient")
     def test_key_create_sync_detailed_error_raise_on_unexpected_status_false(
         self, MockAuthenticatedClient
     ):
@@ -308,7 +308,7 @@ class TestKeyCreateAPI(unittest.TestCase):
 
 
 class TestKeyRetrieveAPI(unittest.TestCase):
-    @patch("hackagent.api.key.key_retrieve.AuthenticatedClient")
+    @patch("hackagent.server.api.key.key_retrieve.AuthenticatedClient")
     def test_key_retrieve_sync_detailed_success(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()
@@ -354,7 +354,7 @@ class TestKeyRetrieveAPI(unittest.TestCase):
         mock_parsed_key = UserAPIKey.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.key.key_retrieve.UserAPIKey.model_validate",
+            "hackagent.server.api.key.key_retrieve.UserAPIKey.model_validate",
             return_value=mock_parsed_key,
         ) as mock_model_validate:
             response = key_retrieve.sync_detailed(
@@ -389,7 +389,7 @@ class TestKeyRetrieveAPI(unittest.TestCase):
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
-    @patch("hackagent.api.key.key_retrieve.AuthenticatedClient")
+    @patch("hackagent.server.api.key.key_retrieve.AuthenticatedClient")
     def test_key_retrieve_sync_detailed_error_not_found(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()
@@ -411,7 +411,7 @@ class TestKeyRetrieveAPI(unittest.TestCase):
         self.assertEqual(cm.exception.status_code, 404)
         self.assertEqual(cm.exception.content, b"API Key Not Found")
 
-    @patch("hackagent.api.key.key_retrieve.AuthenticatedClient")
+    @patch("hackagent.server.api.key.key_retrieve.AuthenticatedClient")
     def test_key_retrieve_sync_detailed_error_raise_false(
         self, MockAuthenticatedClient
     ):
@@ -436,7 +436,7 @@ class TestKeyRetrieveAPI(unittest.TestCase):
 
 
 class TestKeyDestroyAPI(unittest.TestCase):
-    @patch("hackagent.api.key.key_destroy.AuthenticatedClient")
+    @patch("hackagent.server.api.key.key_destroy.AuthenticatedClient")
     def test_key_destroy_sync_detailed_success(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()
@@ -463,7 +463,7 @@ class TestKeyDestroyAPI(unittest.TestCase):
         }
         mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
-    @patch("hackagent.api.key.key_destroy.AuthenticatedClient")
+    @patch("hackagent.server.api.key.key_destroy.AuthenticatedClient")
     def test_key_destroy_sync_detailed_error_not_found(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()
@@ -486,7 +486,7 @@ class TestKeyDestroyAPI(unittest.TestCase):
         self.assertEqual(cm.exception.status_code, 404)
         self.assertEqual(cm.exception.content, b"API Key Not Found For Deletion")
 
-    @patch("hackagent.api.key.key_destroy.AuthenticatedClient")
+    @patch("hackagent.server.api.key.key_destroy.AuthenticatedClient")
     def test_key_destroy_sync_detailed_error_raise_false(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()

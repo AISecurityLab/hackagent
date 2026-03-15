@@ -213,70 +213,37 @@ class AgentsTab(BaseTab):
             self._show_agent_details()
 
     def refresh_data(self) -> None:
-        """Refresh agents data from API."""
+        """Refresh agents data from backend (local or remote)."""
         try:
-            from hackagent.api.agent import agent_list
+            backend = self.create_backend()
+            result = backend.list_agents(page=1, page_size=200)
+            raw_agents = result.items
 
-            # Validate configuration
-            if not self.cli_config.api_key:
-                self._show_empty_state(
-                    "🔑 [bold yellow]API Key Not Configured[/bold yellow]\n\n"
-                    "[cyan]To get started:[/cyan]\n"
-                    "1. Run: [bold]hackagent config set --api-key YOUR_KEY[/bold]\n"
-                    "2. Press [bold]F5[/bold] to refresh\n\n"
-                    "[dim]Need an API key? Visit the HackAgent dashboard[/dim]"
+            if not raw_agents:
+                # Clear table and show empty message
+                table = self.query_one("#agents-table", DataTable)
+                table.clear()
+
+                stats_widget = self.query_one("#agents-stats", Static)
+                stats_widget.update(
+                    "📊 [cyan]Total Agents:[/cyan] [yellow]0[/yellow] | "
+                    "🟢 [green]Active:[/green] [yellow]0[/yellow] | "
+                    "⚡ [magenta]Status:[/magenta] [green]Loaded[/green]"
+                )
+
+                details_widget = self.query_one("#agent-details", Static)
+                details_widget.update(
+                    "📭 [bold cyan]No Agents Found[/bold cyan]\n\n"
+                    "[yellow]Get started by creating your first agent:[/yellow]\n\n"
+                    "• Click [bold]➕ New Agent[/bold] button above\n"
+                    "• Or use the CLI: [bold]hackagent agent create[/bold]\n\n"
+                    "[dim]Agents are AI systems that you can test for security vulnerabilities[/dim]"
                 )
                 return
 
-            # Create API client with timeout
-            client = self.create_api_client()
-
-            # Fetch agents
-            response = agent_list.sync_detailed(client=client)
-
-            if response.status_code == 200 and response.parsed:
-                self.agents_data = (
-                    response.parsed.results if response.parsed.results else []
-                )
-
-                # Always update the table, even if empty
-                if not self.agents_data:
-                    # Clear table and show empty message
-                    table = self.query_one("#agents-table", DataTable)
-                    table.clear()
-
-                    # Update stats
-                    stats_widget = self.query_one("#agents-stats", Static)
-                    stats_widget.update(
-                        "📊 [cyan]Total Agents:[/cyan] [yellow]0[/yellow] | "
-                        "🟢 [green]Active:[/green] [yellow]0[/yellow] | "
-                        "⚡ [magenta]Status:[/magenta] [green]Loaded[/green]"
-                    )
-
-                    details_widget = self.query_one("#agent-details", Static)
-                    details_widget.update(
-                        "📭 [bold cyan]No Agents Found[/bold cyan]\n\n"
-                        "[yellow]Get started by creating your first agent:[/yellow]\n\n"
-                        "• Click [bold]➕ New Agent[/bold] button above\n"
-                        "• Or use the CLI: [bold]hackagent agent create[/bold]\n\n"
-                        "[dim]Agents are AI systems that you can test for security vulnerabilities[/dim]"
-                    )
-                else:
-                    self._update_table()
-            elif response.status_code == 401:
-                error_msg = self.handle_api_error(Exception("401"), "Authentication")
-                self._show_empty_state(error_msg)
-            elif response.status_code == 403:
-                self._show_empty_state(
-                    "🚫 [bold red]Access Forbidden[/bold red]\n\n"
-                    "[yellow]Your API key doesn't have permission to view agents[/yellow]\n\n"
-                    "Contact your administrator or check your API key permissions"
-                )
-            else:
-                error_status = f"API error: {response.status_code}"
-                self._show_empty_state(
-                    f"⚠️ [bold red]API Error[/bold red]\n\n{error_status}\n\n[dim]Press F5 to retry[/dim]"
-                )
+            # Convert AgentRecord objects so the rest of the view code works
+            self.agents_data = raw_agents
+            self._update_table()
 
         except Exception as e:
             error_msg = self.handle_api_error(e, "Loading agents")

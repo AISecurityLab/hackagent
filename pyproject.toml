@@ -30,7 +30,6 @@ dependencies = [
     "pyyaml>=6.0.0",
     "textual>=1.0.0",
     "python-dateutil>=2.8.0",
-    "attrs>=21.0.0",
     "faiss-cpu>=1.13.2",
     "pypdf>=6.7.5",
 ]
@@ -116,12 +115,18 @@ output = "reports/coverage.xml"
 [tool.pytest.ini_options]
 testpaths = ["tests/unit"]
 collect_ignore = [
-    "tests/test_auth.py",
-    "tests/test_google_adk.py",
-    "tests/test_rag_lmstudio.py",
+    "tests/e2e/test_auth.py",
+    "tests/e2e/test_google_adk.py",
+    "tests/e2e/attacks/test_advprefix.py",
+    "tests/e2e/attacks/test_autodan_turbo.py",
+    "tests/e2e/attacks/test_bon.py",
+    "tests/e2e/attacks/test_flipattack.py",
+    "tests/e2e/attacks/test_flipattack_new_metrics.py",
+    "tests/e2e/attacks/test_tap.py",
 ]
 markers = [
     "google_adk: marks tests that require Google ADK server (deselect with '-m \"not google_adk\"')",
+    "e2e: marks end-to-end tests that require external services",
 ]
 
 [tool.datamodel-codegen]

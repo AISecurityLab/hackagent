@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 from uuid import UUID
 
-from hackagent.client import AuthenticatedClient
+from hackagent.server.storage.base import StorageBackend
 
 
 @dataclass
@@ -46,7 +46,7 @@ class TrackingContext:
         ...     tracker = StepTracker(context)
     """
 
-    client: Optional[AuthenticatedClient] = None
+    backend: "Optional[StorageBackend]" = None
     run_id: Optional[str] = None
     parent_result_id: Optional[str] = None
     logger: Optional[logging.Logger] = None
@@ -69,7 +69,7 @@ class TrackingContext:
         Returns:
             True if basic tracking is enabled (can create traces), False otherwise
         """
-        return bool(self.client is not None and self.run_id is not None)
+        return bool(self.backend is not None and self.run_id is not None)
 
     def increment_sequence(self) -> int:
         """
@@ -143,7 +143,7 @@ class TrackingContext:
             A TrackingContext with all tracking disabled
         """
         return cls(
-            client=None,
+            backend=None,
             run_id=None,
             parent_result_id=None,
         )

@@ -3,7 +3,6 @@
 
 """Tests for AttackOrchestrator class."""
 
-import json
 import unittest
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
@@ -91,20 +90,16 @@ class TestAttackOrchestratorServerRecords(unittest.TestCase):
         self.mock_hack_agent.organization_id = uuid4()
         self.mock_hack_agent.agent_router = MagicMock()
 
-    @patch("hackagent.attacks.orchestrator.attacks_create_sync_detailed")
-    def test_create_server_attack_record_success(self, mock_attacks_create):
+    def test_create_server_attack_record_success(self):
         """Test successful attack record creation."""
 
         orchestrator = self.TestOrchestrator(self.mock_hack_agent)
 
-        # Mock successful API response
+        # Mock backend.create_attack response
         attack_id = "attack-123"
-        mock_response = MagicMock()
-        mock_response.status_code = 201
-        mock_response.content = json.dumps({"id": attack_id}).encode()
-        mock_response.parsed = MagicMock()
-        mock_response.parsed.additional_properties = {"id": attack_id}
-        mock_attacks_create.return_value = mock_response
+        mock_record = MagicMock()
+        mock_record.id = attack_id
+        self.mock_hack_agent.backend.create_attack.return_value = mock_record
 
         attack_config = {"goals": ["test goal"]}
 
@@ -116,19 +111,17 @@ class TestAttackOrchestratorServerRecords(unittest.TestCase):
         )
 
         self.assertEqual(result_id, attack_id)
-        mock_attacks_create.assert_called_once()
+        self.mock_hack_agent.backend.create_attack.assert_called_once()
 
-    @patch("hackagent.attacks.orchestrator.attacks_create_sync_detailed")
-    def test_create_server_attack_record_failure(self, mock_attacks_create):
+    def test_create_server_attack_record_failure(self):
         """Test attack record creation failure."""
 
         orchestrator = self.TestOrchestrator(self.mock_hack_agent)
 
-        # Mock failed API response
-        mock_response = MagicMock()
-        mock_response.status_code = 500
-        mock_response.content = b"Server error"
-        mock_attacks_create.return_value = mock_response
+        # Mock backend.create_attack raising an exception
+        self.mock_hack_agent.backend.create_attack.side_effect = Exception(
+            "Server error"
+        )
 
         attack_config = {"goals": ["test goal"]}
 
@@ -140,20 +133,16 @@ class TestAttackOrchestratorServerRecords(unittest.TestCase):
                 attack_config,
             )
 
-    @patch("hackagent.attacks.orchestrator.run_run_tests_create")
-    def test_create_server_run_record_success(self, mock_run_create):
+    def test_create_server_run_record_success(self):
         """Test successful run record creation."""
 
         orchestrator = self.TestOrchestrator(self.mock_hack_agent)
 
-        # Mock successful API response
+        # Mock backend.create_run response
         run_id = "run-456"
-        mock_response = MagicMock()
-        mock_response.status_code = 201
-        mock_response.content = json.dumps({"id": run_id}).encode()
-        mock_response.parsed = MagicMock()
-        mock_response.parsed.additional_properties = {"id": run_id}
-        mock_run_create.sync_detailed.return_value = mock_response
+        mock_record = MagicMock()
+        mock_record.id = run_id
+        self.mock_hack_agent.backend.create_run.return_value = mock_record
 
         attack_id = str(uuid4())
         agent_id = str(self.mock_hack_agent.agent_id)
@@ -161,7 +150,7 @@ class TestAttackOrchestratorServerRecords(unittest.TestCase):
         result_id = orchestrator._create_server_run_record(attack_id, agent_id, None)
 
         self.assertEqual(result_id, run_id)
-        mock_run_create.sync_detailed.assert_called_once()
+        self.mock_hack_agent.backend.create_run.assert_called_once()
 
 
 class TestAttackOrchestratorExecution(unittest.TestCase):
@@ -232,7 +221,7 @@ class TestAttackOrchestratorExecution(unittest.TestCase):
         self.assertEqual(kwargs["config"]["param2"], "value2")
         # Verify tracking context is added
         self.assertEqual(kwargs["config"]["_run_id"], run_id)
-        self.assertEqual(kwargs["config"]["_client"], orchestrator.client)
+        self.assertEqual(kwargs["config"]["_backend"], orchestrator.hack_agent.backend)
 
     @patch.object(AttackOrchestrator, "_create_server_attack_record")
     @patch.object(AttackOrchestrator, "_create_server_run_record")

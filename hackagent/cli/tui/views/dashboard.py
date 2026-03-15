@@ -101,8 +101,8 @@ class DashboardTab(BaseTab):
     def refresh_data(self) -> None:
         """Refresh dashboard data from API."""
         try:
-            from hackagent.api.agent import agent_list
-            from hackagent.api.result import result_list
+            from hackagent.server.api.agent import agent_list
+            from hackagent.server.api.result import result_list
 
             # Validate configuration
             if not self.cli_config.api_key:

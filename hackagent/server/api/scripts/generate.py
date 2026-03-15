@@ -5,12 +5,13 @@
 # Two-step generation of hackagent/api/ from the OpenAPI schema.
 #
 # Step 1 — datamodel-code-generator → hackagent/api/models.py
-#           Produces Pydantic v2 BaseModel classes.
+#           Produces Pydantic v2 BaseModel classes (single consolidated file).
 #
 # Step 2 — openapi-python-client → hackagent/api/<resource>/
-#           Produces typed httpx call functions.
-#           Generated models/ and boilerplate are discarded; all model
-#           imports are rewritten to point at hackagent/api/models.py.
+#           Produces typed httpx call functions (openapi-python-client >= 0.23
+#           generates Pydantic v2 code natively; no attrs-style translation needed).
+#           The generated models/ directory and client boilerplate are discarded;
+#           all model imports are rewritten to point at hackagent/api/models.py.
 #
 # Usage:
 #   python hackagent/api/scripts/generate.py [--schema-url <url>] [--schema-file <path>]
@@ -276,21 +277,10 @@ def step3_rewrite_imports() -> None:
         if "scripts" in py_file.parts:
             continue
         original = py_file.read_text()
+        # Rewrite: from ...models.<module> import <Names>  →  from ..models import <Names>
         updated = pattern.sub(r"from ..models import \1", original)
         # Ensure Unset class is imported when it is referenced in signatures
         updated = unset_import_bare.sub(r"\1, Unset", updated)
-        # openapi-python-client uses attrs-style .from_dict() / .to_dict();
-        # our models are pydantic v2 so translate to model_validate / model_dump.
-        updated = re.sub(r"\.from_dict\(", ".model_validate(", updated)
-        updated = re.sub(
-            r"\.to_dict\(\)", '.model_dump(mode="json", exclude_unset=True)', updated
-        )
-        # to_multipart() is also attrs-style; produce an httpx-compatible dict.
-        updated = re.sub(
-            r"body\.to_multipart\(\)",
-            "{k: (None, str(v)) for k, v in body.model_dump(mode='json', exclude_unset=True).items() if v is not None}",
-            updated,
-        )
         if updated != original:
             py_file.write_text(updated)
 

@@ -27,8 +27,8 @@ from hackagent.attacks.shared.prompt_parser import extract_prompt
 from hackagent.attacks.shared.response_utils import extract_response_content
 from hackagent.attacks.shared.router_factory import create_router
 from hackagent.attacks.shared.tui import with_tui_logging
-from hackagent.client import AuthenticatedClient
-from hackagent.api.models import StepTypeEnum
+from hackagent.server.client import AuthenticatedClient
+from hackagent.server.api.models import StepTypeEnum
 from hackagent.router.router import AgentRouter
 from hackagent.router.tracking import Tracker, Context
 
@@ -154,7 +154,7 @@ class PAIRAttack(BaseAttack):
                 router_config["agent_metadata"]["api_key"] = api_key_config
 
             router, _reg_key = create_router(
-                client=self.client,
+                backend=self.client,
                 config=router_config,
                 logger=self.logger,
                 router_name=attacker_config.get("model", router_config["identifier"]),

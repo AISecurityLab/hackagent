@@ -86,7 +86,10 @@ class BaseAttack(abc.ABC):
             setattr(self, key, value)
 
         # Store core dependencies
-        self.client = client
+        self.backend = (
+            getattr(client, "backend", None) or client
+        )  # accept either backend or legacy client
+        self.client = client  # keep for backward compat with adapters that need it
         self.agent_router = agent_router
 
         # Config will be set by subclass before calling super().__init__()
@@ -219,10 +222,10 @@ class BaseAttack(abc.ABC):
             Initialized TrackingCoordinator
         """
         run_id = self.config.get("_run_id") or self.run_id
-        client = self.config.get("_client") or self.client
+        backend = self.config.get("_backend") or self.backend
 
         coordinator = TrackingCoordinator.create(
-            client=client,
+            backend=backend,
             run_id=run_id,
             logger=self.logger,
             attack_type=attack_type,

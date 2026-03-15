@@ -363,17 +363,13 @@ output_format: table
 
     @patch.dict(os.environ, {"HACKAGENT_API_KEY": ""})
     def test_resolve_api_token_error_no_sources(self):
-        """Test error when no API token found from any source"""
-        with pytest.raises(ValueError) as exc_info:
-            resolve_api_token(
-                direct_api_key_param=None,
-                config_file_path="/nonexistent/config.json",
-            )
-
-        error_msg = str(exc_info.value)
-        assert "API token not found from any source" in error_msg
-        assert "Direct 'api_key' parameter" in error_msg
-        assert "Config file" in error_msg
+        """Test that resolve_api_token returns None (not raises) when no token is found.
+        Local mode without API key is supported."""
+        result = resolve_api_token(
+            direct_api_key_param=None,
+            config_file_path="/nonexistent/config.json",
+        )
+        assert result is None
 
     @patch.dict(os.environ, {"HACKAGENT_API_KEY": ""})
     def test_resolve_api_token_comprehensive_priority_matrix(self):
@@ -516,9 +512,9 @@ class TestUtilityIntegration:
         config_key = _load_api_key_from_config("/nonexistent/config.json")
         assert config_key is None
 
-        # Should raise appropriate error when all sources fail
-        with pytest.raises(ValueError):
-            resolve_api_token(
-                direct_api_key_param=None,
-                config_file_path="/nonexistent/config.json",
-            )
+        # Should return None (not raise) when all sources fail — local mode is supported
+        result = resolve_api_token(
+            direct_api_key_param=None,
+            config_file_path="/nonexistent/config.json",
+        )
+        assert result is None

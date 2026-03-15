@@ -19,18 +19,17 @@ Usage:
     )
 
     # Sync multiple results (aggregates best per result_id)
-    count = sync_evaluation_to_server(evaluated_data, client, logger)
+    count = sync_evaluation_to_server(evaluated_data, backend, logger)
 
     # Update a single result
-    ok = update_single_result(result_id, success, notes, client, logger)
+    ok = update_single_result(result_id, success, notes, backend, logger)
 """
 
 import logging
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from hackagent.api.result import result_partial_update
-from hackagent.api.models import EvaluationStatusEnum, PatchedResultRequest
+from hackagent.server.api.models import EvaluationStatusEnum
 
 logger = logging.getLogger("hackagent.attacks.evaluator.sync")
 
@@ -39,17 +38,17 @@ def update_single_result(
     result_id: str,
     success: bool,
     evaluation_notes: str,
-    client: Any,
+    backend: Any,
     logger: Optional[logging.Logger] = None,
 ) -> bool:
     """
-    Update a single Result's evaluation status on the server.
+    Update a single Result's evaluation status via the storage backend.
 
     Args:
         result_id: UUID string of the result to update.
-        success: Whether the attack was successful (from attacker's perspective).
+        success: Whether the attack was successful.
         evaluation_notes: Explanation of the evaluation outcome.
-        client: Authenticated client for API calls.
+        backend: StorageBackend instance.
         logger: Optional logger instance.
 
     Returns:
@@ -59,32 +58,18 @@ def update_single_result(
 
     try:
         eval_status = (
-            EvaluationStatusEnum.SUCCESSFUL_JAILBREAK
+            EvaluationStatusEnum.SUCCESSFUL_JAILBREAK.value
             if success
-            else EvaluationStatusEnum.FAILED_JAILBREAK
+            else EvaluationStatusEnum.FAILED_JAILBREAK.value
         )
 
-        result_request = PatchedResultRequest(
+        backend.update_result(
+            UUID(result_id) if isinstance(result_id, str) else result_id,
             evaluation_status=eval_status,
             evaluation_notes=evaluation_notes,
         )
-
-        response = result_partial_update.sync_detailed(
-            client=client,
-            id=UUID(result_id) if isinstance(result_id, str) else result_id,
-            body=result_request,
-        )
-
-        if response.status_code < 300:
-            log.debug(f"Updated result {result_id} → {eval_status.value}")
-            return True
-        else:
-            log.warning(
-                f"Failed to update result {result_id}: "
-                f"status={response.status_code}, "
-                f"content={getattr(response, 'content', 'N/A')}"
-            )
-            return False
+        log.debug(f"Updated result {result_id} → {eval_status}")
+        return True
 
     except Exception as e:
         log.error(f"Exception updating result {result_id}: {e}")
@@ -93,7 +78,7 @@ def update_single_result(
 
 def sync_evaluation_to_server(
     evaluated_data: List[Dict[str, Any]],
-    client: Any,
+    backend: Any,
     logger: Optional[logging.Logger] = None,
     judge_keys: Optional[List[Dict[str, str]]] = None,
 ) -> int:
@@ -119,8 +104,8 @@ def sync_evaluation_to_server(
     """
     log = logger or globals()["logger"]
 
-    if not client:
-        log.warning("No client available — cannot sync evaluation to server")
+    if not backend:
+        log.warning("No backend available — cannot sync evaluation")
         return 0
 
     # Find rows with result_id
@@ -167,7 +152,7 @@ def sync_evaluation_to_server(
     updated_count = 0
     for result_id, info in best_per_result.items():
         if update_single_result(
-            result_id, info["success"], info["evaluation_notes"], client, log
+            result_id, info["success"], info["evaluation_notes"], backend, log
         ):
             updated_count += 1
 
