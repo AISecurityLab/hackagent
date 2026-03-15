@@ -32,13 +32,7 @@ dependencies = [
     "textual>=1.0.0",
     "python-dateutil>=2.8.0",
     "faiss-cpu>=1.13.2",
-]
-
-[project.optional-dependencies]
-datasets = [
-    "datasets>=2.14.0",  # HuggingFace datasets library
-]
-web = [
+    "datasets>=2.14.0",
     "nicegui>=2.0",
 ]
 

@@ -2354,9 +2354,11 @@ version = "0.6.0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
+    { name = "datasets" },
     { name = "faiss-cpu" },
     { name = "httpx" },
     { name = "litellm" },
+    { name = "nicegui" },
     { name = "openai" },
     { name = "pydantic", extra = ["email"] },
     { name = "python-dateutil" },
@@ -2364,14 +2366,6 @@ dependencies = [
     { name = "requests" },
     { name = "rich" },
     { name = "textual" },
-]
-
-[package.optional-dependencies]
-datasets = [
-    { name = "datasets" },
-]
-web = [
-    { name = "nicegui" },
 ]
 
 [package.dev-dependencies]
@@ -2403,11 +2397,11 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.1.0" },
-    { name = "datasets", marker = "extra == 'datasets'", specifier = ">=2.14.0" },
+    { name = "datasets", specifier = ">=2.14.0" },
     { name = "faiss-cpu", specifier = ">=1.13.2" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "litellm", specifier = ">=1.69.2" },
-    { name = "nicegui", marker = "extra == 'web'", specifier = ">=2.0" },
+    { name = "nicegui", specifier = ">=2.0" },
     { name = "openai", specifier = ">=1.0.0" },
     { name = "pydantic", extras = ["email"], specifier = ">=2.0" },
     { name = "python-dateutil", specifier = ">=2.8.0" },
@@ -2416,7 +2410,6 @@ requires-dist = [
     { name = "rich", specifier = ">=14.0.0" },
     { name = "textual", specifier = ">=1.0.0" },
 ]
-provides-extras = ["datasets", "web"]
 
 [package.metadata.requires-dev]
 dev = [
