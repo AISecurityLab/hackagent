@@ -221,7 +221,7 @@ class TestStandardizedAPITokenResolution:
 
     def test_load_api_key_from_config_success(self):
         """Test successful API key loading from config file"""
-        config_data = {"api_key": "test-config-key", "output_format": "json"}
+        config_data = {"api_key": "test-config-key"}
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(config_data, f)
@@ -259,7 +259,7 @@ class TestStandardizedAPITokenResolution:
 
     def test_load_api_key_from_config_no_api_key(self):
         """Test config file without api_key field"""
-        config_data = {"output_format": "json", "other_field": "value"}
+        config_data = {"other_field": "value"}
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(config_data, f)
@@ -275,7 +275,6 @@ class TestStandardizedAPITokenResolution:
         """Test loading API key from YAML config file"""
         yaml_content = """
 api_key: yaml-test-key
-output_format: table
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)

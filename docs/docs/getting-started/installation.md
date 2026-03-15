@@ -55,9 +55,8 @@ hackagent init
 
 This will guide you through:
 1. **Enter your API key** *(optional)* — Connects to [app.hackagent.dev](https://app.hackagent.dev) for cloud storage and dashboards. **Leave blank to stay in local mode.**
-2. **Set output format** — Choose between `table`, `json`, or `csv`
-3. **Set verbosity level** — Control logging detail (0=ERROR to 3=DEBUG)
-4. **Save configuration** — Stored in `~/.config/hackagent/config.json`
+2. **Set verbosity level** — Control logging detail (0=ERROR to 3=DEBUG)
+3. **Save configuration** — Stored in `~/.config/hackagent/config.json`
 
 :::info Local mode (no API key required)
 When no API key is configured, HackAgent runs entirely offline. Results are stored in `~/.local/share/hackagent/hackagent.db` and are fully accessible via `hackagent results list` and the TUI. No data is sent to any remote server.

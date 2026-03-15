@@ -264,33 +264,36 @@ class TestStorageBackendProtocol(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             backend = LocalBackend(db_path=os.path.join(tmp, "test.db"))
-            # Python Protocols are not always runtime-checkable by default,
-            # but we can verify the duck-type by checking required methods exist.
-            required_methods = [
-                "get_context",
-                "get_api_key",
-                "create_or_update_agent",
-                "list_agents",
-                "get_agent",
-                "delete_agent",
-                "create_attack",
-                "list_attacks",
-                "create_run",
-                "update_run",
-                "list_runs",
-                "get_run",
-                "create_result",
-                "update_result",
-                "list_results",
-                "get_result",
-                "create_trace",
-                "list_traces",
-            ]
-            for method in required_methods:
-                self.assertTrue(
-                    hasattr(backend, method),
-                    f"LocalBackend missing method: {method}",
-                )
+            try:
+                # Python Protocols are not always runtime-checkable by default,
+                # but we can verify the duck-type by checking required methods exist.
+                required_methods = [
+                    "get_context",
+                    "get_api_key",
+                    "create_or_update_agent",
+                    "list_agents",
+                    "get_agent",
+                    "delete_agent",
+                    "create_attack",
+                    "list_attacks",
+                    "create_run",
+                    "update_run",
+                    "list_runs",
+                    "get_run",
+                    "create_result",
+                    "update_result",
+                    "list_results",
+                    "get_result",
+                    "create_trace",
+                    "list_traces",
+                ]
+                for method in required_methods:
+                    self.assertTrue(
+                        hasattr(backend, method),
+                        f"LocalBackend missing method: {method}",
+                    )
+            finally:
+                backend.close()
 
 
 if __name__ == "__main__":

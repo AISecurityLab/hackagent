@@ -8,6 +8,7 @@ Generates API documentation from the local source using pydoc-markdown.
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -30,6 +31,77 @@ _EXCLUDE_PREFIXES = (
     "hackagent.cli",
     "hackagent.server.dashboard",
 )
+
+
+def _sanitize_mdx(text: str) -> str:
+    """Make pydoc-markdown output safe for MDX (Docusaurus).
+
+    MDX treats ``{`` / ``}`` outside code spans as JSX expression delimiters,
+    which causes build failures when docstrings contain dicts or type hints.
+    This function:
+    - Converts RST double-backtick spans (````code````) → single backtick
+    - Escapes bare ``{`` / ``}`` that appear in non-code, non-frontmatter prose
+    """
+    lines = text.split("\n")
+    result = []
+    in_fence = False
+    in_frontmatter = False
+    frontmatter_done = False
+
+    for i, line in enumerate(lines):
+        # Track YAML frontmatter (first --- block)
+        if i == 0 and line.strip() == "---":
+            in_frontmatter = True
+            result.append(line)
+            continue
+        if in_frontmatter:
+            result.append(line)
+            if line.strip() == "---":
+                in_frontmatter = False
+                frontmatter_done = True
+            continue
+
+        # Track fenced code blocks
+        if re.match(r"^```", line):
+            in_fence = not in_fence
+            result.append(line)
+            continue
+
+        if in_fence:
+            result.append(line)
+            continue
+
+        # Convert RST double-backtick inline code to single-backtick
+        line = re.sub(r"``(.+?)``", r"`\1`", line)
+
+        # Escape bare { and } that are not inside inline backtick spans
+        # Split around inline code spans to protect their contents
+        parts = re.split(r"(`[^`]+`)", line)
+        escaped_parts = []
+        for j, part in enumerate(parts):
+            if j % 2 == 1:  # inside a backtick span – leave as-is
+                escaped_parts.append(part)
+            else:
+                part = part.replace("{", "\\{")
+                part = part.replace("}", "\\}")
+                escaped_parts.append(part)
+        result.append("".join(escaped_parts))
+
+    return "\n".join(result)
+
+
+def _sanitize_generated_docs(docs_dir: Path) -> None:
+    """Apply MDX sanitisation to all generated markdown files under *docs_dir/hackagent*."""
+    hackagent_docs = docs_dir / "hackagent"
+    if not hackagent_docs.exists():
+        return
+    files = list(hackagent_docs.rglob("*.md"))
+    for md_file in files:
+        content = md_file.read_text(encoding="utf-8")
+        sanitized = _sanitize_mdx(content)
+        if sanitized != content:
+            md_file.write_text(sanitized, encoding="utf-8")
+    print(f"🔧 Sanitized {len(files)} generated markdown files for MDX compatibility")
 
 
 def _discover_modules(package_dir: Path) -> list[str]:
@@ -187,7 +259,15 @@ def generate_docs(version: str) -> None:
     )
     if result is None:
         run_command(
-            ["uv", "pip", "install", "pydoc-markdown[docusaurus]", "toml", "packaging", "requests"],
+            [
+                "uv",
+                "pip",
+                "install",
+                "pydoc-markdown[docusaurus]",
+                "toml",
+                "packaging",
+                "requests",
+            ],
             cwd=project_root,
             description="Installing docs dependencies (fallback)",
         )
@@ -203,6 +283,9 @@ def generate_docs(version: str) -> None:
             cwd=project_root,
             description="Generating documentation",
         )
+
+        # Fix MDX incompatibilities in generated files
+        _sanitize_generated_docs(docs_dir)
 
         index_content = f"""---
 sidebar_position: 1
@@ -258,9 +341,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="HackAgent Documentation Generator")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("-v", "--version", help="Specific PyPI version (e.g. 0.2.4)")
-    group.add_argument("-l", "--latest", action="store_true", help="Use latest PyPI version")
     group.add_argument(
-        "-c", "--current", action="store_true", help="Use current local version (default)"
+        "-l", "--latest", action="store_true", help="Use latest PyPI version"
+    )
+    group.add_argument(
+        "-c",
+        "--current",
+        action="store_true",
+        help="Use current local version (default)",
     )
     args = parser.parse_args()
 

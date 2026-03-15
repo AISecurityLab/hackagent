@@ -11,9 +11,9 @@ Architecture (mirrors the attack layer):
                      BaseVulnerability ← vulnerability.assess()
 
 Each concrete vulnerability:
-  1. Defines an Enum of sub-types in its ``types.py``
-  2. Provides prompt templates in its ``templates.py``
-  3. Extends this class in its main module (e.g. ``bias.py``)
+  1. Defines an Enum of sub-types in its `types.py`
+  2. Provides prompt templates in its `templates.py`
+  3. Extends this class in its main module (e.g. `bias.py`)
 
 ## BaseVulnerability Objects
 
@@ -23,13 +23,13 @@ class BaseVulnerability(abc.ABC)
 
 Abstract base class for all vulnerabilities.
 
-Each vulnerability carries an ``Enum`` of sub-types that can be individually selected.
+Each vulnerability carries an `Enum` of sub-types that can be individually selected.
 
 Subclasses must set the class-level attributes:
-    - ``name``             – human-readable name
-    - ``description``      – one-liner for reports
-    - ``ALLOWED_TYPES``    – list of valid sub-type *values* (strings)
-    - ``_type_enum``       – the Enum class used for validation
+    - `name`             – human-readable name
+    - `description`      – one-liner for reports
+    - `ALLOWED_TYPES`    – list of valid sub-type *values* (strings)
+    - `_type_enum`       – the Enum class used for validation
 
 Parameters
 ----------

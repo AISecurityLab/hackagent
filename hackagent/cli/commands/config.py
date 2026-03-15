@@ -27,18 +27,13 @@ def config():
 @click.option("--api-key", help="HackAgent API key")
 @click.option("--base-url", help="HackAgent API base URL")
 @click.option(
-    "--output-format",
-    type=click.Choice(["table", "json", "csv"]),
-    help="Default output format",
-)
-@click.option(
     "--verbose",
     type=str,
     help="Default verbosity level: 0/error, 1/warning, 2/info, 3/debug",
 )
 @click.pass_context
 @handle_errors
-def set(ctx, api_key, base_url, output_format, verbose):
+def set(ctx, api_key, base_url, verbose):
     """Set configuration values"""
 
     cli_config: CLIConfig = ctx.obj["config"]
@@ -56,12 +51,6 @@ def set(ctx, api_key, base_url, output_format, verbose):
         updated = True
         if cli_config.should_show_info():
             display_success(f"Base URL updated to: {base_url}")
-
-    if output_format:
-        cli_config.output_format = output_format
-        updated = True
-        if cli_config.should_show_info():
-            display_success(f"Output format updated to: {output_format}")
 
     if verbose is not None:
         from hackagent.cli.config import VERBOSITY_LEVELS, VERBOSITY_NAMES
@@ -143,7 +132,6 @@ def show(ctx):
 
     table.add_row("API Key", api_key_display, api_key_source)
     table.add_row("Base URL", cli_config.base_url, base_url_source)
-    table.add_row("Output Format", cli_config.output_format, "Default/Config")
     verbosity_display = (
         f"{cli_config.verbose} ({VERBOSITY_NAMES.get(cli_config.verbose, 'UNKNOWN')})"
     )
@@ -273,10 +261,6 @@ def import_config(ctx, config_file):
         if "base_url" in config_data:
             cli_config.base_url = config_data["base_url"]
             updated_fields.append("Base URL")
-
-        if "output_format" in config_data:
-            cli_config.output_format = config_data["output_format"]
-            updated_fields.append("Output format")
 
         if updated_fields:
             cli_config.save()

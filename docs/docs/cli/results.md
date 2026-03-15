@@ -89,13 +89,10 @@ Export results in different formats:
 
 ```bash
 # Export as JSON
-hackagent results list --output-format json > results.json
-
-# Export as CSV
-hackagent results list --output-format csv > results.csv
+hackagent results list > results.json
 
 # Export specific result
-hackagent results get --id res_abc123 --output-format json > result_detail.json
+hackagent results get --id res_abc123 > result_detail.json
 ```
 
 ### Delete Results
@@ -120,14 +117,12 @@ hackagent results delete --id res_abc123 --confirm
 | `--agent-name` | Filter by agent name | `--agent-name "my-agent"` |
 | `--attack-type` | Filter by attack type | `--attack-type advprefix` |
 | `--limit` | Maximum results to show | `--limit 10` |
-| `--output-format` | Output format | `--output-format json` |
 
 ### Get Options
 
 | Option | Description | Example |
-|--------|-------------|---------|
+|--------|-------------|------|
 | `--id` | Result ID | `--id res_abc123` |
-| `--output-format` | Output format | `--output-format json` |
 
 ### Delete Options
 
@@ -167,4 +162,4 @@ Results are also saved locally in `./logs/runs/` for offline access:
 ## See Also
 
 - [Attack](./attack.md) — Run security attacks
-- [Config](./config.md) — Configure output formats
+- [Config](./config.md) — Configure HackAgent settings

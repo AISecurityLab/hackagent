@@ -117,19 +117,6 @@ class TestCLIConfigContext(unittest.TestCase):
         self.assertEqual(call_kwargs["verbose"], 2)
 
     @patch("hackagent.cli.main.CLIConfig")
-    @patch("hackagent.cli.main._launch_tui_default")
-    def test_output_format_passed(self, mock_tui, mock_config_class):
-        """Test that --output-format is passed to CLIConfig."""
-        mock_config = MagicMock()
-        mock_config_class.return_value = mock_config
-
-        runner = CliRunner()
-        runner.invoke(cli, ["--output-format", "json"])
-
-        call_kwargs = mock_config_class.call_args.kwargs
-        self.assertEqual(call_kwargs["output_format"], "json")
-
-    @patch("hackagent.cli.main.CLIConfig")
     def test_config_error_exits(self, mock_config_class):
         """Test that configuration error causes exit."""
         mock_config_class.side_effect = Exception("Config error")

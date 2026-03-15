@@ -44,6 +44,6 @@ def _missing_(cls, value: object) -> "AgentTypeEnum"
 
 Allow case-insensitive lookup and common shorthand aliases.
 
-For example ``AgentTypeEnum(&quot;openai&quot;)`` resolves to
-``AgentTypeEnum.OPENAI_SDK``.
+For example `AgentTypeEnum(&quot;openai&quot;)` resolves to
+`AgentTypeEnum.OPENAI_SDK`.
 

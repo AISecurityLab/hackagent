@@ -7,6 +7,7 @@ HackAgent CLI Main Entry Point
 Main command-line interface for HackAgent security testing toolkit.
 """
 
+import importlib.metadata
 import importlib.util
 import os
 
@@ -25,7 +26,147 @@ install(show_locals=True)
 console = Console()
 
 
-@click.group(invoke_without_command=True)
+def _render_rich_help(ctx: click.Context) -> None:
+    """Print the Rich-formatted help page for the main CLI group."""
+    from rich.rule import Rule
+    from rich.syntax import Syntax
+    from rich.table import Table
+    from rich.text import Text
+
+    from hackagent.utils import HACKAGENT
+
+    c = Console()
+    version = importlib.metadata.version("hackagent")
+
+    # ── Logo ──────────────────────────────────────────────────────────────────
+    c.print(
+        Panel(
+            Text(HACKAGENT, style="bold dark_red"),
+            border_style="red",
+            padding=(0, 2),
+            expand=False,
+        )
+    )
+    c.print(
+        f"  [bold white]HackAgent CLI[/bold white] [dim]v{version}[/dim]"
+        f"  [dim]·[/dim]  [italic cyan]AI Agent Security Testing Toolkit[/italic cyan]\n"
+    )
+
+    # ── Quick Start ───────────────────────────────────────────────────────────
+    c.print(Rule("[bold]Quick Start[/bold]", style="dim"))
+    qs_code = (
+        "# 1. Interactive first-time setup\n"
+        "hackagent init\n\n"
+        "# 2. Register a target agent\n"
+        'hackagent agent create --name "my-bot" --type google-adk \\\n'
+        "    --endpoint http://localhost:8000\n\n"
+        "# 3. Run an adversarial attack\n"
+        'hackagent attack advprefix --agent-name "my-bot" \\\n'
+        '    --goals "Ignore safety rules"\n\n'
+        "# 4. Review findings\n"
+        "hackagent results summary"
+    )
+    c.print(
+        Panel(
+            Syntax(qs_code, "bash", theme="monokai", background_color="default"),
+            border_style="dim",
+            padding=(0, 1),
+        )
+    )
+    c.print()
+
+    # ── Commands ──────────────────────────────────────────────────────────────
+    c.print(Rule("[bold]Commands[/bold]", style="dim"))
+    cmd_table = Table.grid(padding=(0, 3))
+    cmd_table.add_column(style="bold cyan", no_wrap=True, min_width=12)
+    cmd_table.add_column()
+    group: click.Group = ctx.command  # type: ignore[assignment]
+    for name in group.list_commands(ctx):
+        cmd = group.get_command(ctx, name)
+        if cmd is None:
+            continue
+        cmd_table.add_row(f"  {name}", cmd.get_short_help_str(limit=60) or "")
+    c.print(cmd_table)
+    c.print()
+
+    # ── Options ───────────────────────────────────────────────────────────────
+    c.print(Rule("[bold]Options[/bold]", style="dim"))
+    opt_table = Table.grid(padding=(0, 3))
+    opt_table.add_column(style="bold yellow", no_wrap=True, min_width=36)
+    opt_table.add_column(style="dim")
+    for param in ctx.command.params:
+        if not isinstance(param, click.Option):
+            continue
+        decls = ", ".join(param.opts)
+        if param.is_flag or param.count:  # type: ignore[union-attr]
+            meta = ""
+        elif param.metavar:
+            meta = f" {param.metavar}"
+        elif param.type is not None:
+            meta = f" {param.type.name.upper()}"
+        else:
+            meta = ""
+        opt_table.add_row(f"  {decls}{meta}", param.help or "")
+    c.print(opt_table)
+    c.print()
+
+    # ── Environment Variables ─────────────────────────────────────────────────
+    c.print(Rule("[bold]Environment Variables[/bold]", style="dim"))
+    env_table = Table.grid(padding=(0, 3))
+    env_table.add_column(style="bold magenta", no_wrap=True, min_width=24)
+    env_table.add_column(style="dim")
+    env_table.add_row("  HACKAGENT_API_KEY", "API key (overrides config file value)")
+    env_table.add_row(
+        "  HACKAGENT_BASE_URL", "API base URL (default: https://api.hackagent.dev)"
+    )
+    env_table.add_row(
+        "  HACKAGENT_DEBUG", "Enable debug output (set to any non-empty value)"
+    )
+    c.print(env_table)
+    c.print()
+
+    # ── Operating Modes ───────────────────────────────────────────────────────
+    c.print(Rule("[bold]Operating Modes[/bold]", style="dim"))
+    mode_table = Table.grid(padding=(0, 3))
+    mode_table.add_column(no_wrap=True, min_width=10)
+    mode_table.add_column(style="dim")
+    mode_table.add_row(
+        "  [bold green]Local[/bold green]",
+        "No API key needed — results stored in local SQLite database",
+    )
+    mode_table.add_row(
+        "  [bold cyan]Cloud[/bold cyan]",
+        "With HACKAGENT_API_KEY — results synced to HackAgent cloud",
+    )
+    c.print(mode_table)
+    c.print()
+
+    # ── Footer ────────────────────────────────────────────────────────────────
+    c.print(Rule(style="dim"))
+    c.print(
+        "  [dim]Docs[/dim]  [link=https://docs.hackagent.dev]https://docs.hackagent.dev[/link]"
+        "    [dim]API Keys[/dim]  [link=https://app.hackagent.dev]https://app.hackagent.dev[/link]\n"
+    )
+
+
+def _help_option_callback(
+    ctx: click.Context, param: click.Parameter, value: bool
+) -> None:
+    if value and not ctx.resilient_parsing:
+        _render_rich_help(ctx)
+        ctx.exit()
+
+
+@click.group(invoke_without_command=True, add_help_option=False)
+@click.option(
+    "--help",
+    "-h",
+    is_flag=True,
+    is_eager=True,
+    expose_value=False,
+    callback=_help_option_callback,
+    help="Show this message and exit.",
+)
 @click.option(
     "--config-file", type=click.Path(), help="Configuration file path (JSON/YAML)"
 )
@@ -41,50 +182,11 @@ console = Console()
     help="HackAgent API base URL",
 )
 @click.option("--verbose", "-v", count=True, help="Increase verbosity (-v, -vv, -vvv)")
-@click.option(
-    "--output-format",
-    type=click.Choice(["table", "json", "csv"]),
-    help="Default output format",
+@click.version_option(
+    version=importlib.metadata.version("hackagent"), prog_name="hackagent"
 )
-@click.version_option(version="0.2.4", prog_name="hackagent")
 @click.pass_context
-def cli(ctx, config_file, api_key, base_url, verbose, output_format):
-    """🔍 HackAgent CLI - AI Agent Security Testing Tool
-    
-    HackAgent helps you discover vulnerabilities in AI agents through automated
-    security testing including prompt injection, jailbreaking, and goal hijacking.
-    
-    \b
-    Common Usage:
-      hackagent init                                       # Interactive setup
-      hackagent config set --api-key YOUR_KEY             # Set up API key
-      hackagent agent list                                 # List agents  
-      hackagent attack advprefix --help                    # See attack options
-      hackagent results list                               # View results
-    
-    \b
-    Examples:
-      # Quick attack against Google ADK agent
-      hackagent attack advprefix \\
-        --agent-name "weather-bot" \\
-        --agent-type "google-adk" \\
-        --endpoint "http://localhost:8000" \\
-        --goals "Return fake weather data"
-      
-      # Create and manage agents
-      hackagent agent create \\
-        --name "test-agent" \\
-        --type "google-adk" \\
-        --endpoint "http://localhost:8000"
-    
-    \b
-    Environment Variables:
-      HACKAGENT_API_KEY      Your API key
-      HACKAGENT_BASE_URL     API base URL (default: https://api.hackagent.dev)
-      HACKAGENT_DEBUG        Enable debug mode
-    
-    Get your API key at: https://app.hackagent.dev
-    """
+def cli(ctx, config_file, api_key, base_url, verbose):
     ctx.ensure_object(dict)
 
     # Set debug mode based on environment variable
@@ -102,7 +204,6 @@ def cli(ctx, config_file, api_key, base_url, verbose, output_format):
             api_key=api_key,
             base_url=base_url,
             verbose=verbose,
-            output_format=output_format or "table",
         )
     except Exception as e:
         console.print(f"[bold red]❌ Configuration Error: {e}")
@@ -162,14 +263,6 @@ def init(ctx):
     # Base URL is always the official endpoint
     base_url = "https://api.hackagent.dev"
 
-    # Output format setup
-    console.print("\n[cyan]📊 Output Format Configuration[/cyan]")
-    output_format = click.prompt(
-        "Default output format",
-        type=click.Choice(["table", "json", "csv"]),
-        default=cli_config.output_format,
-    )
-
     # Verbosity level setup
     console.print("\n[cyan]🔊 Verbosity Level Configuration[/cyan]")
     console.print("0 = ERROR (only errors)")
@@ -188,7 +281,6 @@ def init(ctx):
     # Save configuration
     cli_config.api_key = api_key
     cli_config.base_url = base_url
-    cli_config.output_format = output_format
     cli_config.verbose = verbose_level
 
     try:
@@ -251,7 +343,9 @@ def version(ctx):
 
     display_hackagent_splash()
 
-    console.print("[bold cyan]HackAgent CLI v0.2.4[/bold cyan]")
+    console.print(
+        f"[bold cyan]HackAgent CLI v{importlib.metadata.version('hackagent')}[/bold cyan]"
+    )
     console.print(
         "[bold green]Python Security Testing Toolkit for AI Agents[/bold green]"
     )

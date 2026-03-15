@@ -14,5 +14,5 @@ def validate_vulnerability_types(vulnerability_name: str, types: List[str],
 
 Validate and convert a list of string type values into Enum members.
 
-Raises ``ValueError`` if any string is not a valid member of the Enum.
+Raises `ValueError` if any string is not a valid member of the Enum.
 

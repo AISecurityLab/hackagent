@@ -197,9 +197,7 @@ class TestResultsDataLoading:
         When the user doesn't have permission to view runs,
         the widget should handle it gracefully.
         """
-        backend = _make_mock_backend(
-            raise_on_list_runs=Exception("403 forbidden")
-        )
+        backend = _make_mock_backend(raise_on_list_runs=Exception("403 forbidden"))
 
         class TestApp(App):
             def compose(self):

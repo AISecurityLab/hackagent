@@ -147,6 +147,15 @@ class LocalBackend:
         self._context: Optional[OrganizationContext] = None
         logger.info(f"LocalBackend initialised at {self._db_path}")
 
+    def close(self) -> None:
+        """Close the underlying SQLite connection.
+
+        Call this when the backend is no longer needed to release the file lock.
+        Particularly important on Windows where open file handles prevent
+        temporary directory cleanup.
+        """
+        self._conn.close()
+
     # ── Context ──────────────────────────────────────────────────────────────
 
     def get_api_key(self) -> Optional[str]:

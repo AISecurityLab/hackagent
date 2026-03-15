@@ -46,14 +46,12 @@ class CLIConfig:
         base_url=_UNSET,
         config_file=_UNSET,
         verbose=_UNSET,
-        output_format=_UNSET,
     ):
         """Initialize with explicit tracking of what was passed via CLI"""
         # Store defaults
         self._defaults = {
             "api_key": None,
             "base_url": "https://api.hackagent.dev",
-            "output_format": "table",
             "verbose": VERBOSITY_WARNING,  # Default to WARNING level
         }
 
@@ -92,14 +90,6 @@ class CLIConfig:
                 self._cli_overrides.add("verbose")
         else:
             self.verbose = self._defaults["verbose"]
-
-        if output_format is not _UNSET:
-            self.output_format = output_format
-            # Only treat as CLI override if actually provided (not None from missing env var)
-            if output_format is not None:
-                self._cli_overrides.add("output_format")
-        else:
-            self.output_format = self._defaults["output_format"]
 
         # STANDARDIZED PRIORITY ORDER:
         # 1. CLI arguments (tracked in _cli_overrides)
@@ -141,17 +131,6 @@ class CLIConfig:
                 env_base_url = os.getenv("HACKAGENT_BASE_URL")
                 if env_base_url:
                     self.base_url = env_base_url
-
-        # Only load output_format from env if not set by CLI or config
-        if "output_format" not in self._cli_overrides:
-            # Use env if no config override, or if config set None
-            if (
-                "output_format" not in self._config_overrides
-                or getattr(self, "output_format", None) is None
-            ):
-                env_format = os.getenv("HACKAGENT_OUTPUT_FORMAT")
-                if env_format:
-                    self.output_format = env_format
 
     def _load_from_file(self, config_path: str):
         """Load from configuration file (JSON or YAML)"""
@@ -204,7 +183,7 @@ class CLIConfig:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w") as f:
             config_dict = {}
-            for attr in ["api_key", "base_url", "output_format", "verbose"]:
+            for attr in ["api_key", "base_url", "verbose"]:
                 value = getattr(self, attr, None)
                 if value is not None:
                     # Only persist base_url if it differs from the default

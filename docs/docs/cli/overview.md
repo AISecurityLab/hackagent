@@ -52,7 +52,6 @@ These options work with all commands:
 |--------|-------------|
 | `-v`, `-vv`, `-vvv` | Increase verbosity level |
 | `--config-file` | Use custom config file |
-| `--output-format` | Set output format (`table`, `json`, `csv`) |
 | `--help` | Show help message |
 
 ## Get Help

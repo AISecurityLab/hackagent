@@ -47,7 +47,6 @@ hackagent attack advprefix \
 | `--judge-endpoint` | ❌ | Judge endpoint URL | `http://localhost:11434/api/generate` |
 | `--max-iterations` | ❌ | Maximum attack iterations | 10 |
 | `--temperature` | ❌ | Sampling temperature | 0.7 |
-| `--output-format` | ❌ | Output format (`table`, `json`, `csv`) | Config default |
 
 ### Examples
 
@@ -121,15 +120,14 @@ Attack results are:
 
 ### JSON Output
 
-For CI/CD integration, output results as JSON:
+For CI/CD integration, output attack results in machine-readable form:
 
 ```bash
 hackagent attack advprefix \
   --agent-name "target" \
   --agent-type "google-adk" \
   --endpoint "http://localhost:8000" \
-  --goals "Security test" \
-  --output-format json > results.json
+  --goals "Security test" > results.json
 ```
 
 ## CI/CD Integration
@@ -143,8 +141,7 @@ Example GitHub Actions workflow:
       --agent-name "${{ env.AGENT_NAME }}" \
       --agent-type "google-adk" \
       --endpoint "${{ env.AGENT_ENDPOINT }}" \
-      --goals "Automated security validation" \
-      --output-format json > test_results.json
+      --goals "Automated security validation" > test_results.json
 
 - name: Upload Results
   uses: actions/upload-artifact@v3

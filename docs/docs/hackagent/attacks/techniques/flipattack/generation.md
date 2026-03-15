@@ -6,7 +6,7 @@ title: hackagent.attacks.techniques.flipattack.generation
 FlipAttack generation and execution module.
 
 Generates flipped prompts by calling :meth:`FlipAttack.generate` on the
-attack instance passed via ``config[&quot;_self&quot;]``, then executes them against
+attack instance passed via `config[&quot;_self&quot;]`, then executes them against
 the target model via HackAgent&#x27;s AgentRouter.
 
 Result Tracking:

@@ -25,7 +25,6 @@ hackagent config show
 ┡━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
 │ API Key       │ gZXFVWca...                                │ Environment/Default config │
 │ Base URL      │ https://api.hackagent.dev                  │ Default                    │
-│ Output Format │ table                                      │ Default/Config             │
 │ Verbosity     │ 3 (DEBUG)                                  │ Default/Config             │
 │ Config File   │ /home/user/.config/hackagent/config.json   │ Default location           │
 └───────────────┴────────────────────────────────────────────┴────────────────────────────┘
@@ -40,7 +39,6 @@ hackagent config show
 ┡━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━┩
 │ API Key       │ (not set — local mode)                                         │ -                 │
 │ Storage       │ ~/.local/share/hackagent/hackagent.db                          │ Local SQLite      │
-│ Output Format │ table                                                          │ Default/Config    │
 │ Verbosity     │ 3 (DEBUG)                                                      │ Default/Config    │
 │ Config File   │ /home/user/.config/hackagent/config.json                       │ Default location  │
 └───────────────┴────────────────────────────────────────────────────────────────┴───────────────────┘
@@ -56,9 +54,6 @@ hackagent config set --api-key YOUR_API_KEY
 
 # Set base URL
 hackagent config set --base-url https://api.hackagent.dev
-
-# Set output format
-hackagent config set --output-format json
 
 # Set verbosity level
 hackagent config set --verbose 2
@@ -92,7 +87,6 @@ You can also configure HackAgent using environment variables:
 |----------|----------|-------------|----------|
 | `HACKAGENT_API_KEY` | ❌ Optional | API key for remote mode. Omit to use local mode. | `export HACKAGENT_API_KEY=abc123` |
 | `HACKAGENT_BASE_URL` | ❌ Optional | Remote API base URL | `export HACKAGENT_BASE_URL=https://api.hackagent.dev` |
-| `HACKAGENT_OUTPUT_FORMAT` | ❌ Optional | Default output format | `export HACKAGENT_OUTPUT_FORMAT=json` |
 
 **Example (remote mode):**
 
@@ -100,7 +94,6 @@ You can also configure HackAgent using environment variables:
 # Add to your shell profile (.bashrc, .zshrc, etc.)
 export HACKAGENT_API_KEY="your_api_key_here"
 export HACKAGENT_BASE_URL="https://api.hackagent.dev"
-export HACKAGENT_OUTPUT_FORMAT="table"
 ```
 
 **Example (local mode — no env vars needed):**
@@ -120,7 +113,6 @@ Default location: `~/.config/hackagent/config.json`
 {
   "api_key": "your-api-key-here",
   "base_url": "https://api.hackagent.dev",
-  "output_format": "table",
   "verbose": 0
 }
 ```
@@ -129,7 +121,6 @@ Default location: `~/.config/hackagent/config.json`
 
 ```json
 {
-  "output_format": "table",
   "verbose": 0
 }
 ```
@@ -142,34 +133,6 @@ Use a different configuration file:
 
 ```bash
 hackagent --config-file ./custom-config.json config show
-```
-
-## Output Formats
-
-HackAgent supports three output formats:
-
-### Table (Default)
-
-Beautiful, colored tables with rich formatting:
-
-```bash
-hackagent config set --output-format table
-```
-
-### JSON
-
-Machine-readable JSON output:
-
-```bash
-hackagent config set --output-format json
-```
-
-### CSV
-
-Comma-separated values for spreadsheet import:
-
-```bash
-hackagent config set --output-format csv
 ```
 
 ## Verbosity Levels

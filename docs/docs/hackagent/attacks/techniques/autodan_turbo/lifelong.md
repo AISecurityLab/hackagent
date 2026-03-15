@@ -34,5 +34,5 @@ it back into the library (lifelong self-improvement).
 **Returns**:
 
   List of best result dictionaries per goal, including prompt/response,
-  AutoDAN score, and success flag against ``break_score``.
+  AutoDAN score, and success flag against `break_score`.
 

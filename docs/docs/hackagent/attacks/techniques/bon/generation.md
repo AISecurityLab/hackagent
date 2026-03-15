@@ -5,8 +5,8 @@ title: hackagent.attacks.techniques.bon.generation
 
 Best-of-N (BoN) generation module.
 
-Core algorithm: for each goal, run ``n_steps`` sequential search steps.
-Within each step, generate ``num_concurrent_k`` independently-seeded
+Core algorithm: for each goal, run `n_steps` sequential search steps.
+Within each step, generate `num_concurrent_k` independently-seeded
 augmented variants of the prompt and send them to the target model in
 parallel.  After selecting the best candidate (longest response), a
 **judge evaluator** is called to determine whether the candidate constitutes
@@ -52,7 +52,7 @@ Evaluate a single candidate with all judges.
 
 **Returns**:
 
-  ``(is_success, best_score, judge_columns)`` where
+  `(is_success, best_score, judge_columns)` where
   *judge_columns* contains the raw eval/explanation columns
   produced by each judge.
 
@@ -71,7 +71,7 @@ while the middle characters are randomly shuffled.
 
 - `text` - Input text to augment.
 - `sigma` - Base augmentation strength.  Scrambling probability per word
-  is ``sigma^(1/2)``.
+  is `sigma^(1/2)`.
   
 
 **Returns**:
@@ -95,7 +95,7 @@ Randomly toggle letter case for each character.
 
 - `text` - Input text to augment.
 - `sigma` - Base augmentation strength.  Toggle probability per character
-  is ``sigma^(1/2)``.
+  is `sigma^(1/2)`.
   
 
 **Returns**:
@@ -119,7 +119,7 @@ Shift printable ASCII characters by ±1 code point.
 
 - `text` - Input text to augment.
 - `sigma` - Base augmentation strength.  Perturbation probability per
-  character is ``sigma^3``.
+  character is `sigma^3`.
   
 
 **Returns**:
@@ -173,8 +173,8 @@ Generate augmented prompts, execute them, and judge inline.
 
 For each goal, performs a multi-step search:
 
-1. For each step ``n`` in ``[0, n_steps)``:
-a. Generate ``num_concurrent_k`` augmented candidates (different seeds).
+1. For each step `n` in `[0, n_steps)`:
+a. Generate `num_concurrent_k` augmented candidates (different seeds).
 b. Send all candidates to the target model in parallel.
 c. Select the best candidate (longest response).
 d. **Call the judge** on the best candidate.
@@ -185,14 +185,14 @@ e. If the judge confirms a jailbreak → **early stop**.
 
 - `goals` - List of harmful prompt strings.
 - `agent_router` - Router for target model communication.
-- `config` - Configuration dictionary with ``bon_params``, ``judges``, etc.
+- `config` - Configuration dictionary with `bon_params`, `judges`, etc.
 - ``3 - Logger instance.
   
 
 **Returns**:
 
-  List of dicts (one per goal) with keys: ``goal``, ``augmented_prompt``,
-  ``response``, ``error``, ``step``, ``candidate``, ``seed``,
-  ``augmentation_params``, ``best_score``, ``success``,
-  ``generation_elapsed_s``, plus any judge columns.
+  List of dicts (one per goal) with keys: `goal`, `augmented_prompt`,
+  `response`, `error`, `step`, `candidate`, `seed`,
+  `augmentation_params`, `best_score`, `success`,
+  `generation_elapsed_s`, plus any judge columns.
 

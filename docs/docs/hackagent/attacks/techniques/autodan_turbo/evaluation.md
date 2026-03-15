@@ -32,8 +32,8 @@ Evaluate generated responses with configured judges and merge scores.
 **Returns**:
 
   Enriched result list containing judge columns, aggregated
-  ``best_score``, and flags like ``judge_success`` while preserving
-  ``autodan_score``/``attack_score`` fields.
+  `best_score`, and flags like `judge_success` while preserving
+  `autodan_score`/`attack_score` fields.
 
 #### execute
 

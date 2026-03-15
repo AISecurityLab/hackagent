@@ -65,23 +65,34 @@ def show(ctx, result_id):
     cli_config.validate()
 
     try:
-        from hackagent.server.api.result import result_retrieve
-        from hackagent.server.client import AuthenticatedClient
+        if cli_config.api_key:
+            from hackagent.server.api.result import result_retrieve
+            from hackagent.server.client import AuthenticatedClient
 
-        client = AuthenticatedClient(
-            base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
-        )
+            client = AuthenticatedClient(
+                base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
+            )
 
-        with console.status(f"[bold green]Fetching result {result_id}..."):
-            response = result_retrieve.sync_detailed(client=client, id=result_id)
+            with console.status(f"[bold green]Fetching result {result_id}..."):
+                response = result_retrieve.sync_detailed(client=client, id=result_id)
 
-        if response.status_code == 200 and response.parsed:
-            result = response.parsed
-            _display_result_details(result)
-
+            if response.status_code == 200 and response.parsed:
+                result = response.parsed
+            else:
+                raise click.ClickException(f"Result not found: {result_id}")
         else:
-            raise click.ClickException(f"Result not found: {result_id}")
+            from uuid import UUID
 
+            from hackagent.server.storage.local import LocalBackend
+
+            backend = LocalBackend()
+            with console.status(f"[bold green]Fetching result {result_id}..."):
+                result = backend.get_result(UUID(result_id))
+
+        _display_result_details(result)
+
+    except click.ClickException:
+        raise
     except Exception as e:
         raise click.ClickException(f"Failed to fetch result: {e}")
 
@@ -154,70 +165,99 @@ def summary(ctx, status, agent, attack_type, days):
     cli_config.validate()
 
     try:
-        from hackagent.server.api.result import result_list
-        from hackagent.server.client import AuthenticatedClient
+        if cli_config.api_key:
+            from hackagent.server.api.result import result_list
+            from hackagent.server.client import AuthenticatedClient
 
-        client = AuthenticatedClient(
-            base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
-        )
+            client = AuthenticatedClient(
+                base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
+            )
 
-        # Fetch results (using a larger limit for statistics)
-        params = {"limit": 1000}
-        if status:
-            params["evaluation_status"] = status.upper()
-
-        with console.status("[bold green]Analyzing results..."):
-            response = result_list.sync_detailed(client=client, **params)
-
-        if response.status_code == 200 and response.parsed:
-            results_list = response.parsed.results
-
-            # Filter by date range
-            from datetime import datetime, timedelta
-
-            cutoff_date = datetime.now() - timedelta(days=days)
-
-            filtered_results = []
-            for result in results_list:
-                if hasattr(result, "created_at") and result.created_at:
-                    try:
-                        created_date = result.created_at
-                        if isinstance(created_date, str):
-                            created_date = datetime.fromisoformat(
-                                created_date.replace("Z", "+00:00")
+            # Page through all results for statistics
+            all_results = []
+            page = 1
+            with console.status("[bold green]Analyzing results..."):
+                while True:
+                    response = result_list.sync_detailed(client=client, page=page)
+                    if response.status_code != 200 or not response.parsed:
+                        if page == 1:
+                            raise click.ClickException(
+                                f"Failed to fetch results: Status {response.status_code}"
                             )
-                        if created_date >= cutoff_date:
-                            filtered_results.append(result)
-                    except (ValueError, TypeError, AttributeError):
-                        filtered_results.append(result)  # Include if date parsing fails
+                        break
+                    batch = response.parsed.results or []
+                    all_results.extend(batch)
+                    if not response.parsed.next:
+                        break
+                    page += 1
 
-            # Apply additional filters
-            if agent or attack_type:
-                temp_results = []
-                for result in filtered_results:
-                    if (
-                        agent
-                        and hasattr(result, "agent_name")
-                        and agent.lower() not in result.agent_name.lower()
-                    ):
-                        continue
-                    if (
-                        attack_type
-                        and hasattr(result, "attack_type")
-                        and attack_type.lower() not in result.attack_type.lower()
-                    ):
-                        continue
-                    temp_results.append(result)
-                filtered_results = temp_results
-
-            # Generate statistics
-            stats = _generate_result_statistics(filtered_results, days)
-            _display_result_summary(stats)
+            # Normalise remote result objects into simple attribute-compatible dicts
+            # (they already have the needed attributes; kept as-is)
+            result_items = all_results
 
         else:
-            raise click.ClickException(
-                f"Failed to fetch results: Status {response.status_code}"
-            )
+            # Local mode — query SQLite directly
+            from hackagent.server.storage.local import LocalBackend
+
+            backend = LocalBackend()
+            result_items = []
+            page = 1
+            with console.status("[bold green]Analyzing local results..."):
+                while True:
+                    page_data = backend.list_results(page=page, page_size=200)
+                    result_items.extend(page_data.items)
+                    if len(result_items) >= page_data.total:
+                        break
+                    page += 1
+
+        # Filter by date range
+        from datetime import datetime, timedelta
+
+        cutoff_date = datetime.now() - timedelta(days=days)
+
+        filtered_results = []
+        for result in result_items:
+            if hasattr(result, "created_at") and result.created_at:
+                try:
+                    created_date = result.created_at
+                    if isinstance(created_date, str):
+                        created_date = datetime.fromisoformat(
+                            created_date.replace("Z", "+00:00")
+                        )
+                    if created_date >= cutoff_date:
+                        filtered_results.append(result)
+                except (ValueError, TypeError, AttributeError):
+                    filtered_results.append(result)  # Include if date parsing fails
+            else:
+                filtered_results.append(result)
+
+        # Apply status / agent / attack-type filters
+        if status or agent or attack_type:
+            temp_results = []
+            for result in filtered_results:
+                if status and hasattr(result, "evaluation_status"):
+                    ev = result.evaluation_status
+                    ev_val = ev.value if hasattr(ev, "value") else str(ev)
+                    if status.upper() not in ev_val.upper():
+                        continue
+                if (
+                    agent
+                    and hasattr(result, "agent_name")
+                    and agent.lower() not in result.agent_name.lower()
+                ):
+                    continue
+                if (
+                    attack_type
+                    and hasattr(result, "attack_type")
+                    and attack_type.lower() not in result.attack_type.lower()
+                ):
+                    continue
+                temp_results.append(result)
+            filtered_results = temp_results
+
+        # Generate statistics
+        stats = _generate_result_statistics(filtered_results, days)
+        _display_result_summary(stats)
 
     except Exception as e:
         raise click.ClickException(f"Failed to generate summary: {e}")

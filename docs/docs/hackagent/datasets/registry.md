@@ -142,19 +142,19 @@ when a &#x27;dataset&#x27; key is present in the attack configuration.
   List of goal strings.
   
   Example config:
-  {
+  \{
 - `"preset"` - &quot;agentharm&quot;,
 - `"limit"` - 100,
 - `"shuffle"` - True
-  }
+  \}
   
   Or:
   
-  {
+  \{
 - `"provider"` - &quot;huggingface&quot;,
 - `"path"` - &quot;ai-safety-institute/AgentHarm&quot;,
 - `"goal_field"` - &quot;prompt&quot;,
 - `"split"` - &quot;test_public&quot;,
 - `"limit"` - 50
-  }
+  \}
 

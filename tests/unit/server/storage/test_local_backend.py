@@ -37,7 +37,10 @@ class TestLocalBackendInit(unittest.TestCase):
     def test_get_api_key_returns_none(self):
         with tempfile.TemporaryDirectory() as tmp:
             backend = _make_backend(tmp)
-            self.assertIsNone(backend.get_api_key())
+            try:
+                self.assertIsNone(backend.get_api_key())
+            finally:
+                backend.close()
 
     def test_multiple_instances_same_db(self):
         """Two instances pointing at the same path share data."""
@@ -45,10 +48,14 @@ class TestLocalBackendInit(unittest.TestCase):
             path = os.path.join(tmp, "shared.db")
             b1 = LocalBackend(db_path=path)
             b2 = LocalBackend(db_path=path)
-            # Both see the same context UUID
-            ctx1 = b1.get_context()
-            ctx2 = b2.get_context()
-            self.assertEqual(ctx1.org_id, ctx2.org_id)
+            try:
+                # Both see the same context UUID
+                ctx1 = b1.get_context()
+                ctx2 = b2.get_context()
+                self.assertEqual(ctx1.org_id, ctx2.org_id)
+            finally:
+                b1.close()
+                b2.close()
 
 
 class TestLocalBackendContext(unittest.TestCase):
@@ -451,57 +458,65 @@ class TestLocalBackendThreadSafety(unittest.TestCase):
     def test_concurrent_agent_creation(self):
         with tempfile.TemporaryDirectory() as tmp:
             backend = _make_backend(tmp)
-            errors = []
+            try:
+                errors = []
 
-            def create(i):
-                try:
-                    backend.create_or_update_agent(
-                        name=f"agent-{i}",
-                        agent_type="LITELLM",
-                        endpoint="http://localhost",
-                        metadata={},
-                    )
-                except Exception as e:
-                    errors.append(e)
+                def create(i):
+                    try:
+                        backend.create_or_update_agent(
+                            name=f"agent-{i}",
+                            agent_type="LITELLM",
+                            endpoint="http://localhost",
+                            metadata={},
+                        )
+                    except Exception as e:
+                        errors.append(e)
 
-            threads = [threading.Thread(target=create, args=(i,)) for i in range(10)]
-            for t in threads:
-                t.start()
-            for t in threads:
-                t.join()
+                threads = [
+                    threading.Thread(target=create, args=(i,)) for i in range(10)
+                ]
+                for t in threads:
+                    t.start()
+                for t in threads:
+                    t.join()
 
-            self.assertEqual(errors, [], f"Thread errors: {errors}")
-            result = backend.list_agents()
-            self.assertEqual(result.total, 10)
+                self.assertEqual(errors, [], f"Thread errors: {errors}")
+                result = backend.list_agents()
+                self.assertEqual(result.total, 10)
+            finally:
+                backend.close()
 
     def test_concurrent_result_creation(self):
         with tempfile.TemporaryDirectory() as tmp:
             backend = _make_backend(tmp)
-            agent = backend.create_or_update_agent(
-                "agent", "LITELLM", "http://localhost", {}
-            )
-            org = backend.get_context().org_id
-            attack = backend.create_attack("x", agent.id, org, {})
-            run = backend.create_run(attack.id, agent.id, {})
-            errors = []
+            try:
+                agent = backend.create_or_update_agent(
+                    "agent", "LITELLM", "http://localhost", {}
+                )
+                org = backend.get_context().org_id
+                attack = backend.create_attack("x", agent.id, org, {})
+                run = backend.create_run(attack.id, agent.id, {})
+                errors = []
 
-            def create_result(i):
-                try:
-                    backend.create_result(run.id, f"goal-{i}", i, {}, {})
-                except Exception as e:
-                    errors.append(e)
+                def create_result(i):
+                    try:
+                        backend.create_result(run.id, f"goal-{i}", i, {}, {})
+                    except Exception as e:
+                        errors.append(e)
 
-            threads = [
-                threading.Thread(target=create_result, args=(i,)) for i in range(20)
-            ]
-            for t in threads:
-                t.start()
-            for t in threads:
-                t.join()
+                threads = [
+                    threading.Thread(target=create_result, args=(i,)) for i in range(20)
+                ]
+                for t in threads:
+                    t.start()
+                for t in threads:
+                    t.join()
 
-            self.assertEqual(errors, [])
-            result = backend.list_results(run_id=run.id)
-            self.assertEqual(result.total, 20)
+                self.assertEqual(errors, [])
+                result = backend.list_results(run_id=run.id)
+                self.assertEqual(result.total, 20)
+            finally:
+                backend.close()
 
 
 if __name__ == "__main__":

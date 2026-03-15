@@ -19,15 +19,15 @@ externally by the framework.
 
 **Arguments**:
 
-- `config` - Full attack config containing ``attacker``, ``scorer`` and
-  ``summarizer`` router settings.
+- `config` - Full attack config containing `attacker`, `scorer` and
+  `summarizer` router settings.
 - `client` - Authenticated API client used by router factory.
 - `logger` - Logger used by router initialization and request flow.
   
 
 **Returns**:
 
-  Tuple ``(att_router, att_key, sc_router, sc_key, sum_router, sum_key)``
+  Tuple `(att_router, att_key, sc_router, sc_key, sum_router, sum_key)`
   with each router plus its registration key.
 
 #### conditional\_generate
@@ -48,7 +48,7 @@ Generate an attacker candidate prompt using conditional generation.
 
 Paper mapping: this implements the Attacker LLM generation behavior used in
 both warm-up and lifelong phases, mirroring the original
-``framework/attacker.py`` conditional pattern.
+`framework/attacker.py` conditional pattern.
 
 The function first tries assistant-prefill continuation, then falls back to
 normal chat completion when a provider does not honor prefilled assistant
@@ -70,7 +70,7 @@ messages.
 **Returns**:
 
   Raw attacker text. If prefill is honored, output is reconstructed with
-  ``[START OF JAILBREAK PROMPT]`` prefix for downstream extraction.
+  `[START OF JAILBREAK PROMPT]` prefix for downstream extraction.
 
 #### query\_target
 
@@ -133,8 +133,8 @@ from AutoDAN-Turbo, with robust fallbacks for production providers.
 
 **Returns**:
 
-  Tuple ``(score, assessment_text)`` where ``score`` is float in ``[1,10]``
-  and ``assessment_text`` is the scorer&#x27;s natural-language reasoning.
+  Tuple `(score, assessment_text)` where `score` is float in `[1,10]`
+  and `assessment_text` is the scorer&#x27;s natural-language reasoning.
 
 #### extract\_jailbreak\_prompt
 
@@ -159,7 +159,7 @@ sent to the target during warm-up/lifelong loops.
 
 **Returns**:
 
-  Extracted jailbreak prompt text or ``fallback`` when no usable content
+  Extracted jailbreak prompt text or `fallback` when no usable content
   is found.
 
 #### check\_refusal
@@ -182,6 +182,6 @@ creation by discarding obvious refusal outputs.
 
 **Returns**:
 
-  ``request`` when refusal-like text is detected, otherwise original
-  ``prompt``.
+  `request` when refusal-like text is detected, otherwise original
+  `prompt`.
 

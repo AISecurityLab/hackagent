@@ -7,10 +7,12 @@ Config Tab
 Manage HackAgent configuration settings.
 """
 
+import importlib.metadata
+
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.widgets import Button, Input, Label, Select, Static
+from textual.widgets import Button, Input, Label, Static
 
 from hackagent.cli.config import CLIConfig
 
@@ -61,14 +63,6 @@ class ConfigTab(VerticalScroll):
                     classes="config-input",
                 )
 
-            with Vertical(classes="form-group"):
-                yield Label("Output Format:")
-                yield Select(
-                    [("Table", "table"), ("JSON", "json"), ("CSV", "csv")],
-                    id="output-format",
-                    value=self.cli_config.output_format,
-                )
-
         with Vertical(classes="config-section"):
             yield Static("[bold]Configuration File[/bold]")
 
@@ -101,7 +95,7 @@ class ConfigTab(VerticalScroll):
 
             yield Static(
                 f"""[dim]Python Version:[/dim] {self._get_python_version()}
-[dim]CLI Version:[/dim] 0.2.5
+[dim]CLI Version:[/dim] {importlib.metadata.version("hackagent")}
 [dim]Dependencies:[/dim] {self._check_dependencies()}
 [dim]Local DB:[/dim] ~/.local/share/hackagent/hackagent.db""",
                 classes="info-box",
@@ -133,9 +127,6 @@ class ConfigTab(VerticalScroll):
 
         # Set base URL
         self.query_one("#base_url", Input).value = self.cli_config.base_url
-
-        # Set output format
-        self.query_one("#output-format", Select).value = self.cli_config.output_format
 
     def _update_status(self) -> None:
         """Update configuration status display."""
@@ -177,14 +168,12 @@ class ConfigTab(VerticalScroll):
             # Get values from form
             api_key = self.query_one("#api-key", Input).value
             base_url = self.query_one("#base_url", Input).value
-            output_format = self.query_one("#output-format", Select).value
 
             # Update config
             if api_key:
                 self.cli_config.api_key = api_key
             if base_url:
                 self.cli_config.base_url = base_url
-            self.cli_config.output_format = output_format
 
             # Save to file
             self.cli_config.save()
@@ -256,7 +245,6 @@ class ConfigTab(VerticalScroll):
 
             # Reset to defaults
             self.cli_config.base_url = "https://api.hackagent.dev"
-            self.cli_config.output_format = "table"
             self.cli_config.api_key = None
 
             self._load_config()
