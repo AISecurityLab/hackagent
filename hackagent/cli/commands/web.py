@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-``hackagent web`` — Community Edition web dashboard command.
+``hackagent web`` — web dashboard command.
 
 Starts a NiceGUI server that reads from the local SQLite backend
 (or the remote backend when an API key is configured) and serves the
@@ -42,7 +42,7 @@ console = Console()
 )
 @click.pass_context
 def web(ctx, host, port, db_path, no_browser):
-    """🌐 Launch the Community Edition web dashboard.
+    """🌐 Launch the web dashboard.
 
     Starts a local web server that serves a full-featured security testing
     dashboard.  Works in both offline mode (SQLite) and online mode (remote
@@ -56,15 +56,15 @@ def web(ctx, host, port, db_path, no_browser):
       hackagent web --no-browser       # skip opening a browser tab
     """
     try:
-        from flask import Flask  # noqa: F401
+        from nicegui import ui  # noqa: F401
     except ImportError:
         console.print(
-            "[bold red]❌ Flask is required for the web dashboard.[/bold red]"
+            "[bold red]❌ NiceGUI is required for the web dashboard.[/bold red]"
         )
         console.print("\n[cyan]Install with:[/cyan]")
         console.print("  pip install 'hackagent[web]'")
         console.print("  # or")
-        console.print("  pip install flask")
+        console.print("  pip install nicegui")
         ctx.exit(1)
         return
 
@@ -103,7 +103,7 @@ def web(ctx, host, port, db_path, no_browser):
     url = f"http://{host}:{port}"
 
     console.print()
-    console.print("[bold]🌐  HackAgent Community Dashboard[/bold]")
+    console.print("[bold]🌐  HackAgent Dashboard[/bold]")
     console.print(f"    [cyan]→  {url}[/cyan]")
     mode_label = "remote" if cli_config.api_key else "local"
     console.print(f"    Mode : [cyan]{mode_label}[/cyan]")

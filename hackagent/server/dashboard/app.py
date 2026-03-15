@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Community Edition Dashboard — NiceGUI application.
+HackAgent Dashboard — NiceGUI application.
 
 Exposes a FastAPI REST API over the HackAgent storage backend and serves the
 dashboard UI at ``/`` using NiceGUI (Quasar/Vue).  Dark/light mode works
@@ -117,10 +117,10 @@ class _DashboardApp:
         ui.run(
             host=host,
             port=port,
-            title="HackAgent Community Dashboard",
+            title="HackAgent Dashboard",
             show=show,
             reload=False,
-            storage_secret="hackagent-community-local-v1",
+            storage_secret="hackagent-local-v1",
             favicon="🛡️",
         )
 
@@ -227,12 +227,12 @@ def create_app(
 
         # ── Dark mode (persisted in browser storage) ──────────────────────────
         dark = ui.dark_mode()
-        if ui.storage.browser.get("hackagent_dark"):
+        if _fastapi_app.storage.browser.get("hackagent_dark"):
             dark.enable()
 
         def toggle_dark() -> None:
             dark.toggle()
-            ui.storage.browser["hackagent_dark"] = dark.value
+            _fastapi_app.storage.browser["hackagent_dark"] = dark.value
             dark_btn.props(f"icon={'light_mode' if dark.value else 'dark_mode'}")
 
         # ── Per-page mutable state ────────────────────────────────────────────
@@ -1100,83 +1100,86 @@ def create_app(
 
             # Risk donut
             no_data = total_results == 0
-            risk_chart.options = {
-                "series": [
-                    {
-                        "type": "pie",
-                        "radius": ["58%", "80%"],
-                        "data": (
-                            [
-                                {
-                                    "value": 1,
-                                    "name": "No data",
-                                    "itemStyle": {"color": "#94a3b8"},
-                                }
-                            ]
-                            if no_data
-                            else [
-                                {
-                                    "value": jailbreaks,
-                                    "name": "Jailbreaks",
-                                    "itemStyle": {"color": "#ef4444"},
-                                },
-                                {
-                                    "value": passed,
-                                    "name": "Passed",
-                                    "itemStyle": {"color": "#22c55e"},
-                                },
-                                {
-                                    "value": errors,
-                                    "name": "Errors",
-                                    "itemStyle": {"color": "#f97316"},
-                                },
-                                {
-                                    "value": not_eval,
-                                    "name": "Pending",
-                                    "itemStyle": {"color": "#94a3b8"},
-                                },
-                            ]
-                        ),
-                        "label": {"show": False},
-                        "emphasis": {"scale": False},
-                    }
-                ],
-                "graphic": (
-                    []
-                    if no_data
-                    else [
+            risk_chart.options.clear()
+            risk_chart.options.update(
+                {
+                    "series": [
                         {
-                            "type": "group",
-                            "left": "center",
-                            "top": "center",
-                            "children": [
-                                {
-                                    "type": "text",
-                                    "style": {
-                                        "text": f"{risk_pct}%",
-                                        "textAlign": "center",
-                                        "fontSize": 22,
-                                        "fontWeight": "bold",
-                                        "fill": risk_color,
+                            "type": "pie",
+                            "radius": ["58%", "80%"],
+                            "data": (
+                                [
+                                    {
+                                        "value": 1,
+                                        "name": "No data",
+                                        "itemStyle": {"color": "#94a3b8"},
+                                    }
+                                ]
+                                if no_data
+                                else [
+                                    {
+                                        "value": jailbreaks,
+                                        "name": "Jailbreaks",
+                                        "itemStyle": {"color": "#ef4444"},
                                     },
-                                    "top": -14,
-                                },
-                                {
-                                    "type": "text",
-                                    "style": {
-                                        "text": risk_level,
-                                        "textAlign": "center",
-                                        "fontSize": 11,
-                                        "fill": risk_color,
+                                    {
+                                        "value": passed,
+                                        "name": "Passed",
+                                        "itemStyle": {"color": "#22c55e"},
                                     },
-                                    "top": 12,
-                                },
-                            ],
+                                    {
+                                        "value": errors,
+                                        "name": "Errors",
+                                        "itemStyle": {"color": "#f97316"},
+                                    },
+                                    {
+                                        "value": not_eval,
+                                        "name": "Pending",
+                                        "itemStyle": {"color": "#94a3b8"},
+                                    },
+                                ]
+                            ),
+                            "label": {"show": False},
+                            "emphasis": {"scale": False},
                         }
-                    ]
-                ),
-                "tooltip": {"trigger": "item" if not no_data else "none"},
-            }
+                    ],
+                    "graphic": (
+                        []
+                        if no_data
+                        else [
+                            {
+                                "type": "group",
+                                "left": "center",
+                                "top": "center",
+                                "children": [
+                                    {
+                                        "type": "text",
+                                        "style": {
+                                            "text": f"{risk_pct}%",
+                                            "textAlign": "center",
+                                            "fontSize": 22,
+                                            "fontWeight": "bold",
+                                            "fill": risk_color,
+                                        },
+                                        "top": -14,
+                                    },
+                                    {
+                                        "type": "text",
+                                        "style": {
+                                            "text": risk_level,
+                                            "textAlign": "center",
+                                            "fontSize": 11,
+                                            "fill": risk_color,
+                                        },
+                                        "top": 12,
+                                    },
+                                ],
+                            }
+                        ]
+                    ),
+                    "tooltip": {"trigger": "item" if not no_data else "none"},
+                }
+            )
             risk_chart.update()
 
             # Distribution bar

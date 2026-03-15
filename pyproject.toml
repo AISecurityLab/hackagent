@@ -22,6 +22,7 @@ classifiers = [
 
 dependencies = [
     "requests>=2.31.0",
+    "httpx>=0.27.0",
     "pydantic[email]>=2.0",
     "litellm>=1.69.2",
     "openai>=1.0.0",
@@ -31,7 +32,6 @@ dependencies = [
     "textual>=1.0.0",
     "python-dateutil>=2.8.0",
     "faiss-cpu>=1.13.2",
-    "pypdf>=6.7.5",
 ]
 
 [project.optional-dependencies]

@@ -49,7 +49,7 @@ class TestCLIHelp(unittest.TestCase):
         result = runner.invoke(cli, ["--help"])
         self.assertEqual(result.exit_code, 0)
         self.assertIn("HackAgent CLI", result.output)
-        self.assertIn("Common Usage", result.output)
+        self.assertIn("Quick Start", result.output)
 
     def test_help_shows_commands(self):
         """Test help output lists available commands."""
