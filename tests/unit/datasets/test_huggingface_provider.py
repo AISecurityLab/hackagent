@@ -12,36 +12,17 @@ class TestHuggingFaceDatasetProvider(unittest.TestCase):
 
     def test_init_requires_path(self):
         """Test that initialization requires a path."""
-        # Need to patch the import check
-        with patch(
-            "hackagent.datasets.providers.huggingface._check_datasets_available",
-            return_value=True,
-        ):
-            from hackagent.datasets.providers.huggingface import (
-                HuggingFaceDatasetProvider,
-            )
+        from hackagent.datasets.providers.huggingface import (
+            HuggingFaceDatasetProvider,
+        )
 
-            with self.assertRaises(ValueError) as context:
-                HuggingFaceDatasetProvider({})
+        with self.assertRaises(ValueError) as context:
+            HuggingFaceDatasetProvider({})
 
-            self.assertIn("path", str(context.exception).lower())
+        self.assertIn("path", str(context.exception).lower())
 
-    @patch("hackagent.datasets.providers.huggingface._check_datasets_available")
-    def test_init_checks_datasets_available(self, mock_check):
-        """Test that initialization checks for datasets library."""
-        mock_check.return_value = False
-
-        from hackagent.datasets.providers.huggingface import HuggingFaceDatasetProvider
-
-        with self.assertRaises(ImportError) as context:
-            HuggingFaceDatasetProvider({"path": "test/dataset"})
-
-        self.assertIn("datasets", str(context.exception).lower())
-
-    @patch("hackagent.datasets.providers.huggingface._check_datasets_available")
-    def test_load_goals_extracts_from_field(self, mock_check):
+    def test_load_goals_extracts_from_field(self):
         """Test that goals are extracted from the specified field."""
-        mock_check.return_value = True
 
         # Mock the datasets module
         with patch.dict("sys.modules", {"datasets": MagicMock()}):
@@ -82,10 +63,8 @@ class TestHuggingFaceDatasetProvider(unittest.TestCase):
             self.assertEqual(goals[1], "Goal 2")
             self.assertEqual(goals[2], "Goal 3")
 
-    @patch("hackagent.datasets.providers.huggingface._check_datasets_available")
-    def test_load_goals_with_limit(self, mock_check):
+    def test_load_goals_with_limit(self):
         """Test that limit parameter works correctly."""
-        mock_check.return_value = True
 
         with patch.dict("sys.modules", {"datasets": MagicMock()}):
             import sys
@@ -114,10 +93,8 @@ class TestHuggingFaceDatasetProvider(unittest.TestCase):
 
             self.assertEqual(len(goals), 10)
 
-    @patch("hackagent.datasets.providers.huggingface._check_datasets_available")
-    def test_load_goals_uses_fallback_fields(self, mock_check):
+    def test_load_goals_uses_fallback_fields(self):
         """Test that fallback fields are used when primary field is missing."""
-        mock_check.return_value = True
 
         with patch.dict("sys.modules", {"datasets": MagicMock()}):
             import sys
@@ -155,10 +132,8 @@ class TestHuggingFaceDatasetProvider(unittest.TestCase):
             self.assertEqual(goals[0], "Found via input")
             self.assertEqual(goals[1], "Found via text")
 
-    @patch("hackagent.datasets.providers.huggingface._check_datasets_available")
-    def test_load_goals_with_shuffle(self, mock_check):
+    def test_load_goals_with_shuffle(self):
         """Test that shuffle parameter is passed to dataset."""
-        mock_check.return_value = True
 
         with patch.dict("sys.modules", {"datasets": MagicMock()}):
             import sys
@@ -186,10 +161,8 @@ class TestHuggingFaceDatasetProvider(unittest.TestCase):
 
             mock_dataset.shuffle.assert_called_once_with(seed=42)
 
-    @patch("hackagent.datasets.providers.huggingface._check_datasets_available")
-    def test_get_metadata(self, mock_check):
+    def test_get_metadata(self):
         """Test that metadata is returned correctly."""
-        mock_check.return_value = True
 
         with patch.dict("sys.modules", {"datasets": MagicMock()}):
             import sys
@@ -222,10 +195,8 @@ class TestHuggingFaceDatasetProvider(unittest.TestCase):
             self.assertEqual(metadata["total_samples"], 1)
             self.assertEqual(metadata["goals_loaded"], 1)
 
-    @patch("hackagent.datasets.providers.huggingface._check_datasets_available")
-    def test_load_dataset_with_config_name(self, mock_check):
+    def test_load_dataset_with_config_name(self):
         """Test that dataset config name is passed correctly."""
-        mock_check.return_value = True
 
         with patch.dict("sys.modules", {"datasets": MagicMock()}):
             import sys
@@ -233,7 +204,7 @@ class TestHuggingFaceDatasetProvider(unittest.TestCase):
             mock_datasets = sys.modules["datasets"]
 
             mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(return_value=iter([{"q": "Goal"}]))
+            mock_dataset.__iter__ = MagicMock(return_value=iter([{"question": "Goal"}]))
             mock_dataset.__len__ = MagicMock(return_value=1)
             mock_datasets.load_dataset.return_value = mock_dataset
 

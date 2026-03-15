@@ -110,12 +110,12 @@ exclude_lines = [
 output = "reports/coverage.xml"
 
 [tool.pytest.ini_options]
-testpaths = ["tests/unit", "tests/integration"]
+testpaths = ["tests/unit", "tests/integration", "tests/e2e"]
 markers = [
     "integration: marks integration tests (use --run-integration to enable)",
     "ollama: marks tests that require a running Ollama instance",
     "openai_sdk: marks tests that require OpenAI/OpenRouter API key",
-    "google_adk: marks tests that require Google ADK server (deselect with '-m \"not google_adk\"')",
+    "google_adk: marks tests that require a live Google ADK server (use --run-google-adk to enable)",
     "litellm: marks tests that require a LiteLLM-compatible backend",
     "e2e: marks end-to-end tests that require external services",
     "hackagent_backend: marks tests that require the HackAgent backend API",

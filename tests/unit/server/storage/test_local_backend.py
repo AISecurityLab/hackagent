@@ -31,8 +31,11 @@ class TestLocalBackendInit(unittest.TestCase):
 
     def test_creates_db_file(self):
         with tempfile.TemporaryDirectory() as tmp:
-            _make_backend(tmp)
-            self.assertTrue(os.path.exists(os.path.join(tmp, "test.db")))
+            backend = _make_backend(tmp)
+            try:
+                self.assertTrue(os.path.exists(os.path.join(tmp, "test.db")))
+            finally:
+                backend.close()
 
     def test_get_api_key_returns_none(self):
         with tempfile.TemporaryDirectory() as tmp:

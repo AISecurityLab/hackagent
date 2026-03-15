@@ -87,7 +87,7 @@ jobs:
         run: uv sync --group dev
 
       - name: Run tests with coverage
-        run: uv run pytest --cov --cov-report=xml:reports/coverage.xml -m "not google_adk"
+        run: uv run pytest --cov --cov-report=xml:reports/coverage.xml
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
@@ -120,7 +120,7 @@ jobs:
         run: uv sync --group dev
 
       - name: Run tests with coverage
-        run: uv run pytest --cov --cov-report=xml:reports/coverage.xml -m "not google_adk"
+        run: uv run pytest --cov --cov-report=xml:reports/coverage.xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
@@ -177,10 +177,7 @@ jobs:
         run: uv sync --group dev
 
       - name: Run integration tests with coverage
-        # Note: --cov-fail-under=0 disables the threshold since integration tests
-        # cover specific paths, not the full codebase. Coverage is merged in Codecov.
-        # --reruns 2 --reruns-delay 30 retries failed tests to handle rate limiting (429 errors).
-        run: uv run pytest tests/integration/ --run-integration -v -m "not google_adk" --tb=short --cov --cov-fail-under=0 --cov-report=xml:reports/integration-coverage.xml --reruns 2 --reruns-delay 30
+        run: uv run pytest tests/integration/ --run-integration -v --tb=short --cov --cov-fail-under=0 --cov-report=xml:reports/integration-coverage.xml
 
       - name: Upload integration coverage to Codecov
         uses: codecov/codecov-action@v5
