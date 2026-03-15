@@ -22,12 +22,12 @@ Usage:
 
     router, reg_key = create_router(
         client=client,
-        config=\{
+        config=&#123;
             &quot;identifier&quot;: &quot;ollama/llama3&quot;,
             &quot;endpoint&quot;: &quot;http://localhost:11434/v1&quot;,
             &quot;max_new_tokens&quot;: 500,
             &quot;temperature&quot;: 0.7,
-        \},
+        &#125;,
         logger=logger,
         router_name=&quot;attacker&quot;,
     )

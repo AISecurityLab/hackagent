@@ -58,7 +58,7 @@ Handles the following response formats:
   &gt;&gt;&gt; # OpenAI-style response
   &gt;&gt;&gt; content = extract_response_content(openai_response)
   &gt;&gt;&gt; # Dict-style response
-  &gt;&gt;&gt; content = extract_response_content(\{&quot;generated_text&quot;: &quot;Hello!&quot;\})
+  &gt;&gt;&gt; content = extract_response_content(&#123;&quot;generated_text&quot;: &quot;Hello!&quot;&#125;)
   &gt;&gt;&gt; # Plain string
   &gt;&gt;&gt; content = extract_response_content(&quot;Hello!&quot;)
 

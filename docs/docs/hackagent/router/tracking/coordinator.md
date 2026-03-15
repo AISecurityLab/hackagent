@@ -30,7 +30,7 @@ Usage:
         logger=logger,
         attack_type=&quot;advprefix&quot;,
     )
-    coordinator.initialize_goals(goals, initial_metadata=\{...\})
+    coordinator.initialize_goals(goals, initial_metadata=&#123;...&#125;)
 
     # Pass coordinator.goal_tracker to sub-modules explicitly
     # (not via config dict)

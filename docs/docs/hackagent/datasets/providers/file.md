@@ -18,23 +18,23 @@ This provider loads goals from local files in various formats.
 **Example**:
 
   # JSON file with array of objects
-  provider = FileDatasetProvider(\{
+  provider = FileDatasetProvider(&#123;
 - `"path"` - &quot;./goals.json&quot;,
 - `"goal_field"` - &quot;objective&quot;,
-  \})
+  &#125;)
   goals = provider.load_goals()
   
   # CSV file
-  provider = FileDatasetProvider(\{
+  provider = FileDatasetProvider(&#123;
 - `"path"` - &quot;./goals.csv&quot;,
 - `"goal_field"` - &quot;prompt&quot;,
-  \})
+  &#125;)
   goals = provider.load_goals()
   
   # Plain text file (one goal per line)
-  provider = FileDatasetProvider(\{
+  provider = FileDatasetProvider(&#123;
 - `"path"` - &quot;./goals.txt&quot;,
-  \})
+  &#125;)
   goals = provider.load_goals()
 
 #### \_\_init\_\_
