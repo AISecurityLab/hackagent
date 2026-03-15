@@ -39,7 +39,7 @@ datasets = [
     "datasets>=2.14.0",  # HuggingFace datasets library
 ]
 web = [
-    "flask>=3.0",
+    "nicegui>=2.0",
 ]
 
 

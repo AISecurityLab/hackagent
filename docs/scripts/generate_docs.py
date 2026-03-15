@@ -46,7 +46,6 @@ def _sanitize_mdx(text: str) -> str:
     result = []
     in_fence = False
     in_frontmatter = False
-    frontmatter_done = False
 
     for i, line in enumerate(lines):
         # Track YAML frontmatter (first --- block)
@@ -58,7 +57,6 @@ def _sanitize_mdx(text: str) -> str:
             result.append(line)
             if line.strip() == "---":
                 in_frontmatter = False
-                frontmatter_done = True
             continue
 
         # Track fenced code blocks
@@ -364,10 +362,6 @@ def main() -> None:
         version = get_current_version(project_root)
 
     generate_docs(version)
-
-
-if __name__ == "__main__":
-    main()
 
 
 if __name__ == "__main__":

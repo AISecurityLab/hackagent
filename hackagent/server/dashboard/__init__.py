@@ -11,7 +11,7 @@ Usage:
     from hackagent.server.dashboard import create_app
 
     app = create_app()          # uses ~/.local/share/hackagent/hackagent.db
-    app.run(host="127.0.0.1", port=7860)
+    app.run(host="127.0.0.1", port=7860)   # starts NiceGUI server
 
 Or via the CLI:
     hackagent web

@@ -4,14 +4,10 @@
 """
 ``hackagent web`` — Community Edition web dashboard command.
 
-Starts a lightweight Flask server that reads from the local SQLite backend
-(or the remote backend when an API key is configured) and serves a SPA
+Starts a NiceGUI server that reads from the local SQLite backend
+(or the remote backend when an API key is configured) and serves the
 dashboard at http://<host>:<port>/.
 """
-
-import threading
-import time
-import webbrowser
 
 import click
 from rich.console import Console
@@ -117,14 +113,5 @@ def web(ctx, host, port, db_path, no_browser):
     console.print()
     console.print("    Press [bold]Ctrl+C[/bold] to stop.\n")
 
-    # ── Auto-open browser ─────────────────────────────────────────────────────
-    if not no_browser:
-
-        def _open_browser():
-            time.sleep(1.0)
-            webbrowser.open(url)
-
-        threading.Thread(target=_open_browser, daemon=True).start()
-
-    # ── Serve ─────────────────────────────────────────────────────────────────
-    app.run(host=host, port=port, debug=False, use_reloader=False)
+    # ── Serve (NiceGUI opens the browser automatically when show=True) ────────
+    app.run(host=host, port=port, show=not no_browser)
