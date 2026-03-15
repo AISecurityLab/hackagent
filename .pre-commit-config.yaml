@@ -19,7 +19,7 @@ repos:
     hooks:
       - id: pytest
         name: pytest
-        entry: uv run pytest
+        entry: uv run pytest --run-integration
         language: system
         pass_filenames: false
         files: ^(.*\.py|pyproject\.toml|poetry\.lock|.*requirements.*\.txt|.*package\.json|.*package-lock\.json)$

@@ -71,7 +71,7 @@ for evaluation.
   either predefined templates (accessed by index) or custom strings with
   optional `{prefix}` placeholders for dynamic formatting.
   
-  Completions are processed sequentially with progress tracking, and
+  Completions are processed in parallel with progress tracking, and
   errors are captured gracefully to allow the pipeline to continue
   processing remaining prefixes.
 

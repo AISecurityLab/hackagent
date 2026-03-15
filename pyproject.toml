@@ -38,6 +38,9 @@ dependencies = [
 datasets = [
     "datasets>=2.14.0",  # HuggingFace datasets library
 ]
+web = [
+    "flask>=3.0",
+]
 
 
 [dependency-groups]
@@ -113,20 +116,16 @@ exclude_lines = [
 output = "reports/coverage.xml"
 
 [tool.pytest.ini_options]
-testpaths = ["tests/unit"]
-collect_ignore = [
-    "tests/e2e/test_auth.py",
-    "tests/e2e/test_google_adk.py",
-    "tests/e2e/attacks/test_advprefix.py",
-    "tests/e2e/attacks/test_autodan_turbo.py",
-    "tests/e2e/attacks/test_bon.py",
-    "tests/e2e/attacks/test_flipattack.py",
-    "tests/e2e/attacks/test_flipattack_new_metrics.py",
-    "tests/e2e/attacks/test_tap.py",
-]
+testpaths = ["tests/unit", "tests/integration"]
 markers = [
+    "integration: marks integration tests (use --run-integration to enable)",
+    "ollama: marks tests that require a running Ollama instance",
+    "openai_sdk: marks tests that require OpenAI/OpenRouter API key",
     "google_adk: marks tests that require Google ADK server (deselect with '-m \"not google_adk\"')",
+    "litellm: marks tests that require a LiteLLM-compatible backend",
     "e2e: marks end-to-end tests that require external services",
+    "hackagent_backend: marks tests that require the HackAgent backend API",
+    "slow: marks slow-running tests",
 ]
 
 [tool.datamodel-codegen]

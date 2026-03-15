@@ -4,22 +4,20 @@ sidebar_position: 1
 
 # Python SDK API Reference
 
-This section provides detailed documentation for all classes, methods, and functions in the HackAgent Python SDK. This is auto-generated documentation from the source code docstrings.
+This section provides detailed documentation for all classes, methods, and functions
+in the HackAgent Python SDK, auto-generated from source-code docstrings.
 
 ## What's Included
 
-- **Core Classes**: `HackAgent`, `Client`, `AuthenticatedClient`
-- **Attack Framework**: Base classes and strategies for implementing security tests
-- **Error Handling**: Exception classes and error handling utilities
-- **Vulnerability Detection**: Tools for identifying security weaknesses
+- **Core**: `HackAgent` agent class, errors, and utilities
+- **Router**: Adapters for OpenAI, Ollama, LiteLLM, Google ADK, and call tracking
+- **Attack Framework**: Base classes, objectives, evaluators, and techniques
+  (AdvPrefix, PAIR, TAP, BON, FlipAttack, AutoDAN-Turbo, Baseline)
+- **Datasets**: Built-in providers and dataset registry
+- **Risks**: Risk profiles and vulnerability definitions for all OWASP LLM risk categories
 
-## SDK vs HTTP API
-
-This documentation covers the **Python SDK API** - the classes and methods you use when writing Python code with HackAgent. If you're looking for information about raw HTTP endpoints, those are accessed through the SDK and not documented separately at this time.
-
-For practical usage examples and getting started guides, see the [Python SDK Quickstart](./sdk/python-quickstart.md).
+For practical usage examples, see the [Python SDK Quickstart](./sdk/python-quickstart.md).
 
 ---
 
-*This documentation was auto-generated from hackagent vlocal.*
-
+*Auto-generated from hackagent v0.6.0.*

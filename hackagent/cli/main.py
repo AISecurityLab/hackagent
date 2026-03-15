@@ -15,7 +15,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.traceback import install
 
-from hackagent.cli.commands import agent, attack, config, results
+from hackagent.cli.commands import agent, attack, config, results, web as web_cmd
 from hackagent.cli.config import CLIConfig
 from hackagent.cli.utils import display_info, handle_errors
 
@@ -505,6 +505,7 @@ cli.add_command(config.config)
 cli.add_command(agent.agent)
 cli.add_command(attack.attack)
 cli.add_command(results.results)
+cli.add_command(web_cmd.web)
 
 
 if __name__ == "__main__":

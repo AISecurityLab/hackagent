@@ -2343,6 +2343,9 @@ dependencies = [
 datasets = [
     { name = "datasets" },
 ]
+web = [
+    { name = "flask" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -2375,6 +2378,7 @@ requires-dist = [
     { name = "click", specifier = ">=8.1.0" },
     { name = "datasets", marker = "extra == 'datasets'", specifier = ">=2.14.0" },
     { name = "faiss-cpu", specifier = ">=1.13.2" },
+    { name = "flask", marker = "extra == 'web'", specifier = ">=3.0" },
     { name = "litellm", specifier = ">=1.69.2" },
     { name = "openai", specifier = ">=1.0.0" },
     { name = "pydantic", extras = ["email"], specifier = ">=2.0" },
@@ -2385,7 +2389,7 @@ requires-dist = [
     { name = "rich", specifier = ">=14.0.0" },
     { name = "textual", specifier = ">=1.0.0" },
 ]
-provides-extras = ["datasets"]
+provides-extras = ["datasets", "web"]
 
 [package.metadata.requires-dev]
 dev = [

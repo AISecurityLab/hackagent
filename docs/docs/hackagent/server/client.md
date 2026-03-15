@@ -1,16 +1,16 @@
 ---
 sidebar_label: client
-title: hackagent.client
+title: hackagent.server.client
 ---
 
 ## Client Objects
 
 ```python
-@define
-class Client()
+class Client(BaseModel)
 ```
 
 A class for keeping track of data related to the API
+
 The following are accepted as keyword arguments and will be used to construct httpx Clients internally:
 ``base_url``: The base URL for the API, all requests are made to a relative path to this URL
 
@@ -130,8 +130,7 @@ Exit a context manager for underlying httpx.AsyncClient (see httpx docs)
 ## AuthenticatedClient Objects
 
 ```python
-@define
-class AuthenticatedClient()
+class AuthenticatedClient(BaseModel)
 ```
 
 A Client which has been authenticated for use on secured endpoints
