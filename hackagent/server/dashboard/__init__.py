@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-HackAgent Community Edition Dashboard
+HackAgent Dashboard
 
 A lightweight, self-hosted web dashboard that reads directly from the local
 SQLite storage (or a remote backend when an API key is configured).
