@@ -325,7 +325,7 @@ class TestOpenAIRouterIntegration:
         openai_base_url: str,
     ):
         """Test that AgentRouter correctly creates OpenAIAgent adapter."""
-        from hackagent.client import AuthenticatedClient
+        from hackagent.server.client import AuthenticatedClient
         from hackagent.router.router import AgentRouter
         from hackagent.router.types import AgentTypeEnum
         from hackagent.router.adapters.openai import OpenAIAgent
@@ -360,7 +360,7 @@ class TestOpenAIRouterIntegration:
         openai_base_url: str,
     ):
         """Test that router can handle requests through OpenAI adapter."""
-        from hackagent.client import AuthenticatedClient
+        from hackagent.server.client import AuthenticatedClient
         from hackagent.router.router import AgentRouter
         from hackagent.router.types import AgentTypeEnum
 

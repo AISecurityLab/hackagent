@@ -274,7 +274,7 @@ class TestOllamaRouterIntegration:
         ollama_model: str,
     ):
         """Test that AgentRouter correctly creates OllamaAgent adapter."""
-        from hackagent.client import AuthenticatedClient
+        from hackagent.server.client import AuthenticatedClient
         from hackagent.router.router import AgentRouter
         from hackagent.router.types import AgentTypeEnum
         from hackagent.router.adapters.ollama import OllamaAgent
@@ -309,7 +309,7 @@ class TestOllamaRouterIntegration:
         ollama_model: str,
     ):
         """Test that router can handle requests through Ollama adapter."""
-        from hackagent.client import AuthenticatedClient
+        from hackagent.server.client import AuthenticatedClient
         from hackagent.router.router import AgentRouter
         from hackagent.router.types import AgentTypeEnum
 

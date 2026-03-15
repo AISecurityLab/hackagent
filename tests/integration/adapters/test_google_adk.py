@@ -354,7 +354,7 @@ class TestGoogleADKRouterIntegration:
         google_adk_agent_url: str,
     ):
         """Test that AgentRouter correctly creates ADKAgent adapter."""
-        from hackagent.client import AuthenticatedClient
+        from hackagent.server.client import AuthenticatedClient
         from hackagent.router.router import AgentRouter
         from hackagent.router.types import AgentTypeEnum
         from hackagent.router.adapters.google_adk import ADKAgent
@@ -388,7 +388,7 @@ class TestGoogleADKRouterIntegration:
         google_adk_agent_url: str,
     ):
         """Test that router can handle requests through ADK adapter."""
-        from hackagent.client import AuthenticatedClient
+        from hackagent.server.client import AuthenticatedClient
         from hackagent.router.router import AgentRouter
         from hackagent.router.types import AgentTypeEnum
 

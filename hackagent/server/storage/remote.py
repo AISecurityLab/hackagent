@@ -179,7 +179,7 @@ class RemoteBackend:
             for a in resp.parsed.results or []:
                 if a.name == name:
                     return a
-            if not resp.parsed.next_:
+            if not resp.parsed.next:
                 break
             page += 1
         return None

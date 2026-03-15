@@ -338,7 +338,7 @@ class TestLiteLLMRouterIntegration:
         ollama_base_url: str,
     ):
         """Test that AgentRouter correctly creates LiteLLMAgent adapter."""
-        from hackagent.client import AuthenticatedClient
+        from hackagent.server.client import AuthenticatedClient
         from hackagent.router.router import AgentRouter
         from hackagent.router.types import AgentTypeEnum
         from hackagent.router.adapters.litellm import LiteLLMAgent
@@ -379,7 +379,7 @@ class TestLiteLLMRouterIntegration:
         ollama_base_url: str,
     ):
         """Test that router can handle requests through LiteLLM adapter."""
-        from hackagent.client import AuthenticatedClient
+        from hackagent.server.client import AuthenticatedClient
         from hackagent.router.router import AgentRouter
         from hackagent.router.types import AgentTypeEnum
 
