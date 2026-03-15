@@ -52,9 +52,9 @@ class TestTrackOperation(unittest.TestCase):
     @patch.object(StepTracker, "track_step")
     def test_track_operation_with_valid_tracker(self, mock_track_step):
         """Test that function is tracked with valid tracker."""
-        mock_client = MagicMock()
+        mock_backend = MagicMock()
         context = TrackingContext(
-            client=mock_client,
+            backend=mock_backend,
             run_id="12345678-1234-1234-1234-123456789abc",
             parent_result_id="87654321-4321-4321-4321-cba987654321",
         )
@@ -97,9 +97,9 @@ class TestTrackOperation(unittest.TestCase):
     @patch.object(StepTracker, "track_step")
     def test_track_operation_extractor_error_handling(self, mock_track_step):
         """Test that extractor errors are handled gracefully."""
-        mock_client = MagicMock()
+        mock_backend = MagicMock()
         context = TrackingContext(
-            client=mock_client,
+            backend=mock_backend,
             run_id="12345678-1234-1234-1234-123456789abc",
         )
         tracker = StepTracker(context)
@@ -218,9 +218,9 @@ class TestTrackMethod(unittest.TestCase):
     @patch.object(StepTracker, "track_step")
     def test_track_method_with_valid_tracker(self, mock_track_step):
         """Test method is tracked with valid tracker."""
-        mock_client = MagicMock()
+        mock_backend = MagicMock()
         context = TrackingContext(
-            client=mock_client,
+            backend=mock_backend,
             run_id="12345678-1234-1234-1234-123456789abc",
         )
         tracker = StepTracker(context)

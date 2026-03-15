@@ -1,0 +1,608 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+"""
+RemoteBackend — StorageBackend implementation backed by api.hackagent.dev.
+
+This backend centralises all HTTP calls that were previously scattered across
+AgentRouter, AttackOrchestrator, Tracker, and StepTracker.  It is instantiated
+when an API key is available and selected automatically by HackAgent.__init__.
+"""
+
+from __future__ import annotations
+
+import logging
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+from uuid import UUID
+
+from hackagent.server.client import AuthenticatedClient
+from hackagent.server.api.agent import agent_create, agent_list, agent_partial_update
+from hackagent.server.api.attack import attack_create, attack_list
+from hackagent.server.api.run import (
+    run_list,
+    run_partial_update,
+    run_retrieve,
+    run_run_tests_create,
+)
+from hackagent.server.api.result import (
+    result_create,
+    result_list,
+    result_partial_update,
+    result_retrieve,
+    result_trace_create,
+)
+from hackagent.server.api.models import (
+    AgentRequest,
+    AttackRequest,
+    EvaluationStatusEnum,
+    PatchedAgentRequest,
+    PatchedResultRequest,
+    PatchedRunRequest,
+    ResultRequest,
+    RunRequest,
+    StatusEnum,
+    StepTypeEnum,
+    TraceRequest,
+)
+from hackagent.server.storage.base import (
+    AgentRecord,
+    AttackRecord,
+    OrganizationContext,
+    PaginatedResult,
+    ResultRecord,
+    RunRecord,
+    TraceRecord,
+)
+
+logger = logging.getLogger("hackagent.server.storage.remote")
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _to_agent_record(agent) -> AgentRecord:
+    """Convert an API Agent model to an AgentRecord."""
+    return AgentRecord(
+        id=agent.id,
+        name=agent.name,
+        agent_type=agent.agent_type.value
+        if hasattr(agent.agent_type, "value")
+        else str(agent.agent_type),
+        endpoint=str(agent.endpoint) if agent.endpoint else "",
+        metadata=agent.metadata if isinstance(agent.metadata, dict) else {},
+        organization=agent.organization,
+        owner=str(agent.owner) if agent.owner is not None else "unknown",
+        created_at=agent.created_at
+        if hasattr(agent, "created_at") and agent.created_at
+        else _now(),
+        updated_at=agent.updated_at
+        if hasattr(agent, "updated_at") and agent.updated_at
+        else _now(),
+    )
+
+
+class RemoteBackend:
+    """
+    StorageBackend implementation that talks to api.hackagent.dev.
+
+    Wraps all HTTP calls behind the StorageBackend interface so that the rest
+    of the SDK is entirely decoupled from HTTP concerns.
+    """
+
+    def __init__(self, client: AuthenticatedClient) -> None:
+        self._client = client
+        self._context: Optional[OrganizationContext] = None  # cached
+
+    # ── Context ──────────────────────────────────────────────────────────────
+
+    def get_api_key(self) -> Optional[str]:
+        return self._client.token
+
+    def get_context(self) -> OrganizationContext:
+        """Fetch org_id and user_id from the first agent (cached after first call)."""
+        if self._context is not None:
+            return self._context
+
+        response = agent_list.sync_detailed(client=self._client)
+        if response.status_code == 200 and response.parsed and response.parsed.results:
+            first = response.parsed.results[0]
+            self._context = OrganizationContext(
+                org_id=first.organization,
+                user_id=str(first.owner) if first.owner is not None else "unknown",
+            )
+            return self._context
+
+        raise RuntimeError(
+            "RemoteBackend: Cannot determine organization context. "
+            "No agents exist — create one first, or check your API key."
+        )
+
+    # ── Agent ─────────────────────────────────────────────────────────────────
+
+    def create_or_update_agent(
+        self,
+        name: str,
+        agent_type: str,
+        endpoint: str,
+        metadata: Dict[str, Any],
+        overwrite_metadata: bool = True,
+    ) -> AgentRecord:
+        existing = self._find_agent_by_name(name)
+
+        if existing:
+            if not overwrite_metadata:
+                return _to_agent_record(existing)
+
+            patch_kwargs: Dict[str, Any] = {}
+            current_meta = (
+                existing.metadata if isinstance(existing.metadata, dict) else {}
+            )
+            merged_meta = {**current_meta, **metadata}
+            patch_kwargs["metadata"] = {
+                k: v for k, v in merged_meta.items() if v is not None
+            }
+            patch_kwargs["agent_type"] = agent_type
+            patch_kwargs["endpoint"] = endpoint
+
+            body = PatchedAgentRequest(**patch_kwargs)
+            resp = agent_partial_update.sync_detailed(
+                id=existing.id, client=self._client, body=body
+            )
+            if resp.status_code < 300 and resp.parsed:
+                return _to_agent_record(resp.parsed)
+            return _to_agent_record(existing)
+
+        body = AgentRequest(
+            name=name,
+            endpoint=endpoint,
+            agent_type=agent_type,
+            metadata={k: v for k, v in metadata.items() if v is not None},
+            description=f"Agent managed by hackagent SDK: {name}",
+        )
+        resp = agent_create.sync_detailed(client=self._client, body=body)
+        if resp.status_code == 201 and resp.parsed:
+            return _to_agent_record(resp.parsed)
+        raise RuntimeError(
+            f"RemoteBackend: Failed to create agent '{name}' "
+            f"(status {resp.status_code})"
+        )
+
+    def _find_agent_by_name(self, name: str):
+        """Return the first agent matching name in the current org, or None."""
+        page = 1
+        while True:
+            resp = agent_list.sync_detailed(client=self._client, page=page)
+            if resp.status_code != 200 or not resp.parsed:
+                break
+            for a in resp.parsed.results or []:
+                if a.name == name:
+                    return a
+            if not resp.parsed.next_:
+                break
+            page += 1
+        return None
+
+    def list_agents(
+        self, page: int = 1, page_size: int = 100
+    ) -> PaginatedResult[AgentRecord]:
+        resp = agent_list.sync_detailed(client=self._client, page=page)
+        if resp.status_code == 200 and resp.parsed:
+            items = [_to_agent_record(a) for a in (resp.parsed.results or [])]
+            return PaginatedResult(items=items, total=resp.parsed.count or len(items))
+        return PaginatedResult(items=[], total=0)
+
+    def get_agent(self, agent_id: UUID) -> AgentRecord:
+        from hackagent.server.api.agent import agent_retrieve
+
+        resp = agent_retrieve.sync_detailed(id=agent_id, client=self._client)
+        if resp.status_code == 200 and resp.parsed:
+            return _to_agent_record(resp.parsed)
+        raise RuntimeError(f"RemoteBackend: Agent {agent_id} not found")
+
+    def delete_agent(self, agent_id: UUID) -> None:
+        from hackagent.server.api.agent import agent_destroy
+
+        agent_destroy.sync_detailed(id=agent_id, client=self._client)
+
+    # ── Attack ────────────────────────────────────────────────────────────────
+
+    def create_attack(
+        self,
+        attack_type: str,
+        agent_id: UUID,
+        organization: UUID,
+        configuration: Dict[str, Any],
+    ) -> AttackRecord:
+        body = AttackRequest.model_validate(
+            {
+                "type": attack_type,
+                "agent": str(agent_id),
+                "organization": str(organization),
+                "configuration": configuration,
+            }
+        )
+        resp = attack_create.sync_detailed(client=self._client, body=body)
+        if resp.status_code == 201:
+            data = self._parse_json_response(resp)
+            attack_id = data.get("id") or str(data.get("pk", ""))
+            return AttackRecord(
+                id=UUID(attack_id),
+                type=attack_type,
+                agent_id=agent_id,
+                organization=organization,
+                configuration=configuration,
+                created_at=_now(),
+            )
+        raise RuntimeError(
+            f"RemoteBackend: Failed to create attack record (status {resp.status_code})"
+        )
+
+    def list_attacks(
+        self, page: int = 1, page_size: int = 100
+    ) -> PaginatedResult[AttackRecord]:
+        resp = attack_list.sync_detailed(client=self._client, page=page)
+        if resp.status_code == 200 and resp.parsed:
+            items = []
+            for a in resp.parsed.results or []:
+                items.append(
+                    AttackRecord(
+                        id=a.id,
+                        type=a.type.value if hasattr(a.type, "value") else str(a.type),
+                        agent_id=a.agent,
+                        organization=a.organization,
+                        configuration=a.configuration
+                        if isinstance(a.configuration, dict)
+                        else {},
+                        created_at=a.created_at
+                        if hasattr(a, "created_at") and a.created_at
+                        else _now(),
+                    )
+                )
+            return PaginatedResult(items=items, total=resp.parsed.count or len(items))
+        return PaginatedResult(items=[], total=0)
+
+    # ── Run ───────────────────────────────────────────────────────────────────
+
+    def create_run(
+        self,
+        attack_id: UUID,
+        agent_id: UUID,
+        run_config: Dict[str, Any],
+    ) -> RunRecord:
+        body = RunRequest(
+            attack=str(attack_id),
+            agent=str(agent_id),
+            run_config=run_config,
+        )
+        resp = run_run_tests_create.sync_detailed(client=self._client, body=body)
+        if resp.status_code in (200, 201):
+            data = self._parse_json_response(resp)
+            run_id = data.get("id") or str(data.get("pk", ""))
+            return RunRecord(
+                id=UUID(run_id),
+                attack_id=attack_id,
+                agent_id=agent_id,
+                run_config=run_config,
+                status="PENDING",
+                run_notes=None,
+                created_at=_now(),
+                updated_at=_now(),
+            )
+        raise RuntimeError(
+            f"RemoteBackend: Failed to create run record (status {resp.status_code})"
+        )
+
+    def update_run(
+        self,
+        run_id: UUID,
+        status: Optional[str] = None,
+        run_notes: Optional[str] = None,
+    ) -> RunRecord:
+        kwargs: Dict[str, Any] = {}
+        if status is not None:
+            try:
+                kwargs["status"] = StatusEnum(status)
+            except ValueError:
+                kwargs["status"] = status
+        if run_notes is not None:
+            kwargs["run_notes"] = run_notes
+        body = PatchedRunRequest(**kwargs)
+        resp = run_partial_update.sync_detailed(
+            id=run_id, client=self._client, body=body
+        )
+        if resp.status_code < 300:
+            return RunRecord(
+                id=run_id,
+                attack_id=UUID("00000000-0000-0000-0000-000000000000"),
+                agent_id=UUID("00000000-0000-0000-0000-000000000000"),
+                run_config={},
+                status=status or "UNKNOWN",
+                run_notes=run_notes,
+                created_at=_now(),
+                updated_at=_now(),
+            )
+        logger.warning(
+            f"RemoteBackend: update_run {run_id} returned {resp.status_code}"
+        )
+        return RunRecord(
+            id=run_id,
+            attack_id=UUID("00000000-0000-0000-0000-000000000000"),
+            agent_id=UUID("00000000-0000-0000-0000-000000000000"),
+            run_config={},
+            status=status or "",
+            run_notes=run_notes,
+            created_at=_now(),
+            updated_at=_now(),
+        )
+
+    def list_runs(
+        self,
+        attack_id: Optional[UUID] = None,
+        page: int = 1,
+        page_size: int = 100,
+    ) -> PaginatedResult[RunRecord]:
+        resp = run_list.sync_detailed(client=self._client, page=page)
+        if resp.status_code == 200 and resp.parsed:
+            items = []
+            for r in resp.parsed.results or []:
+                items.append(
+                    RunRecord(
+                        id=r.id,
+                        attack_id=r.attack
+                        if isinstance(r.attack, UUID)
+                        else UUID(str(r.attack)),
+                        agent_id=r.agent
+                        if isinstance(r.agent, UUID)
+                        else UUID(str(r.agent)),
+                        run_config=r.run_config
+                        if isinstance(r.run_config, dict)
+                        else {},
+                        status=r.status.value
+                        if hasattr(r.status, "value")
+                        else str(r.status),
+                        run_notes=getattr(r, "run_notes", None),
+                        created_at=r.created_at
+                        if hasattr(r, "created_at") and r.created_at
+                        else _now(),
+                        updated_at=r.updated_at
+                        if hasattr(r, "updated_at") and r.updated_at
+                        else _now(),
+                    )
+                )
+            return PaginatedResult(items=items, total=resp.parsed.count or len(items))
+        return PaginatedResult(items=[], total=0)
+
+    def get_run(self, run_id: UUID) -> RunRecord:
+        resp = run_retrieve.sync_detailed(id=run_id, client=self._client)
+        if resp.status_code == 200 and resp.parsed:
+            r = resp.parsed
+            return RunRecord(
+                id=r.id,
+                attack_id=r.attack
+                if isinstance(r.attack, UUID)
+                else UUID(str(r.attack)),
+                agent_id=r.agent if isinstance(r.agent, UUID) else UUID(str(r.agent)),
+                run_config=r.run_config if isinstance(r.run_config, dict) else {},
+                status=r.status.value if hasattr(r.status, "value") else str(r.status),
+                run_notes=getattr(r, "run_notes", None),
+                created_at=r.created_at
+                if hasattr(r, "created_at") and r.created_at
+                else _now(),
+                updated_at=r.updated_at
+                if hasattr(r, "updated_at") and r.updated_at
+                else _now(),
+            )
+        raise RuntimeError(f"RemoteBackend: Run {run_id} not found")
+
+    # ── Result ────────────────────────────────────────────────────────────────
+
+    def create_result(
+        self,
+        run_id: UUID,
+        goal: str,
+        goal_index: int,
+        request_payload: Dict[str, Any],
+        agent_specific_data: Dict[str, Any],
+    ) -> ResultRecord:
+        body = ResultRequest(
+            run=run_id,
+            request_payload=request_payload,
+            evaluation_status=EvaluationStatusEnum.NOT_EVALUATED,
+            agent_specific_data=agent_specific_data,
+        )
+        resp = result_create.sync_detailed(client=self._client, body=body)
+        if resp.status_code == 201 and resp.parsed:
+            r = resp.parsed
+            return ResultRecord(
+                id=r.id,
+                run_id=run_id,
+                goal=goal,
+                goal_index=goal_index,
+                evaluation_status=EvaluationStatusEnum.NOT_EVALUATED.value,
+                evaluation_notes=None,
+                evaluation_metrics={},
+                metadata=agent_specific_data,
+                created_at=_now(),
+                updated_at=_now(),
+            )
+        raise RuntimeError(
+            f"RemoteBackend: Failed to create result "
+            f"(status {resp.status_code}, body={resp.content!r})"
+        )
+
+    def update_result(
+        self,
+        result_id: UUID,
+        evaluation_status: Optional[str] = None,
+        evaluation_notes: Optional[str] = None,
+        evaluation_metrics: Optional[Dict[str, Any]] = None,
+        agent_specific_data: Optional[Dict[str, Any]] = None,
+    ) -> ResultRecord:
+        kwargs: Dict[str, Any] = {}
+        if evaluation_status is not None:
+            try:
+                kwargs["evaluation_status"] = EvaluationStatusEnum(evaluation_status)
+            except ValueError:
+                kwargs["evaluation_status"] = evaluation_status
+        if evaluation_notes is not None:
+            kwargs["evaluation_notes"] = evaluation_notes
+        if agent_specific_data is not None:
+            kwargs["agent_specific_data"] = agent_specific_data
+        body = PatchedResultRequest(**kwargs)
+        resp = result_partial_update.sync_detailed(
+            id=result_id, client=self._client, body=body
+        )
+        if resp.status_code >= 300:
+            logger.warning(
+                f"RemoteBackend: update_result {result_id} returned {resp.status_code}"
+            )
+        return ResultRecord(
+            id=result_id,
+            run_id=UUID("00000000-0000-0000-0000-000000000000"),
+            goal="",
+            goal_index=0,
+            evaluation_status=evaluation_status or "",
+            evaluation_notes=evaluation_notes,
+            evaluation_metrics=evaluation_metrics or {},
+            metadata=agent_specific_data or {},
+            created_at=_now(),
+            updated_at=_now(),
+        )
+
+    def list_results(
+        self,
+        run_id: Optional[UUID] = None,
+        page: int = 1,
+        page_size: int = 100,
+    ) -> PaginatedResult[ResultRecord]:
+        resp = result_list.sync_detailed(client=self._client, page=page)
+        if resp.status_code == 200 and resp.parsed:
+            items = []
+            for r in resp.parsed.results or []:
+                goal = ""
+                goal_index = 0
+                if isinstance(r.agent_specific_data, dict):
+                    goal = r.agent_specific_data.get("goal", "")
+                    goal_index = r.agent_specific_data.get("goal_index", 0)
+                items.append(
+                    ResultRecord(
+                        id=r.id,
+                        run_id=r.run if isinstance(r.run, UUID) else UUID(str(r.run)),
+                        goal=goal,
+                        goal_index=goal_index,
+                        evaluation_status=r.evaluation_status.value
+                        if hasattr(r.evaluation_status, "value")
+                        else str(r.evaluation_status),
+                        evaluation_notes=getattr(r, "evaluation_notes", None),
+                        evaluation_metrics=getattr(r, "evaluation_metrics", {}) or {},
+                        metadata=r.agent_specific_data
+                        if isinstance(r.agent_specific_data, dict)
+                        else {},
+                        created_at=r.created_at
+                        if hasattr(r, "created_at") and r.created_at
+                        else _now(),
+                        updated_at=r.updated_at
+                        if hasattr(r, "updated_at") and r.updated_at
+                        else _now(),
+                    )
+                )
+            return PaginatedResult(items=items, total=resp.parsed.count or len(items))
+        return PaginatedResult(items=[], total=0)
+
+    def get_result(self, result_id: UUID) -> ResultRecord:
+        resp = result_retrieve.sync_detailed(id=result_id, client=self._client)
+        if resp.status_code == 200 and resp.parsed:
+            r = resp.parsed
+            goal = ""
+            goal_index = 0
+            if isinstance(r.agent_specific_data, dict):
+                goal = r.agent_specific_data.get("goal", "")
+                goal_index = r.agent_specific_data.get("goal_index", 0)
+            return ResultRecord(
+                id=r.id,
+                run_id=r.run if isinstance(r.run, UUID) else UUID(str(r.run)),
+                goal=goal,
+                goal_index=goal_index,
+                evaluation_status=r.evaluation_status.value
+                if hasattr(r.evaluation_status, "value")
+                else str(r.evaluation_status),
+                evaluation_notes=getattr(r, "evaluation_notes", None),
+                evaluation_metrics=getattr(r, "evaluation_metrics", {}) or {},
+                metadata=r.agent_specific_data
+                if isinstance(r.agent_specific_data, dict)
+                else {},
+                created_at=r.created_at
+                if hasattr(r, "created_at") and r.created_at
+                else _now(),
+                updated_at=r.updated_at
+                if hasattr(r, "updated_at") and r.updated_at
+                else _now(),
+            )
+        raise RuntimeError(f"RemoteBackend: Result {result_id} not found")
+
+    # ── Trace ─────────────────────────────────────────────────────────────────
+
+    def create_trace(
+        self,
+        result_id: UUID,
+        sequence: int,
+        step_type: str,
+        content: Dict[str, Any],
+    ) -> TraceRecord:
+        try:
+            step_type_enum = StepTypeEnum(step_type)
+        except ValueError:
+            step_type_enum = StepTypeEnum.OTHER
+        body = TraceRequest(
+            sequence=sequence, step_type=step_type_enum, content=content
+        )
+        resp = result_trace_create.sync_detailed(
+            client=self._client, id=result_id, body=body
+        )
+        if resp.status_code == 201 and resp.parsed:
+            return TraceRecord(
+                id=resp.parsed.id,
+                result_id=result_id,
+                sequence=sequence,
+                step_type=step_type,
+                content=content,
+                created_at=_now(),
+            )
+        logger.warning(
+            f"RemoteBackend: create_trace for result {result_id} "
+            f"returned {resp.status_code}"
+        )
+        import uuid as _uuid
+
+        return TraceRecord(
+            id=_uuid.uuid4(),
+            result_id=result_id,
+            sequence=sequence,
+            step_type=step_type,
+            content=content,
+            created_at=_now(),
+        )
+
+    def list_traces(self, result_id: UUID) -> List[TraceRecord]:
+        # Traces are written-only via the API; return empty list for now
+        return []
+
+    # ── Helpers ───────────────────────────────────────────────────────────────
+
+    def _parse_json_response(self, response) -> Dict[str, Any]:
+        """Parse JSON from an httpx response, falling back to parsed attributes."""
+        import json
+
+        if response.content:
+            try:
+                return json.loads(response.content.decode("utf-8", errors="replace"))
+            except (json.JSONDecodeError, AttributeError):
+                pass
+        if hasattr(response, "parsed") and response.parsed:
+            if hasattr(response.parsed, "additional_properties"):
+                return response.parsed.additional_properties or {}
+            if isinstance(response.parsed, dict):
+                return response.parsed
+        return {}

@@ -48,7 +48,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 from hackagent.attacks.evaluator.judge_evaluators import EVALUATOR_MAP
 from hackagent.attacks.evaluator.sync import sync_evaluation_to_server
 from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
-from hackagent.client import AuthenticatedClient
+from hackagent.server.client import AuthenticatedClient
 from hackagent.router.types import AgentTypeEnum
 
 if TYPE_CHECKING:
@@ -674,7 +674,7 @@ class BaseEvaluationStep:
         """Sync evaluation results to the server (best per ``result_id``)."""
         return sync_evaluation_to_server(
             evaluated_data=evaluated_data,
-            client=self._tracking_client or self.client,
+            backend=self._tracking_client or self.client,
             logger=self.logger,
             judge_keys=judge_keys,
         )

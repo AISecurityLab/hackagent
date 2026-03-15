@@ -7,14 +7,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from httpx import Response
 
-from hackagent.api.checkout import checkout_create
-from hackagent.client import AuthenticatedClient
+from hackagent.server.api.checkout import checkout_create
+from hackagent.server.client import AuthenticatedClient
 from hackagent.errors import UnexpectedStatus
-from hackagent.api.models import (
+from hackagent.server.api.models import (
     CheckoutSessionRequestRequest,
 )
-from hackagent.api.models import CheckoutSessionResponse
-from hackagent.api.models import GenericErrorResponse
+from hackagent.server.api.models import CheckoutSessionResponse
+from hackagent.server.api.models import GenericErrorResponse
 
 
 @pytest.fixture
@@ -159,7 +159,7 @@ def test_sync_success(
     mock_detailed_response.parsed = mock_parsed_response
 
     with patch(
-        "hackagent.api.checkout.checkout_create.sync_detailed",
+        "hackagent.server.api.checkout.checkout_create.sync_detailed",
         return_value=mock_detailed_response,
     ) as mock_sync_detailed:
         parsed = checkout_create.sync(
@@ -246,7 +246,7 @@ async def test_asyncio_success(
         return mock_detailed_response
 
     with patch(
-        "hackagent.api.checkout.checkout_create.asyncio_detailed",
+        "hackagent.server.api.checkout.checkout_create.asyncio_detailed",
         new=mock_asyncio_detailed,
     ) as _:
         parsed = await checkout_create.asyncio(

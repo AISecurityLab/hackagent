@@ -17,11 +17,15 @@ hackagent init
 The initialization wizard will:
 
 1. **Display the HackAgent ASCII logo**
-2. **Prompt for your API key** — Get yours at [app.hackagent.dev](https://app.hackagent.dev)
+2. **Prompt for your API key** *(optional)* — Get yours at [app.hackagent.dev](https://app.hackagent.dev). **Press Enter to skip and use local mode.**
 3. **Set output format** — Choose between `table`, `json`, or `csv`
 4. **Set verbosity level** — Control logging detail (0=ERROR to 3=DEBUG)
-5. **Test configuration** — Verify API connection
-6. **Save configuration** — Stored securely in `~/.config/hackagent/config.json`
+5. **Test configuration** — Verify API connection (skipped when no key is provided)
+6. **Save configuration** — Stored in `~/.config/hackagent/config.json`
+
+:::info API key is optional
+HackAgent works fully without an API key. When no key is provided, results are stored locally in `~/.local/share/hackagent/hackagent.db` and no data is sent to any remote server. Provide an API key only if you want cloud storage and the [app.hackagent.dev](https://app.hackagent.dev) dashboard.
+:::
 
 ## Example Session
 
@@ -42,9 +46,10 @@ $ hackagent init
 🔧 HackAgent CLI Setup Wizard
 Welcome! Let's get you set up for AI agent security testing.
 
-📋 API Key Configuration
+📋 API Key Configuration (optional)
 Get your API key from: https://app.hackagent.dev
-Enter API key: ****************************************
+Leave blank to run in local mode (results stored in ~/.local/share/hackagent/hackagent.db)
+Enter API key (press Enter to skip): ****************************************
 
 📊 Output Format Configuration
 Default output format (table, json, csv) [table]: table
@@ -66,6 +71,10 @@ Default verbosity level [3]: 0
   hackagent agent list
 ```
 
+:::tip No API key? That's fine!
+If you pressed Enter at the API key prompt, the wizard skips the connection test and HackAgent runs in **local mode**. You can start testing immediately — no account needed.
+:::
+
 ## Options
 
 | Option | Description |
@@ -79,6 +88,15 @@ After initialization, your configuration is saved to `~/.config/hackagent/config
 ```json
 {
   "api_key": "your-api-key-here",
+  "output_format": "table",
+  "verbose": 0
+}
+```
+
+The `api_key` field is **optional**. If omitted (or left as `null`), HackAgent runs in local mode:
+
+```json
+{
   "output_format": "table",
   "verbose": 0
 }

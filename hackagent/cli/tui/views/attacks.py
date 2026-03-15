@@ -819,6 +819,12 @@ class AttacksTab(Container):
             self.app.call_from_thread(progress_bar.update, progress=100)
 
             result_count = len(results) if hasattr(results, "__len__") else "Unknown"
+            is_local = not self.cli_config.api_key
+            storage_note = (
+                "[dim]Results saved locally → ~/.local/share/hackagent/hackagent.db[/dim]"
+                if is_local
+                else "[dim]Results have been saved to the HackAgent platform.[/dim]"
+            )
             self.app.call_from_thread(
                 status_widget.update,
                 f"""[bold green]✅ Attack Completed Successfully![/bold green]
@@ -829,10 +835,16 @@ class AttacksTab(Container):
 
 [green]Attack execution finished![/green]
 [dim]Check the Results tab to view detailed attack results.[/dim]
-[dim]Results have been saved to the HackAgent platform.[/dim]""",
+{storage_note}""",
             )
 
         except Exception as e:
+            is_local = not self.cli_config.api_key
+            key_hint = (
+                "[dim]Ensure the agent endpoint is accessible.[/dim]"
+                if is_local
+                else "[dim]Ensure the agent endpoint is accessible and API key is valid.[/dim]"
+            )
             self.app.call_from_thread(progress_bar.update, progress=0)
             self.app.call_from_thread(
                 status_widget.update,
@@ -843,7 +855,7 @@ class AttacksTab(Container):
 
 [red]Attack execution encountered an error.[/red]
 [dim]Please check your configuration and try again.[/dim]
-[dim]Ensure the agent endpoint is accessible and API key is valid.[/dim]""",
+{key_hint}""",
             )
 
         finally:

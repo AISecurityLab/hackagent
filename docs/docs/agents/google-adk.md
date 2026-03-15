@@ -53,12 +53,26 @@ Google Agent Development Kit (ADK) is a framework for building conversational AI
 ```python
 from hackagent import HackAgent, AgentTypeEnum
 
-# Configure for Google ADK
+# No API key — results stored locally in ~/.local/share/hackagent/hackagent.db
 agent = HackAgent(
     name="multi_tool_agent",
     endpoint="http://localhost:8000",
     agent_type=AgentTypeEnum.GOOGLE_ADK,
-    base_url="https://api.hackagent.dev"
+)
+```
+
+To use **remote mode** (cloud dashboard), provide an API key:
+
+```python
+import os
+from hackagent import HackAgent, AgentTypeEnum
+
+agent = HackAgent(
+    name="multi_tool_agent",
+    endpoint="http://localhost:8000",
+    agent_type=AgentTypeEnum.GOOGLE_ADK,
+    api_key=os.getenv("HACKAGENT_API_KEY"),          # optional
+    base_url=os.getenv("HACKAGENT_BASE_URL", "https://api.hackagent.dev"),
 )
 ```
 
@@ -112,12 +126,12 @@ from hackagent import HackAgent, AgentTypeEnum
 def test_adk_security():
     """Test ADK agent security with HackAgent"""
     
-    # Initialize client
+    # Initialize client (local mode — no API key needed)
     agent = HackAgent(
         name="multi_tool_agent",
-        base_url=os.getenv("HACKAGENT_BASE_URL", "https://api.hackagent.dev"),
         endpoint=os.getenv("AGENT_URL"),
         agent_type=AgentTypeEnum.GOOGLE_ADK,
+        # Optionally add api_key= and base_url= for remote mode
     )
 
     # Configure comprehensive security test
@@ -201,12 +215,13 @@ agent = HackAgent(
 # Agent endpoint
 export AGENT_URL="http://localhost:8001"
 
-# Optional
+# Optional: enable remote mode with cloud dashboard
+export HACKAGENT_API_KEY="your-api-key"        # omit for local mode
 export HACKAGENT_BASE_URL="https://api.hackagent.dev"
 export OLLAMA_BASE_URL="http://localhost:11434"
 ```
 
-**Note:** For HackAgent authentication, run `hackagent init` or pass `api_key` directly to `HackAgent()`.
+**Note:** `HACKAGENT_API_KEY` is optional. Without it, HackAgent runs in local mode and stores all results in `~/.local/share/hackagent/hackagent.db`. Run `hackagent init` to configure defaults or pass `api_key` directly to `HackAgent()`.
 
 ### ADK Session Management
 

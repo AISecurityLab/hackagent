@@ -35,17 +35,22 @@ def _make_orchestrator():
     return TestOrchestrator(mock_hack_agent), mock_hack_agent, TestAttack
 
 
+_VALID_RUN_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+_VALID_ATK_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+
+
 class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
     """Test full execute flow including status updates."""
 
-    @patch("hackagent.attacks.orchestrator.run_status_update")
-    @patch.object(AttackOrchestrator, "_create_server_run_record", return_value="run-1")
     @patch.object(
-        AttackOrchestrator, "_create_server_attack_record", return_value="atk-1"
+        AttackOrchestrator, "_create_server_run_record", return_value=_VALID_RUN_ID
+    )
+    @patch.object(
+        AttackOrchestrator, "_create_server_attack_record", return_value=_VALID_ATK_ID
     )
     @patch.object(AttackOrchestrator, "_execute_local_attack", return_value=["result"])
     def test_execute_updates_run_status_to_running(
-        self, mock_exec, mock_create_atk, mock_create_run, mock_run_update
+        self, mock_exec, mock_create_atk, mock_create_run
     ):
         """Test that execute updates run to RUNNING status."""
         orch, hack_agent, _ = _make_orchestrator()
@@ -58,17 +63,18 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
         )
 
         # At least one call should be for RUNNING
-        calls = mock_run_update.call_args_list
+        calls = hack_agent.backend.update_run.call_args_list
         self.assertTrue(len(calls) >= 1)
 
-    @patch("hackagent.attacks.orchestrator.run_status_update")
-    @patch.object(AttackOrchestrator, "_create_server_run_record", return_value="run-1")
     @patch.object(
-        AttackOrchestrator, "_create_server_attack_record", return_value="atk-1"
+        AttackOrchestrator, "_create_server_run_record", return_value=_VALID_RUN_ID
+    )
+    @patch.object(
+        AttackOrchestrator, "_create_server_attack_record", return_value=_VALID_ATK_ID
     )
     @patch.object(AttackOrchestrator, "_execute_local_attack", return_value=["result"])
     def test_execute_updates_run_status_to_completed(
-        self, mock_exec, mock_create_atk, mock_create_run, mock_run_update
+        self, mock_exec, mock_create_atk, mock_create_run
     ):
         """Test that execute updates run to COMPLETED on success."""
         orch, hack_agent, _ = _make_orchestrator()
@@ -80,19 +86,20 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
             fail_on_run_error=False,
         )
 
-        # Should have called run_update at least twice (RUNNING and COMPLETED)
-        self.assertGreaterEqual(mock_run_update.call_count, 2)
+        # Should have called update_run at least twice (RUNNING and COMPLETED)
+        self.assertGreaterEqual(hack_agent.backend.update_run.call_count, 2)
 
-    @patch("hackagent.attacks.orchestrator.run_status_update")
-    @patch.object(AttackOrchestrator, "_create_server_run_record", return_value="run-1")
     @patch.object(
-        AttackOrchestrator, "_create_server_attack_record", return_value="atk-1"
+        AttackOrchestrator, "_create_server_run_record", return_value=_VALID_RUN_ID
+    )
+    @patch.object(
+        AttackOrchestrator, "_create_server_attack_record", return_value=_VALID_ATK_ID
     )
     @patch.object(
         AttackOrchestrator, "_execute_local_attack", side_effect=RuntimeError("Boom")
     )
     def test_execute_updates_run_status_to_failed_on_error(
-        self, mock_exec, mock_create_atk, mock_create_run, mock_run_update
+        self, mock_exec, mock_create_atk, mock_create_run
     ):
         """Test that execute updates run to FAILED on exception."""
         orch, hack_agent, _ = _make_orchestrator()
@@ -106,25 +113,24 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
             )
 
         # Should attempt FAILED update
-        self.assertTrue(mock_run_update.call_count >= 1)
+        self.assertTrue(hack_agent.backend.update_run.call_count >= 1)
 
-    @patch(
-        "hackagent.attacks.orchestrator.run_status_update",
-        side_effect=Exception("Update failed"),
-    )
-    @patch.object(AttackOrchestrator, "_create_server_run_record", return_value="run-1")
     @patch.object(
-        AttackOrchestrator, "_create_server_attack_record", return_value="atk-1"
+        AttackOrchestrator, "_create_server_run_record", return_value=_VALID_RUN_ID
+    )
+    @patch.object(
+        AttackOrchestrator, "_create_server_attack_record", return_value=_VALID_ATK_ID
     )
     @patch.object(AttackOrchestrator, "_execute_local_attack", return_value=["result"])
     def test_execute_continues_when_status_update_fails(
-        self, mock_exec, mock_create_atk, mock_create_run, mock_run_update
+        self, mock_exec, mock_create_atk, mock_create_run
     ):
         """Test that execute continues even if status update fails."""
         orch, hack_agent, _ = _make_orchestrator()
+        hack_agent.backend.update_run.side_effect = Exception("Update failed")
 
         attack_config = {"goals": ["test"]}
-        # Should not raise even though run_update fails
+        # Should not raise even though update_run fails
         results = orch.execute(
             attack_config=attack_config,
             run_config_override=None,
@@ -289,7 +295,7 @@ class TestGetAttackImplKwargs(unittest.TestCase):
         )
         self.assertIn("client", kwargs)
         self.assertIn("agent_router", kwargs)
-        self.assertIs(kwargs["client"], orch.client)
+        self.assertIs(kwargs["client"], hack_agent.backend)
 
 
 if __name__ == "__main__":

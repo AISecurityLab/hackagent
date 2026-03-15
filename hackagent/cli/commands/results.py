@@ -65,8 +65,8 @@ def show(ctx, result_id):
     cli_config.validate()
 
     try:
-        from hackagent.api.result import result_retrieve
-        from hackagent.client import AuthenticatedClient
+        from hackagent.server.api.result import result_retrieve
+        from hackagent.server.client import AuthenticatedClient
 
         client = AuthenticatedClient(
             base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
@@ -154,8 +154,8 @@ def summary(ctx, status, agent, attack_type, days):
     cli_config.validate()
 
     try:
-        from hackagent.api.result import result_list
-        from hackagent.client import AuthenticatedClient
+        from hackagent.server.api.result import result_list
+        from hackagent.server.client import AuthenticatedClient
 
         client = AuthenticatedClient(
             base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"

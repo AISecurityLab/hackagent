@@ -47,8 +47,7 @@ class TestCLIConfig:
             config = CLIConfig()
 
             assert config.api_key == "test-key"
-            # Note: base_url is hardcoded and doesn't load from env
-            assert config.base_url == "https://api.hackagent.dev"
+            assert config.base_url == "https://test.example.com"
             assert config.output_format == "json"
 
     def test_config_file_loading(self):
@@ -68,8 +67,7 @@ class TestCLIConfig:
                 config = CLIConfig(config_file=config_file)
 
                 assert config.api_key == "file-key"
-                # Note: base_url is hardcoded and doesn't load from config file
-                assert config.base_url == "https://api.hackagent.dev"
+                assert config.base_url == "https://file.example.com"
                 assert config.output_format == "csv"
         finally:
             Path(config_file).unlink()
@@ -286,8 +284,7 @@ class TestCLIConfig:
                 saved_data = json.load(f)
 
             assert saved_data["api_key"] == "test-key"
-            # Note: base_url is not saved as it's always hardcoded
-            assert "base_url" not in saved_data
+            assert saved_data["base_url"] == "https://test.example.com"
             assert saved_data["output_format"] == "json"
 
     def test_validate_success(self):
@@ -298,7 +295,7 @@ class TestCLIConfig:
         config.validate()
 
     def test_validate_missing_api_key(self):
-        """Test validation failure with missing API key"""
+        """Test that validation succeeds with missing API key (local mode supported)"""
         with (
             patch("pathlib.Path.exists", return_value=False),
             patch("pathlib.Path.home", return_value=Path("/fake/home")),
@@ -306,8 +303,8 @@ class TestCLIConfig:
         ):
             config = CLIConfig(base_url="https://example.com")
 
-            with pytest.raises(ValueError, match="API key is required"):
-                config.validate()
+            # Should NOT raise — running locally without API key is valid
+            config.validate()
 
     def test_validate_missing_base_url(self):
         """Test validation failure with missing base URL"""
@@ -351,8 +348,7 @@ output_format: table
                         config = CLIConfig(config_file=config_file)
 
                     assert config.api_key == "yaml-key"
-                    # Note: base_url is hardcoded and doesn't load from config file
-                    assert config.base_url == "https://api.hackagent.dev"
+                    assert config.base_url == "https://yaml.example.com"
                     assert config.output_format == "table"
             except ImportError:
                 # PyYAML not available, should raise appropriate error

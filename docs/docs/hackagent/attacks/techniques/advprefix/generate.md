@@ -81,6 +81,7 @@ This is the main entry point that orchestrates all sub-steps:
 2. Apply Phase 1 preprocessing
 3. Compute cross-entropy (if agent_router provided)
 4. Apply Phase 2 preprocessing
+5. Write per-goal generation traces to each goal&#x27;s Result
 
 **Arguments**:
 

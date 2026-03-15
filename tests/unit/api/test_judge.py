@@ -10,15 +10,15 @@ from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 
-from hackagent.api.judge.judge_create import asyncio_detailed, sync_detailed
-from hackagent.client import AuthenticatedClient
-from hackagent.api.models import (
+from hackagent.server.api.judge.judge_create import asyncio_detailed, sync_detailed
+from hackagent.server.client import AuthenticatedClient
+from hackagent.server.api.models import (
     GenerateErrorResponse,
     GenerateRequestRequest,
     MessageRequest,
     GenerateSuccessResponse,
 )
-from hackagent.types import Response
+from hackagent.server.types import Response
 
 
 class TestJudgeAPI(unittest.TestCase):

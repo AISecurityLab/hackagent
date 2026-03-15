@@ -132,6 +132,16 @@ class CLIConfig:
                 if env_api_key:
                     self.api_key = env_api_key
 
+        # Only load base_url from env if not set by CLI or config
+        if "base_url" not in self._cli_overrides:
+            if (
+                "base_url" not in self._config_overrides
+                or getattr(self, "base_url", None) is None
+            ):
+                env_base_url = os.getenv("HACKAGENT_BASE_URL")
+                if env_base_url:
+                    self.base_url = env_base_url
+
         # Only load output_format from env if not set by CLI or config
         if "output_format" not in self._cli_overrides:
             # Use env if no config override, or if config set None
@@ -166,10 +176,6 @@ class CLIConfig:
                 # STANDARDIZED PRIORITY: CLI args > Config file > Env vars > Defaults
                 # Never override CLI arguments, but override defaults and environment will be loaded later
                 for key, value in config_data.items():
-                    # Skip base_url as it's always from CLI/env
-                    if key == "base_url":
-                        continue
-
                     # Never override CLI arguments
                     if key in self._cli_overrides:
                         continue
@@ -197,24 +203,30 @@ class CLIConfig:
 
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w") as f:
-            # Don't save None values or base_url (always hardcoded)
             config_dict = {}
-            for attr in ["api_key", "output_format", "verbose"]:
+            for attr in ["api_key", "base_url", "output_format", "verbose"]:
                 value = getattr(self, attr, None)
                 if value is not None:
+                    # Only persist base_url if it differs from the default
+                    if attr == "base_url" and value == self._defaults["base_url"]:
+                        continue
                     config_dict[attr] = value
             json.dump(config_dict, f, indent=2)
 
     def validate(self):
-        """Validate configuration"""
-        if not self.api_key:
-            raise ValueError(
-                "API key is required. Set HACKAGENT_API_KEY environment variable, "
-                "use --api-key flag, or run 'hackagent config set --api-key YOUR_KEY'"
-            )
-
+        """Validate configuration — warns if no api_key but does NOT raise (local mode)."""
         if not self.base_url:
             raise ValueError("Base URL is required")
+        # api_key is optional: missing means local mode (SQLite backend)
+
+    def require_remote(self):
+        """Raise an error if no api_key is set (for commands that need cloud access)."""
+        if not self.api_key:
+            raise ValueError(
+                "API key is required for this command. Set HACKAGENT_API_KEY "
+                "environment variable, use --api-key flag, or run "
+                "'hackagent config set --api-key YOUR_KEY'"
+            )
 
     def should_show_info(self) -> bool:
         """Check if INFO level messages should be displayed"""

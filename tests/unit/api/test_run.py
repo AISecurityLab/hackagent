@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 from dateutil.parser import isoparse
 
 from hackagent import errors
-from hackagent.api.run import (
+from hackagent.server.api.run import (
     run_create,
     run_destroy,
     run_list,
@@ -20,23 +20,23 @@ from hackagent.api.run import (
     run_run_tests_create,
     run_update,
 )  # Added run_run_tests_create
-from hackagent.api.models import (
+from hackagent.server.api.models import (
     EvaluationStatusEnum,
 )  # For nested Result.evaluation_status
-from hackagent.api.models import PaginatedRunList
-from hackagent.api.models import PatchedRunRequest  # Added
-from hackagent.api.models import Result  # For nested results within a Run
-from hackagent.api.models import (
+from hackagent.server.api.models import PaginatedRunList
+from hackagent.server.api.models import PatchedRunRequest  # Added
+from hackagent.server.api.models import Result  # For nested results within a Run
+from hackagent.server.api.models import (
     ResultRequest as RunResultCreateRequest,
 )  # Alias to avoid confusion with main ResultRequest
-from hackagent.api.models import Run
-from hackagent.api.models import StatusEnum  # For run_list filter
-from hackagent.api.models import RunRequest  # Added
-from hackagent.types import UNSET
+from hackagent.server.api.models import Run
+from hackagent.server.api.models import StatusEnum  # For run_list filter
+from hackagent.server.api.models import RunRequest  # Added
+from hackagent.server.types import UNSET
 
 
 class TestRunListAPI(unittest.TestCase):
-    @patch("hackagent.api.run.run_list.AuthenticatedClient")
+    @patch("hackagent.server.api.run.run_list.AuthenticatedClient")
     def test_run_list_sync_detailed_success(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()
@@ -102,7 +102,7 @@ class TestRunListAPI(unittest.TestCase):
         mock_parsed_object = PaginatedRunList.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.run.run_list.PaginatedRunList.model_validate",
+            "hackagent.server.api.run.run_list.PaginatedRunList.model_validate",
             return_value=mock_parsed_object,
         ) as mock_model_validate:
             response = run_list.sync_detailed(
@@ -158,7 +158,7 @@ class TestRunListAPI(unittest.TestCase):
             }
             self.assertDictEqual(sent_params, expected_params)
 
-    @patch("hackagent.api.run.run_list.AuthenticatedClient")
+    @patch("hackagent.server.api.run.run_list.AuthenticatedClient")
     def test_run_list_sync_detailed_error_raise_on_unexpected_status_true(
         self, MockAuthenticatedClient
     ):
@@ -179,7 +179,7 @@ class TestRunListAPI(unittest.TestCase):
         self.assertEqual(cm.exception.status_code, 500)
         self.assertEqual(cm.exception.content, b"Server Error For Run List")
 
-    @patch("hackagent.api.run.run_list.AuthenticatedClient")
+    @patch("hackagent.server.api.run.run_list.AuthenticatedClient")
     def test_run_list_sync_detailed_error_raise_on_unexpected_status_false(
         self, MockAuthenticatedClient
     ):
@@ -201,7 +201,7 @@ class TestRunListAPI(unittest.TestCase):
 
 
 class TestRunCreateAPI(unittest.TestCase):
-    @patch("hackagent.api.run.run_create.AuthenticatedClient")
+    @patch("hackagent.server.api.run.run_create.AuthenticatedClient")
     def test_run_create_sync_detailed_success(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()
@@ -251,7 +251,7 @@ class TestRunCreateAPI(unittest.TestCase):
         mock_parsed_run = Run.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.run.run_create.Run.model_validate",
+            "hackagent.server.api.run.run_create.Run.model_validate",
             return_value=mock_parsed_run,
         ) as mock_model_validate:
             response = run_create.sync_detailed(
@@ -278,7 +278,7 @@ class TestRunCreateAPI(unittest.TestCase):
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
-    @patch("hackagent.api.run.run_create.AuthenticatedClient")
+    @patch("hackagent.server.api.run.run_create.AuthenticatedClient")
     def test_run_create_sync_detailed_error_raise_on_unexpected_status_true(
         self, MockAuthenticatedClient
     ):
@@ -307,7 +307,7 @@ class TestRunCreateAPI(unittest.TestCase):
         self.assertEqual(cm.exception.status_code, 400)
         self.assertEqual(cm.exception.content, b"Bad Run Request Data")
 
-    @patch("hackagent.api.run.run_create.AuthenticatedClient")
+    @patch("hackagent.server.api.run.run_create.AuthenticatedClient")
     def test_run_create_sync_detailed_error_raise_on_unexpected_status_false(
         self, MockAuthenticatedClient
     ):
@@ -335,7 +335,7 @@ class TestRunCreateAPI(unittest.TestCase):
 
 
 class TestRunRetrieveAPI(unittest.TestCase):
-    @patch("hackagent.api.run.run_retrieve.AuthenticatedClient")
+    @patch("hackagent.server.api.run.run_retrieve.AuthenticatedClient")
     def test_run_retrieve_sync_detailed_success(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()
@@ -394,7 +394,7 @@ class TestRunRetrieveAPI(unittest.TestCase):
         mock_parsed_run = Run.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.run.run_retrieve.Run.model_validate",
+            "hackagent.server.api.run.run_retrieve.Run.model_validate",
             return_value=mock_parsed_run,
         ) as mock_model_validate:
             response = run_retrieve.sync_detailed(
@@ -422,7 +422,7 @@ class TestRunRetrieveAPI(unittest.TestCase):
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
-    @patch("hackagent.api.run.run_retrieve.AuthenticatedClient")
+    @patch("hackagent.server.api.run.run_retrieve.AuthenticatedClient")
     def test_run_retrieve_sync_detailed_error_not_found(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()
@@ -442,7 +442,7 @@ class TestRunRetrieveAPI(unittest.TestCase):
         self.assertEqual(cm.exception.status_code, 404)
         self.assertEqual(cm.exception.content, b"Run Not Found")
 
-    @patch("hackagent.api.run.run_retrieve.AuthenticatedClient")
+    @patch("hackagent.server.api.run.run_retrieve.AuthenticatedClient")
     def test_run_retrieve_sync_detailed_error_raise_false(
         self, MockAuthenticatedClient
     ):
@@ -467,7 +467,7 @@ class TestRunRetrieveAPI(unittest.TestCase):
 
 
 class TestRunUpdateAPI(unittest.TestCase):
-    @patch("hackagent.api.run.run_update.AuthenticatedClient")
+    @patch("hackagent.server.api.run.run_update.AuthenticatedClient")
     def test_run_update_sync_detailed_success(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()
@@ -550,7 +550,7 @@ class TestRunUpdateAPI(unittest.TestCase):
         mock_parsed_run = Run.model_validate(mock_updated_run_response_content)
 
         with patch(
-            "hackagent.api.run.run_update.Run.model_validate",
+            "hackagent.server.api.run.run_update.Run.model_validate",
             return_value=mock_parsed_run,
         ) as mock_model_validate:
             response = run_update.sync_detailed(
@@ -588,7 +588,7 @@ class TestRunUpdateAPI(unittest.TestCase):
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
-    @patch("hackagent.api.run.run_update.AuthenticatedClient")
+    @patch("hackagent.server.api.run.run_update.AuthenticatedClient")
     def test_run_update_sync_detailed_error_not_found(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()
@@ -612,7 +612,7 @@ class TestRunUpdateAPI(unittest.TestCase):
         self.assertEqual(cm.exception.status_code, 404)
         self.assertEqual(cm.exception.content, b"Run Not Found For Update")
 
-    @patch("hackagent.api.run.run_update.AuthenticatedClient")
+    @patch("hackagent.server.api.run.run_update.AuthenticatedClient")
     def test_run_update_sync_detailed_error_raise_false(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()
@@ -638,7 +638,7 @@ class TestRunUpdateAPI(unittest.TestCase):
 
 
 class TestRunPartialUpdateAPI(unittest.TestCase):
-    @patch("hackagent.api.run.run_partial_update.AuthenticatedClient")
+    @patch("hackagent.server.api.run.run_partial_update.AuthenticatedClient")
     def test_run_partial_update_sync_detailed_success_patch_status_notes(
         self, MockAuthenticatedClient
     ):
@@ -687,7 +687,7 @@ class TestRunPartialUpdateAPI(unittest.TestCase):
         mock_parsed_run = Run.model_validate(mock_patched_run_response_content)
 
         with patch(
-            "hackagent.api.run.run_partial_update.Run.model_validate",
+            "hackagent.server.api.run.run_partial_update.Run.model_validate",
             return_value=mock_parsed_run,
         ) as mock_model_validate:
             response = run_partial_update.sync_detailed(
@@ -733,7 +733,7 @@ class TestRunPartialUpdateAPI(unittest.TestCase):
 
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
-    @patch("hackagent.api.run.run_partial_update.AuthenticatedClient")
+    @patch("hackagent.server.api.run.run_partial_update.AuthenticatedClient")
     def test_run_partial_update_sync_detailed_error_not_found(
         self, MockAuthenticatedClient
     ):
@@ -759,7 +759,7 @@ class TestRunPartialUpdateAPI(unittest.TestCase):
         self.assertEqual(cm.exception.status_code, 404)
         self.assertEqual(cm.exception.content, b"Run Not Found For Patch")
 
-    @patch("hackagent.api.run.run_partial_update.AuthenticatedClient")
+    @patch("hackagent.server.api.run.run_partial_update.AuthenticatedClient")
     def test_run_partial_update_sync_detailed_error_raise_false(
         self, MockAuthenticatedClient
     ):
@@ -788,7 +788,7 @@ class TestRunPartialUpdateAPI(unittest.TestCase):
 
 
 class TestRunDestroyAPI(unittest.TestCase):
-    @patch("hackagent.api.run.run_destroy.AuthenticatedClient")
+    @patch("hackagent.server.api.run.run_destroy.AuthenticatedClient")
     def test_run_destroy_sync_detailed_success(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()
@@ -815,7 +815,7 @@ class TestRunDestroyAPI(unittest.TestCase):
         }
         mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
-    @patch("hackagent.api.run.run_destroy.AuthenticatedClient")
+    @patch("hackagent.server.api.run.run_destroy.AuthenticatedClient")
     def test_run_destroy_sync_detailed_error_not_found(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()
@@ -838,7 +838,7 @@ class TestRunDestroyAPI(unittest.TestCase):
         self.assertEqual(cm.exception.status_code, 404)
         self.assertEqual(cm.exception.content, b"Run Not Found For Deletion")
 
-    @patch("hackagent.api.run.run_destroy.AuthenticatedClient")
+    @patch("hackagent.server.api.run.run_destroy.AuthenticatedClient")
     def test_run_destroy_sync_detailed_error_raise_false(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()
@@ -862,7 +862,7 @@ class TestRunDestroyAPI(unittest.TestCase):
 
 
 class TestRunResultCreateAPI(unittest.TestCase):
-    @patch("hackagent.api.run.run_result_create.AuthenticatedClient")
+    @patch("hackagent.server.api.run.run_result_create.AuthenticatedClient")
     def test_run_result_create_sync_detailed_success(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()
@@ -932,7 +932,7 @@ class TestRunResultCreateAPI(unittest.TestCase):
         mock_client_instance.raise_on_unexpected_status = True
 
         with patch(
-            "hackagent.api.run.run_result_create.Result.model_validate",
+            "hackagent.server.api.run.run_result_create.Result.model_validate",
             return_value=mock_parsed_result_object,
         ) as mock_model_validate:
             response = run_result_create.sync_detailed(
@@ -970,7 +970,7 @@ class TestRunResultCreateAPI(unittest.TestCase):
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
-    @patch("hackagent.api.run.run_result_create.AuthenticatedClient")
+    @patch("hackagent.server.api.run.run_result_create.AuthenticatedClient")
     def test_run_result_create_sync_detailed_error_run_not_found(
         self, MockAuthenticatedClient
     ):
@@ -999,7 +999,7 @@ class TestRunResultCreateAPI(unittest.TestCase):
             cm.exception.content, b"Parent Run Not Found for Result Creation"
         )
 
-    @patch("hackagent.api.run.run_result_create.AuthenticatedClient")
+    @patch("hackagent.server.api.run.run_result_create.AuthenticatedClient")
     def test_run_result_create_sync_detailed_error_bad_request_raise_false(
         self, MockAuthenticatedClient
     ):
@@ -1031,7 +1031,7 @@ class TestRunResultCreateAPI(unittest.TestCase):
 
 
 class TestRunRunTestsCreateAPI(unittest.TestCase):
-    @patch("hackagent.api.run.run_run_tests_create.AuthenticatedClient")
+    @patch("hackagent.server.api.run.run_run_tests_create.AuthenticatedClient")
     def test_run_run_tests_create_sync_detailed_success(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()
@@ -1077,7 +1077,7 @@ class TestRunRunTestsCreateAPI(unittest.TestCase):
         }
         mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
-    @patch("hackagent.api.run.run_run_tests_create.AuthenticatedClient")
+    @patch("hackagent.server.api.run.run_run_tests_create.AuthenticatedClient")
     def test_run_run_tests_create_sync_detailed_error_bad_request(
         self, MockAuthenticatedClient
     ):
@@ -1124,7 +1124,7 @@ class TestRunRunTestsCreateAPI(unittest.TestCase):
         self.assertEqual(cm.exception.status_code, 400)
         self.assertEqual(cm.exception.content, b"Bad Request for Run Tests Create")
 
-    @patch("hackagent.api.run.run_run_tests_create.AuthenticatedClient")
+    @patch("hackagent.server.api.run.run_run_tests_create.AuthenticatedClient")
     def test_run_run_tests_create_sync_detailed_error_server_error_raise_false(
         self, MockAuthenticatedClient
     ):

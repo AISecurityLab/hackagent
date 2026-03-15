@@ -35,3 +35,15 @@ The OpenAI client will automatically append /chat/completions.
 For Ollama endpoints, provide the base URL (e.g., http://localhost:11434).
 The adapter will automatically use /api/generate or /api/chat as appropriate.
 
+#### \_missing\_
+
+```python
+@classmethod
+def _missing_(cls, value: object) -> "AgentTypeEnum"
+```
+
+Allow case-insensitive lookup and common shorthand aliases.
+
+For example ``AgentTypeEnum(&quot;openai&quot;)`` resolves to
+``AgentTypeEnum.OPENAI_SDK``.
+

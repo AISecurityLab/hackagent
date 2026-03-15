@@ -14,7 +14,7 @@ This tutorial introduces you to loading and using datasets with HackAgent. You'l
 Before starting, ensure you have:
 
 1. ✅ **HackAgent installed**: `pip install hackagent[datasets]`
-2. ✅ **Configuration complete**: Run `hackagent init` to set up your API key
+2. ✅ **Configuration** *(optional)*: Run `hackagent init` to configure preferences or an API key. An API key is **not required** — without one, HackAgent stores results locally in `~/.local/share/hackagent/hackagent.db`.
 3. ✅ **Target agent running**: An AI agent accessible via HTTP endpoint
 
 ## Why Use Datasets?

@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HackAgent — Community Dashboard</title>
+
+  <!-- Tailwind CSS Play CDN (v3) -->
+  <script>
+    // Must be declared before the CDN script is loaded
+    tailwind = {
+      config: {
+        theme: {
+          extend: {
+            fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+          }
+        }
+      }
+    };
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Alpine.js -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+  <style>
+    [x-cloak] { display: none !important; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+
+<body class="bg-slate-50 text-slate-900 font-sans min-h-screen antialiased"
+      x-data="hackagentApp()"
+      x-init="init()"
+      x-cloak>
+
+  <!-- ═══════════════════════ SIDEBAR ═══════════════════════ -->
+  <aside class="fixed inset-y-0 left-0 w-60 bg-slate-900 text-white flex flex-col z-20 shadow-xl">
+
+    <!-- Logo -->
+    <div class="flex items-center gap-3 px-5 py-5 border-b border-slate-700/50">
+      <div class="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center flex-shrink-0">
+        <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001c0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+        </svg>
+      </div>
+      <div>
+        <div class="font-bold text-base leading-tight tracking-tight">HackAgent</div>
+        <div class="text-xs text-slate-400 leading-tight">Community Edition</div>
+      </div>
+    </div>
+
+    <!-- Nav -->
+    <nav class="flex-1 py-4 space-y-0.5 px-3 overflow-y-auto">
+      <template x-for="item in navItems" :key="item.id">
+        <button
+          @click="navigate(item.id)"
+          :class="{
+            'bg-red-600 text-white shadow-sm': currentView === item.id,
+            'text-slate-300 hover:bg-slate-800 hover:text-white': currentView !== item.id
+          }"
+          class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 cursor-pointer"
+        >
+          <span x-html="item.icon" class="w-5 h-5 flex-shrink-0 opacity-80"></span>
+          <span x-text="item.label"></span>
+        </button>
+      </template>
+    </nav>
+
+    <!-- Footer / status -->
+    <div class="px-4 py-4 border-t border-slate-700/50 space-y-1">
+      <div class="flex items-center gap-2">
+        <span :class="status.mode === 'local' ? 'bg-emerald-500' : 'bg-blue-500'"
+              class="w-2 h-2 rounded-full flex-shrink-0"></span>
+        <span class="text-xs text-slate-400 capitalize" x-text="status.mode + ' mode'"></span>
+      </div>
+      <div class="text-xs text-slate-500 truncate font-mono" x-text="status.db_path || 'remote backend'"></div>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════ MAIN ═══════════════════════ -->
+  <main class="ml-60 min-h-screen flex flex-col">
+
+    <!-- Top bar -->
+    <header class="sticky top-0 z-10 bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between shadow-sm">
+      <div class="flex items-center gap-3">
+        <h1 class="text-lg font-semibold text-slate-900"
+            x-text="navItems.find(n => n.id === currentView)?.label || ''"></h1>
+        <span x-show="loading"
+              class="inline-block w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></span>
+      </div>
+      <button @click="refreshCurrentView()"
+              class="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-100">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 4v5h5M20 20v-5h-5M4 9a9 9 0 0114.83-4.83M20 15a9 9 0 01-14.83 4.83"/>
+        </svg>
+        Refresh
+      </button>
+    </header>
+
+    <div class="flex-1 p-8">
+
+      <!-- ───────────────── DASHBOARD VIEW ───────────────── -->
+      <div x-show="currentView === 'dashboard'" class="space-y-6">
+
+        <!-- Stat cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <template x-for="card in statCards" :key="card.label">
+            <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+              <div class="text-xs font-medium text-slate-500 uppercase tracking-wide" x-text="card.label"></div>
+              <div class="text-4xl font-bold mt-2" :class="card.color" x-text="card.value"></div>
+            </div>
+          </template>
+        </div>
+
+        <!-- Charts row -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Risk gauge -->
+          <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+            <h3 class="text-sm font-semibold text-slate-600 mb-1">Risk Overview</h3>
+            <p class="text-xs text-slate-400 mb-5">Jailbreak rate across all evaluated results</p>
+            <div class="flex items-center gap-8">
+              <div class="relative flex-shrink-0" style="width:140px;height:140px;">
+                <canvas id="riskChart" width="140" height="140"></canvas>
+                <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span class="text-2xl font-bold" :class="riskColor" x-text="stats.risk_percentage + '%'"></span>
+                  <span class="text-xs text-slate-400">risk</span>
+                </div>
+              </div>
+              <div class="space-y-2 text-sm">
+                <div class="flex items-center gap-2">
+                  <span class="w-3 h-3 rounded-full bg-red-500 flex-shrink-0"></span>
+                  <span class="text-slate-600">Jailbreaks</span>
+                  <span class="font-semibold ml-auto text-red-600" x-text="stats.successful_jailbreaks"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="w-3 h-3 rounded-full bg-emerald-500 flex-shrink-0"></span>
+                  <span class="text-slate-600">Passed</span>
+                  <span class="font-semibold ml-auto text-emerald-600" x-text="stats.passed"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="w-3 h-3 rounded-full bg-orange-400 flex-shrink-0"></span>
+                  <span class="text-slate-600">Errors</span>
+                  <span class="font-semibold ml-auto text-orange-500" x-text="stats.errors"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="w-3 h-3 rounded-full bg-slate-300 flex-shrink-0"></span>
+                  <span class="text-slate-600">Not evaluated</span>
+                  <span class="font-semibold ml-auto text-slate-500" x-text="stats.not_evaluated"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Distribution bar chart -->
+          <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+            <h3 class="text-sm font-semibold text-slate-600 mb-1">Result Distribution</h3>
+            <p class="text-xs text-slate-400 mb-4">Evaluation outcomes across all runs</p>
+            <div style="height:170px;">
+              <canvas id="distChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent runs table -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-slate-600">Recent Runs</h3>
+            <button @click="navigate('runs')"
+                    class="text-xs text-red-600 hover:text-red-700 font-medium hover:underline">
+              View all →
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left text-xs font-medium text-slate-500 border-b bg-slate-50">
+                  <th class="px-6 py-3">Run ID</th>
+                  <th class="px-4 py-3">Status</th>
+                  <th class="px-4 py-3">Results</th>
+                  <th class="px-4 py-3">Jailbreaks</th>
+                  <th class="px-4 py-3">Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="run in recentRuns" :key="run.id">
+                  <tr class="border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors"
+                      @click="openRunDetail(run)">
+                    <td class="px-6 py-3 font-mono text-xs text-slate-500" x-text="run.id.slice(0,8) + '…'"></td>
+                    <td class="px-4 py-3">
+                      <span :class="statusBadgeClass(run.status)"
+                            class="px-2 py-0.5 rounded-full text-xs font-medium"
+                            x-text="run.status"></span>
+                    </td>
+                    <td class="px-4 py-3 text-slate-600" x-text="run.total_results ?? 0"></td>
+                    <td class="px-4 py-3">
+                      <span :class="(run.successful_jailbreaks ?? 0) > 0 ? 'text-red-600 font-semibold' : 'text-slate-400'"
+                            x-text="run.successful_jailbreaks ?? 0"></span>
+                    </td>
+                    <td class="px-4 py-3 text-slate-400 text-xs" x-text="formatDate(run.created_at)"></td>
+                  </tr>
+                </template>
+                <tr x-show="recentRuns.length === 0">
+                  <td colspan="5" class="px-6 py-10 text-center text-slate-400 text-sm">
+                    No runs yet — start a security test with
+                    <code class="bg-slate-100 px-1.5 py-0.5 rounded text-xs font-mono">hackagent attack</code>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ───────────────── AGENTS VIEW ───────────────── -->
+      <div x-show="currentView === 'agents'">
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left text-xs font-medium text-slate-500 border-b bg-slate-50">
+                  <th class="px-6 py-3">Name</th>
+                  <th class="px-4 py-3">Type</th>
+                  <th class="px-4 py-3">Endpoint</th>
+                  <th class="px-4 py-3">Owner</th>
+                  <th class="px-4 py-3">Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="agent in agents.items" :key="agent.id">
+                  <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                    <td class="px-6 py-3 font-medium text-slate-900" x-text="agent.name"></td>
+                    <td class="px-4 py-3">
+                      <span class="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs font-medium"
+                            x-text="agent.agent_type"></span>
+                    </td>
+                    <td class="px-4 py-3 font-mono text-xs text-slate-500 max-w-xs truncate"
+                        x-text="agent.endpoint" :title="agent.endpoint"></td>
+                    <td class="px-4 py-3 text-slate-500 text-xs" x-text="agent.owner"></td>
+                    <td class="px-4 py-3 text-slate-400 text-xs" x-text="formatDate(agent.created_at)"></td>
+                  </tr>
+                </template>
+                <tr x-show="agents.items.length === 0">
+                  <td colspan="5" class="px-6 py-10 text-center text-slate-400 text-sm">
+                    No agents registered yet.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="px-6 py-3 border-t bg-slate-50 text-xs text-slate-400"
+               x-text="`${agents.total} agent${agents.total !== 1 ? 's' : ''} total`"></div>
+        </div>
+      </div>
+
+      <!-- ───────────────── ATTACKS VIEW ───────────────── -->
+      <div x-show="currentView === 'attacks'">
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left text-xs font-medium text-slate-500 border-b bg-slate-50">
+                  <th class="px-6 py-3">ID</th>
+                  <th class="px-4 py-3">Type</th>
+                  <th class="px-4 py-3">Agent ID</th>
+                  <th class="px-4 py-3">Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="attack in attacks.items" :key="attack.id">
+                  <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                    <td class="px-6 py-3 font-mono text-xs text-slate-500"
+                        x-text="attack.id.slice(0,8) + '…'"></td>
+                    <td class="px-4 py-3">
+                      <span class="px-2 py-0.5 bg-orange-50 text-orange-700 rounded-full text-xs font-medium"
+                            x-text="attack.type"></span>
+                    </td>
+                    <td class="px-4 py-3 font-mono text-xs text-slate-500"
+                        x-text="attack.agent_id.slice(0,8) + '…'"></td>
+                    <td class="px-4 py-3 text-slate-400 text-xs" x-text="formatDate(attack.created_at)"></td>
+                  </tr>
+                </template>
+                <tr x-show="attacks.items.length === 0">
+                  <td colspan="4" class="px-6 py-10 text-center text-slate-400 text-sm">
+                    No attacks configured yet.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="px-6 py-3 border-t bg-slate-50 text-xs text-slate-400"
+               x-text="`${attacks.total} attack${attacks.total !== 1 ? 's' : ''} total`"></div>
+        </div>
+      </div>
+
+      <!-- ───────────────── RUNS VIEW ───────────────── -->
+      <div x-show="currentView === 'runs'">
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left text-xs font-medium text-slate-500 border-b bg-slate-50">
+                  <th class="px-6 py-3">Run ID</th>
+                  <th class="px-4 py-3">Attack ID</th>
+                  <th class="px-4 py-3">Status</th>
+                  <th class="px-4 py-3">Results</th>
+                  <th class="px-4 py-3">Jailbreaks</th>
+                  <th class="px-4 py-3">Notes</th>
+                  <th class="px-4 py-3">Created</th>
+                  <th class="px-4 py-3 w-4"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="run in runs.items" :key="run.id">
+                  <!-- Wrapper row that holds both the summary row and the expandable detail -->
+                  <tr>
+                    <td colspan="8" class="border-b border-slate-100 p-0">
+                      <!-- Summary row -->
+                      <div class="flex items-center gap-4 px-5 py-3 hover:bg-slate-50 cursor-pointer transition-colors select-none"
+                           @click="toggleRunExpand(run.id)">
+                        <span class="font-mono text-xs text-slate-500 w-24 flex-shrink-0"
+                              x-text="run.id.slice(0,8) + '…'"></span>
+                        <span class="font-mono text-xs text-slate-400 w-24 flex-shrink-0"
+                              x-text="run.attack_id.slice(0,8) + '…'"></span>
+                        <span :class="statusBadgeClass(run.status)"
+                              class="px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0"
+                              x-text="run.status"></span>
+                        <span class="text-slate-600 text-xs flex-shrink-0"
+                              x-text="(run.total_results ?? 0) + ' results'"></span>
+                        <span class="text-xs flex-shrink-0"
+                              :class="(run.successful_jailbreaks ?? 0) > 0 ? 'text-red-600 font-semibold' : 'text-slate-400'"
+                              x-text="(run.successful_jailbreaks ?? 0) + ' ⚠'"></span>
+                        <span class="text-slate-400 text-xs truncate flex-1 max-w-40"
+                              x-text="run.run_notes || '—'"></span>
+                        <span class="text-slate-400 text-xs flex-shrink-0 ml-auto"
+                              x-text="formatDate(run.created_at)"></span>
+                        <svg class="w-4 h-4 text-slate-400 flex-shrink-0 transition-transform duration-200"
+                             :class="{'rotate-180': expandedRun === run.id}"
+                             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                      </div>
+
+                      <!-- Expanded results panel -->
+                      <div x-show="expandedRun === run.id"
+                           x-transition:enter="transition-all duration-200"
+                           x-transition:enter-start="opacity-0"
+                           x-transition:enter-end="opacity-100"
+                           class="border-t border-slate-100 bg-slate-50">
+                        <!-- Loading state -->
+                        <div x-show="resultsLoading" class="px-10 py-5 text-sm text-slate-400 flex items-center gap-2">
+                          <span class="inline-block w-3.5 h-3.5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></span>
+                          Loading results…
+                        </div>
+                        <!-- Results table -->
+                        <div x-show="!resultsLoading">
+                          <table class="w-full text-xs">
+                            <thead>
+                              <tr class="text-left text-slate-500 border-b border-slate-200 bg-slate-100">
+                                <th class="px-10 py-2 font-medium">#</th>
+                                <th class="px-4 py-2 font-medium">Goal</th>
+                                <th class="px-4 py-2 font-medium">Evaluation</th>
+                                <th class="px-4 py-2 font-medium">Notes</th>
+                                <th class="px-4 py-2 font-medium">Created</th>
+                                <th class="px-4 py-2"></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <template x-for="result in currentResults" :key="result.id">
+                                <tr class="border-b border-slate-200 hover:bg-white transition-colors">
+                                  <td class="px-10 py-2 text-slate-400"
+                                      x-text="result.goal_index + 1"></td>
+                                  <td class="px-4 py-2 max-w-xs truncate text-slate-700"
+                                      x-text="result.goal" :title="result.goal"></td>
+                                  <td class="px-4 py-2">
+                                    <span :class="evalBadgeClass(result.evaluation_status)"
+                                          class="px-2 py-0.5 rounded-full text-xs font-medium"
+                                          x-text="result.evaluation_status.replace(/_/g,' ')"></span>
+                                  </td>
+                                  <td class="px-4 py-2 text-slate-400 max-w-xs truncate"
+                                      x-text="result.evaluation_notes || '—'"></td>
+                                  <td class="px-4 py-2 text-slate-400"
+                                      x-text="formatDate(result.created_at)"></td>
+                                  <td class="px-4 py-2">
+                                    <button @click.stop="openResultDetail(result)"
+                                            class="text-blue-600 hover:text-blue-700 hover:underline font-medium">
+                                      Traces
+                                    </button>
+                                  </td>
+                                </tr>
+                              </template>
+                              <tr x-show="currentResults.length === 0 && !resultsLoading">
+                                <td colspan="6" class="px-10 py-4 text-slate-400">
+                                  No results recorded yet for this run.
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="runs.items.length === 0">
+                  <td colspan="8" class="px-6 py-10 text-center text-slate-400 text-sm">
+                    No runs yet — start a security test with
+                    <code class="bg-slate-100 px-1.5 py-0.5 rounded font-mono">hackagent attack</code>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          <div class="px-6 py-3 border-t bg-slate-50 flex items-center justify-between text-sm text-slate-500">
+            <span x-text="`${runs.total} run${runs.total !== 1 ? 's' : ''} total`"></span>
+            <div class="flex items-center gap-2">
+              <button @click="runsPage > 1 && loadRuns(runsPage - 1)"
+                      :disabled="runsPage <= 1"
+                      class="px-3 py-1 border border-slate-200 rounded-lg text-xs hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                ← Prev
+              </button>
+              <span class="text-xs" x-text="`Page ${runsPage}`"></span>
+              <button @click="runs.total > runsPage * runsPageSize && loadRuns(runsPage + 1)"
+                      :disabled="runs.total <= runsPage * runsPageSize"
+                      class="px-3 py-1 border border-slate-200 rounded-lg text-xs hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                Next →
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /p-8 -->
+  </main>
+
+
+  <!-- ═══════════════════════ RESULT DETAIL SLIDE-OVER ═══════════════════════ -->
+  <div x-show="selectedResult !== null"
+       x-transition:enter="transition-opacity duration-200"
+       x-transition:enter-start="opacity-0"
+       x-transition:enter-end="opacity-100"
+       x-transition:leave="transition-opacity duration-150"
+       x-transition:leave-start="opacity-100"
+       x-transition:leave-end="opacity-0"
+       class="fixed inset-0 bg-black/40 z-50 flex justify-end"
+       @click.self="selectedResult = null">
+
+    <div class="bg-white w-full max-w-xl h-full overflow-y-auto shadow-2xl flex flex-col"
+         x-show="selectedResult !== null"
+         x-transition:enter="transition-transform duration-250 ease-out"
+         x-transition:enter-start="translate-x-full"
+         x-transition:enter-end="translate-x-0"
+         @click.stop>
+
+      <!-- Panel header -->
+      <div class="sticky top-0 bg-white border-b z-10 px-6 py-4 flex items-start justify-between gap-4">
+        <div class="min-w-0">
+          <h2 class="font-semibold text-slate-900">Result Detail</h2>
+          <p class="text-xs text-slate-400 font-mono truncate mt-0.5" x-text="selectedResult?.id"></p>
+        </div>
+        <button @click="selectedResult = null"
+                class="flex-shrink-0 text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Panel body -->
+      <div class="flex-1 p-6 space-y-6" x-show="selectedResult">
+
+        <!-- Goal -->
+        <div>
+          <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Goal</h3>
+          <p class="text-sm text-slate-800 leading-relaxed" x-text="selectedResult?.goal || '—'"></p>
+        </div>
+
+        <!-- Evaluation + Notes -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Evaluation</h3>
+            <span :class="evalBadgeClass(selectedResult?.evaluation_status)"
+                  class="px-2.5 py-1 rounded-full text-xs font-medium"
+                  x-text="(selectedResult?.evaluation_status || '').replace(/_/g,' ')"></span>
+          </div>
+          <div>
+            <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Goal Index</h3>
+            <span class="text-sm font-mono text-slate-600"
+                  x-text="(selectedResult?.goal_index ?? 0) + 1"></span>
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div x-show="selectedResult?.evaluation_notes">
+          <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Notes</h3>
+          <p class="text-sm text-slate-600" x-text="selectedResult?.evaluation_notes"></p>
+        </div>
+
+        <!-- Metrics -->
+        <div x-show="selectedResult?.evaluation_metrics && Object.keys(selectedResult.evaluation_metrics).length > 0">
+          <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Metrics</h3>
+          <pre class="text-xs bg-slate-50 border border-slate-200 rounded-xl p-4 overflow-x-auto leading-relaxed"
+               x-text="JSON.stringify(selectedResult?.evaluation_metrics, null, 2)"></pre>
+        </div>
+
+        <!-- Metadata snippet -->
+        <div x-show="selectedResult?.metadata && Object.keys(selectedResult.metadata).length > 0">
+          <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Metadata</h3>
+          <pre class="text-xs bg-slate-50 border border-slate-200 rounded-xl p-4 overflow-x-auto leading-relaxed max-h-40"
+               x-text="JSON.stringify(selectedResult?.metadata, null, 2)"></pre>
+        </div>
+
+        <!-- Trace timeline -->
+        <div>
+          <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">Trace Timeline</h3>
+
+          <div x-show="tracesLoading" class="flex items-center gap-2 text-sm text-slate-400">
+            <span class="inline-block w-3.5 h-3.5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></span>
+            Loading traces…
+          </div>
+
+          <div x-show="!tracesLoading" class="space-y-4">
+            <template x-for="trace in currentTraces" :key="trace.id">
+              <div class="flex gap-3">
+                <!-- Step indicator -->
+                <div class="flex flex-col items-center flex-shrink-0">
+                  <div :class="stepTypeIconClass(trace.step_type)"
+                       class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold">
+                    <span x-text="trace.sequence"></span>
+                  </div>
+                  <div class="w-px flex-1 bg-slate-200 mt-1"></div>
+                </div>
+                <!-- Step content -->
+                <div class="flex-1 min-w-0 pb-4">
+                  <div class="flex items-center gap-2 mb-1.5">
+                    <span class="text-xs font-semibold"
+                          :class="stepTypeTextClass(trace.step_type)"
+                          x-text="trace.step_type.replace(/_/g,' ')"></span>
+                    <span class="text-xs text-slate-400" x-text="formatDate(trace.created_at)"></span>
+                  </div>
+                  <pre class="text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 overflow-x-auto whitespace-pre-wrap break-words max-h-52 leading-relaxed"
+                       x-text="JSON.stringify(trace.content, null, 2)"></pre>
+                </div>
+              </div>
+            </template>
+
+            <div x-show="currentTraces.length === 0" class="text-sm text-slate-400 py-4 text-center">
+              No traces recorded for this result.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════ APP SCRIPT ═══════════════════════ -->
+  <script>
+    function hackagentApp() {
+      return {
+        // ── Navigation ───────────────────────────────────────────────────────
+        currentView: 'dashboard',
+
+        navItems: [
+          {
+            id: 'dashboard',
+            label: 'Dashboard',
+            icon: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                       d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0
+                          01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                   </svg>`
+          },
+          {
+            id: 'agents',
+            label: 'Agents',
+            icon: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                       d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0
+                          012-2h14a2 2 0 012 2v10a2 2 0 01-2 2h-2"/>
+                   </svg>`
+          },
+          {
+            id: 'attacks',
+            label: 'Attacks',
+            icon: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                       d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                   </svg>`
+          },
+          {
+            id: 'runs',
+            label: 'Runs',
+            icon: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                       d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0
+                          00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                   </svg>`
+          },
+        ],
+
+        // ── State ────────────────────────────────────────────────────────────
+        loading: false,
+        status: { mode: 'local', db_path: '', org_id: '', user_id: '' },
+        stats: {
+          total_agents: 0, total_attacks: 0, total_runs: 0, total_results: 0,
+          successful_jailbreaks: 0, passed: 0, errors: 0, not_evaluated: 0,
+          risk_percentage: 0,
+        },
+        agents:  { items: [], total: 0 },
+        attacks: { items: [], total: 0 },
+        runs:    { items: [], total: 0 },
+        runsPage: 1,
+        runsPageSize: 20,
+        recentRuns: [],
+
+        // Run expansion
+        expandedRun: null,
+        currentResults: [],
+        resultsLoading: false,
+
+        // Result detail / traces
+        selectedResult: null,
+        currentTraces: [],
+        tracesLoading: false,
+
+        // Charts
+        _riskChart: null,
+        _distChart: null,
+
+        // ── Computed ─────────────────────────────────────────────────────────
+        get statCards() {
+          return [
+            { label: 'Agents',     value: this.stats.total_agents,          color: 'text-slate-900' },
+            { label: 'Attacks',    value: this.stats.total_attacks,         color: 'text-slate-900' },
+            { label: 'Runs',       value: this.stats.total_runs,            color: 'text-slate-900' },
+            { label: 'Jailbreaks', value: this.stats.successful_jailbreaks, color: this.stats.successful_jailbreaks > 0 ? 'text-red-600' : 'text-slate-900' },
+          ];
+        },
+
+        get riskColor() {
+          const p = this.stats.risk_percentage;
+          if (p >= 70) return 'text-red-600';
+          if (p >= 40) return 'text-orange-500';
+          if (p >= 10) return 'text-yellow-500';
+          return 'text-emerald-600';
+        },
+
+        // ── Lifecycle ────────────────────────────────────────────────────────
+        async init() {
+          await this.loadStatus();
+          await this.loadDashboard();
+        },
+
+        // ── Navigation ───────────────────────────────────────────────────────
+        navigate(view) {
+          this.currentView = view;
+          this.refreshCurrentView();
+        },
+
+        refreshCurrentView() {
+          if (this.currentView === 'dashboard') this.loadDashboard();
+          else if (this.currentView === 'agents')  this.loadAgents();
+          else if (this.currentView === 'attacks') this.loadAttacks();
+          else if (this.currentView === 'runs')    this.loadRuns(this.runsPage);
+        },
+
+        // ── API helpers ──────────────────────────────────────────────────────
+        async fetchJSON(url) {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+          return res.json();
+        },
+
+        // ── Data loaders ─────────────────────────────────────────────────────
+        async loadStatus() {
+          try { this.status = await this.fetchJSON('/api/status'); }
+          catch (_) { /* best-effort */ }
+        },
+
+        async loadDashboard() {
+          this.loading = true;
+          try {
+            [this.stats, { items: this.recentRuns }] = await Promise.all([
+              this.fetchJSON('/api/stats'),
+              this.fetchJSON('/api/runs?page=1&page_size=5'),
+            ]);
+            this.$nextTick(() => this.renderCharts());
+          } catch (_) {
+            /* silently fail on network issues */
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        async loadAgents() {
+          this.loading = true;
+          try { this.agents = await this.fetchJSON('/api/agents?page=1&page_size=100'); }
+          finally { this.loading = false; }
+        },
+
+        async loadAttacks() {
+          this.loading = true;
+          try { this.attacks = await this.fetchJSON('/api/attacks?page=1&page_size=100'); }
+          finally { this.loading = false; }
+        },
+
+        async loadRuns(page = 1) {
+          this.loading = true;
+          this.runsPage = page;
+          try {
+            this.runs = await this.fetchJSON(
+              `/api/runs?page=${page}&page_size=${this.runsPageSize}`
+            );
+          } finally { this.loading = false; }
+        },
+
+        // ── Run expand / results ─────────────────────────────────────────────
+        async toggleRunExpand(runId) {
+          if (this.expandedRun === runId) {
+            this.expandedRun = null;
+            return;
+          }
+          this.expandedRun = runId;
+          this.currentResults = [];
+          this.resultsLoading = true;
+          try {
+            const data = await this.fetchJSON(
+              `/api/results?run_id=${runId}&page_size=200`
+            );
+            this.currentResults = data.items;
+          } finally { this.resultsLoading = false; }
+        },
+
+        async openRunDetail(run) {
+          this.navigate('runs');
+          // Wait for view to render before expanding
+          await this.$nextTick();
+          this.toggleRunExpand(run.id);
+        },
+
+        // ── Result detail / traces ───────────────────────────────────────────
+        async openResultDetail(result) {
+          this.selectedResult = result;
+          this.currentTraces = [];
+          this.tracesLoading = true;
+          try {
+            const data = await this.fetchJSON(`/api/traces?result_id=${result.id}`);
+            this.currentTraces = data.items;
+          } finally { this.tracesLoading = false; }
+        },
+
+        // ── Charts ───────────────────────────────────────────────────────────
+        renderCharts() {
+          // Risk donut
+          const riskEl = document.getElementById('riskChart');
+          if (riskEl) {
+            if (this._riskChart) this._riskChart.destroy();
+            const safe = Math.max(0, 100 - this.stats.risk_percentage);
+            const noData = this.stats.total_results === 0;
+            this._riskChart = new Chart(riskEl, {
+              type: 'doughnut',
+              data: {
+                labels: noData ? ['No data'] : ['Jailbreaks', 'Safe'],
+                datasets: [{
+                  data: noData ? [100] : [this.stats.risk_percentage, safe],
+                  backgroundColor: noData ? ['#e2e8f0'] : ['#ef4444', '#22c55e'],
+                  borderWidth: 0,
+                }],
+              },
+              options: {
+                cutout: '72%',
+                plugins: { legend: { display: false }, tooltip: { enabled: !noData } },
+                animation: { animateRotate: true, duration: 600 },
+              },
+            });
+          }
+
+          // Distribution bar
+          const distEl = document.getElementById('distChart');
+          if (distEl) {
+            if (this._distChart) this._distChart.destroy();
+            this._distChart = new Chart(distEl, {
+              type: 'bar',
+              data: {
+                labels: ['Jailbreaks', 'Passed', 'Errors', 'Not Evaluated'],
+                datasets: [{
+                  data: [
+                    this.stats.successful_jailbreaks,
+                    this.stats.passed,
+                    this.stats.errors,
+                    this.stats.not_evaluated,
+                  ],
+                  backgroundColor: ['#ef4444', '#22c55e', '#f97316', '#94a3b8'],
+                  borderRadius: 6,
+                  borderSkipped: false,
+                }],
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                  y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, grid: { color: '#f1f5f9' } },
+                  x: { grid: { display: false } },
+                },
+                animation: { duration: 500 },
+              },
+            });
+          }
+        },
+
+        // ── Formatters / helpers ─────────────────────────────────────────────
+        formatDate(iso) {
+          if (!iso) return '—';
+          try {
+            const d = new Date(iso);
+            return d.toLocaleDateString() + ' ' +
+                   d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          } catch (_) { return iso; }
+        },
+
+        statusBadgeClass(status) {
+          switch ((status || '').toUpperCase()) {
+            case 'COMPLETED': return 'bg-emerald-100 text-emerald-700';
+            case 'RUNNING':   return 'bg-blue-100 text-blue-700';
+            case 'PENDING':   return 'bg-amber-100 text-amber-700';
+            case 'FAILED':    return 'bg-red-100 text-red-700';
+            case 'CANCELLED': return 'bg-slate-100 text-slate-500';
+            default:          return 'bg-slate-100 text-slate-700';
+          }
+        },
+
+        evalBadgeClass(status) {
+          const s = (status || '').toUpperCase();
+          if (s.includes('SUCCESSFUL_JAILBREAK')) return 'bg-red-100 text-red-700';
+          if (s.includes('FAILED_JAILBREAK'))     return 'bg-emerald-100 text-emerald-700';
+          if (s.includes('PASSED_CRITERIA'))      return 'bg-emerald-100 text-emerald-700';
+          if (s.includes('FAILED_CRITERIA'))      return 'bg-orange-100 text-orange-700';
+          if (s.includes('ERROR'))                return 'bg-orange-100 text-orange-700';
+          return 'bg-slate-100 text-slate-600';
+        },
+
+        stepTypeIconClass(stepType) {
+          const s = (stepType || '').toUpperCase();
+          if (s.includes('TOOL_CALL'))     return 'bg-purple-100 text-purple-700';
+          if (s.includes('TOOL_RESPONSE')) return 'bg-indigo-100 text-indigo-700';
+          if (s.includes('AGENT_THOUGHT')) return 'bg-blue-100 text-blue-700';
+          if (s.includes('AGENT_RESPONSE'))return 'bg-emerald-100 text-emerald-700';
+          if (s.includes('MCP'))           return 'bg-teal-100 text-teal-700';
+          if (s.includes('A2A'))           return 'bg-cyan-100 text-cyan-700';
+          return 'bg-slate-100 text-slate-600';
+        },
+
+        stepTypeTextClass(stepType) {
+          const s = (stepType || '').toUpperCase();
+          if (s.includes('TOOL_CALL'))     return 'text-purple-700';
+          if (s.includes('TOOL_RESPONSE')) return 'text-indigo-700';
+          if (s.includes('AGENT_THOUGHT')) return 'text-blue-700';
+          if (s.includes('AGENT_RESPONSE'))return 'text-emerald-700';
+          if (s.includes('MCP'))           return 'text-teal-700';
+          if (s.includes('A2A'))           return 'text-cyan-700';
+          return 'text-slate-700';
+        },
+      };
+    }
+  </script>
+
+</body>
+</html>

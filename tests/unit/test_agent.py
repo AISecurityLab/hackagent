@@ -42,7 +42,7 @@ class TestHackAgentInitialization(unittest.TestCase):
             api_key="test-key",
         )
 
-        self.assertEqual(agent.client._base_url, "https://api.hackagent.dev")
+        self.assertEqual(agent.client.base_url, "https://api.hackagent.dev")
 
     @patch("hackagent.agent.AgentRouter")
     @patch("hackagent.agent.utils.resolve_api_token", return_value="test-token")
@@ -57,7 +57,7 @@ class TestHackAgentInitialization(unittest.TestCase):
             base_url="https://custom.api.com",
         )
 
-        self.assertEqual(agent.client._base_url, "https://custom.api.com")
+        self.assertEqual(agent.client.base_url, "https://custom.api.com")
 
     @patch("hackagent.agent.AgentRouter")
     @patch("hackagent.agent.utils.resolve_api_token", return_value="test-token")

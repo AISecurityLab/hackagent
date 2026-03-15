@@ -54,13 +54,13 @@ class TestPackageImports:
         This specifically tests for the python-dateutil dependency
         which is used in model serialization.
         """
-        from hackagent.api.models import Agent
+        from hackagent.server.api.models import Agent
 
         assert Agent is not None
 
     def test_api_modules_import(self):
         """Test that API modules can be imported."""
-        from hackagent import api
+        from hackagent.server import api
 
         assert api is not None
 
@@ -85,15 +85,18 @@ class TestPackageImports:
 
         assert isoparse is not None
 
-    def test_attrs_dependency(self):
-        """Test that attrs is available.
+    def test_pydantic_dependency(self):
+        """Test that pydantic v2 is available with email extras.
 
-        This dependency is required for model definitions.
+        This dependency is required for model definitions, client classes,
+        and storage records throughout the SDK.
         """
-        from attrs import define, field
+        from pydantic import BaseModel, ConfigDict, PrivateAttr, field_validator
 
-        assert define is not None
-        assert field is not None
+        assert BaseModel is not None
+        assert ConfigDict is not None
+        assert PrivateAttr is not None
+        assert field_validator is not None
 
 
 class TestAllSubmodulesImportable:

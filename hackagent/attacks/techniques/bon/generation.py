@@ -45,7 +45,7 @@ from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
 from hackagent.router.router import AgentRouter
 
 if TYPE_CHECKING:
-    from hackagent.client import AuthenticatedClient
+    from hackagent.server.client import AuthenticatedClient
     from hackagent.router.tracking import Tracker
     from hackagent.router.tracking.tracker import Context
 

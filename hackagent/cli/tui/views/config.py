@@ -84,6 +84,12 @@ class ConfigTab(VerticalScroll):
                 id="config-status",
             )
 
+            yield Static(
+                "[dim]Mode: Detecting...[/dim]",
+                classes="status-indicator",
+                id="mode-indicator",
+            )
+
         with Horizontal(classes="button-group"):
             yield Button("Save Configuration", id="save-config", variant="primary")
             yield Button("Test Connection", id="test-connection", variant="default")
@@ -96,7 +102,8 @@ class ConfigTab(VerticalScroll):
             yield Static(
                 f"""[dim]Python Version:[/dim] {self._get_python_version()}
 [dim]CLI Version:[/dim] 0.2.5
-[dim]Dependencies:[/dim] {self._check_dependencies()}""",
+[dim]Dependencies:[/dim] {self._check_dependencies()}
+[dim]Local DB:[/dim] ~/.local/share/hackagent/hackagent.db""",
                 classes="info-box",
                 id="system-info",
             )
@@ -105,6 +112,7 @@ class ConfigTab(VerticalScroll):
         """Called when the tab is mounted."""
         self._load_config()
         self._update_status()
+        self._update_mode_indicator()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button press events."""
@@ -140,6 +148,29 @@ class ConfigTab(VerticalScroll):
                 "[yellow]⚠️ No configuration file found. Save to create one.[/yellow]"
             )
 
+    def _update_mode_indicator(self) -> None:
+        """Show whether running in local or remote mode."""
+        try:
+            mode_widget = self.query_one("#mode-indicator", Static)
+            if self.cli_config.api_key:
+                mode_widget.update(
+                    "[green]🌐 Mode:[/green] [bold]Remote[/bold] — results synced to HackAgent platform"
+                )
+            else:
+                from pathlib import Path
+
+                db_path = Path("~/.local/share/hackagent/hackagent.db").expanduser()
+                db_exists = (
+                    "[green]✓ exists[/green]"
+                    if db_path.exists()
+                    else "[yellow]not yet created[/yellow]"
+                )
+                mode_widget.update(
+                    f"[cyan]💾 Mode:[/cyan] [bold]Local[/bold] — SQLite at {db_path} ({db_exists})"
+                )
+        except Exception:
+            pass
+
     def _save_config(self) -> None:
         """Save configuration to file."""
         try:
@@ -159,29 +190,56 @@ class ConfigTab(VerticalScroll):
             self.cli_config.save()
 
             self._update_status()
+            self._update_mode_indicator()
 
         except Exception:
             pass
 
     def _test_connection(self) -> None:
-        """Test API connection."""
+        """Test API connection (remote) or local SQLite DB (local mode)."""
         try:
-            from hackagent.api.key import key_list
-            from hackagent.client import AuthenticatedClient
-
             if not self.cli_config.api_key:
+                # Local mode: verify SQLite DB is accessible
+                from pathlib import Path
+                import sqlite3
+
+                db_path = Path("~/.local/share/hackagent/hackagent.db").expanduser()
+                if not db_path.exists():
+                    self.app.notify(
+                        "💾 Local mode — DB not yet created (will be created on first run)",
+                        severity="information",
+                        timeout=5,
+                    )
+                    return
+                conn = sqlite3.connect(str(db_path))
+                run_count = conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0]
+                agent_count = conn.execute("SELECT COUNT(*) FROM agents").fetchone()[0]
+                conn.close()
+                self.app.notify(
+                    f"💾 Local mode — {run_count} run(s), {agent_count} agent(s) in DB",
+                    severity="information",
+                    timeout=5,
+                )
                 return
+
+            # Remote mode: test API key against the platform
+            from hackagent.server.api.key import key_list
+            from hackagent.server.client import AuthenticatedClient
 
             client = AuthenticatedClient(
                 base_url=self.cli_config.base_url,
                 token=self.cli_config.api_key,
                 prefix="Bearer",
             )
-
             key_list.sync_detailed(client=client)
+            self.app.notify(
+                "✅ Connected to HackAgent platform", severity="information", timeout=4
+            )
 
-        except Exception:
-            pass
+        except Exception as e:
+            self.app.notify(
+                f"❌ Connection test failed: {e}", severity="error", timeout=6
+            )
 
     def _validate_config(self) -> None:
         """Validate current configuration."""

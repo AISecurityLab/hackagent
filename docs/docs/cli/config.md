@@ -16,7 +16,7 @@ Display your current configuration:
 hackagent config show
 ```
 
-**Example output:**
+**Example output (with API key — remote mode):**
 
 ```
                                   HackAgent Configuration
@@ -29,6 +29,21 @@ hackagent config show
 │ Verbosity     │ 3 (DEBUG)                                  │ Default/Config             │
 │ Config File   │ /home/user/.config/hackagent/config.json   │ Default location           │
 └───────────────┴────────────────────────────────────────────┴────────────────────────────┘
+```
+
+**Example output (no API key — local mode):**
+
+```
+                                  HackAgent Configuration
+┏━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┓
+┃ Setting       ┃ Value                                                          ┃ Source            ┃
+┡━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━┩
+│ API Key       │ (not set — local mode)                                         │ -                 │
+│ Storage       │ ~/.local/share/hackagent/hackagent.db                          │ Local SQLite      │
+│ Output Format │ table                                                          │ Default/Config    │
+│ Verbosity     │ 3 (DEBUG)                                                      │ Default/Config    │
+│ Config File   │ /home/user/.config/hackagent/config.json                       │ Default location  │
+└───────────────┴────────────────────────────────────────────────────────────────┴───────────────────┘
 ```
 
 ### Set Configuration
@@ -49,6 +64,17 @@ hackagent config set --output-format json
 hackagent config set --verbose 2
 ```
 
+## Storage Modes
+
+HackAgent automatically selects a storage backend based on whether an API key is found:
+
+| Mode | Trigger | Storage | Network |
+|------|---------|---------|--------|
+| **Local** | No API key configured | `~/.local/share/hackagent/hackagent.db` (SQLite) | None — fully offline |
+| **Remote** | API key configured | [app.hackagent.dev](https://app.hackagent.dev) | HTTPS |
+
+Both modes support identical functionality: the TUI, CLI, SDK, and all attack types work the same way regardless of which mode is active.
+
 ## Configuration Priority
 
 Configuration is loaded in this order (highest to lowest priority):
@@ -56,19 +82,19 @@ Configuration is loaded in this order (highest to lowest priority):
 1. **Command-line arguments** — Override everything
 2. **Config file** — `~/.config/hackagent/config.json`
 3. **Environment variables** — Fallback
-4. **Default values** — Built-in defaults
+4. **Default values** — Built-in defaults (no API key → local mode)
 
 ## Environment Variables
 
 You can also configure HackAgent using environment variables:
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `HACKAGENT_API_KEY` | Your API key | `export HACKAGENT_API_KEY=abc123` |
-| `HACKAGENT_BASE_URL` | API base URL | `export HACKAGENT_BASE_URL=https://api.hackagent.dev` |
-| `HACKAGENT_OUTPUT_FORMAT` | Default output format | `export HACKAGENT_OUTPUT_FORMAT=json` |
+| Variable | Required | Description | Example |
+|----------|----------|-------------|----------|
+| `HACKAGENT_API_KEY` | ❌ Optional | API key for remote mode. Omit to use local mode. | `export HACKAGENT_API_KEY=abc123` |
+| `HACKAGENT_BASE_URL` | ❌ Optional | Remote API base URL | `export HACKAGENT_BASE_URL=https://api.hackagent.dev` |
+| `HACKAGENT_OUTPUT_FORMAT` | ❌ Optional | Default output format | `export HACKAGENT_OUTPUT_FORMAT=json` |
 
-**Example:**
+**Example (remote mode):**
 
 ```bash
 # Add to your shell profile (.bashrc, .zshrc, etc.)
@@ -77,9 +103,18 @@ export HACKAGENT_BASE_URL="https://api.hackagent.dev"
 export HACKAGENT_OUTPUT_FORMAT="table"
 ```
 
+**Example (local mode — no env vars needed):**
+
+```bash
+# Just run — HackAgent stores results locally with no configuration required
+hackagent attack advprefix --agent-name "my-agent" --agent-type "ollama" --endpoint "http://localhost:11434" --goals "Test"
+```
+
 ## Configuration File
 
 Default location: `~/.config/hackagent/config.json`
+
+**Remote mode** (API key configured):
 
 ```json
 {
@@ -89,6 +124,17 @@ Default location: `~/.config/hackagent/config.json`
   "verbose": 0
 }
 ```
+
+**Local mode** (no API key — results stored in `~/.local/share/hackagent/hackagent.db`):
+
+```json
+{
+  "output_format": "table",
+  "verbose": 0
+}
+```
+
+The `api_key` field is entirely optional. Omitting it activates local mode automatically.
 
 ### Custom Configuration File
 

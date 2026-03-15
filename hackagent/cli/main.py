@@ -15,7 +15,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.traceback import install
 
-from hackagent.cli.commands import agent, attack, config, results
+from hackagent.cli.commands import agent, attack, config, results, web as web_cmd
 from hackagent.cli.config import CLIConfig
 from hackagent.cli.utils import display_info, handle_errors
 
@@ -201,8 +201,8 @@ def init(ctx):
         cli_config.validate()
 
         # Test API connection
-        from hackagent.api.agent import agent_list
-        from hackagent.client import AuthenticatedClient
+        from hackagent.server.api.agent import agent_list
+        from hackagent.server.client import AuthenticatedClient
 
         client = AuthenticatedClient(
             base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
@@ -372,8 +372,8 @@ def doctor(ctx):
     console.print("\n[cyan]🌐 API Connection")
     if cli_config.api_key:
         try:
-            from hackagent.api.agent import agent_list
-            from hackagent.client import AuthenticatedClient
+            from hackagent.server.api.agent import agent_list
+            from hackagent.server.client import AuthenticatedClient
 
             client = AuthenticatedClient(
                 base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
@@ -505,6 +505,7 @@ cli.add_command(config.config)
 cli.add_command(agent.agent)
 cli.add_command(attack.attack)
 cli.add_command(results.results)
+cli.add_command(web_cmd.web)
 
 
 if __name__ == "__main__":

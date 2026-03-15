@@ -8,7 +8,7 @@ import unittest
 
 import httpx
 
-from hackagent.client import AuthenticatedClient, Client
+from hackagent.server.client import AuthenticatedClient, Client
 
 
 class TestClientSSLAndRedirects(unittest.TestCase):
@@ -17,22 +17,22 @@ class TestClientSSLAndRedirects(unittest.TestCase):
     def test_verify_ssl_default_true(self):
         """Test verify_ssl defaults to True."""
         client = Client(base_url="https://api.example.com")
-        self.assertTrue(client._verify_ssl)
+        self.assertTrue(client.verify_ssl)
 
     def test_verify_ssl_false(self):
         """Test verify_ssl can be set to False."""
         client = Client(base_url="https://api.example.com", verify_ssl=False)
-        self.assertFalse(client._verify_ssl)
+        self.assertFalse(client.verify_ssl)
 
     def test_follow_redirects_default_false(self):
         """Test follow_redirects defaults to False."""
         client = Client(base_url="https://api.example.com")
-        self.assertFalse(client._follow_redirects)
+        self.assertFalse(client.follow_redirects)
 
     def test_follow_redirects_true(self):
         """Test follow_redirects can be set to True."""
         client = Client(base_url="https://api.example.com", follow_redirects=True)
-        self.assertTrue(client._follow_redirects)
+        self.assertTrue(client.follow_redirects)
 
 
 class TestClientHttpxArgs(unittest.TestCase):
@@ -82,9 +82,9 @@ class TestAuthenticatedClientAsyncContextManager(unittest.TestCase):
             base_url="https://api.example.com",
             token="my-secret",
         )
-        client.get_async_httpx_client()
-        self.assertIn("Authorization", client._headers)
-        self.assertEqual(client._headers["Authorization"], "Bearer my-secret")
+        async_httpx = client.get_async_httpx_client()
+        self.assertIn("authorization", async_httpx.headers)
+        self.assertEqual(async_httpx.headers["authorization"], "Bearer my-secret")
 
     def test_async_client_no_prefix(self):
         """Test get_async_httpx_client with empty prefix."""
@@ -93,8 +93,8 @@ class TestAuthenticatedClientAsyncContextManager(unittest.TestCase):
             token="raw-token",
             prefix="",
         )
-        client.get_async_httpx_client()
-        self.assertEqual(client._headers["Authorization"], "raw-token")
+        async_httpx = client.get_async_httpx_client()
+        self.assertEqual(async_httpx.headers["authorization"], "raw-token")
 
 
 class TestClientWithMethodsUpdateAsyncClients(unittest.TestCase):

@@ -5,10 +5,10 @@ from hackagent.logger import get_logger
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 from hackagent import utils
-from hackagent.client import AuthenticatedClient
 from hackagent.errors import HackAgentError
 from hackagent.router import AgentRouter
 from hackagent.router.types import AgentTypeEnum
+from hackagent.server.storage.base import StorageBackend
 
 # Lazy import for attack orchestrators to avoid ~0.5s startup delay
 if TYPE_CHECKING:
@@ -89,23 +89,37 @@ class HackAgent:
 
         resolved_auth_token = utils.resolve_api_token(direct_api_key_param=api_key)
 
-        # Use default base_url if not provided
-        if base_url is None:
-            base_url = "https://api.hackagent.dev"
+        if resolved_auth_token:
+            from hackagent.server.client import AuthenticatedClient
+            from hackagent.server.storage.remote import RemoteBackend
 
-        self.client = AuthenticatedClient(
-            base_url=base_url,
-            token=resolved_auth_token,
-            prefix="Bearer",
-            raise_on_unexpected_status=raise_on_unexpected_status,
-            timeout=timeout,
-        )
+            _base_url = base_url or "https://api.hackagent.dev"
+            _client = AuthenticatedClient(
+                base_url=_base_url,
+                token=resolved_auth_token,
+                prefix="Bearer",
+                raise_on_unexpected_status=raise_on_unexpected_status,
+                timeout=timeout,
+            )
+            self.backend: StorageBackend = RemoteBackend(_client)
+            logger.info("HackAgent using remote backend → %s", _base_url)
+        else:
+            from hackagent.server.storage.local import LocalBackend
+
+            self.backend = LocalBackend()
+            logger.info(
+                "HackAgent using local backend → ~/.local/share/hackagent/hackagent.db"
+            )
+
+        # Keep self.client as the raw HTTP client for backward compat
+        # (adapters that need it can access it via backend.get_api_key())
+        self.client = getattr(self.backend, "_client", None)
 
         processed_agent_type = utils.resolve_agent_type(agent_type)
 
         self.router = AgentRouter(
-            client=self.client,
-            name=name,
+            backend=self.backend,
+            name=name or endpoint,  # fall back to endpoint if no name provided
             agent_type=processed_agent_type,
             endpoint=endpoint,
             metadata=metadata,
