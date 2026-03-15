@@ -40,7 +40,7 @@ Initialize AutoDAN-Turbo attack with merged defaults.
 
 **Raises**:
 
-- `ValueError` - If `client` or `agent_router` are missing.
+- `ValueError` - If ``client`` or ``agent_router`` are missing.
 
 #### run
 

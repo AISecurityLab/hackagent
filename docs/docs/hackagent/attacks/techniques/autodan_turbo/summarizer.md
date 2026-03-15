@@ -41,6 +41,6 @@ second wrapper pass that enforces structured JSON output.
 
 **Returns**:
 
-  Dictionary with at least `Strategy` and `Definition` on success,
-  else `None` when extraction fails.
+  Dictionary with at least ``Strategy`` and ``Definition`` on success,
+  else ``None`` when extraction fails.
 

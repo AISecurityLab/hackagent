@@ -24,3 +24,15 @@ All tracking data (agents, attacks, runs, results, traces) is stored in a
 single SQLite database.  The schema mirrors the remote Django models so that
 TUI views and the SDK work identically in both online and offline modes.
 
+#### close
+
+```python
+def close() -> None
+```
+
+Close the underlying SQLite connection.
+
+Call this when the backend is no longer needed to release the file lock.
+Particularly important on Windows where open file handles prevent
+temporary directory cleanup.
+

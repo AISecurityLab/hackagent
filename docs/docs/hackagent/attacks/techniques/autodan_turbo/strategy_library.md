@@ -59,7 +59,7 @@ before FAISS nearest-neighbor search.
 
 **Returns**:
 
-  Float32 numpy vector if successful, otherwise `None`.
+  Float32 numpy vector if successful, otherwise ``None``.
 
 #### add
 
@@ -75,8 +75,8 @@ examples/scores/embeddings instead of duplicating entries.
 
 **Arguments**:
 
-- `strategy` - Dictionary with keys such as `Strategy`, `Definition`,
-  `Example`, `Score`, `Embeddings`.
+- `strategy` - Dictionary with keys such as ``Strategy``, ``Definition``,
+  ``Example``, ``Score``, ``Embeddings``.
 - ``1 - Whether to emit informational log upon update.
   
 
@@ -105,12 +105,12 @@ Faithfully replicates original retrival.py:pop() logic:
 
 **Returns**:
 
-  Tuple `(valid, strategies)` where:
-  - `valid` is `True` when retrieved strategies are considered
-  effective candidates to reuse, `False` when they are low-scoring
+  Tuple ``(valid, strategies)`` where:
+  - ``valid`` is ``True`` when retrieved strategies are considered
+  effective candidates to reuse, ``False`` when they are low-scoring
   strategies to avoid.
-  - `strategies` is a list of strategy dictionaries containing
-  `Strategy`, `Definition` and representative `Example`.
+  - ``strategies`` is a list of strategy dictionaries containing
+  ``Strategy``, ``Definition`` and representative ``Example``.
 
 #### all
 
@@ -122,7 +122,7 @@ Return full in-memory strategy dictionary.
 
 **Returns**:
 
-  Mapping `strategy_name -&gt; strategy_record`.
+  Mapping ``strategy_name -&gt; strategy_record``.
 
 #### size
 
@@ -146,7 +146,7 @@ Persist strategy library to pickle file.
 
 **Arguments**:
 
-- `path` - Target path without extension or full `.pkl` prefix base.
+- `path` - Target path without extension or full ``.pkl`` prefix base.
   
 
 **Returns**:
@@ -163,7 +163,7 @@ Load strategy library from pickle file if present.
 
 **Arguments**:
 
-- `path` - Source path with or without `.pkl` suffix.
+- `path` - Source path with or without ``.pkl`` suffix.
   
 
 **Returns**:

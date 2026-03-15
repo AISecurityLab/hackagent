@@ -26,8 +26,8 @@ by phase/subphase in server traces.
 
 **Arguments**:
 
-- `config` - Attack config containing optional internal `_tracker`.
-- `phase` - High-level phase label (e.g. `WARMUP`, `LIFELONG`).
+- `config` - Attack config containing optional internal ``_tracker``.
+- `phase` - High-level phase label (e.g. ``WARMUP``, ``LIFELONG``).
 - `subphase` - Finer-grained action label (generation/scoring/etc.).
 - `step_name` - Human-readable trace step title.
 - ``0 - Extra structured fields to attach to trace content.

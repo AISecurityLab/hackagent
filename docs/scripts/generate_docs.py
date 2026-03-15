@@ -74,14 +74,16 @@ def _sanitize_mdx(text: str) -> str:
 
         # Escape bare { and } that are not inside inline backtick spans
         # Split around inline code spans to protect their contents
+        # Use HTML entities (&#123;/&#125;) because MDX v3 does not treat \{/\}
+        # as escape sequences in prose text.
         parts = re.split(r"(`[^`]+`)", line)
         escaped_parts = []
         for j, part in enumerate(parts):
             if j % 2 == 1:  # inside a backtick span – leave as-is
                 escaped_parts.append(part)
             else:
-                part = part.replace("{", "\\{")
-                part = part.replace("}", "\\}")
+                part = part.replace("{", "&#123;")
+                part = part.replace("}", "&#125;")
                 escaped_parts.append(part)
         result.append("".join(escaped_parts))
 

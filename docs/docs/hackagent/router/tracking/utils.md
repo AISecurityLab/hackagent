@@ -21,7 +21,7 @@ def deep_clean(obj: Any) -> Any
 
 Recursively convert Pydantic/OpenAI model objects to plain dicts/lists.
 
-Handles objects with `model_dump()` (Pydantic v2) or `dict()`
+Handles objects with ``model_dump()`` (Pydantic v2) or ``dict()``
 (Pydantic v1 / legacy), and recurses into dicts and lists.
 All other values are returned as-is.
 
@@ -44,17 +44,17 @@ Unified JSON sanitization for tracking payloads.
 
 Applies the following rules recursively:
 
-- `None` → `None`
-- `dict`:
-- Keys in `_SKIP_KEYS` (`_client`, `client`) → `&quot;&lt;TypeName&gt;&quot;`
+- ``None`` → ``None``
+- ``dict``:
+- Keys in ``_SKIP_KEYS`` (``_client``, ``client``) → ``&quot;&lt;TypeName&gt;&quot;``
 - Keys whose lowercase form contains a sensitive substring
-(`key`, `token`, `secret`, `password`) → `&quot;***REDACTED***&quot;`
+(``key``, ``token``, ``secret``, ``password``) → ``&quot;***REDACTED***&quot;``
 - All other values recurse.
-- `list` / `tuple` → recurse element-wise, preserving type.
-- `float`: `inf`/`-inf` → `&quot;Infinity&quot;`/`&quot;-Infinity&quot;`,
-`nan` → `&quot;NaN&quot;`, finite float returned as-is.
-- `str`, `int`, `bool` → returned as-is.
-- Anything else: attempt `json.dumps`; if that fails, return `&quot;&lt;TypeName&gt;&quot;`.
+- ``list`` / ``tuple`` → recurse element-wise, preserving type.
+- ``float``: ``inf``/``-inf`` → ``&quot;Infinity&quot;``/``&quot;-Infinity&quot;``,
+``nan`` → ``&quot;NaN&quot;``, finite float returned as-is.
+- ``str``, ``int``, ``bool`` → returned as-is.
+- Anything else: attempt ``json.dumps``; if that fails, return ``&quot;&lt;TypeName&gt;&quot;``.
 
 **Arguments**:
 
