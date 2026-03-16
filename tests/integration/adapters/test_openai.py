@@ -336,6 +336,7 @@ class TestOpenAIRouterIntegration:
             prefix="Bearer",
         )
         from hackagent.server.storage.remote import RemoteBackend
+
         backend = RemoteBackend(client)
 
         router = AgentRouter(
@@ -372,6 +373,7 @@ class TestOpenAIRouterIntegration:
             prefix="Bearer",
         )
         from hackagent.server.storage.remote import RemoteBackend
+
         backend = RemoteBackend(client)
 
         router = AgentRouter(
