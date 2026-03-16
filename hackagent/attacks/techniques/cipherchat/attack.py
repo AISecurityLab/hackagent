@@ -176,9 +176,7 @@ class CipherChatAttack(BaseAttack):
                     "instruction_type", "Crimes_And_Illegal_Activities"
                 ),
                 "language": params.get("language", "en"),
-                "demonstration_toxicity": params.get(
-                    "demonstration_toxicity", "toxic"
-                ),
+                "demonstration_toxicity": params.get("demonstration_toxicity", "toxic"),
             }
             coordinator.initialize_goals_from_pipeline_data(
                 pipeline_data=generation_output,

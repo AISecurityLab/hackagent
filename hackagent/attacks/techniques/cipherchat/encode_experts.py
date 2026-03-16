@@ -8,23 +8,104 @@
 
 # ciphers we used
 
-chinese_alphabet = ["甲","乙","丙","丁","戊","己","庚","辛","壬","癸","子","丑","寅","卯","辰","巳","午","未","申","酉","戌","亥","天","地","人","黄"]
-english_alphabet = ["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"]
-chinese_alphabet = ["e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z", "a","b","c","d"]
+chinese_alphabet = [
+    "甲",
+    "乙",
+    "丙",
+    "丁",
+    "戊",
+    "己",
+    "庚",
+    "辛",
+    "壬",
+    "癸",
+    "子",
+    "丑",
+    "寅",
+    "卯",
+    "辰",
+    "巳",
+    "午",
+    "未",
+    "申",
+    "酉",
+    "戌",
+    "亥",
+    "天",
+    "地",
+    "人",
+    "黄",
+]
+english_alphabet = [
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "f",
+    "g",
+    "h",
+    "i",
+    "j",
+    "k",
+    "l",
+    "m",
+    "n",
+    "o",
+    "p",
+    "q",
+    "r",
+    "s",
+    "t",
+    "u",
+    "v",
+    "w",
+    "x",
+    "y",
+    "z",
+]
+chinese_alphabet = [
+    "e",
+    "f",
+    "g",
+    "h",
+    "i",
+    "j",
+    "k",
+    "l",
+    "m",
+    "n",
+    "o",
+    "p",
+    "q",
+    "r",
+    "s",
+    "t",
+    "u",
+    "v",
+    "w",
+    "x",
+    "y",
+    "z",
+    "a",
+    "b",
+    "c",
+    "d",
+]
 
 # for i in range(26):
 #     print(english_alphabet[i], "->", chinese_alphabet[i])
 
-class SelfDefineCipher():
 
+class SelfDefineCipher:
     def encode(self, s):
         s = s.lower()
 
         ans = ""
         for letter in s:
             try:
-                ans += chinese_alphabet[ord(letter.lower()) - 96-1]
-            except:
+                ans += chinese_alphabet[ord(letter.lower()) - 96 - 1]
+            except Exception:
                 ans += letter
         return ans
 
@@ -34,41 +115,42 @@ class SelfDefineCipher():
             try:
                 position = chinese_alphabet.index(letter)
                 ans += english_alphabet[position]
-            except:
+            except Exception:
                 ans += letter
         return ans
 
-shift = 3
-class CaesarExpert():
 
+shift = 3
+
+
+class CaesarExpert:
     def encode(self, s):
-        ans = ''
+        ans = ""
         for p in s:
-            if 'a' <= p <= 'z':
-                ans += chr(ord('a') + (ord(p) - ord('a') + shift) % 26)
-            elif 'A' <= p <= 'Z':
-                ans += chr(ord('A') + (ord(p) - ord('A') + shift) % 26)
+            if "a" <= p <= "z":
+                ans += chr(ord("a") + (ord(p) - ord("a") + shift) % 26)
+            elif "A" <= p <= "Z":
+                ans += chr(ord("A") + (ord(p) - ord("A") + shift) % 26)
             else:
                 ans += p
 
         return ans
 
     def decode(self, s):
-        ans = ''
+        ans = ""
         for p in s:
-            if 'a' <= p <= 'z':
-                ans += chr(ord('a') + (ord(p) - ord('a') - shift) % 26)
-            elif 'A' <= p <= 'Z':
-                ans += chr(ord('A') + (ord(p) - ord('A') - shift) % 26)
+            if "a" <= p <= "z":
+                ans += chr(ord("a") + (ord(p) - ord("a") - shift) % 26)
+            elif "A" <= p <= "Z":
+                ans += chr(ord("A") + (ord(p) - ord("A") - shift) % 26)
             else:
                 ans += p
         return ans
 
 
-class UnicodeExpert():
-
+class UnicodeExpert:
     def encode(self, s):
-        ans = ''
+        ans = ""
 
         lines = s.split("\n")
         for line in lines:
@@ -86,8 +168,7 @@ class UnicodeExpert():
         return ans
 
 
-class BaseExpert():
-
+class BaseExpert:
     def encode(self, s):
         return s
 
@@ -95,10 +176,9 @@ class BaseExpert():
         return s
 
 
-class UTF8Expert():
-
+class UTF8Expert:
     def encode(self, s):
-        ans = ''
+        ans = ""
 
         lines = s.split("\n")
         for line in lines:
@@ -112,7 +192,7 @@ class UTF8Expert():
         return ans
 
     def decode(self, s):
-        ans = b''
+        ans = b""
         while len(s):
             if s.startswith("\\x"):
                 ans += bytes.fromhex(s[2:4])
@@ -125,17 +205,16 @@ class UTF8Expert():
         return ans
 
 
-class AsciiExpert():
-
+class AsciiExpert:
     def encode(self, s):
-        ans = ''
+        ans = ""
 
         lines = s.split("\n")
         for line in lines:
             for c in line:
                 try:
                     ans += str(ord(c)) + " "
-                except:
+                except Exception:
                     ans += c
             ans += "\n"
         return ans
@@ -148,14 +227,14 @@ class AsciiExpert():
             for c in cs:
                 try:
                     ans += chr(int(c))
-                except:
+                except Exception:
                     ans += c
         return ans
 
-class GBKExpert():
 
+class GBKExpert:
     def encode(self, s):
-        ans = ''
+        ans = ""
 
         lines = s.split("\n")
         for line in lines:
@@ -169,7 +248,7 @@ class GBKExpert():
         return ans
 
     def decode(self, s):
-        ans = b''
+        ans = b""
         while len(s):
             if s.startswith("\\x"):
                 ans += bytes.fromhex(s[2:4])
@@ -182,110 +261,168 @@ class GBKExpert():
         return ans
 
 
-class MorseExpert():
-
+class MorseExpert:
     def encode(self, s):
         s = s.upper()
-        MORSE_CODE_DICT = {'A': '.-', 'B': '-...',
-                           'C': '-.-.', 'D': '-..', 'E': '.',
-                           'F': '..-.', 'G': '--.', 'H': '....',
-                           'I': '..', 'J': '.---', 'K': '-.-',
-                           'L': '.-..', 'M': '--', 'N': '-.',
-                           'O': '---', 'P': '.--.', 'Q': '--.-',
-                           'R': '.-.', 'S': '...', 'T': '-',
-                           'U': '..-', 'V': '...-', 'W': '.--',
-                           'X': '-..-', 'Y': '-.--', 'Z': '--..',
-                           '1': '.----', '2': '..---', '3': '...--',
-                           '4': '....-', '5': '.....', '6': '-....',
-                           '7': '--...', '8': '---..', '9': '----.',
-                           '0': '-----', ', ': '--..--', '.': '.-.-.-',
-                           '?': '..--..', '/': '-..-.', '-': '-....-',
-                           '(': '-.--.', ')': '-.--.-'}
-        cipher = ''
+        MORSE_CODE_DICT = {
+            "A": ".-",
+            "B": "-...",
+            "C": "-.-.",
+            "D": "-..",
+            "E": ".",
+            "F": "..-.",
+            "G": "--.",
+            "H": "....",
+            "I": "..",
+            "J": ".---",
+            "K": "-.-",
+            "L": ".-..",
+            "M": "--",
+            "N": "-.",
+            "O": "---",
+            "P": ".--.",
+            "Q": "--.-",
+            "R": ".-.",
+            "S": "...",
+            "T": "-",
+            "U": "..-",
+            "V": "...-",
+            "W": ".--",
+            "X": "-..-",
+            "Y": "-.--",
+            "Z": "--..",
+            "1": ".----",
+            "2": "..---",
+            "3": "...--",
+            "4": "....-",
+            "5": ".....",
+            "6": "-....",
+            "7": "--...",
+            "8": "---..",
+            "9": "----.",
+            "0": "-----",
+            ", ": "--..--",
+            ".": ".-.-.-",
+            "?": "..--..",
+            "/": "-..-.",
+            "-": "-....-",
+            "(": "-.--.",
+            ")": "-.--.-",
+        }
+        cipher = ""
         lines = s.split("\n")
         for line in lines:
             for letter in line:
                 try:
-                    if letter != ' ':
-                        cipher += MORSE_CODE_DICT[letter] + ' '
+                    if letter != " ":
+                        cipher += MORSE_CODE_DICT[letter] + " "
                     else:
-                        cipher += ' '
-                except:
-                    cipher += letter + ' '
+                        cipher += " "
+                except Exception:
+                    cipher += letter + " "
             cipher += "\n"
         return cipher
 
     def decode(self, s):
-        MORSE_CODE_DICT = {'A': '.-', 'B': '-...',
-                           'C': '-.-.', 'D': '-..', 'E': '.',
-                           'F': '..-.', 'G': '--.', 'H': '....',
-                           'I': '..', 'J': '.---', 'K': '-.-',
-                           'L': '.-..', 'M': '--', 'N': '-.',
-                           'O': '---', 'P': '.--.', 'Q': '--.-',
-                           'R': '.-.', 'S': '...', 'T': '-',
-                           'U': '..-', 'V': '...-', 'W': '.--',
-                           'X': '-..-', 'Y': '-.--', 'Z': '--..',
-                           '1': '.----', '2': '..---', '3': '...--',
-                           '4': '....-', '5': '.....', '6': '-....',
-                           '7': '--...', '8': '---..', '9': '----.',
-                           '0': '-----', ', ': '--..--', '.': '.-.-.-',
-                           '?': '..--..', '/': '-..-.', '-': '-....-',
-                           '(': '-.--.', ')': '-.--.-'}
-        decipher = ''
-        citext = ''
+        MORSE_CODE_DICT = {
+            "A": ".-",
+            "B": "-...",
+            "C": "-.-.",
+            "D": "-..",
+            "E": ".",
+            "F": "..-.",
+            "G": "--.",
+            "H": "....",
+            "I": "..",
+            "J": ".---",
+            "K": "-.-",
+            "L": ".-..",
+            "M": "--",
+            "N": "-.",
+            "O": "---",
+            "P": ".--.",
+            "Q": "--.-",
+            "R": ".-.",
+            "S": "...",
+            "T": "-",
+            "U": "..-",
+            "V": "...-",
+            "W": ".--",
+            "X": "-..-",
+            "Y": "-.--",
+            "Z": "--..",
+            "1": ".----",
+            "2": "..---",
+            "3": "...--",
+            "4": "....-",
+            "5": ".....",
+            "6": "-....",
+            "7": "--...",
+            "8": "---..",
+            "9": "----.",
+            "0": "-----",
+            ", ": "--..--",
+            ".": ".-.-.-",
+            "?": "..--..",
+            "/": "-..-.",
+            "-": "-....-",
+            "(": "-.--.",
+            ")": "-.--.-",
+        }
+        decipher = ""
+        citext = ""
         lines = s.split("\n")
         for line in lines:
             for letter in line:
                 while True and len(letter):
-                    if letter[0] not in ['-', '.', ' ']:
+                    if letter[0] not in ["-", ".", " "]:
                         decipher += letter[0]
                         letter = letter[1:]
                     else:
                         break
                 try:
-                    if (letter != ' '):
+                    if letter != " ":
                         i = 0
                         citext += letter
                     else:
                         i += 1
                         if i == 2:
-                            decipher += ' '
+                            decipher += " "
                         else:
-                            decipher += list(MORSE_CODE_DICT.keys())[list(MORSE_CODE_DICT
-                                                                          .values()).index(citext)]
-                            citext = ''
-                except:
+                            decipher += list(MORSE_CODE_DICT.keys())[
+                                list(MORSE_CODE_DICT.values()).index(citext)
+                            ]
+                            citext = ""
+                except Exception:
                     decipher += letter
-            decipher += '\n'
+            decipher += "\n"
         return decipher
 
 
-
-class AtbashExpert():
-
+class AtbashExpert:
     def encode(self, text):
-        ans = ''
-        N = ord('z') + ord('a')
+        ans = ""
+        N = ord("z") + ord("a")
         for s in text:
             try:
                 if s.isalpha():
                     ans += chr(N - ord(s))
                 else:
                     ans += s
-            except:
+            except Exception:
                 ans += s
         return ans
 
     def decode(self, text):
-        ans = ''
-        N = ord('z') + ord('a')
+        ans = ""
+        N = ord("z") + ord("a")
         for s in text:
             try:
                 if s.isalpha():
                     ans += chr(N - ord(s))
                 else:
                     ans += s
-            except:
+            except Exception:
                 ans += s
         return ans
 
