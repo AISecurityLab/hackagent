@@ -81,6 +81,7 @@ def summarize_strategy(
     library,
     logger,
     max_retries=5,
+    summarizer_max_tokens=512,
     role_label="summarizer",
 ):
     """Summarize why a stronger prompt outperforms a weaker one.
@@ -140,7 +141,7 @@ def summarize_strategy(
                 registration_key=key,
                 request_data={
                     "messages": msgs,
-                    "max_tokens": 4096,
+                    "max_tokens": summarizer_max_tokens,
                     "temperature": 0.6,
                     "top_p": 0.9,
                 },
@@ -164,7 +165,7 @@ def summarize_strategy(
                 registration_key=key,
                 request_data={
                     "messages": msgs2,
-                    "max_tokens": 2000,
+                    "max_tokens": 256,
                     "temperature": 0.0,
                 },
             )

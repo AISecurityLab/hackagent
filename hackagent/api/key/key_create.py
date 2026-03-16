@@ -20,7 +20,7 @@ def _get_kwargs(
         "url": "/key",
     }
 
-    _kwargs["json"] = body.model_dump(by_alias=True, mode="json", exclude_none=True)
+    _kwargs["json"] = body.model_dump(mode="json", exclude_unset=True)
 
     headers["Content-Type"] = "application/json"
 

@@ -7,7 +7,7 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...types import UNSET, Response, Unset
-from ..models import PaginatedRunList, StatusEnum
+from ..models import PaginatedRunList, RunListStatus
 
 
 def _get_kwargs(
@@ -18,7 +18,7 @@ def _get_kwargs(
     organization: UUID | Unset = UNSET,
     page: int | Unset = UNSET,
     page_size: int | Unset = UNSET,
-    status: StatusEnum | Unset = UNSET,
+    status: RunListStatus | Unset = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
@@ -94,7 +94,7 @@ def sync_detailed(
     organization: UUID | Unset = UNSET,
     page: int | Unset = UNSET,
     page_size: int | Unset = UNSET,
-    status: StatusEnum | Unset = UNSET,
+    status: RunListStatus | Unset = UNSET,
 ) -> Response[PaginatedRunList]:
     """ViewSet for managing Run instances.
     Primarily for listing/retrieving runs.
@@ -112,7 +112,7 @@ def sync_detailed(
         organization (UUID | Unset):
         page (int | Unset):
         page_size (int | Unset):
-        status (StatusEnum | Unset):
+        status (RunListStatus | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -148,7 +148,7 @@ def sync(
     organization: UUID | Unset = UNSET,
     page: int | Unset = UNSET,
     page_size: int | Unset = UNSET,
-    status: StatusEnum | Unset = UNSET,
+    status: RunListStatus | Unset = UNSET,
 ) -> PaginatedRunList | None:
     """ViewSet for managing Run instances.
     Primarily for listing/retrieving runs.
@@ -166,7 +166,7 @@ def sync(
         organization (UUID | Unset):
         page (int | Unset):
         page_size (int | Unset):
-        status (StatusEnum | Unset):
+        status (RunListStatus | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -197,7 +197,7 @@ async def asyncio_detailed(
     organization: UUID | Unset = UNSET,
     page: int | Unset = UNSET,
     page_size: int | Unset = UNSET,
-    status: StatusEnum | Unset = UNSET,
+    status: RunListStatus | Unset = UNSET,
 ) -> Response[PaginatedRunList]:
     """ViewSet for managing Run instances.
     Primarily for listing/retrieving runs.
@@ -215,7 +215,7 @@ async def asyncio_detailed(
         organization (UUID | Unset):
         page (int | Unset):
         page_size (int | Unset):
-        status (StatusEnum | Unset):
+        status (RunListStatus | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -249,7 +249,7 @@ async def asyncio(
     organization: UUID | Unset = UNSET,
     page: int | Unset = UNSET,
     page_size: int | Unset = UNSET,
-    status: StatusEnum | Unset = UNSET,
+    status: RunListStatus | Unset = UNSET,
 ) -> PaginatedRunList | None:
     """ViewSet for managing Run instances.
     Primarily for listing/retrieving runs.
@@ -267,7 +267,7 @@ async def asyncio(
         organization (UUID | Unset):
         page (int | Unset):
         page_size (int | Unset):
-        status (StatusEnum | Unset):
+        status (RunListStatus | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

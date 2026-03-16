@@ -44,5 +44,37 @@ class AgentTypeEnum(str, Enum):
     A2A = "A2A"
     UNKNOWN = "UNKNOWN"
 
+    @classmethod
+    def _missing_(cls, value: object) -> "AgentTypeEnum":
+        """Allow case-insensitive lookup and common shorthand aliases.
+
+        For example ``AgentTypeEnum("openai")`` resolves to
+        ``AgentTypeEnum.OPENAI_SDK``.
+        """
+        if not isinstance(value, str):
+            return None
+        normalised = value.strip().upper()
+        # Direct case-insensitive match against member values
+        for member in cls:
+            if member.value == normalised:
+                return member
+        # Shorthand alias map
+        alias_target = _AGENT_TYPE_ALIASES.get(normalised)
+        if alias_target:
+            return cls(alias_target)
+        return None
+
     def __str__(self) -> str:
         return str(self.value)
+
+
+# Shorthand aliases accepted in config files and test scripts.
+# Keys are the normalised (upper-cased, stripped) input strings.
+_AGENT_TYPE_ALIASES: dict = {
+    "OPENAI": "OPENAI_SDK",
+    "OPENAI-SDK": "OPENAI_SDK",
+    "GOOGLE": "GOOGLE_ADK",
+    "ADK": "GOOGLE_ADK",
+    "LITE_LLM": "LITELLM",
+    "LITE-LLM": "LITELLM",
+}
