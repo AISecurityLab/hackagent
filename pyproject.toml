@@ -58,7 +58,7 @@ dev = [
     "flask>=3.1.2",
     "mcp>=1.21.2",
     "vllm>=0.11.0; sys_platform != 'win32'",
-    "transformers>=4.40,<5.0; sys_platform != 'win32'",
+    "transformers>=4.40,<6.0; sys_platform != 'win32'",
 ]
 docs = [
     "pydoc-markdown>=4.8.2",
