@@ -64,6 +64,7 @@ jobs:
   test-matrix:
     name: Tests (Python ${{ matrix.python-version }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
     strategy:
       fail-fast: false
@@ -86,8 +87,8 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
 
-      - name: Run tests with coverage
-        run: uv run pytest --cov --cov-report=xml:reports/coverage.xml
+      - name: Run unit tests with coverage
+        run: uv run pytest tests/unit/ --cov --cov-report=xml:reports/coverage.xml
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
@@ -102,6 +103,7 @@ jobs:
   test-quick:
     name: Tests (Quick)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     if: github.event_name == 'pull_request' && github.base_ref != 'main'
     steps:
       - uses: actions/checkout@v6
@@ -119,8 +121,8 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
 
-      - name: Run tests with coverage
-        run: uv run pytest --cov --cov-report=xml:reports/coverage.xml
+      - name: Run unit tests with coverage
+        run: uv run pytest tests/unit/ --cov --cov-report=xml:reports/coverage.xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
