@@ -60,7 +60,9 @@ jobs:
       - name: Run Ruff Formatting Check
         run: uv run ruff format --check .
 
-  # Full compatibility matrix - only on PRs to main
+  # ── Unit tests: full OS × Python-version matrix ──────────────────────────
+  # Runs tests/unit/ only (no external services, fast). Coverage artifact
+  # is uploaded for the canonical ubuntu/3.11 slice and merged later.
   test-matrix:
     name: Tests (Python ${{ matrix.python-version }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -90,16 +92,15 @@ jobs:
       - name: Run unit tests with coverage
         run: uv run pytest tests/unit/ --cov --cov-report=xml:reports/coverage.xml
 
-      - name: Upload coverage to Codecov
+      - name: Upload unit coverage artifact
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
-        uses: codecov/codecov-action@v5
+        uses: actions/upload-artifact@v4
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: reports/coverage.xml
-          flags: unit
-          fail_ci_if_error: true
+          name: coverage-unit
+          path: reports/.coverage
+          retention-days: 1
 
-  # Quick test - for PRs to non-main branches
+  # ── Quick test – PRs to non-main branches ────────────────────────────────
   test-quick:
     name: Tests (Quick)
     runs-on: ubuntu-latest
@@ -132,16 +133,59 @@ jobs:
           flags: unit
           fail_ci_if_error: true
 
-  # Integration tests with Ollama - only on PRs to main
-  integration-tests:
+  # ── Integration (offline) ─────────────────────────────────────────────────
+  # Covers tests/integration/storage/ (LocalBackend + SQLite) and
+  # tests/integration/tui/ (mock-based). No external services required.
+  integration-offline:
+    name: Integration Tests (Offline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run offline integration tests with coverage
+        run: >
+          uv run pytest
+          tests/integration/storage/
+          tests/integration/tui/
+          --run-integration
+          -v --tb=short
+          --cov --cov-fail-under=0
+          --cov-report=xml:reports/coverage.xml
+
+      - name: Upload offline-integration coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-integration-offline
+          path: reports/.coverage
+          retention-days: 1
+
+  # ── Integration (Ollama) ──────────────────────────────────────────────────
+  # Covers tests/integration/adapters/ and tests/integration/attacks/.
+  # Requires a running Ollama instance with tinyllama.
+  integration-ollama:
     name: Integration Tests (Ollama)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
     env:
       HACKAGENT_API_KEY: ${{ secrets.HACKAGENT_API_KEY }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       OLLAMA_MODEL: tinyllama
-      # Speed optimization for CI
       TEST_MAX_TOKENS_FAST: "15"
       TEST_MAX_TOKENS_MEDIUM: "25"
       TEST_MAX_TOKENS_SLOW: "40"
@@ -178,13 +222,120 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
 
-      - name: Run integration tests with coverage
-        run: uv run pytest tests/integration/ --run-integration -v --tb=short --cov --cov-fail-under=0 --cov-report=xml:reports/integration-coverage.xml
+      - name: Run Ollama integration tests with coverage
+        run: >
+          uv run pytest
+          tests/integration/adapters/
+          tests/integration/attacks/
+          --run-integration
+          -v --tb=short
+          --cov --cov-fail-under=0
+          --cov-report=xml:reports/coverage.xml
 
-      - name: Upload integration coverage to Codecov
+      - name: Upload Ollama-integration coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-integration-ollama
+          path: reports/.coverage
+          retention-days: 1
+
+  # ── E2E tests ─────────────────────────────────────────────────────────────
+  # Requires OPENROUTER_API_KEY (and optionally HACKAGENT_API_KEY).
+  # Skips gracefully when secrets are absent.
+  test-e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    env:
+      HACKAGENT_API_KEY: ${{ secrets.HACKAGENT_API_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      TEST_MAX_TOKENS_FAST: "15"
+      TEST_MAX_TOKENS_MEDIUM: "25"
+      TEST_MAX_TOKENS_SLOW: "40"
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run e2e tests with coverage
+        run: >
+          uv run pytest
+          tests/e2e/
+          -v --tb=short
+          --cov --cov-fail-under=0
+          --cov-report=xml:reports/coverage.xml
+
+      - name: Upload e2e coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-e2e
+          path: reports/.coverage
+          retention-days: 1
+
+  # ── Coverage merge & upload ───────────────────────────────────────────────
+  # Downloads all per-job .coverage files, combines them into one, generates
+  # a merged XML report, and uploads to Codecov with full coverage data.
+  coverage-report:
+    name: Coverage Report
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    needs:
+      - test-matrix
+      - integration-offline
+      - integration-ollama
+      - test-e2e
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Download all coverage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*
+          path: coverage-artifacts/
+
+      - name: Combine coverage data
+        run: |
+          mkdir -p reports
+          # Rename each artifact's .coverage with a unique suffix so combine can merge them
+          i=0
+          for f in coverage-artifacts/*/.coverage; do
+            cp "$f" "reports/.coverage.$i"
+            i=$((i + 1))
+          done
+          uv run coverage combine reports/
+          uv run coverage xml -o reports/coverage-merged.xml
+          uv run coverage report --skip-covered
+
+      - name: Upload merged coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: reports/integration-coverage.xml
-          flags: integration
+          files: reports/coverage-merged.xml
+          flags: merged
           fail_ci_if_error: false
