@@ -836,7 +836,7 @@ class Result(HackAgentBaseModel):
     run: UUID
     run_id: UUID
     prompt: UUID | None = None
-    prompt_name: Annotated[str | None, Field(...)]
+    prompt_name: Annotated[str | None, Field(title="Prompt Name")] = None
     request_payload: Any | None = None
     """
     Payload sent to agent or relevant data for client-submitted results.

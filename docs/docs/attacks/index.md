@@ -19,6 +19,7 @@ graph LR
         F[FlipAttack] --> |"Obfuscation"| T
         G[BoN] --> |"Augmentation"| T
         H4[h4rm3l] --> |"Composable"| T
+        I[CipherChat] --> |"Cipher"| T
     end
     T --> R[Results & Analysis]
 ```
@@ -34,6 +35,7 @@ graph LR
 | [**FlipAttack**](./flipattack.md) | Character-level text obfuscation | ⭐ Basic | Fast |
 | [**BoN**](./bon.md) | Best-of-N random text augmentation | ⭐ Basic | Fast |
 | [**h4rm3l**](./h4rm3l.md) | Composable prompt-decoration chains | ⭐⭐ Medium | Fast |
+| [**CipherChat**](./cipherchat.md) | Cipher-based non-natural-language jailbreak prompts | ⭐⭐ Medium | Fast |
 | [**Baseline**](./baseline.md) | Template-based prompt injection | ⭐ Basic | Fast |
 
 :::tip Dataset Support
