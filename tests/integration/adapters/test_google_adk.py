@@ -364,9 +364,11 @@ class TestGoogleADKRouterIntegration:
             token=hackagent_api_key,
             prefix="Bearer",
         )
+        from hackagent.server.storage.remote import RemoteBackend
+        backend = RemoteBackend(client)
 
         router = AgentRouter(
-            client=client,
+            backend=backend,
             name="multi_tool_agent",
             agent_type=AgentTypeEnum.GOOGLE_ADK,
             endpoint=google_adk_agent_url,
@@ -397,9 +399,11 @@ class TestGoogleADKRouterIntegration:
             token=hackagent_api_key,
             prefix="Bearer",
         )
+        from hackagent.server.storage.remote import RemoteBackend
+        backend = RemoteBackend(client)
 
         router = AgentRouter(
-            client=client,
+            backend=backend,
             name="multi_tool_agent",
             agent_type=AgentTypeEnum.GOOGLE_ADK,
             endpoint=google_adk_agent_url,

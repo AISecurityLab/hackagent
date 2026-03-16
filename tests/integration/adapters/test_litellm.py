@@ -339,6 +339,7 @@ class TestLiteLLMRouterIntegration:
     ):
         """Test that AgentRouter correctly creates LiteLLMAgent adapter."""
         from hackagent.server.client import AuthenticatedClient
+        from hackagent.server.storage.remote import RemoteBackend
         from hackagent.router.router import AgentRouter
         from hackagent.router.types import AgentTypeEnum
         from hackagent.router.adapters.litellm import LiteLLMAgent
@@ -348,6 +349,7 @@ class TestLiteLLMRouterIntegration:
             token=hackagent_api_key,
             prefix="Bearer",
         )
+        backend = RemoteBackend(client)
 
         endpoint = (
             ollama_base_url
@@ -356,7 +358,7 @@ class TestLiteLLMRouterIntegration:
         )
 
         router = AgentRouter(
-            client=client,
+            backend=backend,
             name=litellm_model,
             agent_type=AgentTypeEnum.LITELLM,
             endpoint=endpoint,
@@ -380,6 +382,7 @@ class TestLiteLLMRouterIntegration:
     ):
         """Test that router can handle requests through LiteLLM adapter."""
         from hackagent.server.client import AuthenticatedClient
+        from hackagent.server.storage.remote import RemoteBackend
         from hackagent.router.router import AgentRouter
         from hackagent.router.types import AgentTypeEnum
 
@@ -388,6 +391,7 @@ class TestLiteLLMRouterIntegration:
             token=hackagent_api_key,
             prefix="Bearer",
         )
+        backend = RemoteBackend(client)
 
         endpoint = (
             ollama_base_url
@@ -396,7 +400,7 @@ class TestLiteLLMRouterIntegration:
         )
 
         router = AgentRouter(
-            client=client,
+            backend=backend,
             name=litellm_model,
             agent_type=AgentTypeEnum.LITELLM,
             endpoint=endpoint,

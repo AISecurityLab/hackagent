@@ -275,6 +275,7 @@ class TestOllamaRouterIntegration:
     ):
         """Test that AgentRouter correctly creates OllamaAgent adapter."""
         from hackagent.server.client import AuthenticatedClient
+        from hackagent.server.storage.remote import RemoteBackend
         from hackagent.router.router import AgentRouter
         from hackagent.router.types import AgentTypeEnum
         from hackagent.router.adapters.ollama import OllamaAgent
@@ -284,9 +285,10 @@ class TestOllamaRouterIntegration:
             token=hackagent_api_key,
             prefix="Bearer",
         )
+        backend = RemoteBackend(client)
 
         router = AgentRouter(
-            client=client,
+            backend=backend,
             name=ollama_model,
             agent_type=AgentTypeEnum.OLLAMA,
             endpoint=ollama_base_url,
@@ -310,6 +312,7 @@ class TestOllamaRouterIntegration:
     ):
         """Test that router can handle requests through Ollama adapter."""
         from hackagent.server.client import AuthenticatedClient
+        from hackagent.server.storage.remote import RemoteBackend
         from hackagent.router.router import AgentRouter
         from hackagent.router.types import AgentTypeEnum
 
@@ -318,9 +321,10 @@ class TestOllamaRouterIntegration:
             token=hackagent_api_key,
             prefix="Bearer",
         )
+        backend = RemoteBackend(client)
 
         router = AgentRouter(
-            client=client,
+            backend=backend,
             name=ollama_model,
             agent_type=AgentTypeEnum.OLLAMA,
             endpoint=ollama_base_url,

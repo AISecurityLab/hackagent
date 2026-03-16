@@ -335,9 +335,11 @@ class TestOpenAIRouterIntegration:
             token=hackagent_api_key,
             prefix="Bearer",
         )
+        from hackagent.server.storage.remote import RemoteBackend
+        backend = RemoteBackend(client)
 
         router = AgentRouter(
-            client=client,
+            backend=backend,
             name=openai_model,
             agent_type=AgentTypeEnum.OPENAI_SDK,
             endpoint=openai_base_url,
@@ -369,9 +371,11 @@ class TestOpenAIRouterIntegration:
             token=hackagent_api_key,
             prefix="Bearer",
         )
+        from hackagent.server.storage.remote import RemoteBackend
+        backend = RemoteBackend(client)
 
         router = AgentRouter(
-            client=client,
+            backend=backend,
             name=openai_model,
             agent_type=AgentTypeEnum.OPENAI_SDK,
             endpoint=openai_base_url,
