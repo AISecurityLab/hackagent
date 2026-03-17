@@ -710,7 +710,7 @@ class Run(BaseModel):
     """
     Indicates if the run was initiated via an Attack by a client application.
     """
-    results: list[Result]
+    results: list[Result] = Field(default_factory=list)
 
 
 class RunRequest(BaseModel):
