@@ -169,8 +169,8 @@ class AgentsTab(BaseTab):
         except Exception:
             pass
 
-        # Call base class mount which handles initial refresh
-        super().on_mount()
+        # Don't fetch on mount; BaseTab.on_show will lazily trigger first refresh.
+        # This keeps TUI startup responsive even when backend calls are slow.
 
         # Enable auto-refresh every 10 seconds
         self.enable_auto_refresh(interval=10.0)

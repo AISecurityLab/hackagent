@@ -12,6 +12,7 @@ when an API key is available and selected automatically by HackAgent.__init__.
 from __future__ import annotations
 
 import logging
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID
@@ -60,6 +61,39 @@ logger = logging.getLogger("hackagent.server.storage.remote")
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _pick_dt(obj: Any, *names: str) -> datetime:
+    """Return first available datetime-like attribute from object, else now."""
+    for name in names:
+        value = getattr(obj, name, None)
+        if value:
+            return value
+    return _now()
+
+
+def _coerce_trace_id(raw_id: Any, result_id: UUID, sequence: int) -> UUID:
+    """Normalize API trace IDs to UUID for TraceRecord compatibility."""
+    if isinstance(raw_id, UUID):
+        return raw_id
+
+    if isinstance(raw_id, str):
+        try:
+            return UUID(raw_id)
+        except ValueError:
+            pass
+
+    try:
+        logger.warning(
+            "RemoteBackend: received non-UUID trace id=%r (type=%s); "
+            "using deterministic UUID fallback",
+            raw_id,
+            type(raw_id).__name__,
+        )
+    except Exception:
+        # Never fail tracing due to logging handler misconfiguration.
+        pass
+    return uuid.uuid5(uuid.NAMESPACE_URL, f"trace:{result_id}:{sequence}:{raw_id}")
 
 
 def _to_agent_record(agent) -> AgentRecord:
@@ -187,6 +221,7 @@ class RemoteBackend:
     def list_agents(
         self, page: int = 1, page_size: int = 100
     ) -> PaginatedResult[AgentRecord]:
+        # Agent endpoint currently supports page but not page_size.
         resp = agent_list.sync_detailed(client=self._client, page=page)
         if resp.status_code == 200 and resp.parsed:
             items = [_to_agent_record(a) for a in (resp.parsed.results or [])]
@@ -343,10 +378,28 @@ class RemoteBackend:
         page: int = 1,
         page_size: int = 100,
     ) -> PaginatedResult[RunRecord]:
-        resp = run_list.sync_detailed(client=self._client, page=page)
-        if resp.status_code == 200 and resp.parsed:
-            items = []
-            for r in resp.parsed.results or []:
+        items: List[RunRecord] = []
+        total = 0
+        current_page = max(1, int(page))
+        remaining = max(1, int(page_size))
+
+        while remaining > 0:
+            run_kwargs: Dict[str, Any] = {
+                "client": self._client,
+                "page": current_page,
+                "page_size": remaining,
+            }
+            if attack_id is not None:
+                run_kwargs["attack"] = attack_id
+
+            resp = run_list.sync_detailed(**run_kwargs)
+            if resp.status_code != 200 or not resp.parsed:
+                break
+
+            page_results = resp.parsed.results or []
+            total = resp.parsed.count or total
+
+            for r in page_results:
                 items.append(
                     RunRecord(
                         id=r.id,
@@ -363,16 +416,21 @@ class RemoteBackend:
                         if hasattr(r.status, "value")
                         else str(r.status),
                         run_notes=getattr(r, "run_notes", None),
-                        created_at=r.created_at
-                        if hasattr(r, "created_at") and r.created_at
-                        else _now(),
-                        updated_at=r.updated_at
-                        if hasattr(r, "updated_at") and r.updated_at
-                        else _now(),
+                        created_at=_pick_dt(r, "timestamp", "created_at"),
+                        updated_at=_pick_dt(r, "updated_at", "timestamp"),
                     )
                 )
-            return PaginatedResult(items=items, total=resp.parsed.count or len(items))
-        return PaginatedResult(items=[], total=0)
+
+            remaining -= len(page_results)
+            next_page = getattr(resp.parsed, "next", None)
+            if not isinstance(next_page, str) or not next_page.strip():
+                next_page = getattr(resp.parsed, "next_", None)
+            has_next_page = isinstance(next_page, str) and bool(next_page.strip())
+            if remaining <= 0 or not has_next_page or not page_results:
+                break
+            current_page += 1
+
+        return PaginatedResult(items=items, total=total or len(items))
 
     def get_run(self, run_id: UUID) -> RunRecord:
         resp = run_retrieve.sync_detailed(id=run_id, client=self._client)
@@ -387,12 +445,8 @@ class RemoteBackend:
                 run_config=r.run_config if isinstance(r.run_config, dict) else {},
                 status=r.status.value if hasattr(r.status, "value") else str(r.status),
                 run_notes=getattr(r, "run_notes", None),
-                created_at=r.created_at
-                if hasattr(r, "created_at") and r.created_at
-                else _now(),
-                updated_at=r.updated_at
-                if hasattr(r, "updated_at") and r.updated_at
-                else _now(),
+                created_at=_pick_dt(r, "timestamp", "created_at"),
+                updated_at=_pick_dt(r, "updated_at", "timestamp"),
             )
         raise RuntimeError(f"RemoteBackend: Run {run_id} not found")
 
@@ -424,8 +478,8 @@ class RemoteBackend:
                 evaluation_notes=None,
                 evaluation_metrics={},
                 metadata=agent_specific_data,
-                created_at=_now(),
-                updated_at=_now(),
+                created_at=_pick_dt(r, "timestamp", "created_at"),
+                updated_at=_pick_dt(r, "updated_at", "timestamp"),
             )
         raise RuntimeError(
             f"RemoteBackend: Failed to create result "
@@ -477,10 +531,27 @@ class RemoteBackend:
         page: int = 1,
         page_size: int = 100,
     ) -> PaginatedResult[ResultRecord]:
-        resp = result_list.sync_detailed(client=self._client, page=page)
-        if resp.status_code == 200 and resp.parsed:
-            items = []
-            for r in resp.parsed.results or []:
+        items: List[ResultRecord] = []
+        total = 0
+        current_page = max(1, int(page))
+        remaining = max(1, int(page_size))
+
+        while remaining > 0:
+            result_kwargs: Dict[str, Any] = {
+                "client": self._client,
+                "page": current_page,
+            }
+            if run_id is not None:
+                result_kwargs["run"] = run_id
+
+            resp = result_list.sync_detailed(**result_kwargs)
+            if resp.status_code != 200 or not resp.parsed:
+                break
+
+            page_results = resp.parsed.results or []
+            total = resp.parsed.count or total
+
+            for r in page_results:
                 goal = ""
                 goal_index = 0
                 if isinstance(r.agent_specific_data, dict):
@@ -500,16 +571,21 @@ class RemoteBackend:
                         metadata=r.agent_specific_data
                         if isinstance(r.agent_specific_data, dict)
                         else {},
-                        created_at=r.created_at
-                        if hasattr(r, "created_at") and r.created_at
-                        else _now(),
-                        updated_at=r.updated_at
-                        if hasattr(r, "updated_at") and r.updated_at
-                        else _now(),
+                        created_at=_pick_dt(r, "timestamp", "created_at"),
+                        updated_at=_pick_dt(r, "updated_at", "timestamp"),
                     )
                 )
-            return PaginatedResult(items=items, total=resp.parsed.count or len(items))
-        return PaginatedResult(items=[], total=0)
+
+            remaining -= len(page_results)
+            next_page = getattr(resp.parsed, "next", None)
+            if not isinstance(next_page, str) or not next_page.strip():
+                next_page = getattr(resp.parsed, "next_", None)
+            has_next_page = isinstance(next_page, str) and bool(next_page.strip())
+            if remaining <= 0 or not has_next_page or not page_results:
+                break
+            current_page += 1
+
+        return PaginatedResult(items=items, total=total or len(items))
 
     def get_result(self, result_id: UUID) -> ResultRecord:
         resp = result_retrieve.sync_detailed(id=result_id, client=self._client)
@@ -533,12 +609,8 @@ class RemoteBackend:
                 metadata=r.agent_specific_data
                 if isinstance(r.agent_specific_data, dict)
                 else {},
-                created_at=r.created_at
-                if hasattr(r, "created_at") and r.created_at
-                else _now(),
-                updated_at=r.updated_at
-                if hasattr(r, "updated_at") and r.updated_at
-                else _now(),
+                created_at=_pick_dt(r, "timestamp", "created_at"),
+                updated_at=_pick_dt(r, "updated_at", "timestamp"),
             )
         raise RuntimeError(f"RemoteBackend: Result {result_id} not found")
 
@@ -563,7 +635,9 @@ class RemoteBackend:
         )
         if resp.status_code == 201 and resp.parsed:
             return TraceRecord(
-                id=resp.parsed.id,
+                id=_coerce_trace_id(
+                    resp.parsed.id, result_id=result_id, sequence=sequence
+                ),
                 result_id=result_id,
                 sequence=sequence,
                 step_type=step_type,
@@ -574,10 +648,8 @@ class RemoteBackend:
             f"RemoteBackend: create_trace for result {result_id} "
             f"returned {resp.status_code}"
         )
-        import uuid as _uuid
-
         return TraceRecord(
-            id=_uuid.uuid4(),
+            id=uuid.uuid4(),
             result_id=result_id,
             sequence=sequence,
             step_type=step_type,

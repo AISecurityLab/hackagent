@@ -479,6 +479,35 @@ def _format_response_body(response: Any, indent: str = "     ") -> str:
     return output
 
 
+def _coerce_datetime(value: Any) -> datetime | None:
+    """Best-effort conversion of API/local timestamp values to aware datetime."""
+    if value is None:
+        return None
+
+    if isinstance(value, datetime):
+        dt = value
+    elif isinstance(value, (int, float)):
+        dt = datetime.fromtimestamp(float(value), tz=dt_module.timezone.utc)
+    else:
+        try:
+            dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except Exception:
+            return None
+
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=dt_module.timezone.utc)
+
+    return dt
+
+
+def _format_local_datetime(value: Any, fmt: str, fallback: str = "N/A") -> str:
+    """Format timestamps in the machine local timezone for TUI display."""
+    dt = _coerce_datetime(value)
+    if dt is None:
+        return fallback
+    return dt.astimezone(tz.tzlocal()).strftime(fmt)
+
+
 def _format_config_dict(config: dict, indent: str = "  ") -> str:
     """Format a configuration dictionary for human-readable display.
 
@@ -1159,6 +1188,7 @@ class ResultsTab(BaseTab):
         )
         # Local-mode enrichment caches (populated in refresh_data)
         self._agent_map: dict[str, str] = {}  # agent_id str -> agent name
+        self._attack_map: dict[str, str] = {}  # attack_id str -> attack type
         self._result_counts: dict[
             str, tuple
         ] = {}  # run_id str -> (success, fail, total)
@@ -1222,7 +1252,7 @@ class ResultsTab(BaseTab):
         try:
             table = self.query_one("#results-table", DataTable)
             table.clear(columns=True)
-            table.add_columns("#", "⚡", "Agent", "✅/❌", "Created")
+            table.add_columns("#", "⚡", "Agent", "Attack", "✅/❌", "Created")
         except Exception as e:
             self.app.notify(f"Failed to initialize table: {str(e)}", severity="error")
 
@@ -1233,18 +1263,8 @@ class ResultsTab(BaseTab):
         except Exception:
             pass
 
-        # Initial load - call refresh_data directly to populate initial state
-        try:
-            self.refresh_data()
-        except Exception as e:
-            # If initial load fails, show error
-            try:
-                header_widget = self.query_one("#run-header-static", Static)
-                header_widget.update(
-                    f"[red]Failed to load data: {_escape(str(e))}[/red]\n\n[dim]Press 🔄 Refresh button or F5 to retry[/dim]"
-                )
-            except Exception:
-                pass
+        # Do not fetch on mount; BaseTab.on_show will lazily trigger first refresh.
+        # This prevents hidden tab network calls from delaying TUI startup.
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button press events."""
@@ -1322,6 +1342,15 @@ class ResultsTab(BaseTab):
                 agents_result = backend.list_agents(page=1, page_size=500)
                 for ag in agents_result.items:
                     self._agent_map[str(ag.id)] = ag.name
+            except Exception:
+                pass
+
+            # Build attack type cache for showing human-readable attack names
+            self._attack_map.clear()
+            try:
+                attacks_result = backend.list_attacks(page=1, page_size=500)
+                for attack in attacks_result.items:
+                    self._attack_map[str(attack.id)] = str(attack.type)
             except Exception:
                 pass
 
@@ -1432,27 +1461,14 @@ class ResultsTab(BaseTab):
             def get_timestamp(run):
                 # Support both API response objects (timestamp) and RunRecord (created_at)
                 ts = getattr(run, "timestamp", None) or getattr(run, "created_at", None)
-                if ts:
-                    if isinstance(ts, datetime):
-                        return ts
-                    try:
-                        return datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
-                    except Exception:
-                        pass
-                return datetime.min
+                dt = _coerce_datetime(ts)
+                if dt is not None:
+                    return dt
+                return datetime.min.replace(tzinfo=dt_module.timezone.utc)
 
-            sorted_runs = sorted(self.results_data, key=get_timestamp)
-
-            # Calculate the starting number based on total count and displayed results
-            # If we have 50 total runs and display 10, the oldest displayed run should be #41
-            # The newest displayed run should be #50
-            num_displayed = len(sorted_runs)
-            start_number = self._total_count - num_displayed + 1
-
-            # Create list of (run, stable_number) pairs, then reverse for display
-            # so newest appears on top but oldest still has its correct global number
-            numbered_runs = list(enumerate(sorted_runs, start=start_number))
-            numbered_runs.reverse()  # Newest on top, oldest at bottom
+            # Newest first; #1 is the most recent run by request.
+            sorted_runs = sorted(self.results_data, key=get_timestamp, reverse=True)
+            numbered_runs = list(enumerate(sorted_runs, start=1))
 
             for idx, run in numbered_runs:
                 # Get status with color coding from Run.status
@@ -1489,19 +1505,30 @@ class ResultsTab(BaseTab):
                 if len(agent_name) > 20:
                     agent_name = agent_name[:17] + "..."
 
+                # Resolve attack name/type
+                attack_name = "Unknown"
+                run_cfg = getattr(run, "run_config", None)
+                if isinstance(run_cfg, dict):
+                    attack_name = str(
+                        run_cfg.get("attack_type") or run_cfg.get("type") or attack_name
+                    )
+
+                attack_ref = getattr(run, "attack", None) or getattr(
+                    run, "attack_id", None
+                )
+                if attack_ref:
+                    attack_name = self._attack_map.get(str(attack_ref), attack_name)
+
+                if len(attack_name) > 16:
+                    attack_name = attack_name[:13] + "..."
+
                 # Get created time — remote uses timestamp, local uses created_at
                 created_time = "N/A"
                 ts = getattr(run, "timestamp", None) or getattr(run, "created_at", None)
                 if ts:
-                    try:
-                        dt = (
-                            ts
-                            if isinstance(ts, datetime)
-                            else datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
-                        )
-                        created_time = dt.strftime("%m/%d %H:%M")
-                    except Exception:
-                        created_time = str(ts)[:10]
+                    created_time = _format_local_datetime(
+                        ts, fmt="%m/%d %H:%M", fallback=str(ts)[:10]
+                    )
 
                 # Calculate success/failure ratio — prefer nested results, fall back to cache
                 if hasattr(run, "results") and run.results:
@@ -1546,6 +1573,7 @@ class ResultsTab(BaseTab):
                     str(idx),
                     status_display,
                     _escape(agent_name),
+                    _escape(attack_name),
                     results_display,
                     created_time,
                     key=run_id_str,
@@ -1738,13 +1766,9 @@ class ResultsTab(BaseTab):
         created = "Unknown"
         ts = getattr(run, "timestamp", None) or getattr(run, "created_at", None)
         if ts:
-            try:
-                if isinstance(ts, datetime):
-                    created = ts.strftime("%Y-%m-%d %H:%M:%S")
-                else:
-                    created = str(ts)
-            except (AttributeError, ValueError, TypeError):
-                created = str(ts)
+            created = _format_local_datetime(
+                ts, fmt="%Y-%m-%d %H:%M:%S", fallback=str(ts)
+            )
 
         # Resolve agent name — remote has agent_name, local has agent_id
         if hasattr(run, "agent_name") and run.agent_name:

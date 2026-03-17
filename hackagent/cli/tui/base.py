@@ -69,6 +69,7 @@ class BaseTab(Container):
         super().__init__(**kwargs)
         self.cli_config = cli_config
         self._refresh_interval = None
+        self._did_initial_refresh = False
 
     def create_backend(self) -> StorageBackend:
         """Return a StorageBackend (Remote or Local) based on available credentials.
@@ -179,5 +180,14 @@ class BaseTab(Container):
         Subclasses can override to add custom mounting behavior,
         but should call super().on_mount() to ensure proper initialization.
         """
-        # Defer initial load to ensure DOM is ready
-        self.call_after_refresh(self.refresh_data)
+        # Run initial load only for the currently visible tab.
+        # Other tabs will refresh lazily on first show.
+        if self.display:
+            self._did_initial_refresh = True
+            self.call_after_refresh(self.refresh_data)
+
+    def on_show(self) -> None:
+        """Refresh lazily the first time a hidden tab becomes visible."""
+        if not self._did_initial_refresh:
+            self._did_initial_refresh = True
+            self.call_after_refresh(self.refresh_data)

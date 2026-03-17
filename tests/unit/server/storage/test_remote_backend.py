@@ -318,6 +318,73 @@ class TestRemoteBackendRun(unittest.TestCase):
         self.assertEqual(result.total, 1)
         self.assertIsInstance(result.items[0], RunRecord)
 
+    def test_list_runs_uses_run_timestamp_for_created_at(self):
+        run_m = MagicMock()
+        run_m.id = _uid()
+        run_m.attack = _uid()
+        run_m.agent = _uid()
+        run_m.run_config = {}
+        run_m.status = MagicMock()
+        run_m.status.value = "COMPLETED"
+        run_m.run_notes = None
+        run_m.timestamp = _dt()
+        run_m.updated_at = None
+
+        parsed = MagicMock()
+        parsed.results = [run_m]
+        parsed.count = 1
+        parsed.next = None
+
+        with patch("hackagent.server.storage.remote.run_list") as mock_list:
+            mock_list.sync_detailed.return_value = _mock_response(200, parsed=parsed)
+            result = self.backend.list_runs()
+
+        self.assertEqual(result.items[0].created_at, run_m.timestamp)
+
+    def test_list_runs_paginates_when_next_present(self):
+        run_1 = MagicMock()
+        run_1.id = _uid()
+        run_1.attack = _uid()
+        run_1.agent = _uid()
+        run_1.run_config = {}
+        run_1.status = MagicMock()
+        run_1.status.value = "COMPLETED"
+        run_1.run_notes = None
+        run_1.created_at = _dt()
+        run_1.updated_at = _dt()
+
+        run_2 = MagicMock()
+        run_2.id = _uid()
+        run_2.attack = _uid()
+        run_2.agent = _uid()
+        run_2.run_config = {}
+        run_2.status = MagicMock()
+        run_2.status.value = "FAILED"
+        run_2.run_notes = None
+        run_2.created_at = _dt()
+        run_2.updated_at = _dt()
+
+        parsed_1 = MagicMock()
+        parsed_1.results = [run_1]
+        parsed_1.count = 2
+        parsed_1.next = "https://api.hackagent.dev/run?page=2"
+
+        parsed_2 = MagicMock()
+        parsed_2.results = [run_2]
+        parsed_2.count = 2
+        parsed_2.next = None
+
+        with patch("hackagent.server.storage.remote.run_list") as mock_list:
+            mock_list.sync_detailed.side_effect = [
+                _mock_response(200, parsed=parsed_1),
+                _mock_response(200, parsed=parsed_2),
+            ]
+            result = self.backend.list_runs(page=1, page_size=2)
+
+        self.assertEqual(result.total, 2)
+        self.assertEqual(len(result.items), 2)
+        self.assertEqual(mock_list.sync_detailed.call_count, 2)
+
     def test_get_run_success(self):
         run_id = _uid()
         run_m = MagicMock()
@@ -407,6 +474,28 @@ class TestRemoteBackendResult(unittest.TestCase):
         self.assertEqual(rec.result_id, result_id)
         self.assertEqual(rec.sequence, 1)
 
+    def test_create_trace_success_with_integer_id(self):
+        result_id = _uid()
+        parsed_m = MagicMock()
+        parsed_m.id = 44390
+        resp = _mock_response(201, parsed=parsed_m)
+
+        with patch(
+            "hackagent.server.storage.remote.result_trace_create"
+        ) as mock_create:
+            mock_create.sync_detailed.return_value = resp
+            rec = self.backend.create_trace(
+                result_id=result_id,
+                sequence=2,
+                step_type="OTHER",
+                content={"msg": "hello"},
+            )
+
+        self.assertIsInstance(rec, TraceRecord)
+        self.assertIsInstance(rec.id, UUID)
+        self.assertEqual(rec.result_id, result_id)
+        self.assertEqual(rec.sequence, 2)
+
     def test_list_results_empty_on_error(self):
         resp = _mock_response(500, parsed=None)
 
@@ -416,6 +505,34 @@ class TestRemoteBackendResult(unittest.TestCase):
 
         self.assertEqual(result.total, 0)
         self.assertEqual(result.items, [])
+
+    def test_list_results_filters_by_run_id(self):
+        run_id = _uid()
+        result_m = MagicMock()
+        result_m.id = _uid()
+        result_m.run = run_id
+        result_m.agent_specific_data = {"goal": "g1", "goal_index": 0}
+        result_m.evaluation_status = MagicMock()
+        result_m.evaluation_status.value = "SUCCESSFUL_JAILBREAK"
+        result_m.evaluation_notes = None
+        result_m.evaluation_metrics = {}
+        result_m.created_at = _dt()
+        result_m.updated_at = _dt()
+
+        parsed = MagicMock()
+        parsed.results = [result_m]
+        parsed.count = 1
+        parsed.next = None
+
+        with patch("hackagent.server.storage.remote.result_list") as mock_list:
+            mock_list.sync_detailed.return_value = _mock_response(200, parsed=parsed)
+            result = self.backend.list_results(run_id=run_id, page=1, page_size=50)
+
+        self.assertEqual(result.total, 1)
+        self.assertEqual(len(result.items), 1)
+        self.assertEqual(result.items[0].run_id, run_id)
+        _, kwargs = mock_list.sync_detailed.call_args
+        self.assertEqual(kwargs.get("run"), run_id)
 
 
 if __name__ == "__main__":

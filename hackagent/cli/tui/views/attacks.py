@@ -201,7 +201,7 @@ class AttacksTab(Container):
 
                 # --- Advanced toggle ---
                 yield Checkbox(
-                    "Show advanced settings",
+                    "Show advanced configuration (all fields as text boxes)",
                     id="advanced-toggle",
                     value=False,
                     classes="advanced-toggle",
@@ -363,6 +363,29 @@ class AttacksTab(Container):
 
     def _create_field_widget(self, cfg_field: ConfigField, widget_id: str) -> Any:
         """Create the appropriate Textual widget for a :class:`ConfigField`."""
+        if self._show_advanced:
+            # Advanced mode intentionally uses plain text boxes for all fields.
+            default_str = ""
+            if cfg_field.default is not None:
+                if isinstance(cfg_field.default, bool):
+                    default_str = "true" if cfg_field.default else "false"
+                else:
+                    default_str = str(cfg_field.default)
+
+            placeholder = ""
+            if cfg_field.field_type == FieldType.BOOLEAN:
+                placeholder = "true / false"
+            elif cfg_field.field_type == FieldType.CHOICE and cfg_field.choices:
+                placeholder = ", ".join(str(choice[1]) for choice in cfg_field.choices)
+            elif cfg_field.min_value is not None and cfg_field.max_value is not None:
+                placeholder = f"{cfg_field.min_value} – {cfg_field.max_value}"
+            elif cfg_field.field_type == FieldType.INTEGER:
+                placeholder = "integer"
+            elif cfg_field.field_type == FieldType.FLOAT:
+                placeholder = "number"
+
+            return Input(value=default_str, placeholder=placeholder, id=widget_id)
+
         if cfg_field.field_type == FieldType.CHOICE:
             return Select(
                 cfg_field.choices or [],
@@ -457,6 +480,13 @@ class AttacksTab(Container):
                         raw = float(raw)
                     except (TypeError, ValueError):
                         pass
+                elif cfg_field.field_type == FieldType.BOOLEAN:
+                    if isinstance(raw, str):
+                        lowered = raw.strip().lower()
+                        if lowered in {"true", "1", "yes", "y", "on"}:
+                            raw = True
+                        elif lowered in {"false", "0", "no", "n", "off"}:
+                            raw = False
 
             values[cfg_field.key] = raw
 

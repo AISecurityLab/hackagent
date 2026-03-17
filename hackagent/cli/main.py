@@ -26,6 +26,23 @@ install(show_locals=True)
 console = Console()
 
 
+def _patch_textual_terminal_queries() -> None:
+    """Apply compatibility patch for terminals that leak '\x1b[?2048$p' as a visible 'p'."""
+    try:
+        from textual.drivers.linux_driver import LinuxDriver
+
+        LinuxDriver._query_in_band_window_resize = lambda self: None
+    except Exception:
+        pass
+
+    try:
+        from textual.drivers.linux_inline_driver import LinuxInlineDriver
+
+        LinuxInlineDriver._query_in_band_window_resize = lambda self: None
+    except Exception:
+        pass
+
+
 def _render_rich_help(ctx: click.Context) -> None:
     """Print the Rich-formatted help page for the main CLI group."""
     from rich.rule import Rule
@@ -409,6 +426,7 @@ def tui(ctx):
     try:
         from hackagent.cli.tui import HackAgentTUI
 
+        _patch_textual_terminal_queries()
         app = HackAgentTUI(cli_config)
         app.run()
 
@@ -549,6 +567,7 @@ def _launch_tui_default(ctx):
         from hackagent.cli.tui import HackAgentTUI
 
         # Launch TUI
+        _patch_textual_terminal_queries()
         app = HackAgentTUI(cli_config)
         app.run()
 
