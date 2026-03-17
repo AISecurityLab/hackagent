@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Strategy library with FAISS retrieval — faithful port of original retrival.py + library.py."""
 
+import hashlib
 import logging
 import os
 import pickle
@@ -15,8 +16,6 @@ except ImportError:
     raise ImportError(
         "faiss-cpu is required for AutoDAN-Turbo. Install with: pip install faiss-cpu"
     )
-
-from openai import OpenAI
 
 
 class StrategyLibrary:
@@ -51,14 +50,26 @@ class StrategyLibrary:
         self.embedding_api_key = embedding_api_key
         self.embedding_api_base = embedding_api_base
         self.logger = logger or logging.getLogger(__name__)
-
-        # Build OpenAI client for embeddings (works with any OpenAI-compatible endpoint)
-        client_kwargs: Dict[str, Any] = {}
-        if self.embedding_api_key:
-            client_kwargs["api_key"] = self.embedding_api_key
-        if self.embedding_api_base:
-            client_kwargs["base_url"] = self.embedding_api_base
-        self._embed_client = OpenAI(**client_kwargs) if client_kwargs else OpenAI()
+        self._embedding_disabled_reason: Optional[str] = None
+        # "local/<name>" models are handled entirely in-process by _local_embed();
+        # all other model strings are forwarded to litellm.embedding(), which
+        # supports every provider the rest of the project uses (openai/, huggingface/,
+        # cohere/, etc.).  No client object is pre-built — litellm is called lazily.
+        #
+        # ROUTING NOTE: for the "openai/" prefix, litellm uses api_base to decide
+        # where the call goes:
+        #   api_base set   → that server   (e.g. a local vLLM embedding instance)
+        #   api_base unset → OpenAI cloud  (requires a valid OPENAI_API_KEY)
+        # The model string prefix alone does NOT determine cloud vs local.
+        if embedding_model.startswith("local/"):
+            endpoint_display = "<built-in>"
+        else:
+            endpoint_display = embedding_api_base or "<provider default / cloud>"
+        self.logger.info(
+            "Embedding backend: model=%s  endpoint=%s",
+            embedding_model,
+            endpoint_display,
+        )
 
     def embed(self, text: str) -> Optional[np.ndarray]:
         """Encode text to an embedding vector for strategy retrieval.
@@ -72,15 +83,57 @@ class StrategyLibrary:
         Returns:
             Float32 numpy vector if successful, otherwise ``None``.
         """
+        if self.embedding_model.startswith("local/"):
+            return self._local_embed(text)
+
+        if self._embedding_disabled_reason is not None:
+            return None
+
         try:
-            response = self._embed_client.embeddings.create(
-                model=self.embedding_model,
-                input=[text],
-            )
+            import litellm
+
+            kwargs: Dict[str, Any] = {
+                "model": self.embedding_model,
+                "input": [text],
+            }
+            if self.embedding_api_base:
+                kwargs["api_base"] = self.embedding_api_base
+            if self.embedding_api_key:
+                kwargs["api_key"] = self.embedding_api_key
+
+            response = litellm.embedding(**kwargs)
             return np.array(response.data[0].embedding, dtype=np.float32)
         except Exception as e:
-            self.logger.error(f"Embedding failed: {e}")
+            message = str(e)
+            if "No embedding data received" in message:
+                self._embedding_disabled_reason = (
+                    "Embedding endpoint returned no vectors; the selected model "
+                    "likely does not support /v1/embeddings."
+                )
+                self.logger.error(
+                    "Embedding disabled for this run: %s (model=%s, base=%s)",
+                    self._embedding_disabled_reason,
+                    self.embedding_model,
+                    self.embedding_api_base or "<provider-default>",
+                )
+            else:
+                self.logger.error(f"Embedding failed: {message}")
             return None
+
+    def _local_embed(self, text: str, _dim: int = 512) -> np.ndarray:
+        """Deterministic hashing-trick bag-of-words embedding (``local/bag-of-words``).
+
+        Uses MD5 to map each whitespace-separated token into a bucket of a
+        fixed-size float32 vector, then L2-normalises the result.  No API key,
+        no model download and no external service are required.
+        """
+        tokens = text.lower().split()
+        vec = np.zeros(_dim, dtype=np.float32)
+        for token in tokens:
+            idx = int(hashlib.md5(token.encode()).hexdigest(), 16) % _dim
+            vec[idx] += 1.0
+        norm = np.linalg.norm(vec)
+        return (vec / norm) if norm > 0 else vec
 
     def add(self, strategy: Dict[str, Any], notify: bool = True) -> None:
         """Add a new strategy or merge with an existing strategy name.
@@ -161,8 +214,8 @@ class StrategyLibrary:
         # Build FAISS index and search
         matrix = np.array(all_embeddings, dtype=np.float32)
         index = faiss.IndexFlatL2(matrix.shape[1])
-        index.add(matrix)
-        distances, indices = index.search(
+        index.add(matrix)  # type: ignore[arg-type]
+        distances, indices = index.search(  # type: ignore[call-arg]
             query_embedding.reshape(1, -1), len(all_embeddings)
         )
         distances, indices = distances[0], indices[0]

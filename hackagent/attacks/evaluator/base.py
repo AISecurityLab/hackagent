@@ -324,6 +324,12 @@ class BaseJudgeEvaluator(ABC):
             f"[blue]{self.config.agent_name}: "
             f"{progress_description.replace('[cyan]', '').strip()}"
         )
+        total_rows = len(rows_to_process)
+        # Persistent textual fallback: always visible even if live progress
+        # bars are collapsed/overwritten by terminal rendering.
+        self.logger.info(
+            f"{self.config.agent_name}: {self.__class__.__name__} progress 0/{total_rows}"
+        )
 
         # ── Parallel judge evaluation ──────────────────────────────────────
         # Each HTTP judge call is independent; fire batch_size rows at once.
@@ -400,6 +406,11 @@ class BaseJudgeEvaluator(ABC):
                 ):
                     results_map[idx] = (original_index, current_eval, current_expl)
                     progress_bar.update(task, advance=1)
+                    progress_bar.refresh()
+
+        self.logger.info(
+            f"{self.config.agent_name}: {self.__class__.__name__} progress {total_rows}/{total_rows}"
+        )
 
         for idx in range(len(rows_to_process)):
             original_index, current_eval, current_expl = results_map[idx]

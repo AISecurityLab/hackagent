@@ -26,13 +26,13 @@ def main():
     hackagent_api_key = os.getenv("HACKAGENT_API_KEY")
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
     OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1"
-    dataset_preset = os.getenv("DATASET_PRESET", "harmbench")
-    dataset_limit = int(os.getenv("DATASET_LIMIT", "20"))
-    dataset_shuffle = os.getenv("DATASET_SHUFFLE", "true").lower() == "true"
-    dataset_seed = int(os.getenv("DATASET_SEED", "42"))
-    goal_batch_size = int(os.getenv("GOAL_BATCH_SIZE", "2"))
-    goal_batch_workers = int(os.getenv("GOAL_BATCH_WORKERS", "2"))
-    batch_size_judge = int(os.getenv("BATCH_SIZE_JUDGE", "1"))
+    dataset_preset = "harmbench"
+    dataset_limit = 1
+    dataset_shuffle = "true"
+    dataset_seed = 42
+    goal_batch_size = 2
+    goal_batch_workers = 2
+    batch_size_judge = 1
     disable_target_reasoning = (
         os.getenv("DISABLE_TARGET_REASONING", "true").lower() == "true"
     )

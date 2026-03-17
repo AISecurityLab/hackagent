@@ -147,8 +147,18 @@ class TestUnicodeUtfGbkExperts(unittest.TestCase):
 
 class TestEncodeExpertDict(unittest.TestCase):
     def test_all_methods_present(self):
-        expected = {"caesar", "unicode", "morse", "atbash", "utf", "ascii", "gbk",
-                    "baseline", "selfdefine", "unchange"}
+        expected = {
+            "caesar",
+            "unicode",
+            "morse",
+            "atbash",
+            "utf",
+            "ascii",
+            "gbk",
+            "baseline",
+            "selfdefine",
+            "unchange",
+        }
         self.assertEqual(set(encode_expert_dict.keys()), expected)
 
     def test_all_have_encode_decode(self):

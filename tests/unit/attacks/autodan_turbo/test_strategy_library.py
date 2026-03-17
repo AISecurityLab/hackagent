@@ -43,20 +43,19 @@ class TestStrategyLibrary(unittest.TestCase):
             with self.assertRaises(ImportError):
                 runpy.run_path(str(module_path))
 
-    @patch("hackagent.attacks.techniques.autodan_turbo.strategy_library.OpenAI")
-    def test_init_passes_embedding_api_kwargs(self, mock_openai):
-        mock_openai.return_value = MagicMock()
-        StrategyLibrary(
+    def test_init_passes_embedding_api_kwargs(self):
+        lib = StrategyLibrary(
+            embedding_model="openai/text-embedding-3-small",
             embedding_api_key="k",
             embedding_api_base="http://base",
             logger=MagicMock(),
         )
-        mock_openai.assert_called_with(api_key="k", base_url="http://base")
+        self.assertEqual(lib.embedding_api_key, "k")
+        self.assertEqual(lib.embedding_api_base, "http://base")
 
-    @patch("hackagent.attacks.techniques.autodan_turbo.strategy_library.OpenAI")
-    def test_add_merge_all_size(self, mock_openai):
-        mock_openai.return_value = MagicMock()
+    def test_add_merge_all_size(self):
         lib = StrategyLibrary(logger=MagicMock())
+        lib.logger.info.reset_mock()  # ignore the init-time "Embedding backend" log
 
         s = {
             "Strategy": "S",
@@ -73,44 +72,42 @@ class TestStrategyLibrary(unittest.TestCase):
         self.assertEqual(len(lib.all()["S"]["Example"]), 2)
         lib.logger.info.assert_not_called()
 
-    @patch("hackagent.attacks.techniques.autodan_turbo.strategy_library.OpenAI")
-    def test_add_notify_logs(self, mock_openai):
-        mock_openai.return_value = MagicMock()
+    def test_add_notify_logs(self):
         logger = MagicMock()
         lib = StrategyLibrary(logger=logger)
+        logger.info.reset_mock()  # ignore the init-time "Embedding backend" log
         lib.add({"Strategy": "S", "Definition": "D"}, notify=True)
         logger.info.assert_called_once()
 
-    @patch("hackagent.attacks.techniques.autodan_turbo.strategy_library.OpenAI")
-    def test_embed_success(self, mock_openai):
-        client = MagicMock()
+    @patch("litellm.embedding")
+    def test_embed_success(self, mock_litellm_embedding):
         emb_item = MagicMock()
         emb_item.embedding = [0.0, 1.0]
-        client.embeddings.create.return_value = MagicMock(data=[emb_item])
-        mock_openai.return_value = client
+        mock_litellm_embedding.return_value = MagicMock(data=[emb_item])
 
-        lib = StrategyLibrary(logger=MagicMock())
+        lib = StrategyLibrary(
+            embedding_model="openai/text-embedding-3-small",
+            logger=MagicMock(),
+        )
         vec = lib.embed("hello")
         self.assertEqual(vec.dtype, np.float32)
         self.assertEqual(vec.shape[0], 2)
 
-    @patch("hackagent.attacks.techniques.autodan_turbo.strategy_library.OpenAI")
-    def test_embed_failure_returns_none(self, mock_openai):
-        client = MagicMock()
-        client.embeddings.create.side_effect = RuntimeError("embed failed")
-        mock_openai.return_value = client
+    @patch("litellm.embedding")
+    def test_embed_failure_returns_none(self, mock_litellm_embedding):
+        mock_litellm_embedding.side_effect = RuntimeError("embed failed")
         logger = MagicMock()
-        lib = StrategyLibrary(logger=logger)
+        lib = StrategyLibrary(
+            embedding_model="openai/text-embedding-3-small",
+            logger=logger,
+        )
         self.assertIsNone(lib.embed("hello"))
         logger.error.assert_called_once()
 
-    @patch("hackagent.attacks.techniques.autodan_turbo.strategy_library.OpenAI")
     @patch(
         "hackagent.attacks.techniques.autodan_turbo.strategy_library.faiss.IndexFlatL2"
     )
-    def test_retrieve_high_score_returns_single_best(self, mock_index_cls, mock_openai):
-        mock_openai.return_value = MagicMock()
-
+    def test_retrieve_high_score_returns_single_best(self, mock_index_cls):
         class _FakeIndex:
             def __init__(self, _dim):
                 pass
@@ -149,23 +146,16 @@ class TestStrategyLibrary(unittest.TestCase):
         self.assertEqual(len(out), 1)
         self.assertEqual(out[0]["Strategy"], "A")
 
-    @patch("hackagent.attacks.techniques.autodan_turbo.strategy_library.OpenAI")
-    def test_retrieve_on_empty_library(self, mock_openai):
-        mock_openai.return_value = MagicMock()
+    def test_retrieve_on_empty_library(self):
         lib = StrategyLibrary(logger=MagicMock())
         valid, out = lib.retrieve("query", k=2)
         self.assertTrue(valid)
         self.assertEqual(out, [])
 
-    @patch("hackagent.attacks.techniques.autodan_turbo.strategy_library.OpenAI")
     @patch(
         "hackagent.attacks.techniques.autodan_turbo.strategy_library.faiss.IndexFlatL2"
     )
-    def test_retrieve_moderate_scores_returns_valid_list(
-        self, mock_index_cls, mock_openai
-    ):
-        mock_openai.return_value = MagicMock()
-
+    def test_retrieve_moderate_scores_returns_valid_list(self, mock_index_cls):
         class _FakeIndex:
             def __init__(self, _dim):
                 pass
@@ -195,15 +185,10 @@ class TestStrategyLibrary(unittest.TestCase):
         self.assertTrue(valid)
         self.assertEqual(len(out), 1)
 
-    @patch("hackagent.attacks.techniques.autodan_turbo.strategy_library.OpenAI")
     @patch(
         "hackagent.attacks.techniques.autodan_turbo.strategy_library.faiss.IndexFlatL2"
     )
-    def test_retrieve_moderate_scores_respect_k_break(
-        self, mock_index_cls, mock_openai
-    ):
-        mock_openai.return_value = MagicMock()
-
+    def test_retrieve_moderate_scores_respect_k_break(self, mock_index_cls):
         class _FakeIndex:
             def __init__(self, _dim):
                 pass
@@ -240,13 +225,10 @@ class TestStrategyLibrary(unittest.TestCase):
         self.assertTrue(valid)
         self.assertEqual(len(out), 1)
 
-    @patch("hackagent.attacks.techniques.autodan_turbo.strategy_library.OpenAI")
     @patch(
         "hackagent.attacks.techniques.autodan_turbo.strategy_library.faiss.IndexFlatL2"
     )
-    def test_retrieve_low_scores_returns_ineffective(self, mock_index_cls, mock_openai):
-        mock_openai.return_value = MagicMock()
-
+    def test_retrieve_low_scores_returns_ineffective(self, mock_index_cls):
         class _FakeIndex:
             def __init__(self, _dim):
                 pass
@@ -276,15 +258,12 @@ class TestStrategyLibrary(unittest.TestCase):
         self.assertFalse(valid)
         self.assertEqual(len(out), 1)
 
-    @patch("hackagent.attacks.techniques.autodan_turbo.strategy_library.OpenAI")
     @patch(
         "hackagent.attacks.techniques.autodan_turbo.strategy_library.faiss.IndexFlatL2"
     )
     def test_retrieve_duplicate_strategy_updates_average_and_example(
-        self, mock_index_cls, mock_openai
+        self, mock_index_cls
     ):
-        mock_openai.return_value = MagicMock()
-
         class _FakeIndex:
             def __init__(self, _dim):
                 pass
@@ -318,11 +297,7 @@ class TestStrategyLibrary(unittest.TestCase):
         self.assertEqual(len(out), 1)
         self.assertEqual(out[0]["Strategy"], "A")
 
-    @patch("hackagent.attacks.techniques.autodan_turbo.strategy_library.OpenAI")
-    def test_retrieve_returns_empty_for_embed_none_or_invalid_embeddings(
-        self, mock_openai
-    ):
-        mock_openai.return_value = MagicMock()
+    def test_retrieve_returns_empty_for_embed_none_or_invalid_embeddings(self):
         lib = StrategyLibrary(logger=MagicMock())
         lib.library = {
             "A": {
@@ -343,9 +318,7 @@ class TestStrategyLibrary(unittest.TestCase):
         self.assertTrue(valid)
         self.assertEqual(out, [])
 
-    @patch("hackagent.attacks.techniques.autodan_turbo.strategy_library.OpenAI")
-    def test_save_load(self, mock_openai):
-        mock_openai.return_value = MagicMock()
+    def test_save_load(self):
         lib = StrategyLibrary(logger=MagicMock())
         lib.library = {
             "S": {
@@ -364,9 +337,7 @@ class TestStrategyLibrary(unittest.TestCase):
             lib2.load(path)
             self.assertIn("S", lib2.library)
 
-    @patch("hackagent.attacks.techniques.autodan_turbo.strategy_library.OpenAI")
-    def test_load_missing_file_noop(self, mock_openai):
-        mock_openai.return_value = MagicMock()
+    def test_load_missing_file_noop(self):
         lib = StrategyLibrary(logger=MagicMock())
         lib.load("non_existing_path_12345")
         self.assertEqual(lib.library, {})

@@ -72,9 +72,13 @@ class TestAttackRegistry(unittest.TestCase):
         """Test that registry contains cipherchat attack."""
         self.assertIn("cipherchat", ATTACK_REGISTRY)
 
-    def test_registry_has_nine_attacks(self):
-        """Test that registry has exactly nine attacks."""
-        self.assertEqual(len(ATTACK_REGISTRY), 9)
+    def test_registry_contains_pap(self):
+        """Test that registry contains PAP attack."""
+        self.assertIn("pap", ATTACK_REGISTRY)
+
+    def test_registry_has_ten_attacks(self):
+        """Test that registry has exactly ten attacks."""
+        self.assertEqual(len(ATTACK_REGISTRY), 10)
 
 
 class TestAdvPrefixOrchestrator(unittest.TestCase):

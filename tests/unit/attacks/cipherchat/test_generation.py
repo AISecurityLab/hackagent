@@ -28,7 +28,7 @@ class TestBuildSystemPrompt(unittest.TestCase):
             }
         }
         expert = MagicMock()
-        prompt = _build_system_prompt(config, expert)
+        _build_system_prompt(config, expert)
         # Should contain system role for baseline but NO encoded demos
         expert.encode.assert_not_called()
 
@@ -84,7 +84,7 @@ class TestBuildSystemPrompt(unittest.TestCase):
             }
         }
         expert = MagicMock()
-        prompt = _build_system_prompt(config, expert)
+        _build_system_prompt(config, expert)
         expert.encode.assert_not_called()
 
     def test_no_examples_placeholder_when_demonstrations_disabled(self):

@@ -96,6 +96,17 @@
                   "label": "hackagent.attacks.techniques.cipherchat",
                   "type": "category"
                 },
+                {
+                  "items": [
+                    "reference/hackagent/attacks/techniques/pap/attack",
+                    "reference/hackagent/attacks/techniques/pap/config",
+                    "reference/hackagent/attacks/techniques/pap/evaluation",
+                    "reference/hackagent/attacks/techniques/pap/generation",
+                    "reference/hackagent/attacks/techniques/pap/taxonomy"
+                  ],
+                  "label": "hackagent.attacks.techniques.pap",
+                  "type": "category"
+                },
                 "reference/hackagent/attacks/techniques/base"
               ],
               "label": "hackagent.attacks.techniques",

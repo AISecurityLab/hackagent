@@ -1,3 +1,103 @@
+## v0.6.0 (2026-03-14)
+
+### ✨ Features
+
+- Added BoN attack
+- Added BoN attack
+- Added AutoDan-Turbo, fixed goal parallelization for all attacks
+- removed dublicated function
+- removed dublicated function
+- removed dublicated function
+- removed formated error from  the file after adding tests
+- formated the files after adding tests
+- add tests and fix metrics calculations
+-  reformated all files
+-  reformated
+-  update init
+- add new metrics with exception handling and ASR majority vote
+- Added AutoDan-Turbo, fixed goal parallelization for all attacks
+- Added AutoDAN-turbo
+- TAP attack added
+- TAP attack added
+
+### 🐛🚑️ Fixes
+
+- **tests**: fixing tests
+- **API**: fixing api connection
+- **merge-with-main**: testing the pull request
+- Now score columns automatically adapt on presence or absence of a certain judge type
+- **tests**: fixing tests
+- **embeddings**: fixing the embeddings error
+- Fixed parallelization for advprefix and flipattack + documentation + latency logging
+- **vllm**: adding vllm as additional inference endpoint
+- **tracker**: Tracking the results and traces through the api
+- **jailbreak**: adding jailbreak example
+- Added UTF8 documentation support for Windows
+
+### ♻️ Refactorings
+
+- **api**: refactoring api to make use of pydantic and removed all list of models
+
+### ⚡️ Performance
+
+- **parallelization**: parallelization for attacks generation in batches
+- **parallelization**: parallelization for attacks generation in batches
+
+### bump
+
+- **deps-dev**: bump google-adk from 1.26.0 to 1.27.0
+- **deps-dev**: bump ruff from 0.15.5 to 0.15.6
+- **deps**: bump openai from 2.26.0 to 2.28.0
+- **deps**: bump datasets from 4.6.1 to 4.7.0
+- **deps-dev**: bump openapi-python-client from 0.28.2 to 0.28.3
+- **deps**: bump textual from 8.0.2 to 8.1.1
+- **deps**: bump litellm from 1.82.0 to 1.82.1
+- **deps-dev**: bump ruff from 0.15.4 to 0.15.5
+- **deps**: bump openai from 2.24.0 to 2.26.0
+- **deps-dev**: bump transformers from 4.57.6 to 5.3.0
+- **deps**: bump textual from 8.0.0 to 8.0.2
+- **deps**: bump datasets from 4.6.0 to 4.6.1
+- **deps**: bump litellm from 1.81.16 to 1.82.0
+- **deps**: bump datasets from 4.5.0 to 4.6.0
+- **deps-dev**: bump commitizen from 4.13.8 to 4.13.9
+- **deps**: bump litellm from 1.81.14 to 1.81.16
+- **deps-dev**: bump google-adk from 1.25.1 to 1.26.0
+- **deps**: bump openai from 2.22.0 to 2.24.0
+- **deps-dev**: bump ruff from 0.15.2 to 0.15.4
+- **deps**: bump litellm from 1.81.13 to 1.81.14
+- **deps**: bump openai from 2.21.0 to 2.22.0
+- **deps-dev**: bump ruff from 0.15.1 to 0.15.2
+- **deps-dev**: bump commitizen from 4.13.7 to 4.13.8
+- **deps-dev**: bump flask from 3.1.2 to 3.1.3
+- **deps**: bump rich from 14.3.2 to 14.3.3
+- **deps-dev**: bump google-adk from 1.25.0 to 1.25.1
+- **deps**: bump litellm from 1.81.12 to 1.81.13
+
+### ✅🤡🧪 Tests
+
+- **tests**: fixing tests
+- **integration**: fixing integration tests
+- **flipattack**: fix model_validate → from_dict and add _self to generation config
+- **flipattack**: flipattack tests not passing
+- **ci-cd**: fixing tests for windows
+- **ci-cd**: fixing tests in ci-cd
+- **integration**: fixing integration tests
+
+### 💚👷 CI & Build
+
+- Fixed lock
+
+### 📝💡 Documentation
+
+- **Comments**: Adding comments to the functions and documentation
+- **Risks-profile**: Adding risk profiles within the documentation
+
+### 🔥⚰️ Clean up
+
+- -
+- -
+- **db_index**: db_index folder
+
 ## v0.5.0 (2026-02-17)
 
 ### ✨ Features

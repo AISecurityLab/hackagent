@@ -24,7 +24,9 @@ class TestCipherChatEvaluation(unittest.TestCase):
 
     def test_error_items_get_zero_score(self):
         ev = self._make_eval()
-        data = [{"goal": "g", "error": "fail", "response": None, "decoded_response": ""}]
+        data = [
+            {"goal": "g", "error": "fail", "response": None, "decoded_response": ""}
+        ]
         result = ev.execute(data)
         self.assertEqual(result[0]["best_score"], 0.0)
         self.assertFalse(result[0]["success"])

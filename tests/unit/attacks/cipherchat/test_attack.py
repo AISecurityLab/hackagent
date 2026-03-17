@@ -95,7 +95,10 @@ class TestCipherChatAttack(unittest.TestCase):
         attack = CipherChatAttack(
             config={
                 "output_dir": "./logs/runs",
-                "cipherchat_params": {"encode_method": "morse", "num_demonstrations": 5},
+                "cipherchat_params": {
+                    "encode_method": "morse",
+                    "num_demonstrations": 5,
+                },
             },
             client=MagicMock(),
             agent_router=MagicMock(),

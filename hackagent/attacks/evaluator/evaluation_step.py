@@ -41,6 +41,7 @@ Usage:
 """
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import fields
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
@@ -215,6 +216,12 @@ class BaseEvaluationStep:
             "batch_size": (
                 cfg.get("batch_size_judge") or tp.get("judge_batch_size", 1)
             ),
+            "judge_parallelism": (
+                cfg.get("judge_parallelism")
+                or tp.get("judge_parallelism")
+                or cfg.get("batch_size_judge")
+                or tp.get("judge_batch_size", 1)
+            ),
             "max_new_tokens_eval": (
                 cfg.get("max_new_tokens_eval")
                 or tp.get("judge_max_new_tokens_eval", 256)
@@ -355,7 +362,7 @@ class BaseEvaluationStep:
         Run the multi-judge evaluation loop.
 
         1. Prepare and validate judge configurations.
-        2. Execute each judge sequentially.
+        2. Execute each judge (optionally in parallel).
         3. Merge per-judge results into *original_data*.
 
         Returns the enriched data list (same objects, mutated in-place).
@@ -372,18 +379,83 @@ class BaseEvaluationStep:
             self.logger.warning("No valid judges found after configuration processing")
             return input_data
 
+        total_judges = len(judges_to_run)
+        max_parallel = max(
+            1,
+            int((base_config.get("judge_parallelism") or 1)),
+        )
+        run_parallel = total_judges > 1 and max_parallel > 1
+
         judge_results: Dict[str, List[Dict[str, Any]]] = {}
-        for judge_type_str, subprocess_config in judges_to_run:
-            evaluated_data = self._run_single_evaluator(
-                judge_type=judge_type_str,
-                config=subprocess_config,
-                data=[row.copy() for row in original_data],
+
+        if not run_parallel:
+            for judge_index, (judge_type_str, subprocess_config) in enumerate(
+                judges_to_run, start=1
+            ):
+                self.logger.info(
+                    f"Judge progress {judge_index}/{total_judges}: starting '{judge_type_str}' evaluator"
+                )
+                evaluated_data = self._run_single_evaluator(
+                    judge_type=judge_type_str,
+                    config=subprocess_config,
+                    data=[row.copy() for row in original_data],
+                )
+                if evaluated_data is not None:
+                    judge_results[judge_type_str] = evaluated_data
+                    self._statistics["successful_judges"].append(judge_type_str)
+                    self.logger.info(
+                        f"Judge progress {judge_index}/{total_judges}: completed '{judge_type_str}' evaluator"
+                    )
+                else:
+                    self._statistics["failed_judges"].append(judge_type_str)
+                    self.logger.warning(
+                        f"Judge progress {judge_index}/{total_judges}: failed '{judge_type_str}' evaluator"
+                    )
+        else:
+            workers = min(max_parallel, total_judges)
+            self.logger.info(
+                f"Running judges in parallel: workers={workers}, total_judges={total_judges}"
             )
-            if evaluated_data is not None:
-                judge_results[judge_type_str] = evaluated_data
-                self._statistics["successful_judges"].append(judge_type_str)
-            else:
-                self._statistics["failed_judges"].append(judge_type_str)
+
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                future_to_info = {}
+                for judge_index, (judge_type_str, subprocess_config) in enumerate(
+                    judges_to_run, start=1
+                ):
+                    self.logger.info(
+                        f"Judge progress {judge_index}/{total_judges}: starting '{judge_type_str}' evaluator"
+                    )
+                    future = pool.submit(
+                        self._run_single_evaluator,
+                        judge_type_str,
+                        subprocess_config,
+                        [row.copy() for row in original_data],
+                    )
+                    future_to_info[future] = (judge_index, judge_type_str)
+
+                for future in as_completed(future_to_info):
+                    judge_index, judge_type_str = future_to_info[future]
+                    try:
+                        evaluated_data = future.result()
+                    except Exception as e:
+                        self._statistics["failed_judges"].append(judge_type_str)
+                        self.logger.error(
+                            f"Judge progress {judge_index}/{total_judges}: failed '{judge_type_str}' evaluator with exception: {e}",
+                            exc_info=True,
+                        )
+                        continue
+
+                    if evaluated_data is not None:
+                        judge_results[judge_type_str] = evaluated_data
+                        self._statistics["successful_judges"].append(judge_type_str)
+                        self.logger.info(
+                            f"Judge progress {judge_index}/{total_judges}: completed '{judge_type_str}' evaluator"
+                        )
+                    else:
+                        self._statistics["failed_judges"].append(judge_type_str)
+                        self.logger.warning(
+                            f"Judge progress {judge_index}/{total_judges}: failed '{judge_type_str}' evaluator"
+                        )
 
         final_data = self._merge_evaluation_results(original_data, judge_results)
         return final_data
