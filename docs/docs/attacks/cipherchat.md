@@ -100,3 +100,12 @@ results = agent.hack(attack_config=attack_config)
 - `encode_method="baseline"` disables demonstrations, matching the original implementation behavior.
 - Judge evaluation is performed on decoded responses, aligned with the CipherChat paper workflow.
 - The integrated prompt and demonstration resources include the same categories used in the upstream release.
+
+## Target Model Requirements
+
+CipherChat generally requires a sufficiently capable target LLM that can follow long, structured cipher-role instructions and produce consistent encoded outputs.
+
+- In practice, more capable models (for example `gpt-4.1`) tend to work better.
+- Smaller or lightweight models (for example `gpt-4o-mini`) often fail to follow the cipher protocol consistently, which can make the attack ineffective.
+
+If results look unstable, try a stronger target model first before tuning attack parameters.

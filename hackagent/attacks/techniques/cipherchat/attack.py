@@ -155,6 +155,24 @@ class CipherChatAttack(BaseAttack):
             return []
 
         coordinator = self._initialize_coordinator(attack_type="cipherchat")
+
+        # Initialize per-goal tracking BEFORE generation so that
+        # generation.py can emit candidate-level traces to the dashboard.
+        params = self.config.get("cipherchat_params", {})
+        goal_metadata = {
+            "attack_type": "cipherchat",
+            "encode_method": params.get("encode_method", "caesar"),
+            "instruction_type": params.get(
+                "instruction_type", "Crimes_And_Illegal_Activities"
+            ),
+            "language": params.get("language", "en"),
+            "demonstration_toxicity": params.get("demonstration_toxicity", "toxic"),
+        }
+        coordinator.initialize_goals(goals=goals, initial_metadata=goal_metadata)
+
+        if coordinator.goal_tracker:
+            self.config["_tracker"] = coordinator.goal_tracker
+
         pipeline_steps = self._get_pipeline_steps()
         start_step = self.config.get("start_step", 1) - 1
 
@@ -167,24 +185,6 @@ class CipherChatAttack(BaseAttack):
                 self.logger.warning("Generation produced no output")
                 coordinator.finalize_pipeline([], lambda _: False)
                 return []
-
-            params = self.config.get("cipherchat_params", {})
-            goal_metadata = {
-                "attack_type": "cipherchat",
-                "encode_method": params.get("encode_method", "caesar"),
-                "instruction_type": params.get(
-                    "instruction_type", "Crimes_And_Illegal_Activities"
-                ),
-                "language": params.get("language", "en"),
-                "demonstration_toxicity": params.get("demonstration_toxicity", "toxic"),
-            }
-            coordinator.initialize_goals_from_pipeline_data(
-                pipeline_data=generation_output,
-                initial_metadata=goal_metadata,
-            )
-
-            if coordinator.goal_tracker:
-                self.config["_tracker"] = coordinator.goal_tracker
 
             results = self._execute_pipeline(
                 pipeline_steps, generation_output, start_step=start_step + 1

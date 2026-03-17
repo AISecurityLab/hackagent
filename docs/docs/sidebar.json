@@ -85,6 +85,17 @@
                   "label": "hackagent.attacks.techniques.h4rm3l",
                   "type": "category"
                 },
+                {
+                  "items": [
+                    "reference/hackagent/attacks/techniques/cipherchat/attack",
+                    "reference/hackagent/attacks/techniques/cipherchat/config",
+                    "reference/hackagent/attacks/techniques/cipherchat/evaluation",
+                    "reference/hackagent/attacks/techniques/cipherchat/generation",
+                    "reference/hackagent/attacks/techniques/cipherchat/encode_experts"
+                  ],
+                  "label": "hackagent.attacks.techniques.cipherchat",
+                  "type": "category"
+                },
                 "reference/hackagent/attacks/techniques/base"
               ],
               "label": "hackagent.attacks.techniques",

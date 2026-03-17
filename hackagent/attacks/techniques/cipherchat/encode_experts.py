@@ -6,6 +6,8 @@
 # The original copyright and license terms are preserved in the upstream
 # repository and LICENSE file.
 
+import re
+
 # ciphers we used
 
 chinese_alphabet = [
@@ -150,18 +152,8 @@ class CaesarExpert:
 
 class UnicodeExpert:
     def encode(self, s):
-        ans = ""
-
-        lines = s.split("\n")
-        for line in lines:
-            for c in line:
-                byte_s = str(c.encode("unicode_escape"))
-                if len(byte_s) > 8:
-                    ans += byte_s[3:-1]
-                else:
-                    ans += byte_s[-2]
-            ans += "\n"
-        return ans
+        # Always produce escaped form (e.g. \u0041) so text is not left clear.
+        return "".join(f"\\u{ord(c):04x}" for c in s)
 
     def decode(self, s):
         ans = bytes(s, encoding="utf8").decode("unicode_escape")
@@ -178,18 +170,7 @@ class BaseExpert:
 
 class UTF8Expert:
     def encode(self, s):
-        ans = ""
-
-        lines = s.split("\n")
-        for line in lines:
-            for c in line:
-                byte_s = str(c.encode("utf8"))
-                if len(byte_s) > 8:
-                    ans += byte_s[2:-1]
-                else:
-                    ans += byte_s[-2]
-            ans += "\n"
-        return ans
+        return "".join(f"\\x{b:02x}" for b in s.encode("utf-8"))
 
     def decode(self, s):
         ans = b""
@@ -234,18 +215,7 @@ class AsciiExpert:
 
 class GBKExpert:
     def encode(self, s):
-        ans = ""
-
-        lines = s.split("\n")
-        for line in lines:
-            for c in line:
-                byte_s = str(c.encode("GBK"))
-                if len(byte_s) > 8:
-                    ans += byte_s[2:-1]
-                else:
-                    ans += byte_s[-2]
-            ans += "\n"
-        return ans
+        return "".join(f"\\x{b:02x}" for b in s.encode("GBK"))
 
     def decode(self, s):
         ans = b""
@@ -262,60 +232,63 @@ class GBKExpert:
 
 
 class MorseExpert:
+    MORSE_CODE_DICT = {
+        "A": ".-",
+        "B": "-...",
+        "C": "-.-.",
+        "D": "-..",
+        "E": ".",
+        "F": "..-.",
+        "G": "--.",
+        "H": "....",
+        "I": "..",
+        "J": ".---",
+        "K": "-.-",
+        "L": ".-..",
+        "M": "--",
+        "N": "-.",
+        "O": "---",
+        "P": ".--.",
+        "Q": "--.-",
+        "R": ".-.",
+        "S": "...",
+        "T": "-",
+        "U": "..-",
+        "V": "...-",
+        "W": ".--",
+        "X": "-..-",
+        "Y": "-.--",
+        "Z": "--..",
+        "1": ".----",
+        "2": "..---",
+        "3": "...--",
+        "4": "....-",
+        "5": ".....",
+        "6": "-....",
+        "7": "--...",
+        "8": "---..",
+        "9": "----.",
+        "0": "-----",
+        ",": "--..--",
+        ".": ".-.-.-",
+        "?": "..--..",
+        "/": "-..-.",
+        "-": "-....-",
+        "(": "-.--.",
+        ")": "-.--.-",
+    }
+
+    REVERSE_MORSE_CODE_DICT = {v: k for k, v in MORSE_CODE_DICT.items()}
+
     def encode(self, s):
         s = s.upper()
-        MORSE_CODE_DICT = {
-            "A": ".-",
-            "B": "-...",
-            "C": "-.-.",
-            "D": "-..",
-            "E": ".",
-            "F": "..-.",
-            "G": "--.",
-            "H": "....",
-            "I": "..",
-            "J": ".---",
-            "K": "-.-",
-            "L": ".-..",
-            "M": "--",
-            "N": "-.",
-            "O": "---",
-            "P": ".--.",
-            "Q": "--.-",
-            "R": ".-.",
-            "S": "...",
-            "T": "-",
-            "U": "..-",
-            "V": "...-",
-            "W": ".--",
-            "X": "-..-",
-            "Y": "-.--",
-            "Z": "--..",
-            "1": ".----",
-            "2": "..---",
-            "3": "...--",
-            "4": "....-",
-            "5": ".....",
-            "6": "-....",
-            "7": "--...",
-            "8": "---..",
-            "9": "----.",
-            "0": "-----",
-            ", ": "--..--",
-            ".": ".-.-.-",
-            "?": "..--..",
-            "/": "-..-.",
-            "-": "-....-",
-            "(": "-.--.",
-            ")": "-.--.-",
-        }
         cipher = ""
         lines = s.split("\n")
         for line in lines:
             for letter in line:
                 try:
                     if letter != " ":
-                        cipher += MORSE_CODE_DICT[letter] + " "
+                        cipher += self.MORSE_CODE_DICT[letter] + " "
                     else:
                         cipher += " "
                 except Exception:
@@ -324,79 +297,25 @@ class MorseExpert:
         return cipher
 
     def decode(self, s):
-        MORSE_CODE_DICT = {
-            "A": ".-",
-            "B": "-...",
-            "C": "-.-.",
-            "D": "-..",
-            "E": ".",
-            "F": "..-.",
-            "G": "--.",
-            "H": "....",
-            "I": "..",
-            "J": ".---",
-            "K": "-.-",
-            "L": ".-..",
-            "M": "--",
-            "N": "-.",
-            "O": "---",
-            "P": ".--.",
-            "Q": "--.-",
-            "R": ".-.",
-            "S": "...",
-            "T": "-",
-            "U": "..-",
-            "V": "...-",
-            "W": ".--",
-            "X": "-..-",
-            "Y": "-.--",
-            "Z": "--..",
-            "1": ".----",
-            "2": "..---",
-            "3": "...--",
-            "4": "....-",
-            "5": ".....",
-            "6": "-....",
-            "7": "--...",
-            "8": "---..",
-            "9": "----.",
-            "0": "-----",
-            ", ": "--..--",
-            ".": ".-.-.-",
-            "?": "..--..",
-            "/": "-..-.",
-            "-": "-....-",
-            "(": "-.--.",
-            ")": "-.--.-",
-        }
-        decipher = ""
-        citext = ""
         lines = s.split("\n")
+        decoded_lines = []
         for line in lines:
-            for letter in line:
-                while True and len(letter):
-                    if letter[0] not in ["-", ".", " "]:
-                        decipher += letter[0]
-                        letter = letter[1:]
-                    else:
-                        break
-                try:
-                    if letter != " ":
-                        i = 0
-                        citext += letter
-                    else:
-                        i += 1
-                        if i == 2:
-                            decipher += " "
-                        else:
-                            decipher += list(MORSE_CODE_DICT.keys())[
-                                list(MORSE_CODE_DICT.values()).index(citext)
-                            ]
-                            citext = ""
-                except Exception:
-                    decipher += letter
-            decipher += "\n"
-        return decipher
+            # Words are separated by 2+ spaces in our encoder.
+            words = re.split(r"\s{2,}", line.strip()) if line.strip() else [""]
+            decoded_words = []
+            for word in words:
+                if not word:
+                    decoded_words.append("")
+                    continue
+                letters = word.split()
+                decoded_letters = []
+                for token in letters:
+                    decoded_letters.append(
+                        self.REVERSE_MORSE_CODE_DICT.get(token, token)
+                    )
+                decoded_words.append("".join(decoded_letters))
+            decoded_lines.append(" ".join(decoded_words).rstrip())
+        return "\n".join(decoded_lines)
 
 
 class AtbashExpert:
@@ -406,7 +325,10 @@ class AtbashExpert:
         for s in text:
             try:
                 if s.isalpha():
-                    ans += chr(N - ord(s))
+                    if s.isupper():
+                        ans += chr(ord("Z") + ord("A") - ord(s))
+                    else:
+                        ans += chr(N - ord(s))
                 else:
                     ans += s
             except Exception:
@@ -419,7 +341,10 @@ class AtbashExpert:
         for s in text:
             try:
                 if s.isalpha():
-                    ans += chr(N - ord(s))
+                    if s.isupper():
+                        ans += chr(ord("Z") + ord("A") - ord(s))
+                    else:
+                        ans += chr(N - ord(s))
                 else:
                     ans += s
             except Exception:

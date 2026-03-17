@@ -117,6 +117,7 @@ const sidebars: SidebarsConfig = {
         'attacks/flipattack',
         'attacks/bon',
         'attacks/h4rm3l',
+        'attacks/cipherchat',
         'attacks/baseline',
       ],
     },

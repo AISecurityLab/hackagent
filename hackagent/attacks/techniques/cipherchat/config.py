@@ -23,7 +23,7 @@ DEFAULT_CIPHERCHAT_CONFIG: Dict[str, Any] = {
     "dataset": None,
     "batch_size": 8,
     "max_new_tokens": 512,
-    "temperature": 0.6,
+    "temperature": 0.0,
     "request_timeout": 120,
     "goal_batch_size": 1,
     "goal_batch_workers": 1,
@@ -68,7 +68,7 @@ class CipherChatConfig:
     judges: List[Dict[str, Any]] = field(default_factory=list)
     batch_size: int = 8
     max_new_tokens: int = 512
-    temperature: float = 0.6
+    temperature: float = 0.0
     request_timeout: int = 120
     goal_batch_size: int = 1
     goal_batch_workers: int = 1
