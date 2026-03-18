@@ -9,6 +9,7 @@ Execute and manage security attacks with dynamic, strategy-aware configuration.
 
 from typing import Any, Dict, List, Optional
 
+from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Horizontal, Vertical, VerticalScroll
@@ -307,6 +308,13 @@ class AttacksTab(Container):
             if self._current_spec:
                 self._render_strategy_config(self._current_spec.technique_key)
 
+    @on(Checkbox.Changed, "#advanced-toggle")
+    def _on_advanced_toggle(self, event: Checkbox.Changed) -> None:
+        """Handle advanced-toggle changes reliably across Textual versions."""
+        self._show_advanced = bool(event.value)
+        if self._current_spec:
+            self._render_strategy_config(self._current_spec.technique_key)
+
     def _render_strategy_config(self, technique_key: str) -> None:
         """Clear and re-render the strategy-specific config fields.
 
@@ -316,6 +324,13 @@ class AttacksTab(Container):
         spec = get_attack_config_spec(technique_key)
         if spec is None:
             return
+
+        # Keep internal state aligned with the current checkbox value.
+        try:
+            self._show_advanced = self.query_one("#advanced-toggle", Checkbox).value
+        except Exception:
+            pass
+
         self._current_spec = spec
 
         # Update description
@@ -334,9 +349,7 @@ class AttacksTab(Container):
             if not fields:
                 continue
 
-            # Mount a collapsible section
-            collapsible = Collapsible(title=section, collapsed=False)
-            container.mount(collapsible)
+            section_widgets: List[Any] = []
 
             for cfg_field in fields:
                 widget_id = _field_widget_id(cfg_field)
@@ -344,10 +357,10 @@ class AttacksTab(Container):
                 label_text = cfg_field.label
                 if cfg_field.required:
                     label_text += " *"
-                collapsible.mount(Label(label_text))
+                section_widgets.append(Label(label_text))
 
                 if cfg_field.description:
-                    collapsible.mount(
+                    section_widgets.append(
                         Static(
                             f"[dim]{_escape(cfg_field.description)}[/dim]",
                             classes="field-description",
@@ -356,7 +369,11 @@ class AttacksTab(Container):
 
                 # Render the appropriate widget
                 widget = self._create_field_widget(cfg_field, widget_id)
-                collapsible.mount(widget)
+                section_widgets.append(widget)
+
+            # Build collapsible with children upfront to avoid mount-order issues.
+            collapsible = Collapsible(*section_widgets, title=section, collapsed=False)
+            container.mount(collapsible)
 
         # Clear validation errors
         self.query_one("#validation-errors", Static).update("")

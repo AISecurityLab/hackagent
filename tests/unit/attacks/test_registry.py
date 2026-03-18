@@ -14,9 +14,9 @@ from hackagent.attacks.registry import (
     create_orchestrator,
 )
 from hackagent.attacks.techniques.advprefix.attack import AdvPrefixAttack
-from hackagent.attacks.techniques.pair.attack import PAIRAttack
 from hackagent.attacks.techniques.baseline.attack import BaselineAttack
 from hackagent.attacks.techniques.base import BaseAttack
+from hackagent.attacks.techniques.pair.attack import PAIRAttack
 
 
 class MockAttack(BaseAttack):
@@ -64,9 +64,21 @@ class TestAttackRegistry(unittest.TestCase):
         """Test that registry contains BoN attack."""
         self.assertIn("bon", ATTACK_REGISTRY)
 
-    def test_registry_has_seven_attacks(self):
-        """Test that registry has exactly seven attacks."""
-        self.assertEqual(len(ATTACK_REGISTRY), 7)
+    def test_registry_contains_h4rm3l(self):
+        """Test that registry contains h4rm3l attack."""
+        self.assertIn("h4rm3l", ATTACK_REGISTRY)
+
+    def test_registry_contains_cipherchat(self):
+        """Test that registry contains cipherchat attack."""
+        self.assertIn("cipherchat", ATTACK_REGISTRY)
+
+    def test_registry_contains_pap(self):
+        """Test that registry contains PAP attack."""
+        self.assertIn("pap", ATTACK_REGISTRY)
+
+    def test_registry_has_ten_attacks(self):
+        """Test that registry has exactly ten attacks."""
+        self.assertEqual(len(ATTACK_REGISTRY), 10)
 
 
 class TestAdvPrefixOrchestrator(unittest.TestCase):

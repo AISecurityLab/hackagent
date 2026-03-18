@@ -30,6 +30,9 @@ from hackagent.attacks.techniques.tap import (
 )  # Placeholder for future implementation
 from hackagent.attacks.techniques.autodan_turbo import AutoDANTurboAttack
 from hackagent.attacks.techniques.bon import BoNAttack
+from hackagent.attacks.techniques.cipherchat import CipherChatAttack
+from hackagent.attacks.techniques.h4rm3l import H4rm3lAttack
+from hackagent.attacks.techniques.pap import PAPAttack
 
 
 def create_orchestrator(
@@ -78,6 +81,9 @@ FlipAttackOrchestrator = create_orchestrator("FlipAttack", FlipAttack)
 TAPOrchestrator = create_orchestrator("TAP", TAPAttack)
 AutoDANTurboOrchestrator = create_orchestrator("AutoDANTurbo", AutoDANTurboAttack)
 BoNOrchestrator = create_orchestrator("bon", BoNAttack)
+H4rm3lOrchestrator = create_orchestrator("h4rm3l", H4rm3lAttack)
+CipherChatOrchestrator = create_orchestrator("cipherchat", CipherChatAttack)
+PAPOrchestrator = create_orchestrator("pap", PAPAttack)
 
 # Registry of all available attacks
 ATTACK_REGISTRY = {
@@ -88,6 +94,9 @@ ATTACK_REGISTRY = {
     "TAP": TAPOrchestrator,
     "AutoDANTurbo": AutoDANTurboOrchestrator,
     "bon": BoNOrchestrator,
+    "h4rm3l": H4rm3lOrchestrator,
+    "cipherchat": CipherChatOrchestrator,
+    "pap": PAPOrchestrator,
 }
 
 __all__ = [
@@ -98,5 +107,8 @@ __all__ = [
     "TAPOrchestrator",
     "AutoDANTurboOrchestrator",
     "BoNOrchestrator",
+    "H4rm3lOrchestrator",
+    "CipherChatOrchestrator",
+    "PAPOrchestrator",
     "ATTACK_REGISTRY",
 ]

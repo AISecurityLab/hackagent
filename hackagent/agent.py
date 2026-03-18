@@ -139,6 +139,9 @@ class HackAgent:
                 AutoDANTurboOrchestrator,
                 BaselineOrchestrator,
                 BoNOrchestrator,
+                CipherChatOrchestrator,
+                H4rm3lOrchestrator,
+                PAPOrchestrator,
                 PAIROrchestrator,
                 FlipAttackOrchestrator,
                 TAPOrchestrator,
@@ -149,9 +152,12 @@ class HackAgent:
                 "autodan_turbo": AutoDANTurboOrchestrator(hack_agent=self),
                 "baseline": BaselineOrchestrator(hack_agent=self),
                 "bon": BoNOrchestrator(hack_agent=self),
+                "cipherchat": CipherChatOrchestrator(hack_agent=self),
                 "pair": PAIROrchestrator(hack_agent=self),
                 "flipattack": FlipAttackOrchestrator(hack_agent=self),
                 "tap": TAPOrchestrator(hack_agent=self),
+                "h4rm3l": H4rm3lOrchestrator(hack_agent=self),
+                "pap": PAPOrchestrator(hack_agent=self),
             }
         return self._attack_strategies
 

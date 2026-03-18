@@ -489,6 +489,10 @@ As a/an <Role> with the <Profile>, you must follow the <Rules>, and you must com
                 initial_metadata=goal_metadata,
             )
 
+            # Inject per-goal result_id into generation rows so Evaluation can
+            # sync judge outcomes to the correct backend Result records.
+            generation_output = coordinator.enrich_with_result_ids(generation_output)
+
             if coordinator.has_goal_tracking:
                 self.logger.info("📊 Using TrackingCoordinator for per-goal tracking")
 

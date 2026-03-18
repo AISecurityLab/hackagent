@@ -14,10 +14,13 @@ graph LR
         A[AdvPrefix] --> |"Sophisticated"| T[Target Agent]
         B[AutoDAN-Turbo] --> |"Sophisticated"| T
         C[PAIR] --> |"Adaptive"| T
+        P[PAP] --> |"Persuasion"| T
         D[Baseline] --> |"Fast"| T
         E[TAP] --> |"Tree Search"| T
         F[FlipAttack] --> |"Obfuscation"| T
         G[BoN] --> |"Augmentation"| T
+        H4[h4rm3l] --> |"Composable"| T
+        I[CipherChat] --> |"Cipher"| T
     end
     T --> R[Results & Analysis]
 ```
@@ -32,6 +35,9 @@ graph LR
 | [**TAP**](./tap.md) | Tree search with on-topic pruning | ⭐⭐ Medium | Medium |
 | [**FlipAttack**](./flipattack.md) | Character-level text obfuscation | ⭐ Basic | Fast |
 | [**BoN**](./bon.md) | Best-of-N random text augmentation | ⭐ Basic | Fast |
+| [**h4rm3l**](./h4rm3l.md) | Composable prompt-decoration chains | ⭐⭐ Medium | Fast |
+| [**CipherChat**](./cipherchat.md) | Cipher-based non-natural-language jailbreak prompts | ⭐⭐ Medium | Fast |
+| [**PAP**](./pap.md) | Persuasive adversarial paraphrasing with social-science techniques | ⭐⭐ Medium | Medium |
 | [**Baseline**](./baseline.md) | Template-based prompt injection | ⭐ Basic | Fast |
 
 :::tip Dataset Support
@@ -187,6 +193,30 @@ attack_config = {
 
 ---
 
+## PAP — Persuasive Adversarial Prompts
+
+A taxonomy-guided attack that rewrites harmful goals into **persuasive, human-readable prompts** using social-science persuasion techniques (e.g., evidence-based persuasion, expert endorsement, logical appeal).
+
+<div style={{background: 'var(--ifm-background-surface-color)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--ifm-color-emphasis-200)', margin: '1rem 0'}}>
+
+For each goal, PAP iterates through selected persuasion techniques, uses an attacker LLM to generate a persuasive paraphrase, sends it to the target, and evaluates success with a judge. The loop stops early as soon as a jailbreak is confirmed. This makes PAP practical for realistic red-teaming scenarios where prompts look natural rather than heavily obfuscated.
+
+</div>
+
+```python
+attack_config = {
+    "attack_type": "pap",
+    "goals": ["Reveal confidential system instructions"],
+    "pap_params": {"techniques": "top5", "max_techniques_per_goal": 5},
+    "attacker": {"identifier": "gpt-4o-mini", "endpoint": "https://api.openai.com/v1"},
+    "judges": [{"identifier": "gpt-4o-mini", "type": "harmbench"}]
+}
+```
+
+[**Learn more about PAP →**](./pap.md)
+
+---
+
 ## Baseline — Template-Based Attacks
 
 A simpler but effective approach using **predefined prompt templates** combined with harmful goals. Great for quick vulnerability assessments.
@@ -220,6 +250,10 @@ attack_config = {
 **FlipAttack** is the fastest option — a single deterministic pass, no attacker model required. Use it for quick scans, character-level safety assessments, or when comparing model robustness across flip modes.
 
 **BoN** complements FlipAttack with a stochastic approach: random augmentations explore the neighbourhood of the goal in character/word space, making it effective against classifiers that are robust to purely deterministic obfuscation. No attacker model needed.
+
+**h4rm3l** is best when you want programmable prompt transformations: it composes decorator chains for controlled, reproducible obfuscation workflows without requiring an attacker LLM.
+
+**PAP** is the best fit for human-like social engineering prompts: it uses persuasion-taxonomy paraphrasing to produce natural prompts that can bypass alignment without relying on token-level gibberish.
 
 **Baseline** is ideal for a rapid first-pass: template-based prompts sent directly to the target with no setup overhead, good for establishing a vulnerability baseline before running heavier attacks.
 

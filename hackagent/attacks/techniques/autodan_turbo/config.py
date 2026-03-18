@@ -110,6 +110,9 @@ DEFAULT_AUTODAN_TURBO_CONFIG: Dict[str, Any] = {
     "temperature": 0.6,
     "top_p": 0.9,
     "request_timeout": 120,
+    # Optional passthrough parameters for target requests
+    # (provider/model-specific, e.g. OpenRouter/OpenAI reasoning controls)
+    "target_request_overrides": {},
     # Goals/prompts to attack
     "goals": [],
     # Dataset configuration (optional)
