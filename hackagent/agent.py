@@ -125,6 +125,7 @@ class HackAgent:
                 AutoDANTurboOrchestrator,
                 BaselineOrchestrator,
                 BoNOrchestrator,
+                H4rm3lOrchestrator,
                 PAIROrchestrator,
                 FlipAttackOrchestrator,
                 TAPOrchestrator,
@@ -138,6 +139,7 @@ class HackAgent:
                 "pair": PAIROrchestrator(hack_agent=self),
                 "flipattack": FlipAttackOrchestrator(hack_agent=self),
                 "tap": TAPOrchestrator(hack_agent=self),
+                "h4rm3l": H4rm3lOrchestrator(hack_agent=self),
             }
         return self._attack_strategies
 

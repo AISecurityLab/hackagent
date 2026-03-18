@@ -803,3 +803,442 @@ _register(
         ],
     )
 )
+
+
+# =====================================================================
+# FlipAttack
+# =====================================================================
+
+_register(
+    AttackConfigSpec(
+        technique_key="flipattack",
+        display_name="FlipAttack",
+        description=(
+            "Prompt obfuscation attack that applies reversible text flipping "
+            "strategies (word/character transforms) and optional prompting "
+            "enhancements before target evaluation."
+        ),
+        fields=[
+            ConfigField(
+                key="flipattack_params.flip_mode",
+                label="Flip Mode",
+                field_type=FieldType.CHOICE,
+                default="FCS",
+                description="Transformation mode applied to the goal prompt.",
+                choices=[
+                    ("FCS (Flip chars in sentence)", "FCS"),
+                    ("FCW (Flip chars in words)", "FCW"),
+                    ("FWO (Flip word order)", "FWO"),
+                    ("FMM (Fool model mode)", "FMM"),
+                ],
+                section="Algorithm",
+            ),
+            ConfigField(
+                key="flipattack_params.cot",
+                label="Enable Chain-of-Thought Prompting",
+                field_type=FieldType.BOOLEAN,
+                default=False,
+                description="Append reasoning-oriented decoding instructions.",
+                section="Algorithm",
+                advanced=True,
+            ),
+            ConfigField(
+                key="flipattack_params.lang_gpt",
+                label="Enable LangGPT Wrapper",
+                field_type=FieldType.BOOLEAN,
+                default=False,
+                description="Wrap prompts in a structured LangGPT format.",
+                section="Algorithm",
+                advanced=True,
+            ),
+            ConfigField(
+                key="flipattack_params.few_shot",
+                label="Enable Few-shot Examples",
+                field_type=FieldType.BOOLEAN,
+                default=False,
+                description="Inject few-shot decoding demonstrations.",
+                section="Algorithm",
+                advanced=True,
+            ),
+            ConfigField(
+                key="max_new_tokens_eval",
+                label="Max Judge Tokens",
+                field_type=FieldType.INTEGER,
+                default=256,
+                description="Max tokens for judge evaluation responses.",
+                min_value=16,
+                max_value=2048,
+                section="Evaluation",
+            ),
+            ConfigField(
+                key="judge_temperature",
+                label="Judge Temperature",
+                field_type=FieldType.FLOAT,
+                default=0.0,
+                description="Sampling temperature for judge requests.",
+                min_value=0.0,
+                max_value=2.0,
+                step=0.1,
+                section="Evaluation",
+                advanced=True,
+            ),
+            ConfigField(
+                key="judge_request_timeout",
+                label="Judge Timeout (s)",
+                field_type=FieldType.INTEGER,
+                default=120,
+                description="Timeout in seconds for judge API requests.",
+                min_value=10,
+                max_value=600,
+                section="Evaluation",
+                advanced=True,
+            ),
+            ConfigField(
+                key="output_dir",
+                label="Output Directory",
+                field_type=FieldType.STRING,
+                default="./logs/runs",
+                description="Directory for saving run artifacts.",
+                section="Output",
+                advanced=True,
+            ),
+        ],
+    )
+)
+
+
+# =====================================================================
+# TAP
+# =====================================================================
+
+_register(
+    AttackConfigSpec(
+        technique_key="tap",
+        display_name="TAP",
+        description=(
+            "Tree of Attacks with Pruning. Explores adversarial prompt trees "
+            "with attacker/judge feedback and branch pruning."
+        ),
+        fields=[
+            ConfigField(
+                key="tap_params.depth",
+                label="Tree Depth",
+                field_type=FieldType.INTEGER,
+                default=3,
+                description="Maximum search depth for refinement tree.",
+                min_value=1,
+                max_value=10,
+                section="Algorithm",
+            ),
+            ConfigField(
+                key="tap_params.width",
+                label="Tree Width",
+                field_type=FieldType.INTEGER,
+                default=4,
+                description="Candidates retained per level.",
+                min_value=1,
+                max_value=20,
+                section="Algorithm",
+            ),
+            ConfigField(
+                key="tap_params.branching_factor",
+                label="Branching Factor",
+                field_type=FieldType.INTEGER,
+                default=3,
+                description="New candidates generated per parent node.",
+                min_value=1,
+                max_value=20,
+                section="Algorithm",
+            ),
+            ConfigField(
+                key="tap_params.n_streams",
+                label="Parallel Streams",
+                field_type=FieldType.INTEGER,
+                default=4,
+                description="Parallel attacker streams per goal.",
+                min_value=1,
+                max_value=20,
+                section="Algorithm",
+            ),
+            ConfigField(
+                key="tap_params.early_stop_on_success",
+                label="Early Stop on Success",
+                field_type=FieldType.BOOLEAN,
+                default=True,
+                description="Stop search immediately after successful jailbreak.",
+                section="Algorithm",
+            ),
+            ConfigField(
+                key="target_str",
+                label="Target Prefix",
+                field_type=FieldType.STRING,
+                default="Sure, here is",
+                description="Desired beginning of target model response.",
+                section="Evaluation",
+            ),
+            ConfigField(
+                key="max_new_tokens",
+                label="Target Max Tokens",
+                field_type=FieldType.INTEGER,
+                default=256,
+                description="Max tokens for target model responses.",
+                min_value=16,
+                max_value=4096,
+                section="Target Model",
+            ),
+            ConfigField(
+                key="temperature",
+                label="Target Temperature",
+                field_type=FieldType.FLOAT,
+                default=0.7,
+                description="Sampling temperature for target model.",
+                min_value=0.0,
+                max_value=2.0,
+                step=0.1,
+                section="Target Model",
+            ),
+            ConfigField(
+                key="request_timeout",
+                label="Request Timeout (s)",
+                field_type=FieldType.INTEGER,
+                default=120,
+                description="Timeout in seconds for individual API requests.",
+                min_value=10,
+                max_value=600,
+                section="Target Model",
+            ),
+            ConfigField(
+                key="output_dir",
+                label="Output Directory",
+                field_type=FieldType.STRING,
+                default="./logs/runs",
+                description="Directory for saving run artifacts.",
+                section="Output",
+                advanced=True,
+            ),
+        ],
+    )
+)
+
+
+# =====================================================================
+# BoN
+# =====================================================================
+
+_register(
+    AttackConfigSpec(
+        technique_key="bon",
+        display_name="BoN",
+        description=(
+            "Best-of-N jailbreak search with stochastic text augmentations and "
+            "judge-based candidate selection."
+        ),
+        fields=[
+            ConfigField(
+                key="bon_params.n_steps",
+                label="Search Steps",
+                field_type=FieldType.INTEGER,
+                default=4,
+                description="Number of sequential optimization steps.",
+                min_value=1,
+                max_value=100,
+                section="Algorithm",
+            ),
+            ConfigField(
+                key="bon_params.num_concurrent_k",
+                label="Candidates per Step (K)",
+                field_type=FieldType.INTEGER,
+                default=5,
+                description="Parallel augmented candidates evaluated each step.",
+                min_value=1,
+                max_value=100,
+                section="Algorithm",
+            ),
+            ConfigField(
+                key="bon_params.sigma",
+                label="Augmentation Strength (Sigma)",
+                field_type=FieldType.FLOAT,
+                default=0.4,
+                description="Mutation strength for text perturbations.",
+                min_value=0.01,
+                max_value=1.0,
+                step=0.01,
+                section="Algorithm",
+            ),
+            ConfigField(
+                key="bon_params.word_scrambling",
+                label="Enable Word Scrambling",
+                field_type=FieldType.BOOLEAN,
+                default=True,
+                description="Shuffle internal characters in eligible words.",
+                section="Algorithm",
+                advanced=True,
+            ),
+            ConfigField(
+                key="bon_params.random_capitalization",
+                label="Enable Random Capitalization",
+                field_type=FieldType.BOOLEAN,
+                default=True,
+                description="Randomly toggle character case.",
+                section="Algorithm",
+                advanced=True,
+            ),
+            ConfigField(
+                key="bon_params.ascii_perturbation",
+                label="Enable ASCII Perturbation",
+                field_type=FieldType.BOOLEAN,
+                default=True,
+                description="Apply small printable-ASCII shifts.",
+                section="Algorithm",
+                advanced=True,
+            ),
+            ConfigField(
+                key="batch_size",
+                label="Target Batch Size",
+                field_type=FieldType.INTEGER,
+                default=1,
+                description="Parallel target requests within each step.",
+                min_value=1,
+                max_value=32,
+                section="Execution",
+            ),
+            ConfigField(
+                key="max_new_tokens",
+                label="Target Max Tokens",
+                field_type=FieldType.INTEGER,
+                default=4096,
+                description="Max tokens for target model responses.",
+                min_value=16,
+                max_value=8192,
+                section="Execution",
+            ),
+            ConfigField(
+                key="temperature",
+                label="Target Temperature",
+                field_type=FieldType.FLOAT,
+                default=0.6,
+                description="Sampling temperature for target model.",
+                min_value=0.0,
+                max_value=2.0,
+                step=0.1,
+                section="Execution",
+            ),
+            ConfigField(
+                key="request_timeout",
+                label="Request Timeout (s)",
+                field_type=FieldType.INTEGER,
+                default=120,
+                description="Timeout in seconds for individual API requests.",
+                min_value=10,
+                max_value=600,
+                section="Execution",
+            ),
+            ConfigField(
+                key="output_dir",
+                label="Output Directory",
+                field_type=FieldType.STRING,
+                default="./logs/runs",
+                description="Directory for saving run artifacts.",
+                section="Output",
+                advanced=True,
+            ),
+        ],
+    )
+)
+
+
+# =====================================================================
+# h4rm3l
+# =====================================================================
+
+_register(
+    AttackConfigSpec(
+        technique_key="h4rm3l",
+        display_name="h4rm3l",
+        description=(
+            "Composable prompt-decoration attack that applies configurable "
+            "obfuscation/transformation chains before evaluating target behavior."
+        ),
+        fields=[
+            ConfigField(
+                key="h4rm3l_params.program",
+                label="Decorator Program",
+                field_type=FieldType.TEXT,
+                default="refusal_suppression",
+                description=(
+                    "Preset name or raw decorator chain expression for h4rm3l."
+                ),
+                section="Program",
+            ),
+            ConfigField(
+                key="h4rm3l_params.syntax_version",
+                label="Syntax Version",
+                field_type=FieldType.CHOICE,
+                default=2,
+                description="Program parser mode for decorator chaining syntax.",
+                choices=[("v1 (semicolon)", 1), ("v2 (.then chaining)", 2)],
+                section="Program",
+            ),
+            ConfigField(
+                key="goal_batch_size",
+                label="Goal Batch Size",
+                field_type=FieldType.INTEGER,
+                default=1,
+                description="Number of goals processed per orchestrator batch.",
+                min_value=1,
+                max_value=32,
+                section="Execution",
+            ),
+            ConfigField(
+                key="goal_batch_workers",
+                label="Goal Batch Workers",
+                field_type=FieldType.INTEGER,
+                default=1,
+                description="Parallel workers used within each goal batch.",
+                min_value=1,
+                max_value=32,
+                section="Execution",
+            ),
+            ConfigField(
+                key="max_new_tokens",
+                label="Target Max Tokens",
+                field_type=FieldType.INTEGER,
+                default=4096,
+                description="Max tokens for target model responses.",
+                min_value=16,
+                max_value=8192,
+                section="Execution",
+            ),
+            ConfigField(
+                key="temperature",
+                label="Target Temperature",
+                field_type=FieldType.FLOAT,
+                default=0.6,
+                description="Sampling temperature for target model.",
+                min_value=0.0,
+                max_value=2.0,
+                step=0.1,
+                section="Execution",
+            ),
+            ConfigField(
+                key="request_timeout",
+                label="Request Timeout (s)",
+                field_type=FieldType.INTEGER,
+                default=120,
+                description="Timeout in seconds for individual API requests.",
+                min_value=10,
+                max_value=600,
+                section="Execution",
+            ),
+            ConfigField(
+                key="output_dir",
+                label="Output Directory",
+                field_type=FieldType.STRING,
+                default="./logs/runs",
+                description="Directory for saving run artifacts.",
+                section="Output",
+                advanced=True,
+            ),
+        ],
+    )
+)

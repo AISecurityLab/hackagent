@@ -18,6 +18,7 @@ graph LR
         E[TAP] --> |"Tree Search"| T
         F[FlipAttack] --> |"Obfuscation"| T
         G[BoN] --> |"Augmentation"| T
+        H4[h4rm3l] --> |"Composable"| T
     end
     T --> R[Results & Analysis]
 ```
@@ -32,6 +33,7 @@ graph LR
 | [**TAP**](./tap.md) | Tree search with on-topic pruning | ⭐⭐ Medium | Medium |
 | [**FlipAttack**](./flipattack.md) | Character-level text obfuscation | ⭐ Basic | Fast |
 | [**BoN**](./bon.md) | Best-of-N random text augmentation | ⭐ Basic | Fast |
+| [**h4rm3l**](./h4rm3l.md) | Composable prompt-decoration chains | ⭐⭐ Medium | Fast |
 | [**Baseline**](./baseline.md) | Template-based prompt injection | ⭐ Basic | Fast |
 
 :::tip Dataset Support

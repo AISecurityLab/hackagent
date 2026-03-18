@@ -2328,6 +2328,7 @@ source = { editable = "." }
 dependencies = [
     { name = "attrs" },
     { name = "click" },
+    { name = "datasets" },
     { name = "faiss-cpu" },
     { name = "litellm" },
     { name = "openai" },
@@ -2375,6 +2376,7 @@ docs = [
 requires-dist = [
     { name = "attrs", specifier = ">=21.0.0" },
     { name = "click", specifier = ">=8.1.0" },
+    { name = "datasets", specifier = ">=4.6.1" },
     { name = "datasets", marker = "extra == 'datasets'", specifier = ">=2.14.0" },
     { name = "faiss-cpu", specifier = ">=1.13.2" },
     { name = "litellm", specifier = ">=1.69.2" },

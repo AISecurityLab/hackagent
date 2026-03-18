@@ -74,6 +74,17 @@
                   "label": "hackagent.attacks.techniques.bon",
                   "type": "category"
                 },
+                {
+                  "items": [
+                    "reference/hackagent/attacks/techniques/h4rm3l/attack",
+                    "reference/hackagent/attacks/techniques/h4rm3l/config",
+                    "reference/hackagent/attacks/techniques/h4rm3l/decorators",
+                    "reference/hackagent/attacks/techniques/h4rm3l/evaluation",
+                    "reference/hackagent/attacks/techniques/h4rm3l/generation"
+                  ],
+                  "label": "hackagent.attacks.techniques.h4rm3l",
+                  "type": "category"
+                },
                 "reference/hackagent/attacks/techniques/base"
               ],
               "label": "hackagent.attacks.techniques",

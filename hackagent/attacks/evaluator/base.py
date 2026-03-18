@@ -384,9 +384,9 @@ class BaseJudgeEvaluator(ABC):
                                     explanation=current_expl,
                                     evaluator_name=self.__class__.__name__,
                                     metadata={
-                                        "prefix": row.get("prefix", "")[:100],
+                                        "prefix": row.get("prefix", ""),
                                         "completion": (
-                                            row.get("completion", "")[:100]
+                                            row.get("completion", "")
                                             if row.get("completion")
                                             else None
                                         ),
