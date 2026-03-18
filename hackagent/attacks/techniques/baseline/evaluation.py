@@ -323,7 +323,7 @@ def _sync_evaluation_to_server(
         )
 
     # Legacy fallback: Update individual result_id records
-    client = config.get("_client")
+    client = config.get("_backend") or config.get("_client")
     if not client:
         logger.warning("No client available - cannot sync evaluation to server")
         return 0

@@ -160,6 +160,7 @@ class BoNAttack(BaseAttack):
                     "batch_size",
                     "bon_params",
                     "_run_id",
+                    "_backend",
                     "_client",
                     "_tracker",
                     # Judge config keys — used by inline _StepJudge
@@ -181,6 +182,7 @@ class BoNAttack(BaseAttack):
                 "config_keys": [
                     "bon_params",
                     "_run_id",
+                    "_backend",
                     "_client",
                     "_tracker",
                     "judges",

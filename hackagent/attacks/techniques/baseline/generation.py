@@ -108,7 +108,7 @@ def execute_prompts(
 
     # Extract tracking information from config (for backwards compatibility)
     run_id = config.get("_run_id")
-    client = config.get("_client")
+    client = config.get("_backend") or config.get("_client")
 
     # Use Tracker if provided, otherwise log warning
     if goal_tracker:
@@ -116,7 +116,7 @@ def execute_prompts(
     elif run_id and client:
         logger.info(f"📊 Creating Tracker for baseline (run_id={run_id})")
         goal_tracker = Tracker(
-            client=client,
+            backend=client,
             run_id=run_id,
             logger=logger,
             attack_type="baseline",

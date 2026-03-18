@@ -123,6 +123,7 @@ class PAPAttack(BaseAttack):
                     "pap_params",
                     "attacker",
                     "_run_id",
+                    "_backend",
                     "_client",
                     "_tracker",
                     "judges",
@@ -146,6 +147,7 @@ class PAPAttack(BaseAttack):
                 "config_keys": [
                     "pap_params",
                     "_run_id",
+                    "_backend",
                     "_client",
                     "_tracker",
                     "judges",

@@ -134,7 +134,9 @@ class BaseEvaluationStep:
             config.get("_run_id") if isinstance(config, dict) else None
         )
         self._tracking_client = (
-            config.get("_client") if isinstance(config, dict) else None
+            (config.get("_backend") or config.get("_client"))
+            if isinstance(config, dict)
+            else None
         )
         self._tracker: Optional["Tracker"] = (
             config.get("_tracker") if isinstance(config, dict) else None

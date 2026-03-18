@@ -186,7 +186,7 @@ def _create_attacker_router(
         metadata["api_key"] = api_key
 
     return AgentRouter(
-        client=client,
+        backend=client,
         name=f"pap-attacker-{attacker_config.get('identifier', 'unknown')[:30]}",
         agent_type=attacker_config.get("agent_type", "OPENAI_SDK"),
         endpoint=attacker_config.get("endpoint"),
@@ -226,7 +226,7 @@ def execute(
     attacker_cfg = config.get("attacker", {})
 
     tracker: Optional["Tracker"] = config.get("_tracker")
-    client: Optional["AuthenticatedClient"] = config.get("_client")
+    client: Optional["AuthenticatedClient"] = config.get("_backend") or config.get("_client")
 
     techniques = _resolve_techniques(pap_params)
     max_techniques = pap_params.get("max_techniques_per_goal", 0)

@@ -121,6 +121,7 @@ class CipherChatAttack(BaseAttack):
                     "request_timeout",
                     "cipherchat_params",
                     "_run_id",
+                    "_backend",
                     "_client",
                     "_tracker",
                 ],
@@ -134,6 +135,7 @@ class CipherChatAttack(BaseAttack):
                 "config_keys": [
                     "cipherchat_params",
                     "_run_id",
+                    "_backend",
                     "_client",
                     "_tracker",
                     "judges",
