@@ -12,7 +12,7 @@ from hackagent.attacks.techniques.pap.generation import (
     _resolve_techniques,
     _attack_single_goal,
 )
-from hackagent.attacks.techniques.pap.config import TOP_5_TECHNIQUES, ALL_TECHNIQUES
+from hackagent.attacks.techniques.pap.config import TOP_5_TECHNIQUES
 
 
 class TestTaxonomy(unittest.TestCase):
@@ -59,7 +59,9 @@ class TestBuildMutationPrompt(unittest.TestCase):
 
     def test_contains_output_format(self):
         prompt = build_mutation_prompt("test", "Logical Appeal")
-        self.assertIn("#mutated_text_with_same_specific_harmful_or_unlawful_intention", prompt)
+        self.assertIn(
+            "#mutated_text_with_same_specific_harmful_or_unlawful_intention", prompt
+        )
 
 
 class TestExtractMutatedText(unittest.TestCase):

@@ -14,7 +14,7 @@ Ported from the original PAP codebase:
 Based on: https://arxiv.org/abs/2401.06373
 """
 
-from typing import Any, Dict, List
+from typing import Dict, List
 
 # --------------------------------------------------------------------------- #
 # Persuasion taxonomy: 40 techniques with definitions and examples

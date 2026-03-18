@@ -28,10 +28,10 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from hackagent.api.result import (
-    result_create,
     result_partial_update,
     result_trace_create,
 )
+from hackagent.api.run import run_retrieve
 from hackagent.api.models import (
     EvaluationStatusEnum,
     PatchedResultRequest,
@@ -132,6 +132,8 @@ class Tracker:
         self.run_id = run_id
         self.logger = logger or get_logger(__name__)
         self.attack_type = attack_type
+        self._run_agent_uuid: Optional[UUID] = None
+        self._run_agent_lookup_attempted: bool = False
 
         # Track all goal contexts for batch operations
         self._goal_contexts: Dict[int, Context] = {}
@@ -149,6 +151,34 @@ class Tracker:
             except (ValueError, AttributeError):
                 self.logger.warning(f"Invalid UUID format for run_id: {self.run_id}")
         return None
+
+    def _get_run_agent_uuid(self, run_uuid: UUID) -> Optional[UUID]:
+        """Resolve and cache the run's agent UUID from backend."""
+        if self._run_agent_uuid is not None:
+            return self._run_agent_uuid
+        if self._run_agent_lookup_attempted:
+            return None
+
+        self._run_agent_lookup_attempted = True
+        try:
+            response = run_retrieve.sync_detailed(id=run_uuid, client=self.client)
+            if response.status_code == 200 and response.parsed:
+                self._run_agent_uuid = getattr(response.parsed, "agent", None)
+                if self._run_agent_uuid is None:
+                    self.logger.warning(
+                        f"Run {run_uuid} retrieved but has no agent field"
+                    )
+            else:
+                self.logger.warning(
+                    f"Failed to retrieve run {run_uuid} for agent lookup: "
+                    f"status={response.status_code}"
+                )
+        except Exception as e:
+            self.logger.warning(
+                f"Exception retrieving run {run_uuid} for agent lookup: {e}"
+            )
+
+        return self._run_agent_uuid
 
     def create_goal_result(
         self,
@@ -184,6 +214,8 @@ class Tracker:
                 self._goal_contexts[goal_index] = ctx
                 return ctx
 
+            run_agent_uuid = self._get_run_agent_uuid(run_uuid)
+
             # Create result with goal information
             result_request = ResultRequest(
                 run=run_uuid,
@@ -199,14 +231,25 @@ class Tracker:
                     **(initial_metadata or {}),
                 },
             )
+            payload = result_request.model_dump(
+                by_alias=True,
+                mode="json",
+                exclude_none=True,
+            )
+            if run_agent_uuid is not None:
+                payload["agent"] = str(run_agent_uuid)
 
-            response = result_create.sync_detailed(
-                client=self.client,
-                body=result_request,
+            response = self.client.get_httpx_client().request(
+                method="post",
+                url="/result",
+                json=payload,
+                headers={"Content-Type": "application/json"},
             )
 
             if response.status_code == 201:
-                result_id = self._extract_id(response)
+                response_data = response.json() if response.content else {}
+                raw_result_id = response_data.get("id")
+                result_id = str(raw_result_id) if raw_result_id is not None else None
                 if result_id:
                     ctx.result_id = result_id
                     self.logger.info(
@@ -225,9 +268,15 @@ class Tracker:
                         },
                     )
             else:
+                error_body = ""
+                if getattr(response, "content", None):
+                    try:
+                        error_body = response.content.decode("utf-8", errors="replace")
+                    except Exception:
+                        error_body = str(response.content)
                 self.logger.warning(
                     f"Failed to create result for goal {goal_index}: "
-                    f"status={response.status_code} body={response.content!r}"
+                    f"status={response.status_code} body={response.content!r}, body={error_body}"
                 )
 
         except Exception as e:

@@ -105,9 +105,16 @@ def execute(
         system_prompt = attack_messages[0]["content"] if attack_messages else ""
         user_prompt = attack_messages[1]["content"] if len(attack_messages) > 1 else ""
         full_prompt = f"{system_prompt}\n\n{user_prompt}".strip()
+        logger.info(
+            f"[Goal {idx + 1}/{len(goals)}] Modified prompt generated:\n{full_prompt}"
+        )
 
         # Step 2: Execute against target model (HTTP — parallelised here)
         request_data = {"prompt": full_prompt}
+        _request_t0 = time.perf_counter()
+        logger.info(
+            f"[Goal {idx + 1}/{len(goals)}] Sending modified prompt to target model"
+        )
         try:
             response = agent_router.route_request(
                 registration_key=victim_key,
@@ -128,8 +135,25 @@ def execute(
                 }
             return
 
+        _request_elapsed = round(time.perf_counter() - _request_t0, 3)
+        logger.info(
+            f"[Goal {idx + 1}/{len(goals)}] Target model responded in {_request_elapsed}s"
+        )
+
         generated_text = response.get("generated_text")
         error_message = response.get("error_message")
+
+        if generated_text:
+            logger.info(
+                f"[Goal {idx + 1}/{len(goals)}] Target response:\n{generated_text}"
+            )
+        else:
+            logger.info(f"[Goal {idx + 1}/{len(goals)}] Target response is empty")
+
+        if error_message:
+            logger.warning(
+                f"[Goal {idx + 1}/{len(goals)}] Target error: {error_message}"
+            )
 
         with _lock:
             _goal_elapsed = round(time.perf_counter() - _t0, 3)

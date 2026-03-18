@@ -23,7 +23,7 @@ Based on: https://arxiv.org/abs/2401.06373
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 
 # ---- Top-5 persuasion techniques from the paper (broad-scan results) ---- #
@@ -114,7 +114,7 @@ DEFAULT_PAP_CONFIG: Dict[str, Any] = {
         }
     ],
     # Batching
-    "batch_size": 1,       # Parallelism for goal processing
+    "batch_size": 1,  # Parallelism for goal processing
     "batch_size_judge": 1,
     "goal_batch_size": 1,
     # Judge parameters (standard)
@@ -166,11 +166,17 @@ class PAPParams:
             if not self.techniques:
                 raise ValueError("techniques list must not be empty")
         else:
-            raise TypeError(f"techniques must be str or list, got {type(self.techniques)}")
+            raise TypeError(
+                f"techniques must be str or list, got {type(self.techniques)}"
+            )
         if self.attacker_temperature < 0:
-            raise ValueError(f"attacker_temperature must be >= 0, got {self.attacker_temperature}")
+            raise ValueError(
+                f"attacker_temperature must be >= 0, got {self.attacker_temperature}"
+            )
         if self.attacker_max_tokens < 1:
-            raise ValueError(f"attacker_max_tokens must be >= 1, got {self.attacker_max_tokens}")
+            raise ValueError(
+                f"attacker_max_tokens must be >= 1, got {self.attacker_max_tokens}"
+            )
 
 
 @dataclass

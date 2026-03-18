@@ -19,9 +19,7 @@ Based on: https://arxiv.org/abs/2401.06373
 """
 
 import logging
-import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import fields
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
@@ -226,7 +224,6 @@ def execute(
     """
     pap_params = config.get("pap_params", {})
     attacker_cfg = config.get("attacker", {})
-    batch_size = max(1, config.get("batch_size", 1))
 
     tracker: Optional["Tracker"] = config.get("_tracker")
     client: Optional["AuthenticatedClient"] = config.get("_client")
@@ -416,9 +413,17 @@ def _attack_single_goal(
                 goal_ctx = tracker.get_goal_context(goal_idx)
                 if goal_ctx:
                     _persist_technique_trace(
-                        tracker, goal_ctx, tech_idx, len(techniques),
-                        technique, None, None, attacker_error,
-                        0.0, False, {},
+                        tracker,
+                        goal_ctx,
+                        tech_idx,
+                        len(techniques),
+                        technique,
+                        None,
+                        None,
+                        attacker_error,
+                        0.0,
+                        False,
+                        {},
                     )
             continue
 
@@ -485,9 +490,17 @@ def _attack_single_goal(
             goal_ctx = tracker.get_goal_context(goal_idx)
             if goal_ctx:
                 _persist_technique_trace(
-                    tracker, goal_ctx, tech_idx, len(techniques),
-                    technique, persuasive_prompt, response_text, target_error,
-                    judge_score, is_jailbreak, judge_cols,
+                    tracker,
+                    goal_ctx,
+                    tech_idx,
+                    len(techniques),
+                    technique,
+                    persuasive_prompt,
+                    response_text,
+                    target_error,
+                    judge_score,
+                    is_jailbreak,
+                    judge_cols,
                 )
 
         # Update best result

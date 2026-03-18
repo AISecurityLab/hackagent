@@ -28,6 +28,9 @@ class _DummyCoordinator:
     def initialize_goals_from_pipeline_data(self, *_args, **_kwargs):
         pass
 
+    def enrich_with_result_ids(self, results):
+        return results
+
     def finalize_all_goals(self, *_args, **_kwargs):
         pass
 
