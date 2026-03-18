@@ -11,10 +11,12 @@ import requests
 def test_auth_endpoint():
     """Smoke-test that the HackAgent API auth endpoint returns a valid response."""
     api_key = os.environ.get("HACKAGENT_API_KEY")
-    base_url = os.environ.get("HACKAGENT_API_BASE_URL", "http://localhost:3001")
+    base_url = os.environ.get("HACKAGENT_API_BASE_URL")
 
-    if not api_key:
-        pytest.skip("HACKAGENT_API_KEY not set — skipping auth smoke test")
+    if not api_key or not base_url:
+        pytest.skip(
+            "HACKAGENT_API_KEY and HACKAGENT_API_BASE_URL must both be set — skipping auth smoke test"
+        )
 
     headers = {
         "accept": "application/json",
