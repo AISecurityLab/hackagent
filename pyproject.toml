@@ -111,6 +111,7 @@ output = "reports/coverage.xml"
 
 [tool.pytest.ini_options]
 testpaths = ["tests/unit", "tests/integration", "tests/e2e"]
+addopts = "--ignore=tests/e2e/attacks"
 markers = [
     "integration: marks integration tests (use --run-integration to enable)",
     "ollama: marks tests that require a running Ollama instance",

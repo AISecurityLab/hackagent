@@ -325,6 +325,8 @@ class TestFlipAttackGenerationExecute:
             {"generated_text": "Response 3", "error_message": None},
         ]
         config = _make_config()
+        # Force deterministic ordering for side_effect consumption.
+        config["batch_size"] = 1
         goals = ["Goal 1", "Goal 2", "Goal 3"]
 
         results = generation.execute(

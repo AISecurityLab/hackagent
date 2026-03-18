@@ -148,12 +148,13 @@ class TestResultsTabMounting:
         """
         Test that DataTable columns are set up when widget mounts.
 
-        The results table should have 5 columns:
+        The results table should have 6 columns:
         1. # (Run number)
         2. ⚡ (Status indicator)
         3. Agent (Agent name)
-        4. ✅/❌ (Success/fail ratio)
-        5. Created (Timestamp)
+        4. Attack (Attack type)
+        5. ✅/❌ (Success/fail ratio)
+        6. Created (Timestamp)
         """
 
         class TestApp(App):
@@ -167,11 +168,11 @@ class TestResultsTabMounting:
 
             # Check table exists and has columns
             assert table is not None
-            assert len(table.columns) == 5
+            assert len(table.columns) == 6
 
             # Verify column labels exist
             columns = list(table.columns.keys())
-            assert len(columns) == 5
+            assert len(columns) == 6
 
     @pytest.mark.asyncio
     async def test_results_tab_has_all_required_widgets(self, cli_config):

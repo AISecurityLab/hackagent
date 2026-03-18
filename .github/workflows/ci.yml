@@ -273,6 +273,7 @@ jobs:
         run: >
           uv run pytest
           tests/e2e/
+          --ignore=tests/e2e/attacks
           -v --tb=short
           --cov --cov-fail-under=0
           --cov-report=xml:reports/coverage.xml

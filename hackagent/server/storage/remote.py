@@ -213,7 +213,11 @@ class RemoteBackend:
             for a in resp.parsed.results or []:
                 if a.name == name:
                     return a
-            if not resp.parsed.next:
+            next_page = getattr(resp.parsed, "next", None)
+            if not isinstance(next_page, str) or not next_page.strip():
+                next_page = getattr(resp.parsed, "next_", None)
+            has_next_page = isinstance(next_page, str) and bool(next_page.strip())
+            if not has_next_page:
                 break
             page += 1
         return None
