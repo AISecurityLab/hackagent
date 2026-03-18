@@ -226,7 +226,9 @@ def execute(
     attacker_cfg = config.get("attacker", {})
 
     tracker: Optional["Tracker"] = config.get("_tracker")
-    client: Optional["AuthenticatedClient"] = config.get("_backend") or config.get("_client")
+    client: Optional["AuthenticatedClient"] = config.get("_backend") or config.get(
+        "_client"
+    )
 
     techniques = _resolve_techniques(pap_params)
     max_techniques = pap_params.get("max_techniques_per_goal", 0)
