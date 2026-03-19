@@ -45,7 +45,7 @@ from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
 from hackagent.router.router import AgentRouter
 
 if TYPE_CHECKING:
-    from hackagent.client import AuthenticatedClient
+    from hackagent.server.client import AuthenticatedClient
     from hackagent.router.tracking import Tracker
     from hackagent.router.tracking.tracker import Context
 
@@ -354,7 +354,9 @@ def execute(
 
     batch_size = max(1, config.get("batch_size", 1))
     tracker: Optional["Tracker"] = config.get("_tracker")
-    client: Optional["AuthenticatedClient"] = config.get("_client")
+    client: Optional["AuthenticatedClient"] = config.get("_backend") or config.get(
+        "_client"
+    )
 
     victim_key = str(agent_router.backend_agent.id)
     logger.info(

@@ -50,7 +50,3 @@ architecture separation between orchestration and attack algorithms.
   &gt;&gt;&gt; orchestrator = MyOrchestrator(hack_agent)
   &gt;&gt;&gt; results = orchestrator.execute(attack_config)
 
-#### FlipAttackOrchestrator
-
-Placeholder for future implementation
-

@@ -20,7 +20,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional, Tuple
 
-from hackagent.client import AuthenticatedClient
+from hackagent.server.client import AuthenticatedClient
 from hackagent.router.router import AgentRouter
 from hackagent.router.types import AgentTypeEnum
 
@@ -318,8 +318,12 @@ class PrefixGenerationPipeline:
             endpoint = self.config.generator.get("endpoint")
             model_name = self.config.generator.get("identifier")
 
-            # Handle API key
-            api_key = self.client.token
+            # Handle API key (supports both AuthenticatedClient and StorageBackend)
+            api_key = (
+                self.client.get_api_key()
+                if hasattr(self.client, "get_api_key")
+                else getattr(self.client, "token", None)
+            )
             api_key_config = self.config.generator.get("api_key")
             if api_key_config:
                 env_key = os.environ.get(api_key_config)
@@ -346,7 +350,7 @@ class PrefixGenerationPipeline:
                 agent_type = AgentTypeEnum.OPENAI_SDK
 
             router = AgentRouter(
-                client=self.client,
+                backend=self.client,
                 name=model_name,
                 agent_type=agent_type,
                 endpoint=endpoint,

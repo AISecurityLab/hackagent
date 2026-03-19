@@ -12,14 +12,14 @@ import datetime as dt_module
 from dateutil import tz
 import json
 from typing import Any
-from uuid import UUID
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Horizontal, Vertical, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Button, Collapsible, DataTable, Label, Select, Static
 
 from hackagent.cli.config import CLIConfig
+from hackagent.cli.tui.base import BaseTab
 
 
 def _escape(value: Any) -> str:
@@ -479,6 +479,35 @@ def _format_response_body(response: Any, indent: str = "     ") -> str:
     return output
 
 
+def _coerce_datetime(value: Any) -> datetime | None:
+    """Best-effort conversion of API/local timestamp values to aware datetime."""
+    if value is None:
+        return None
+
+    if isinstance(value, datetime):
+        dt = value
+    elif isinstance(value, (int, float)):
+        dt = datetime.fromtimestamp(float(value), tz=dt_module.timezone.utc)
+    else:
+        try:
+            dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except Exception:
+            return None
+
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=dt_module.timezone.utc)
+
+    return dt
+
+
+def _format_local_datetime(value: Any, fmt: str, fallback: str = "N/A") -> str:
+    """Format timestamps in the machine local timezone for TUI display."""
+    dt = _coerce_datetime(value)
+    if dt is None:
+        return fallback
+    return dt.astimezone(tz.tzlocal()).strftime(fmt)
+
+
 def _format_config_dict(config: dict, indent: str = "  ") -> str:
     """Format a configuration dictionary for human-readable display.
 
@@ -522,6 +551,123 @@ def _format_config_dict(config: dict, indent: str = "  ") -> str:
             )
 
     return output
+
+
+def _format_trace_block(
+    step_num: int, seq: Any, step_type: str, content: dict, ts_str: str
+) -> str:
+    """Render one trace step block with semantic detection.
+
+    Detects the logical sub-type from content keys and delegates to a
+    specialised formatter, falling back to generic key-value display.
+    """
+    # Detect semantic sub-type from content structure
+    evaluator = content.get("evaluator", "")
+    step_name = content.get("step_name", "")
+    has_goal = "goal" in content and "attack_type" in content
+
+    if has_goal and not step_name:
+        # ── Attack initialisation ──────────────────────────────────────────
+        goal = content.get("goal", "")
+        goal_index = content.get("goal_index", "?")
+        attack = content.get("attack_type", "").upper()
+        header = (
+            f"  [bold cyan]{_step_num_circle(step_num)} 🎯 INIT[/bold cyan]{ts_str}"
+        )
+        body = (
+            f"  [dim]│[/dim]  [bold]Attack:[/bold] [bright_white]{_escape(attack)}[/bright_white]\n"
+            f"  [dim]│[/dim]  [bold]Goal #{goal_index}:[/bold] [yellow]{_escape(goal[:200])}[/yellow]\n"
+        )
+    elif evaluator == "HarmBenchEvaluator":
+        # ── LLM judge evaluation ───────────────────────────────────────────
+        score = content.get("score", "?")
+        explanation = content.get("explanation", "")
+        meta = content.get("metadata", {}) or {}
+        judge_model = meta.get("judge_model", "")
+        elapsed = meta.get("elapsed_s")
+        completion = meta.get("completion")
+        score_color = (
+            "bright_green" if (isinstance(score, (int, float)) and score > 0) else "red"
+        )
+        elapsed_s = f"  [dim]{elapsed:.1f}s[/dim]" if elapsed is not None else ""
+        header = f"  [bold magenta]{_step_num_circle(step_num)} ⚖️  LLM JUDGE[/bold magenta]{ts_str}"
+        body = (
+            f"  [dim]│[/dim]  [bold]Model:[/bold] [bright_cyan]{_escape(judge_model)}[/bright_cyan]{elapsed_s}\n"
+            f"  [dim]│[/dim]  [bold]Score:[/bold] [{score_color}]{score}[/{score_color}]"
+            f"  [dim]—[/dim]  {_escape(explanation[:120])}\n"
+        )
+        if completion:
+            preview = completion[:100] + "…" if len(completion) > 100 else completion
+            body += f"  [dim]│[/dim]  [bold]Completion:[/bold] [italic dim]{_escape(preview)}[/italic dim]\n"
+        else:
+            body += "  [dim]│[/dim]  [dim]Completion: (none / refused)[/dim]\n"
+    elif (
+        step_name == "Evaluation" and evaluator and evaluator != "tracking_coordinator"
+    ):
+        # ── Attack-specific evaluator ──────────────────────────────────────
+        score = content.get("score", "?")
+        explanation = content.get("explanation", "")
+        result_inner = content.get("result", {}) or {}
+        score_color = (
+            "bright_green" if (isinstance(score, (int, float)) and score > 0) else "red"
+        )
+        header = f"  [bold yellow]{_step_num_circle(step_num)} 🔬 EVALUATOR[/bold yellow]{ts_str}"
+        body = f"  [dim]│[/dim]  [bold]Type:[/bold] [dim]{_escape(evaluator)}[/dim]\n"
+        # Render inner result fields
+        for k, v in list(result_inner.items())[:6]:
+            if isinstance(v, bool):
+                vc = "bright_green" if v else "red"
+                body += f"  [dim]│[/dim]    {_escape(k)}: [{vc}]{v}[/{vc}]\n"
+            else:
+                body += f"  [dim]│[/dim]    [yellow]{_escape(k)}:[/yellow] [{score_color}]{_escape(str(v))}[/{score_color}]\n"
+        if explanation:
+            body += f"  [dim]│[/dim]  [dim]{_escape(explanation[:150])}[/dim]\n"
+    elif evaluator == "tracking_coordinator":
+        # ── Coordinator summary ────────────────────────────────────────────
+        result_inner = content.get("result", {}) or {}
+        num_results = result_inner.get("num_results", "?")
+        best_score = result_inner.get("best_score", 0.0)
+        is_success = result_inner.get("is_success", False)
+        jb_icon = (
+            "[bright_green]✓ JAILBREAK[/bright_green]"
+            if is_success
+            else "[red]✗ REFUSED[/red]"
+        )
+        score_color = "bright_green" if best_score > 0 else "dim"
+        header = f"  [bold green]{_step_num_circle(step_num)} 📋 SUMMARY[/bold green]{ts_str}"
+        body = (
+            f"  [dim]│[/dim]  Attempts: [bright_white]{num_results}[/bright_white]"
+            f"  |  Best Score: [{score_color}]{best_score:.2f}[/{score_color}]"
+            f"  |  {jb_icon}\n"
+        )
+    else:
+        # ── Generic fallback (TOOL_CALL, AGENT_THOUGHT, etc.) ─────────────
+        step_color, step_icon = _step_style(step_type)
+        header = f"  [bold {step_color}]{_step_num_circle(step_num)} {step_icon} {_escape(step_type)}[/bold {step_color}]{ts_str}"
+        body = _format_trace_content(content, step_type, step_color)
+
+    return f"{header}\n{body}  [dim]{'╌' * 46}[/dim]\n"
+
+
+def _step_num_circle(n: int) -> str:
+    """Return a circled digit for step numbers 1–20."""
+    circles = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳"
+    if 1 <= n <= 20:
+        return circles[n - 1]
+    return f"({n})"
+
+
+def _step_style(step_type: str) -> tuple[str, str]:
+    """Return (rich_color, icon) for a step_type string."""
+    mapping = {
+        "TOOL_CALL": ("green", "🔧"),
+        "TOOL_RESPONSE": ("cyan", "📥"),
+        "AGENT_THOUGHT": ("magenta", "🧠"),
+        "AGENT_RESPONSE_CHUNK": ("white", "💬"),
+        "MCP_STEP": ("yellow", "🔗"),
+        "A2A_COMM": ("yellow", "🤝"),
+    }
+    return mapping.get(step_type, ("bright_black", "📋"))
 
 
 def _format_trace_content(content: Any, step_type: str, step_color: str) -> str:
@@ -741,184 +887,193 @@ def _format_result_summary(result: Any, index: int) -> str:
     """
     eval_status, status_color, status_icon = _get_result_status_info(result)
 
-    # Get prompt name if available (truncated)
-    prompt_name = ""
-    if hasattr(result, "prompt_name") and result.prompt_name:
-        name = result.prompt_name
-        if len(name) > 25:
-            name = name[:22] + "..."
-        prompt_name = f" 📝 {_escape(name)}"
+    # Goal text — prefer result.goal, fall back to metadata
+    goal_text = ""
+    raw_goal = getattr(result, "goal", None)
+    if not raw_goal:
+        raw_goal = (getattr(result, "metadata", None) or {}).get("goal", "")
+    if raw_goal:
+        truncated = raw_goal[:55] + "…" if len(raw_goal) > 55 else raw_goal
+        goal_text = f"  [dim]{_escape(truncated)}[/dim]"
 
-    # Get latency if available - format nicely
-    latency = ""
-    if hasattr(result, "latency_ms") and result.latency_ms:
-        ms = result.latency_ms
-        if ms >= 1000:
-            latency = f" ⏱️ {ms / 1000:.1f}s"
-        else:
-            latency = f" ⏱️ {ms}ms"
+    # Timing from metadata
+    timing = ""
+    meta = getattr(result, "metadata", None) or {}
+    elapsed = meta.get("elapsed_s")
+    if elapsed is not None:
+        try:
+            timing = f"  [dim]⏱ {float(elapsed):.1f}s[/dim]"
+        except (TypeError, ValueError):
+            pass
 
-    # Get trace count with better formatting
-    trace_count = ""
-    if hasattr(result, "traces") and result.traces:
-        count = len(result.traces)
-        trace_count = f" 🔍 {count}"
+    # Best score from metadata
+    score_str = ""
+    best = meta.get("best_score")
+    if best is not None:
+        try:
+            score_color = "bright_green" if float(best) > 0 else "dim"
+            score_str = f"  [{score_color}]▸{float(best):.2f}[/{score_color}]"
+        except (TypeError, ValueError):
+            pass
 
-    return f"{status_icon} [bold]#{index}[/bold] [{status_color}]{_escape(eval_status)}[/]{prompt_name}{latency}{trace_count}"
+    return f"{status_icon} [bold]#{index}[/bold] [{status_color}]{_escape(eval_status)}[/]{goal_text}{timing}{score_str}"
 
 
-def _format_result_full_details(result: Any, index: int, max_traces: int = 5) -> str:
+def _format_result_full_details(
+    result: Any, index: int, max_traces: int = 5, traces: list | None = None
+) -> str:
     """Format full details for a single result.
 
     Args:
         result: Result object
         index: Result index (1-based)
         max_traces: Maximum number of traces to display
+        traces: Pre-fetched list of TraceRecord objects (used when result has no embedded traces)
 
     Returns:
         Formatted details string
     """
     eval_status, status_color, status_icon = _get_result_status_info(result)
+    meta: dict = getattr(result, "metadata", None) or {}
 
-    # Build compact header
-    details = f"[dim]{'─' * 45}[/dim]\n"
-    details += f"[bold]Result #{index}[/bold] {status_icon} [{status_color}]{_escape(eval_status)}[/]\n"
-    details += f"[dim]ID: {str(result.id)[:8]}...[/dim]\n\n"
-
-    # Key metrics in a compact row
-    metrics_row = []
-    if hasattr(result, "prompt_name") and result.prompt_name:
-        metrics_row.append(f"📝 {_escape(result.prompt_name)[:30]}")
-    if hasattr(result, "latency_ms") and result.latency_ms:
-        ms = result.latency_ms
-        if ms >= 1000:
-            metrics_row.append(f"⏱️ {ms / 1000:.1f}s")
-        else:
-            metrics_row.append(f"⏱️ {ms}ms")
-    if hasattr(result, "response_status_code") and result.response_status_code:
-        code = result.response_status_code
-        color = (
-            "green" if 200 <= code < 300 else "yellow" if 300 <= code < 400 else "red"
-        )
-        metrics_row.append(f"[{color}]HTTP {code}[/]")
-
-    if metrics_row:
-        details += "  " + "  •  ".join(metrics_row) + "\n"
-
-    # Show evaluation notes if any (compact)
-    if hasattr(result, "evaluation_notes") and result.evaluation_notes:
-        notes = result.evaluation_notes
-        if len(notes) > 100:
-            notes = notes[:97] + "..."
-        details += f"\n  [dim]💬 {_escape(notes)}[/dim]\n"
-
-    # Show evaluation metrics if any (compact inline)
-    if hasattr(result, "evaluation_metrics") and result.evaluation_metrics:
+    # ── Header ─────────────────────────────────────────────────────────────
+    details = f"[bold {status_color}]{'━' * 48}[/bold {status_color}]\n"
+    details += f"  {status_icon} [bold {status_color}]{_escape(eval_status)}[/bold {status_color}]"
+    elapsed = meta.get("elapsed_s")
+    if elapsed is not None:
         try:
-            if (
-                isinstance(result.evaluation_metrics, dict)
-                and result.evaluation_metrics
-            ):
-                metrics_items = []
-                for key, value in list(result.evaluation_metrics.items())[:3]:
-                    metrics_items.append(
-                        f"{_escape(key)}=[cyan]{_escape(str(value)[:15])}[/]"
-                    )
-                if metrics_items:
-                    details += f"  📊 {' | '.join(metrics_items)}\n"
-        except Exception:
+            details += f"  [dim]⏱ {float(elapsed):.1f}s[/dim]"
+        except (TypeError, ValueError):
             pass
+    attack_type = meta.get("attack_type", "")
+    # Try request_payload for attack_type
+    if not attack_type:
+        rp = getattr(result, "request_payload", None) or {}
+        if isinstance(rp, dict):
+            attack_type = rp.get("attack_type", "")
+    if attack_type:
+        details += f"  [dim]via {_escape(attack_type.upper())}[/dim]"
+    details += "\n"
+    details += f"[bold {status_color}]{'━' * 48}[/bold {status_color}]\n\n"
 
-    # Show request payload if available (collapsible-style)
-    if hasattr(result, "request_payload") and result.request_payload:
-        details += "\n[bold cyan]📤 Request[/bold cyan]\n"
-        details += _format_request_payload(result.request_payload)
+    # ── Goal ────────────────────────────────────────────────────────────────
+    goal_text = getattr(result, "goal", None) or meta.get("goal", "")
+    goal_index = getattr(result, "goal_index", None)
+    if goal_text:
+        gi_str = f"[dim] #{goal_index}[/dim]" if goal_index is not None else ""
+        details += f"[bold cyan]🎯 GOAL{gi_str}[/bold cyan]\n"
+        # Word-wrap goal at 80 chars
+        words, line, wrapped = goal_text.split(), "", []
+        for w in words:
+            if len(line) + len(w) + 1 > 78:
+                wrapped.append(line)
+                line = w
+            else:
+                line = (line + " " + w).strip()
+        if line:
+            wrapped.append(line)
+        for ln in wrapped:
+            details += f"  [yellow]{_escape(ln)}[/yellow]\n"
+        details += "\n"
 
-    # Show response body if available
-    if hasattr(result, "response_body") and result.response_body:
-        details += "\n[bold green]📥 Response[/bold green]\n"
-        details += _format_response_body(result.response_body)
+    # ── Attack configuration ────────────────────────────────────────────────
+    config_keys = [
+        "flip_mode",
+        "cot",
+        "lang_gpt",
+        "few_shot",
+        "judge",
+        "num_results",
+        "best_score",
+        "success",
+        "total_traces",
+    ]
+    cfg_items = {k: meta[k] for k in config_keys if k in meta}
+    if cfg_items:
+        details += "[bold bright_yellow]⚙️  ATTACK CONFIG[/bold bright_yellow]\n"
+        row_parts = []
+        labels = {
+            "flip_mode": "Mode",
+            "cot": "CoT",
+            "lang_gpt": "LangGPT",
+            "few_shot": "FewShot",
+            "judge": "Judge",
+            "num_results": "Attempts",
+            "best_score": "Best",
+            "success": "Jailbreak",
+            "total_traces": "Traces",
+        }
+        for k, v in cfg_items.items():
+            label = labels.get(k, k)
+            if isinstance(v, bool):
+                val_s = "[bright_green]✓[/bright_green]" if v else "[dim]✗[/dim]"
+            elif isinstance(v, float):
+                val_s = f"[bright_cyan]{v:.2f}[/bright_cyan]"
+            elif isinstance(v, str):
+                val_s = f"[bright_white]{_escape(v)}[/bright_white]"
+            else:
+                val_s = f"[bright_cyan]{v}[/bright_cyan]"
+            row_parts.append(f"[dim]{label}:[/dim] {val_s}")
+        # 2-column layout
+        for i in range(0, len(row_parts), 2):
+            left = row_parts[i]
+            right = row_parts[i + 1] if i + 1 < len(row_parts) else ""
+            details += f"  {left:<50}{right}\n"
+        details += "\n"
 
-    # Show traces for this result
-    if hasattr(result, "traces") and result.traces:
-        # Sort traces by sequence number
+    # ── Evaluation notes ────────────────────────────────────────────────────
+    notes = getattr(result, "evaluation_notes", None)
+    if notes:
+        details += f"[bold magenta]💬 NOTES[/bold magenta]\n  [italic dim]{_escape(notes[:200])}[/italic dim]\n\n"
+
+    # ── Traces ──────────────────────────────────────────────────────────────
+    _raw_traces = (
+        (result.traces if hasattr(result, "traces") and result.traces else None)
+        or traces
+        or []
+    )
+    if _raw_traces:
         sorted_traces = sorted(
-            result.traces,
+            _raw_traces,
             key=lambda t: t.sequence if hasattr(t, "sequence") else 0,
         )
-
         total_traces = len(sorted_traces)
         display_traces = sorted_traces[:max_traces]
 
-        details += f"\n[bold magenta]🔍 Execution Traces[/bold magenta] [dim]({total_traces} steps)[/dim]\n"
+        details += f"[bold magenta]🔍 EXECUTION TRACE[/bold magenta]  [dim]({total_traces} steps)[/dim]\n"
+        details += f"[dim]{'─' * 48}[/dim]\n"
 
-        for trace in display_traces:
-            # Get step type with proper field name
-            step_type = "OTHER"
-            step_icon = "📋"
-            step_color = "cyan"
+        for i, trace in enumerate(display_traces, 1):
+            step_type = str(getattr(trace, "step_type", "OTHER"))
+            if hasattr(getattr(trace, "step_type", None), "value"):
+                step_type = trace.step_type.value
+            content = getattr(trace, "content", {}) or {}
+            seq = getattr(trace, "sequence", i)
 
-            if hasattr(trace, "step_type"):
-                step_val = trace.step_type
-                step_type = (
-                    step_val.value if hasattr(step_val, "value") else str(step_val)
-                )
-
-                # Assign icons and colors based on step type
-                if step_type == "TOOL_CALL":
-                    step_icon = "🔧"
-                    step_color = "green"
-                elif step_type == "TOOL_RESPONSE":
-                    step_icon = "📥"
-                    step_color = "cyan"
-                elif step_type == "AGENT_THOUGHT":
-                    step_icon = "🧠"
-                    step_color = "magenta"
-                elif step_type == "AGENT_RESPONSE_CHUNK":
-                    step_icon = "💬"
-                    step_color = "white"
-                elif step_type == "MCP_STEP":
-                    step_icon = "🔗"
-                    step_color = "yellow"
-                elif step_type == "A2A_COMM":
-                    step_icon = "🤝"
-                    step_color = "yellow"
-
-            # Get sequence number
-            seq = trace.sequence if hasattr(trace, "sequence") else "?"
-
-            # Get timestamp - compact format
-            trace_time = ""
-            if hasattr(trace, "timestamp"):
+            ts = getattr(trace, "timestamp", None) or getattr(trace, "created_at", None)
+            ts_str = ""
+            if ts:
                 try:
-                    if isinstance(trace.timestamp, datetime):
-                        trace_time = trace.timestamp.strftime("%H:%M:%S")
-                    else:
-                        dt = datetime.fromisoformat(
-                            str(trace.timestamp).replace("Z", "+00:00")
-                        )
-                        trace_time = dt.strftime("%H:%M:%S")
+                    _dt = (
+                        ts
+                        if isinstance(ts, datetime)
+                        else datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+                    )
+                    ts_str = f"[dim] {_dt.strftime('%H:%M:%S')}[/dim]"
                 except Exception:
-                    trace_time = str(trace.timestamp)[:8]
+                    pass
 
-            # Format the trace header - more compact
-            time_str = f" [dim]{trace_time}[/dim]" if trace_time else ""
-            details += f"\n[{step_color}]┌[/] [{step_color}]{step_icon} Step {seq}[/] [bold]{_escape(step_type)}[/]{time_str}\n"
+            details += _format_trace_block(i, seq, step_type, content, ts_str)
 
-            # Get and format content using the helper function
-            if hasattr(trace, "content") and trace.content:
-                details += _format_trace_content(trace.content, step_type, step_color)
-
-            details += f"[{step_color}]└{'─' * 35}[/]\n"
-
-        # Show message if traces were truncated
         if total_traces > max_traces:
-            details += f"\n[dim]... {total_traces - max_traces} more traces (export for full details)[/dim]\n"
+            details += f"\n[dim]  … {total_traces - max_traces} more steps (use export for full trace)[/dim]\n"
+    else:
+        details += "[dim]  No execution traces recorded.[/dim]\n"
 
     return details
 
 
-class ResultsTab(Container):
+class ResultsTab(BaseTab):
     """Results tab for viewing attack results with split view."""
 
     DEFAULT_CSS = """
@@ -1021,8 +1176,7 @@ class ResultsTab(Container):
         Args:
             cli_config: CLI configuration object
         """
-        super().__init__()
-        self.cli_config = cli_config
+        super().__init__(cli_config)
         self.results_data: list[Any] = []
         self.selected_result: Any = None
         self._detail_page: int = 0  # Current page for result details pagination
@@ -1032,6 +1186,12 @@ class ResultsTab(Container):
         self._total_count: int = (
             0  # Total number of runs from API (for correct numbering)
         )
+        # Local-mode enrichment caches (populated in refresh_data)
+        self._agent_map: dict[str, str] = {}  # agent_id str -> agent name
+        self._attack_map: dict[str, str] = {}  # attack_id str -> attack type
+        self._result_counts: dict[
+            str, tuple
+        ] = {}  # run_id str -> (success, fail, total)
 
     def compose(self) -> ComposeResult:
         """Compose the results layout with horizontal split."""
@@ -1092,7 +1252,7 @@ class ResultsTab(Container):
         try:
             table = self.query_one("#results-table", DataTable)
             table.clear(columns=True)
-            table.add_columns("#", "⚡", "Agent", "✅/❌", "Created")
+            table.add_columns("#", "⚡", "Agent", "Attack", "✅/❌", "Created")
         except Exception as e:
             self.app.notify(f"Failed to initialize table: {str(e)}", severity="error")
 
@@ -1103,18 +1263,8 @@ class ResultsTab(Container):
         except Exception:
             pass
 
-        # Initial load - call refresh_data directly to populate initial state
-        try:
-            self.refresh_data()
-        except Exception as e:
-            # If initial load fails, show error
-            try:
-                header_widget = self.query_one("#run-header-static", Static)
-                header_widget.update(
-                    f"[red]Failed to load data: {_escape(str(e))}[/red]\n\n[dim]Press 🔄 Refresh button or F5 to retry[/dim]"
-                )
-            except Exception:
-                pass
+        # Do not fetch on mount; BaseTab.on_show will lazily trigger first refresh.
+        # This prevents hidden tab network calls from delaying TUI startup.
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button press events."""
@@ -1164,9 +1314,6 @@ class ResultsTab(Container):
     def refresh_data(self) -> None:
         """Refresh results data from API."""
         try:
-            from hackagent.api.run import run_list
-            from hackagent.client import AuthenticatedClient
-
             # Get filter values
             status_sel = self.query_one("#status-filter", Select).value
             limit_sel = self.query_one("#limit-select", Select).value
@@ -1180,63 +1327,87 @@ class ResultsTab(Container):
                 except (ValueError, TypeError):
                     limit = 25
 
-            # Validate configuration
-            if not self.cli_config.api_key:
-                self._show_empty_state("API key not configured")
-                return
+            # Validate configuration — works in local mode too
+            pass
 
-            import httpx
+            backend = self.create_backend()
 
-            client = AuthenticatedClient(
-                base_url=self.cli_config.base_url,
-                token=self.cli_config.api_key,
-                prefix="Bearer",
-                timeout=httpx.Timeout(5.0, connect=5.0),  # 5 second timeout
-            )
+            # Fetch runs via backend
+            runs_result = backend.list_runs(page=1, page_size=limit)
+            all_runs = runs_result.items
 
-            # Build query parameters with status filter if not "all"
-            kwargs = {"client": client, "page_size": limit}
+            # Build agent name cache (for local RunRecord which only has agent_id)
+            self._agent_map.clear()
+            try:
+                agents_result = backend.list_agents(page=1, page_size=500)
+                for ag in agents_result.items:
+                    self._agent_map[str(ag.id)] = ag.name
+            except Exception:
+                pass
+
+            # Build attack type cache for showing human-readable attack names
+            self._attack_map.clear()
+            try:
+                attacks_result = backend.list_attacks(page=1, page_size=500)
+                for attack in attacks_result.items:
+                    self._attack_map[str(attack.id)] = str(attack.type)
+            except Exception:
+                pass
+
+            # Build result-count cache for runs that don't carry nested results
+            self._result_counts.clear()
+            for run in all_runs:
+                if not hasattr(run, "results") or run.results is None:
+                    try:
+                        from uuid import UUID as _UUID
+
+                        rid = (
+                            run.id if isinstance(run.id, _UUID) else _UUID(str(run.id))
+                        )
+                        res_page = backend.list_results(
+                            run_id=rid, page=1, page_size=500
+                        )
+                        success = sum(
+                            1
+                            for r in res_page.items
+                            if "SUCCESSFUL"
+                            in str(getattr(r, "evaluation_status", "")).upper()
+                            and "JAILBREAK"
+                            in str(getattr(r, "evaluation_status", "")).upper()
+                        )
+                        fail = sum(
+                            1
+                            for r in res_page.items
+                            if "FAILED"
+                            in str(getattr(r, "evaluation_status", "")).upper()
+                            and "JAILBREAK"
+                            in str(getattr(r, "evaluation_status", "")).upper()
+                        )
+                        self._result_counts[str(run.id)] = (
+                            success,
+                            fail,
+                            len(res_page.items),
+                        )
+                    except Exception:
+                        self._result_counts[str(run.id)] = (0, 0, 0)
+
+            # Filter by status if requested
             if status_filter and status_filter != "all":
-                # Map filter values to API enum
-                from hackagent.api.models import StatusEnum
+                all_runs = [
+                    r
+                    for r in all_runs
+                    if str(r.status).upper() == status_filter.upper()
+                ]
 
-                status_map = {
-                    "pending": StatusEnum.PENDING,
-                    "running": StatusEnum.RUNNING,
-                    "completed": StatusEnum.COMPLETED,
-                    "failed": StatusEnum.FAILED,
-                }
-                if status_filter.lower() in status_map:
-                    kwargs["status"] = status_map[status_filter.lower()]
+            self.results_data = all_runs if all_runs else []
+            self._total_count = len(self.results_data)
 
-            response = run_list.sync_detailed(**kwargs)
-
-            if response.status_code == 200 and response.parsed:
-                # Get all runs - these contain agent_name, attack info, etc.
-                all_runs = response.parsed.results if response.parsed.results else []
-
-                self.results_data = all_runs if all_runs else []
-                # Store total count for correct run numbering
-                self._total_count = (
-                    response.parsed.count
-                    if response.parsed.count
-                    else len(self.results_data)
-                )
-
-                if not self.results_data:
-                    self._show_empty_state(
-                        "No runs found. Execute an attack to see results here."
-                    )
-                else:
-                    self._update_table()
-            elif response.status_code == 401:
-                self._show_empty_state("Authentication failed")
-            elif response.status_code == 403:
-                self._show_empty_state("Access forbidden")
-            else:
+            if not self.results_data:
                 self._show_empty_state(
-                    f"Failed to fetch results: {response.status_code}"
+                    "No runs found. Execute an attack to see results here."
                 )
+            else:
+                self._update_table()
 
         except Exception as e:
             error_type = type(e).__name__
@@ -1288,29 +1459,16 @@ class ResultsTab(Container):
 
             # Sort runs by timestamp (oldest first) to assign stable numbers
             def get_timestamp(run):
-                if hasattr(run, "timestamp") and run.timestamp:
-                    if isinstance(run.timestamp, datetime):
-                        return run.timestamp
-                    try:
-                        return datetime.fromisoformat(
-                            str(run.timestamp).replace("Z", "+00:00")
-                        )
-                    except Exception:
-                        pass
-                return datetime.min
+                # Support both API response objects (timestamp) and RunRecord (created_at)
+                ts = getattr(run, "timestamp", None) or getattr(run, "created_at", None)
+                dt = _coerce_datetime(ts)
+                if dt is not None:
+                    return dt
+                return datetime.min.replace(tzinfo=dt_module.timezone.utc)
 
-            sorted_runs = sorted(self.results_data, key=get_timestamp)
-
-            # Calculate the starting number based on total count and displayed results
-            # If we have 50 total runs and display 10, the oldest displayed run should be #41
-            # The newest displayed run should be #50
-            num_displayed = len(sorted_runs)
-            start_number = self._total_count - num_displayed + 1
-
-            # Create list of (run, stable_number) pairs, then reverse for display
-            # so newest appears on top but oldest still has its correct global number
-            numbered_runs = list(enumerate(sorted_runs, start=start_number))
-            numbered_runs.reverse()  # Newest on top, oldest at bottom
+            # Newest first; #1 is the most recent run by request.
+            sorted_runs = sorted(self.results_data, key=get_timestamp, reverse=True)
+            numbered_runs = list(enumerate(sorted_runs, start=1))
 
             for idx, run in numbered_runs:
                 # Get status with color coding from Run.status
@@ -1335,51 +1493,65 @@ class ResultsTab(Container):
                     else:
                         status_display = "[dim]❓[/dim]"
 
-                # Get agent name - directly available in Run model
-                agent_name = run.agent_name if hasattr(run, "agent_name") else "Unknown"
-                # Truncate long agent names
+                # Get agent name — remote Run has agent_name, local RunRecord only has agent_id
+                if hasattr(run, "agent_name") and run.agent_name:
+                    agent_name = run.agent_name
+                elif hasattr(run, "agent_id"):
+                    agent_name = self._agent_map.get(
+                        str(run.agent_id), str(run.agent_id)[:8] + "..."
+                    )
+                else:
+                    agent_name = "Unknown"
                 if len(agent_name) > 20:
                     agent_name = agent_name[:17] + "..."
 
-                # Get created time from timestamp - show relative or compact time
-                created_time = "N/A"
-                if hasattr(run, "timestamp") and run.timestamp:
-                    try:
-                        dt = (
-                            run.timestamp
-                            if isinstance(run.timestamp, datetime)
-                            else datetime.fromisoformat(
-                                str(run.timestamp).replace("Z", "+00:00")
-                            )
-                        )
-                        # Show more compact date
-                        created_time = dt.strftime("%m/%d %H:%M")
-                    except Exception:
-                        created_time = str(run.timestamp)[:10]
+                # Resolve attack name/type
+                attack_name = "Unknown"
+                run_cfg = getattr(run, "run_config", None)
+                if isinstance(run_cfg, dict):
+                    attack_name = str(
+                        run_cfg.get("attack_type") or run_cfg.get("type") or attack_name
+                    )
 
-                # Calculate success/failure ratio from results
-                success_count = 0
-                fail_count = 0
-                total_results = 0
+                attack_ref = getattr(run, "attack", None) or getattr(
+                    run, "attack_id", None
+                )
+                if attack_ref:
+                    attack_name = self._attack_map.get(str(attack_ref), attack_name)
+
+                if len(attack_name) > 16:
+                    attack_name = attack_name[:13] + "..."
+
+                # Get created time — remote uses timestamp, local uses created_at
+                created_time = "N/A"
+                ts = getattr(run, "timestamp", None) or getattr(run, "created_at", None)
+                if ts:
+                    created_time = _format_local_datetime(
+                        ts, fmt="%m/%d %H:%M", fallback=str(ts)[:10]
+                    )
+
+                # Calculate success/failure ratio — prefer nested results, fall back to cache
                 if hasattr(run, "results") and run.results:
                     total_results = len(run.results)
-                    for result in run.results:
-                        if hasattr(result, "evaluation_status"):
-                            eval_status = (
-                                result.evaluation_status.value
-                                if hasattr(result.evaluation_status, "value")
-                                else str(result.evaluation_status)
-                            )
-                            if (
-                                "SUCCESSFUL" in eval_status.upper()
-                                and "JAILBREAK" in eval_status.upper()
-                            ):
-                                success_count += 1
-                            elif (
-                                "FAILED" in eval_status.upper()
-                                and "JAILBREAK" in eval_status.upper()
-                            ):
-                                fail_count += 1
+                    success_count = sum(
+                        1
+                        for r in run.results
+                        if "SUCCESSFUL"
+                        in str(getattr(r, "evaluation_status", "")).upper()
+                        and "JAILBREAK"
+                        in str(getattr(r, "evaluation_status", "")).upper()
+                    )
+                    fail_count = sum(
+                        1
+                        for r in run.results
+                        if "FAILED" in str(getattr(r, "evaluation_status", "")).upper()
+                        and "JAILBREAK"
+                        in str(getattr(r, "evaluation_status", "")).upper()
+                    )
+                else:
+                    success_count, fail_count, total_results = self._result_counts.get(
+                        str(run.id), (0, 0, 0)
+                    )
 
                 # Format results as success/fail ratio with colors
                 if total_results > 0:
@@ -1401,36 +1573,39 @@ class ResultsTab(Container):
                     str(idx),
                     status_display,
                     _escape(agent_name),
+                    _escape(attack_name),
                     results_display,
                     created_time,
                     key=run_id_str,
                 )
 
-            # Calculate overall statistics
+            # Calculate overall statistics — use cached counts for local RunRecords
             total_success = 0
             total_failed = 0
             total_pending = 0
             for run in self.results_data:
                 if hasattr(run, "results") and run.results:
                     for result in run.results:
-                        if hasattr(result, "evaluation_status"):
-                            eval_status = (
-                                result.evaluation_status.value
-                                if hasattr(result.evaluation_status, "value")
-                                else str(result.evaluation_status)
-                            )
-                            if (
-                                "SUCCESSFUL" in eval_status.upper()
-                                and "JAILBREAK" in eval_status.upper()
-                            ):
-                                total_success += 1
-                            elif (
-                                "FAILED" in eval_status.upper()
-                                and "JAILBREAK" in eval_status.upper()
-                            ):
-                                total_failed += 1
-                            else:
-                                total_pending += 1
+                        eval_status = str(getattr(result, "evaluation_status", ""))
+                        if hasattr(getattr(result, "evaluation_status", None), "value"):
+                            eval_status = result.evaluation_status.value
+                        if (
+                            "SUCCESSFUL" in eval_status.upper()
+                            and "JAILBREAK" in eval_status.upper()
+                        ):
+                            total_success += 1
+                        elif (
+                            "FAILED" in eval_status.upper()
+                            and "JAILBREAK" in eval_status.upper()
+                        ):
+                            total_failed += 1
+                        else:
+                            total_pending += 1
+                else:
+                    s, f, t = self._result_counts.get(str(run.id), (0, 0, 0))
+                    total_success += s
+                    total_failed += f
+                    total_pending += max(0, t - s - f)
 
             total_results = total_success + total_failed + total_pending
             success_rate = (
@@ -1574,41 +1749,54 @@ class ResultsTab(Container):
         header_widget.update("[cyan]⏳ Loading run details...[/cyan]")
         results_container.remove_children()
 
-        # Fetch full run details from API including all results and traces
+        # Fetch full run details via backend
         try:
-            import httpx
+            from uuid import UUID
 
-            from hackagent.api.run import run_retrieve
-            from hackagent.client import AuthenticatedClient
-
-            client = AuthenticatedClient(
-                base_url=self.cli_config.base_url,
-                token=self.cli_config.api_key,
-                prefix="Bearer",
-                timeout=httpx.Timeout(10.0, connect=10.0),
-            )
-
+            backend = self.create_backend()
             run_id = run.id if isinstance(run.id, UUID) else UUID(str(run.id))
-            response = run_retrieve.sync_detailed(client=client, id=run_id)
-
-            if response.status_code == 200 and response.parsed:
-                run = response.parsed
+            run = backend.get_run(run_id)
         except Exception as e:
             header_widget.update(
                 f"[yellow]⚠️ Could not fetch full details: {_escape(str(e))}[/yellow]\n\n[dim]Showing cached data...[/dim]"
             )
             return
 
-        # Format creation date
+        # Format creation date — remote uses timestamp, local uses created_at
         created = "Unknown"
-        if hasattr(run, "timestamp") and run.timestamp:
+        ts = getattr(run, "timestamp", None) or getattr(run, "created_at", None)
+        if ts:
+            created = _format_local_datetime(
+                ts, fmt="%Y-%m-%d %H:%M:%S", fallback=str(ts)
+            )
+
+        # Resolve agent name — remote has agent_name, local has agent_id
+        if hasattr(run, "agent_name") and run.agent_name:
+            agent_display = run.agent_name
+        elif hasattr(run, "agent_id"):
+            agent_display = self._agent_map.get(
+                str(run.agent_id), str(run.agent_id)[:8] + "..."
+            )
+        else:
+            agent_display = "Unknown"
+
+        # Resolve organisation name — local mode is always "Local"
+        org_display = getattr(run, "organization_name", None) or "Local"
+
+        # Fetch results for this run when they are not embedded (local RunRecord)
+        run_results: list[Any] = []
+        if hasattr(run, "results") and run.results:
+            run_results = list(run.results)
+        else:
             try:
-                if isinstance(run.timestamp, datetime):
-                    created = run.timestamp.strftime("%Y-%m-%d %H:%M:%S")
-                else:
-                    created = str(run.timestamp)
-            except (AttributeError, ValueError, TypeError):
-                created = str(run.timestamp)
+                from uuid import UUID as _UUID
+
+                _rid = run.id if isinstance(run.id, _UUID) else _UUID(str(run.id))
+                _backend = self.create_backend()
+                _res_page = _backend.list_results(run_id=_rid, page=1, page_size=500)
+                run_results = list(_res_page.items)
+            except Exception:
+                pass
 
         # Get status from Run
         status_display = "Unknown"
@@ -1636,9 +1824,7 @@ class ResultsTab(Container):
             status_icon = "⏳"
 
         # Get results count and evaluation summary
-        results_count = (
-            len(run.results) if hasattr(run, "results") and run.results else 0
-        )
+        results_count = len(run_results)
 
         # Count evaluation statuses
         eval_summary = {
@@ -1648,30 +1834,29 @@ class ResultsTab(Container):
             "ERROR": 0,
             "OTHER": 0,
         }
-        if hasattr(run, "results") and run.results:
-            for result in run.results:
-                if hasattr(result, "evaluation_status"):
-                    eval_status = (
-                        result.evaluation_status.value
-                        if hasattr(result.evaluation_status, "value")
-                        else str(result.evaluation_status)
-                    )
-                    if (
-                        "SUCCESSFUL" in eval_status.upper()
-                        and "JAILBREAK" in eval_status.upper()
-                    ):
-                        eval_summary["SUCCESSFUL_JAILBREAK"] += 1
-                    elif (
-                        "FAILED" in eval_status.upper()
-                        and "JAILBREAK" in eval_status.upper()
-                    ):
-                        eval_summary["FAILED_JAILBREAK"] += 1
-                    elif "NOT_EVALUATED" in eval_status.upper():
-                        eval_summary["NOT_EVALUATED"] += 1
-                    elif "ERROR" in eval_status.upper():
-                        eval_summary["ERROR"] += 1
-                    else:
-                        eval_summary["OTHER"] += 1
+        for result in run_results:
+            if hasattr(result, "evaluation_status"):
+                eval_status = (
+                    result.evaluation_status.value
+                    if hasattr(result.evaluation_status, "value")
+                    else str(result.evaluation_status)
+                )
+                if (
+                    "SUCCESSFUL" in eval_status.upper()
+                    and "JAILBREAK" in eval_status.upper()
+                ):
+                    eval_summary["SUCCESSFUL_JAILBREAK"] += 1
+                elif (
+                    "FAILED" in eval_status.upper()
+                    and "JAILBREAK" in eval_status.upper()
+                ):
+                    eval_summary["FAILED_JAILBREAK"] += 1
+                elif "NOT_EVALUATED" in eval_status.upper():
+                    eval_summary["NOT_EVALUATED"] += 1
+                elif "ERROR" in eval_status.upper():
+                    eval_summary["ERROR"] += 1
+                else:
+                    eval_summary["OTHER"] += 1
 
         # Build run header with visual progress bar
         total_evaluated = (
@@ -1707,8 +1892,8 @@ class ResultsTab(Container):
 
 [bold bright_cyan]▌ Overview[/bold bright_cyan]
   🆔 [bold]ID:[/bold]     [dim]{str(run.id)[:8]}...[/dim]
-  🤖 [bold]Agent:[/bold]  [bright_cyan]{_escape(run.agent_name)}[/bright_cyan]
-  🏢 [bold]Org:[/bold]    [bright_cyan]{_escape(run.organization_name)}[/bright_cyan]
+  🤖 [bold]Agent:[/bold]  [bright_cyan]{_escape(agent_display)}[/bright_cyan]
+  🏢 [bold]Org:[/bold]    [bright_cyan]{_escape(org_display)}[/bright_cyan]
   📅 [bold]Time:[/bold]   {_escape(created)}
   {status_icon} [bold]Status:[/bold] [bright_{status_color}]{_escape(status_display)}[/bright_{status_color}]
 
@@ -1742,7 +1927,7 @@ class ResultsTab(Container):
         # Clear and rebuild results container with collapsible items
         results_container.remove_children()
 
-        if hasattr(run, "results") and run.results:
+        if run_results:
             # Add results section header - more compact
             results_container.mount(
                 Static(
@@ -1753,8 +1938,22 @@ class ResultsTab(Container):
                 )
             )
 
+            # Pre-fetch traces for all results from the backend (local mode)
+            _backend_for_traces = self.create_backend()
+            _traces_by_result: dict[str, list] = {}
+            for _r in run_results:
+                try:
+                    from uuid import UUID as _UUID2
+
+                    _rid2 = _r.id if isinstance(_r.id, _UUID2) else _UUID2(str(_r.id))
+                    _traces_by_result[str(_r.id)] = _backend_for_traces.list_traces(
+                        _rid2
+                    )
+                except Exception:
+                    _traces_by_result[str(_r.id)] = []
+
             # Create collapsible for each result
-            for idx, result in enumerate(run.results, 1):
+            for idx, result in enumerate(run_results, 1):
                 # Get status info for CSS class
                 eval_status, status_color, _ = _get_result_status_info(result)
 
@@ -1775,14 +1974,21 @@ class ResultsTab(Container):
                 else:
                     css_class += " -pending"
 
-                # Create the title summary
-                title = _format_result_summary(result, idx)
+                # Resolve traces — embedded (remote) or pre-fetched (local)
+                result_traces = _traces_by_result.get(str(result.id)) or []
+
+                # Create the title summary (show trace count in header)
+                trace_count_str = f" 🔍 {len(result_traces)}" if result_traces else ""
+                title = _format_result_summary(result, idx) + trace_count_str
 
                 # Create collapsible with full details inside
                 collapsible = Collapsible(
                     Static(
                         _format_result_full_details(
-                            result, idx, self.MAX_TRACES_PER_RESULT
+                            result,
+                            idx,
+                            self.MAX_TRACES_PER_RESULT,
+                            traces=result_traces,
                         ),
                         classes="result-details",
                     ),

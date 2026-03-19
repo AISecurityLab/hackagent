@@ -46,7 +46,7 @@ import time
 from hackagent.logger import get_logger
 from typing import Any, Callable, Dict, List, Optional
 
-from hackagent.api.models import StatusEnum
+from hackagent.server.api.models import StatusEnum
 
 from .context import TrackingContext
 from .step import StepTracker
@@ -97,7 +97,7 @@ class TrackingCoordinator:
     @classmethod
     def create(
         cls,
-        client: Any,
+        backend: Any,
         run_id: Optional[str],
         logger: Optional[logging.Logger] = None,
         attack_type: str = "unknown",
@@ -107,14 +107,8 @@ class TrackingCoordinator:
         """
         Factory method to create a fully-initialized coordinator.
 
-        Creates both StepTracker and Tracker, and optionally initializes
-        goal results. Pipeline-level traces from the StepTracker are
-        attached to the first goal's Result (set during initialize_goals),
-        so that there is exactly one Result per goal with no extra
-        synthetic parent Result.
-
         Args:
-            client: Authenticated API client (or None to disable tracking)
+            backend: StorageBackend (RemoteBackend or LocalBackend), or None to disable.
             run_id: Server-side run record ID (or None to disable)
             logger: Logger instance
             attack_type: Attack identifier (e.g., "advprefix", "pair")
@@ -128,19 +122,16 @@ class TrackingCoordinator:
 
         # Build goal Tracker
         goal_tracker = None
-        if client and run_id:
+        if backend is not None and run_id:
             goal_tracker = Tracker(
-                client=client,
+                backend=backend,
                 run_id=run_id,
                 logger=_logger,
                 attack_type=attack_type,
             )
 
-        # StepTracker has no target Result — it only updates run status.
-        # All goal-specific traces (including generation) live in the
-        # per-goal Results created by initialize_goals().
         tracking_context = TrackingContext(
-            client=client,
+            backend=backend,
             run_id=run_id,
             parent_result_id=None,
             logger=_logger,

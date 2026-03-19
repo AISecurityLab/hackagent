@@ -104,18 +104,18 @@ def init_routers(config, client, logger):
     att_cfg = dict(config.get("attacker", {}))
     att_cfg.setdefault("request_timeout", config.get("request_timeout", 120))
     att_router, att_key = create_router(
-        client=client, config=att_cfg, logger=logger, router_name="autodan-attacker"
+        backend=client, config=att_cfg, logger=logger, router_name="autodan-attacker"
     )
     sc_cfg = dict(config.get("scorer", {}))
     sc_cfg.setdefault("request_timeout", config.get("request_timeout", 120))
     sc_router, sc_key = create_router(
-        client=client, config=sc_cfg, logger=logger, router_name="autodan-scorer"
+        backend=client, config=sc_cfg, logger=logger, router_name="autodan-scorer"
     )
 
     sum_cfg = dict(config.get("summarizer", {}))
     sum_cfg.setdefault("request_timeout", config.get("request_timeout", 120))
     sum_router, sum_key = create_router(
-        client=client, config=sum_cfg, logger=logger, router_name="autodan-summarizer"
+        backend=client, config=sum_cfg, logger=logger, router_name="autodan-summarizer"
     )
     return att_router, att_key, sc_router, sc_key, sum_router, sum_key
 

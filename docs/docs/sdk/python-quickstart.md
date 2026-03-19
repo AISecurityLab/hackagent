@@ -10,12 +10,24 @@ For installation instructions, see the [Installation Guide](../getting-started/i
 
 ## SDK vs HTTP API
 
-The **HackAgent SDK** wraps the HackAgent platform's HTTP API in easy-to-use classes and methods. When you use the SDK, you're making HTTP requests to the HackAgent platform, but the SDK handles all the low-level details like authentication, request formatting, and response parsing.
+The **HackAgent SDK** supports two storage backends, selected automatically based on whether an API key is present:
 
-**Use the SDK when:**
-- You want to integrate HackAgent into applications
+| Mode | When | Storage | Network |
+|------|------|---------|--------|
+| **Local** | No API key | `~/.local/share/hackagent/hackagent.db` (SQLite) | Fully offline |
+| **Remote** | API key configured | [app.hackagent.dev](https://app.hackagent.dev) | HTTPS |
+
+Both modes offer identical interfaces — the same `HackAgent(...)` constructor and `.hack()` method work unchanged.
+
+**Use the SDK in local mode when:**
+- You want zero configuration and no account
+- You're testing privately and want results stored only on your machine
 - You prefer object-oriented interfaces over raw HTTP calls
-- You want built-in error handling and response validation
+
+**Use the SDK in remote mode when:**
+- You want cloud storage and the [app.hackagent.dev](https://app.hackagent.dev) dashboard
+- You're collaborating with a team
+- You need centralized result tracking across machines
 
 **Use the HTTP API directly when:**
 - You're working in a different programming language
@@ -37,12 +49,12 @@ from hackagent import HackAgent, AgentTypeEnum
 ```python
 from hackagent import HackAgent, AgentTypeEnum
 
-# Initialize the HackAgent client
+# No API key — HackAgent runs in local mode, results saved to
+# ~/.local/share/hackagent/hackagent.db (no network required)
 agent = HackAgent(
     name="multi_tool_agent",
     endpoint="http://localhost:8000",
     agent_type=AgentTypeEnum.GOOGLE_ADK,
-    base_url="https://api.hackagent.dev"
 )
 
 # Configure the attack
@@ -67,6 +79,22 @@ attack_config = {
 
 # Execute the attack
 results = agent.hack(attack_config=attack_config)
+```
+
+To use **remote mode** (cloud storage and dashboard), pass an API key:
+
+```python
+import os
+from hackagent import HackAgent, AgentTypeEnum
+
+agent = HackAgent(
+    name="multi_tool_agent",
+    endpoint="http://localhost:8000",
+    agent_type=AgentTypeEnum.GOOGLE_ADK,
+    # Resolve from env var, config file, or pass directly:
+    api_key=os.getenv("HACKAGENT_API_KEY"),  # optional
+    base_url=os.getenv("HACKAGENT_BASE_URL", "https://api.hackagent.dev"),
+)
 ```
 
 ### Real Example from Tests

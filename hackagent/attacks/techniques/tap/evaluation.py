@@ -4,7 +4,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
-from hackagent.client import AuthenticatedClient
+from hackagent.server.client import AuthenticatedClient
 
 
 class TapEvaluation(BaseEvaluationStep):

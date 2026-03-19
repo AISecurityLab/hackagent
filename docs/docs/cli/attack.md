@@ -47,7 +47,6 @@ hackagent attack advprefix \
 | `--judge-endpoint` | ❌ | Judge endpoint URL | `http://localhost:11434/api/generate` |
 | `--max-iterations` | ❌ | Maximum attack iterations | 10 |
 | `--temperature` | ❌ | Sampling temperature | 0.7 |
-| `--output-format` | ❌ | Output format (`table`, `json`, `csv`) | Config default |
 
 ### Examples
 
@@ -115,19 +114,20 @@ Attack results are:
 
 1. **Displayed in the terminal** — Progress and summary
 2. **Saved locally** — In `./logs/runs/` directory
-3. **Uploaded to dashboard** — View at [app.hackagent.dev](https://app.hackagent.dev)
+3. **Stored in the backend** — Depends on your configuration:
+   - **Local mode** (no API key): stored in `~/.local/share/hackagent/hackagent.db` and viewable via `hackagent results list` or the TUI
+   - **Remote mode** (API key configured): uploaded to [app.hackagent.dev](https://app.hackagent.dev) dashboard
 
 ### JSON Output
 
-For CI/CD integration, output results as JSON:
+For CI/CD integration, output attack results in machine-readable form:
 
 ```bash
 hackagent attack advprefix \
   --agent-name "target" \
   --agent-type "google-adk" \
   --endpoint "http://localhost:8000" \
-  --goals "Security test" \
-  --output-format json > results.json
+  --goals "Security test" > results.json
 ```
 
 ## CI/CD Integration
@@ -141,8 +141,7 @@ Example GitHub Actions workflow:
       --agent-name "${{ env.AGENT_NAME }}" \
       --agent-type "google-adk" \
       --endpoint "${{ env.AGENT_ENDPOINT }}" \
-      --goals "Automated security validation" \
-      --output-format json > test_results.json
+      --goals "Automated security validation" > test_results.json
 
 - name: Upload Results
   uses: actions/upload-artifact@v3

@@ -73,7 +73,8 @@ HackAgent automates testing for these vulnerabilities using **research-backed at
 
 <div style={{minWidth: '300px', maxWidth: '600px', width: '100%', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '1px solid var(--ifm-color-emphasis-300)', textAlign: 'center'}}>
   <div style={{fontSize: '1.1rem', marginBottom: '0.75rem'}}><strong>Quick Install</strong></div>
-  <code style={{padding: '0.5rem 1rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.9rem'}}>pip install hackagent && hackagent init</code>
+  <code style={{padding: '0.5rem 1rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.9rem'}}>pip install hackagent</code>
+  <div style={{marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--ifm-color-emphasis-600)'}}>No API key required — works locally out of the box</div>
 </div>
 
 <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center'}}>

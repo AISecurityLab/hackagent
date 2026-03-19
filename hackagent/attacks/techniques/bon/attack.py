@@ -36,7 +36,7 @@ import copy
 import logging
 from typing import Any, Dict, List, Optional
 
-from hackagent.client import AuthenticatedClient
+from hackagent.server.client import AuthenticatedClient
 from hackagent.router.router import AgentRouter
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.shared.tui import with_tui_logging
@@ -160,6 +160,7 @@ class BoNAttack(BaseAttack):
                     "batch_size",
                     "bon_params",
                     "_run_id",
+                    "_backend",
                     "_client",
                     "_tracker",
                     # Judge config keys — used by inline _StepJudge
@@ -181,6 +182,7 @@ class BoNAttack(BaseAttack):
                 "config_keys": [
                     "bon_params",
                     "_run_id",
+                    "_backend",
                     "_client",
                     "_tracker",
                     "judges",

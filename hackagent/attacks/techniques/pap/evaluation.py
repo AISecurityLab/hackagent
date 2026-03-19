@@ -19,7 +19,7 @@ import logging
 from typing import Any, Dict, List
 
 from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
-from hackagent.client import AuthenticatedClient
+from hackagent.server.client import AuthenticatedClient
 
 
 def _build_prompt_prefix(item: Dict[str, Any]) -> str:

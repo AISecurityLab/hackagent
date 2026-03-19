@@ -29,7 +29,6 @@ class TestCLIConfig:
             assert config.api_key is None
             assert config.base_url == "https://api.hackagent.dev"
             assert config.verbose == 1  # Default is VERBOSITY_WARNING
-            assert config.output_format == "table"
 
     def test_env_variable_loading(self):
         """Test loading from environment variables"""
@@ -39,7 +38,6 @@ class TestCLIConfig:
                 {
                     "HACKAGENT_API_KEY": "test-key",
                     "HACKAGENT_BASE_URL": "https://test.example.com",
-                    "HACKAGENT_OUTPUT_FORMAT": "json",
                 },
             ),
             patch("pathlib.Path.exists", return_value=False),
@@ -47,9 +45,7 @@ class TestCLIConfig:
             config = CLIConfig()
 
             assert config.api_key == "test-key"
-            # Note: base_url is hardcoded and doesn't load from env
-            assert config.base_url == "https://api.hackagent.dev"
-            assert config.output_format == "json"
+            assert config.base_url == "https://test.example.com"
 
     def test_config_file_loading(self):
         """Test loading from configuration file"""
@@ -57,7 +53,6 @@ class TestCLIConfig:
             config_data = {
                 "api_key": "file-key",
                 "base_url": "https://file.example.com",
-                "output_format": "csv",
             }
             json.dump(config_data, f)
             config_file = f.name
@@ -68,9 +63,7 @@ class TestCLIConfig:
                 config = CLIConfig(config_file=config_file)
 
                 assert config.api_key == "file-key"
-                # Note: base_url is hardcoded and doesn't load from config file
-                assert config.base_url == "https://api.hackagent.dev"
-                assert config.output_format == "csv"
+                assert config.base_url == "https://file.example.com"
         finally:
             Path(config_file).unlink()
 
@@ -102,10 +95,7 @@ class TestCLIConfig:
     def test_standardized_priority_config_over_env(self):
         """Test NEW behavior: Config file takes priority over environment variable"""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            config_data = {
-                "api_key": "config-file-key",
-                "output_format": "json",
-            }
+            config_data = {"api_key": "config-file-key"}
             json.dump(config_data, f)
             config_file = f.name
 
@@ -113,16 +103,12 @@ class TestCLIConfig:
             # Set environment variable that should be overridden by config file
             with patch.dict(
                 "os.environ",
-                {
-                    "HACKAGENT_API_KEY": "env-key-should-lose",
-                    "HACKAGENT_OUTPUT_FORMAT": "csv",
-                },
+                {"HACKAGENT_API_KEY": "env-key-should-lose"},
             ):
                 config = CLIConfig(config_file=config_file)
 
                 # Config file should win over environment
                 assert config.api_key == "config-file-key"
-                assert config.output_format == "json"
         finally:
             Path(config_file).unlink()
 
@@ -131,24 +117,17 @@ class TestCLIConfig:
         with patch("pathlib.Path.exists", return_value=False):
             with patch.dict(
                 "os.environ",
-                {
-                    "HACKAGENT_API_KEY": "env-fallback-key",
-                    "HACKAGENT_OUTPUT_FORMAT": "csv",
-                },
+                {"HACKAGENT_API_KEY": "env-fallback-key"},
             ):
                 config = CLIConfig()
 
                 # Environment should be used as fallback
                 assert config.api_key == "env-fallback-key"
-                assert config.output_format == "csv"
 
     def test_standardized_priority_cli_over_config_and_env(self):
         """Test CLI arguments override both config file and environment"""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            config_data = {
-                "api_key": "config-key",
-                "output_format": "json",
-            }
+            config_data = {"api_key": "config-key"}
             json.dump(config_data, f)
             config_file = f.name
 
@@ -157,25 +136,19 @@ class TestCLIConfig:
                 patch.object(CLIConfig, "_load_default_config"),
                 patch.dict(
                     "os.environ",
-                    {"HACKAGENT_API_KEY": "env-key", "HACKAGENT_OUTPUT_FORMAT": "csv"},
+                    {"HACKAGENT_API_KEY": "env-key"},
                 ),
             ):
-                config = CLIConfig(
-                    config_file=config_file, api_key="cli-wins", output_format="table"
-                )
+                config = CLIConfig(config_file=config_file, api_key="cli-wins")
 
                 # CLI should win over everything
                 assert config.api_key == "cli-wins"
-                assert config.output_format == "table"
         finally:
             Path(config_file).unlink()
 
     def test_standardized_priority_default_config_over_env(self):
         """Test default config file takes priority over environment"""
-        config_data = {
-            "api_key": "default-config-key",
-            "output_format": "json",
-        }
+        config_data = {"api_key": "default-config-key"}
 
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create a writable fake home directory inside temp_dir
@@ -191,10 +164,7 @@ class TestCLIConfig:
                 patch("pathlib.Path.home") as mock_home,
                 patch.dict(
                     "os.environ",
-                    {
-                        "HACKAGENT_API_KEY": "env-should-lose",
-                        "HACKAGENT_OUTPUT_FORMAT": "csv",
-                    },
+                    {"HACKAGENT_API_KEY": "env-should-lose"},
                 ),
             ):
                 # Mock home directory to point to our writable fake home
@@ -204,7 +174,6 @@ class TestCLIConfig:
 
                 # Default config file should win over environment
                 assert config.api_key == "default-config-key"
-                assert config.output_format == "json"
 
     def test_env_only_when_no_config_and_no_cli(self):
         """Test environment variables work when no config file or CLI args"""
@@ -212,18 +181,17 @@ class TestCLIConfig:
             patch("pathlib.Path.exists", return_value=False),
             patch.dict(
                 "os.environ",
-                {"HACKAGENT_API_KEY": "env-only-key", "HACKAGENT_OUTPUT_FORMAT": "csv"},
+                {"HACKAGENT_API_KEY": "env-only-key"},
             ),
         ):
             config = CLIConfig()
 
             assert config.api_key == "env-only-key"
-            assert config.output_format == "csv"
 
     def test_partial_config_file_with_env_fallback(self):
         """Test config file with partial settings, env provides rest"""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            # Config file only has api_key, not output_format
+            # Config file only has api_key, not base_url
             config_data = {"api_key": "config-api-key"}
             json.dump(config_data, f)
             config_file = f.name
@@ -233,15 +201,15 @@ class TestCLIConfig:
                 "os.environ",
                 {
                     "HACKAGENT_API_KEY": "env-api-key-ignored",
-                    "HACKAGENT_OUTPUT_FORMAT": "csv",
+                    "HACKAGENT_BASE_URL": "https://env.example.com",
                 },
             ):
                 config = CLIConfig(config_file=config_file)
 
                 # Config file value should be used for api_key
                 assert config.api_key == "config-api-key"
-                # Environment value should be used for output_format
-                assert config.output_format == "csv"
+                # Environment value should be used for base_url
+                assert config.base_url == "https://env.example.com"
         finally:
             Path(config_file).unlink()
 
@@ -250,19 +218,19 @@ class TestCLIConfig:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             config_data = {
                 "api_key": "config-should-not-win",
-                "output_format": "json",
+                "base_url": "https://config.example.com",
             }
             json.dump(config_data, f)
             config_file = f.name
 
         try:
-            # Set CLI argument for api_key but not output_format
+            # Set CLI argument for api_key but not base_url
             config = CLIConfig(config_file=config_file, api_key="cli-should-win")
 
             # CLI argument should be preserved
             assert config.api_key == "cli-should-win"
-            # Config file should provide output_format
-            assert config.output_format == "json"
+            # Config file should provide base_url
+            assert config.base_url == "https://config.example.com"
         finally:
             Path(config_file).unlink()
 
@@ -274,7 +242,6 @@ class TestCLIConfig:
             config = CLIConfig(
                 api_key="test-key",
                 base_url="https://test.example.com",
-                output_format="json",
             )
 
             config.save(str(config_path))
@@ -286,9 +253,7 @@ class TestCLIConfig:
                 saved_data = json.load(f)
 
             assert saved_data["api_key"] == "test-key"
-            # Note: base_url is not saved as it's always hardcoded
-            assert "base_url" not in saved_data
-            assert saved_data["output_format"] == "json"
+            assert saved_data["base_url"] == "https://test.example.com"
 
     def test_validate_success(self):
         """Test successful validation"""
@@ -298,7 +263,7 @@ class TestCLIConfig:
         config.validate()
 
     def test_validate_missing_api_key(self):
-        """Test validation failure with missing API key"""
+        """Test that validation succeeds with missing API key (local mode supported)"""
         with (
             patch("pathlib.Path.exists", return_value=False),
             patch("pathlib.Path.home", return_value=Path("/fake/home")),
@@ -306,8 +271,8 @@ class TestCLIConfig:
         ):
             config = CLIConfig(base_url="https://example.com")
 
-            with pytest.raises(ValueError, match="API key is required"):
-                config.validate()
+            # Should NOT raise — running locally without API key is valid
+            config.validate()
 
     def test_validate_missing_base_url(self):
         """Test validation failure with missing base URL"""
@@ -334,7 +299,6 @@ class TestCLIConfig:
             yaml_content = """
 api_key: yaml-key
 base_url: https://yaml.example.com
-output_format: table
 """
             f.write(yaml_content)
             config_file = f.name
@@ -351,9 +315,7 @@ output_format: table
                         config = CLIConfig(config_file=config_file)
 
                     assert config.api_key == "yaml-key"
-                    # Note: base_url is hardcoded and doesn't load from config file
-                    assert config.base_url == "https://api.hackagent.dev"
-                    assert config.output_format == "table"
+                    assert config.base_url == "https://yaml.example.com"
             except ImportError:
                 # PyYAML not available, should raise appropriate error
                 with pytest.raises(ImportError, match="PyYAML required"):
@@ -382,7 +344,6 @@ output_format: table
 
             # Should use defaults
             assert config.base_url == "https://api.hackagent.dev"
-            assert config.output_format == "table"
 
     # EDGE CASE TESTS
     def test_empty_config_file(self):
@@ -397,7 +358,6 @@ output_format: table
 
                 # Should fallback to environment
                 assert config.api_key == "env-fallback"
-                assert config.output_format == "table"  # Default
         finally:
             Path(config_file).unlink()
 
@@ -406,7 +366,6 @@ output_format: table
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             config_data = {
                 "api_key": None,
-                "output_format": "json",
             }
             json.dump(config_data, f)
             config_file = f.name
@@ -420,8 +379,6 @@ output_format: table
 
                 # Should fallback to environment for None api_key
                 assert config.api_key == "env-fallback"
-                # Should use config file value for output_format
-                assert config.output_format == "json"
         finally:
             Path(config_file).unlink()
 

@@ -17,64 +17,49 @@ from hackagent.attacks.evaluator.sync import (
 class TestUpdateSingleResult(unittest.TestCase):
     """Test update_single_result function."""
 
-    @patch("hackagent.attacks.evaluator.sync.result_partial_update")
-    def test_successful_update(self, mock_update):
+    def test_successful_update(self):
         """Test successful result update returns True."""
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_update.sync_detailed.return_value = mock_response
-
         mock_client = MagicMock()
         result = update_single_result(
             result_id="550e8400-e29b-41d4-a716-446655440000",
             success=True,
             evaluation_notes="Jailbreak detected",
-            client=mock_client,
+            backend=mock_client,
         )
 
         self.assertTrue(result)
-        mock_update.sync_detailed.assert_called_once()
+        mock_client.update_result.assert_called_once()
 
-    @patch("hackagent.attacks.evaluator.sync.result_partial_update")
-    def test_failed_update_returns_false(self, mock_update):
+    def test_failed_update_returns_false(self):
         """Test failed API call returns False."""
-        mock_response = MagicMock()
-        mock_response.status_code = 500
-        mock_response.content = b"Server error"
-        mock_update.sync_detailed.return_value = mock_response
-
         mock_client = MagicMock()
+        mock_client.update_result.side_effect = Exception("Server error")
+
         result = update_single_result(
             result_id="550e8400-e29b-41d4-a716-446655440000",
             success=False,
             evaluation_notes="Failed",
-            client=mock_client,
+            backend=mock_client,
         )
 
         self.assertFalse(result)
 
-    @patch("hackagent.attacks.evaluator.sync.result_partial_update")
-    def test_exception_returns_false(self, mock_update):
+    def test_exception_returns_false(self):
         """Test exception during update returns False."""
-        mock_update.sync_detailed.side_effect = Exception("Network error")
-
         mock_client = MagicMock()
+        mock_client.update_result.side_effect = Exception("Network error")
+
         result = update_single_result(
             result_id="550e8400-e29b-41d4-a716-446655440000",
             success=True,
             evaluation_notes="Test",
-            client=mock_client,
+            backend=mock_client,
         )
 
         self.assertFalse(result)
 
-    @patch("hackagent.attacks.evaluator.sync.result_partial_update")
-    def test_uses_custom_logger(self, mock_update):
+    def test_uses_custom_logger(self):
         """Test that custom logger is used when provided."""
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_update.sync_detailed.return_value = mock_response
-
         custom_logger = logging.getLogger("test_sync")
         mock_client = MagicMock()
 
@@ -82,56 +67,49 @@ class TestUpdateSingleResult(unittest.TestCase):
             result_id="550e8400-e29b-41d4-a716-446655440000",
             success=True,
             evaluation_notes="Test",
-            client=mock_client,
+            backend=mock_client,
             logger=custom_logger,
         )
 
         self.assertTrue(result)
 
-    @patch("hackagent.attacks.evaluator.sync.result_partial_update")
-    def test_success_true_uses_successful_jailbreak(self, mock_update):
+    def test_success_true_uses_successful_jailbreak(self):
         """Test that success=True maps to SUCCESSFUL_JAILBREAK."""
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_update.sync_detailed.return_value = mock_response
-
         mock_client = MagicMock()
         update_single_result(
             result_id="550e8400-e29b-41d4-a716-446655440000",
             success=True,
             evaluation_notes="Jailbreak",
-            client=mock_client,
+            backend=mock_client,
         )
 
-        # Check PatchedResultRequest was constructed correctly
-        call_kwargs = mock_update.sync_detailed.call_args
-        body = call_kwargs.kwargs.get("body") or call_kwargs[1].get("body")
-        from hackagent.api.models import EvaluationStatusEnum
+        from hackagent.server.api.models import EvaluationStatusEnum
 
+        call_kwargs = mock_client.update_result.call_args
+        evaluation_status = call_kwargs.kwargs.get("evaluation_status") or call_kwargs[
+            1
+        ].get("evaluation_status")
         self.assertEqual(
-            body.evaluation_status, EvaluationStatusEnum.SUCCESSFUL_JAILBREAK
+            evaluation_status, EvaluationStatusEnum.SUCCESSFUL_JAILBREAK.value
         )
 
-    @patch("hackagent.attacks.evaluator.sync.result_partial_update")
-    def test_success_false_uses_failed_jailbreak(self, mock_update):
+    def test_success_false_uses_failed_jailbreak(self):
         """Test that success=False maps to FAILED_JAILBREAK."""
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_update.sync_detailed.return_value = mock_response
-
         mock_client = MagicMock()
         update_single_result(
             result_id="550e8400-e29b-41d4-a716-446655440000",
             success=False,
             evaluation_notes="No jailbreak",
-            client=mock_client,
+            backend=mock_client,
         )
 
-        call_kwargs = mock_update.sync_detailed.call_args
-        body = call_kwargs.kwargs.get("body") or call_kwargs[1].get("body")
-        from hackagent.api.models import EvaluationStatusEnum
+        from hackagent.server.api.models import EvaluationStatusEnum
 
-        self.assertEqual(body.evaluation_status, EvaluationStatusEnum.FAILED_JAILBREAK)
+        call_kwargs = mock_client.update_result.call_args
+        evaluation_status = call_kwargs.kwargs.get("evaluation_status") or call_kwargs[
+            1
+        ].get("evaluation_status")
+        self.assertEqual(evaluation_status, EvaluationStatusEnum.FAILED_JAILBREAK.value)
 
 
 class TestEvaluateRow(unittest.TestCase):
@@ -210,7 +188,7 @@ class TestSyncEvaluationToServer(unittest.TestCase):
         """Test with no client returns 0."""
         count = sync_evaluation_to_server(
             evaluated_data=[{"result_id": "test"}],
-            client=None,
+            backend=None,
         )
         self.assertEqual(count, 0)
 
@@ -219,7 +197,7 @@ class TestSyncEvaluationToServer(unittest.TestCase):
         mock_client = MagicMock()
         count = sync_evaluation_to_server(
             evaluated_data=[{"other": "data"}],
-            client=mock_client,
+            backend=mock_client,
         )
         self.assertEqual(count, 0)
 
@@ -228,7 +206,7 @@ class TestSyncEvaluationToServer(unittest.TestCase):
         mock_client = MagicMock()
         count = sync_evaluation_to_server(
             evaluated_data=[],
-            client=mock_client,
+            backend=mock_client,
         )
         self.assertEqual(count, 0)
 
@@ -246,7 +224,7 @@ class TestSyncEvaluationToServer(unittest.TestCase):
 
         count = sync_evaluation_to_server(
             evaluated_data=evaluated_data,
-            client=mock_client,
+            backend=mock_client,
         )
 
         # Should update 2 unique result_ids
@@ -266,7 +244,7 @@ class TestSyncEvaluationToServer(unittest.TestCase):
 
         sync_evaluation_to_server(
             evaluated_data=evaluated_data,
-            client=mock_client,
+            backend=mock_client,
         )
 
         # The update call should have success=True
@@ -286,7 +264,7 @@ class TestSyncEvaluationToServer(unittest.TestCase):
 
         count = sync_evaluation_to_server(
             evaluated_data=evaluated_data,
-            client=mock_client,
+            backend=mock_client,
         )
 
         self.assertEqual(count, 1)
@@ -306,7 +284,7 @@ class TestSyncEvaluationToServer(unittest.TestCase):
 
         count = sync_evaluation_to_server(
             evaluated_data=evaluated_data,
-            client=mock_client,
+            backend=mock_client,
             judge_keys=custom_keys,
         )
 
@@ -325,7 +303,7 @@ class TestSyncEvaluationToServer(unittest.TestCase):
 
         count = sync_evaluation_to_server(
             evaluated_data=evaluated_data,
-            client=mock_client,
+            backend=mock_client,
             logger=custom_logger,
         )
 

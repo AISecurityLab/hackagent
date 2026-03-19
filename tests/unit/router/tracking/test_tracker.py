@@ -6,9 +6,9 @@
 import json
 import logging
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-from hackagent.api.models import EvaluationStatusEnum, StatusEnum
+from hackagent.server.api.models import EvaluationStatusEnum, StatusEnum
 from hackagent.router.tracking.context import TrackingContext
 from hackagent.router.tracking.step import StepTracker
 from hackagent.router.tracking.utils import sanitize_for_json
@@ -19,10 +19,10 @@ class TestStepTrackerInitialization(unittest.TestCase):
 
     def test_initialization(self):
         """Test StepTracker initialization with context."""
-        mock_client = MagicMock()
+        mock_backend = MagicMock()
         mock_logger = MagicMock(spec=logging.Logger)
         context = TrackingContext(
-            client=mock_client,
+            backend=mock_backend,
             run_id="run-123",
             parent_result_id="result-456",
             logger=mock_logger,
@@ -45,76 +45,62 @@ class TestStepTrackerTrackStep(unittest.TestCase):
         with tracker.track_step("Test Step", "TEST_STEP") as trace_id:
             self.assertIsNone(trace_id)
 
-    @patch("hackagent.router.tracking.step.result_trace_create")
-    def test_track_step_creates_trace(self, mock_trace_create):
+    def test_track_step_creates_trace(self):
         """Test track_step creates a trace when enabled."""
-        mock_client = MagicMock()
+        mock_backend = MagicMock()
         context = TrackingContext(
-            client=mock_client,
+            backend=mock_backend,
             run_id="12345678-1234-1234-1234-123456789abc",
             parent_result_id="87654321-4321-4321-4321-cba987654321",
         )
         tracker = StepTracker(context)
 
-        mock_response = MagicMock()
-        mock_response.status_code = 201
-        mock_response.parsed = MagicMock(id="trace-id-123")
-        mock_trace_create.sync_detailed.return_value = mock_response
+        mock_backend.create_trace.return_value = MagicMock(id="trace-id-123")
 
         with tracker.track_step("Test Step", "TEST_STEP") as trace_id:
             self.assertEqual(trace_id, "trace-id-123")
 
-        self.assertEqual(mock_trace_create.sync_detailed.call_count, 2)
+        self.assertEqual(mock_backend.create_trace.call_count, 2)
 
-    @patch("hackagent.router.tracking.step.result_trace_create")
-    @patch("hackagent.router.tracking.step.result_partial_update")
-    def test_track_step_handles_exception(self, mock_partial_update, mock_trace_create):
+    def test_track_step_handles_exception(self):
         """Test track_step handles exceptions and re-raises."""
-        mock_client = MagicMock()
+        mock_backend = MagicMock()
         context = TrackingContext(
-            client=mock_client,
+            backend=mock_backend,
             run_id="12345678-1234-1234-1234-123456789abc",
             parent_result_id="87654321-4321-4321-4321-cba987654321",
         )
         tracker = StepTracker(context)
 
-        mock_response = MagicMock()
-        mock_response.status_code = 201
-        mock_response.parsed = MagicMock(id="trace-id-123")
-        mock_trace_create.sync_detailed.return_value = mock_response
+        mock_backend.create_trace.return_value = MagicMock(id="trace-id-123")
 
         with self.assertRaises(ValueError):
             with tracker.track_step("Test Step", "TEST_STEP"):
                 raise ValueError("Test error")
 
         # Should have attempted to update error status
-        mock_partial_update.sync_detailed.assert_called()
-        self.assertGreaterEqual(mock_trace_create.sync_detailed.call_count, 1)
+        mock_backend.update_result.assert_called()
+        self.assertGreaterEqual(mock_backend.create_trace.call_count, 1)
 
-    @patch("hackagent.router.tracking.step.result_trace_create")
-    def test_track_step_records_metadata_and_progress(self, mock_trace_create):
+    def test_track_step_records_metadata_and_progress(self):
         """Test that step metadata/progress logs are recorded in summary trace."""
-        mock_client = MagicMock()
+        mock_backend = MagicMock()
         context = TrackingContext(
-            client=mock_client,
+            backend=mock_backend,
             run_id="12345678-1234-1234-1234-123456789abc",
             parent_result_id="87654321-4321-4321-4321-cba987654321",
         )
         tracker = StepTracker(context)
 
-        mock_response = MagicMock()
-        mock_response.status_code = 201
-        mock_response.parsed = MagicMock(id="trace-id-123")
-        mock_trace_create.sync_detailed.return_value = mock_response
+        mock_backend.create_trace.return_value = MagicMock(id="trace-id-123")
 
         with tracker.track_step("Test Step", "TEST_STEP"):
             tracker.add_step_metadata("items_processed", 5)
             tracker.record_progress("Batch 1", items=5)
 
-        self.assertEqual(mock_trace_create.sync_detailed.call_count, 2)
-        summary_call = mock_trace_create.sync_detailed.call_args_list[1]
-        trace_request = summary_call.kwargs["body"]
-        summary_content = trace_request.content
+        self.assertEqual(mock_backend.create_trace.call_count, 2)
+        summary_call = mock_backend.create_trace.call_args_list[1]
+        summary_content = summary_call.kwargs["content"]
 
         self.assertIn("step_metadata", summary_content)
         self.assertIn("progress_log", summary_content)
@@ -187,31 +173,25 @@ class TestStepTrackerUpdateRunStatus(unittest.TestCase):
 
         self.assertFalse(result)
 
-    @patch("hackagent.router.tracking.step.run_partial_update")
-    def test_update_run_status_success(self, mock_run_update):
+    def test_update_run_status_success(self):
         """Test successful run status update."""
-        mock_client = MagicMock()
+        mock_backend = MagicMock()
         context = TrackingContext(
-            client=mock_client,
+            backend=mock_backend,
             run_id="12345678-1234-1234-1234-123456789abc",
         )
         tracker = StepTracker(context)
 
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_run_update.sync_detailed.return_value = mock_response
-
         result = tracker.update_run_status(StatusEnum.COMPLETED)
 
         self.assertTrue(result)
-        mock_run_update.sync_detailed.assert_called_once()
+        mock_backend.update_run.assert_called_once()
 
-    @patch("hackagent.router.tracking.step.run_partial_update")
-    def test_update_run_status_invalid_uuid(self, mock_run_update):
+    def test_update_run_status_invalid_uuid(self):
         """Test update_run_status handles invalid UUID."""
-        mock_client = MagicMock()
+        mock_backend = MagicMock()
         context = TrackingContext(
-            client=mock_client,
+            backend=mock_backend,
             run_id="invalid-uuid",
         )
         tracker = StepTracker(context)
@@ -219,22 +199,18 @@ class TestStepTrackerUpdateRunStatus(unittest.TestCase):
         result = tracker.update_run_status(StatusEnum.COMPLETED)
 
         self.assertFalse(result)
-        mock_run_update.sync_detailed.assert_not_called()
+        mock_backend.update_run.assert_not_called()
 
-    @patch("hackagent.router.tracking.step.run_partial_update")
-    def test_update_run_status_api_failure(self, mock_run_update):
+    def test_update_run_status_api_failure(self):
         """Test update_run_status handles API failures."""
-        mock_client = MagicMock()
+        mock_backend = MagicMock()
         context = TrackingContext(
-            client=mock_client,
+            backend=mock_backend,
             run_id="12345678-1234-1234-1234-123456789abc",
         )
         tracker = StepTracker(context)
 
-        mock_response = MagicMock()
-        mock_response.status_code = 500
-        mock_response.content = b"Server error"
-        mock_run_update.sync_detailed.return_value = mock_response
+        mock_backend.update_run.side_effect = Exception("Server error")
 
         result = tracker.update_run_status(StatusEnum.COMPLETED)
 
@@ -253,20 +229,15 @@ class TestStepTrackerUpdateResultStatus(unittest.TestCase):
 
         self.assertFalse(result)
 
-    @patch("hackagent.router.tracking.step.result_partial_update")
-    def test_update_result_status_success(self, mock_result_update):
+    def test_update_result_status_success(self):
         """Test successful result status update."""
-        mock_client = MagicMock()
+        mock_backend = MagicMock()
         context = TrackingContext(
-            client=mock_client,
+            backend=mock_backend,
             run_id="12345678-1234-1234-1234-123456789abc",
             parent_result_id="87654321-4321-4321-4321-cba987654321",
         )
         tracker = StepTracker(context)
-
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_result_update.sync_detailed.return_value = mock_response
 
         result = tracker.update_result_status(
             EvaluationStatusEnum.PASSED_CRITERIA,
@@ -275,14 +246,13 @@ class TestStepTrackerUpdateResultStatus(unittest.TestCase):
         )
 
         self.assertTrue(result)
-        mock_result_update.sync_detailed.assert_called_once()
+        mock_backend.update_result.assert_called_once()
 
-    @patch("hackagent.router.tracking.step.result_partial_update")
-    def test_update_result_status_invalid_uuid(self, mock_result_update):
+    def test_update_result_status_invalid_uuid(self):
         """Test update_result_status handles invalid UUID."""
-        mock_client = MagicMock()
+        mock_backend = MagicMock()
         context = TrackingContext(
-            client=mock_client,
+            backend=mock_backend,
             run_id="12345678-1234-1234-1234-123456789abc",
             parent_result_id="invalid-uuid",
         )
@@ -291,7 +261,7 @@ class TestStepTrackerUpdateResultStatus(unittest.TestCase):
         result = tracker.update_result_status(EvaluationStatusEnum.PASSED_CRITERIA)
 
         self.assertFalse(result)
-        mock_result_update.sync_detailed.assert_not_called()
+        mock_backend.update_result.assert_not_called()
 
 
 class TestStepTrackerMetadataHelpers(unittest.TestCase):
@@ -391,12 +361,11 @@ class TestStepTrackerHandleStepError(unittest.TestCase):
         # Should not raise
         tracker._handle_step_error("Test Step", "Test error")
 
-    @patch("hackagent.router.tracking.step.result_partial_update")
-    def test_handle_step_error_updates_result(self, mock_partial_update):
+    def test_handle_step_error_updates_result(self):
         """Test _handle_step_error updates result status."""
-        mock_client = MagicMock()
+        mock_backend = MagicMock()
         context = TrackingContext(
-            client=mock_client,
+            backend=mock_backend,
             run_id="12345678-1234-1234-1234-123456789abc",
             parent_result_id="87654321-4321-4321-4321-cba987654321",
         )
@@ -404,14 +373,14 @@ class TestStepTrackerHandleStepError(unittest.TestCase):
 
         tracker._handle_step_error("Test Step", "Something went wrong")
 
-        mock_partial_update.sync_detailed.assert_called_once()
-        call_args = mock_partial_update.sync_detailed.call_args
-        body = call_args.kwargs["body"]
+        mock_backend.update_result.assert_called_once()
+        call_args = mock_backend.update_result.call_args
         self.assertEqual(
-            body.evaluation_status, EvaluationStatusEnum.ERROR_TEST_FRAMEWORK
+            call_args.kwargs["evaluation_status"],
+            EvaluationStatusEnum.ERROR_TEST_FRAMEWORK.value,
         )
-        self.assertIn("Test Step", body.evaluation_notes)
-        self.assertIn("Something went wrong", body.evaluation_notes)
+        self.assertIn("Test Step", call_args.kwargs["evaluation_notes"])
+        self.assertIn("Something went wrong", call_args.kwargs["evaluation_notes"])
 
 
 if __name__ == "__main__":

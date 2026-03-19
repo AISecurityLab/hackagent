@@ -10,22 +10,6 @@ from hackagent.datasets.base import DatasetProvider
 
 logger = get_logger(__name__)
 
-# Lazy import flag
-_datasets_available = None
-
-
-def _check_datasets_available() -> bool:
-    """Check if the datasets library is available."""
-    global _datasets_available
-    if _datasets_available is None:
-        try:
-            import datasets  # noqa: F401
-
-            _datasets_available = True
-        except ImportError:
-            _datasets_available = False
-    return _datasets_available
-
 
 class HuggingFaceDatasetProvider(DatasetProvider):
     """
@@ -58,12 +42,6 @@ class HuggingFaceDatasetProvider(DatasetProvider):
                 - trust_remote_code (bool, optional): Whether to trust remote code (default: False)
         """
         super().__init__(config)
-
-        if not _check_datasets_available():
-            raise ImportError(
-                "The 'datasets' library is required for HuggingFace datasets. "
-                "Install it with: pip install datasets"
-            )
 
         self.path = config.get("path")
         if not self.path:

@@ -61,7 +61,6 @@ class TestMainCLI:
             "Setup wizard greeting",
             "API key prompt",
             "Base URL prompt",
-            "Output format prompt",
             "Configuration save",
         ]
 

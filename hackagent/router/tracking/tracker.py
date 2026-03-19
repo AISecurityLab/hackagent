@@ -27,18 +27,8 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from hackagent.api.result import (
-    result_partial_update,
-    result_trace_create,
-)
-from hackagent.api.run import run_retrieve
-from hackagent.api.models import (
-    EvaluationStatusEnum,
-    PatchedResultRequest,
-    ResultRequest,
-    StepTypeEnum,
-    TraceRequest,
-)
+from hackagent.server.storage.base import StorageBackend
+from hackagent.server.api.models import EvaluationStatusEnum, StepTypeEnum
 
 from .utils import deep_clean, sanitize_for_json
 
@@ -114,7 +104,7 @@ class Tracker:
 
     def __init__(
         self,
-        client: Any,
+        backend: StorageBackend,
         run_id: str,
         logger: Optional[logging.Logger] = None,
         attack_type: Optional[str] = None,
@@ -128,20 +118,16 @@ class Tracker:
             logger: Optional logger instance
             attack_type: Optional attack type identifier for metadata
         """
-        self.client = client
+        self.backend = backend
         self.run_id = run_id
         self.logger = logger or get_logger(__name__)
         self.attack_type = attack_type
-        self._run_agent_uuid: Optional[UUID] = None
-        self._run_agent_lookup_attempted: bool = False
-
-        # Track all goal contexts for batch operations
         self._goal_contexts: Dict[int, Context] = {}
 
     @property
     def is_enabled(self) -> bool:
-        """Check if tracking is enabled (has client and run_id)."""
-        return self.client is not None and self.run_id is not None
+        """Check if tracking is enabled (has backend and run_id)."""
+        return self.backend is not None and self.run_id is not None
 
     def _get_run_uuid(self) -> Optional[UUID]:
         """Get run_id as UUID."""
@@ -151,34 +137,6 @@ class Tracker:
             except (ValueError, AttributeError):
                 self.logger.warning(f"Invalid UUID format for run_id: {self.run_id}")
         return None
-
-    def _get_run_agent_uuid(self, run_uuid: UUID) -> Optional[UUID]:
-        """Resolve and cache the run's agent UUID from backend."""
-        if self._run_agent_uuid is not None:
-            return self._run_agent_uuid
-        if self._run_agent_lookup_attempted:
-            return None
-
-        self._run_agent_lookup_attempted = True
-        try:
-            response = run_retrieve.sync_detailed(id=run_uuid, client=self.client)
-            if response.status_code == 200 and response.parsed:
-                self._run_agent_uuid = getattr(response.parsed, "agent", None)
-                if self._run_agent_uuid is None:
-                    self.logger.warning(
-                        f"Run {run_uuid} retrieved but has no agent field"
-                    )
-            else:
-                self.logger.warning(
-                    f"Failed to retrieve run {run_uuid} for agent lookup: "
-                    f"status={response.status_code}"
-                )
-        except Exception as e:
-            self.logger.warning(
-                f"Exception retrieving run {run_uuid} for agent lookup: {e}"
-            )
-
-        return self._run_agent_uuid
 
     def create_goal_result(
         self,
@@ -214,70 +172,36 @@ class Tracker:
                 self._goal_contexts[goal_index] = ctx
                 return ctx
 
-            run_agent_uuid = self._get_run_agent_uuid(run_uuid)
-
-            # Create result with goal information
-            result_request = ResultRequest(
-                run=run_uuid,
+            # Create result via backend
+            record = self.backend.create_result(
+                run_uuid,
+                goal=goal,
+                goal_index=goal_index,
                 request_payload={
                     "goal": goal,
                     "goal_index": goal_index,
                     "attack_type": self.attack_type,
                 },
-                evaluation_status=EvaluationStatusEnum.NOT_EVALUATED,
                 agent_specific_data={
                     "goal": goal,
                     "goal_index": goal_index,
                     **(initial_metadata or {}),
                 },
             )
-            payload = result_request.model_dump(
-                by_alias=True,
-                mode="json",
-                exclude_none=True,
+            ctx.result_id = str(record.id)
+            self.logger.info(f"Created result for goal {goal_index}: {ctx.result_id}")
+
+            # Add initial trace with goal info
+            self._add_trace(
+                ctx,
+                step_name="Goal Setup",
+                step_type=StepTypeEnum.OTHER,
+                content={
+                    "goal": goal,
+                    "goal_index": goal_index,
+                    "attack_type": self.attack_type,
+                },
             )
-            if run_agent_uuid is not None:
-                payload["agent"] = str(run_agent_uuid)
-
-            response = self.client.get_httpx_client().request(
-                method="post",
-                url="/result",
-                json=payload,
-                headers={"Content-Type": "application/json"},
-            )
-
-            if response.status_code == 201:
-                response_data = response.json() if response.content else {}
-                raw_result_id = response_data.get("id")
-                result_id = str(raw_result_id) if raw_result_id is not None else None
-                if result_id:
-                    ctx.result_id = result_id
-                    self.logger.info(
-                        f"Created result for goal {goal_index}: {result_id}"
-                    )
-
-                    # Add initial trace with goal info
-                    self._add_trace(
-                        ctx,
-                        step_name="Goal Setup",
-                        step_type=StepTypeEnum.OTHER,
-                        content={
-                            "goal": goal,
-                            "goal_index": goal_index,
-                            "attack_type": self.attack_type,
-                        },
-                    )
-            else:
-                error_body = ""
-                if getattr(response, "content", None):
-                    try:
-                        error_body = response.content.decode("utf-8", errors="replace")
-                    except Exception:
-                        error_body = str(response.content)
-                self.logger.warning(
-                    f"Failed to create result for goal {goal_index}: "
-                    f"status={response.status_code} body={response.content!r}, body={error_body}"
-                )
 
         except Exception as e:
             self.logger.error(
@@ -416,36 +340,26 @@ class Tracker:
         }
         ctx.traces.append(trace_record)
 
-        # Send to server if enabled and we have a result_id
+        # Send to backend if enabled and we have a result_id
         if not self.is_enabled or not ctx.result_id:
             return None
 
         try:
             result_uuid = UUID(ctx.result_id)
-
-            trace_request = TraceRequest(
+            step_type_str = (
+                step_type.value if hasattr(step_type, "value") else str(step_type)
+            )
+            trace_record = self.backend.create_trace(
+                result_uuid,
                 sequence=seq,
-                step_type=step_type,
+                step_type=step_type_str,
                 content=sanitized_content,
             )
-
-            response = result_trace_create.sync_detailed(
-                client=self.client,
-                id=result_uuid,
-                body=trace_request,
+            trace_id = str(trace_record.id)
+            self.logger.debug(
+                f"Created trace {seq} for goal {ctx.goal_index}: {trace_id}"
             )
-
-            if response.status_code == 201:
-                trace_id = self._extract_id(response)
-                self.logger.debug(
-                    f"Created trace {seq} for goal {ctx.goal_index}: {trace_id}"
-                )
-                return trace_id
-            else:
-                self.logger.warning(
-                    f"Failed to create trace for goal {ctx.goal_index}: "
-                    f"status={response.status_code}"
-                )
+            return trace_id
 
         except Exception as e:
             self.logger.error(
@@ -495,7 +409,7 @@ class Tracker:
         try:
             result_uuid = UUID(ctx.result_id)
 
-            # Map success to evaluation status
+            # Map success to evaluation status string
             if success:
                 eval_status = EvaluationStatusEnum.SUCCESSFUL_JAILBREAK
             else:
@@ -512,8 +426,9 @@ class Tracker:
                 )
             )
 
-            result_request = PatchedResultRequest(
-                evaluation_status=eval_status,
+            self.backend.update_result(
+                result_uuid,
+                evaluation_status=eval_status.value,
                 evaluation_notes=notes,
                 agent_specific_data={
                     **ctx.metadata,
@@ -522,25 +437,11 @@ class Tracker:
                     "total_traces": len(ctx.traces),
                 },
             )
-
-            response = result_partial_update.sync_detailed(
-                client=self.client,
-                id=result_uuid,
-                body=result_request,
+            self.logger.info(
+                f"Finalized goal {ctx.goal_index} (result {ctx.result_id}): "
+                f"{'SUCCESS' if success else 'FAILED'}"
             )
-
-            if response.status_code < 300:
-                self.logger.info(
-                    f"Finalized goal {ctx.goal_index} (result {ctx.result_id}): "
-                    f"{'SUCCESS' if success else 'FAILED'}"
-                )
-                return True
-            else:
-                self.logger.warning(
-                    f"Failed to finalize goal {ctx.goal_index}: "
-                    f"status={response.status_code}"
-                )
-                return False
+            return True
 
         except Exception as e:
             self.logger.error(

@@ -202,7 +202,7 @@ class AttacksTab(Container):
 
                 # --- Advanced toggle ---
                 yield Checkbox(
-                    "Show advanced settings",
+                    "Show advanced configuration (all fields as text boxes)",
                     id="advanced-toggle",
                     value=False,
                     classes="advanced-toggle",
@@ -380,6 +380,29 @@ class AttacksTab(Container):
 
     def _create_field_widget(self, cfg_field: ConfigField, widget_id: str) -> Any:
         """Create the appropriate Textual widget for a :class:`ConfigField`."""
+        if self._show_advanced:
+            # Advanced mode intentionally uses plain text boxes for all fields.
+            default_str = ""
+            if cfg_field.default is not None:
+                if isinstance(cfg_field.default, bool):
+                    default_str = "true" if cfg_field.default else "false"
+                else:
+                    default_str = str(cfg_field.default)
+
+            placeholder = ""
+            if cfg_field.field_type == FieldType.BOOLEAN:
+                placeholder = "true / false"
+            elif cfg_field.field_type == FieldType.CHOICE and cfg_field.choices:
+                placeholder = ", ".join(str(choice[1]) for choice in cfg_field.choices)
+            elif cfg_field.min_value is not None and cfg_field.max_value is not None:
+                placeholder = f"{cfg_field.min_value} – {cfg_field.max_value}"
+            elif cfg_field.field_type == FieldType.INTEGER:
+                placeholder = "integer"
+            elif cfg_field.field_type == FieldType.FLOAT:
+                placeholder = "number"
+
+            return Input(value=default_str, placeholder=placeholder, id=widget_id)
+
         if cfg_field.field_type == FieldType.CHOICE:
             return Select(
                 cfg_field.choices or [],
@@ -474,6 +497,13 @@ class AttacksTab(Container):
                         raw = float(raw)
                     except (TypeError, ValueError):
                         pass
+                elif cfg_field.field_type == FieldType.BOOLEAN:
+                    if isinstance(raw, str):
+                        lowered = raw.strip().lower()
+                        if lowered in {"true", "1", "yes", "y", "on"}:
+                            raw = True
+                        elif lowered in {"false", "0", "no", "n", "off"}:
+                            raw = False
 
             values[cfg_field.key] = raw
 
@@ -836,6 +866,12 @@ class AttacksTab(Container):
             self.app.call_from_thread(progress_bar.update, progress=100)
 
             result_count = len(results) if hasattr(results, "__len__") else "Unknown"
+            is_local = not self.cli_config.api_key
+            storage_note = (
+                "[dim]Results saved locally → ~/.local/share/hackagent/hackagent.db[/dim]"
+                if is_local
+                else "[dim]Results have been saved to the HackAgent platform.[/dim]"
+            )
             self.app.call_from_thread(
                 status_widget.update,
                 f"""[bold green]✅ Attack Completed Successfully![/bold green]
@@ -846,10 +882,16 @@ class AttacksTab(Container):
 
 [green]Attack execution finished![/green]
 [dim]Check the Results tab to view detailed attack results.[/dim]
-[dim]Results have been saved to the HackAgent platform.[/dim]""",
+{storage_note}""",
             )
 
         except Exception as e:
+            is_local = not self.cli_config.api_key
+            key_hint = (
+                "[dim]Ensure the agent endpoint is accessible.[/dim]"
+                if is_local
+                else "[dim]Ensure the agent endpoint is accessible and API key is valid.[/dim]"
+            )
             self.app.call_from_thread(progress_bar.update, progress=0)
             self.app.call_from_thread(
                 status_widget.update,
@@ -860,7 +902,7 @@ class AttacksTab(Container):
 
 [red]Attack execution encountered an error.[/red]
 [dim]Please check your configuration and try again.[/dim]
-[dim]Ensure the agent endpoint is accessible and API key is valid.[/dim]""",
+{key_hint}""",
             )
 
         finally:

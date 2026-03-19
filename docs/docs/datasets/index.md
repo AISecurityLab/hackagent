@@ -42,15 +42,9 @@ graph LR
 
 ## Installation
 
-Dataset functionality requires the optional `datasets` dependency:
-
 ```bash
-pip install hackagent[datasets]
+pip install hackagent
 ```
-
-:::warning HuggingFace Datasets Required
-The `datasets` library is only needed if you're using **presets** or the **HuggingFace provider**. Local file loading works without it.
-:::
 
 ## Quick Start
 

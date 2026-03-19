@@ -10,18 +10,18 @@ from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 
-from hackagent.api.generate.v1_chat_completions_create import (
+from hackagent.server.api.generate.v1_chat_completions_create import (
     asyncio_detailed,
     sync_detailed,
 )
-from hackagent.client import AuthenticatedClient
-from hackagent.api.models import (
+from hackagent.server.client import AuthenticatedClient
+from hackagent.server.api.models import (
     GenerateErrorResponse,  # Added import
     GenerateRequestRequest,
     MessageRequest,
     GenerateSuccessResponse,  # Added import
 )
-from hackagent.types import Response
+from hackagent.server.types import Response
 
 
 class TestGeneratorAPI(unittest.TestCase):

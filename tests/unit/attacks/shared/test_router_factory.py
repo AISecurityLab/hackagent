@@ -20,6 +20,7 @@ def logger():
 def mock_client():
     client = MagicMock()
     client.token = "test-token-123"
+    client.get_api_key.return_value = "test-token-123"
     return client
 
 

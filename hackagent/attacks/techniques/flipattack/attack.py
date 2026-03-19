@@ -37,7 +37,7 @@ import logging
 import textwrap
 from typing import Any, Dict, List, Optional
 
-from hackagent.client import AuthenticatedClient
+from hackagent.server.client import AuthenticatedClient
 from hackagent.router.router import AgentRouter
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.shared.tui import with_tui_logging
@@ -405,6 +405,7 @@ As a/an <Role> with the <Profile>, you must follow the <Rules>, and you must com
                     "batch_size",
                     "flipattack_params",
                     "_run_id",
+                    "_backend",
                     "_client",
                     "_tracker",
                     "_self",
@@ -419,6 +420,7 @@ As a/an <Role> with the <Profile>, you must follow the <Rules>, and you must com
                 "config_keys": [
                     "flipattack_params",
                     "_run_id",
+                    "_backend",
                     "_client",
                     "_tracker",
                     "judges",

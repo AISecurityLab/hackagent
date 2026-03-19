@@ -33,16 +33,8 @@ from uuid import UUID
 
 import httpx
 
-from hackagent.api.attack.attack_create import (
-    sync_detailed as attacks_create_sync_detailed,
-)
-from hackagent.api.run import run_run_tests_create
-from hackagent.api.run.run_partial_update import sync_detailed as run_status_update
 from hackagent.errors import HackAgentError
-from hackagent.api.models import AttackRequest
-from hackagent.api.models import PatchedRunRequest
-from hackagent.api.models import RunRequest
-from hackagent.api.models import StatusEnum
+from hackagent.server.api.models import StatusEnum
 
 if TYPE_CHECKING:
     from hackagent.agent import HackAgent
@@ -108,7 +100,8 @@ class AttackOrchestrator:
             ValueError: If attack_type or attack_impl_class not defined
         """
         self.hack_agent = hack_agent
-        self.client = hack_agent.client
+        # keep self.client as legacy attr for subclasses that may reference it directly
+        self.client = getattr(hack_agent, "client", None)
 
         if not self.attack_type:
             raise ValueError(f"{self.__class__.__name__} must define attack_type")
@@ -122,46 +115,22 @@ class AttackOrchestrator:
         organization_id: UUID,
         attack_config: Dict[str, Any],
     ) -> str:
-        """
-        Create Attack record on server for tracking.
-
-        Args:
-            attack_type: Type of attack (e.g., "advprefix")
-            victim_agent_id: UUID of target agent
-            organization_id: UUID of organization
-            attack_config: Attack configuration dictionary
-
-        Returns:
-            Attack record ID
-
-        Raises:
-            HackAgentError: If record creation fails
-        """
-        logger.info(f"Creating {attack_type} Attack record on server")
-
-        payload = {
-            "type": attack_type,
-            "agent": str(victim_agent_id),
-            "organization": str(organization_id),
-            "configuration": attack_config,
-        }
-
+        """Create Attack record via the storage backend."""
+        logger.info(f"Creating {attack_type} Attack record")
         try:
-            attack_req_obj = AttackRequest.model_validate(payload)
-            response = attacks_create_sync_detailed(
-                client=self.client, body=attack_req_obj
+            record = self.hack_agent.backend.create_attack(
+                attack_type=attack_type,
+                agent_id=victim_agent_id,
+                organization=organization_id,
+                configuration=attack_config,
             )
+            logger.info(f"Attack record created. ID: {record.id}")
+            return str(record.id)
         except Exception as e:
             logger.error(
                 f"Failed to create {attack_type} Attack record: {e}", exc_info=True
             )
             raise HackAgentError(f"Failed to create Attack record: {e}") from e
-
-        attack_id, _ = self._extract_ids_from_response(
-            response=response, context=attack_type
-        )
-        logger.info(f"Attack record created. ID: {attack_id}")
-        return attack_id
 
     def _create_server_run_record(
         self,
@@ -169,46 +138,19 @@ class AttackOrchestrator:
         victim_agent_id: str,
         run_config_override: Optional[Dict[str, Any]],
     ) -> str:
-        """
-        Create Run record on server for this execution.
-
-        Args:
-            attack_id: ID of parent attack record
-            victim_agent_id: ID of target agent
-            run_config_override: Optional configuration overrides
-
-        Returns:
-            Run record ID
-
-        Raises:
-            HackAgentError: If record creation fails
-        """
+        """Create Run record via the storage backend."""
         logger.info(f"Creating Run record for Attack ID: {attack_id}")
-
-        payload = RunRequest(
-            attack=attack_id,
-            agent=victim_agent_id,
-            run_config=run_config_override or {},
-        )
-
         try:
-            response = run_run_tests_create.sync_detailed(
-                client=self.client, body=payload
+            record = self.hack_agent.backend.create_run(
+                attack_id=UUID(attack_id),
+                agent_id=UUID(victim_agent_id),
+                run_config=run_config_override or {},
             )
+            logger.info(f"Run record created. ID: {record.id}")
+            return str(record.id)
         except Exception as e:
             logger.error(f"Failed to create Run record: {e}", exc_info=True)
             raise HackAgentError(f"Failed to create Run record: {e}") from e
-
-        decoded_content = self._decode_response(response)
-        parsed_data = self._parse_response(response, decoded_content, "Run record")
-
-        run_id = parsed_data.get("id")
-        if not run_id:
-            logger.error(f"Run record missing 'id': {parsed_data}")
-            raise HackAgentError("Run record missing 'id' field")
-
-        logger.info(f"Run record created. ID: {run_id}")
-        return run_id
 
     def _prepare_attack_params(self, attack_config: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -319,10 +261,10 @@ class AttackOrchestrator:
             "config": {
                 **attack_config,  ## Spread full attack config
                 **(run_config_override or {}),
-                "_run_id": run_id,  # Add run_id for result tracking
-                "_client": self.client,  # Add client for result tracking
+                "_run_id": run_id,
+                "_backend": self.hack_agent.backend,  # StorageBackend for result tracking
             },
-            "client": self.client,
+            "client": self.hack_agent.backend,  # pass backend as 'client' for BaseAttack compat
             "agent_router": self.hack_agent.router,
         }
 
@@ -548,12 +490,9 @@ class AttackOrchestrator:
         # 4. Update run status to RUNNING
         try:
             logger.info(f"Updating run {run_id} status to RUNNING")
-            run_status_update(
-                id=run_id,
-                client=self.client,
-                body=PatchedRunRequest(
-                    status=StatusEnum.RUNNING,
-                ),
+            self.hack_agent.backend.update_run(
+                UUID(run_id),
+                status=StatusEnum.RUNNING.value,
             )
         except Exception as e:
             logger.warning(f"Failed to update run status to RUNNING: {e}")
@@ -574,12 +513,9 @@ class AttackOrchestrator:
             # 6. Update run status to COMPLETED
             try:
                 logger.info(f"Updating run {run_id} status to COMPLETED")
-                run_status_update(
-                    id=run_id,
-                    client=self.client,
-                    body=PatchedRunRequest(
-                        status=StatusEnum.COMPLETED,
-                    ),
+                self.hack_agent.backend.update_run(
+                    UUID(run_id),
+                    status=StatusEnum.COMPLETED.value,
                 )
             except Exception as e:
                 logger.warning(f"Failed to update run status to COMPLETED: {e}")
@@ -590,13 +526,10 @@ class AttackOrchestrator:
             # Update run status to FAILED on error
             try:
                 logger.error(f"Attack execution failed: {e}")
-                run_status_update(
-                    id=run_id,
-                    client=self.client,
-                    body=PatchedRunRequest(
-                        status=StatusEnum.FAILED,
-                        run_notes=f"Execution failed: {str(e)}",
-                    ),
+                self.hack_agent.backend.update_run(
+                    UUID(run_id),
+                    status=StatusEnum.FAILED.value,
+                    run_notes=f"Execution failed: {str(e)}",
                 )
             except Exception as update_error:
                 logger.warning(f"Failed to update run status to FAILED: {update_error}")

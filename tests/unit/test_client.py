@@ -7,7 +7,7 @@ import unittest
 
 import httpx
 
-from hackagent.client import Client, AuthenticatedClient
+from hackagent.server.client import Client, AuthenticatedClient
 
 
 class TestClientInitialization(unittest.TestCase):
@@ -17,9 +17,9 @@ class TestClientInitialization(unittest.TestCase):
         """Test Client with minimal parameters."""
         client = Client(base_url="https://api.example.com")
 
-        self.assertEqual(client._base_url, "https://api.example.com")
-        self.assertEqual(client._cookies, {})
-        self.assertEqual(client._headers, {})
+        self.assertEqual(client.base_url, "https://api.example.com")
+        self.assertEqual(client.cookies, {})
+        self.assertEqual(client.headers, {})
         self.assertFalse(client.raise_on_unexpected_status)
 
     def test_client_initialization_with_options(self):
@@ -35,12 +35,12 @@ class TestClientInitialization(unittest.TestCase):
             raise_on_unexpected_status=True,
         )
 
-        self.assertEqual(client._base_url, "https://api.example.com")
-        self.assertEqual(client._cookies, {"session": "abc123"})
-        self.assertEqual(client._headers, {"X-Custom": "value"})
-        self.assertEqual(client._timeout, timeout)
-        self.assertFalse(client._verify_ssl)
-        self.assertTrue(client._follow_redirects)
+        self.assertEqual(client.base_url, "https://api.example.com")
+        self.assertEqual(client.cookies, {"session": "abc123"})
+        self.assertEqual(client.headers, {"X-Custom": "value"})
+        self.assertEqual(client.timeout, timeout)
+        self.assertFalse(client.verify_ssl)
+        self.assertTrue(client.follow_redirects)
         self.assertTrue(client.raise_on_unexpected_status)
 
 
@@ -56,8 +56,8 @@ class TestClientWithMethods(unittest.TestCase):
 
         new_client = client.with_headers({"X-New": "new"})
 
-        self.assertEqual(new_client._headers["X-Original"], "original")
-        self.assertEqual(new_client._headers["X-New"], "new")
+        self.assertEqual(new_client.headers["X-Original"], "original")
+        self.assertEqual(new_client.headers["X-New"], "new")
 
     def test_with_cookies(self):
         """Test with_cookies returns new client with merged cookies."""
@@ -68,8 +68,8 @@ class TestClientWithMethods(unittest.TestCase):
 
         new_client = client.with_cookies({"new": "value2"})
 
-        self.assertEqual(new_client._cookies["original"], "value1")
-        self.assertEqual(new_client._cookies["new"], "value2")
+        self.assertEqual(new_client.cookies["original"], "value1")
+        self.assertEqual(new_client.cookies["new"], "value2")
 
     def test_with_timeout(self):
         """Test with_timeout returns new client with new timeout."""
@@ -78,7 +78,7 @@ class TestClientWithMethods(unittest.TestCase):
 
         new_client = client.with_timeout(timeout)
 
-        self.assertEqual(new_client._timeout, timeout)
+        self.assertEqual(new_client.timeout, timeout)
 
 
 class TestClientHttpxClient(unittest.TestCase):
@@ -134,7 +134,7 @@ class TestAuthenticatedClientInitialization(unittest.TestCase):
             token="my-secret-token",
         )
 
-        self.assertEqual(client._base_url, "https://api.example.com")
+        self.assertEqual(client.base_url, "https://api.example.com")
         self.assertEqual(client.token, "my-secret-token")
         self.assertEqual(client.prefix, "Bearer")
         self.assertEqual(client.auth_header_name, "Authorization")
@@ -174,8 +174,8 @@ class TestAuthenticatedClientWithMethods(unittest.TestCase):
         new_client = client.with_headers({"X-New": "new"})
 
         self.assertIsInstance(new_client, AuthenticatedClient)
-        self.assertEqual(new_client._headers["X-Original"], "original")
-        self.assertEqual(new_client._headers["X-New"], "new")
+        self.assertEqual(new_client.headers["X-Original"], "original")
+        self.assertEqual(new_client.headers["X-New"], "new")
 
     def test_with_cookies(self):
         """Test with_cookies returns new client with merged cookies."""
@@ -188,8 +188,8 @@ class TestAuthenticatedClientWithMethods(unittest.TestCase):
         new_client = client.with_cookies({"new": "value2"})
 
         self.assertIsInstance(new_client, AuthenticatedClient)
-        self.assertEqual(new_client._cookies["original"], "value1")
-        self.assertEqual(new_client._cookies["new"], "value2")
+        self.assertEqual(new_client.cookies["original"], "value1")
+        self.assertEqual(new_client.cookies["new"], "value2")
 
     def test_with_timeout(self):
         """Test with_timeout returns new client with new timeout."""
@@ -202,7 +202,7 @@ class TestAuthenticatedClientWithMethods(unittest.TestCase):
         new_client = client.with_timeout(timeout)
 
         self.assertIsInstance(new_client, AuthenticatedClient)
-        self.assertEqual(new_client._timeout, timeout)
+        self.assertEqual(new_client.timeout, timeout)
 
 
 class TestAuthenticatedClientHttpxClient(unittest.TestCase):
@@ -215,11 +215,13 @@ class TestAuthenticatedClientHttpxClient(unittest.TestCase):
             token="my-secret-token",
         )
 
-        client.get_httpx_client()
+        httpx_client = client.get_httpx_client()
 
-        # The headers should include the Authorization header
-        self.assertIn("Authorization", client._headers)
-        self.assertEqual(client._headers["Authorization"], "Bearer my-secret-token")
+        # The auth header is passed to the underlying httpx client, not stored on client.headers
+        self.assertIn("authorization", httpx_client.headers)
+        self.assertEqual(
+            httpx_client.headers["authorization"], "Bearer my-secret-token"
+        )
 
     def test_get_httpx_client_no_prefix(self):
         """Test get_httpx_client with empty prefix."""
@@ -229,10 +231,10 @@ class TestAuthenticatedClientHttpxClient(unittest.TestCase):
             prefix="",
         )
 
-        client.get_httpx_client()
+        httpx_client = client.get_httpx_client()
 
         # The token should be used without prefix
-        self.assertEqual(client._headers["Authorization"], "my-token")
+        self.assertEqual(httpx_client.headers["authorization"], "my-token")
 
     def test_set_httpx_client(self):
         """Test set_httpx_client sets custom client."""
@@ -304,11 +306,13 @@ class TestAuthenticatedClientAsyncClient(unittest.TestCase):
             token="my-secret-token",
         )
 
-        client.get_async_httpx_client()
+        async_client = client.get_async_httpx_client()
 
-        # The headers should include the Authorization header
-        self.assertIn("Authorization", client._headers)
-        self.assertEqual(client._headers["Authorization"], "Bearer my-secret-token")
+        # The auth header is passed to the underlying httpx client, not stored on client.headers
+        self.assertIn("authorization", async_client.headers)
+        self.assertEqual(
+            async_client.headers["authorization"], "Bearer my-secret-token"
+        )
 
     def test_set_async_httpx_client(self):
         """Test set_async_httpx_client sets custom async client."""

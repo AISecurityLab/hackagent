@@ -12,7 +12,7 @@ import copy
 import logging
 from typing import Any, Dict, List, Optional
 
-from hackagent.client import AuthenticatedClient
+from hackagent.server.client import AuthenticatedClient
 from hackagent.router.router import AgentRouter
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.shared.tui import with_tui_logging
@@ -152,7 +152,8 @@ class BaselineAttack(BaseAttack):
                     "temperature",
                     "n_samples_per_template",
                     "_run_id",  # For real-time result tracking
-                    "_client",  # For real-time result tracking
+                    "_backend",  # For real-time result tracking (StorageBackend)
+                    "_client",  # Legacy fallback
                 ],
                 "input_data_arg_name": "goals",
                 "required_args": ["logger", "agent_router", "config"],
@@ -166,7 +167,8 @@ class BaselineAttack(BaseAttack):
                     "evaluator_type",
                     "min_response_length",
                     "_run_id",  # For real-time result tracking
-                    "_client",  # For real-time result tracking
+                    "_backend",  # For real-time result tracking (StorageBackend)
+                    "_client",  # Legacy fallback
                 ],
                 "input_data_arg_name": "input_data",
                 "required_args": ["logger", "config"],

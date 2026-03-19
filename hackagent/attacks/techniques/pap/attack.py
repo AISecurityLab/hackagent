@@ -23,7 +23,7 @@ import copy
 import logging
 from typing import Any, Dict, List, Optional
 
-from hackagent.client import AuthenticatedClient
+from hackagent.server.client import AuthenticatedClient
 from hackagent.router.router import AgentRouter
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.shared.tui import with_tui_logging
@@ -123,6 +123,7 @@ class PAPAttack(BaseAttack):
                     "pap_params",
                     "attacker",
                     "_run_id",
+                    "_backend",
                     "_client",
                     "_tracker",
                     "judges",
@@ -146,6 +147,7 @@ class PAPAttack(BaseAttack):
                 "config_keys": [
                     "pap_params",
                     "_run_id",
+                    "_backend",
                     "_client",
                     "_tracker",
                     "judges",

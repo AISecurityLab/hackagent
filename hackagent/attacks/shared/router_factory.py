@@ -36,7 +36,6 @@ import logging
 import os
 from typing import Any, Dict, Optional, Tuple
 
-from hackagent.client import AuthenticatedClient
 from hackagent.router.router import AgentRouter
 from hackagent.router.types import AgentTypeEnum
 
@@ -52,7 +51,7 @@ _AGENT_TYPE_ALIASES: Dict[str, str] = {
 
 
 def create_router(
-    client: AuthenticatedClient,
+    backend: Any,
     config: Dict[str, Any],
     logger: Optional[logging.Logger] = None,
     router_name: Optional[str] = None,
@@ -60,42 +59,14 @@ def create_router(
     """
     Create an AgentRouter from a configuration dictionary.
 
-    This factory extracts endpoint, model identifier, API key, and
-    operational parameters from a flat config dict and returns a
-    fully-initialized AgentRouter with its registration key.
-
     Args:
-        client: Authenticated client providing the default API key.
-        config: Configuration dictionary. Expected keys:
-            - identifier (str, required): Model identifier (e.g. "ollama/llama3").
-            - endpoint (str, optional): API endpoint URL.
-            - agent_type (str, optional): Agent type string, default "OPENAI_SDK".
-            - api_key (str, optional): Explicit API key or env var name.
-            - max_new_tokens (int, optional): Max tokens to generate.
-            - temperature (float, optional): Sampling temperature.
-            - top_p (float, optional): Top-p (nucleus) sampling.
-            - request_timeout (int, optional): Request timeout in seconds.
-            - agent_metadata (dict, optional): Extra metadata for the agent.
-            Any additional keys in the dict are merged into agent_metadata.
-        logger: Logger instance. Falls back to module-level logger.
-        router_name: Human-readable name for logging (e.g. "generator",
-            "attacker", "judge-harmbench"). Defaults to the identifier.
+        backend: StorageBackend providing default API key.
+        config: Configuration dictionary (identifier, endpoint, agent_type, api_key etc.)
+        logger: Logger instance.
+        router_name: Human-readable name for logging.
 
     Returns:
         Tuple of (AgentRouter, registration_key).
-
-    Raises:
-        ValueError: If ``identifier`` is missing from config.
-        RuntimeError: If the AgentRouter fails to register the agent.
-
-    Example:
-        >>> router, key = create_router(
-        ...     client=my_client,
-        ...     config={"identifier": "gpt-4", "endpoint": "https://api.openai.com/v1"},
-        ...     logger=my_logger,
-        ...     router_name="attacker",
-        ... )
-        >>> response = router.route_request(registration_key=key, request_data={...})
     """
     log = logger or globals()["logger"]
 
@@ -110,8 +81,8 @@ def create_router(
     endpoint = config.get("endpoint")
 
     # ---- API key resolution ----
-    # Priority: explicit config key → env var lookup → client token
-    api_key = client.token
+    # Priority: explicit config key → env var lookup → backend api key
+    api_key = backend.get_api_key() or ""
     api_key_config = config.get("api_key")
     if api_key_config:
         env_key = os.environ.get(api_key_config)
@@ -159,7 +130,7 @@ def create_router(
     log.debug(f"Creating AgentRouter for '{name}' ({model_name} via {endpoint})")
 
     router = AgentRouter(
-        client=client,
+        backend=backend,
         name=model_name,
         agent_type=agent_type,
         endpoint=endpoint,

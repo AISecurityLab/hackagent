@@ -325,7 +325,7 @@ class TestOpenAIRouterIntegration:
         openai_base_url: str,
     ):
         """Test that AgentRouter correctly creates OpenAIAgent adapter."""
-        from hackagent.client import AuthenticatedClient
+        from hackagent.server.client import AuthenticatedClient
         from hackagent.router.router import AgentRouter
         from hackagent.router.types import AgentTypeEnum
         from hackagent.router.adapters.openai import OpenAIAgent
@@ -335,9 +335,12 @@ class TestOpenAIRouterIntegration:
             token=hackagent_api_key,
             prefix="Bearer",
         )
+        from hackagent.server.storage.remote import RemoteBackend
+
+        backend = RemoteBackend(client)
 
         router = AgentRouter(
-            client=client,
+            backend=backend,
             name=openai_model,
             agent_type=AgentTypeEnum.OPENAI_SDK,
             endpoint=openai_base_url,
@@ -360,7 +363,7 @@ class TestOpenAIRouterIntegration:
         openai_base_url: str,
     ):
         """Test that router can handle requests through OpenAI adapter."""
-        from hackagent.client import AuthenticatedClient
+        from hackagent.server.client import AuthenticatedClient
         from hackagent.router.router import AgentRouter
         from hackagent.router.types import AgentTypeEnum
 
@@ -369,9 +372,12 @@ class TestOpenAIRouterIntegration:
             token=hackagent_api_key,
             prefix="Bearer",
         )
+        from hackagent.server.storage.remote import RemoteBackend
+
+        backend = RemoteBackend(client)
 
         router = AgentRouter(
-            client=client,
+            backend=backend,
             name=openai_model,
             agent_type=AgentTypeEnum.OPENAI_SDK,
             endpoint=openai_base_url,

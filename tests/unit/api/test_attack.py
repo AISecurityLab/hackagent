@@ -9,7 +9,7 @@ from http import HTTPStatus
 from unittest.mock import MagicMock, patch
 
 from hackagent import errors
-from hackagent.api.attack import (
+from hackagent.server.api.attack import (
     attack_create,
     attack_destroy,
     attack_list,
@@ -17,18 +17,18 @@ from hackagent.api.attack import (
     attack_retrieve,
     attack_update,
 )
-from hackagent.api.models import Attack  # For individual attack items
-from hackagent.api.models import AttackRequest
+from hackagent.server.api.models import Attack  # For individual attack items
+from hackagent.server.api.models import AttackRequest
 
 # Assuming these are the correct import paths based on the project structure
-from hackagent.api.models import PaginatedAttackList
-from hackagent.api.models import (
+from hackagent.server.api.models import PaginatedAttackList
+from hackagent.server.api.models import (
     PatchedAttackRequest,
 )  # Added PatchedAttackRequest
 
 
 class TestAttackListAPI(unittest.TestCase):
-    @patch("hackagent.api.attack.attack_list.AuthenticatedClient")
+    @patch("hackagent.server.api.attack.attack_list.AuthenticatedClient")
     def test_attack_list_sync_detailed_success(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()
@@ -75,7 +75,7 @@ class TestAttackListAPI(unittest.TestCase):
         mock_parsed_object = PaginatedAttackList.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.attack.attack_list.PaginatedAttackList.model_validate",
+            "hackagent.server.api.attack.attack_list.PaginatedAttackList.model_validate",
             return_value=mock_parsed_object,
         ) as mock_model_validate:
             response = attack_list.sync_detailed(client=mock_client_instance, page=1)
@@ -107,7 +107,7 @@ class TestAttackListAPI(unittest.TestCase):
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
-    @patch("hackagent.api.attack.attack_list.AuthenticatedClient")
+    @patch("hackagent.server.api.attack.attack_list.AuthenticatedClient")
     def test_attack_list_sync_detailed_error_raise_on_unexpected_status_true(
         self, MockAuthenticatedClient
     ):
@@ -128,7 +128,7 @@ class TestAttackListAPI(unittest.TestCase):
         self.assertEqual(cm.exception.status_code, 500)
         self.assertEqual(cm.exception.content, b"Server Error For Attack List")
 
-    @patch("hackagent.api.attack.attack_list.AuthenticatedClient")
+    @patch("hackagent.server.api.attack.attack_list.AuthenticatedClient")
     def test_attack_list_sync_detailed_error_raise_on_unexpected_status_false(
         self, MockAuthenticatedClient
     ):
@@ -150,7 +150,7 @@ class TestAttackListAPI(unittest.TestCase):
 
 
 class TestAttackCreateAPI(unittest.TestCase):
-    @patch("hackagent.api.attack.attack_create.AuthenticatedClient")
+    @patch("hackagent.server.api.attack.attack_create.AuthenticatedClient")
     def test_attack_create_sync_detailed_success(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()
@@ -193,7 +193,7 @@ class TestAttackCreateAPI(unittest.TestCase):
         mock_parsed_attack = Attack.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.attack.attack_create.Attack.model_validate",
+            "hackagent.server.api.attack.attack_create.Attack.model_validate",
             return_value=mock_parsed_attack,
         ) as mock_model_validate:
             response = attack_create.sync_detailed(
@@ -220,7 +220,7 @@ class TestAttackCreateAPI(unittest.TestCase):
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
-    @patch("hackagent.api.attack.attack_create.AuthenticatedClient")
+    @patch("hackagent.server.api.attack.attack_create.AuthenticatedClient")
     def test_attack_create_sync_detailed_error_raise_on_unexpected_status_true(
         self, MockAuthenticatedClient
     ):
@@ -247,7 +247,7 @@ class TestAttackCreateAPI(unittest.TestCase):
         self.assertEqual(cm.exception.status_code, 400)
         self.assertEqual(cm.exception.content, b"Bad Attack Request Data")
 
-    @patch("hackagent.api.attack.attack_create.AuthenticatedClient")
+    @patch("hackagent.server.api.attack.attack_create.AuthenticatedClient")
     def test_attack_create_sync_detailed_error_raise_on_unexpected_status_false(
         self, MockAuthenticatedClient
     ):
@@ -275,7 +275,7 @@ class TestAttackCreateAPI(unittest.TestCase):
 
 
 class TestAttackRetrieveAPI(unittest.TestCase):
-    @patch("hackagent.api.attack.attack_retrieve.AuthenticatedClient")
+    @patch("hackagent.server.api.attack.attack_retrieve.AuthenticatedClient")
     def test_attack_retrieve_sync_detailed_success(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()
@@ -310,7 +310,7 @@ class TestAttackRetrieveAPI(unittest.TestCase):
         mock_parsed_attack = Attack.model_validate(mock_response_content)
 
         with patch(
-            "hackagent.api.attack.attack_retrieve.Attack.model_validate",
+            "hackagent.server.api.attack.attack_retrieve.Attack.model_validate",
             return_value=mock_parsed_attack,
         ) as mock_model_validate:
             response = attack_retrieve.sync_detailed(
@@ -333,7 +333,7 @@ class TestAttackRetrieveAPI(unittest.TestCase):
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
-    @patch("hackagent.api.attack.attack_retrieve.AuthenticatedClient")
+    @patch("hackagent.server.api.attack.attack_retrieve.AuthenticatedClient")
     def test_attack_retrieve_sync_detailed_error_not_found(
         self, MockAuthenticatedClient
     ):
@@ -357,7 +357,7 @@ class TestAttackRetrieveAPI(unittest.TestCase):
         self.assertEqual(cm.exception.status_code, 404)
         self.assertEqual(cm.exception.content, b"Attack Not Found")
 
-    @patch("hackagent.api.attack.attack_retrieve.AuthenticatedClient")
+    @patch("hackagent.server.api.attack.attack_retrieve.AuthenticatedClient")
     def test_attack_retrieve_sync_detailed_error_raise_false(
         self, MockAuthenticatedClient
     ):
@@ -382,7 +382,7 @@ class TestAttackRetrieveAPI(unittest.TestCase):
 
 
 class TestAttackUpdateAPI(unittest.TestCase):
-    @patch("hackagent.api.attack.attack_update.AuthenticatedClient")
+    @patch("hackagent.server.api.attack.attack_update.AuthenticatedClient")
     def test_attack_update_sync_detailed_success(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()
@@ -425,7 +425,7 @@ class TestAttackUpdateAPI(unittest.TestCase):
         mock_parsed_attack = Attack.model_validate(mock_updated_attack_response_content)
 
         with patch(
-            "hackagent.api.attack.attack_update.Attack.model_validate",
+            "hackagent.server.api.attack.attack_update.Attack.model_validate",
             return_value=mock_parsed_attack,
         ) as mock_model_validate:
             response = attack_update.sync_detailed(
@@ -459,7 +459,7 @@ class TestAttackUpdateAPI(unittest.TestCase):
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
-    @patch("hackagent.api.attack.attack_update.AuthenticatedClient")
+    @patch("hackagent.server.api.attack.attack_update.AuthenticatedClient")
     def test_attack_update_sync_detailed_error_not_found(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()
@@ -487,7 +487,7 @@ class TestAttackUpdateAPI(unittest.TestCase):
         self.assertEqual(cm.exception.status_code, 404)
         self.assertEqual(cm.exception.content, b"Attack Not Found For Update")
 
-    @patch("hackagent.api.attack.attack_update.AuthenticatedClient")
+    @patch("hackagent.server.api.attack.attack_update.AuthenticatedClient")
     def test_attack_update_sync_detailed_error_raise_false(
         self, MockAuthenticatedClient
     ):
@@ -518,7 +518,7 @@ class TestAttackUpdateAPI(unittest.TestCase):
 
 
 class TestAttackPartialUpdateAPI(unittest.TestCase):
-    @patch("hackagent.api.attack.attack_partial_update.AuthenticatedClient")
+    @patch("hackagent.server.api.attack.attack_partial_update.AuthenticatedClient")
     def test_attack_partial_update_sync_detailed_success(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()
@@ -561,7 +561,7 @@ class TestAttackPartialUpdateAPI(unittest.TestCase):
         mock_parsed_attack = Attack.model_validate(mock_patched_attack_response_content)
 
         with patch(
-            "hackagent.api.attack.attack_partial_update.Attack.model_validate",
+            "hackagent.server.api.attack.attack_partial_update.Attack.model_validate",
             return_value=mock_parsed_attack,
         ) as mock_model_validate:
             response = attack_partial_update.sync_detailed(
@@ -598,7 +598,7 @@ class TestAttackPartialUpdateAPI(unittest.TestCase):
             }
             mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
-    @patch("hackagent.api.attack.attack_partial_update.AuthenticatedClient")
+    @patch("hackagent.server.api.attack.attack_partial_update.AuthenticatedClient")
     def test_attack_partial_update_sync_detailed_error_not_found(
         self, MockAuthenticatedClient
     ):
@@ -626,7 +626,7 @@ class TestAttackPartialUpdateAPI(unittest.TestCase):
         self.assertEqual(cm.exception.status_code, 404)
         self.assertEqual(cm.exception.content, b"Attack Not Found For Patch")
 
-    @patch("hackagent.api.attack.attack_partial_update.AuthenticatedClient")
+    @patch("hackagent.server.api.attack.attack_partial_update.AuthenticatedClient")
     def test_attack_partial_update_sync_detailed_error_raise_false(
         self, MockAuthenticatedClient
     ):
@@ -655,7 +655,7 @@ class TestAttackPartialUpdateAPI(unittest.TestCase):
 
 
 class TestAttackDestroyAPI(unittest.TestCase):
-    @patch("hackagent.api.attack.attack_destroy.AuthenticatedClient")
+    @patch("hackagent.server.api.attack.attack_destroy.AuthenticatedClient")
     def test_attack_destroy_sync_detailed_success(self, MockAuthenticatedClient):
         mock_client_instance = MockAuthenticatedClient.return_value
         mock_httpx_client = MagicMock()
@@ -682,7 +682,7 @@ class TestAttackDestroyAPI(unittest.TestCase):
         }
         mock_httpx_client.request.assert_called_once_with(**expected_kwargs)
 
-    @patch("hackagent.api.attack.attack_destroy.AuthenticatedClient")
+    @patch("hackagent.server.api.attack.attack_destroy.AuthenticatedClient")
     def test_attack_destroy_sync_detailed_error_not_found(
         self, MockAuthenticatedClient
     ):
@@ -707,7 +707,7 @@ class TestAttackDestroyAPI(unittest.TestCase):
         self.assertEqual(cm.exception.status_code, 404)
         self.assertEqual(cm.exception.content, b"Attack Not Found For Deletion")
 
-    @patch("hackagent.api.attack.attack_destroy.AuthenticatedClient")
+    @patch("hackagent.server.api.attack.attack_destroy.AuthenticatedClient")
     def test_attack_destroy_sync_detailed_error_raise_false(
         self, MockAuthenticatedClient
     ):

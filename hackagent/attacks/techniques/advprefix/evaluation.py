@@ -29,7 +29,7 @@ from hackagent.attacks.evaluator.evaluation_step import (
     BaseEvaluationStep,
     JUDGE_MEAN_COLUMN_MAP,
 )
-from hackagent.client import AuthenticatedClient
+from hackagent.server.client import AuthenticatedClient
 
 from .config import EvaluationPipelineConfig
 from .utils import handle_empty_input, log_errors

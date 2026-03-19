@@ -8,10 +8,11 @@ Overview and statistics for HackAgent.
 """
 
 from typing import Any
+import json
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.widgets import Static
+from textual.widgets import Static, Tree
 
 from hackagent.cli.config import CLIConfig
 from hackagent.cli.tui.base import BaseTab
@@ -84,10 +85,12 @@ class DashboardTab(BaseTab):
 
         # Activity section
         yield Static(
-            "\n[bold yellow]📝 Recent Activity[/bold yellow]", id="activity-header"
+            "\n[bold yellow]📝 Recent Activity & Traces[/bold yellow]",
+            id="activity-header",
         )
 
-        with VerticalScroll():
+        yield Tree("Activity Log", id="activity-tree")
+        with VerticalScroll(id="activity-scroll"):
             yield Static("[dim]Waiting for data...[/dim]", id="activity-log")
 
     def on_mount(self) -> None:
@@ -101,8 +104,8 @@ class DashboardTab(BaseTab):
     def refresh_data(self) -> None:
         """Refresh dashboard data from API."""
         try:
-            from hackagent.api.agent import agent_list
-            from hackagent.api.result import result_list
+            from hackagent.server.api.agent import agent_list
+            from hackagent.server.api.result import result_list
 
             # Validate configuration
             if not self.cli_config.api_key:
@@ -179,6 +182,8 @@ class DashboardTab(BaseTab):
 
             # Update activity log
             if not agents_data and not results_data:
+                self.query_one("#activity-tree", Tree).display = False
+                self.query_one("#activity-scroll").display = True
                 activity_log = self.query_one("#activity-log", Static)
                 activity_log.update(
                     "[yellow]No data found[/yellow]\n\n"
@@ -193,6 +198,8 @@ class DashboardTab(BaseTab):
 
         except Exception as e:
             # Display error in activity log with helpful context
+            self.query_one("#activity-tree", Tree).display = False
+            self.query_one("#activity-scroll").display = True
             activity_log = self.query_one("#activity-log", Static)
 
             error_type = type(e).__name__
@@ -272,51 +279,128 @@ class DashboardTab(BaseTab):
             agents: List of agents
             results: List of results
         """
-        activity_log = self.query_one("#activity-log", Static)
-        log_lines = []
+        try:
+            tree = self.query_one("#activity-tree", Tree)
+            self.query_one("#activity-scroll").display = False
+            tree.display = True
 
-        # Add recent agents with icons - escape user content
-        if agents:
-            log_lines.append("[bold cyan]🤖 Recent Agents:[/bold cyan]")
-            for i, agent in enumerate(agents[:3], 1):
-                agent_type = (
-                    agent.agent_type.value
-                    if hasattr(agent.agent_type, "value")
-                    else agent.agent_type
+            # Clear existing data
+            tree.clear()
+            tree.root.expand()
+
+            # Add recent agents
+            if agents:
+                agents_node = tree.root.add(
+                    "[bold cyan]🤖 Recent Agents[/bold cyan]", expand=True
                 )
-                agent_name = _escape(agent.name) if agent.name else "Unnamed"
-                log_lines.append(
-                    f"  {i}. [cyan]{agent_name}[/cyan] [dim]({_escape(agent_type)})[/dim]"
-                )
-            log_lines.append("")
-
-        # Add recent results with status colors - escape user content
-        if results:
-            log_lines.append("[bold green]📋 Recent Results:[/bold green]")
-            for i, result in enumerate(results[:5], 1):
-                status = "Unknown"
-                status_color = "dim"
-
-                if hasattr(result, "evaluation_status"):
-                    status = (
-                        result.evaluation_status.value
-                        if hasattr(result.evaluation_status, "value")
-                        else str(result.evaluation_status)
+                for i, agent in enumerate(agents[:3], 1):
+                    agent_type = (
+                        agent.agent_type.value
+                        if hasattr(agent.agent_type, "value")
+                        else agent.agent_type
                     )
-                    # Color code based on status
-                    if status.upper() == "COMPLETED":
-                        status_color = "green"
-                    elif status.upper() == "RUNNING":
-                        status_color = "yellow"
-                    elif status.upper() == "FAILED":
-                        status_color = "red"
+                    agent_name = _escape(agent.name) if agent.name else "Unnamed"
+                    agents_node.add_leaf(
+                        f"{i}. [cyan]{agent_name}[/cyan] [dim]({_escape(agent_type)})[/dim]"
+                    )
 
-                attack_type = getattr(result, "attack_type", "Unknown")
-                log_lines.append(
-                    f"  {i}. [yellow]{_escape(attack_type)}[/yellow] → [{status_color}]{_escape(status)}[/{status_color}]"
+            # Add recent results and their traces
+            if results:
+                results_node = tree.root.add(
+                    "[bold green]📋 Recent Results & Traces[/bold green]", expand=True
                 )
+                for i, result in enumerate(results[:5], 1):
+                    status = "Unknown"
+                    status_color = "dim"
 
-        if not log_lines:
-            log_lines = ["[dim]No recent activity yet...[/dim]"]
+                    if hasattr(result, "evaluation_status"):
+                        status = (
+                            result.evaluation_status.value
+                            if hasattr(result.evaluation_status, "value")
+                            else str(result.evaluation_status)
+                        )
+                        # Color code based on status
+                        if status.upper() == "COMPLETED":
+                            status_color = "green"
+                        elif status.upper() == "RUNNING":
+                            status_color = "yellow"
+                        elif status.upper() == "FAILED":
+                            status_color = "red"
 
-        activity_log.update("\n".join(log_lines))
+                    attack_type = getattr(result, "attack_type", "Unknown")
+                    result_label = f"{i}. [yellow]{_escape(attack_type)}[/yellow] → [{status_color}]{_escape(status)}[/{status_color}]"
+
+                    res_node = results_node.add(result_label, expand=(i == 1))
+
+                    # Add nested traces if available
+                    traces = getattr(result, "traces", [])
+                    if not traces:
+                        res_node.add_leaf("[dim]No traces available[/dim]")
+                    else:
+                        for trace_idx, trace in enumerate(traces, 1):
+                            step_type = getattr(trace, "step_type", "Unknown")
+                            step_type_str = (
+                                step_type.value
+                                if hasattr(step_type, "value")
+                                else str(step_type)
+                            )
+
+                            content = getattr(trace, "content", None)
+                            preview = ""
+                            if content:
+                                try:
+                                    if isinstance(content, str):
+                                        c_dict = json.loads(content)
+                                    else:
+                                        c_dict = content
+
+                                    if isinstance(c_dict, dict):
+                                        if "thought" in c_dict:
+                                            preview = f": {_escape(str(c_dict['thought'])[:60])}..."
+                                        elif "tool_name" in c_dict:
+                                            preview = f" ([bright_magenta]🔧 {_escape(str(c_dict['tool_name']))}[/bright_magenta])"
+                                        elif "response" in c_dict:
+                                            preview = f": {_escape(str(c_dict['response'])[:60])}..."
+                                    else:
+                                        preview = f": {_escape(str(content)[:60])}..."
+                                except Exception:
+                                    preview = f": {_escape(str(content)[:60])}..."
+
+                            trace_label = (
+                                f"└─ [magenta]{step_type_str}[/magenta]{preview}"
+                            )
+
+                            # Expand first few traces
+                            trace_node = res_node.add(
+                                trace_label, expand=(trace_idx <= 3)
+                            )
+
+                            # Add full content as leaf
+                            if content:
+                                try:
+                                    content_str = (
+                                        json.dumps(content, indent=2)
+                                        if isinstance(content, dict)
+                                        else str(content)
+                                    )
+                                    # limit leaf content to prevent slowing down TUI too much
+                                    content_str = content_str[:1000] + (
+                                        "..." if len(content_str) > 1000 else ""
+                                    )
+                                    trace_node.add_leaf(
+                                        f"[dim]{_escape(content_str)}[/dim]"
+                                    )
+                                except Exception:
+                                    pass
+
+        except Exception as e:
+            # Fallback to static log on error
+            try:
+                self.query_one("#activity-tree", Tree).display = False
+                self.query_one("#activity-scroll").display = True
+                activity_log = self.query_one("#activity-log", Static)
+                activity_log.update(
+                    f"[red]Error rendering traces: {_escape(str(e))}[/red]"
+                )
+            except Exception:
+                pass

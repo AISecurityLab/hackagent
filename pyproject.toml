@@ -22,6 +22,7 @@ classifiers = [
 
 dependencies = [
     "requests>=2.31.0",
+    "httpx>=0.27.0",
     "pydantic[email]>=2.0",
     "litellm>=1.69.2",
     "openai>=1.0.0",
@@ -30,16 +31,9 @@ dependencies = [
     "pyyaml>=6.0.0",
     "textual>=1.0.0",
     "python-dateutil>=2.8.0",
-    "attrs>=21.0.0",
     "faiss-cpu>=1.13.2",
-    "pypdf>=6.7.5",
-    "datasets>=4.6.1",
-    "asyncssh>=2.22.0",
-]
-
-[project.optional-dependencies]
-datasets = [
-    "datasets>=2.14.0",  # HuggingFace datasets library
+    "datasets>=2.14.0",
+    "nicegui>=2.0",
 ]
 
 
@@ -116,14 +110,17 @@ exclude_lines = [
 output = "reports/coverage.xml"
 
 [tool.pytest.ini_options]
-testpaths = ["tests/unit"]
-collect_ignore = [
-    "tests/test_auth.py",
-    "tests/test_google_adk.py",
-    "tests/test_rag_lmstudio.py",
-]
+testpaths = ["tests/unit", "tests/integration", "tests/e2e"]
+addopts = "--ignore=tests/e2e/attacks"
 markers = [
-    "google_adk: marks tests that require Google ADK server (deselect with '-m \"not google_adk\"')",
+    "integration: marks integration tests (use --run-integration to enable)",
+    "ollama: marks tests that require a running Ollama instance",
+    "openai_sdk: marks tests that require OpenAI/OpenRouter API key",
+    "google_adk: marks tests that require a live Google ADK server (use --run-google-adk to enable)",
+    "litellm: marks tests that require a LiteLLM-compatible backend",
+    "e2e: marks end-to-end tests that require external services",
+    "hackagent_backend: marks tests that require the HackAgent backend API",
+    "slow: marks slow-running tests",
 ]
 
 [tool.datamodel-codegen]

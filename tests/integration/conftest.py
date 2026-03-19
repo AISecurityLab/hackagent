@@ -170,13 +170,16 @@ def ollama_model() -> str:
 
 
 @pytest.fixture(scope="session")
-def ollama_available(ollama_base_url: str) -> bool:
-    """Check if Ollama is available at the configured URL."""
+def ollama_available(ollama_base_url: str, ollama_model: str) -> bool:
+    """Check if Ollama is available and the required model is loaded."""
     import requests
 
     try:
         response = requests.get(f"{ollama_base_url}/api/tags", timeout=5)
-        return response.status_code == 200
+        if response.status_code != 200:
+            return False
+        models = response.json().get("models", [])
+        return any(m.get("name", "").startswith(ollama_model) for m in models)
     except requests.exceptions.RequestException:
         return False
 

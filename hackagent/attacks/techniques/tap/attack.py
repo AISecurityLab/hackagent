@@ -50,7 +50,7 @@ from typing import Any, Dict, List, Optional
 
 from hackagent.attacks.shared.tui import with_tui_logging
 from hackagent.attacks.techniques.base import BaseAttack
-from hackagent.client import AuthenticatedClient
+from hackagent.server.client import AuthenticatedClient
 from hackagent.router.router import AgentRouter
 
 from . import evaluation, generation

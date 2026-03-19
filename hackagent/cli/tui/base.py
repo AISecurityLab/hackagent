@@ -14,7 +14,8 @@ from textual.containers import Container
 from textual.widgets import Static
 
 from hackagent.cli.config import CLIConfig
-from hackagent.client import AuthenticatedClient
+from hackagent.server.client import AuthenticatedClient
+from hackagent.server.storage.base import StorageBackend
 
 
 class HackAgentHeader(Container):
@@ -68,9 +69,37 @@ class BaseTab(Container):
         super().__init__(**kwargs)
         self.cli_config = cli_config
         self._refresh_interval = None
+        self._did_initial_refresh = False
+
+    def create_backend(self) -> StorageBackend:
+        """Return a StorageBackend (Remote or Local) based on available credentials.
+
+        Uses RemoteBackend when an api_key is configured; otherwise falls back
+        to LocalBackend so the TUI works completely offline.
+
+        Returns:
+            StorageBackend instance ready for use.
+        """
+        api_key = self.cli_config.api_key
+        if api_key:
+            from hackagent.server.storage.remote import RemoteBackend
+
+            client = AuthenticatedClient(
+                base_url=self.cli_config.base_url,
+                token=api_key,
+                prefix="Bearer",
+                timeout=httpx.Timeout(self.API_TIMEOUT, connect=self.API_TIMEOUT),
+            )
+            return RemoteBackend(client)
+        else:
+            from hackagent.server.storage.local import LocalBackend
+
+            return LocalBackend()
 
     def create_api_client(self, timeout: float | None = None) -> AuthenticatedClient:
         """Create an authenticated API client with timeout.
+
+        Deprecated: prefer create_backend() which works in both local and remote modes.
 
         Args:
             timeout: Optional timeout override (uses API_TIMEOUT by default)
@@ -151,5 +180,14 @@ class BaseTab(Container):
         Subclasses can override to add custom mounting behavior,
         but should call super().on_mount() to ensure proper initialization.
         """
-        # Defer initial load to ensure DOM is ready
-        self.call_after_refresh(self.refresh_data)
+        # Run initial load only for the currently visible tab.
+        # Other tabs will refresh lazily on first show.
+        if self.display:
+            self._did_initial_refresh = True
+            self.call_after_refresh(self.refresh_data)
+
+    def on_show(self) -> None:
+        """Refresh lazily the first time a hidden tab becomes visible."""
+        if not self._did_initial_refresh:
+            self._did_initial_refresh = True
+            self.call_after_refresh(self.refresh_data)
