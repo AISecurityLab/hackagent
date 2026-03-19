@@ -845,7 +845,31 @@ class BaseEvaluationStep:
         """Return a copy of execution statistics."""
         return self._statistics.copy()
 
+def _sync_metrics_to_server(self, summary: Dict[str, Any]) -> None:
+    """Send evaluation summary metrics to backend (for dashboard)."""
+    if not self._run_id:
+        self.logger.warning("No run_id — skipping metrics sync")
+        return
 
+    try:
+        from hackagent.api.run.run_partial_update import sync_detailed as run_status_update
+        from hackagent.api.models import PatchedRunRequest
+        import json
+
+        self.logger.info("Syncing evaluation metrics to server")
+
+        run_status_update(
+            id=self._run_id,
+            client=self._tracking_client or self.client,
+            body=PatchedRunRequest(
+                # 👇 store JSON in run_notes (quick solution)
+                run_notes=json.dumps(summary, indent=2)
+            ),
+        )
+
+    except Exception as e:
+        self.logger.warning(f"Failed to sync metrics to server: {e}")
+        
 def save_evaluation_results_to_csv(data, file_path="evaluation_results.csv"):
     """
     Save evaluation results to CSV for dashboard use.

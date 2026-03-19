@@ -581,15 +581,20 @@ class AttackOrchestrator:
                 from hackagent.attacks.evaluator.evaluation_step import (
                     BaseEvaluationStep,
                 )
+
                 # Normalize results for evaluator
                 for r in results:
-                    if 'completion' not in r and 'response' in r:
-                        r['completion'] = r['response']
-                    if 'prefix' not in r:
-                        r['prefix'] = ""
+                    if "completion" not in r and "response" in r:
+                        r["completion"] = r["response"]
+                    if "prefix" not in r:
+                        r["prefix"] = ""
 
                 evaluator = BaseEvaluationStep(
-                    config={"_run_id": run_id},
+                    config={
+                        "_run_id": run_id,
+                        "_client": self.client,  # 🔥 important
+                        "_tracker": self.tracker,  # if available
+                    },
                     logger=logger,
                     client=self.client,
                 )
