@@ -98,6 +98,7 @@ jobs:
         with:
           name: coverage-unit
           path: reports/.coverage
+          include-hidden-files: true
           retention-days: 1
 
   # ── Quick test – PRs to non-main branches ────────────────────────────────
@@ -172,6 +173,7 @@ jobs:
         with:
           name: coverage-integration-offline
           path: reports/.coverage
+          include-hidden-files: true
           retention-days: 1
 
   # ── Integration (Ollama) ──────────────────────────────────────────────────
@@ -237,6 +239,7 @@ jobs:
         with:
           name: coverage-integration-ollama
           path: reports/.coverage
+          include-hidden-files: true
           retention-days: 1
 
   # ── E2E tests ─────────────────────────────────────────────────────────────
