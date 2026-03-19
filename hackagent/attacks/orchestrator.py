@@ -500,6 +500,7 @@ class AttackOrchestrator:
         # 5. Execute locally
         try:
             _total_t0 = time.perf_counter()
+
             results = self._execute_local_attack(
                 attack_id=attack_id,
                 run_id=run_id,
@@ -507,8 +508,43 @@ class AttackOrchestrator:
                 attack_config=attack_config,
                 run_config_override=run_config_override,
             )
+
             _total_elapsed = round(time.perf_counter() - _total_t0, 3)
             logger.info(f"Total run time: {_total_elapsed:.1f}s")
+
+            # ================================
+            # 🚨 ADD EVALUATION STEP HERE
+            # ================================
+            try:
+                logger.info("Starting evaluation of attack results")
+                from hackagent.attacks.evaluator.evaluation_step import (
+                    BaseEvaluationStep,
+                )
+
+                # Normalize results for evaluator
+                for r in results:
+                    if "completion" not in r and "response" in r:
+                        r["completion"] = r["response"]
+                    if "prefix" not in r:
+                        r["prefix"] = ""
+
+                evaluator = BaseEvaluationStep(
+                    config={
+                        "_run_id": run_id,
+                        "_client": self.client,  # 🔥 important
+                        "_tracker": self.tracker,  # if available
+                    },
+                    logger=logger,
+                    client=self.client,
+                )
+
+                evaluated_results = evaluator.execute(results)
+
+                logger.info("Evaluation completed successfully")
+
+            except Exception as eval_error:
+                logger.warning(f"Evaluation step failed: {eval_error}")
+            # ================================
 
             # 6. Update run status to COMPLETED
             try:
@@ -520,7 +556,7 @@ class AttackOrchestrator:
             except Exception as e:
                 logger.warning(f"Failed to update run status to COMPLETED: {e}")
 
-            return results
+            return evaluated_results if "evaluated_results" in locals() else results
 
         except Exception as e:
             # Update run status to FAILED on error

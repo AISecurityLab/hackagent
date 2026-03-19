@@ -40,11 +40,14 @@ Usage:
             ...
 """
 
+import csv
+from pathlib import Path
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import fields
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
-
+import json
+from hackagent.attacks.evaluator.metrics import generate_summary_report
 from hackagent.attacks.evaluator.judge_evaluators import EVALUATOR_MAP
 from hackagent.attacks.evaluator.sync import sync_evaluation_to_server
 from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
@@ -664,6 +667,46 @@ class BaseEvaluationStep:
             item["best_score"] = self.compute_best_score(item)
             item["success"] = item["best_score"] > 0
 
+    def execute(self, input_data: List[Dict[str, Any]]):
+        """
+        Run the full evaluation pipeline:
+        - Multi-judge evaluation
+        - Compute best_score and success
+        - ASR logging
+        - Update tracker
+        - Sync to server
+        - Save results to CSV and JSON summary
+
+        Returns:
+            List of evaluated items (with enrichment).
+        """
+        # 1. Resolve judges & build config
+        judges_config = self._resolve_judges_from_config()
+        evaluator_base_config = self._build_base_eval_config()
+
+        # 2. Run evaluation
+        evaluated_items = self._run_evaluation(
+            input_data, judges_config, evaluator_base_config
+        )
+
+        # 3. Enrich with best_score & success
+        self._enrich_items_with_scores(evaluated_items)
+
+        # 4. ASR Logging
+        self._log_evaluation_asr(evaluated_items)
+
+        # 5. Update tracker (if tracker exists)
+        self._update_tracker(evaluated_items)
+
+        # 6. Sync results to server
+        self._sync_to_server(evaluated_items)
+
+        # 7. Save results locally
+        save_evaluation_results_to_csv(evaluated_items)
+        save_metrics_summary(evaluated_items)
+
+        return evaluated_items
+
     # ====================================================================
     # SERVER SYNC
     # ====================================================================
@@ -803,3 +846,73 @@ class BaseEvaluationStep:
     def get_statistics(self) -> Dict[str, Any]:
         """Return a copy of execution statistics."""
         return self._statistics.copy()
+
+
+def _sync_metrics_to_server(self, summary: Dict[str, Any]) -> None:
+    """Send evaluation summary metrics to backend (for dashboard)."""
+    if not self._run_id:
+        self.logger.warning("No run_id — skipping metrics sync")
+        return
+
+    try:
+        from hackagent.api.run.run_partial_update import (
+            sync_detailed as run_status_update,
+        )
+        from hackagent.api.models import PatchedRunRequest
+        import json
+
+        self.logger.info("Syncing evaluation metrics to server")
+
+        run_status_update(
+            id=self._run_id,
+            client=self._tracking_client or self.client,
+            body=PatchedRunRequest(
+                # 👇 store JSON in run_notes (quick solution)
+                run_notes=json.dumps(summary, indent=2)
+            ),
+        )
+
+    except Exception as e:
+        self.logger.warning(f"Failed to sync metrics to server: {e}")
+
+
+def save_evaluation_results_to_csv(data, file_path="evaluation_results.csv"):
+    """
+    Save evaluation results to CSV for dashboard use.
+
+    Args:
+        data: List of dictionaries containing evaluation results
+        file_path: Output CSV file path
+    """
+    if not data:
+        return
+
+    # Ensure logs directory exists
+    Path("logs").mkdir(exist_ok=True)
+
+    file_path = Path("logs") / file_path
+
+    # Collect all possible keys
+    keys = set()
+    for row in data:
+        keys.update(row.keys())
+
+    fieldnames = sorted(list(keys))
+
+    with open(file_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(data)
+
+    print(f"Evaluation results saved to {file_path}")
+
+
+def save_metrics_summary(data):
+    summary = generate_summary_report(data)
+
+    Path("logs").mkdir(exist_ok=True)
+
+    with open("logs/evaluation_metrics.json", "w") as f:
+        json.dump(summary, f, indent=2)
+
+    print("Evaluation metrics summary saved to logs/evaluation_metrics.json")
