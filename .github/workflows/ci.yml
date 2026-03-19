@@ -326,13 +326,11 @@ jobs:
       - name: Combine coverage data
         run: |
           mkdir -p reports
-          # upload-artifact@v4 preserves the full relative path, so each artifact
-          # stores reports/.coverage internally → extracted to <name>/reports/.coverage
           i=0
-          for f in coverage-artifacts/*/reports/.coverage; do
+          while IFS= read -r f; do
             cp "$f" "reports/.coverage.$i"
             i=$((i + 1))
-          done
+          done < <(find coverage-artifacts -name ".coverage" -type f)
           uv run coverage combine reports/
           uv run coverage xml -o reports/coverage-merged.xml
           uv run coverage report --skip-covered
