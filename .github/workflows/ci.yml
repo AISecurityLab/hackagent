@@ -323,9 +323,10 @@ jobs:
       - name: Combine coverage data
         run: |
           mkdir -p reports
-          # Rename each artifact's .coverage with a unique suffix so combine can merge them
+          # upload-artifact@v4 preserves the full relative path, so each artifact
+          # stores reports/.coverage internally → extracted to <name>/reports/.coverage
           i=0
-          for f in coverage-artifacts/*/.coverage; do
+          for f in coverage-artifacts/*/reports/.coverage; do
             cp "$f" "reports/.coverage.$i"
             i=$((i + 1))
           done
