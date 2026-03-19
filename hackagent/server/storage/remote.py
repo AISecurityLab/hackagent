@@ -213,11 +213,11 @@ class RemoteBackend:
             for a in resp.parsed.results or []:
                 if a.name == name:
                     return a
+            # `next` is AnyUrl | None (not str), so use bool() / str() checks
             next_page = getattr(resp.parsed, "next", None)
-            if not isinstance(next_page, str) or not next_page.strip():
+            if next_page is None:
                 next_page = getattr(resp.parsed, "next_", None)
-            has_next_page = isinstance(next_page, str) and bool(next_page.strip())
-            if not has_next_page:
+            if not next_page:
                 break
             page += 1
         return None
@@ -426,11 +426,11 @@ class RemoteBackend:
                 )
 
             remaining -= len(page_results)
+            # `next` is AnyUrl | None (not str), so use bool() check
             next_page = getattr(resp.parsed, "next", None)
-            if not isinstance(next_page, str) or not next_page.strip():
+            if next_page is None:
                 next_page = getattr(resp.parsed, "next_", None)
-            has_next_page = isinstance(next_page, str) and bool(next_page.strip())
-            if remaining <= 0 or not has_next_page or not page_results:
+            if remaining <= 0 or not next_page or not page_results:
                 break
             current_page += 1
 
@@ -581,11 +581,11 @@ class RemoteBackend:
                 )
 
             remaining -= len(page_results)
+            # `next` is AnyUrl | None (not str), so use bool() check
             next_page = getattr(resp.parsed, "next", None)
-            if not isinstance(next_page, str) or not next_page.strip():
+            if next_page is None:
                 next_page = getattr(resp.parsed, "next_", None)
-            has_next_page = isinstance(next_page, str) and bool(next_page.strip())
-            if remaining <= 0 or not has_next_page or not page_results:
+            if remaining <= 0 or not next_page or not page_results:
                 break
             current_page += 1
 
