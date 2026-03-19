@@ -432,7 +432,9 @@ class RemoteBackend:
             next_page = getattr(resp.parsed, "next", None)
             if not isinstance(next_page, (str, AnyUrl)) or not str(next_page).strip():
                 next_page = getattr(resp.parsed, "next_", None)
-            has_next = isinstance(next_page, (str, AnyUrl)) and bool(str(next_page).strip())
+            has_next = isinstance(next_page, (str, AnyUrl)) and bool(
+                str(next_page).strip()
+            )
             if remaining <= 0 or not has_next or not page_results:
                 break
             current_page += 1
@@ -588,7 +590,9 @@ class RemoteBackend:
             next_page = getattr(resp.parsed, "next", None)
             if not isinstance(next_page, (str, AnyUrl)) or not str(next_page).strip():
                 next_page = getattr(resp.parsed, "next_", None)
-            has_next = isinstance(next_page, (str, AnyUrl)) and bool(str(next_page).strip())
+            has_next = isinstance(next_page, (str, AnyUrl)) and bool(
+                str(next_page).strip()
+            )
             if remaining <= 0 or not has_next or not page_results:
                 break
             current_page += 1
