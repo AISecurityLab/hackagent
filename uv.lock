@@ -1641,7 +1641,7 @@ wheels = [
 
 [[package]]
 name = "google-adk"
-version = "1.27.1"
+version = "1.27.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiosqlite" },
@@ -1690,9 +1690,9 @@ dependencies = [
     { name = "watchdog" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3d/59/e49d38b6948192180ed971d65bd03ad75d07593476db1cdd63b5cf6cfbeb/google_adk-1.27.1.tar.gz", hash = "sha256:b252b6e2139385fb8b96cc24026f77be83a93a71da877aa3e7e98868a8f5c9d9", size = 2297550, upload-time = "2026-03-13T23:09:05.028Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5e/8c/5f3d3fcfdabbbe509e2a488cbfbf799c6a889b25ace877d40956498d3da1/google_adk-1.27.2.tar.gz", hash = "sha256:2971793c9872cd496cc322e6dd7cf404e99512689ed2fffd43f333683d204c2a", size = 2297941, upload-time = "2026-03-17T21:14:52.978Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/63/ac/dfaa3f751c22662ff045814f62f68be7f8e5a9c0dbd882c24a7afb5284c7/google_adk-1.27.1-py3-none-any.whl", hash = "sha256:806c72dd6d79b16a1dd86e5874ed48f5a42f2acc0129becbb77487a7629af224", size = 2688647, upload-time = "2026-03-13T23:09:03.457Z" },
+    { url = "https://files.pythonhosted.org/packages/44/0d/bde4735b5ec36a312774526bb75fecaf45af6ae029d9bd665c42c5fe8d15/google_adk-1.27.2-py3-none-any.whl", hash = "sha256:04b4f23e9d26d75ee2f70c8d933629b095b8f6b23ed8ffc072f4d13fd106848d", size = 2689037, upload-time = "2026-03-17T21:14:51.318Z" },
 ]
 
 [[package]]
