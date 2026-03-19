@@ -17,6 +17,8 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
+from pydantic import AnyUrl
+
 from hackagent.server.client import AuthenticatedClient
 from hackagent.server.api.agent import agent_create, agent_list, agent_partial_update
 from hackagent.server.api.attack import attack_create, attack_list
@@ -213,11 +215,11 @@ class RemoteBackend:
             for a in resp.parsed.results or []:
                 if a.name == name:
                     return a
-            # `next` is AnyUrl | None (not str), so use bool() / str() checks
+            # `next` is AnyUrl | None — isinstance guards against truthy MagicMocks
             next_page = getattr(resp.parsed, "next", None)
-            if next_page is None:
+            if not isinstance(next_page, (str, AnyUrl)) or not str(next_page).strip():
                 next_page = getattr(resp.parsed, "next_", None)
-            if not next_page:
+            if not isinstance(next_page, (str, AnyUrl)) or not str(next_page).strip():
                 break
             page += 1
         return None
@@ -426,11 +428,12 @@ class RemoteBackend:
                 )
 
             remaining -= len(page_results)
-            # `next` is AnyUrl | None (not str), so use bool() check
+            # `next` is AnyUrl | None — isinstance guards against truthy MagicMocks
             next_page = getattr(resp.parsed, "next", None)
-            if next_page is None:
+            if not isinstance(next_page, (str, AnyUrl)) or not str(next_page).strip():
                 next_page = getattr(resp.parsed, "next_", None)
-            if remaining <= 0 or not next_page or not page_results:
+            has_next = isinstance(next_page, (str, AnyUrl)) and bool(str(next_page).strip())
+            if remaining <= 0 or not has_next or not page_results:
                 break
             current_page += 1
 
@@ -581,11 +584,12 @@ class RemoteBackend:
                 )
 
             remaining -= len(page_results)
-            # `next` is AnyUrl | None (not str), so use bool() check
+            # `next` is AnyUrl | None — isinstance guards against truthy MagicMocks
             next_page = getattr(resp.parsed, "next", None)
-            if next_page is None:
+            if not isinstance(next_page, (str, AnyUrl)) or not str(next_page).strip():
                 next_page = getattr(resp.parsed, "next_", None)
-            if remaining <= 0 or not next_page or not page_results:
+            has_next = isinstance(next_page, (str, AnyUrl)) and bool(str(next_page).strip())
+            if remaining <= 0 or not has_next or not page_results:
                 break
             current_page += 1
 
