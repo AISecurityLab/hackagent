@@ -95,6 +95,9 @@ class StrategyLibrary:
             kwargs: Dict[str, Any] = {
                 "model": self.embedding_model,
                 "input": [text],
+                # OpenRouter/OpenAI-compatible embedding endpoints expect
+                # encoding_format to be one of: float|base64.
+                "encoding_format": "float",
             }
             if self.embedding_api_base:
                 kwargs["api_base"] = self.embedding_api_base
