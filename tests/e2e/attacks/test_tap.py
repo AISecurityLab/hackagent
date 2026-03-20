@@ -49,7 +49,7 @@ def test_tap():
         "goal_batch_workers": 10,
         "max_new_tokens": 400,
         "tap_params": {
-            "depth": 2,
+            "depth": 4,
             "width": 2,
             "branching_factor": 3,
             "n_streams": 3,
