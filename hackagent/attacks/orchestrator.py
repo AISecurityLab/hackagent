@@ -262,6 +262,7 @@ class AttackOrchestrator:
                 **attack_config,  ## Spread full attack config
                 **(run_config_override or {}),
                 "_run_id": run_id,
+                "_client": self.hack_agent.backend,  # backend expected by evaluator/router factory
                 "_backend": self.hack_agent.backend,  # StorageBackend for result tracking
             },
             "client": self.hack_agent.backend,  # pass backend as 'client' for BaseAttack compat

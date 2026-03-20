@@ -175,7 +175,7 @@ def _resolve_techniques(pap_params: Dict[str, Any]) -> List[str]:
 
 def _create_attacker_router(
     attacker_config: Dict[str, Any],
-    client: "AuthenticatedClient",
+    backend: Any,
 ) -> AgentRouter:
     """Create an AgentRouter for the attacker LLM."""
     metadata: Dict[str, Any] = {
@@ -186,7 +186,7 @@ def _create_attacker_router(
         metadata["api_key"] = api_key
 
     return AgentRouter(
-        client=client,
+        backend=backend,
         name=f"pap-attacker-{attacker_config.get('identifier', 'unknown')[:30]}",
         agent_type=attacker_config.get("agent_type", "OPENAI_SDK"),
         endpoint=attacker_config.get("endpoint"),
@@ -227,6 +227,7 @@ def execute(
 
     tracker: Optional["Tracker"] = config.get("_tracker")
     client: Optional["AuthenticatedClient"] = config.get("_client")
+    backend = config.get("_backend") or getattr(agent_router, "backend", None)
 
     techniques = _resolve_techniques(pap_params)
     max_techniques = pap_params.get("max_techniques_per_goal", 0)
@@ -246,9 +247,9 @@ def execute(
 
     # Create attacker router
     attacker_router: Optional[AgentRouter] = None
-    if client and attacker_cfg.get("identifier"):
+    if backend and attacker_cfg.get("identifier"):
         try:
-            attacker_router = _create_attacker_router(attacker_cfg, client)
+            attacker_router = _create_attacker_router(attacker_cfg, backend)
             logger.info(
                 f"Attacker LLM: {attacker_cfg.get('identifier')} "
                 f"(endpoint={attacker_cfg.get('endpoint')})"

@@ -19,6 +19,7 @@ from uuid import UUID
 
 from hackagent.server.client import AuthenticatedClient
 from hackagent.server.api.agent import agent_create, agent_list, agent_partial_update
+from hackagent.server.api.organization import organization_me_retrieve
 from hackagent.server.api.attack import attack_create, attack_list
 from hackagent.server.api.run import (
     run_list,
@@ -73,7 +74,11 @@ def _pick_dt(obj: Any, *names: str) -> datetime:
 
 
 def _coerce_trace_id(raw_id: Any, result_id: UUID, sequence: int) -> UUID:
-    """Normalize API trace IDs to UUID for TraceRecord compatibility."""
+    """Normalize API trace IDs to UUID for TraceRecord compatibility.
+
+    Remote Trace IDs are integer-based in the current API schema, so int IDs are
+    expected and converted deterministically without logging a warning.
+    """
     if isinstance(raw_id, UUID):
         return raw_id
 
@@ -82,6 +87,9 @@ def _coerce_trace_id(raw_id: Any, result_id: UUID, sequence: int) -> UUID:
             return UUID(raw_id)
         except ValueError:
             pass
+
+    if isinstance(raw_id, int):
+        return uuid.uuid5(uuid.NAMESPACE_URL, f"trace:{result_id}:{sequence}:{raw_id}")
 
     try:
         logger.warning(
@@ -148,12 +156,56 @@ class RemoteBackend:
             )
             return self._context
 
+        # New accounts may legitimately have zero agents. In that case, resolve
+        # the organization directly from the dedicated endpoint and keep user_id
+        # as unknown (it is only required for specific adapter flows like ADK).
+        org_response = organization_me_retrieve.sync_detailed(client=self._client)
+        if org_response.status_code == 200 and org_response.parsed:
+            self._context = OrganizationContext(
+                org_id=org_response.parsed.id,
+                user_id="unknown",
+            )
+            return self._context
+
         raise RuntimeError(
             "RemoteBackend: Cannot determine organization context. "
-            "No agents exist — create one first, or check your API key."
+            "No agents exist, and /organization/me lookup failed. "
+            f"agent_list_status={response.status_code}, "
+            f"agent_list_body={response.content!r}, "
+            f"organization_me_status={org_response.status_code}, "
+            f"organization_me_body={org_response.content!r}."
         )
 
     # ── Agent ─────────────────────────────────────────────────────────────────
+
+    def _update_existing_agent(
+        self,
+        existing: Any,
+        agent_type: str,
+        endpoint: str,
+        metadata: Dict[str, Any],
+        overwrite_metadata: bool,
+    ) -> AgentRecord:
+        """Update an existing agent record, or return it unchanged."""
+        if not overwrite_metadata:
+            return _to_agent_record(existing)
+
+        patch_kwargs: Dict[str, Any] = {}
+        current_meta = existing.metadata if isinstance(existing.metadata, dict) else {}
+        merged_meta = {**current_meta, **metadata}
+        patch_kwargs["metadata"] = {
+            k: v for k, v in merged_meta.items() if v is not None
+        }
+        patch_kwargs["agent_type"] = agent_type
+        patch_kwargs["endpoint"] = endpoint
+
+        body = PatchedAgentRequest(**patch_kwargs)
+        resp = agent_partial_update.sync_detailed(
+            id=existing.id, client=self._client, body=body
+        )
+        if resp.status_code < 300 and resp.parsed:
+            return _to_agent_record(resp.parsed)
+        return _to_agent_record(existing)
 
     def create_or_update_agent(
         self,
@@ -166,27 +218,13 @@ class RemoteBackend:
         existing = self._find_agent_by_name(name)
 
         if existing:
-            if not overwrite_metadata:
-                return _to_agent_record(existing)
-
-            patch_kwargs: Dict[str, Any] = {}
-            current_meta = (
-                existing.metadata if isinstance(existing.metadata, dict) else {}
+            return self._update_existing_agent(
+                existing=existing,
+                agent_type=agent_type,
+                endpoint=endpoint,
+                metadata=metadata,
+                overwrite_metadata=overwrite_metadata,
             )
-            merged_meta = {**current_meta, **metadata}
-            patch_kwargs["metadata"] = {
-                k: v for k, v in merged_meta.items() if v is not None
-            }
-            patch_kwargs["agent_type"] = agent_type
-            patch_kwargs["endpoint"] = endpoint
-
-            body = PatchedAgentRequest(**patch_kwargs)
-            resp = agent_partial_update.sync_detailed(
-                id=existing.id, client=self._client, body=body
-            )
-            if resp.status_code < 300 and resp.parsed:
-                return _to_agent_record(resp.parsed)
-            return _to_agent_record(existing)
 
         body = AgentRequest(
             name=name,
@@ -198,9 +236,28 @@ class RemoteBackend:
         resp = agent_create.sync_detailed(client=self._client, body=body)
         if resp.status_code == 201 and resp.parsed:
             return _to_agent_record(resp.parsed)
+
+        # Some backend deployments may return 5xx for duplicate names.
+        # Retry lookup and convert to update semantics instead of crashing.
+        recovered_existing = self._find_agent_by_name(name)
+        if recovered_existing:
+            logger.warning(
+                "RemoteBackend: create for existing agent name '%s' returned %s; "
+                "falling back to update path",
+                name,
+                resp.status_code,
+            )
+            return self._update_existing_agent(
+                existing=recovered_existing,
+                agent_type=agent_type,
+                endpoint=endpoint,
+                metadata=metadata,
+                overwrite_metadata=overwrite_metadata,
+            )
+
         raise RuntimeError(
             f"RemoteBackend: Failed to create agent '{name}' "
-            f"(status {resp.status_code})"
+            f"(status {resp.status_code}, body={resp.content!r})"
         )
 
     def _find_agent_by_name(self, name: str):
@@ -214,9 +271,9 @@ class RemoteBackend:
                 if a.name == name:
                     return a
             next_page = getattr(resp.parsed, "next", None)
-            if not isinstance(next_page, str) or not next_page.strip():
+            if next_page is None:
                 next_page = getattr(resp.parsed, "next_", None)
-            has_next_page = isinstance(next_page, str) and bool(next_page.strip())
+            has_next_page = bool(next_page)
             if not has_next_page:
                 break
             page += 1

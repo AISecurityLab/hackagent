@@ -7,6 +7,7 @@ Attacks Tab
 Execute and manage security attacks with dynamic, strategy-aware configuration.
 """
 
+import copy
 from typing import Any, Dict, List, Optional
 
 from textual import on
@@ -20,6 +21,8 @@ from textual.widgets import (
     Input,
     Label,
     ProgressBar,
+    RadioButton,
+    RadioSet,
     RichLog,
     Select,
     Static,
@@ -28,6 +31,8 @@ from textual.widgets import (
     TabPane,
     TextArea,
 )
+
+from hackagent.datasets.presets import PRESETS as _DATASET_PRESETS
 
 from hackagent.cli.config import CLIConfig
 from hackagent.cli.tui.attack_specs import (
@@ -115,6 +120,15 @@ class AttacksTab(Container):
         color: $error;
         margin-top: 1;
     }
+
+    AttacksTab #goals-container {
+        height: auto;
+    }
+
+    AttacksTab #dataset-container {
+        display: none;
+        height: auto;
+    }
     """
 
     BINDINGS = [
@@ -132,6 +146,12 @@ class AttacksTab(Container):
         super().__init__()
         self.cli_config = cli_config
         self.initial_data = initial_data or {}
+        self._attack_config_overrides: Dict[str, Any] = copy.deepcopy(
+            self.initial_data.get("attack_config_overrides", {})
+        )
+        self._agent_adapter_operational_config: Optional[Dict[str, Any]] = (
+            copy.deepcopy(self.initial_data.get("agent_adapter_operational_config"))
+        )
         self._show_advanced = False
         self._current_spec: Optional[AttackConfigSpec] = None
 
@@ -177,10 +197,36 @@ class AttacksTab(Container):
                 )
                 yield Static("")
 
-                yield Label("Goals (what you want the agent to do incorrectly):")
-                goals_area = TextArea("Return fake weather data", id="attack-goals")
-                goals_area.styles.height = 5
-                yield goals_area
+                # --- Input source: Goals vs Dataset (radio toggle) ---
+                yield Static("[bold]Input Source[/bold]", classes="section-title")
+                with RadioSet(id="input-source-radio"):
+                    yield RadioButton("Goals", value=True, id="radio-goals")
+                    yield RadioButton("Dataset", id="radio-dataset")
+                yield Static("")
+
+                # Goals container (visible by default)
+                with Vertical(id="goals-container"):
+                    yield Label("Goals (what you want the agent to do incorrectly):")
+                    goals_area = TextArea("Return fake weather data", id="attack-goals")
+                    goals_area.styles.height = 5
+                    yield goals_area
+
+                # Dataset container (hidden by default)
+                with Vertical(id="dataset-container"):
+                    yield Label("Dataset:")
+                    dataset_choices = [(k, k) for k in sorted(_DATASET_PRESETS)]
+                    yield Select(
+                        dataset_choices, id="dataset-preset", value="harmbench"
+                    )
+                    yield Static("")
+                    yield Label("Limit (max samples):")
+                    yield Input(value="5", id="dataset-limit", placeholder="e.g. 5")
+                    yield Static("")
+                    yield Label("Shuffle:")
+                    yield Switch(value=True, id="dataset-shuffle")
+                    yield Static("")
+                    yield Label("Seed:")
+                    yield Input(value="42", id="dataset-seed", placeholder="e.g. 42")
                 yield Static("")
 
                 yield Label("Timeout (seconds):")
@@ -260,6 +306,9 @@ class AttacksTab(Container):
         ):
             self._render_strategy_config(str(strategy_select.value))
 
+        if self.initial_data.get("auto_execute_attack", False):
+            self.call_after_refresh(lambda: self._execute_attack(dry_run=False))
+
     def _add_initial_messages(self) -> None:
         """Add initial welcome messages to the viewers."""
         try:
@@ -292,6 +341,18 @@ class AttacksTab(Container):
     # ------------------------------------------------------------------
     # Dynamic strategy config rendering
     # ------------------------------------------------------------------
+
+    def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
+        """Toggle between Goals and Dataset input panels."""
+        if event.radio_set.id == "input-source-radio":
+            goals_container = self.query_one("#goals-container")
+            dataset_container = self.query_one("#dataset-container")
+            if event.pressed.id == "radio-goals":
+                goals_container.display = True
+                dataset_container.display = False
+            else:
+                goals_container.display = False
+                dataset_container.display = True
 
     def on_select_changed(self, event: Select.Changed) -> None:
         """React to strategy selector changes."""
@@ -545,6 +606,90 @@ class AttacksTab(Container):
         if "timeout" in self.initial_data:
             self.query_one("#timeout", Input).value = str(self.initial_data["timeout"])
 
+        strategy_value = self.initial_data.get(
+            "attack_type"
+        ) or self._attack_config_overrides.get("attack_type")
+        if strategy_value:
+            strategy_select = self.query_one("#attack-strategy", Select)
+            strategy_select.value = str(strategy_value)
+            self._render_strategy_config(str(strategy_value))
+
+        if self._attack_config_overrides:
+            self._prefill_strategy_fields(self._attack_config_overrides)
+
+        goals_from_overrides = self._attack_config_overrides.get("goals")
+        if isinstance(goals_from_overrides, list) and goals_from_overrides:
+            self.query_one("#attack-goals", TextArea).text = str(
+                goals_from_overrides[0]
+            )
+
+        # ── Prefill dataset vs goals toggle ──
+        dataset_cfg = self._attack_config_overrides.get("dataset")
+        if isinstance(dataset_cfg, dict) and dataset_cfg.get("preset"):
+            self.query_one("#radio-dataset", RadioButton).value = True
+            self.query_one("#goals-container").display = False
+            self.query_one("#dataset-container").display = True
+            self.query_one("#dataset-preset", Select).value = dataset_cfg["preset"]
+            if "limit" in dataset_cfg:
+                self.query_one("#dataset-limit", Input).value = str(
+                    dataset_cfg["limit"]
+                )
+            if "shuffle" in dataset_cfg:
+                self.query_one("#dataset-shuffle", Switch).value = bool(
+                    dataset_cfg["shuffle"]
+                )
+            if "seed" in dataset_cfg:
+                self.query_one("#dataset-seed", Input).value = str(dataset_cfg["seed"])
+
+    @staticmethod
+    def _flatten_dict(data: Dict[str, Any], prefix: str = "") -> Dict[str, Any]:
+        """Flatten nested dict keys using dot notation."""
+        flat: Dict[str, Any] = {}
+        for key, value in data.items():
+            dotted_key = f"{prefix}.{key}" if prefix else key
+            if isinstance(value, dict):
+                flat.update(AttacksTab._flatten_dict(value, dotted_key))
+            else:
+                flat[dotted_key] = value
+        return flat
+
+    def _prefill_strategy_fields(self, attack_config: Dict[str, Any]) -> None:
+        """Pre-fill strategy-specific form fields from attack config overrides."""
+        if not self._current_spec:
+            return
+
+        flat_overrides = self._flatten_dict(attack_config)
+        advanced_keys = {
+            field.key for field in self._current_spec.fields if field.advanced
+        }
+
+        if advanced_keys.intersection(flat_overrides.keys()):
+            advanced_toggle = self.query_one("#advanced-toggle", Checkbox)
+            advanced_toggle.value = True
+            self._show_advanced = True
+            self._render_strategy_config(self._current_spec.technique_key)
+
+        for cfg_field in self._current_spec.fields:
+            if cfg_field.key not in flat_overrides:
+                continue
+
+            widget_id = _field_widget_id(cfg_field)
+            try:
+                widget = self.query_one(f"#{widget_id}")
+            except Exception:
+                continue
+
+            value = flat_overrides[cfg_field.key]
+
+            if isinstance(widget, Select):
+                widget.value = value
+            elif isinstance(widget, Switch):
+                widget.value = bool(value)
+            elif isinstance(widget, TextArea):
+                widget.text = "" if value is None else str(value)
+            elif isinstance(widget, Input):
+                widget.value = "" if value is None else str(value)
+
     # ------------------------------------------------------------------
     # Button handlers
     # ------------------------------------------------------------------
@@ -577,8 +722,10 @@ class AttacksTab(Container):
         agent_type_raw = self.query_one("#agent-type", Select).value
         endpoint = self.query_one("#endpoint-url", Input).value
         strategy_raw = self.query_one("#attack-strategy", Select).value
-        goals = self.query_one("#attack-goals", TextArea).text
         timeout = self.query_one("#timeout", Input).value
+
+        # Detect which input source is active (Goals vs Dataset)
+        using_dataset = self.query_one("#radio-dataset", RadioButton).value
 
         # ── Basic validation ──
         if not agent_name:
@@ -589,9 +736,6 @@ class AttacksTab(Container):
             return
         if isinstance(strategy_raw, NoSelection) or not strategy_raw:
             return
-        if not goals:
-            return
-
         try:
             timeout_int = int(timeout)
             if timeout_int <= 0:
@@ -619,11 +763,42 @@ class AttacksTab(Container):
 
         # Build the full attack config dict (nested)
         strategy_config = self._expand_dotted_keys(strategy_values)
-        attack_config: Dict[str, Any] = {
-            "attack_type": strategy,
-            "goals": [goals],
-            **strategy_config,
-        }
+        attack_config: Dict[str, Any] = copy.deepcopy(self._attack_config_overrides)
+        if not isinstance(attack_config, dict):
+            attack_config = {}
+
+        self._deep_merge_dicts(attack_config, strategy_config)
+        attack_config["attack_type"] = strategy
+
+        # ── Populate goals or dataset from form ──
+        if using_dataset:
+            dataset_preset_raw = self.query_one("#dataset-preset", Select).value
+            if (
+                isinstance(dataset_preset_raw, type(Select.BLANK))
+                or not dataset_preset_raw
+            ):
+                return
+            dataset_cfg: Dict[str, Any] = {"preset": str(dataset_preset_raw)}
+            try:
+                limit_val = int(self.query_one("#dataset-limit", Input).value)
+                dataset_cfg["limit"] = limit_val
+            except (ValueError, TypeError):
+                pass
+            dataset_cfg["shuffle"] = self.query_one("#dataset-shuffle", Switch).value
+            try:
+                seed_val = int(self.query_one("#dataset-seed", Input).value)
+                dataset_cfg["seed"] = seed_val
+            except (ValueError, TypeError):
+                pass
+            attack_config["dataset"] = dataset_cfg
+            attack_config.pop("goals", None)
+            goals = ""
+        else:
+            goals = self.query_one("#attack-goals", TextArea).text
+            if goals:
+                attack_config["goals"] = [goals]
+            else:
+                return
 
         status_widget = self.query_one("#execution-status", Static)
         progress_bar = self.query_one("#attack-progress", ProgressBar)
@@ -793,6 +968,7 @@ class AttacksTab(Container):
                 api_key=self.cli_config.api_key,
                 base_url=self.cli_config.base_url,
                 timeout=5.0,
+                adapter_operational_config=self._agent_adapter_operational_config,
             )
 
             self.app.call_from_thread(progress_bar.update, progress=30)
@@ -936,6 +1112,15 @@ class AttacksTab(Container):
         self.query_one("#attack-goals", TextArea).text = "Return fake weather data"
         self.query_one("#timeout", Input).value = "300"
 
+        # Reset input source to Goals
+        self.query_one("#radio-goals", RadioButton).value = True
+        self.query_one("#goals-container").display = True
+        self.query_one("#dataset-container").display = False
+        self.query_one("#dataset-preset", Select).value = "harmbench"
+        self.query_one("#dataset-limit", Input).value = "5"
+        self.query_one("#dataset-shuffle", Switch).value = True
+        self.query_one("#dataset-seed", Input).value = "42"
+
         status_widget = self.query_one("#execution-status", Static)
         progress_bar = self.query_one("#attack-progress", ProgressBar)
         status_widget.update("[dim]Configure attack parameters and click Execute[/dim]")
@@ -945,3 +1130,12 @@ class AttacksTab(Container):
     def refresh_data(self) -> None:
         """Refresh attacks data."""
         pass
+
+    @staticmethod
+    def _deep_merge_dicts(base: Dict[str, Any], updates: Dict[str, Any]) -> None:
+        """Deep-merge updates into base in place."""
+        for key, value in updates.items():
+            if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+                AttacksTab._deep_merge_dicts(base[key], value)
+            else:
+                base[key] = value

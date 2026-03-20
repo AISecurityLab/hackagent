@@ -171,6 +171,9 @@ class OpenAIAgent(ChatCompletionsAgent):
         if self.api_base_url:
             client_kwargs["base_url"] = self.api_base_url
 
+        timeout = self._get_config_key("timeout", 120)
+        client_kwargs["timeout"] = timeout
+
         self.client = openai_client_class(**client_kwargs)
 
         self.logger.info(

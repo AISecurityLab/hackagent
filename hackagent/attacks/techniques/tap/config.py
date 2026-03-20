@@ -36,7 +36,6 @@ DEFAULT_TAP_CONFIG: Dict[str, Any] = {
         "identifier": "hackagent-attacker",
         "endpoint": "https://api.hackagent.dev/v1",
         "agent_type": "OPENAI_SDK",
-        "model": "gpt-4",
         "max_new_tokens": 400,
         "temperature": 1.0,
         "top_p": 0.9,

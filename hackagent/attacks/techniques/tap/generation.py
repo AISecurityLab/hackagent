@@ -621,6 +621,18 @@ class TapExecutor:
                     )
                     _log_colored(
                         self.logger,
+                        "[ATTACKER PROMPT] Depth %s/%s %s/%s: %s"
+                        % (
+                            iteration,
+                            depth,
+                            idx,
+                            len(adv_prompt_list),
+                            prompt,
+                        ),
+                        "cyan",
+                    )
+                    _log_colored(
+                        self.logger,
                         "[TARGET RESPONSE] Depth %s/%s %s/%s: %s"
                         % (
                             iteration,

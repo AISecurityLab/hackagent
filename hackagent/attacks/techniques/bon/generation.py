@@ -352,15 +352,26 @@ def execute(
     random_capitalization_flag = bon_params.get("random_capitalization", True)
     ascii_perturbation_flag = bon_params.get("ascii_perturbation", True)
 
-    batch_size = max(1, config.get("batch_size", 1))
+    configured_batch_size = max(1, config.get("batch_size", num_concurrent_k))
+    candidate_workers = max(1, int(num_concurrent_k))
+    target_max_new_tokens = config.get("max_new_tokens")
     tracker: Optional["Tracker"] = config.get("_tracker")
     client: Optional["AuthenticatedClient"] = config.get("_client")
 
     victim_key = str(agent_router.backend_agent.id)
     logger.info(
         f"BoN generation: {len(goals)} goal(s), "
-        f"n_steps={n_steps}, K={num_concurrent_k}, sigma={sigma}"
+        f"n_steps={n_steps}, K={num_concurrent_k}, sigma={sigma}, "
+        f"candidate_workers={candidate_workers}"
     )
+
+    if configured_batch_size != candidate_workers:
+        logger.warning(
+            "BoN candidate concurrency is pinned to num_concurrent_k=%s "
+            "(configured batch_size=%s is ignored for candidate fanout)",
+            candidate_workers,
+            configured_batch_size,
+        )
 
     if tracker:
         logger.info("📊 Generation tracking via Tracker enabled")
@@ -408,11 +419,12 @@ def execute(
             goal_idx=goal_idx,
             n_steps=n_steps,
             num_concurrent_k=num_concurrent_k,
+            target_max_new_tokens=target_max_new_tokens,
             sigma=sigma,
             word_scrambling=word_scrambling,
             random_capitalization=random_capitalization_flag,
             ascii_perturbation=ascii_perturbation_flag,
-            batch_size=batch_size,
+            candidate_workers=candidate_workers,
             victim_key=victim_key,
             agent_router=agent_router,
             tracker=tracker,
@@ -457,11 +469,12 @@ def _search_single_goal(
     goal_idx: int,
     n_steps: int,
     num_concurrent_k: int,
+    target_max_new_tokens: Optional[int],
     sigma: float,
     word_scrambling: bool,
     random_capitalization: bool,
     ascii_perturbation: bool,
-    batch_size: int,
+    candidate_workers: int,
     victim_key: str,
     agent_router: AgentRouter,
     tracker: Optional["Tracker"],
@@ -524,6 +537,8 @@ def _search_single_goal(
             )
             try:
                 request_data = {"prompt": augmented_prompt}
+                if target_max_new_tokens is not None:
+                    request_data["max_new_tokens"] = target_max_new_tokens
                 response = agent_router.route_request(
                     registration_key=victim_key,
                     request_data=request_data,
@@ -565,7 +580,7 @@ def _search_single_goal(
                     },
                 }
 
-        with ThreadPoolExecutor(max_workers=batch_size) as pool:
+        with ThreadPoolExecutor(max_workers=candidate_workers) as pool:
             list(pool.map(_query_candidate, candidates))
 
         # Pick the best candidate from this step (longest response)

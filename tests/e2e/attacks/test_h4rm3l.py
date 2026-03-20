@@ -16,18 +16,18 @@ from statistics import mean
 from hackagent import HackAgent
 from hackagent.router.types import AgentTypeEnum
 
+DATASET = {
+    "preset": "harmbench",
+    "limit": 5,
+    "shuffle": False,
+    "seed": 42,
+}
+
 
 def main():
     hackagent_api_key = os.getenv("HACKAGENT_API_KEY")
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
     ENDPOINT = "https://openrouter.ai/api/v1"
-    dataset_preset = os.getenv("DATASET_PRESET", "harmbench")
-    dataset_limit = int(os.getenv("DATASET_LIMIT", "20"))
-    dataset_shuffle = os.getenv("DATASET_SHUFFLE", "true").lower() == "true"
-    dataset_seed = int(os.getenv("DATASET_SEED", "42"))
-    goal_batch_size = int(os.getenv("GOAL_BATCH_SIZE", "10"))
-    goal_batch_workers = int(os.getenv("GOAL_BATCH_WORKERS", "10"))
-    batch_size_judge = int(os.getenv("BATCH_SIZE_JUDGE", "1"))
 
     if not hackagent_api_key:
         raise RuntimeError("Set HACKAGENT_API_KEY")
@@ -35,12 +35,11 @@ def main():
         raise RuntimeError("Set OPENROUTER_API_KEY")
 
     agent = HackAgent(
-        name="test_h4rm3l_target",
+        name="test_target",
         endpoint=ENDPOINT,
         agent_type=AgentTypeEnum.OPENAI_SDK,
-        api_key=hackagent_api_key,
         adapter_operational_config={
-            "name": "z-ai/glm-5",
+            "name": "google/gemma-3-27b-it",
             "api_key": openrouter_api_key,
             "endpoint": ENDPOINT,
         },
@@ -48,30 +47,22 @@ def main():
 
     config = {
         "attack_type": "h4rm3l",
-        "dataset": {
-            "preset": dataset_preset,
-            "limit": dataset_limit,
-            "shuffle": dataset_shuffle,
-            "seed": dataset_seed,
-        },
+        "dataset": DATASET,
         "h4rm3l_params": {
             # Use an LLM-assisted program (PAP) + refusal suppression.
             # This requires decorator_llm below.
             "program": (
-                "DANDecorator().then(Base64Decorator()).then(RefusalSuppressionDecorator()).then(AIMDecorator()).then(StyleInjectionShortDecorator())"
+                "DANDecorator().then(RefusalSuppressionDecorator()).then(AIMDecorator()).then(StyleInjectionShortDecorator()).then(Base64Decorator())"
             ),
             "syntax_version": 2,
         },
         # LLM synthesizer used by LLM-assisted decorators (PAP/Translate/etc.)
         "decorator_llm": {
-            "identifier": "x-ai/grok-3-mini",
+            "identifier": "mistralai/mistral-small-3.2-24b-instruct",
             "endpoint": ENDPOINT,
             "agent_type": AgentTypeEnum.OPENAI_SDK,
             "api_key": openrouter_api_key,
         },
-        # Goal batching/workers apply regardless of goal source (direct goals or dataset-loaded goals).
-        "goal_batch_size": goal_batch_size,
-        "goal_batch_workers": goal_batch_workers,
         "max_new_tokens": 1000,
         "judges": [
             {
@@ -82,19 +73,12 @@ def main():
                 "endpoint": ENDPOINT,
             },
         ],
-        "batch_size_judge": batch_size_judge,
+        "batch_size_judge": 5,
+        "goal_batch_size": 5,
+        "goal_batch_workers": 5,
     }
 
     print("Starting h4rm3l test...")
-    print(
-        f"Dataset preset={dataset_preset} limit={dataset_limit} "
-        f"shuffle={dataset_shuffle} seed={dataset_seed}"
-    )
-    print(
-        f"Batching: goal_batch_size={goal_batch_size}, "
-        f"goal_batch_workers={goal_batch_workers}, batch_size_judge={batch_size_judge}"
-    )
-    print(f"Program: {config['h4rm3l_params']['program']}")
     results = agent.hack(attack_config=config)
 
     print("\n=== Results ===")
