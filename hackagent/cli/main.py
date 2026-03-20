@@ -280,9 +280,17 @@ def init(ctx):
         if click.confirm("Keep current API key?"):
             api_key = current_key
         else:
-            api_key = click.prompt("Enter your API key")
+            api_key = click.prompt(
+                "Enter your API key (press Enter to skip)",
+                default="",
+                show_default=False,
+            ).strip() or None
     else:
-        api_key = click.prompt("Enter your API key")
+        api_key = click.prompt(
+            "Enter your API key (press Enter to skip)",
+            default="",
+            show_default=False,
+        ).strip() or None
 
     # Base URL is always the official endpoint
     base_url = "https://api.hackagent.dev"
@@ -316,7 +324,19 @@ def init(ctx):
             console.print("\n[cyan]🔍 Testing configuration...[/cyan]")
         cli_config.validate()
 
-        # Test API connection
+        # API key is optional: if absent, keep local mode and skip remote check.
+        if not cli_config.api_key:
+            console.print(
+                "[bold green]✅ Setup complete![/bold green] "
+                "[dim](No API key set: local mode enabled)[/dim]"
+            )
+            if cli_config.should_show_info():
+                console.print("\n[bold cyan]💡 Next steps:[/bold cyan]")
+                console.print("  [green]hackagent attack advprefix --help[/green]")
+                console.print("  [green]hackagent agent list[/green]")
+            return
+
+        # Test API connection when a key is configured.
         from hackagent.server.api.agent import agent_list
         from hackagent.server.client import AuthenticatedClient
 

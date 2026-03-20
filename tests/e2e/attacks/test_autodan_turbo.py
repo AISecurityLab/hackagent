@@ -33,12 +33,12 @@ def main():
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
     OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1"
     dataset_preset = "harmbench"
-    dataset_limit = 10
+    dataset_limit = 5
     dataset_shuffle = "False"
     dataset_seed = 42
-    goal_batch_size = 10
-    goal_batch_workers = 10
-    batch_size_judge = 10
+    goal_batch_size = 5
+    goal_batch_workers = 5
+    batch_size_judge = 5
     disable_target_reasoning = (
         os.getenv("DISABLE_TARGET_REASONING", "true").lower() == "true"
     )
