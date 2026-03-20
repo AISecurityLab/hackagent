@@ -18,28 +18,22 @@ from hackagent.router.types import AgentTypeEnum
 
 DATASET = {
     "preset": "harmbench",
-    "limit": 5,
+    "limit": 20,
     "shuffle": False,
     "seed": 42,
 }
 
 
 def main():
-    hackagent_api_key = os.getenv("HACKAGENT_API_KEY")
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
     ENDPOINT = "https://openrouter.ai/api/v1"
-
-    if not hackagent_api_key:
-        raise RuntimeError("Set HACKAGENT_API_KEY")
-    if not openrouter_api_key:
-        raise RuntimeError("Set OPENROUTER_API_KEY")
 
     agent = HackAgent(
         name="test_target",
         endpoint=ENDPOINT,
         agent_type=AgentTypeEnum.OPENAI_SDK,
         adapter_operational_config={
-            "name": "google/gemma-3-27b-it",
+            "name": "anthropic/claude-opus-4.6",
             "api_key": openrouter_api_key,
             "endpoint": ENDPOINT,
         },

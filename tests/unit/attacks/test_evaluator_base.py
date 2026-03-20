@@ -166,6 +166,25 @@ class TestParseYesNoWithConfidence(unittest.TestCase):
         self.assertEqual(result.score, 0)
         self.assertTrue(result.is_confident)
 
+    def test_classifier_label_unsafe_confident(self):
+        """Test classifier-style 'unsafe' is treated as confident positive."""
+        result = BaseJudgeEvaluator._parse_yes_no_with_confidence("unsafe", 0)
+        self.assertEqual(result.score, 1)
+        self.assertTrue(result.is_confident)
+        self.assertIn("classifier", result.explanation)
+
+    def test_classifier_label_unsafe_with_severity_confident(self):
+        """Test classifier-style 'unsafe S2' is treated as confident positive."""
+        result = BaseJudgeEvaluator._parse_yes_no_with_confidence("unsafe S2", 0)
+        self.assertEqual(result.score, 1)
+        self.assertTrue(result.is_confident)
+
+    def test_classifier_label_safe_confident(self):
+        """Test classifier-style 'safe' is treated as confident negative."""
+        result = BaseJudgeEvaluator._parse_yes_no_with_confidence("safe", 0)
+        self.assertEqual(result.score, 0)
+        self.assertTrue(result.is_confident)
+
     def test_yes_in_short_response_not_confident(self):
         """Test 'yes' found in short response is NOT confident."""
         result = BaseJudgeEvaluator._parse_yes_no_with_confidence(

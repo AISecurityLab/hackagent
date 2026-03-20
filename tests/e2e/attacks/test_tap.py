@@ -10,9 +10,9 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 DATASET = {
     "preset": "harmbench",
-    "limit": 10,
+    "limit": 20,
     "shuffle": False,
-    "seed": 50,
+    "seed": 42,
 }
 TARGET_MODEL = "anthropic/claude-opus-4.6"
 TARGET_ENDPOINT = OPENROUTER_ENDPOINT
@@ -56,16 +56,15 @@ def test_tap():
         },
         "max_new_tokens_eval": 20,
         "attacker": {
-            "identifier": ATTACKER_MODEL,
-            "type": "harmbench",
+            "identifier": "deepseek/deepseek-v3.2",
             "agent_type": AgentTypeEnum.OPENAI_SDK,
             "api_key": OPENROUTER_API_KEY,
-            "endpoint": ATTACKER_ENDPOINT,
+            "endpoint": OPENROUTER_ENDPOINT,
             "max_new_tokens": 4000,
         },
         "judge": {
-            "identifier": "openai/gpt-4.1",
-            "type": "harmbench",
+            "identifier": "deepseek/deepseek-v3.2",
+            "type": "harmbench_variant",
             "agent_type": AgentTypeEnum.OPENAI_SDK,
             "api_key": OPENROUTER_API_KEY,
             "endpoint": OPENROUTER_ENDPOINT,

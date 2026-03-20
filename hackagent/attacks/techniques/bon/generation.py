@@ -66,6 +66,7 @@ class _StepJudge:
         "nuanced": ["eval_nj", "explanation_nj"],
         "jailbreakbench": ["eval_jb", "explanation_jb"],
         "harmbench": ["eval_hb", "explanation_hb"],
+        "harmbench_variant": ["eval_hbv", "explanation_hbv"],
         "on_topic": ["eval_on_topic", "explanation_on_topic"],
     }
 

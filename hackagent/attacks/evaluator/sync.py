@@ -128,6 +128,11 @@ def sync_evaluation_to_server(
                 "label": "JailbreakBench",
             },
             {"key": "eval_hb", "explanation": "explanation_hb", "label": "HarmBench"},
+            {
+                "key": "eval_hbv",
+                "explanation": "explanation_hbv",
+                "label": "HarmBenchVariant",
+            },
             {"key": "eval_nj", "explanation": "explanation_nj", "label": "Nuanced"},
         ]
 

@@ -19,15 +19,14 @@ def main() -> None:
     client = OpenAI(
         base_url=ATTACKER_ENDPOINT,
         api_key=os.getenv("ATTACKER_API_KEY", "dummy"),
-        
     )
 
     response = client.chat.completions.create(
         model=ATTACKER_MODEL,
-        messages=[{"role": "user", "content": QUESTION,"reasoning":"none"}],
+        messages=[{"role": "user", "content": QUESTION, "reasoning": "none"}],
         max_tokens=2000,
         max_completion_tokens=2000,
-        extra_body={"reasoning":"none"}
+        extra_body={"reasoning": "none"},
     )
 
     answer = response.choices[0].message.content or ""

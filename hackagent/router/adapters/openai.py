@@ -187,6 +187,9 @@ class OpenAIAgent(ChatCompletionsAgent):
         self.default_temperature = self._get_config_key(
             "temperature", self.DEFAULT_TEMPERATURE
         )
+        # Provider-specific request payload (e.g., OpenRouter "reasoning").
+        # This can be overridden per-call via request_data["extra_body"].
+        self.default_extra_body = self._get_config_key("extra_body")
         self.default_tools = self._get_config_key("tools")
         self.default_tool_choice = self._get_config_key("tool_choice")
 
@@ -206,6 +209,13 @@ class OpenAIAgent(ChatCompletionsAgent):
         params["tool_choice"] = request_data.get(
             "tool_choice", self.default_tool_choice
         )
+        if "extra_body" in request_data:
+            params["extra_body"] = request_data.get("extra_body")
+        elif self.default_extra_body is not None:
+            if isinstance(self.default_extra_body, dict):
+                params["extra_body"] = dict(self.default_extra_body)
+            else:
+                params["extra_body"] = self.default_extra_body
 
         return params
 

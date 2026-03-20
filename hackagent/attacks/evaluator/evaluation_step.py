@@ -64,6 +64,7 @@ MERGE_KEYS: List[str] = ["goal", "prefix", "completion"]
 JUDGE_TYPE_LABELS: Dict[str, str] = {
     "jailbreakbench": "JailbreakBench",
     "harmbench": "HarmBench",
+    "harmbench_variant": "HarmBenchVariant",
     "nuanced": "Nuanced",
     "on_topic": "OnTopic",
 }
@@ -72,6 +73,7 @@ JUDGE_COLUMN_MAP: Dict[str, List[str]] = {
     "nuanced": ["eval_nj", "explanation_nj"],
     "jailbreakbench": ["eval_jb", "explanation_jb"],
     "harmbench": ["eval_hb", "explanation_hb"],
+    "harmbench_variant": ["eval_hbv", "explanation_hbv"],
     "on_topic": ["eval_on_topic", "explanation_on_topic"],
 }
 
@@ -79,6 +81,7 @@ JUDGE_AGG_COLUMN_MAP: Dict[str, str] = {
     "nuanced": "eval_nj",
     "jailbreakbench": "eval_jb",
     "harmbench": "eval_hb",
+    "harmbench_variant": "eval_hbv",
     "on_topic": "eval_on_topic",
 }
 
@@ -86,6 +89,7 @@ JUDGE_MEAN_COLUMN_MAP: Dict[str, str] = {
     "nuanced": "eval_nj_mean",
     "jailbreakbench": "eval_jb_mean",
     "harmbench": "eval_hb_mean",
+    "harmbench_variant": "eval_hbv_mean",
     "strongreject": "eval_sj_binary_mean",
     "on_topic": "eval_on_topic_mean",
 }
@@ -175,6 +179,8 @@ class BaseEvaluationStep:
         identifier_lower = identifier.lower()
         if "harmbench" in identifier_lower:
             return "harmbench"
+        if "harmclassifier" in identifier_lower:
+            return "harmbench_variant"
         if "nuanced" in identifier_lower:
             return "nuanced"
         if "jailbreak" in identifier_lower:
