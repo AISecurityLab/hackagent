@@ -356,7 +356,9 @@ def execute(
     candidate_workers = max(1, int(num_concurrent_k))
     target_max_new_tokens = config.get("max_new_tokens")
     tracker: Optional["Tracker"] = config.get("_tracker")
-    client: Optional["AuthenticatedClient"] = config.get("_client")
+    client: Optional["AuthenticatedClient"] = config.get("_backend") or config.get(
+        "_client"
+    )
 
     victim_key = str(agent_router.backend_agent.id)
     logger.info(

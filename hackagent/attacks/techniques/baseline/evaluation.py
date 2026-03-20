@@ -237,17 +237,17 @@ def _update_result_status(
     result_id: str,
     success: bool,
     evaluation_notes: str,
-    client,
+    backend,
     logger: logging.Logger,
 ) -> bool:
     """
-    Update a result's evaluation status on the server.
+    Update a result's evaluation status via the storage backend.
 
     Args:
         result_id: UUID of the result to update
         success: Whether the attack was successful
         evaluation_notes: Notes explaining the evaluation
-        client: Authenticated client for API calls
+        backend: StorageBackend (or legacy AuthenticatedClient) for API calls
         logger: Logger instance
 
     Returns:
@@ -258,22 +258,32 @@ def _update_result_status(
     try:
         # Map success to appropriate evaluation status
         # From attacker's perspective: success=True means jailbreak succeeded
-        if success:
-            eval_status = EvaluationStatusEnum.SUCCESSFUL_JAILBREAK
-        else:
-            eval_status = EvaluationStatusEnum.FAILED_JAILBREAK
+        eval_status = (
+            EvaluationStatusEnum.SUCCESSFUL_JAILBREAK
+            if success
+            else EvaluationStatusEnum.FAILED_JAILBREAK
+        )
 
+        # Prefer StorageBackend.update_result() when available
+        if hasattr(backend, "update_result"):
+            backend.update_result(
+                result_id=UUID(result_id),
+                evaluation_status=eval_status.value,
+                evaluation_notes=evaluation_notes,
+            )
+            logger.debug(f"Updated result {result_id} to {eval_status.value}")
+            return True
+
+        # Legacy fallback: raw AuthenticatedClient
         result_request = PatchedResultRequest(
             evaluation_status=eval_status,
             evaluation_notes=evaluation_notes,
         )
-
         response = result_partial_update.sync_detailed(
-            client=client,
+            client=backend,
             id=UUID(result_id),
             body=result_request,
         )
-
         if response.status_code < 300:
             logger.debug(f"Updated result {result_id} to {eval_status.value}")
             return True
@@ -323,7 +333,7 @@ def _sync_evaluation_to_server(
         )
 
     # Legacy fallback: Update individual result_id records
-    client = config.get("_client")
+    client = config.get("_backend") or config.get("_client")
     if not client:
         logger.warning("No client available - cannot sync evaluation to server")
         return 0

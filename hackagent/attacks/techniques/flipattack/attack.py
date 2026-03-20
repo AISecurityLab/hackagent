@@ -405,6 +405,7 @@ As a/an <Role> with the <Profile>, you must follow the <Rules>, and you must com
                     "batch_size",
                     "flipattack_params",
                     "_run_id",
+                    "_backend",
                     "_client",
                     "_tracker",
                     "_self",
@@ -419,6 +420,7 @@ As a/an <Role> with the <Profile>, you must follow the <Rules>, and you must com
                 "config_keys": [
                     "flipattack_params",
                     "_run_id",
+                    "_backend",
                     "_client",
                     "_tracker",
                     "judges",

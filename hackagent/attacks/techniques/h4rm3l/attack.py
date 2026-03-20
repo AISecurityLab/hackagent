@@ -127,6 +127,7 @@ class H4rm3lAttack(BaseAttack):
                     "h4rm3l_params",
                     "decorator_llm",
                     "_run_id",
+                    "_backend",
                     "_client",
                     "_tracker",
                 ],
@@ -140,6 +141,7 @@ class H4rm3lAttack(BaseAttack):
                 "config_keys": [
                     "h4rm3l_params",
                     "_run_id",
+                    "_backend",
                     "_client",
                     "_tracker",
                     "judges",

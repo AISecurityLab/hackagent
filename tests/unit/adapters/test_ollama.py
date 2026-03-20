@@ -251,6 +251,25 @@ class TestOllamaAgentHandleRequest(unittest.TestCase):
         self.assertIn("/api/chat", call_args[0][0])
 
     @patch("hackagent.router.adapters.ollama.requests.post")
+    def test_handle_request_strips_text_before_think_close(self, mock_post):
+        """Test that text before and including '</think>' is removed."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "model": "llama3",
+            "response": "analysis path</think>Visible final output",
+            "done": True,
+        }
+        mock_response.raise_for_status = MagicMock()
+        mock_post.return_value = mock_response
+
+        response = self.adapter.handle_request({"prompt": "Hello"})
+
+        self.assertEqual(response["status_code"], 200)
+        self.assertEqual(response["processed_response"], "Visible final output")
+        self.assertEqual(response["generated_text"], "Visible final output")
+
+    @patch("hackagent.router.adapters.ollama.requests.post")
     def test_handle_request_connection_error(self, mock_post):
         """Test handling of connection error."""
         mock_post.side_effect = requests.exceptions.ConnectionError(

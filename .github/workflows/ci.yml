@@ -98,6 +98,7 @@ jobs:
         with:
           name: coverage-unit
           path: reports/.coverage
+          include-hidden-files: true
           retention-days: 1
 
   # ── Quick test – PRs to non-main branches ────────────────────────────────
@@ -172,6 +173,7 @@ jobs:
         with:
           name: coverage-integration-offline
           path: reports/.coverage
+          include-hidden-files: true
           retention-days: 1
 
   # ── Integration (Ollama) ──────────────────────────────────────────────────
@@ -237,6 +239,7 @@ jobs:
         with:
           name: coverage-integration-ollama
           path: reports/.coverage
+          include-hidden-files: true
           retention-days: 1
 
   # ── E2E tests ─────────────────────────────────────────────────────────────
@@ -323,12 +326,11 @@ jobs:
       - name: Combine coverage data
         run: |
           mkdir -p reports
-          # Rename each artifact's .coverage with a unique suffix so combine can merge them
           i=0
-          for f in coverage-artifacts/*/.coverage; do
+          while IFS= read -r f; do
             cp "$f" "reports/.coverage.$i"
             i=$((i + 1))
-          done
+          done < <(find coverage-artifacts -name ".coverage" -type f)
           uv run coverage combine reports/
           uv run coverage xml -o reports/coverage-merged.xml
           uv run coverage report --skip-covered

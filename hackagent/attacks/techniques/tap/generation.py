@@ -76,21 +76,35 @@ def _resolve_judges_config(
 
 def _resolve_on_topic_judges_config(
     on_topic: Optional[Dict[str, Any]],
+    fallback_judges: Optional[List[Dict[str, Any]]] = None,
 ) -> Optional[List[Dict[str, Any]]]:
     """
     Normalize on-topic judge config and default type if missing.
 
+    If no dedicated on-topic judge is configured, fallback to the standard judge
+    backend (first configured judge) while forcing evaluator type to ``on_topic``.
+
     Args:
         on_topic: Optional on-topic judge config dict.
+        fallback_judges: Optional list of standard judge configs.
 
     Returns:
         List with one on-topic judge config, or None when disabled.
     """
-    if not isinstance(on_topic, dict):
+    using_fallback = False
+    if isinstance(on_topic, dict):
+        on_topic_config = dict(on_topic)
+    elif isinstance(fallback_judges, list) and fallback_judges:
+        using_fallback = True
+        on_topic_config = dict(fallback_judges[0])
+    else:
         return None
-    on_topic_config = dict(on_topic)
-    if not on_topic_config.get("type") and not on_topic_config.get("evaluator_type"):
+
+    if using_fallback:
         on_topic_config["type"] = "on_topic"
+    elif not on_topic_config.get("type") and not on_topic_config.get("evaluator_type"):
+        on_topic_config["type"] = "on_topic"
+
     return [on_topic_config]
 
 
@@ -256,7 +270,8 @@ class TapExecutor:
             config.get("judge"),
         )
         self.on_topic_judges_config = _resolve_on_topic_judges_config(
-            config.get("on_topic_judge")
+            config.get("on_topic_judge"),
+            self.judges_config,
         )
 
         self.evaluator = TapEvaluation(
@@ -517,15 +532,26 @@ class TapExecutor:
 
             # Aggregated generated prompts log intentionally omitted.
 
-            on_topic_scores = self.evaluator.score_on_topic(
-                goal,
-                adv_prompt_list,
+            on_topic_rows = [
+                {
+                    "goal": goal,
+                    "prefix": "",
+                    "completion": prompt,
+                }
+                for prompt in adv_prompt_list
+            ]
+            on_topic_evaluated = self.evaluator.evaluate_on_topic(
+                on_topic_rows,
                 self.on_topic_judges_config,
+            )
+            on_topic_scores = self.evaluator.extract_scores(
+                on_topic_evaluated,
+                "eval_on_topic",
                 default=0,
             )
             if verbose:
-                for idx, (prompt, score) in enumerate(
-                    zip(adv_prompt_list, on_topic_scores), start=1
+                for idx, (prompt, score, judged_row) in enumerate(
+                    zip(adv_prompt_list, on_topic_scores, on_topic_evaluated), start=1
                 ):
                     _log_colored(
                         self.logger,
@@ -537,6 +563,24 @@ class TapExecutor:
                             len(adv_prompt_list),
                             score,
                             prompt,
+                        ),
+                        "magenta",
+                    )
+                    raw_on_topic_response = judged_row.get("eval_on_topic_raw_response")
+                    if raw_on_topic_response is None or raw_on_topic_response == "":
+                        raw_on_topic_response = judged_row.get("explanation_on_topic")
+                    if raw_on_topic_response is None or raw_on_topic_response == "":
+                        raw_on_topic_response = "<no response>"
+
+                    _log_colored(
+                        self.logger,
+                        "[ON TOPIC JUDGE RESPONSE] Depth %s/%s %s/%s: %s"
+                        % (
+                            iteration,
+                            depth,
+                            idx,
+                            len(adv_prompt_list),
+                            raw_on_topic_response,
                         ),
                         "magenta",
                     )

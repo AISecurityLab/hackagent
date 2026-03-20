@@ -323,6 +323,9 @@ class Agent(ABC):
         Returns:
             A dictionary representing a standardized success response.
         """
+        if isinstance(processed_response, str):
+            processed_response = self._strip_think_prefix(processed_response)
+
         if agent_specific_data is None:
             agent_specific_data = {}
 
@@ -342,6 +345,14 @@ class Agent(ABC):
             "agent_id": self.id,
             "adapter_type": self.ADAPTER_TYPE,
         }
+
+    def _strip_think_prefix(self, text: str) -> str:
+        """Strip hidden reasoning prefix up to and including '</think>' if present."""
+        marker = "</think>"
+        marker_index = text.find(marker)
+        if marker_index == -1:
+            return text
+        return text[marker_index + len(marker) :]
 
     @abstractmethod
     def handle_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:

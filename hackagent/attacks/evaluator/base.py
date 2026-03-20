@@ -292,23 +292,32 @@ class BaseJudgeEvaluator(ABC):
 
         # Process via judge
         if rows_to_process:
-            results_eval, results_expl, processed_indices = (
+            results_eval, results_expl, processed_indices, raw_judge_responses = (
                 self._process_rows_with_router(
                     rows_to_process,
                     f"[cyan]Evaluating responses ({self.__class__.__name__})...",
+                    include_raw_responses=True,
                 )
             )
 
             # Map results back by original index
             index_to_result = {
-                idx: (ev, ex)
-                for idx, ev, ex in zip(processed_indices, results_eval, results_expl)
+                idx: (ev, ex, raw_resp)
+                for idx, ev, ex, raw_resp in zip(
+                    processed_indices,
+                    results_eval,
+                    results_expl,
+                    raw_judge_responses,
+                )
             }
             for row in data:
                 orig_idx = row.get("_original_index")
                 if orig_idx in index_to_result:
                     row[self.eval_column] = index_to_result[orig_idx][0]
                     row[self.explanation_column] = index_to_result[orig_idx][1]
+                    row[f"{self.eval_column}_raw_response"] = index_to_result[orig_idx][
+                        2
+                    ]
 
         # Clean up temporary index
         for row in data:
@@ -323,7 +332,11 @@ class BaseJudgeEvaluator(ABC):
         self,
         rows_to_process: List[Dict[str, Any]],
         progress_description: str,
-    ) -> Tuple[List[Any], List[Optional[str]], List[int]]:
+        include_raw_responses: bool = False,
+    ) -> (
+        Tuple[List[Any], List[Optional[str]], List[int]]
+        | Tuple[List[Any], List[Optional[str]], List[int], List[Optional[str]]]
+    ):
         """
         Process evaluation rows using AgentRouter backend.
 
@@ -343,6 +356,7 @@ class BaseJudgeEvaluator(ABC):
         results_eval: List[Any] = []
         results_expl: List[Optional[str]] = []
         processed_indices: List[int] = []
+        raw_judge_responses: List[Optional[str]] = []
 
         if not self.agent_router or not self.agent_registration_key:
             self.logger.error(
@@ -354,6 +368,14 @@ class BaseJudgeEvaluator(ABC):
                     "Configuration Error: No evaluation agent available"
                 )
                 processed_indices.append(row.get("_original_index", idx))
+                raw_judge_responses.append(None)
+            if include_raw_responses:
+                return (
+                    results_eval,
+                    results_expl,
+                    processed_indices,
+                    raw_judge_responses,
+                )
             return results_eval, results_expl, processed_indices
 
         # Log tracking context
@@ -390,13 +412,17 @@ class BaseJudgeEvaluator(ABC):
             original_index = row.get("_original_index", idx)
             current_eval: Any = 0
             current_expl: Optional[str] = "Evaluation failed or skipped"
+            current_raw_response: Optional[str] = None
             request_data = None
             try:
                 request_data = self._get_request_data_for_row(row)
-                current_eval, current_expl = self._request_with_assertions(
-                    request_data=request_data,
-                    original_index=original_index,
-                    max_retries=max_retries,
+                current_eval, current_expl, current_raw_response = (
+                    self._request_with_assertions(
+                        request_data=request_data,
+                        original_index=original_index,
+                        max_retries=max_retries,
+                        include_raw_response=True,
+                    )
                 )
             except Exception as e:
                 current_expl = (
@@ -438,17 +464,26 @@ class BaseJudgeEvaluator(ABC):
                                         "elapsed_s": _eval_elapsed,
                                     },
                                 )
-            return idx, original_index, current_eval, current_expl
+            return idx, original_index, current_eval, current_expl, current_raw_response
 
         with create_progress_bar(task_desc, total=len(rows_to_process)) as (
             progress_bar,
             task,
         ):
             with ThreadPoolExecutor(max_workers=batch_size) as pool:
-                for idx, original_index, current_eval, current_expl in pool.map(
-                    _process_row, enumerate(rows_to_process)
-                ):
-                    results_map[idx] = (original_index, current_eval, current_expl)
+                for (
+                    idx,
+                    original_index,
+                    current_eval,
+                    current_expl,
+                    current_raw_response,
+                ) in pool.map(_process_row, enumerate(rows_to_process)):
+                    results_map[idx] = (
+                        original_index,
+                        current_eval,
+                        current_expl,
+                        current_raw_response,
+                    )
                     progress_bar.update(task, advance=1)
                     progress_bar.refresh()
 
@@ -457,11 +492,19 @@ class BaseJudgeEvaluator(ABC):
         )
 
         for idx in range(len(rows_to_process)):
-            original_index, current_eval, current_expl = results_map[idx]
+            (
+                original_index,
+                current_eval,
+                current_expl,
+                current_raw_response,
+            ) = results_map[idx]
             results_eval.append(current_eval)
             results_expl.append(current_expl)
             processed_indices.append(original_index)
+            raw_judge_responses.append(current_raw_response)
 
+        if include_raw_responses:
+            return results_eval, results_expl, processed_indices, raw_judge_responses
         return results_eval, results_expl, processed_indices
 
     def _request_with_assertions(
@@ -469,7 +512,8 @@ class BaseJudgeEvaluator(ABC):
         request_data: Dict[str, Any],
         original_index: Any,
         max_retries: int = 1,
-    ) -> Tuple[Any, Optional[str]]:
+        include_raw_response: bool = False,
+    ) -> Tuple[Any, Optional[str]] | Tuple[Any, Optional[str], Optional[str]]:
         """
         Send a judge request and retry with assertion feedback if needed.
 
@@ -499,9 +543,13 @@ class BaseJudgeEvaluator(ABC):
         response_content = response.get("processed_response")
 
         if error_msg:
+            if include_raw_response:
+                return 0, f"{self.__class__.__name__}: {error_msg}", None
             return 0, f"{self.__class__.__name__}: {error_msg}"
 
         if response_content is None:
+            if include_raw_response:
+                return 0, f"{self.__class__.__name__}: No content from router", None
             return 0, f"{self.__class__.__name__}: No content from router"
 
         # Step 2: Parse and assert
@@ -513,6 +561,8 @@ class BaseJudgeEvaluator(ABC):
         assertion = self._check_assertion(response_content, original_index)
 
         if assertion.is_confident or max_retries <= 0:
+            if include_raw_response:
+                return current_eval, current_expl, response_content
             return current_eval, current_expl
 
         # Step 3: Assertion failed → backtrack with feedback
@@ -546,6 +596,12 @@ class BaseJudgeEvaluator(ABC):
                     f"✅ Assertion retry {retry + 1} succeeded for index "
                     f"{original_index}: score={retry_assertion.score}"
                 )
+                if include_raw_response:
+                    return (
+                        retry_assertion.score,
+                        retry_assertion.explanation + " (retry)",
+                        retry_content,
+                    )
                 return retry_assertion.score, retry_assertion.explanation + " (retry)"
 
             # Update for next iteration
@@ -553,6 +609,12 @@ class BaseJudgeEvaluator(ABC):
 
         # All retries exhausted — use last parse result
         final = self._check_assertion(response_content, original_index)
+        if include_raw_response:
+            return (
+                final.score,
+                final.explanation + " (retries exhausted)",
+                response_content,
+            )
         return final.score, final.explanation + " (retries exhausted)"
 
     def _check_assertion(

@@ -19,7 +19,7 @@ ISSUES FIXED:
 
 import logging
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 from hackagent.server.api.models import EvaluationStatusEnum
@@ -191,26 +191,21 @@ class TestEvaluationEndToEnd(unittest.TestCase):
             _update_result_status,
         )
 
-        mock_client = MagicMock()
+        mock_backend = MagicMock()
         mock_logger = logging.getLogger("test")
 
-        with patch(
-            "hackagent.attacks.techniques.baseline.evaluation.result_partial_update"
-        ) as mock_update:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_update.sync_detailed.return_value = mock_response
+        # mock_backend has update_result (MagicMock provides all attrs),
+        # so the StorageBackend path should be taken.
+        result = _update_result_status(
+            result_id=str(uuid4()),
+            success=True,
+            evaluation_notes="Test notes",
+            backend=mock_backend,
+            logger=mock_logger,
+        )
 
-            result = _update_result_status(
-                result_id=str(uuid4()),
-                success=True,
-                evaluation_notes="Test notes",
-                client=mock_client,
-                logger=mock_logger,
-            )
-
-            self.assertTrue(result)
-            mock_update.sync_detailed.assert_called_once()
+        self.assertTrue(result)
+        mock_backend.update_result.assert_called_once()
 
 
 if __name__ == "__main__":

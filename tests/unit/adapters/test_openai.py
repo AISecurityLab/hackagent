@@ -666,6 +666,32 @@ class TestOpenAIAgentReasoningModels(unittest.TestCase):
         self.assertEqual(response["status_code"], 200)
         self.assertEqual(response["generated_text"], "")
 
+    def test_handle_request_strips_text_before_think_close(self):
+        """Test that text before and including '</think>' is removed."""
+        mock_message = MagicMock()
+        mock_message.content = "draft steps</think>Final visible answer"
+        mock_message.tool_calls = None
+
+        mock_choice = MagicMock()
+        mock_choice.message = mock_message
+        mock_choice.finish_reason = "stop"
+
+        mock_usage = MagicMock()
+        mock_usage.model_dump.return_value = {"total_tokens": 12}
+
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_response.usage = mock_usage
+        mock_response.model = "gpt-4"
+
+        self.mock_client.chat.completions.create.return_value = mock_response
+
+        response = self.adapter.handle_request({"prompt": "Hello"})
+
+        self.assertEqual(response["status_code"], 200)
+        self.assertEqual(response["generated_text"], "Final visible answer")
+        self.assertEqual(response["processed_response"], "Final visible answer")
+
 
 if __name__ == "__main__":
     unittest.main()

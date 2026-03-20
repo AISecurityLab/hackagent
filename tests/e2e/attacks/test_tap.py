@@ -10,10 +10,18 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 DATASET = {
     "preset": "harmbench",
-    "limit": 5,
+    "limit": 10,
     "shuffle": False,
-    "seed": 42,
+    "seed": 50,
 }
+TARGET_MODEL = "anthropic/claude-opus-4.6"
+TARGET_ENDPOINT = OPENROUTER_ENDPOINT
+
+ATTACKER_MODEL = "qwen3.5-27b"
+ATTACKER_ENDPOINT = "https://somerset-fragrance-wedding-guests.trycloudflare.com/v1"
+
+JUDGE_MODEL = "Abel-24/HarmClassifier"
+JUDGE_ENDPOINT = "https://priced-law-nonprofit-eddie.trycloudflare.com/v1"
 
 
 @pytest.mark.e2e
@@ -23,13 +31,13 @@ def test_tap():
         pytest.skip("OPENROUTER_API_KEY not set")
 
     agent = HackAgent(
-        name="anthropic/claude-opus-4.6",
-        endpoint=OPENROUTER_ENDPOINT,
+        name=TARGET_MODEL,
+        endpoint=TARGET_ENDPOINT,
         agent_type=AgentTypeEnum.OPENAI_SDK,
         adapter_operational_config={
-            "name": "anthropic/claude-opus-4.6",
+            "name": TARGET_MODEL,
             "api_key": OPENROUTER_API_KEY,
-            "endpoint": OPENROUTER_ENDPOINT,
+            "endpoint": TARGET_ENDPOINT,
         },
     )
 
@@ -39,25 +47,27 @@ def test_tap():
         "judge_batch_size": 10,
         "goal_batch_size": 10,
         "goal_batch_workers": 10,
-        "max_new_tokens": 800,
+        "max_new_tokens": 400,
         "tap_params": {
             "depth": 2,
             "width": 2,
             "branching_factor": 3,
-            "n_streams": 10,
+            "n_streams": 3,
         },
+        "max_new_tokens_eval": 20,
         "attacker": {
-            "identifier": "mistralai/mistral-small-3.2-24b-instruct",
+            "identifier": ATTACKER_MODEL,
             "type": "harmbench",
             "agent_type": AgentTypeEnum.OPENAI_SDK,
-            "api_key": openrouter_api_key,
-            "endpoint": OPENROUTER_ENDPOINT,
+            "api_key": OPENROUTER_API_KEY,
+            "endpoint": ATTACKER_ENDPOINT,
+            "max_new_tokens": 4000,
         },
         "judge": {
-            "identifier": "anthropic/claude-opus-4.6",
+            "identifier": "openai/gpt-4.1",
             "type": "harmbench",
             "agent_type": AgentTypeEnum.OPENAI_SDK,
-            "api_key": openrouter_api_key,
+            "api_key": OPENROUTER_API_KEY,
             "endpoint": OPENROUTER_ENDPOINT,
         },
     }
