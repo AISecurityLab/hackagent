@@ -53,7 +53,7 @@ class TestOpenAIAgentInit(unittest.TestCase):
         adapter = OpenAIAgent(id=adapter_id, config=config)
 
         self.assertEqual(adapter.actual_api_key, "test-key-123")
-        mock_openai_class.assert_called_once_with(api_key="test-key-123")
+        mock_openai_class.assert_called_once_with(api_key="test-key-123", timeout=120)
 
     @patch("hackagent.router.adapters.openai.OPENAI_AVAILABLE", True)
     @patch("hackagent.router.adapters.openai.OpenAI")

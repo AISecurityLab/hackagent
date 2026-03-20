@@ -107,20 +107,28 @@ class TestRemoteBackendGetContext(unittest.TestCase):
 
         self.assertEqual(ctx1.org_id, ctx2.org_id)
 
-    def test_context_raises_when_no_agents(self):
+    def test_context_from_organization_me_when_no_agents(self):
         client = _mock_client()
         backend = RemoteBackend(client)
 
         parsed = MagicMock()
         parsed.results = []
         resp = _mock_response(200, parsed=parsed)
+        org = MagicMock()
+        org.id = _uid()
 
-        with patch("hackagent.server.storage.remote.agent_list") as mock_list:
+        with (
+            patch("hackagent.server.storage.remote.agent_list") as mock_list,
+            patch(
+                "hackagent.server.storage.remote.organization_me_retrieve"
+            ) as mock_org,
+        ):
             mock_list.sync_detailed.return_value = resp
-            with self.assertRaises(RuntimeError) as ctx:
-                backend.get_context()
+            mock_org.sync_detailed.return_value = _mock_response(200, parsed=org)
+            ctx = backend.get_context()
 
-        self.assertIn("organization context", str(ctx.exception))
+        self.assertEqual(ctx.org_id, org.id)
+        self.assertEqual(ctx.user_id, "unknown")
 
     def test_context_raises_on_http_error(self):
         client = _mock_client()
@@ -128,8 +136,14 @@ class TestRemoteBackendGetContext(unittest.TestCase):
 
         resp = _mock_response(401, parsed=None)
 
-        with patch("hackagent.server.storage.remote.agent_list") as mock_list:
+        with (
+            patch("hackagent.server.storage.remote.agent_list") as mock_list,
+            patch(
+                "hackagent.server.storage.remote.organization_me_retrieve"
+            ) as mock_org,
+        ):
             mock_list.sync_detailed.return_value = resp
+            mock_org.sync_detailed.return_value = _mock_response(500, parsed=None)
             with self.assertRaises(RuntimeError):
                 backend.get_context()
 
@@ -185,6 +199,7 @@ class TestRemoteBackendCreateOrUpdateAgent(unittest.TestCase):
     def _no_existing_agent_resp(self):
         parsed = MagicMock()
         parsed.results = []
+        parsed.next = None
         parsed.next_ = None
         return _mock_response(200, parsed=parsed)
 

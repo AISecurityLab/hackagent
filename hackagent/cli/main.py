@@ -280,17 +280,23 @@ def init(ctx):
         if click.confirm("Keep current API key?"):
             api_key = current_key
         else:
-            api_key = click.prompt(
+            api_key = (
+                click.prompt(
+                    "Enter your API key (press Enter to skip)",
+                    default="",
+                    show_default=False,
+                ).strip()
+                or None
+            )
+    else:
+        api_key = (
+            click.prompt(
                 "Enter your API key (press Enter to skip)",
                 default="",
                 show_default=False,
-            ).strip() or None
-    else:
-        api_key = click.prompt(
-            "Enter your API key (press Enter to skip)",
-            default="",
-            show_default=False,
-        ).strip() or None
+            ).strip()
+            or None
+        )
 
     # Base URL is always the official endpoint
     base_url = "https://api.hackagent.dev"

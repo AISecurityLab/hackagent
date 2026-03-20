@@ -16,6 +16,7 @@ from rich.console import Console
 
 from hackagent.cli.config import CLIConfig
 from hackagent.cli.utils import handle_errors
+
 console = Console()
 
 
@@ -90,9 +91,7 @@ def ollama(ctx):
         "timeout": 300,
         "attack_type": attack_config.get("attack_type", "flipattack"),
         "auto_execute_attack": True,
-        "agent_adapter_operational_config": agent_cfg.get(
-            "adapter_operational_config"
-        ),
+        "agent_adapter_operational_config": agent_cfg.get("adapter_operational_config"),
         "attack_config_overrides": attack_config,
     }
 

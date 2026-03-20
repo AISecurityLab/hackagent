@@ -93,7 +93,7 @@ def build_ollama_demo_config() -> dict:
                 "agent_type": AgentTypeEnum.OLLAMA,
                 "endpoint": OLLAMA_ENDPOINT,
             },
-        }
+        },
     }
 
 
