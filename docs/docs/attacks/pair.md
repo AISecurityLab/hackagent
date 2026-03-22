@@ -128,7 +128,7 @@ advanced_config = {
     "attacker": {
         "identifier": "gpt-4",
         "endpoint": "https://api.openai.com/v1",
-        "max_new_tokens": 500,
+        "max_tokens": 500,
         "temperature": 1.0  # Higher for more creative attacks
     },
     
@@ -153,7 +153,7 @@ advanced_config = {
 |-----------|-------------|---------|-------|
 | `n_iterations` | Maximum iterations per goal | 20 | 1-100 |
 | `temperature` | Attacker creativity (higher = more varied) | 1.0 | 0.0-2.0 |
-| `max_new_tokens` | Max tokens for attacker response | 500 | 100-2000 |
+| `max_tokens` | Max tokens for attacker response | 500 | 100-2000 |
 | `objective` | Evaluation criteria | `"jailbreak"` | See objectives |
 
 ---

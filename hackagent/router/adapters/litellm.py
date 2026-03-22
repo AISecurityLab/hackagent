@@ -120,7 +120,7 @@ class LiteLLMAgent(ChatCompletionsAgent):
                           - 'name': Model string for LiteLLM (e.g., "ollama/llama3").
                           - 'endpoint' (optional): Base URL for the API.
                           - 'api_key' (optional): Name of the environment variable holding the API key.
-                          - 'max_new_tokens' (optional): Default max tokens for generation (defaults to 100).
+                          - 'max_tokens' (optional): Default max tokens for generation (defaults to 100).
                           - 'temperature' (optional): Default temperature (defaults to 0.8).
                           - 'top_p' (optional): Default top_p (defaults to 0.95).
         """
@@ -186,7 +186,7 @@ class LiteLLMAgent(ChatCompletionsAgent):
     def _prepare_litellm_params(
         self,
         messages: List[Dict[str, str]],
-        max_new_tokens: int,
+        max_tokens: int,
         temperature: float,
         top_p: float,
         **kwargs,
@@ -195,7 +195,7 @@ class LiteLLMAgent(ChatCompletionsAgent):
         litellm_params = {
             "model": self.model_name,
             "messages": messages,
-            "max_tokens": max_new_tokens,
+            "max_tokens": max_tokens,
             "temperature": temperature,
             "top_p": top_p,
         }
@@ -284,7 +284,7 @@ class LiteLLMAgent(ChatCompletionsAgent):
         return {
             "prompt",
             "messages",
-            "max_new_tokens",
+            "max_tokens",
             "max_tokens",
             "temperature",
             "top_p",
@@ -329,7 +329,7 @@ class LiteLLMAgent(ChatCompletionsAgent):
                 self.logger.debug(f"   Message preview: {msg_preview}...")
 
             # Extract parameters
-            max_tokens = parameters.get("max_tokens", self.default_max_new_tokens)
+            max_tokens = parameters.get("max_tokens", self.default_max_tokens)
             temperature = parameters.get("temperature", self.default_temperature)
             top_p = parameters.get("top_p", self.default_top_p)
 
@@ -374,7 +374,7 @@ class LiteLLMAgent(ChatCompletionsAgent):
     def _execute_litellm_completion_with_messages(
         self,
         messages: List[Dict[str, str]],
-        max_new_tokens: int,
+        max_tokens: int,
         temperature: float,
         top_p: float,
         **kwargs,
@@ -385,7 +385,7 @@ class LiteLLMAgent(ChatCompletionsAgent):
         """
         result = self._execute_completion(
             messages,
-            max_tokens=max_new_tokens,
+            max_tokens=max_tokens,
             temperature=temperature,
             top_p=top_p,
             **kwargs,
@@ -399,7 +399,7 @@ class LiteLLMAgent(ChatCompletionsAgent):
     def _execute_litellm_completion(
         self,
         texts: List[str],
-        max_new_tokens: int,
+        max_tokens: int,
         temperature: float,
         top_p: float,
         **kwargs,
@@ -425,7 +425,7 @@ class LiteLLMAgent(ChatCompletionsAgent):
 
             try:
                 litellm_params = self._prepare_litellm_params(
-                    messages, max_new_tokens, temperature, top_p, **kwargs
+                    messages, max_tokens, temperature, top_p, **kwargs
                 )
                 response = litellm.completion(**litellm_params)
                 completion_text = self._extract_raw_response_content(

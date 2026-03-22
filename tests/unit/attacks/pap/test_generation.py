@@ -131,7 +131,7 @@ class TestTargetRequestControls(unittest.TestCase):
             goal_idx=0,
             techniques=["Logical Appeal"],
             pap_params={"attacker_temperature": 0.9, "attacker_max_tokens": 128},
-            target_max_new_tokens=400,
+            target_max_tokens=400,
             target_temperature=0.2,
             target_timeout=90,
             attacker_router=attacker_router,
@@ -144,7 +144,7 @@ class TestTargetRequestControls(unittest.TestCase):
         )
 
         target_call = target_router.route_request.call_args.kwargs["request_data"]
-        self.assertEqual(target_call["max_new_tokens"], 400)
+        self.assertEqual(target_call["max_tokens"], 400)
         self.assertEqual(target_call["max_tokens"], 400)
         self.assertEqual(target_call["temperature"], 0.2)
         self.assertEqual(target_call["timeout"], 90)

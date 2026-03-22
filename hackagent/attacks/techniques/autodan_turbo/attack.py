@@ -11,7 +11,7 @@ from hackagent.attacks.shared.tui import with_tui_logging
 from hackagent.attacks.techniques.base import BaseAttack
 
 from . import evaluation, lifelong, warm_up
-from .config import DEFAULT_AUTODAN_TURBO_CONFIG
+from .config import DEFAULT_AUTODAN_TURBO_CONFIG, AutoDANTurboConfig
 from .dashboard_tracing import emit_phase_trace
 from .log_styles import format_phase_message, phase_separator
 
@@ -68,6 +68,7 @@ class AutoDANTurboAttack(BaseAttack):
         cfg = copy.deepcopy(DEFAULT_AUTODAN_TURBO_CONFIG)
         if config:
             _deep_update(cfg, config)
+        cfg = AutoDANTurboConfig.from_dict(cfg).to_dict()
 
         self.logger = logging.getLogger("hackagent.attacks.autodan_turbo")
         super().__init__(cfg, client, agent_router)

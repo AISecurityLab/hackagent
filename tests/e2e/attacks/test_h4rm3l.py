@@ -57,7 +57,7 @@ def main():
             "agent_type": AgentTypeEnum.OPENAI_SDK,
             "api_key": openrouter_api_key,
         },
-        "max_new_tokens": 1000,
+        "max_tokens": 1000,
         "judges": [
             {
                 "identifier": "openai/gpt-4o-mini",

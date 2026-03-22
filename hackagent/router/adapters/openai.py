@@ -111,6 +111,7 @@ class OpenAIAgent(ChatCompletionsAgent):
                             or the API key itself. Defaults to OPENAI_API_KEY env var.
                           - 'max_tokens' (optional): Default max tokens for generation.
                           - 'temperature' (optional): Default temperature (defaults to 1.0).
+                          - 'timeout' (optional): Default request timeout.
                           - 'tools' (optional): List of tool/function definitions for function calling.
                           - 'tool_choice' (optional): Controls which tools the model can call.
         """
@@ -139,7 +140,7 @@ class OpenAIAgent(ChatCompletionsAgent):
                     "name", OpenAIConfigurationError
                 )
         else:
-            self.model_name: str = self.config["name"]
+            self.model_name = self.config["name"]
 
         # Handle API key resolution
         self.actual_api_key = self._resolve_api_key(
@@ -163,6 +164,8 @@ class OpenAIAgent(ChatCompletionsAgent):
         else:
             # Lazy load the module
             openai = _get_openai()
+            if openai is None:
+                raise OpenAIConfigurationError("OpenAI SDK is unavailable")
             openai_client_class = openai.OpenAI
 
         client_kwargs = {}
@@ -171,7 +174,9 @@ class OpenAIAgent(ChatCompletionsAgent):
         if self.api_base_url:
             client_kwargs["base_url"] = self.api_base_url
 
-        timeout = self._get_config_key("timeout", 120)
+        timeout = self._get_config_key(
+            "timeout", self._get_config_key("request_timeout", 120)
+        )
         client_kwargs["timeout"] = timeout
 
         self.client = openai_client_class(**client_kwargs)
@@ -182,8 +187,9 @@ class OpenAIAgent(ChatCompletionsAgent):
         )
 
         # Store default generation parameters
-        self.default_max_tokens = self._get_config_key("max_tokens")
-        self.default_max_new_tokens = self.default_max_tokens  # Alias for base class
+        self.default_max_tokens = self._get_config_key(
+            "max_tokens", self.DEFAULT_MAX_TOKENS
+        )
         self.default_temperature = self._get_config_key(
             "temperature", self.DEFAULT_TEMPERATURE
         )

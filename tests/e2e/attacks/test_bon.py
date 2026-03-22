@@ -57,8 +57,8 @@ def test_bon():
             "random_capitalization": True,
             "ascii_perturbation": True,
         },
-        "max_new_tokens": 500,
-        "max_new_tokens_eval": 1000,
+        "max_tokens": 500,
+        "max_tokens_eval": 1000,
         "judges": [
             {
                 "identifier": JUDGE_MODEL,

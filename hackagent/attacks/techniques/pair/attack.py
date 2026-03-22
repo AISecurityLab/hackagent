@@ -36,7 +36,17 @@ from .config import (
     ATTACKER_SYSTEM_PROMPT,
     DEFAULT_PAIR_CONFIG,
     JUDGE_SYSTEM_PROMPT,
+    PairConfig,
 )
+
+
+def _deep_update(target: Dict[str, Any], source: Dict[str, Any]) -> None:
+    """Recursively merge user config into defaults."""
+    for key, value in source.items():
+        if isinstance(value, dict) and isinstance(target.get(key), dict):
+            _deep_update(target[key], value)
+        else:
+            target[key] = copy.deepcopy(value)
 
 
 class PAIRAttack(BaseAttack):
@@ -108,7 +118,8 @@ class PAIRAttack(BaseAttack):
         # Merge config
         current_config = copy.deepcopy(DEFAULT_PAIR_CONFIG)
         if config:
-            current_config.update(config)
+            _deep_update(current_config, config)
+        current_config = PairConfig.from_dict(current_config).to_dict()
 
         # Set logger name for hierarchical logging
         self.logger = logging.getLogger("hackagent.attacks.pair")
@@ -143,7 +154,7 @@ class PAIRAttack(BaseAttack):
                     "endpoint", "https://api.hackagent.dev/v1"
                 ),
                 "agent_type": attacker_config.get("agent_type", "OPENAI_SDK"),
-                "max_new_tokens": attacker_config.get("max_new_tokens", 500),
+                "max_tokens": attacker_config.get("max_tokens", 500),
                 "temperature": attacker_config.get("temperature", 1.0),
                 "agent_metadata": {},
             }
@@ -247,7 +258,7 @@ SCORE: {score}"""
             # Use max_tokens (OpenAI API parameter name)
             attacker_config = self.config.get("attacker", {})
             max_tokens = attacker_config.get(
-                "max_new_tokens", attacker_config.get("max_tokens", 500)
+                "max_tokens", attacker_config.get("max_tokens", 500)
             )
             temperature = attacker_config.get("temperature", 1.0)
 
@@ -300,7 +311,7 @@ SCORE: {score}"""
 
             request_data = {
                 "messages": messages,
-                "max_tokens": self.config.get("max_new_tokens", 150),
+                "max_tokens": self.config.get("max_tokens", 150),
                 "temperature": self.config.get("temperature", 0.7),
             }
 

@@ -4,6 +4,7 @@
 
 import re
 
+from hackagent.attacks.techniques.config import DEFAULT_MAX_OUTPUT_TOKENS
 from hackagent.attacks.shared.response_utils import extract_response_content
 from hackagent.attacks.shared.router_factory import create_router
 
@@ -102,18 +103,18 @@ def init_routers(config, client, logger):
         with each router plus its registration key.
     """
     att_cfg = dict(config.get("attacker", {}))
-    att_cfg.setdefault("request_timeout", config.get("request_timeout", 120))
+    att_cfg.setdefault("timeout", config.get("timeout", 120))
     att_router, att_key = create_router(
         backend=client, config=att_cfg, logger=logger, router_name="autodan-attacker"
     )
     sc_cfg = dict(config.get("scorer", {}))
-    sc_cfg.setdefault("request_timeout", config.get("request_timeout", 120))
+    sc_cfg.setdefault("timeout", config.get("timeout", 120))
     sc_router, sc_key = create_router(
         backend=client, config=sc_cfg, logger=logger, router_name="autodan-scorer"
     )
 
     sum_cfg = dict(config.get("summarizer", {}))
-    sum_cfg.setdefault("request_timeout", config.get("request_timeout", 120))
+    sum_cfg.setdefault("timeout", config.get("timeout", 120))
     sum_router, sum_key = create_router(
         backend=client, config=sum_cfg, logger=logger, router_name="autodan-summarizer"
     )
@@ -243,7 +244,7 @@ def query_target(agent_router, victim_key, prompt, config, logger, role_label="t
     )
     request_data = {
         "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": config.get("max_new_tokens", 4096),
+        "max_tokens": config.get("max_tokens", 4096),
         "temperature": config.get("temperature", 0.6),
     }
 
@@ -299,7 +300,7 @@ def score_response(
     target_response,
     logger,
     max_retries=5,
-    scorer_max_tokens=512,
+    scorer_max_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
     role_label="scorer",
 ):
     """Score target output using the two-step scorer/wrapper protocol.

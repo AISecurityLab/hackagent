@@ -257,8 +257,11 @@ class AttackOrchestrator:
         Returns:
             Kwargs for attack_impl_class constructor
         """
+        target_config = getattr(self.hack_agent, "target_config", {}) or {}
+
         return {
             "config": {
+                **target_config,
                 **attack_config,  ## Spread full attack config
                 **(run_config_override or {}),
                 "_run_id": run_id,

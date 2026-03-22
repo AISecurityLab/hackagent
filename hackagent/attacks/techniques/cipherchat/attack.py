@@ -100,13 +100,13 @@ class CipherChatAttack(BaseAttack):
         if num_demonstrations < 0:
             raise ValueError("cipherchat_params.num_demonstrations must be >= 0")
 
-        request_timeout = int(self.config.get("request_timeout", 120))
-        if request_timeout <= 0:
-            raise ValueError("request_timeout must be > 0")
+        timeout = int(self.config.get("timeout", 120))
+        if timeout <= 0:
+            raise ValueError("timeout must be > 0")
 
-        max_new_tokens = int(self.config.get("max_new_tokens", 512))
-        if max_new_tokens <= 0:
-            raise ValueError("max_new_tokens must be > 0")
+        max_tokens = int(self.config.get("max_tokens", 512))
+        if max_tokens <= 0:
+            raise ValueError("max_tokens must be > 0")
 
     def _get_pipeline_steps(self) -> List[Dict]:
         return [
@@ -116,9 +116,9 @@ class CipherChatAttack(BaseAttack):
                 "step_type_enum": "GENERATION",
                 "config_keys": [
                     "batch_size",
-                    "max_new_tokens",
+                    "max_tokens",
                     "temperature",
-                    "request_timeout",
+                    "timeout",
                     "cipherchat_params",
                     "_run_id",
                     "_backend",
@@ -140,9 +140,9 @@ class CipherChatAttack(BaseAttack):
                     "_tracker",
                     "judges",
                     "batch_size_judge",
-                    "max_new_tokens_eval",
+                    "max_tokens_eval",
                     "filter_len",
-                    "judge_request_timeout",
+                    "judge_timeout",
                     "judge_temperature",
                     "max_judge_retries",
                 ],

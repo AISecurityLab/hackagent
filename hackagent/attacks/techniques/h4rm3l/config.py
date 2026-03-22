@@ -6,7 +6,7 @@ Configuration for h4rm3l attacks.
 
 Provides the plain-dict ``DEFAULT_H4RM3L_CONFIG`` used internally by
 :class:`~hackagent.attacks.techniques.h4rm3l.attack.H4rm3lAttack`,
-plus typed dataclasses for structured configuration.
+plus typed Pydantic models for structured configuration.
 
 h4rm3l is a composable prompt-decoration framework that chains multiple
 "decorators" to obfuscate harmful prompts.  Users specify a *program*
@@ -53,8 +53,15 @@ v2 (``.then()`` chaining)::
     "Base64Decorator().then(RefusalSuppressionDecorator())"
 """
 
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
+
+from pydantic import BaseModel, Field
+
+from hackagent.attacks.techniques.config import (
+    DEFAULT_CONFIG_BASE,
+    ConfigBase,
+    default_attacker,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -119,6 +126,7 @@ PRESET_PROGRAMS: Dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 DEFAULT_H4RM3L_CONFIG: Dict[str, Any] = {
+    **DEFAULT_CONFIG_BASE,
     # === Attack identifier (required) ===
     "attack_type": "h4rm3l",
     # === h4rm3l-specific parameters ===
@@ -131,53 +139,16 @@ DEFAULT_H4RM3L_CONFIG: Dict[str, Any] = {
     },
     # === LLM endpoint for decorator synthesis (optional) ===
     # Only needed when using LLM-assisted decorators (PAP, Translate, etc.)
-    "decorator_llm": {
-        "identifier": "gpt-4o-mini",
-        "endpoint": "https://api.openai.com/v1",
-        "agent_type": "OPENAI_SDK",
-        "api_key": None,
-    },
-    # === Judge (required) ===
-    "judges": [
-        {
-            "identifier": "gpt-4-0613",
-            "type": "harmbench",
-            "agent_type": "OPENAI_SDK",
-            "api_key": None,
-            "endpoint": None,
-        }
-    ],
-    # === Batching ===
-    # Goal concurrency is controlled at orchestrator level.
-    "goal_batch_size": 1,  # Goals per orchestrator batch
-    "goal_batch_workers": 1,  # Parallel workers within each goal batch
-    "batch_size_judge": 1,  # Parallel judge evaluation
-    # === Judge parameters ===
-    "max_new_tokens_eval": 256,
-    "filter_len": 10,
-    "judge_request_timeout": 120,
-    "judge_temperature": 0.0,
-    "max_judge_retries": 1,
-    # === Target model settings ===
-    "max_new_tokens": 4096,
-    "temperature": 0.6,
-    "request_timeout": 120,
-    # === Output & pipeline ===
-    "goals": [],
-    "dataset": None,
-    "output_dir": "./logs/runs",
-    "run_id": None,
-    "start_step": 1,
+    "decorator_llm": default_attacker(),
 }
 
 
 # ---------------------------------------------------------------------------
-# Typed dataclasses (optional convenience)
+# Typed Pydantic models (optional convenience)
 # ---------------------------------------------------------------------------
 
 
-@dataclass
-class H4rm3lParams:
+class H4rm3lParams(BaseModel):
     """Parameters controlling the h4rm3l decorator chain.
 
     Attributes:
@@ -188,82 +159,25 @@ class H4rm3lParams:
     """
 
     program: str = "refusal_suppression"
-    syntax_version: int = 2
-
-    def __post_init__(self):
-        if self.syntax_version not in (1, 2):
-            raise ValueError(
-                f"syntax_version must be 1 or 2, got {self.syntax_version}"
-            )
+    syntax_version: Literal[1, 2] = 2
 
 
-@dataclass
-class H4rm3lConfig:
-    """Complete h4rm3l configuration dataclass.
+class H4rm3lConfig(ConfigBase):
+    """Complete h4rm3l configuration.
 
-    Mirrors ``DEFAULT_H4RM3L_CONFIG`` as a typed alternative.
-    Use ``asdict(config)`` to convert to the plain dict expected by
-    the pipeline.
+    Mirrors ``DEFAULT_H4RM3L_CONFIG`` as a typed alternative.  Call
+    :meth:`model_dump` (or :meth:`to_dict`) to obtain the plain dict expected
+    by the pipeline.
     """
 
     attack_type: str = "h4rm3l"
-    h4rm3l_params: H4rm3lParams = field(default_factory=H4rm3lParams)
-    goals: List[str] = field(default_factory=list)
-    judges: List[Dict[str, Any]] = field(default_factory=list)
-    goal_batch_size: int = 1
-    goal_batch_workers: int = 1
-    batch_size_judge: int = 1
-    max_new_tokens_eval: int = 256
-    filter_len: int = 10
-    judge_request_timeout: int = 120
-    judge_temperature: float = 0.0
-    max_judge_retries: int = 1
-    dataset: Optional[str] = None
-    output_dir: str = "./logs/runs"
-    start_step: int = 1
+    h4rm3l_params: H4rm3lParams = Field(default_factory=H4rm3lParams)
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "H4rm3lConfig":
         """Build from a plain dictionary."""
-        params_dict = d.get("h4rm3l_params", {})
-        if "synthesis_model" in params_dict:
-            params_dict = dict(params_dict)
-            params_dict.pop("synthesis_model", None)
-        params = H4rm3lParams(**params_dict) if params_dict else H4rm3lParams()
-        return cls(
-            attack_type=d.get("attack_type", "h4rm3l"),
-            h4rm3l_params=params,
-            goals=d.get("goals", []),
-            judges=d.get("judges", []),
-            goal_batch_size=d.get("goal_batch_size", 1),
-            goal_batch_workers=d.get("goal_batch_workers", 1),
-            batch_size_judge=d.get("batch_size_judge", 1),
-            max_new_tokens_eval=d.get("max_new_tokens_eval", 256),
-            filter_len=d.get("filter_len", 10),
-            judge_request_timeout=d.get("judge_request_timeout", 120),
-            judge_temperature=d.get("judge_temperature", 0.0),
-            max_judge_retries=d.get("max_judge_retries", 1),
-            dataset=d.get("dataset"),
-            output_dir=d.get("output_dir", "./logs/runs"),
-            start_step=d.get("start_step", 1),
-        )
+        return cls.model_validate(d)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
-        return {
-            "attack_type": self.attack_type,
-            "h4rm3l_params": asdict(self.h4rm3l_params),
-            "goals": self.goals,
-            "judges": self.judges,
-            "goal_batch_size": self.goal_batch_size,
-            "goal_batch_workers": self.goal_batch_workers,
-            "batch_size_judge": self.batch_size_judge,
-            "max_new_tokens_eval": self.max_new_tokens_eval,
-            "filter_len": self.filter_len,
-            "judge_request_timeout": self.judge_request_timeout,
-            "judge_temperature": self.judge_temperature,
-            "max_judge_retries": self.max_judge_retries,
-            "dataset": self.dataset,
-            "output_dir": self.output_dir,
-            "start_step": self.start_step,
-        }
+        return self.model_dump()

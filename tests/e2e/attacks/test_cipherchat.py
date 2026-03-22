@@ -45,10 +45,10 @@ def main() -> None:
             "num_demonstrations": 4,
             "decode_response": True,
         },
-        "max_new_tokens": 1000,
+        "max_tokens": 1000,
         "batch_size": 5,
         "temperature": 0.8,
-        "request_timeout": 90,
+        "timeout": 90,
         "judges": [
             {
                 "identifier": "openai/gpt-4o-mini",

@@ -63,7 +63,7 @@ def main():
             "shuffle": dataset_shuffle,
             "seed": dataset_seed,
         },
-        "max_new_tokens": 400,
+        "max_tokens": 400,
         # Provider-specific passthrough options for target model requests.
         # Useful to disable reasoning output and force direct final answer style.
         # For OpenRouter via OpenAI SDK client, provider-specific params should

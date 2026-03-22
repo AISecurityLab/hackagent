@@ -258,7 +258,7 @@ class TapExecutor:
         self.logger = logger
 
         attacker_config = dict(config.get("attacker", {}))
-        attacker_config.setdefault("request_timeout", config.get("request_timeout"))
+        attacker_config.setdefault("timeout", config.get("timeout"))
         self.attacker_router, self.attacker_key = _initialize_attacker_router(
             client=self.client,
             config=attacker_config,
@@ -293,7 +293,7 @@ class TapExecutor:
             Dict with keys like "prompt" and "improvement", or None on failure.
         """
         attacker_config = self.config.get("attacker", {})
-        max_tokens = attacker_config.get("max_new_tokens", 400)
+        max_tokens = attacker_config.get("max_tokens", 400)
         temperature = attacker_config.get("temperature", 1.0)
         top_p = attacker_config.get("top_p", 0.9)
 
@@ -324,7 +324,7 @@ class TapExecutor:
         """
         request_data = {
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": self.config.get("max_new_tokens", 256),
+            "max_tokens": self.config.get("max_tokens", 256),
             "temperature": self.config.get("temperature", 0.7),
             "top_p": self.config.get("top_p", 1.0),
         }

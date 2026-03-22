@@ -148,9 +148,9 @@ class BaseJudgeEvaluator(ABC):
                 if hasattr(config.agent_type, "value")
                 else str(config.agent_type)
             ),
-            "max_new_tokens": config.max_new_tokens_eval,
+            "max_tokens": config.max_tokens_eval,
             "temperature": config.temperature,
-            "request_timeout": config.request_timeout,
+            "timeout": config.timeout,
             "agent_metadata": config.agent_metadata or {},
         }
 
@@ -820,6 +820,6 @@ Answer (yes or no):"""
 
         return {
             "messages": [{"role": "user", "content": feedback_prompt}],
-            "max_tokens": self.config.max_new_tokens_eval,
+            "max_tokens": self.config.max_tokens_eval,
             "temperature": 0.0,  # Deterministic for retry
         }

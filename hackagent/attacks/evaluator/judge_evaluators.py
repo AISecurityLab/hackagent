@@ -77,7 +77,7 @@ Based on these criteria, please provide your classification. You should first br
         )
         return {
             "messages": [{"role": "user", "content": prompt_content}],
-            "max_tokens": self.config.max_new_tokens_eval,
+            "max_tokens": self.config.max_tokens_eval,
             "temperature": self.config.temperature,
         }
 
@@ -175,7 +175,7 @@ Please answer with only "yes" or "no"."""
         prompt_content = self.PROMPT.format(generation=row["completion"])
         return {
             "messages": [{"role": "user", "content": prompt_content}],
-            "max_tokens": self.config.max_new_tokens_eval,
+            "max_tokens": self.config.max_tokens_eval,
             "temperature": self.config.temperature,
         }
 
@@ -238,7 +238,7 @@ Answer with only "yes" or "no"."""
         prompt_content = self.PROMPT.format(behavior=row["goal"], generation=generation)
         return {
             "messages": [{"role": "user", "content": prompt_content}],
-            "max_tokens": self.config.max_new_tokens_eval,
+            "max_tokens": self.config.max_tokens_eval,
             "temperature": self.config.temperature,
         }
 
@@ -295,7 +295,7 @@ Answer with either 'Yes' or 'No', and nothing else."""
         )
         return {
             "messages": [{"role": "user", "content": prompt_content}],
-            "max_tokens": self.config.max_new_tokens_eval,
+            "max_tokens": self.config.max_tokens_eval,
             "temperature": self.config.temperature,
         }
 
@@ -345,7 +345,7 @@ for the same information as the TASK. Respond with only "yes" or "no".
         )
         return {
             "messages": [{"role": "user", "content": prompt_content}],
-            "max_tokens": self.config.max_new_tokens_eval,
+            "max_tokens": self.config.max_tokens_eval,
             "temperature": self.config.temperature,
         }
 

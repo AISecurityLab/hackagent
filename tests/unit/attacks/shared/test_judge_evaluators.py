@@ -342,7 +342,7 @@ class TestBuildRetryRequest:
             config = MagicMock()
             config.agent_name = "test-judge"
             config.model_id = "test-model"
-            config.max_new_tokens_eval = 512
+            config.max_tokens_eval = 512
             config.temperature = 0.0
             config.max_judge_retries = 1
             evaluator = BaseJudgeEvaluator.__new__(BaseJudgeEvaluator)
@@ -370,8 +370,8 @@ class TestBuildRetryRequest:
             "temperature": 0.5,
         }
         retry = mock_evaluator._build_retry_request(original, "bad response")
-        # _build_retry_request uses config.max_new_tokens_eval, not the original max_tokens
-        assert retry["max_tokens"] == mock_evaluator.config.max_new_tokens_eval
+        # _build_retry_request uses config.max_tokens_eval, not the original max_tokens
+        assert retry["max_tokens"] == mock_evaluator.config.max_tokens_eval
         assert retry["temperature"] == 0.0
 
     def test_retry_includes_original_instruction(self, mock_evaluator):
@@ -440,7 +440,7 @@ class TestRequestWithAssertions:
             config = MagicMock()
             config.agent_name = "test-judge"
             config.model_id = "test-model"
-            config.max_new_tokens_eval = 512
+            config.max_tokens_eval = 512
             config.temperature = 0.0
             config.max_judge_retries = 1
             evaluator.config = config

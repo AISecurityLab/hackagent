@@ -27,7 +27,7 @@ class ConcreteJudgeEvaluator(BaseJudgeEvaluator):
         prompt = self.PROMPT.format(generation=row.get("completion", ""))
         return {
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": self.config.max_new_tokens_eval,
+            "max_tokens": self.config.max_tokens_eval,
             "temperature": self.config.temperature,
         }
 
@@ -295,9 +295,9 @@ class TestVerifyKeys(unittest.TestCase):
         mock_config.agent_endpoint = "http://localhost"
         mock_config.agent_type = MagicMock()
         mock_config.agent_type.value = "litellm"
-        mock_config.max_new_tokens_eval = 100
+        mock_config.max_tokens_eval = 100
         mock_config.temperature = 0.0
-        mock_config.request_timeout = 30
+        mock_config.timeout = 30
         mock_config.agent_metadata = {}
         mock_config.agent_name = "test-judge"
         self.evaluator = ConcreteJudgeEvaluator(client=mock_client, config=mock_config)
@@ -340,9 +340,9 @@ class TestPrepareResponses(unittest.TestCase):
         mock_config.agent_endpoint = "http://localhost"
         mock_config.agent_type = MagicMock()
         mock_config.agent_type.value = "litellm"
-        mock_config.max_new_tokens_eval = 100
+        mock_config.max_tokens_eval = 100
         mock_config.temperature = 0.0
-        mock_config.request_timeout = 30
+        mock_config.timeout = 30
         mock_config.agent_metadata = {}
         mock_config.agent_name = "test-judge"
         self.evaluator = ConcreteJudgeEvaluator(client=mock_client, config=mock_config)
@@ -394,9 +394,9 @@ class TestEvaluateMethod(unittest.TestCase):
         mock_config.agent_endpoint = "http://localhost"
         mock_config.agent_type = MagicMock()
         mock_config.agent_type.value = "litellm"
-        mock_config.max_new_tokens_eval = 100
+        mock_config.max_tokens_eval = 100
         mock_config.temperature = 0.0
-        mock_config.request_timeout = 30
+        mock_config.timeout = 30
         mock_config.agent_metadata = {}
         mock_config.agent_name = "test-judge"
         mock_config.filter_len = 10
@@ -471,9 +471,9 @@ class TestBuildRetryRequest(unittest.TestCase):
         mock_config.agent_endpoint = "http://localhost"
         mock_config.agent_type = MagicMock()
         mock_config.agent_type.value = "litellm"
-        mock_config.max_new_tokens_eval = 100
+        mock_config.max_tokens_eval = 100
         mock_config.temperature = 0.0
-        mock_config.request_timeout = 30
+        mock_config.timeout = 30
         mock_config.agent_metadata = {}
         mock_config.agent_name = "test-judge"
         self.evaluator = ConcreteJudgeEvaluator(client=mock_client, config=mock_config)
@@ -536,9 +536,9 @@ class TestRequestWithAssertions(unittest.TestCase):
         mock_config.agent_endpoint = "http://localhost"
         mock_config.agent_type = MagicMock()
         mock_config.agent_type.value = "litellm"
-        mock_config.max_new_tokens_eval = 100
+        mock_config.max_tokens_eval = 100
         mock_config.temperature = 0.0
-        mock_config.request_timeout = 30
+        mock_config.timeout = 30
         mock_config.agent_metadata = {}
         mock_config.agent_name = "test-judge"
         mock_config.max_judge_retries = 1
@@ -646,9 +646,9 @@ class TestProcessRowsWithRouter(unittest.TestCase):
         mock_config.agent_endpoint = "http://localhost"
         mock_config.agent_type = MagicMock()
         mock_config.agent_type.value = "litellm"
-        mock_config.max_new_tokens_eval = 100
+        mock_config.max_tokens_eval = 100
         mock_config.temperature = 0.0
-        mock_config.request_timeout = 30
+        mock_config.timeout = 30
         mock_config.agent_metadata = {}
         mock_config.agent_name = "test-judge"
 

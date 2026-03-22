@@ -49,20 +49,20 @@ def main():
     config = {
         "attack_type": "pap",
         "dataset": DATASET,
-        "max_new_tokens": 300,
+        "max_tokens": 300,
         "pap_params": {
             "techniques": "top5",
             "attacker_temperature": 1.0,
             "attacker_max_tokens": 400,
         },
-        "max_new_tokens_eval": 20,
+        "max_tokens_eval": 20,
         "attacker": {
             "identifier": ATTACKER_MODEL,
             "type": "harmbench",
             "agent_type": AgentTypeEnum.OPENAI_SDK,
             "api_key": OPENROUTER_API_KEY,
             "endpoint": ATTACKER_ENDPOINT,
-            "max_new_tokens": 4000,
+            "max_tokens": 4000,
         },
         "judges": [
             {

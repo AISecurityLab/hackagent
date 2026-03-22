@@ -86,7 +86,7 @@ class TestCoreGenerationAndScoring(unittest.TestCase):
     def test_query_target(self, _):
         agent_router = MagicMock()
         agent_router.route_request.return_value = {"dummy": True}
-        cfg = {"max_new_tokens": 10, "temperature": 0.1}
+        cfg = {"max_tokens": 10, "temperature": 0.1}
         out = core.query_target(agent_router, "v-key", "prompt", cfg, MagicMock())
         self.assertEqual(out, "target out")
 

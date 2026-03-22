@@ -120,8 +120,8 @@ def _get_completion_via_router(
     agent_reg_key: str,
     prefix_text: str,
     surrogate_prompt_template: str,  # The resolved template or suffix string
-    request_timeout: int,
-    max_new_tokens: Optional[int],
+    timeout: int,
+    max_tokens: Optional[int],
     temperature: Optional[float],
     n_samples: Optional[int],  # Number of samples to request
     logger_instance: logging.Logger,
@@ -141,8 +141,8 @@ def _get_completion_via_router(
         prefix_text: The adversarial prefix to use for completion generation.
         surrogate_prompt_template: Template or suffix string to combine with
             the prefix. May contain {prefix} placeholder for formatting.
-        request_timeout: Timeout in seconds for the completion request.
-        max_new_tokens: Maximum number of tokens to generate in the completion.
+        timeout: Timeout in seconds for the completion request.
+        max_tokens: Maximum number of tokens to generate in the completion.
         temperature: Sampling temperature for completion generation.
         n_samples: Number of completion samples to request from the model.
         logger_instance: Logger for tracking individual request progress.
@@ -190,10 +190,10 @@ def _get_completion_via_router(
 
     request_data: Dict[str, Any] = {
         "prompt": final_prompt,
-        "timeout": request_timeout,
+        "timeout": timeout,
     }
-    if max_new_tokens is not None:
-        request_data["max_tokens"] = max_new_tokens  # Adapters should know to map this
+    if max_tokens is not None:
+        request_data["max_tokens"] = max_tokens  # Adapters should know to map this
     if temperature is not None:
         request_data["temperature"] = temperature
     if n_samples is not None and n_samples > 0:
@@ -283,7 +283,7 @@ def execute(
             Each dict should have key: 'prefix', and optionally 'goal'.
         config: Configuration dictionary containing completion parameters including:
             - surrogate_attack_prompt: Template or suffix to append to prefixes
-            - max_new_tokens_completion: Maximum tokens to generate per completion
+            - max_tokens_completion: Maximum tokens to generate per completion
             - temperature: Sampling temperature for completion generation
         logger: Logger instance for tracking completion generation progress.
 
@@ -346,8 +346,8 @@ def execute(
         logger.debug("📊 Tracker present — per-goal result tracking active")
 
     # --- Completion Parameters from config ---
-    request_timeout = 120
-    max_new_tokens = config.get("max_new_tokens_completion", 256)
+    timeout = 120
+    max_tokens = config.get("max_tokens_completion", 256)
     temperature = config.get("temperature", 0.7)
 
     # --- Prepare and run tasks (parallel) ---
@@ -372,8 +372,8 @@ def execute(
                 agent_reg_key=victim_agent_reg_key,
                 prefix_text=prefix_text,
                 surrogate_prompt_template=actual_surrogate_prompt_str,
-                request_timeout=request_timeout,
-                max_new_tokens=max_new_tokens,
+                timeout=timeout,
+                max_tokens=max_tokens,
                 temperature=temperature,
                 n_samples=1,
                 logger_instance=logger,

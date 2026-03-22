@@ -46,6 +46,7 @@ from dataclasses import fields
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from hackagent.attacks.evaluator.judge_evaluators import EVALUATOR_MAP
+from hackagent.attacks.shared.router_factory import extract_passthrough_request_config
 from hackagent.attacks.evaluator.sync import sync_evaluation_to_server
 from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
 from hackagent.server.client import AuthenticatedClient
@@ -230,13 +231,16 @@ class BaseEvaluationStep:
                 or cfg.get("batch_size_judge")
                 or tp.get("judge_batch_size", 1)
             ),
-            "max_new_tokens_eval": (
-                cfg.get("max_new_tokens_eval")
-                or tp.get("judge_max_new_tokens_eval", 256)
+            "max_tokens_eval": (
+                cfg.get("max_tokens_eval")
+                or tp.get("judge_max_tokens_eval", 256)
             ),
             "filter_len": (cfg.get("filter_len") or tp.get("judge_filter_len", 10)),
-            "request_timeout": (
-                cfg.get("judge_request_timeout") or tp.get("judge_request_timeout", 120)
+            "timeout": (
+                cfg.get("judge_timeout")
+                or cfg.get("judge_request_timeout")
+                or tp.get("judge_timeout")
+                or tp.get("judge_request_timeout", 120)
             ),
             "temperature": (
                 cfg.get("judge_temperature") or tp.get("judge_temperature", 0.0)
@@ -524,6 +528,9 @@ class BaseEvaluationStep:
             subprocess_config["agent_endpoint"] = judge_config_item.get("endpoint")
             subprocess_config["agent_metadata"] = dict(
                 judge_config_item.get("agent_metadata", {}) or {}
+            )
+            subprocess_config["agent_metadata"].update(
+                extract_passthrough_request_config(judge_config_item)
             )
 
             # Inject API key into metadata

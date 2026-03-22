@@ -49,7 +49,7 @@ class OllamaAgent(Agent):
     Configuration:
     - 'name': Model name (e.g., "llama3", "mistral", "codellama")
     - 'endpoint': Ollama API base URL (default: "http://localhost:11434")
-    - 'max_new_tokens': Maximum tokens to generate (default: 100)
+    - 'max_tokens': Maximum tokens to generate (default: 100)
     - 'temperature': Sampling temperature (default: 0.8)
     - 'top_p': Top-p sampling parameter (default: 0.95)
     - 'top_k': Top-k sampling parameter (optional)
@@ -70,7 +70,7 @@ class OllamaAgent(Agent):
                 Expected keys:
                 - 'name': Model name (required, e.g., "llama3", "mistral")
                 - 'endpoint' (optional): Ollama API base URL (default: http://localhost:11434)
-                - 'max_new_tokens' (optional): Default max tokens for generation (default: 100)
+                - 'max_tokens' (optional): Default max tokens for generation (default: 100)
                 - 'temperature' (optional): Default temperature (default: 0.8)
                 - 'top_p' (optional): Default top_p (default: 0.95)
                 - 'top_k' (optional): Default top_k sampling
@@ -100,7 +100,9 @@ class OllamaAgent(Agent):
         self.default_stream = self._get_config_key("stream", False)
 
         # Request timeout
-        self.timeout = self._get_config_key("timeout", 120)
+        self.timeout = self._get_config_key(
+            "timeout", self._get_config_key("request_timeout", 120)
+        )
 
         self.logger.info(
             f"OllamaAgent '{self.id}' initialized for model: '{self.model_name}' "
@@ -138,7 +140,7 @@ class OllamaAgent(Agent):
 
     def _build_options(
         self,
-        max_new_tokens: Optional[int] = None,
+        max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
         top_p: Optional[float] = None,
         top_k: Optional[int] = None,
@@ -149,7 +151,7 @@ class OllamaAgent(Agent):
         Build Ollama options dictionary from parameters.
 
         Args:
-            max_new_tokens: Maximum tokens to generate
+            max_tokens: Maximum tokens to generate
             temperature: Sampling temperature
             top_p: Top-p sampling parameter
             top_k: Top-k sampling parameter
@@ -162,10 +164,10 @@ class OllamaAgent(Agent):
         options = {}
 
         # Use provided values or fall back to defaults
-        if max_new_tokens is not None:
-            options["num_predict"] = max_new_tokens
-        elif self.default_max_new_tokens is not None:
-            options["num_predict"] = self.default_max_new_tokens
+        if max_tokens is not None:
+            options["num_predict"] = max_tokens
+        elif self.default_max_tokens is not None:
+            options["num_predict"] = self.default_max_tokens
 
         if temperature is not None:
             options["temperature"] = temperature
@@ -332,7 +334,7 @@ class OllamaAgent(Agent):
         Args:
             request_data: The data for the agent to process. Expected keys:
                 - 'prompt' or 'messages': The input for generation
-                - 'max_new_tokens' or 'max_tokens' (optional): Override default max tokens
+                - 'max_tokens' (optional): Override default max tokens
                 - 'temperature' (optional): Override default temperature
                 - 'top_p' (optional): Override default top_p
                 - 'top_k' (optional): Override default top_k
@@ -365,12 +367,9 @@ class OllamaAgent(Agent):
             )
 
         # Build options from request data
-        # Support both 'max_new_tokens' and 'max_tokens' (OpenAI convention)
-        max_tokens_value = request_data.get("max_new_tokens") or request_data.get(
-            "max_tokens"
-        )
+        max_tokens_value = request_data.get("max_tokens")
         options = self._build_options(
-            max_new_tokens=max_tokens_value,
+            max_tokens=max_tokens_value,
             temperature=request_data.get("temperature"),
             top_p=request_data.get("top_p"),
             top_k=request_data.get("top_k"),
@@ -391,6 +390,8 @@ class OllamaAgent(Agent):
                 processed_response = raw_response.get("message", {}).get("content", "")
             else:
                 # Use generate endpoint
+                if prompt is None:
+                    raise ValueError("Prompt request resolved to None")
                 raw_response = self._execute_generate(prompt, options, stream, system)
                 # Generate response has 'response' field
                 processed_response = raw_response.get("response", "")
@@ -491,6 +492,8 @@ class OllamaAgent(Agent):
             models = self.list_models()
             model_names = [m.get("name", "").split(":")[0] for m in models]
             # Check if our model (without tag) exists
+            if not self.model_name:
+                return False
             base_model = self.model_name.split(":")[0]
             return base_model in model_names or self.model_name in [
                 m.get("name") for m in models

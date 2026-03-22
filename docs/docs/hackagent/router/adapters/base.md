@@ -55,7 +55,7 @@ building, and configuration handling.
 - `adapter_type` _str_ - Type identifier for the adapter (e.g., &quot;OpenAIAgent&quot;).
   
   Default Generation Parameters (optional, set by subclasses):
-- `default_max_new_tokens` _int_ - Default maximum tokens to generate.
+- `default_max_tokens` _int_ - Default maximum tokens to generate.
 - `default_temperature` _float_ - Default sampling temperature.
 - `default_top_p` _float_ - Default top-p sampling parameter.
 
@@ -101,7 +101,7 @@ include enough information to reconstruct the interaction.
   Common keys:
   - &#x27;prompt&#x27;: Simple text prompt
   - &#x27;messages&#x27;: List of message dicts with &#x27;role&#x27; and &#x27;content&#x27;
-  - &#x27;max_new_tokens&#x27;: Override default max tokens
+  - &#x27;max_tokens&#x27;: Override default max tokens
   - &#x27;temperature&#x27;: Override default temperature
   - &#x27;top_p&#x27;: Override default top_p
   
@@ -185,7 +185,7 @@ This method implements the common flow for chat completion agents:
   Expected keys:
   - &#x27;prompt&#x27;: Text prompt (converted to messages)
   - &#x27;messages&#x27;: Pre-formatted messages list (takes precedence)
-  - &#x27;max_tokens&#x27;/&#x27;max_new_tokens&#x27;: Override default max tokens
+  - &#x27;max_tokens&#x27;/&#x27;max_tokens&#x27;: Override default max tokens
   - &#x27;temperature&#x27;: Override default temperature
   - &#x27;top_p&#x27;: Override default top_p
   - Additional adapter-specific parameters

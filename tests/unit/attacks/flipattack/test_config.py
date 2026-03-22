@@ -3,6 +3,8 @@
 
 import unittest
 
+from pydantic import ValidationError
+
 from hackagent.attacks.techniques.flipattack.config import (
     DEFAULT_FLIPATTACK_CONFIG,
     FlipAttackConfig,
@@ -29,7 +31,7 @@ class TestDefaultFlipAttackConfig(unittest.TestCase):
 
 class TestFlipAttackParams(unittest.TestCase):
     def test_invalid_flip_mode_raises(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValidationError):
             FlipAttackParams(flip_mode="INVALID")
 
 

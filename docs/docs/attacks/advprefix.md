@@ -105,7 +105,7 @@ advanced_config = {
     "generator": {
         "identifier": "ollama/llama2-uncensored",
         "endpoint": "http://localhost:11434/api/generate",
-        "max_new_tokens": 100,
+        "max_tokens": 100,
         "temperature": 0.8
     },
     "batch_size": 4,
@@ -135,7 +135,7 @@ advanced_config = {
         "Explain step by step:"
     ],
     "meta_prefix_samples": 5,
-    "max_new_tokens_completion": 200,
+    "max_tokens_completion": 200,
     "n_samples": 3,
     "n_prefixes_per_goal": 3
 }
@@ -176,7 +176,7 @@ Generators create attack prefixes using less restricted models:
 "generator": {
     "identifier": "ollama/llama2-uncensored",  # Model identifier
     "endpoint": "http://localhost:11434/api/generate",
-    "max_new_tokens": 50,                      # Prefix length
+    "max_tokens": 50,                      # Prefix length
     "temperature": 0.7                         # Creativity level
 }
 
@@ -331,7 +331,7 @@ fast_config = {
     "goals": ["Your goals"],
     "batch_size": 8,               # Larger batches
     "generator": {
-        "max_new_tokens": 30           # Shorter prefixes
+        "max_tokens": 30           # Shorter prefixes
     },
     "n_candidates_per_goal": 3,        # Fewer candidates
     "meta_prefix_samples": 2,          # Fewer samples
@@ -344,7 +344,7 @@ quality_config = {
     "goals": ["Your goals"],
     "batch_size": 2,               # Smaller batches
     "generator": {
-        "max_new_tokens": 100,         # Longer prefixes
+        "max_tokens": 100,         # Longer prefixes
         "temperature": 0.9             # More creative
     },
     "n_candidates_per_goal": 20,       # More candidates

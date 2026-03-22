@@ -53,7 +53,7 @@ class ADKAgent(Agent):
         name (str): The name of the ADK application (used for router registration AND as ADK app identifier).
         endpoint (str): The base API endpoint for the ADK agent.
         user_id (str): The user identifier for ADK sessions.
-        request_timeout (int): Timeout in seconds for requests to the ADK agent.
+        timeout (int): Timeout in seconds for requests to the ADK agent.
         logger (logging.Logger): Logger instance for this adapter.
     """
 
@@ -70,7 +70,7 @@ class ADKAgent(Agent):
                           - 'name': Name of the ADK application (e.g., 'multi_tool_agent').
                           - 'endpoint': Base URL of the ADK agent.
                           - 'user_id': User ID for the ADK session.
-                          - 'request_timeout' (optional): Request timeout in seconds
+                          - 'timeout' (optional): Request timeout in seconds
                             (defaults to 120).
 
         Raises:
@@ -86,7 +86,7 @@ class ADKAgent(Agent):
         self.user_id: str = self._require_config_key("user_id", AgentConfigurationError)
 
         self.endpoint: str = endpoint_raw.strip("/")
-        self.request_timeout: int = self._get_config_key("request_timeout", 120)
+        self.timeout: int = self._get_config_key("timeout", 120)
 
         # Option to use a fresh session for each request (useful for attack scenarios
         # where session state pollution can cause issues)
@@ -277,7 +277,7 @@ class ADKAgent(Agent):
                 self.logger.debug(f"   Message preview: {msg_preview}...")
 
             response = requests.post(
-                url, headers=headers, json=payload, timeout=self.request_timeout
+                url, headers=headers, json=payload, timeout=self.timeout
             )
 
             # Log response status

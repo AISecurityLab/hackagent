@@ -26,7 +26,7 @@ agent = HackAgent(
 config = {
     "attack_type": "flipattack",
     "dataset": DATASET,
-    "max_new_tokens": 400,
+    "max_tokens": 400,
     "batch_size": 10,
     "flipattack_params": {
         "flip_mode": "FCS",

@@ -74,7 +74,7 @@ def build_ollama_demo_config() -> dict:
             "judge_batch_size": 5,
             "goal_batch_size": 1,
             "goal_batch_workers": 1,
-            "max_new_tokens": 400,
+            "max_tokens": 400,
             "tap_params": {
                 "depth": 2,
                 "width": 1,

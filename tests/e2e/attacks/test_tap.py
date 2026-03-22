@@ -5,24 +5,16 @@ import pytest
 from hackagent import HackAgent
 from hackagent.router.types import AgentTypeEnum
 
-OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1"
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 DATASET = {
     "preset": "harmbench",
-    "limit": 20,
+    "limit": 100,
     "shuffle": False,
     "seed": 42,
 }
 TARGET_MODEL = "anthropic/claude-opus-4.6"
-TARGET_ENDPOINT = OPENROUTER_ENDPOINT
-
-ATTACKER_MODEL = "qwen3.5-27b"
-ATTACKER_ENDPOINT = "https://somerset-fragrance-wedding-guests.trycloudflare.com/v1"
-
-JUDGE_MODEL = "Abel-24/HarmClassifier"
-JUDGE_ENDPOINT = "https://priced-law-nonprofit-eddie.trycloudflare.com/v1"
-
+TARGET_ENDPOINT = "https://openrouter.ai/api/v1"
 
 @pytest.mark.e2e
 def test_tap():
@@ -45,29 +37,14 @@ def test_tap():
         "attack_type": "tap",
         "dataset": DATASET,
         "judge_batch_size": 10,
-        "goal_batch_size": 10,
-        "goal_batch_workers": 10,
-        "max_new_tokens": 400,
+        "goal_batch_size": 2,
+        "goal_batch_workers": 2,
+        "max_tokens": 8000,
         "tap_params": {
-            "depth": 4,
-            "width": 2,
-            "branching_factor": 3,
+            "depth": 10,
+            "width": 10,
+            "branching_factor": 4,
             "n_streams": 3,
-        },
-        "max_new_tokens_eval": 20,
-        "attacker": {
-            "identifier": "deepseek/deepseek-v3.2",
-            "agent_type": AgentTypeEnum.OPENAI_SDK,
-            "api_key": OPENROUTER_API_KEY,
-            "endpoint": OPENROUTER_ENDPOINT,
-            "max_new_tokens": 4000,
-        },
-        "judge": {
-            "identifier": "deepseek/deepseek-v3.2",
-            "type": "harmbench_variant",
-            "agent_type": AgentTypeEnum.OPENAI_SDK,
-            "api_key": OPENROUTER_API_KEY,
-            "endpoint": OPENROUTER_ENDPOINT,
         },
     }
 
