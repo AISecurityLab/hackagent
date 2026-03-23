@@ -67,9 +67,7 @@ class AutoDANTurboConfig(ConfigBase):
     """Complete typed configuration for AutoDAN-Turbo."""
 
     attack_type: str = "autodan_turbo"
-    autodan_turbo_params: AutoDANTurboParams = Field(
-        default_factory=AutoDANTurboParams
-    )
+    autodan_turbo_params: AutoDANTurboParams = Field(default_factory=AutoDANTurboParams)
     scorer: AttackerConfig = Field(
         default_factory=lambda: AttackerConfig(identifier="hackagent-scorer")
     )

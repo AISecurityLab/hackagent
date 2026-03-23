@@ -139,7 +139,11 @@ class HackAgent:
         processed_agent_type = utils.resolve_agent_type(agent_type)
         self.target_config = _resolve_target_config(target_config)
         explicit_target_config = (
-            {key: value for key, value in (target_config or {}).items() if value is not None}
+            {
+                key: value
+                for key, value in (target_config or {}).items()
+                if value is not None
+            }
             if target_config
             else {}
         )

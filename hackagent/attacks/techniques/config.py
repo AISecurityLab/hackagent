@@ -173,7 +173,9 @@ class ConfigBase(
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
-    attacker: Dict[str, Any] = Field(default_factory=lambda: AttackerConfig().model_dump())
+    attacker: Dict[str, Any] = Field(
+        default_factory=lambda: AttackerConfig().model_dump()
+    )
     judge: Dict[str, Any] = Field(default_factory=lambda: JudgeConfig().model_dump())
     judges: List[Dict[str, Any]] = Field(
         default_factory=lambda: [JudgeConfig().model_dump()]
@@ -271,13 +273,9 @@ DEFAULT_STANDARD_TARGET_TEMPERATURE: float = TargetConfig.model_fields[
 ].default
 
 DEFAULT_BATCH_SIZE_JUDGE: int = JudgeEvalConfig.model_fields["batch_size_judge"].default
-DEFAULT_MAX_TOKENS_EVAL: int = JudgeEvalConfig.model_fields[
-    "max_tokens_eval"
-].default
+DEFAULT_MAX_TOKENS_EVAL: int = JudgeEvalConfig.model_fields["max_tokens_eval"].default
 DEFAULT_FILTER_LEN: int = JudgeEvalConfig.model_fields["filter_len"].default
-DEFAULT_JUDGE_TIMEOUT: int = JudgeEvalConfig.model_fields[
-    "judge_timeout"
-].default
+DEFAULT_JUDGE_TIMEOUT: int = JudgeEvalConfig.model_fields["judge_timeout"].default
 DEFAULT_JUDGE_TEMPERATURE: float = JudgeEvalConfig.model_fields[
     "judge_temperature"
 ].default

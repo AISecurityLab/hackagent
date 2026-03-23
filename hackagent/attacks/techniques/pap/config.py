@@ -137,9 +137,7 @@ class PAPParams(BaseModel):
             if not v:
                 raise ValueError("techniques list must not be empty")
         else:
-            raise ValueError(
-                f"techniques must be str or list, got {type(v)}"
-            )
+            raise ValueError(f"techniques must be str or list, got {type(v)}")
         return v
 
 

@@ -53,7 +53,7 @@ v2 (``.then()`` chaining)::
     "Base64Decorator().then(RefusalSuppressionDecorator())"
 """
 
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, Literal
 
 from pydantic import BaseModel, Field
 

@@ -232,8 +232,7 @@ class BaseEvaluationStep:
                 or tp.get("judge_batch_size", 1)
             ),
             "max_tokens_eval": (
-                cfg.get("max_tokens_eval")
-                or tp.get("judge_max_tokens_eval", 256)
+                cfg.get("max_tokens_eval") or tp.get("judge_max_tokens_eval", 256)
             ),
             "filter_len": (cfg.get("filter_len") or tp.get("judge_filter_len", 10)),
             "timeout": (

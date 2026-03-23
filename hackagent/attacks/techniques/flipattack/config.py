@@ -30,7 +30,7 @@ few_shot
     Injects two task-oriented decoding demonstrations into the prompt.
 """
 
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, Literal
 
 from pydantic import BaseModel, Field
 
@@ -90,6 +90,8 @@ class FlipAttackConfig(ConfigBase):
     """
 
     attack_type: str = "flipattack"
+    output_dir: str = "./logs/flipattack"
+    judges: list[Dict[str, Any]] = Field(default_factory=list)
     flipattack_params: FlipAttackParams = Field(default_factory=FlipAttackParams)
 
     @classmethod
@@ -102,7 +104,10 @@ class FlipAttackConfig(ConfigBase):
         Returns:
             Populated :class:`FlipAttackConfig` instance.
         """
-        return cls.model_validate(config_dict)
+        filtered_config = {
+            key: value for key, value in config_dict.items() if key in cls.model_fields
+        }
+        return cls.model_validate(filtered_config)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
