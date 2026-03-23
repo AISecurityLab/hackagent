@@ -20,11 +20,12 @@ Based on: https://arxiv.org/abs/2401.06373
 
 import logging
 import time
-from dataclasses import fields
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from hackagent.attacks.evaluator.judge_evaluators import EVALUATOR_MAP
+from hackagent.attacks.shared.router_factory import extract_passthrough_request_config
 from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
+from hackagent.attacks.techniques.config import DEFAULT_MAX_OUTPUT_TOKENS
 from hackagent.router.router import AgentRouter
 
 from .config import ALL_TECHNIQUES, TOP_5_TECHNIQUES
@@ -81,12 +82,13 @@ class _StepJudge:
             sub_cfg["agent_type"] = jcfg.get("agent_type", "OPENAI_SDK")
             sub_cfg["agent_endpoint"] = jcfg.get("endpoint")
             sub_cfg["agent_metadata"] = dict(jcfg.get("agent_metadata", {}) or {})
+            sub_cfg["agent_metadata"].update(extract_passthrough_request_config(jcfg))
 
             api_key = jcfg.get("api_key") or jcfg.get("api_key_env")
             if api_key:
                 sub_cfg["agent_metadata"]["api_key"] = api_key
 
-            expected_fields = {f.name for f in fields(EvaluatorConfig)}
+            expected_fields = set(EvaluatorConfig.model_fields.keys())
             filtered = {k: v for k, v in sub_cfg.items() if k in expected_fields}
 
             try:
@@ -175,7 +177,7 @@ def _resolve_techniques(pap_params: Dict[str, Any]) -> List[str]:
 
 def _create_attacker_router(
     attacker_config: Dict[str, Any],
-    client: "AuthenticatedClient",
+    backend: Any,
 ) -> AgentRouter:
     """Create an AgentRouter for the attacker LLM."""
     metadata: Dict[str, Any] = {
@@ -186,10 +188,10 @@ def _create_attacker_router(
         metadata["api_key"] = api_key
 
     return AgentRouter(
-        backend=client,
+        backend=backend,
         name=f"pap-attacker-{attacker_config.get('identifier', 'unknown')[:30]}",
         agent_type=attacker_config.get("agent_type", "OPENAI_SDK"),
-        endpoint=attacker_config.get("endpoint"),
+        endpoint=attacker_config.get("endpoint") or "",
         metadata=metadata,
     )
 
@@ -226,18 +228,17 @@ def execute(
     attacker_cfg = config.get("attacker", {})
 
     tracker: Optional["Tracker"] = config.get("_tracker")
-    client: Optional["AuthenticatedClient"] = config.get("_backend") or config.get(
-        "_client"
-    )
+    client: Optional["AuthenticatedClient"] = config.get("_client")
+    backend = config.get("_backend") or getattr(agent_router, "backend", None)
 
     techniques = _resolve_techniques(pap_params)
     max_techniques = pap_params.get("max_techniques_per_goal", 0)
     if max_techniques and max_techniques > 0:
         techniques = techniques[:max_techniques]
 
-    target_max_new_tokens = int(config.get("max_new_tokens", 4096))
+    target_max_tokens = int(config.get("max_tokens", 4096))
     target_temperature = float(config.get("temperature", 0.6))
-    target_timeout = int(config.get("request_timeout", 120))
+    target_timeout = int(config.get("timeout", 120))
 
     victim_key = str(agent_router.backend_agent.id)
 
@@ -248,9 +249,9 @@ def execute(
 
     # Create attacker router
     attacker_router: Optional[AgentRouter] = None
-    if client and attacker_cfg.get("identifier"):
+    if backend and attacker_cfg.get("identifier"):
         try:
-            attacker_router = _create_attacker_router(attacker_cfg, client)
+            attacker_router = _create_attacker_router(attacker_cfg, backend)
             logger.info(
                 f"Attacker LLM: {attacker_cfg.get('identifier')} "
                 f"(endpoint={attacker_cfg.get('endpoint')})"
@@ -272,9 +273,9 @@ def execute(
     if isinstance(judges_config, list) and judges_config and client is not None:
         base_eval_cfg: Dict[str, Any] = {
             "batch_size": config.get("batch_size_judge", 1),
-            "max_new_tokens_eval": config.get("max_new_tokens_eval", 256),
+            "max_tokens_eval": config.get("max_tokens_eval", 256),
             "filter_len": config.get("filter_len", 10),
-            "request_timeout": config.get("judge_request_timeout", 120),
+            "timeout": config.get("judge_timeout", 120),
             "temperature": config.get("judge_temperature", 0.0),
             "max_judge_retries": config.get("max_judge_retries", 1),
             "organization_id": config.get("organization_id"),
@@ -307,7 +308,7 @@ def execute(
             goal_idx=goal_idx,
             techniques=techniques,
             pap_params=pap_params,
-            target_max_new_tokens=target_max_new_tokens,
+            target_max_tokens=target_max_tokens,
             target_temperature=target_temperature,
             target_timeout=target_timeout,
             attacker_router=attacker_router,
@@ -354,7 +355,7 @@ def _attack_single_goal(
     goal_idx: int,
     techniques: List[str],
     pap_params: Dict[str, Any],
-    target_max_new_tokens: int,
+    target_max_tokens: int,
     target_temperature: float,
     target_timeout: int,
     attacker_router: AgentRouter,
@@ -371,7 +372,9 @@ def _attack_single_goal(
     queries the target, evaluates with the judge.  Early stops on jailbreak.
     """
     attacker_temp = pap_params.get("attacker_temperature", 1.0)
-    attacker_max_tokens = pap_params.get("attacker_max_tokens", 1024)
+    attacker_max_tokens = pap_params.get(
+        "attacker_max_tokens", DEFAULT_MAX_OUTPUT_TOKENS
+    )
 
     best_result: Dict[str, Any] = {
         "goal": goal,
@@ -444,9 +447,7 @@ def _attack_single_goal(
                 registration_key=victim_key,
                 request_data={
                     "prompt": persuasive_prompt,
-                    # Pass both aliases because adapters normalize differently.
-                    "max_new_tokens": target_max_new_tokens,
-                    "max_tokens": target_max_new_tokens,
+                    "max_tokens": target_max_tokens,
                     "temperature": target_temperature,
                     # OpenAI-compatible per-request timeout.
                     "timeout": target_timeout,

@@ -51,13 +51,13 @@ class Agent(ABC):
         adapter_type (str): Type identifier for the adapter (e.g., "OpenAIAgent").
 
     Default Generation Parameters (optional, set by subclasses):
-        default_max_new_tokens (int): Default maximum tokens to generate.
+        default_max_tokens (int): Default maximum tokens to generate.
         default_temperature (float): Default sampling temperature.
         default_top_p (float): Default top-p sampling parameter.
     """
 
     # Default values for generation parameters (can be overridden by subclasses)
-    DEFAULT_MAX_NEW_TOKENS: int = 100
+    DEFAULT_MAX_TOKENS: int = 100
     DEFAULT_TEMPERATURE: float = 0.8
     DEFAULT_TOP_P: float = 0.95
 
@@ -81,7 +81,7 @@ class Agent(ABC):
 
         # Initialize optional attributes that subclasses may set
         self.model_name: Optional[str] = None
-        self.default_max_new_tokens: int = self.DEFAULT_MAX_NEW_TOKENS
+        self.default_max_tokens: int = self.DEFAULT_MAX_TOKENS
         self.default_temperature: float = self.DEFAULT_TEMPERATURE
         self.default_top_p: float = self.DEFAULT_TOP_P
 
@@ -136,11 +136,11 @@ class Agent(ABC):
         Initialize default generation parameters from config.
 
         This method should be called by subclasses after setting up the basic
-        configuration. It reads max_new_tokens, temperature, and top_p from
+        configuration. It reads max_tokens, temperature, and top_p from
         the config with fallback to class defaults.
         """
-        self.default_max_new_tokens = self._get_config_key(
-            "max_new_tokens", self.DEFAULT_MAX_NEW_TOKENS
+        self.default_max_tokens = self._get_config_key(
+            "max_tokens", self.DEFAULT_MAX_TOKENS
         )
         self.default_temperature = self._get_config_key(
             "temperature", self.DEFAULT_TEMPERATURE
@@ -323,6 +323,9 @@ class Agent(ABC):
         Returns:
             A dictionary representing a standardized success response.
         """
+        if isinstance(processed_response, str):
+            processed_response = self._strip_think_prefix(processed_response)
+
         if agent_specific_data is None:
             agent_specific_data = {}
 
@@ -343,6 +346,14 @@ class Agent(ABC):
             "adapter_type": self.ADAPTER_TYPE,
         }
 
+    def _strip_think_prefix(self, text: str) -> str:
+        """Strip hidden reasoning prefix up to and including '</think>' if present."""
+        marker = "</think>"
+        marker_index = text.find(marker)
+        if marker_index == -1:
+            return text
+        return text[marker_index + len(marker) :]
+
     @abstractmethod
     def handle_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -357,7 +368,7 @@ class Agent(ABC):
                           Common keys:
                           - 'prompt': Simple text prompt
                           - 'messages': List of message dicts with 'role' and 'content'
-                          - 'max_new_tokens': Override default max tokens
+                          - 'max_tokens': Override default max tokens
                           - 'temperature': Override default temperature
                           - 'top_p': Override default top_p
 
@@ -454,7 +465,6 @@ class ChatCompletionsAgent(Agent):
         return {
             "prompt",
             "messages",
-            "max_new_tokens",
             "max_tokens",
             "temperature",
             "top_p",
@@ -474,10 +484,7 @@ class ChatCompletionsAgent(Agent):
         Returns:
             Dictionary of parameters to pass to _execute_completion.
         """
-        # Support both max_tokens (OpenAI style) and max_new_tokens (HuggingFace style)
-        max_tokens = request_data.get("max_tokens") or request_data.get(
-            "max_new_tokens", self.default_max_new_tokens
-        )
+        max_tokens = request_data.get("max_tokens", self.default_max_tokens)
 
         params = {
             "max_tokens": max_tokens,
@@ -555,7 +562,7 @@ class ChatCompletionsAgent(Agent):
                           Expected keys:
                           - 'prompt': Text prompt (converted to messages)
                           - 'messages': Pre-formatted messages list (takes precedence)
-                          - 'max_tokens'/'max_new_tokens': Override default max tokens
+                          - 'max_tokens': Override default max tokens
                           - 'temperature': Override default temperature
                           - 'top_p': Override default top_p
                           - Additional adapter-specific parameters

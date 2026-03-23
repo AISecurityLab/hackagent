@@ -55,9 +55,9 @@ def test_advprefix():
         "meta_prefix_samples": 1,
         "n_samples": 1,
         "n_prefixes_per_goal": 1,
-        "max_new_tokens": 120,
-        "max_new_tokens_completion": 120,
-        "max_new_tokens_eval": 128,
+        "max_tokens": 120,
+        "max_tokens_completion": 120,
+        "max_tokens_eval": 128,
     }
 
     results = agent.hack(attack_config=config)

@@ -37,10 +37,10 @@ import random
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import fields
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from hackagent.attacks.evaluator.judge_evaluators import EVALUATOR_MAP
+from hackagent.attacks.shared.router_factory import extract_passthrough_request_config
 from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
 from hackagent.router.router import AgentRouter
 
@@ -66,6 +66,7 @@ class _StepJudge:
         "nuanced": ["eval_nj", "explanation_nj"],
         "jailbreakbench": ["eval_jb", "explanation_jb"],
         "harmbench": ["eval_hb", "explanation_hb"],
+        "harmbench_variant": ["eval_hbv", "explanation_hbv"],
         "on_topic": ["eval_on_topic", "explanation_on_topic"],
     }
 
@@ -101,13 +102,14 @@ class _StepJudge:
             sub_cfg["agent_type"] = jcfg.get("agent_type", "OPENAI_SDK")
             sub_cfg["agent_endpoint"] = jcfg.get("endpoint")
             sub_cfg["agent_metadata"] = dict(jcfg.get("agent_metadata", {}) or {})
+            sub_cfg["agent_metadata"].update(extract_passthrough_request_config(jcfg))
 
             api_key = jcfg.get("api_key") or jcfg.get("api_key_env")
             if api_key:
                 sub_cfg["agent_metadata"]["api_key"] = api_key
 
             # Filter to EvaluatorConfig fields
-            expected_fields = {f.name for f in fields(EvaluatorConfig)}
+            expected_fields = set(EvaluatorConfig.model_fields.keys())
             filtered = {k: v for k, v in sub_cfg.items() if k in expected_fields}
 
             try:
@@ -352,7 +354,9 @@ def execute(
     random_capitalization_flag = bon_params.get("random_capitalization", True)
     ascii_perturbation_flag = bon_params.get("ascii_perturbation", True)
 
-    batch_size = max(1, config.get("batch_size", 1))
+    configured_batch_size = max(1, config.get("batch_size", num_concurrent_k))
+    candidate_workers = max(1, int(num_concurrent_k))
+    target_max_tokens = config.get("max_tokens")
     tracker: Optional["Tracker"] = config.get("_tracker")
     client: Optional["AuthenticatedClient"] = config.get("_backend") or config.get(
         "_client"
@@ -361,8 +365,17 @@ def execute(
     victim_key = str(agent_router.backend_agent.id)
     logger.info(
         f"BoN generation: {len(goals)} goal(s), "
-        f"n_steps={n_steps}, K={num_concurrent_k}, sigma={sigma}"
+        f"n_steps={n_steps}, K={num_concurrent_k}, sigma={sigma}, "
+        f"candidate_workers={candidate_workers}"
     )
+
+    if configured_batch_size != candidate_workers:
+        logger.warning(
+            "BoN candidate concurrency is pinned to num_concurrent_k=%s "
+            "(configured batch_size=%s is ignored for candidate fanout)",
+            candidate_workers,
+            configured_batch_size,
+        )
 
     if tracker:
         logger.info("📊 Generation tracking via Tracker enabled")
@@ -373,9 +386,9 @@ def execute(
     if isinstance(judges_config, list) and judges_config and client is not None:
         base_eval_cfg: Dict[str, Any] = {
             "batch_size": config.get("batch_size_judge", 1),
-            "max_new_tokens_eval": config.get("max_new_tokens_eval", 256),
+            "max_tokens_eval": config.get("max_tokens_eval", 256),
             "filter_len": config.get("filter_len", 10),
-            "request_timeout": config.get("judge_request_timeout", 120),
+            "timeout": config.get("judge_timeout", 120),
             "temperature": config.get("judge_temperature", 0.0),
             "max_judge_retries": config.get("max_judge_retries", 1),
             "organization_id": config.get("organization_id"),
@@ -410,11 +423,12 @@ def execute(
             goal_idx=goal_idx,
             n_steps=n_steps,
             num_concurrent_k=num_concurrent_k,
+            target_max_tokens=target_max_tokens,
             sigma=sigma,
             word_scrambling=word_scrambling,
             random_capitalization=random_capitalization_flag,
             ascii_perturbation=ascii_perturbation_flag,
-            batch_size=batch_size,
+            candidate_workers=candidate_workers,
             victim_key=victim_key,
             agent_router=agent_router,
             tracker=tracker,
@@ -459,11 +473,12 @@ def _search_single_goal(
     goal_idx: int,
     n_steps: int,
     num_concurrent_k: int,
+    target_max_tokens: Optional[int],
     sigma: float,
     word_scrambling: bool,
     random_capitalization: bool,
     ascii_perturbation: bool,
-    batch_size: int,
+    candidate_workers: int,
     victim_key: str,
     agent_router: AgentRouter,
     tracker: Optional["Tracker"],
@@ -526,6 +541,8 @@ def _search_single_goal(
             )
             try:
                 request_data = {"prompt": augmented_prompt}
+                if target_max_tokens is not None:
+                    request_data["max_tokens"] = target_max_tokens
                 response = agent_router.route_request(
                     registration_key=victim_key,
                     request_data=request_data,
@@ -567,7 +584,7 @@ def _search_single_goal(
                     },
                 }
 
-        with ThreadPoolExecutor(max_workers=batch_size) as pool:
+        with ThreadPoolExecutor(max_workers=candidate_workers) as pool:
             list(pool.map(_query_candidate, candidates))
 
         # Pick the best candidate from this step (longest response)

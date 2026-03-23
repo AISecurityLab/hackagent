@@ -103,7 +103,7 @@ class BaselineAttack(BaseAttack):
             "output_dir",
             "template_categories",
             "templates_per_category",
-            "max_new_tokens",
+            "max_tokens",
             "objective",
         ]
 
@@ -128,7 +128,7 @@ class BaselineAttack(BaseAttack):
             (:func:`~hackagent.attacks.techniques.baseline.generation.execute`):
             Selects templates, injects goals, and collects target responses.
             Configurable via ``template_categories``, ``templates_per_category``,
-            ``max_new_tokens``, ``temperature``, and ``n_samples_per_template``.
+            ``max_tokens``, ``temperature``, and ``n_samples_per_template``.
 
         Stage 2 — **Evaluation**
             (:func:`~hackagent.attacks.techniques.baseline.evaluation.execute`):
@@ -148,7 +148,7 @@ class BaselineAttack(BaseAttack):
                 "config_keys": [
                     "template_categories",
                     "templates_per_category",
-                    "max_new_tokens",
+                    "max_tokens",
                     "temperature",
                     "n_samples_per_template",
                     "_run_id",  # For real-time result tracking

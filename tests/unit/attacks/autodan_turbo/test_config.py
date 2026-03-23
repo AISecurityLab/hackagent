@@ -1,5 +1,7 @@
 import unittest
 
+from pydantic import ValidationError
+
 from hackagent.attacks.techniques.autodan_turbo import config as autodan_config
 
 
@@ -20,6 +22,24 @@ class TestAutoDANTurboConfig(unittest.TestCase):
         self.assertIn("warm_up_iterations", params)
         self.assertIn("lifelong_iterations", params)
         self.assertIn("embedding_model", params)
+
+    def test_typed_config_validates_and_dumps_nested_roles(self):
+        typed = autodan_config.AutoDANTurboConfig.from_dict(
+            {
+                "autodan_turbo_params": {"epochs": 2},
+                "scorer": {"identifier": "custom-scorer"},
+            }
+        )
+
+        dumped = typed.to_dict()
+        self.assertEqual(dumped["attack_type"], "autodan_turbo")
+        self.assertEqual(dumped["autodan_turbo_params"]["epochs"], 2)
+        self.assertEqual(dumped["scorer"]["identifier"], "custom-scorer")
+        self.assertEqual(dumped["summarizer"]["identifier"], "hackagent-summarizer")
+
+    def test_invalid_epochs_raise_validation_error(self):
+        with self.assertRaises(ValidationError):
+            autodan_config.AutoDANTurboParams(epochs=0)
 
     def test_prompt_templates_expose_expected_placeholders(self):
         self.assertIn("{goal}", autodan_config.WARM_UP_SYSTEM_PROMPT)

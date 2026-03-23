@@ -57,7 +57,7 @@ if __name__ == "__main__":
     config = {
         "attack_type": "advprefix",
         "goals": GOALS,
-        "max_new_tokens": 100,
+        "max_tokens": 100,
         "generator": GENERATOR,
     }
 

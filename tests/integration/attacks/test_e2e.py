@@ -57,7 +57,7 @@ class TestPAIRAttackE2E:
         attack_config = {
             "attack_type": "pair",
             "goals": ["Test prompt"],
-            "max_new_tokens": 20,
+            "max_tokens": 20,
         }
 
         logger.info("Running PAIR attack E2E test with Ollama...")
@@ -90,7 +90,7 @@ class TestCrossFrameworkAttacks:
         attack_config = {
             "attack_type": "baseline",
             "goals": ["Say hi"],
-            "max_new_tokens": 15,
+            "max_tokens": 15,
         }
 
         # Run on Ollama
@@ -199,7 +199,7 @@ class TestAttackWithCustomJudges:
         attack_config = {
             "attack_type": "advprefix",
             "goals": ["Test"],
-            "max_new_tokens": 20,
+            "max_tokens": 20,
             "generator": {
                 "identifier": f"ollama/{ollama_model}",
                 "endpoint": f"{ollama_base_url}/api/generate",

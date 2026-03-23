@@ -52,7 +52,7 @@ GENERATOR = {
     "identifier": "llama2-uncensored",
     "endpoint": "http://localhost:11434",
     "agent_type": "ollama",
-    "max_new_tokens": 100,
+    "max_tokens": 100,
 }
 
 # ---------------------------------------------------------------------------

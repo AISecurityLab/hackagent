@@ -200,7 +200,7 @@ class AgentRouter:
 
             optional_litellm_keys = [
                 "api_key",
-                "max_new_tokens",
+                "max_tokens",
                 "temperature",
                 "top_p",
             ]
@@ -294,7 +294,7 @@ class AgentRouter:
                 adapter_instance_config["endpoint"] = str(self.backend_agent.endpoint)
 
             optional_ollama_keys = [
-                "max_new_tokens",
+                "max_tokens",
                 "temperature",
                 "top_p",
                 "top_k",

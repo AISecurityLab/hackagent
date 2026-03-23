@@ -672,7 +672,7 @@ advanced_config = {
         "identifier": "ollama/llama2-uncensored",
         "endpoint": "http://localhost:11434/api/generate",
         "batch_size": 4,
-        "max_new_tokens": 100,
+        "max_tokens": 100,
         "temperature": 0.8
     },
     

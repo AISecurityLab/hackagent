@@ -67,9 +67,9 @@ def _make_step(config=None, **overrides):
             }
         ],
         "batch_size_judge": 1,
-        "max_new_tokens_eval": 256,
+        "max_tokens_eval": 256,
         "filter_len": 10,
-        "judge_request_timeout": 120,
+        "judge_timeout": 120,
         "judge_temperature": 0.0,
         "max_judge_retries": 1,
     }
@@ -226,9 +226,9 @@ class TestBuildBaseEvalConfig:
         config = step._build_base_eval_config()
 
         assert config["batch_size"] == 1
-        assert config["max_new_tokens_eval"] == 256
+        assert config["max_tokens_eval"] == 256
         assert config["filter_len"] == 10
-        assert config["request_timeout"] == 120
+        assert config["timeout"] == 120
         assert config["temperature"] == 0.0
         assert config["max_judge_retries"] == 1
 
@@ -242,18 +242,18 @@ class TestBuildBaseEvalConfig:
         )
         technique_params = {
             "judge_batch_size": 8,
-            "judge_max_new_tokens_eval": 512,
+            "judge_max_tokens_eval": 512,
             "judge_filter_len": 20,
-            "judge_request_timeout": 60,
+            "judge_timeout": 60,
             "judge_temperature": 0.5,
             "judge_max_retries": 3,
         }
         config = step._build_base_eval_config(technique_params=technique_params)
 
         assert config["batch_size"] == 8
-        assert config["max_new_tokens_eval"] == 512
+        assert config["max_tokens_eval"] == 512
         assert config["filter_len"] == 20
-        assert config["request_timeout"] == 60
+        assert config["timeout"] == 60
         assert config["temperature"] == 0.5
         assert config["max_judge_retries"] == 3
 

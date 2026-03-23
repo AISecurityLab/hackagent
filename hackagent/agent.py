@@ -17,6 +17,22 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
+def _resolve_target_config(target_config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Return normalized victim request defaults for the configured router."""
+    from hackagent.attacks.techniques.config import default_target
+
+    resolved = default_target()
+    if not target_config:
+        return resolved
+
+    merged = {key: value for key, value in target_config.items() if value is not None}
+    if "request_timeout" in merged and "timeout" not in merged:
+        merged["timeout"] = merged.pop("request_timeout")
+
+    resolved.update(merged)
+    return resolved
+
+
 class HackAgent:
     """
     The primary client for orchestrating security assessments with HackAgent.
@@ -50,6 +66,7 @@ class HackAgent:
         raise_on_unexpected_status: bool = False,
         timeout: Optional[float] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        target_config: Optional[Dict[str, Any]] = None,
         adapter_operational_config: Optional[Dict[str, Any]] = None,
     ):
         """
@@ -84,6 +101,10 @@ class HackAgent:
                 authenticated client. Defaults to `None` (which might mean a
                 default timeout from the underlying HTTP library is used).
             metadata: Optional dictionary containing agent-specific metadata.
+            target_config: Optional default request settings for the configured
+                victim model. This is the preferred place to define target-side
+                generation defaults such as `max_tokens`, `temperature`,
+                and `timeout`.
             adapter_operational_config: Optional configuration for the agent adapter.
         """
 
@@ -116,14 +137,34 @@ class HackAgent:
         self.client = getattr(self.backend, "_client", None)
 
         processed_agent_type = utils.resolve_agent_type(agent_type)
+        self.target_config = _resolve_target_config(target_config)
+        explicit_target_config = (
+            {
+                key: value
+                for key, value in (target_config or {}).items()
+                if value is not None
+            }
+            if target_config
+            else {}
+        )
+
+        router_metadata = {
+            key: value
+            for key, value in {**(metadata or {}), **explicit_target_config}.items()
+            if value is not None
+        }
+        router_operational_config = {
+            **self.target_config,
+            **(adapter_operational_config or {}),
+        }
 
         self.router = AgentRouter(
             backend=self.backend,
             name=name or endpoint,  # fall back to endpoint if no name provided
             agent_type=processed_agent_type,
             endpoint=endpoint,
-            metadata=metadata,
-            adapter_operational_config=adapter_operational_config,
+            metadata=router_metadata,
+            adapter_operational_config=router_operational_config,
         )
 
         # Attack strategies are lazy-loaded to improve startup time

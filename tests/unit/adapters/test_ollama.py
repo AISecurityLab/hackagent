@@ -42,7 +42,7 @@ class TestOllamaAgentInit(unittest.TestCase):
         self.assertEqual(adapter.id, adapter_id)
         self.assertEqual(adapter.model_name, "llama3")
         self.assertEqual(adapter.api_base_url, "http://localhost:11434")
-        self.assertEqual(adapter.default_max_new_tokens, 100)
+        self.assertEqual(adapter.default_max_tokens, 100)
         self.assertEqual(adapter.default_temperature, 0.8)
         self.assertEqual(adapter.default_top_p, 0.95)
 
@@ -88,7 +88,7 @@ class TestOllamaAgentInit(unittest.TestCase):
         config = {
             "name": "codellama",
             "endpoint": "http://localhost:11434",
-            "max_new_tokens": 200,
+            "max_tokens": 200,
             "temperature": 0.7,
             "top_p": 0.9,
             "top_k": 40,
@@ -100,7 +100,7 @@ class TestOllamaAgentInit(unittest.TestCase):
         adapter = OllamaAgent(id=adapter_id, config=config)
 
         self.assertEqual(adapter.model_name, "codellama")
-        self.assertEqual(adapter.default_max_new_tokens, 200)
+        self.assertEqual(adapter.default_max_tokens, 200)
         self.assertEqual(adapter.default_temperature, 0.7)
         self.assertEqual(adapter.default_top_p, 0.9)
         self.assertEqual(adapter.default_top_k, 40)
@@ -125,7 +125,7 @@ class TestOllamaAgentBuildOptions(unittest.TestCase):
             id="test_options_adapter",
             config={
                 "name": "llama3",
-                "max_new_tokens": 100,
+                "max_tokens": 100,
                 "temperature": 0.8,
                 "top_p": 0.95,
             },
@@ -142,7 +142,7 @@ class TestOllamaAgentBuildOptions(unittest.TestCase):
     def test_build_options_with_overrides(self):
         """Test building options with override values."""
         options = self.adapter._build_options(
-            max_new_tokens=200, temperature=0.5, top_p=0.7
+            max_tokens=200, temperature=0.5, top_p=0.7
         )
 
         self.assertEqual(options["num_predict"], 200)
@@ -167,7 +167,7 @@ class TestOllamaAgentHandleRequest(unittest.TestCase):
         self.config = {
             "name": "llama3",
             "endpoint": "http://localhost:11434",
-            "max_new_tokens": 50,
+            "max_tokens": 50,
             "temperature": 0.5,
         }
         self.adapter = OllamaAgent(id=self.adapter_id, config=self.config)
@@ -251,6 +251,25 @@ class TestOllamaAgentHandleRequest(unittest.TestCase):
         self.assertIn("/api/chat", call_args[0][0])
 
     @patch("hackagent.router.adapters.ollama.requests.post")
+    def test_handle_request_strips_text_before_think_close(self, mock_post):
+        """Test that text before and including '</think>' is removed."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "model": "llama3",
+            "response": "analysis path</think>Visible final output",
+            "done": True,
+        }
+        mock_response.raise_for_status = MagicMock()
+        mock_post.return_value = mock_response
+
+        response = self.adapter.handle_request({"prompt": "Hello"})
+
+        self.assertEqual(response["status_code"], 200)
+        self.assertEqual(response["processed_response"], "Visible final output")
+        self.assertEqual(response["generated_text"], "Visible final output")
+
+    @patch("hackagent.router.adapters.ollama.requests.post")
     def test_handle_request_connection_error(self, mock_post):
         """Test handling of connection error."""
         mock_post.side_effect = requests.exceptions.ConnectionError(
@@ -264,7 +283,7 @@ class TestOllamaAgentHandleRequest(unittest.TestCase):
         self.assertIn("connection error", response["error_message"].lower())
 
     @patch("hackagent.router.adapters.ollama.requests.post")
-    def test_handle_request_timeout_error(self, mock_post):
+    def test_handle_timeout_error(self, mock_post):
         """Test handling of timeout error."""
         mock_post.side_effect = requests.exceptions.Timeout("Request timed out")
 
@@ -331,7 +350,7 @@ class TestOllamaAgentHandleRequest(unittest.TestCase):
 
         request_data = {
             "prompt": "Hello",
-            "max_new_tokens": 200,
+            "max_tokens": 200,
             "temperature": 0.3,
             "top_k": 20,
             "seed": 42,

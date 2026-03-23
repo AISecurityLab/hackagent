@@ -333,7 +333,7 @@ class PrefixGenerationPipeline:
                 "name": model_name,
                 "endpoint": endpoint,
                 "api_key": api_key,
-                "max_new_tokens": self.config.max_new_tokens,
+                "max_tokens": self.config.max_tokens,
                 "temperature": self.config.temperature,
                 "top_p": self.config.top_p,
             }
@@ -453,7 +453,7 @@ class PrefixGenerationPipeline:
             idx, prompt, goal, meta_prefix = args
             request_params = {
                 "prompt": prompt,
-                "max_new_tokens": self.config.max_new_tokens,
+                "max_tokens": self.config.max_tokens,
                 "temperature": temperature,
                 "top_p": self.config.top_p,
             }

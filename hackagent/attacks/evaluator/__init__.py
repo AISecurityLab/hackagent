@@ -23,6 +23,7 @@ Usage:
         NuancedEvaluator,
         JailbreakBenchEvaluator,
         HarmBenchEvaluator,
+        HarmBenchVariantEvaluator,
         EVALUATOR_MAP,
         AssertionResult,
         # Pattern-based evaluators
@@ -48,6 +49,7 @@ from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
 from hackagent.attacks.evaluator.judge_evaluators import (
     EVALUATOR_MAP,
     HarmBenchEvaluator,
+    HarmBenchVariantEvaluator,
     JailbreakBenchEvaluator,
     NuancedEvaluator,
     OnTopicEvaluator,
@@ -81,6 +83,7 @@ __all__ = [
     "NuancedEvaluator",
     "JailbreakBenchEvaluator",
     "HarmBenchEvaluator",
+    "HarmBenchVariantEvaluator",
     "OnTopicEvaluator",
     "EVALUATOR_MAP",
     # Pattern evaluators

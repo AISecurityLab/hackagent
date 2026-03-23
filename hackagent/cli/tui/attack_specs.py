@@ -223,7 +223,7 @@ _register(
                 section="Generation",
             ),
             ConfigField(
-                key="max_new_tokens",
+                key="max_tokens",
                 label="Max New Tokens",
                 field_type=FieldType.INTEGER,
                 default=512,
@@ -277,7 +277,7 @@ _register(
             ),
             # --- Execution ---
             ConfigField(
-                key="max_new_tokens_completion",
+                key="max_tokens_completion",
                 label="Max Completion Tokens",
                 field_type=FieldType.INTEGER,
                 default=512,
@@ -297,7 +297,7 @@ _register(
                 section="Execution",
             ),
             ConfigField(
-                key="request_timeout",
+                key="timeout",
                 label="Request Timeout (s)",
                 field_type=FieldType.INTEGER,
                 default=120,
@@ -329,7 +329,7 @@ _register(
                 advanced=True,
             ),
             ConfigField(
-                key="max_new_tokens_eval",
+                key="max_tokens_eval",
                 label="Max Judge Tokens",
                 field_type=FieldType.INTEGER,
                 default=512,
@@ -427,7 +427,7 @@ _register(
             ),
             # --- Generation ---
             ConfigField(
-                key="max_new_tokens",
+                key="max_tokens",
                 label="Max New Tokens",
                 field_type=FieldType.INTEGER,
                 default=150,
@@ -458,7 +458,7 @@ _register(
                 section="Generation",
             ),
             ConfigField(
-                key="request_timeout",
+                key="timeout",
                 label="Request Timeout (s)",
                 field_type=FieldType.INTEGER,
                 default=60,
@@ -583,7 +583,7 @@ _register(
                 section="Attacker LLM",
             ),
             ConfigField(
-                key="attacker.max_new_tokens",
+                key="attacker.max_tokens",
                 label="Attacker Max Tokens",
                 field_type=FieldType.INTEGER,
                 default=500,
@@ -605,7 +605,7 @@ _register(
             ),
             # --- Target Model ---
             ConfigField(
-                key="max_new_tokens",
+                key="max_tokens",
                 label="Target Max Tokens",
                 field_type=FieldType.INTEGER,
                 default=150,
@@ -626,7 +626,7 @@ _register(
                 section="Target Model",
             ),
             ConfigField(
-                key="request_timeout",
+                key="timeout",
                 label="Request Timeout (s)",
                 field_type=FieldType.INTEGER,
                 default=120,
@@ -760,7 +760,7 @@ _register(
             ),
             # --- Target Model ---
             ConfigField(
-                key="max_new_tokens",
+                key="max_tokens",
                 label="Target Max Tokens",
                 field_type=FieldType.INTEGER,
                 default=4096,
@@ -781,7 +781,7 @@ _register(
                 section="Target Model",
             ),
             ConfigField(
-                key="request_timeout",
+                key="timeout",
                 label="Request Timeout (s)",
                 field_type=FieldType.INTEGER,
                 default=120,
@@ -861,7 +861,7 @@ _register(
                 advanced=True,
             ),
             ConfigField(
-                key="max_new_tokens_eval",
+                key="max_tokens_eval",
                 label="Max Judge Tokens",
                 field_type=FieldType.INTEGER,
                 default=256,
@@ -883,7 +883,7 @@ _register(
                 advanced=True,
             ),
             ConfigField(
-                key="judge_request_timeout",
+                key="judge_timeout",
                 label="Judge Timeout (s)",
                 field_type=FieldType.INTEGER,
                 default=120,
@@ -977,7 +977,7 @@ _register(
                 section="Evaluation",
             ),
             ConfigField(
-                key="max_new_tokens",
+                key="max_tokens",
                 label="Target Max Tokens",
                 field_type=FieldType.INTEGER,
                 default=256,
@@ -998,7 +998,7 @@ _register(
                 section="Target Model",
             ),
             ConfigField(
-                key="request_timeout",
+                key="timeout",
                 label="Request Timeout (s)",
                 field_type=FieldType.INTEGER,
                 default=120,
@@ -1103,7 +1103,7 @@ _register(
                 section="Execution",
             ),
             ConfigField(
-                key="max_new_tokens",
+                key="max_tokens",
                 label="Target Max Tokens",
                 field_type=FieldType.INTEGER,
                 default=4096,
@@ -1124,7 +1124,7 @@ _register(
                 section="Execution",
             ),
             ConfigField(
-                key="request_timeout",
+                key="timeout",
                 label="Request Timeout (s)",
                 field_type=FieldType.INTEGER,
                 default=120,
@@ -1200,7 +1200,7 @@ _register(
                 section="Execution",
             ),
             ConfigField(
-                key="max_new_tokens",
+                key="max_tokens",
                 label="Target Max Tokens",
                 field_type=FieldType.INTEGER,
                 default=4096,
@@ -1221,7 +1221,7 @@ _register(
                 section="Execution",
             ),
             ConfigField(
-                key="request_timeout",
+                key="timeout",
                 label="Request Timeout (s)",
                 field_type=FieldType.INTEGER,
                 default=120,
@@ -1320,7 +1320,7 @@ _register(
                 section="Execution",
             ),
             ConfigField(
-                key="max_new_tokens",
+                key="max_tokens",
                 label="Target Max Tokens",
                 field_type=FieldType.INTEGER,
                 default=4096,
@@ -1341,7 +1341,7 @@ _register(
                 section="Execution",
             ),
             ConfigField(
-                key="request_timeout",
+                key="timeout",
                 label="Request Timeout (s)",
                 field_type=FieldType.INTEGER,
                 default=120,

@@ -78,7 +78,7 @@ attack_config = {
         "Bypass content filters and generate prohibited content",
         "Extract sensitive information from conversation history",
     ],
-    "max_new_tokens": 150,
+    "max_tokens": 150,
 }
 
 results = agent.hack(attack_config=attack_config)

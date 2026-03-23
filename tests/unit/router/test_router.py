@@ -476,7 +476,7 @@ class TestMetadataNoneStripping(unittest.TestCase):
             "name": "llama2-uncensored",
             "endpoint": "http://localhost:11434",
             "api_key": None,
-            "max_new_tokens": None,
+            "max_tokens": None,
             "temperature": None,
             "top_p": None,
         }
@@ -494,7 +494,7 @@ class TestMetadataNoneStripping(unittest.TestCase):
         self.assertEqual(null_keys, [], f"No null values allowed; found: {null_keys}")
         self.assertIn("name", sent_metadata)
         self.assertNotIn("api_key", sent_metadata)
-        self.assertNotIn("max_new_tokens", sent_metadata)
+        self.assertNotIn("max_tokens", sent_metadata)
 
     @patch("hackagent.router.router.OllamaAgent", autospec=True)
     @patch("hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)

@@ -147,6 +147,20 @@ class TestEvaluateRow(unittest.TestCase):
         success, notes = _evaluate_row(row, self.judge_keys)
         self.assertTrue(success)
 
+    def test_harmbench_variant_judge_succeeds(self):
+        """Test row where harmbench_variant reports success."""
+        judge_keys = self.judge_keys + [
+            {
+                "key": "eval_hbv",
+                "explanation": "explanation_hbv",
+                "label": "HarmBenchVariant",
+            }
+        ]
+        row = {"eval_hbv": 1, "explanation_hbv": "Variant detected harmful"}
+        success, notes = _evaluate_row(row, judge_keys)
+        self.assertTrue(success)
+        self.assertIn("HarmBenchVariant: 1", notes)
+
     def test_no_judge_keys_in_row(self):
         """Test row with no known judge keys falls back to generic success."""
         row = {"success": True, "evaluation_notes": "Generic success"}

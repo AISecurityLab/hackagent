@@ -108,7 +108,7 @@ class TestGoogleADKAdapterIntegration:
 
         request = {
             "prompt": "What is 2 + 2? Answer briefly.",
-            "max_new_tokens": 15,
+            "max_tokens": 15,
         }
 
         response = adapter.handle_request(request)
@@ -136,7 +136,7 @@ class TestGoogleADKAdapterIntegration:
 
         request = {
             "messages": [{"role": "user", "content": "Hello! Say hi."}],
-            "max_new_tokens": 15,
+            "max_tokens": 15,
         }
 
         response = adapter.handle_request(request)
@@ -165,7 +165,7 @@ class TestGoogleADKAdapterIntegration:
         # First message
         request1 = {
             "prompt": "Say hello.",
-            "max_new_tokens": 15,
+            "max_tokens": 15,
         }
         response1 = adapter.handle_request(request1)
         assert response1 is not None
@@ -179,7 +179,7 @@ class TestGoogleADKAdapterIntegration:
         # Second message in same session should have context
         request2 = {
             "prompt": "Say goodbye.",
-            "max_new_tokens": 15,
+            "max_tokens": 15,
         }
         response2 = adapter.handle_request(request2)
         assert response2 is not None
@@ -207,7 +207,7 @@ class TestGoogleADKAdapterIntegration:
         # Make multiple requests
         for i in range(3):
             response = adapter.handle_request(
-                {"prompt": f"Request {i}", "max_new_tokens": 20}
+                {"prompt": f"Request {i}", "max_tokens": 20}
             )
             assert response is not None
 
@@ -415,7 +415,7 @@ class TestGoogleADKRouterIntegration:
         agent_id = str(router.backend_agent.id)
         request_data = {
             "prompt": "What can you help me with?",
-            "max_new_tokens": 15,
+            "max_tokens": 15,
         }
 
         response = router.route_request(
@@ -450,7 +450,7 @@ class TestGoogleADKToolUsage:
         # Request that should trigger tool use (if agent supports it)
         request = {
             "prompt": "What is the weather in Boston?",
-            "max_new_tokens": 20,
+            "max_tokens": 20,
         }
 
         response = adapter.handle_request(request)
@@ -472,7 +472,7 @@ class TestGoogleADKToolUsage:
 
         request = {
             "prompt": "First tell me the weather in New York, then tell me about activities suitable for that weather.",
-            "max_new_tokens": 30,
+            "max_tokens": 30,
         }
 
         response = adapter.handle_request(request)

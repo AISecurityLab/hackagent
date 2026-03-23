@@ -165,8 +165,8 @@ def execute(
     params = config.get("cipherchat_params", {})
     encode_method = params.get("encode_method", "caesar")
     decode_response = params.get("decode_response", True)
-    request_timeout = int(config.get("request_timeout", 120))
-    max_new_tokens = int(config.get("max_new_tokens", 512))
+    timeout = int(config.get("timeout", 120))
+    max_tokens = int(config.get("max_tokens", 512))
     temperature = float(config.get("temperature", 0.6))
 
     if encode_method not in encode_expert_dict:
@@ -181,11 +181,11 @@ def execute(
 
     logger.info(
         "CipherChat generation initialized with encode_method=%s "
-        "(decode_response=%s, request_timeout=%ss, max_new_tokens=%s)",
+        "(decode_response=%s, timeout=%ss, max_tokens=%s)",
         encode_method,
         decode_response,
-        request_timeout,
-        max_new_tokens,
+        timeout,
+        max_tokens,
     )
 
     victim_key = str(agent_router.backend_agent.id)
@@ -206,9 +206,9 @@ def execute(
 
         request_data = {
             "prompt": full_prompt,
-            "max_new_tokens": max_new_tokens,
+            "max_tokens": max_tokens,
             "temperature": temperature,
-            "timeout": request_timeout,
+            "timeout": timeout,
         }
 
         _prompt_preview = (
