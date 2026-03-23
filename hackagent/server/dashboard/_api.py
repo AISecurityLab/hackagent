@@ -7,11 +7,29 @@ from __future__ import annotations
 
 from nicegui import app as _fastapi_app
 
-from ._helpers import _serialize
+from ._helpers import _result_bucket, _serialize
+
+_RESULTS_FETCH_LIMIT = 20
+_DASHBOARD_RUN_SCAN_LIMIT = 10
 
 
 def register_api(backend) -> None:
     """Register all ``/api/*`` FastAPI routes on the NiceGUI application."""
+
+    def _derive_run_status(
+        result_statuses: list[tuple[str, str | None]],
+        fallback: str = "",
+    ) -> str:
+        buckets = [_result_bucket(status=s, notes=n) for s, n in result_statuses]
+        has_pending = any(b == "pending" for b in buckets)
+        has_failed = any(b == "failed" for b in buckets)
+        if has_pending:
+            return "RUNNING"
+        if has_failed:
+            return "FAILED"
+        if buckets:
+            return "COMPLETED"
+        return fallback or "PENDING"
 
     @_fastapi_app.get("/api/status")
     async def api_status():
@@ -28,20 +46,22 @@ def register_api(backend) -> None:
     async def api_stats():
         agents_p = backend.list_agents(page=1, page_size=1)
         attacks_p = backend.list_attacks(page=1, page_size=1)
-        runs_p = backend.list_runs(page=1, page_size=200)
-        total_results = jailbreaks = passed = errors = not_evaluated = 0
+        runs_p = backend.list_runs(page=1, page_size=_DASHBOARD_RUN_SCAN_LIMIT)
+        total_results = jailbreaks = mitigated = failed = not_evaluated = 0
         for run in runs_p.items:
-            rp = backend.list_results(run_id=run.id, page=1, page_size=500)
+            rp = backend.list_results(
+                run_id=run.id, page=1, page_size=_RESULTS_FETCH_LIMIT
+            )
             total_results += rp.total
             for r in rp.items:
-                s = r.evaluation_status.upper()
-                if "SUCCESSFUL_JAILBREAK" in s:
+                bucket = _result_bucket(r.evaluation_status, r.evaluation_notes)
+                if bucket == "jailbreak":
                     jailbreaks += 1
-                elif "PASSED" in s:
-                    passed += 1
-                elif "ERROR" in s:
-                    errors += 1
-                elif "NOT_EVALUATED" in s:
+                elif bucket == "mitigated":
+                    mitigated += 1
+                elif bucket == "failed":
+                    failed += 1
+                elif bucket == "pending":
                     not_evaluated += 1
         risk_pct = (
             round(100 * jailbreaks / max(total_results, 1)) if total_results else 0
@@ -52,8 +72,8 @@ def register_api(backend) -> None:
             "total_runs": runs_p.total,
             "total_results": total_results,
             "successful_jailbreaks": jailbreaks,
-            "passed": passed,
-            "errors": errors,
+            "passed": mitigated,
+            "errors": failed,
             "not_evaluated": not_evaluated,
             "risk_percentage": risk_pct,
         }
@@ -74,12 +94,18 @@ def register_api(backend) -> None:
         items = []
         for run in result.items:
             d = _serialize(run)
-            rp = backend.list_results(run_id=run.id, page=1, page_size=500)
+            rp = backend.list_results(
+                run_id=run.id, page=1, page_size=_RESULTS_FETCH_LIMIT
+            )
             d["total_results"] = rp.total
             d["successful_jailbreaks"] = sum(
                 1
                 for r in rp.items
-                if "SUCCESSFUL_JAILBREAK" in r.evaluation_status.upper()
+                if _result_bucket(r.evaluation_status, r.evaluation_notes) == "jailbreak"
+            )
+            d["status"] = _derive_run_status(
+                [(r.evaluation_status, r.evaluation_notes) for r in rp.items],
+                fallback=str(d.get("status", "")),
             )
             items.append(d)
         return {"items": items, "total": result.total}

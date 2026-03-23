@@ -10,6 +10,7 @@ dashboard at http://<host>:<port>/.
 """
 
 import click
+import httpx
 from rich.console import Console
 
 console = Console()
@@ -70,8 +71,14 @@ def web(ctx, host, port, db_path, no_browser):
             client = AuthenticatedClient(
                 base_url=cli_config.base_url,
                 token=cli_config.api_key,
+                # Never disable HTTP timeouts in web mode: a stuck remote call
+                # would otherwise keep the dashboard loading forever.
+                timeout=httpx.Timeout(15.0, connect=5.0, read=15.0, write=15.0),
             )
-            backend = RemoteBackend(client=client)
+            candidate_backend = RemoteBackend(client=client)
+            # Preflight check to fail fast on invalid/unreachable remote config.
+            candidate_backend.get_context()
+            backend = candidate_backend
             console.print("[dim]Using remote backend.[/dim]")
         except Exception as exc:
             console.print(
@@ -92,9 +99,9 @@ def web(ctx, host, port, db_path, no_browser):
     console.print()
     console.print("[bold]🌐  HackAgent Dashboard[/bold]")
     console.print(f"    [cyan]→  {url}[/cyan]")
-    mode_label = "remote" if cli_config.api_key else "local"
+    mode_label = "remote" if backend.__class__.__name__ == "RemoteBackend" else "local"
     console.print(f"    Mode : [cyan]{mode_label}[/cyan]")
-    if not cli_config.api_key:
+    if mode_label == "local":
         resolved_db = db_path or "~/.local/share/hackagent/hackagent.db"
         console.print(f"    DB   : [dim]{resolved_db}[/dim]")
     console.print()

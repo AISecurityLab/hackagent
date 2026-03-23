@@ -459,6 +459,17 @@ class LocalBackend:
             return self._row_to_run(row)
         raise RuntimeError(f"LocalBackend: Run {run_id} not found")
 
+    def delete_run(self, run_id: UUID) -> None:
+        with self._lock:
+            # Delete children first due FK constraints (no ON DELETE CASCADE).
+            self._conn.execute(
+                "DELETE FROM traces WHERE result_id IN (SELECT id FROM results WHERE run_id=?)",
+                (str(run_id),),
+            )
+            self._conn.execute("DELETE FROM results WHERE run_id=?", (str(run_id),))
+            self._conn.execute("DELETE FROM runs WHERE id=?", (str(run_id),))
+            self._conn.commit()
+
     def _row_to_run(self, row) -> RunRecord:
         return RunRecord(
             id=UUID(row["id"]),
@@ -657,3 +668,22 @@ class LocalBackend:
             )
             for r in rows
         ]
+
+    def delete_attack(self, attack_id: UUID) -> None:
+        with self._lock:
+            run_rows = self._conn.execute(
+                "SELECT id FROM runs WHERE attack_id=?",
+                (str(attack_id),),
+            ).fetchall()
+            run_ids = [row["id"] for row in run_rows]
+
+            for rid in run_ids:
+                self._conn.execute(
+                    "DELETE FROM traces WHERE result_id IN (SELECT id FROM results WHERE run_id=?)",
+                    (rid,),
+                )
+                self._conn.execute("DELETE FROM results WHERE run_id=?", (rid,))
+                self._conn.execute("DELETE FROM runs WHERE id=?", (rid,))
+
+            self._conn.execute("DELETE FROM attacks WHERE id=?", (str(attack_id),))
+            self._conn.commit()

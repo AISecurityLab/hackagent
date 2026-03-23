@@ -33,32 +33,62 @@ def _rel_time(iso: str | None) -> str:
     return iso or "—"
 
 
-def _eval_label(status: str | None) -> str:
+def _short_date(iso: str | None) -> str:
+    """Return a compact date for table secondary timestamp rows."""
+    if not iso:
+        return "—"
+    with contextlib.suppress(Exception):
+        dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+        return dt.strftime("%d/%m/%Y")
+    return "—"
+
+
+def _result_bucket(status: str | None, notes: str | None = None) -> str:
+    """Classify a result into dashboard buckets.
+
+    Buckets: jailbreak, mitigated, failed, pending.
+    """
     s = (status or "").upper()
+    n = (notes or "").lower()
+
+    # Operational failures must be treated as failed even if the model outcome
+    # would otherwise be considered mitigated.
+    if "failed with exception" in n:
+        return "failed"
     if "SUCCESSFUL_JAILBREAK" in s:
+        return "jailbreak"
+    if "FAILED_CRITERIA" in s or "ERROR" in s:
+        return "failed"
+    if "FAILED_JAILBREAK" in s or "PASSED_CRITERIA" in s:
+        return "mitigated"
+    if "NOT_EVALUATED" in s:
+        return "pending"
+    return "pending"
+
+
+def _eval_label(status: str | None, notes: str | None = None) -> str:
+    s = (status or "").upper()
+    bucket = _result_bucket(status, notes)
+    if bucket == "jailbreak":
         return "Jailbreak"
-    if "FAILED_JAILBREAK" in s:
+    if bucket == "mitigated":
         return "Mitigated"
-    if "PASSED_CRITERIA" in s:
-        return "Passed"
-    if "FAILED_CRITERIA" in s:
+    if bucket == "failed":
         return "Failed"
     if "ERROR_AGENT" in s:
-        return "Agent Error"
-    if "ERROR" in s:
-        return "Error"
-    if "NOT_EVALUATED" in s:
+        return "Failed"
+    if bucket == "pending":
         return "Pending"
     return status or "N/A"
 
 
-def _eval_color(status: str | None) -> str:
-    s = (status or "").upper()
-    if "SUCCESSFUL_JAILBREAK" in s:
+def _eval_color(status: str | None, notes: str | None = None) -> str:
+    bucket = _result_bucket(status, notes)
+    if bucket == "jailbreak":
         return "negative"
-    if "FAILED_JAILBREAK" in s or "PASSED_CRITERIA" in s:
+    if bucket == "mitigated":
         return "positive"
-    if "ERROR" in s:
+    if bucket == "failed":
         return "warning"
     return "grey-6"
 

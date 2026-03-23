@@ -11,6 +11,7 @@ when an API key is available and selected automatically by HackAgent.__init__.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -22,8 +23,9 @@ from pydantic import AnyUrl
 from hackagent.server.client import AuthenticatedClient
 from hackagent.server.api.agent import agent_create, agent_list, agent_partial_update
 from hackagent.server.api.organization import organization_me_retrieve
-from hackagent.server.api.attack import attack_create, attack_list
+from hackagent.server.api.attack import attack_create, attack_destroy, attack_list
 from hackagent.server.api.run import (
+    run_destroy,
     run_list,
     run_partial_update,
     run_retrieve,
@@ -464,6 +466,9 @@ class RemoteBackend:
             total = resp.parsed.count or total
 
             for r in page_results:
+                run_config = r.run_config if isinstance(r.run_config, dict) else {}
+                if getattr(r, "agent_name", None):
+                    run_config = {**run_config, "_agent_name": str(r.agent_name)}
                 items.append(
                     RunRecord(
                         id=r.id,
@@ -473,9 +478,7 @@ class RemoteBackend:
                         agent_id=r.agent
                         if isinstance(r.agent, UUID)
                         else UUID(str(r.agent)),
-                        run_config=r.run_config
-                        if isinstance(r.run_config, dict)
-                        else {},
+                        run_config=run_config,
                         status=r.status.value
                         if hasattr(r.status, "value")
                         else str(r.status),
@@ -503,19 +506,25 @@ class RemoteBackend:
         resp = run_retrieve.sync_detailed(id=run_id, client=self._client)
         if resp.status_code == 200 and resp.parsed:
             r = resp.parsed
+            run_config = r.run_config if isinstance(r.run_config, dict) else {}
+            if getattr(r, "agent_name", None):
+                run_config = {**run_config, "_agent_name": str(r.agent_name)}
             return RunRecord(
                 id=r.id,
                 attack_id=r.attack
                 if isinstance(r.attack, UUID)
                 else UUID(str(r.attack)),
                 agent_id=r.agent if isinstance(r.agent, UUID) else UUID(str(r.agent)),
-                run_config=r.run_config if isinstance(r.run_config, dict) else {},
+                run_config=run_config,
                 status=r.status.value if hasattr(r.status, "value") else str(r.status),
                 run_notes=getattr(r, "run_notes", None),
                 created_at=_pick_dt(r, "timestamp", "created_at"),
                 updated_at=_pick_dt(r, "updated_at", "timestamp"),
             )
         raise RuntimeError(f"RemoteBackend: Run {run_id} not found")
+
+    def delete_run(self, run_id: UUID) -> None:
+        run_destroy.sync_detailed(id=run_id, client=self._client)
 
     # ── Result ────────────────────────────────────────────────────────────────
 
@@ -655,6 +664,36 @@ class RemoteBackend:
                 break
             current_page += 1
 
+        if run_id is not None and not items:
+            run_resp = run_retrieve.sync_detailed(id=run_id, client=self._client)
+            if run_resp.status_code == 200 and run_resp.parsed:
+                embedded = getattr(run_resp.parsed, "results", None) or []
+                for r in embedded:
+                    goal = ""
+                    goal_index = 0
+                    if isinstance(r.agent_specific_data, dict):
+                        goal = r.agent_specific_data.get("goal", "")
+                        goal_index = r.agent_specific_data.get("goal_index", 0)
+                    items.append(
+                        ResultRecord(
+                            id=r.id,
+                            run_id=r.run if isinstance(r.run, UUID) else UUID(str(r.run)),
+                            goal=goal,
+                            goal_index=goal_index,
+                            evaluation_status=r.evaluation_status.value
+                            if hasattr(r.evaluation_status, "value")
+                            else str(r.evaluation_status),
+                            evaluation_notes=getattr(r, "evaluation_notes", None),
+                            evaluation_metrics=getattr(r, "evaluation_metrics", {}) or {},
+                            metadata=r.agent_specific_data
+                            if isinstance(r.agent_specific_data, dict)
+                            else {},
+                            created_at=_pick_dt(r, "timestamp", "created_at"),
+                            updated_at=_pick_dt(r, "updated_at", "timestamp"),
+                        )
+                    )
+                total = len(items)
+
         return PaginatedResult(items=items, total=total or len(items))
 
     def get_result(self, result_id: UUID) -> ResultRecord:
@@ -730,6 +769,23 @@ class RemoteBackend:
     def list_traces(self, result_id: UUID) -> List[TraceRecord]:
         # Traces are written-only via the API; return empty list for now
         return []
+
+    def delete_attack(self, attack_id: UUID) -> None:
+        # Remove associated runs first for backends that enforce FK constraints.
+        page = 1
+        page_size = 100
+        while True:
+            runs_p = self.list_runs(attack_id=attack_id, page=page, page_size=page_size)
+            if not runs_p.items:
+                break
+            for run in runs_p.items:
+                with contextlib.suppress(Exception):
+                    self.delete_run(run.id)
+            if len(runs_p.items) < page_size:
+                break
+            page += 1
+
+        attack_destroy.sync_detailed(id=attack_id, client=self._client)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
