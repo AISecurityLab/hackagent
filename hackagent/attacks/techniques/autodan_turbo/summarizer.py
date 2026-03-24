@@ -5,6 +5,7 @@
 import json
 import re
 
+from hackagent.attacks.techniques.config import DEFAULT_MAX_OUTPUT_TOKENS
 from hackagent.attacks.shared.response_utils import extract_response_content
 
 from .config import (
@@ -81,7 +82,7 @@ def summarize_strategy(
     library,
     logger,
     max_retries=5,
-    summarizer_max_tokens=512,
+    summarizer_max_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
     role_label="summarizer",
 ):
     """Summarize why a stronger prompt outperforms a weaker one.

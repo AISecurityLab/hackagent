@@ -30,7 +30,7 @@ class TestLiteLLMAgentInit(unittest.TestCase):
             self.assertEqual(adapter.model_name, config["name"])
             self.assertIsNone(adapter.api_base_url)
             self.assertIsNone(adapter.actual_api_key)
-            self.assertEqual(adapter.default_max_new_tokens, 100)
+            self.assertEqual(adapter.default_max_tokens, 100)
             self.assertEqual(adapter.default_temperature, 0.8)
             self.assertEqual(adapter.default_top_p, 0.95)
         except LiteLLMConfigurationError:
@@ -42,7 +42,7 @@ class TestLiteLLMAgentInit(unittest.TestCase):
             "name": "gpt-3.5-turbo",
             "endpoint": "https://api.openai.com/v1",
             "api_key": "OPENAI_API_KEY_ENV_VAR_NAME",  # Env var name
-            "max_new_tokens": 200,
+            "max_tokens": 200,
             "temperature": 0.7,
             "top_p": 0.9,
         }
@@ -52,7 +52,7 @@ class TestLiteLLMAgentInit(unittest.TestCase):
             self.assertEqual(adapter.api_base_url, config["endpoint"])
             # When env var is not found, the adapter uses the string itself as the key
             self.assertEqual(adapter.actual_api_key, "OPENAI_API_KEY_ENV_VAR_NAME")
-            self.assertEqual(adapter.default_max_new_tokens, config["max_new_tokens"])
+            self.assertEqual(adapter.default_max_tokens, config["max_tokens"])
             self.assertEqual(adapter.default_temperature, config["temperature"])
             self.assertEqual(adapter.default_top_p, config["top_p"])
 
@@ -90,7 +90,7 @@ class TestLiteLLMAgentHandleRequest(unittest.TestCase):
         self.config = {
             "name": "test-model",
             "endpoint": "http://fake-litellm-api.com",
-            "max_new_tokens": 50,
+            "max_tokens": 50,
             "temperature": 0.5,
             "top_p": 0.9,
         }
@@ -116,7 +116,7 @@ class TestLiteLLMAgentHandleRequest(unittest.TestCase):
         mock_response.choices = [mock_choice]
         mock_litellm_completion.return_value = mock_response
 
-        request_data = {"prompt": self.prompt, "max_new_tokens": 150}
+        request_data = {"prompt": self.prompt, "max_tokens": 150}
         response = self.adapter.handle_request(request_data)
 
         self.assertEqual(response["status_code"], 200)

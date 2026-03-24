@@ -55,7 +55,7 @@ class TestLiteLLMAdapterIntegration:
         config = {
             "name": "ollama/tinyllama",
             "endpoint": ollama_base_url,
-            "max_new_tokens": 20,
+            "max_tokens": 20,
         }
 
         adapter = LiteLLMAgent(id="test_litellm_ollama", config=config)
@@ -75,7 +75,7 @@ class TestLiteLLMAdapterIntegration:
         config = {
             "name": "gpt-4o-mini",
             "api_key": openai_api_key,
-            "max_new_tokens": 20,
+            "max_tokens": 20,
         }
 
         adapter = LiteLLMAgent(id="test_litellm_openai", config=config)
@@ -95,7 +95,7 @@ class TestLiteLLMAdapterIntegration:
         config = {
             "name": "ollama/tinyllama",
             "endpoint": ollama_base_url,
-            "max_new_tokens": 15,
+            "max_tokens": 15,
         }
 
         adapter = LiteLLMAgent(id="test_litellm_chat_ollama", config=config)
@@ -104,7 +104,7 @@ class TestLiteLLMAdapterIntegration:
             "messages": [
                 {"role": "user", "content": "What is 2 + 2? Answer in one word."}
             ],
-            "max_new_tokens": 20,
+            "max_tokens": 20,
         }
 
         response = adapter.handle_request(request)
@@ -124,7 +124,7 @@ class TestLiteLLMAdapterIntegration:
         config = {
             "name": "gpt-4o-mini",
             "api_key": openai_api_key,
-            "max_new_tokens": 15,
+            "max_tokens": 15,
         }
 
         adapter = LiteLLMAgent(id="test_litellm_chat_openai", config=config)
@@ -133,7 +133,7 @@ class TestLiteLLMAdapterIntegration:
             "messages": [
                 {"role": "user", "content": "What is 2 + 2? Answer in one word."}
             ],
-            "max_new_tokens": 20,
+            "max_tokens": 20,
         }
 
         response = adapter.handle_request(request)
@@ -156,7 +156,7 @@ class TestLiteLLMAdapterIntegration:
             "messages": [
                 {"role": "user", "content": "Generate a creative one-word response."}
             ],
-            "max_new_tokens": 20,
+            "max_tokens": 20,
             "temperature": 1.2,
         }
 
@@ -184,7 +184,7 @@ class TestLiteLLMAdapterIntegration:
                 {"role": "assistant", "content": "Nice to meet you, Bob!"},
                 {"role": "user", "content": "What is my name?"},
             ],
-            "max_new_tokens": 30,
+            "max_tokens": 30,
         }
 
         response = adapter.handle_request(request)
@@ -216,7 +216,7 @@ class TestLiteLLMAdapterIntegration:
                 },
                 {"role": "user", "content": "What is the square root of 16?"},
             ],
-            "max_new_tokens": 30,
+            "max_tokens": 30,
         }
 
         response = adapter.handle_request(request)
@@ -410,7 +410,7 @@ class TestLiteLLMRouterIntegration:
         agent_id = str(router.backend_agent.id)
         request_data = {
             "messages": [{"role": "user", "content": "Say hello in one word!"}],
-            "max_new_tokens": 10,
+            "max_tokens": 10,
         }
 
         response = router.route_request(
@@ -441,7 +441,7 @@ class TestLiteLLMProviderSwitching:
         ollama_config = {
             "name": "ollama/tinyllama",
             "endpoint": ollama_base_url,
-            "max_new_tokens": 30,
+            "max_tokens": 30,
         }
         ollama_adapter = LiteLLMAgent(id="test_switch_ollama", config=ollama_config)
 
@@ -458,7 +458,7 @@ class TestLiteLLMProviderSwitching:
         openai_config = {
             "name": "gpt-4o-mini",
             "api_key": openai_api_key,
-            "max_new_tokens": 30,
+            "max_tokens": 30,
         }
         openai_adapter = LiteLLMAgent(id="test_switch_openai", config=openai_config)
 
@@ -490,7 +490,7 @@ class TestLiteLLMProviderSwitching:
                 config = {
                     "name": model_name,
                     "endpoint": ollama_base_url,
-                    "max_new_tokens": 20,
+                    "max_tokens": 20,
                 }
                 adapter = LiteLLMAgent(id=f"test_format_{model_name}", config=config)
 

@@ -97,7 +97,7 @@ class TestPAPAttack(unittest.TestCase):
         self.assertEqual(attack.config["pap_params"]["techniques"], "all")
         self.assertAlmostEqual(attack.config["pap_params"]["attacker_temperature"], 0.5)
         # Defaults for non-overridden keys should remain
-        self.assertEqual(attack.config["pap_params"]["attacker_max_tokens"], 1024)
+        self.assertEqual(attack.config["pap_params"]["attacker_max_tokens"], 4096)
 
     def test_run_empty_goals(self):
         attack = PAPAttack(

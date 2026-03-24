@@ -15,14 +15,11 @@ class TestDefaultTemplateConfig(unittest.TestCase):
             "output_dir",
             "template_categories",
             "templates_per_category",
-            "max_new_tokens",
-            "temperature",
             "n_samples_per_template",
             "objective",
             "evaluator_type",
             "min_response_length",
             "deduplicate_responses",
-            "request_timeout",
         ]
         for key in required:
             self.assertIn(key, DEFAULT_TEMPLATE_CONFIG)
@@ -45,10 +42,10 @@ class TestTemplateAttackConfig(unittest.TestCase):
         self.assertFalse(hasattr(cfg, "unknown_key"))
 
     def test_to_dict_roundtrip(self):
-        cfg = TemplateAttackConfig.from_dict({"request_timeout": 99})
+        cfg = TemplateAttackConfig.from_dict({"timeout": 99})
         d = cfg.to_dict()
-        self.assertIn("request_timeout", d)
-        self.assertEqual(d["request_timeout"], 99)
+        self.assertIn("timeout", d)
+        self.assertEqual(d["timeout"], 99)
 
 
 if __name__ == "__main__":

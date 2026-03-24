@@ -171,9 +171,9 @@ advanced_config = {
         }
     ],
     "batch_size_judge": 1,
-    "max_new_tokens_eval": 256,
+    "max_tokens_eval": 256,
     "filter_len": 10,
-    "judge_request_timeout": 120,
+    "judge_timeout": 120,
     "judge_temperature": 0.0,
     "max_judge_retries": 1,
 

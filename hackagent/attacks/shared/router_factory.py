@@ -24,7 +24,7 @@ Usage:
         config={
             "identifier": "ollama/llama3",
             "endpoint": "http://localhost:11434/v1",
-            "max_new_tokens": 500,
+            "max_tokens": 500,
             "temperature": 0.7,
         },
         logger=logger,
@@ -48,6 +48,29 @@ _AGENT_TYPE_ALIASES: Dict[str, str] = {
     "OPENAI": "OPENAI_SDK",
     "OPENAI-SDK": "OPENAI_SDK",
 }
+
+_PASSTHROUGH_REQUEST_CONFIG_KEYS = (
+    "top_p",
+    "frequency_penalty",
+    "presence_penalty",
+    "seed",
+    "stop",
+    "reasoning_effort",
+    "extra_body",
+    "response_format",
+    "logit_bias",
+    "tools",
+    "tool_choice",
+)
+
+
+def extract_passthrough_request_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Return supported provider request parameters present in a config dict."""
+    return {
+        key: config[key]
+        for key in _PASSTHROUGH_REQUEST_CONFIG_KEYS
+        if key in config and config[key] is not None
+    }
 
 
 def create_router(
@@ -78,7 +101,7 @@ def create_router(
         )
 
     name = router_name or model_name
-    endpoint = config.get("endpoint")
+    endpoint = config.get("endpoint") or ""
 
     # ---- API key resolution ----
     # Priority: explicit config key → env var lookup → backend api key
@@ -89,7 +112,7 @@ def create_router(
         api_key = env_key if env_key else api_key_config
 
     # Also check agent_metadata for api_key (used by evaluators)
-    agent_metadata = config.get("agent_metadata", {}) or {}
+    agent_metadata = dict(config.get("agent_metadata", {}) or {})
     metadata_api_key = agent_metadata.get("api_key")
     if metadata_api_key and not api_key_config:
         env_key = os.environ.get(metadata_api_key)
@@ -100,14 +123,12 @@ def create_router(
         "name": config.get("model", model_name),
         "endpoint": endpoint,
         "api_key": api_key,
-        "max_new_tokens": config.get("max_new_tokens"),
+        "max_tokens": config.get("max_tokens"),
         "temperature": config.get("temperature"),
-        "request_timeout": config.get("request_timeout"),
+        "timeout": config.get("timeout", config.get("request_timeout")),
     }
 
-    # Optional top_p
-    if "top_p" in config:
-        operational_config["top_p"] = config["top_p"]
+    operational_config.update(extract_passthrough_request_config(config))
 
     # Merge remaining metadata
     for key, value in agent_metadata.items():

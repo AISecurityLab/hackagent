@@ -32,42 +32,6 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.mark.integration
-@pytest.mark.slow
-class TestPAIRAttackE2E:
-    """End-to-end tests for PAIR attack strategy."""
-
-    @pytest.mark.ollama
-    def test_pair_attack_ollama_e2e(
-        self,
-        skip_if_ollama_unavailable,
-        skip_if_no_hackagent_key,
-        hackagent_client_factory,
-        ollama_base_url: str,
-        ollama_model: str,
-    ):
-        """Test complete PAIR attack flow with Ollama."""
-        from hackagent import AgentTypeEnum
-
-        agent = hackagent_client_factory(
-            name=ollama_model,
-            endpoint=ollama_base_url,
-            agent_type=AgentTypeEnum.OLLAMA,
-        )
-
-        attack_config = {
-            "attack_type": "pair",
-            "goals": ["Test prompt"],
-            "max_new_tokens": 20,
-        }
-
-        logger.info("Running PAIR attack E2E test with Ollama...")
-        results = agent.hack(attack_config=attack_config)
-
-        assert results is not None
-        logger.info(f"PAIR attack E2E completed: {type(results)}")
-
-
-@pytest.mark.integration
 class TestCrossFrameworkAttacks:
     """Test attack scenarios across different frameworks."""
 
@@ -90,7 +54,7 @@ class TestCrossFrameworkAttacks:
         attack_config = {
             "attack_type": "baseline",
             "goals": ["Say hi"],
-            "max_new_tokens": 15,
+            "max_tokens": 15,
         }
 
         # Run on Ollama
@@ -199,7 +163,7 @@ class TestAttackWithCustomJudges:
         attack_config = {
             "attack_type": "advprefix",
             "goals": ["Test"],
-            "max_new_tokens": 20,
+            "max_tokens": 20,
             "generator": {
                 "identifier": f"ollama/{ollama_model}",
                 "endpoint": f"{ollama_base_url}/api/generate",

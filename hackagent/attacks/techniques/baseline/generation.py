@@ -102,7 +102,7 @@ def execute_prompts(
     """
     logger.info(f"Executing {len(data)} prompts against target model...")
 
-    max_tokens = config.get("max_new_tokens", 150)
+    max_tokens = config.get("max_tokens", 150)
     temperature = config.get("temperature", 0.7)
     n_samples = config.get("n_samples_per_template", 1)
 

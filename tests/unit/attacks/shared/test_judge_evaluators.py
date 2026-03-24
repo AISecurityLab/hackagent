@@ -18,6 +18,7 @@ from hackagent.attacks.evaluator import (
     NuancedEvaluator,
     JailbreakBenchEvaluator,
     HarmBenchEvaluator,
+    HarmBenchVariantEvaluator,
     OnTopicEvaluator,
     EVALUATOR_MAP,
 )
@@ -116,8 +117,8 @@ class TestParseYesNoResponse:
 class TestEvaluatorMap:
     """Tests for the EVALUATOR_MAP registry."""
 
-    def test_map_has_four_entries(self):
-        assert len(EVALUATOR_MAP) == 4
+    def test_map_has_five_entries(self):
+        assert len(EVALUATOR_MAP) == 5
 
     def test_nuanced_in_map(self):
         assert "nuanced" in EVALUATOR_MAP
@@ -134,6 +135,10 @@ class TestEvaluatorMap:
     def test_ontopic_in_map(self):
         assert "on_topic" in EVALUATOR_MAP
         assert EVALUATOR_MAP["on_topic"] is OnTopicEvaluator
+
+    def test_harmbench_variant_in_map(self):
+        assert "harmbench_variant" in EVALUATOR_MAP
+        assert EVALUATOR_MAP["harmbench_variant"] is HarmBenchVariantEvaluator
 
 
 class TestEvaluatorClassAttributes:
@@ -154,6 +159,11 @@ class TestEvaluatorClassAttributes:
         assert HarmBenchEvaluator.explanation_column == "explanation_hb"
         assert HarmBenchEvaluator.skip_length_filter is True
 
+    def test_harmbench_variant_columns(self):
+        assert HarmBenchVariantEvaluator.eval_column == "eval_hbv"
+        assert HarmBenchVariantEvaluator.explanation_column == "explanation_hbv"
+        assert HarmBenchVariantEvaluator.skip_length_filter is True
+
     def test_nuanced_prompt_has_placeholders(self):
         assert "{request}" in NuancedEvaluator.PROMPT
         assert "{response}" in NuancedEvaluator.PROMPT
@@ -164,6 +174,10 @@ class TestEvaluatorClassAttributes:
     def test_harmbench_prompt_has_placeholders(self):
         assert "{behavior}" in HarmBenchEvaluator.PROMPT
         assert "{generation}" in HarmBenchEvaluator.PROMPT
+
+    def test_harmbench_variant_prompt_has_placeholders(self):
+        assert "{adv_prompt}" in HarmBenchVariantEvaluator.ABEL_TEMPLATE
+        assert "{model_res}" in HarmBenchVariantEvaluator.ABEL_TEMPLATE
 
 
 class TestReExports:
@@ -194,6 +208,13 @@ class TestReExports:
         )
 
         assert HB is HarmBenchEvaluator
+
+    def test_harmbench_variant_reexport(self):
+        from hackagent.attacks.evaluator import (
+            HarmBenchVariantEvaluator as HBV,
+        )
+
+        assert HBV is HarmBenchVariantEvaluator
 
     def test_evaluator_map_reexport(self):
         from hackagent.attacks.evaluator import (
@@ -321,7 +342,7 @@ class TestBuildRetryRequest:
             config = MagicMock()
             config.agent_name = "test-judge"
             config.model_id = "test-model"
-            config.max_new_tokens_eval = 512
+            config.max_tokens_eval = 512
             config.temperature = 0.0
             config.max_judge_retries = 1
             evaluator = BaseJudgeEvaluator.__new__(BaseJudgeEvaluator)
@@ -349,8 +370,8 @@ class TestBuildRetryRequest:
             "temperature": 0.5,
         }
         retry = mock_evaluator._build_retry_request(original, "bad response")
-        # _build_retry_request uses config.max_new_tokens_eval, not the original max_tokens
-        assert retry["max_tokens"] == mock_evaluator.config.max_new_tokens_eval
+        # _build_retry_request uses config.max_tokens_eval, not the original max_tokens
+        assert retry["max_tokens"] == mock_evaluator.config.max_tokens_eval
         assert retry["temperature"] == 0.0
 
     def test_retry_includes_original_instruction(self, mock_evaluator):
@@ -419,7 +440,7 @@ class TestRequestWithAssertions:
             config = MagicMock()
             config.agent_name = "test-judge"
             config.model_id = "test-model"
-            config.max_new_tokens_eval = 512
+            config.max_tokens_eval = 512
             config.temperature = 0.0
             config.max_judge_retries = 1
             evaluator.config = config

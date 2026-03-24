@@ -53,7 +53,7 @@ Initializes the LiteLLMAgent.
   - &#x27;name&#x27;: Model string for LiteLLM (e.g., &quot;ollama/llama3&quot;).
   - &#x27;endpoint&#x27; (optional): Base URL for the API.
   - &#x27;api_key&#x27; (optional): Name of the environment variable holding the API key.
-  - &#x27;max_new_tokens&#x27; (optional): Default max tokens for generation (defaults to 100).
+  - &#x27;max_tokens&#x27; (optional): Default max tokens for generation (defaults to 100).
   - &#x27;temperature&#x27; (optional): Default temperature (defaults to 0.8).
   - &#x27;top_p&#x27; (optional): Default top_p (defaults to 0.95).
 

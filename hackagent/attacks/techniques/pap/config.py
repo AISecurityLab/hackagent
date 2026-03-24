@@ -4,7 +4,7 @@
 """
 Configuration for PAP (Persuasive Adversarial Prompts) attack.
 
-Provides ``DEFAULT_PAP_CONFIG`` and typed dataclasses for the PAP attack.
+Provides ``DEFAULT_PAP_CONFIG`` and typed Pydantic models for the PAP attack.
 
 The attack uses a taxonomy of 40 persuasion techniques to paraphrase harmful
 prompts into persuasive variants.  An attacker LLM performs the paraphrasing
@@ -22,8 +22,15 @@ For each goal the attack:
 Based on: https://arxiv.org/abs/2401.06373
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
+
+from pydantic import BaseModel, Field, field_validator
+
+from hackagent.attacks.techniques.config import (
+    DEFAULT_CONFIG_BASE,
+    DEFAULT_MAX_OUTPUT_TOKENS,
+    ConfigBase,
+)
 
 
 # ---- Top-5 persuasion techniques from the paper (broad-scan results) ---- #
@@ -81,6 +88,7 @@ ALL_TECHNIQUES = [
 
 
 DEFAULT_PAP_CONFIG: Dict[str, Any] = {
+    **DEFAULT_CONFIG_BASE,
     # Attack type identifier
     "attack_type": "pap",
     # PAP-specific parameters
@@ -94,51 +102,12 @@ DEFAULT_PAP_CONFIG: Dict[str, Any] = {
         # Attacker LLM temperature for paraphrasing
         "attacker_temperature": 1.0,
         # Attacker LLM max tokens
-        "attacker_max_tokens": 1024,
+        "attacker_max_tokens": DEFAULT_MAX_OUTPUT_TOKENS,
     },
-    # Attacker LLM endpoint (performs persuasive paraphrasing)
-    "attacker": {
-        "identifier": "gpt-4",
-        "endpoint": "https://api.openai.com/v1",
-        "agent_type": "OPENAI_SDK",
-        "api_key": None,
-    },
-    # Judge configuration
-    "judges": [
-        {
-            "identifier": "gpt-4-0613",
-            "type": "harmbench",
-            "agent_type": "OPENAI_SDK",
-            "api_key": None,
-            "endpoint": None,
-        }
-    ],
-    # Batching
-    "batch_size": 1,  # Parallelism for goal processing
-    "batch_size_judge": 1,
-    "goal_batch_size": 1,
-    # Judge parameters (standard)
-    "max_new_tokens_eval": 256,
-    "filter_len": 10,
-    "judge_request_timeout": 120,
-    "judge_temperature": 0.0,
-    "max_judge_retries": 1,
-    # Target model settings
-    "max_new_tokens": 4096,
-    "temperature": 0.6,
-    "request_timeout": 120,
-    # Goals / dataset
-    "goals": [],
-    "dataset": None,
-    # Output & pipeline
-    "output_dir": "./logs/runs",
-    "run_id": None,
-    "start_step": 1,
 }
 
 
-@dataclass
-class PAPParams:
+class PAPParams(BaseModel):
     """Hyperparameters controlling the PAP attack.
 
     Attributes:
@@ -151,64 +120,38 @@ class PAPParams:
         attacker_max_tokens: Maximum tokens for the attacker LLM response.
     """
 
-    techniques: Any = "top5"
+    techniques: Union[str, List[str]] = "top5"
     max_techniques_per_goal: int = 0
-    attacker_temperature: float = 1.0
-    attacker_max_tokens: int = 1024
+    attacker_temperature: float = Field(default=1.0, ge=0.0)
+    attacker_max_tokens: int = Field(default=DEFAULT_MAX_OUTPUT_TOKENS, ge=1)
 
-    def __post_init__(self):
-        if isinstance(self.techniques, str):
-            if self.techniques not in ("top5", "all"):
+    @field_validator("techniques")
+    @classmethod
+    def validate_techniques(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            if v not in ("top5", "all"):
                 raise ValueError(
-                    f"techniques must be 'top5', 'all', or a list; got '{self.techniques}'"
+                    f"techniques must be 'top5', 'all', or a list; got '{v}'"
                 )
-        elif isinstance(self.techniques, list):
-            if not self.techniques:
+        elif isinstance(v, list):
+            if not v:
                 raise ValueError("techniques list must not be empty")
         else:
-            raise TypeError(
-                f"techniques must be str or list, got {type(self.techniques)}"
-            )
-        if self.attacker_temperature < 0:
-            raise ValueError(
-                f"attacker_temperature must be >= 0, got {self.attacker_temperature}"
-            )
-        if self.attacker_max_tokens < 1:
-            raise ValueError(
-                f"attacker_max_tokens must be >= 1, got {self.attacker_max_tokens}"
-            )
+            raise ValueError(f"techniques must be str or list, got {type(v)}")
+        return v
 
 
-@dataclass
-class PAPConfig:
+class PAPConfig(ConfigBase):
     """Full typed configuration for the PAP attack."""
 
     attack_type: str = "pap"
-    pap_params: PAPParams = field(default_factory=PAPParams)
-    attacker: Dict[str, Any] = field(
-        default_factory=lambda: {
-            "identifier": "gpt-4",
-            "endpoint": "https://api.openai.com/v1",
-            "agent_type": "OPENAI_SDK",
-            "api_key": None,
-        }
-    )
-    judges: List[Dict[str, Any]] = field(
-        default_factory=lambda: [
-            {
-                "identifier": "gpt-4-0613",
-                "type": "harmbench",
-                "agent_type": "OPENAI_SDK",
-                "api_key": None,
-                "endpoint": None,
-            }
-        ]
-    )
-    batch_size: int = 1
-    batch_size_judge: int = 1
-    goal_batch_size: int = 1
+    pap_params: PAPParams = Field(default_factory=PAPParams)
+
+    @classmethod
+    def from_dict(cls, config_dict: Dict[str, Any]) -> "PAPConfig":
+        """Create a :class:`PAPConfig` from a plain dictionary."""
+        return cls.model_validate(config_dict)
 
     def to_dict(self) -> Dict[str, Any]:
-        from dataclasses import asdict
-
-        return asdict(self)
+        """Convert to dictionary suitable for :meth:`HackAgent.hack`."""
+        return self.model_dump()

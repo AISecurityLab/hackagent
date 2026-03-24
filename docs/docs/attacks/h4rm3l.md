@@ -381,16 +381,16 @@ advanced_config = {
             "endpoint": None
         }
     ],
-    "max_new_tokens_eval": 256,
+    "max_tokens_eval": 256,
     "filter_len": 10,
-    "judge_request_timeout": 120,
+    "judge_timeout": 120,
     "judge_temperature": 0.0,
     "max_judge_retries": 1,
 
     # Target model settings
-    "max_new_tokens": 4096,
+    "max_tokens": 4096,
     "temperature": 0.6,
-    "request_timeout": 120,
+    "timeout": 120,
 
     # Output directory
     "output_dir": "./logs/runs"
@@ -425,7 +425,7 @@ advanced_config = {
 | `goal_batch_workers` | int | `1` | Parallel goal workers inside each macro-batch |
 | `batch_size_judge` | int | `1` | Concurrent judge evaluation requests |
 | `judges` | list | `[...]` | Judge configurations (at least one required) |
-| `max_new_tokens` | int | `4096` | Max tokens for target model response |
+| `max_tokens` | int | `4096` | Max tokens for target model response |
 | `temperature` | float | `0.6` | Sampling temperature for target model |
 | `filter_len` | int | `10` | Minimum response length to be considered non-trivial |
 

@@ -185,6 +185,9 @@ class CLIConfig:
             config_dict = {}
             for attr in ["api_key", "base_url", "verbose"]:
                 value = getattr(self, attr, None)
+                # Never persist empty API keys.
+                if attr == "api_key" and isinstance(value, str) and not value.strip():
+                    continue
                 if value is not None:
                     # Only persist base_url if it differs from the default
                     if attr == "base_url" and value == self._defaults["base_url"]:

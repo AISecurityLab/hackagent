@@ -257,11 +257,15 @@ class AttackOrchestrator:
         Returns:
             Kwargs for attack_impl_class constructor
         """
+        target_config = getattr(self.hack_agent, "target_config", {}) or {}
+
         return {
             "config": {
+                **target_config,
                 **attack_config,  ## Spread full attack config
                 **(run_config_override or {}),
                 "_run_id": run_id,
+                "_client": self.hack_agent.backend,  # backend expected by evaluator/router factory
                 "_backend": self.hack_agent.backend,  # StorageBackend for result tracking
             },
             "client": self.hack_agent.backend,  # pass backend as 'client' for BaseAttack compat
@@ -287,8 +291,8 @@ class AttackOrchestrator:
         Batches are processed **sequentially** — batch *N+1* starts only
         after all goals in batch *N* have completed.
 
-        When ``goal_batch_size`` is absent (or the goals list is smaller
-        than the batch size), the attack runs as a single call to ``run()``.
+        When ``goal_batch_size`` is absent, the attack runs as a single call
+        to ``run()``.
 
         Args:
             attack_id: Server-side attack record ID
@@ -320,11 +324,7 @@ class AttackOrchestrator:
             )
             goal_batch_workers = 1
 
-        if (
-            goal_batch_size
-            and isinstance(goals, list)
-            and len(goals) >= goal_batch_size
-        ):
+        if goal_batch_size and isinstance(goals, list):
             batches = [
                 goals[i : i + goal_batch_size]
                 for i in range(0, len(goals), goal_batch_size)

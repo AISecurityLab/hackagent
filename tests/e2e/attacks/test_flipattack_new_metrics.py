@@ -41,7 +41,7 @@ def test_flipattack_new_metrics():
     config = {
         "attack_type": "flipattack",
         "goals": GOALS,
-        "max_new_tokens": 300,
+        "max_tokens": 300,
         "batch_size": 1,
         "flipattack_params": {
             "flip_mode": "FCS",

@@ -30,7 +30,7 @@ def basic_config():
         "identifier": "test-model",
         "endpoint": "https://api.example.com/v1",
         "agent_type": "OPENAI_SDK",
-        "max_new_tokens": 500,
+        "max_tokens": 500,
         "temperature": 0.7,
         "agent_metadata": {},
     }
@@ -141,3 +141,100 @@ class TestCreateRouter:
 
         call_kwargs = MockRouter.call_args[1]
         assert call_kwargs["adapter_operational_config"]["custom_param"] == "value123"
+
+    @patch("hackagent.attacks.shared.router_factory.AgentRouter")
+    def test_hackagent_endpoints_do_not_disable_reasoning_by_default(
+        self, MockRouter, mock_client, logger
+    ):
+        """HackAgent-style routers do not inject provider-specific reasoning overrides."""
+        mock_instance = MagicMock()
+        mock_instance._agent_registry = {"key-1": MagicMock()}
+        MockRouter.return_value = mock_instance
+
+        create_router(
+            mock_client,
+            {
+                "identifier": "hackagent-judge",
+                "endpoint": "https://api.hackagent.dev/v1",
+                "agent_type": "OPENAI_SDK",
+            },
+            logger,
+            "test-router",
+        )
+
+        call_kwargs = MockRouter.call_args[1]
+        assert "extra_body" not in call_kwargs["adapter_operational_config"]
+
+    @patch("hackagent.attacks.shared.router_factory.AgentRouter")
+    def test_openrouter_endpoint_does_not_trigger_reasoning_default(
+        self, MockRouter, mock_client, logger
+    ):
+        """OpenRouter endpoints alone should not opt into the shared default."""
+        mock_instance = MagicMock()
+        mock_instance._agent_registry = {"key-1": MagicMock()}
+        MockRouter.return_value = mock_instance
+
+        create_router(
+            mock_client,
+            {
+                "identifier": "gpt-4-judge",
+                "endpoint": "https://openrouter.ai/api/v1",
+                "agent_type": "OPENAI_SDK",
+            },
+            logger,
+            "test-router",
+        )
+
+        call_kwargs = MockRouter.call_args[1]
+        assert "extra_body" not in call_kwargs["adapter_operational_config"]
+
+    @patch("hackagent.attacks.shared.router_factory.AgentRouter")
+    def test_top_level_extra_body_is_preserved(
+        self, MockRouter, mock_client, basic_config, logger
+    ):
+        """Explicit extra_body config is forwarded unchanged."""
+        mock_instance = MagicMock()
+        mock_instance._agent_registry = {"key-1": MagicMock()}
+        MockRouter.return_value = mock_instance
+        basic_config["identifier"] = "hackagent-attacker"
+        basic_config["endpoint"] = "https://api.hackagent.dev/v1"
+        basic_config["extra_body"] = {"reasoning": {"enabled": True}}
+
+        create_router(mock_client, basic_config, logger, "test-router")
+
+        call_kwargs = MockRouter.call_args[1]
+        assert call_kwargs["adapter_operational_config"]["extra_body"] == {
+            "reasoning": {"enabled": True}
+        }
+
+    @patch("hackagent.attacks.shared.router_factory.AgentRouter")
+    def test_openai_request_options_are_passed_through(
+        self, MockRouter, mock_client, basic_config, logger
+    ):
+        """Supported OpenAI-style request fields are forwarded to the adapter."""
+        mock_instance = MagicMock()
+        mock_instance._agent_registry = {"key-1": MagicMock()}
+        MockRouter.return_value = mock_instance
+        basic_config.update(
+            {
+                "reasoning_effort": "minimal",
+                "frequency_penalty": 0.2,
+                "presence_penalty": 0.1,
+                "seed": 42,
+                "stop": ["END"],
+                "response_format": {"type": "json_object"},
+                "logit_bias": {"123": -100},
+            }
+        )
+
+        create_router(mock_client, basic_config, logger, "test-router")
+
+        call_kwargs = MockRouter.call_args[1]
+        operational_config = call_kwargs["adapter_operational_config"]
+        assert operational_config["reasoning_effort"] == "minimal"
+        assert operational_config["frequency_penalty"] == 0.2
+        assert operational_config["presence_penalty"] == 0.1
+        assert operational_config["seed"] == 42
+        assert operational_config["stop"] == ["END"]
+        assert operational_config["response_format"] == {"type": "json_object"}
+        assert operational_config["logit_bias"] == {"123": -100}

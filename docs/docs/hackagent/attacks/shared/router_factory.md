@@ -25,7 +25,7 @@ Usage:
         config={
             &quot;identifier&quot;: &quot;ollama/llama3&quot;,
             &quot;endpoint&quot;: &quot;http://localhost:11434/v1&quot;,
-            &quot;max_new_tokens&quot;: 500,
+            &quot;max_tokens&quot;: 500,
             &quot;temperature&quot;: 0.7,
         },
         logger=logger,

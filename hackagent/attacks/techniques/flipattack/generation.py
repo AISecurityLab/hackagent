@@ -111,6 +111,9 @@ def execute(
 
         # Step 2: Execute against target model (HTTP — parallelised here)
         request_data = {"prompt": full_prompt}
+        max_tokens = config.get("max_tokens")
+        if max_tokens is not None:
+            request_data["max_tokens"] = max_tokens
         _request_t0 = time.perf_counter()
         logger.info(
             f"[Goal {idx + 1}/{len(goals)}] Sending modified prompt to target model"

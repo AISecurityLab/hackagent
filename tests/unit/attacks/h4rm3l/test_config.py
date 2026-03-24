@@ -5,6 +5,8 @@
 
 import unittest
 
+from pydantic import ValidationError
+
 from hackagent.attacks.techniques.h4rm3l.config import (
     DEFAULT_H4RM3L_CONFIG,
     H4rm3lConfig,
@@ -24,9 +26,9 @@ class TestDefaultConfig(unittest.TestCase):
             "batch_size_judge",
             "goal_batch_size",
             "goal_batch_workers",
-            "max_new_tokens_eval",
+            "max_tokens_eval",
             "filter_len",
-            "judge_request_timeout",
+            "judge_timeout",
             "judge_temperature",
             "max_judge_retries",
             "goals",
@@ -114,11 +116,11 @@ class TestH4rm3lParams(unittest.TestCase):
         self.assertEqual(p.program, "IdentityDecorator()")
 
     def test_invalid_syntax_version(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValidationError):
             H4rm3lParams(syntax_version=3)
 
     def test_syntax_version_0_invalid(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValidationError):
             H4rm3lParams(syntax_version=0)
 
     def test_valid_v1(self):

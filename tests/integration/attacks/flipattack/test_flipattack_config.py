@@ -27,6 +27,7 @@ import copy
 import logging
 
 import pytest
+from pydantic import ValidationError
 
 from hackagent.attacks.techniques.flipattack.config import (
     DEFAULT_FLIPATTACK_CONFIG,
@@ -61,8 +62,8 @@ class TestFlipAttackParams:
         assert params.flip_mode == mode
 
     def test_invalid_flip_mode_raises(self):
-        """Test that invalid flip mode raises ValueError."""
-        with pytest.raises(ValueError, match="flip_mode must be one of"):
+        """Test that invalid flip mode raises ValidationError."""
+        with pytest.raises(ValidationError):
             FlipAttackParams(flip_mode="INVALID")
 
     def test_all_enhancements_enabled(self):
@@ -89,9 +90,9 @@ class TestFlipAttackConfig:
         config = FlipAttackConfig()
         assert config.attack_type == "flipattack"
         assert config.batch_size_judge == 1
-        assert config.max_new_tokens_eval == 256
+        assert config.max_tokens_eval == 4096
         assert config.filter_len == 10
-        assert config.judge_request_timeout == 120
+        assert config.judge_timeout == 120
         assert config.judge_temperature == 0.0
         assert config.max_judge_retries == 1
         assert config.output_dir == "./logs/flipattack"
@@ -143,9 +144,9 @@ class TestFlipAttackConfig:
             "goals": ["goal1"],
             "judges": [{"identifier": "test-judge", "type": "harmbench"}],
             "batch_size_judge": 4,
-            "max_new_tokens_eval": 512,
+            "max_tokens_eval": 512,
             "filter_len": 20,
-            "judge_request_timeout": 60,
+            "judge_timeout": 60,
             "judge_temperature": 0.1,
             "max_judge_retries": 3,
             "dataset": "advbench",
@@ -161,7 +162,7 @@ class TestFlipAttackConfig:
         assert result["flipattack_params"]["few_shot"] is True
         assert result["goals"] == ["goal1"]
         assert result["batch_size_judge"] == 4
-        assert result["max_new_tokens_eval"] == 512
+        assert result["max_tokens_eval"] == 512
         assert result["dataset"] == "advbench"
         assert result["output_dir"] == "/tmp/test"
         assert result["start_step"] == 2

@@ -384,7 +384,7 @@ It uses a multi-step pipeline involving uncensored language models to craft effe
 • judges: Judge models for evaluating attack success
 • batch_size: Number of prefixes to generate per batch
 • temperature: Sampling temperature for generation
-• max_new_tokens: Maximum tokens to generate
+• max_tokens: Maximum tokens to generate
 
 [cyan]Example Config File:[/cyan]
 {
@@ -402,7 +402,7 @@ It uses a multi-step pipeline involving uncensored language models to craft effe
   ],
   "batch_size": 20,
   "temperature": 1.0,
-  "max_new_tokens": 512
+  "max_tokens": 512
 }
 
 [cyan]Requirements:[/cyan]
