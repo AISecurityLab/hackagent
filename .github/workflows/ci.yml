@@ -94,7 +94,7 @@ jobs:
 
       - name: Upload unit coverage artifact
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-unit
           path: reports/.coverage
@@ -169,7 +169,7 @@ jobs:
           --cov-report=xml:reports/coverage.xml
 
       - name: Upload offline-integration coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-integration-offline
           path: reports/.coverage
@@ -235,7 +235,7 @@ jobs:
           --cov-report=xml:reports/coverage.xml
 
       - name: Upload Ollama-integration coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-integration-ollama
           path: reports/.coverage
@@ -282,7 +282,7 @@ jobs:
           --cov-report=xml:reports/coverage.xml
 
       - name: Upload e2e coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-e2e
           path: reports/.coverage
