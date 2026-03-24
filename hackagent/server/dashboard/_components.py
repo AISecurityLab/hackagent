@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from nicegui import ui
@@ -190,12 +191,30 @@ def make_run_table(
                     return row
         return None
 
+    _last_click_row_id: str | None = None
+    _last_click_ts: float = 0.0
+
     def _handle_row_click(e, cb=on_row_click) -> None:
+        nonlocal _last_click_row_id, _last_click_ts
         row = _extract_row(e.args)
         if row is not None:
+            row_id = str(row.get("id", ""))
+            now = time.monotonic()
+            # Quasar may fire both custom `rowClick` and native `row-click` for one
+            # user action; collapse near-simultaneous duplicates.
+            if (
+                row_id
+                and row_id == _last_click_row_id
+                and (now - _last_click_ts) < 0.25
+            ):
+                return
+            _last_click_row_id = row_id
+            _last_click_ts = now
             cb(row)
 
     tbl.on("rowClick", _handle_row_click)
+    # Also handle native Quasar row-click (fires as 'row-click' in kebab-case)
+    tbl.on("row-click", _handle_row_click)
     if on_select is not None:
         tbl.on("selection", lambda e, cb=on_select: cb(e))
     return tbl

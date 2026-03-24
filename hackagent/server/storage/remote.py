@@ -770,8 +770,33 @@ class RemoteBackend:
         )
 
     def list_traces(self, result_id: UUID) -> List[TraceRecord]:
-        # Traces are written-only via the API; return empty list for now
-        return []
+        resp = result_retrieve.sync_detailed(id=result_id, client=self._client)
+        if resp.status_code != 200 or not resp.parsed:
+            return []
+
+        traces = []
+        for t in getattr(resp.parsed, "traces", []) or []:
+            step_type = (
+                t.step_type.value if hasattr(t.step_type, "value") else t.step_type
+            )
+            raw_content = getattr(t, "content", None)
+            content = (
+                raw_content if isinstance(raw_content, dict) else {"value": raw_content}
+            )
+            sequence = int(getattr(t, "sequence", 0) or 0)
+            traces.append(
+                TraceRecord(
+                    id=_coerce_trace_id(t.id, result_id=result_id, sequence=sequence),
+                    result_id=result_id,
+                    sequence=sequence,
+                    step_type=str(step_type or "OTHER"),
+                    content=content,
+                    created_at=_pick_dt(t, "timestamp", "created_at"),
+                )
+            )
+
+        traces.sort(key=lambda tr: tr.sequence)
+        return traces
 
     # ── Delete ────────────────────────────────────────────────────────────────
 

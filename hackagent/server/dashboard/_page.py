@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import math
 from uuid import UUID
@@ -12,7 +13,7 @@ from uuid import UUID
 from nicegui import app as _fastapi_app
 from nicegui import ui
 
-from ._components import EVAL_COLOR_JS, EVAL_LABEL_JS, make_run_table
+from ._components import make_run_table
 from ._helpers import (
     _eval_color,
     _eval_label,
@@ -84,7 +85,8 @@ class DashboardPage:
         # Run results dialog
         self.run_dialog: ui.dialog | None = None
         self.run_dialog_title: ui.label | None = None
-        self.results_table: ui.table | None = None
+        self.run_dialog_subtitle: ui.label | None = None
+        self.results_list_area: ui.column | None = None
         self.results_empty_label: ui.label | None = None
 
         # Attack detail dialog
@@ -348,7 +350,9 @@ class DashboardPage:
                     ).props("flat dense").classes("text-xs text-grey-6")
                 self.recent_runs_table = make_run_table(
                     on_row_click=lambda run: ui.timer(
-                        0, lambda r=run: self._open_run_results(r), once=True
+                        0,
+                        lambda r=run: asyncio.create_task(self._open_run_results(r)),
+                        once=True,
                     ),
                     include_agent=True,
                     include_progressive_run=True,
@@ -562,7 +566,9 @@ class DashboardPage:
                         ).props("flat dense no-caps")
                 self.runs_table = make_run_table(
                     on_row_click=lambda run: ui.timer(
-                        0, lambda r=run: self._open_run_results(r), once=True
+                        0,
+                        lambda r=run: asyncio.create_task(self._open_run_results(r)),
+                        once=True,
                     ),
                     pagination={"rowsPerPage": 0},
                     include_agent=True,
@@ -582,98 +588,16 @@ class DashboardPage:
                     )
                     ui.button(icon="close", on_click=dialog.close).props("flat round")
 
+                self.run_dialog_subtitle = ui.label("—").classes(
+                    "text-xs text-grey-6 px-2"
+                )
+
                 self.results_empty_label = ui.label("Loading results...").classes(
                     "text-sm text-grey-8 px-2 py-4"
                 )
 
-                self.results_table = ui.table(
-                    columns=[
-                        {
-                            "name": "num",
-                            "label": "#",
-                            "field": "goal_index",
-                            "align": "center",
-                            "style": "width:50px",
-                        },
-                        {
-                            "name": "goal",
-                            "label": "Goal",
-                            "field": "goal",
-                            "align": "left",
-                        },
-                        {
-                            "name": "eval",
-                            "label": "Evaluation",
-                            "field": "evaluation_status",
-                            "align": "left",
-                        },
-                        {
-                            "name": "notes",
-                            "label": "Notes",
-                            "field": "evaluation_notes",
-                            "align": "left",
-                        },
-                    ],
-                    rows=[],
-                    row_key="id",
-                    pagination={"rowsPerPage": 25},
-                ).classes("w-full flex-1")
-
-                self.results_table.add_slot(
-                    "body-cell-num",
-                    r"""
-                    <q-td :props="props" class="cursor-pointer"
-                          @click="$emit('rowClick', props.row)">
-                      <span class="tabular-nums text-grey-6 text-xs">
-                                                {{ props.row.goal_number ?? ((props.row.goal_index ?? 0) + 1) }}
-                      </span>
-                    </q-td>
-                    """,
-                )
-                self.results_table.add_slot(
-                    "body-cell-goal",
-                    r"""
-                    <q-td :props="props" class="cursor-pointer max-w-md"
-                          @click="$emit('rowClick', props.row)">
-                      <span class="text-xs truncate block max-w-md"
-                            :title="props.row.goal">
-                        {{ props.row.goal }}
-                      </span>
-                    </q-td>
-                    """,
-                )
-                self.results_table.add_slot(
-                    "body-cell-eval",
-                    f"""
-                    <q-td :props="props" class="cursor-pointer"
-                          @click="$emit('rowClick', props.row)">
-                      <q-badge :color="{EVAL_COLOR_JS}"
-                               :label="{EVAL_LABEL_JS}" />
-                    </q-td>
-                    """,
-                )
-                self.results_table.add_slot(
-                    "body-cell-notes",
-                    r"""
-                    <q-td :props="props" class="cursor-pointer max-w-xs"
-                          @click="$emit('rowClick', props.row)">
-                      <span class="text-xs text-grey-6 truncate block max-w-xs">
-                        {{ props.row.evaluation_notes || '—' }}
-                      </span>
-                    </q-td>
-                    """,
-                )
-
-                def _on_result_row_click(e) -> None:
-                    row = self._extract_row(e.args)
-                    if row is not None:
-                        ui.timer(
-                            0,
-                            lambda r=row: self.show_result_detail(r, foreground=True),
-                            once=True,
-                        )
-
-                self.results_table.on("rowClick", _on_result_row_click)
+                with ui.scroll_area().classes("w-full flex-1"):
+                    self.results_list_area = ui.column().classes("w-full gap-3 p-2")
         self.run_dialog = dialog
 
     def _build_attack_dialog(self) -> None:
@@ -1015,6 +939,19 @@ class DashboardPage:
             return "generation", "Attack / Generation"
 
         if isinstance(content, dict):
+            step_name = str(content.get("step_name") or "").strip().lower()
+            metadata = (
+                content.get("metadata")
+                if isinstance(content.get("metadata"), dict)
+                else {}
+            )
+            display_type = str(metadata.get("display_type") or "").strip().lower()
+            if (
+                step_name in {"evaluation", "judge", "scoring"}
+                or step_name.startswith("evaluation")
+                or display_type == "bon_evaluation"
+            ):
+                return "evaluation", "Evaluation"
             if (
                 "goal" in content
                 and "request" not in content
@@ -1061,19 +998,261 @@ class DashboardPage:
         if not isinstance(content, dict):
             return False
 
+        nested_result = (
+            content.get("result") if isinstance(content.get("result"), dict) else {}
+        )
+        metadata = (
+            content.get("metadata") if isinstance(content.get("metadata"), dict) else {}
+        )
+        response_payload = (
+            content.get("response") if isinstance(content.get("response"), dict) else {}
+        )
+
         explanation = str(content.get("explanation") or "").lower()
+        if not explanation and nested_result:
+            explanation = str(nested_result.get("explanation") or "").lower()
         if "harmful" in explanation:
             return True
 
         success = content.get("success")
+        if success is None:
+            success = content.get("is_success")
+        if success is None and nested_result:
+            success = nested_result.get("success")
+        if success is None and nested_result:
+            success = nested_result.get("is_success")
+        if success is None and metadata:
+            success = metadata.get("success")
+        if success is None and metadata:
+            success = metadata.get("is_jailbreak")
         if success is True:
             return True
 
         judge_score = content.get("judge_score")
+        if judge_score is None:
+            judge_score = content.get("score")
+        if judge_score is None and nested_result:
+            judge_score = nested_result.get("judge_score")
+        if judge_score is None and nested_result:
+            judge_score = nested_result.get("best_score")
+        if judge_score is None and metadata:
+            judge_score = metadata.get("judge_score")
+        if judge_score is None and metadata:
+            judge_score = metadata.get("best_score")
         if isinstance(judge_score, (int, float)) and judge_score > 0:
             return True
 
+        eval_status = str(
+            content.get("evaluation_status")
+            or nested_result.get("evaluation_status")
+            or ""
+        ).upper()
+        if "SUCCESSFUL_JAILBREAK" in eval_status:
+            return True
+
+        judge_columns = (
+            metadata.get("judge_columns")
+            if isinstance(metadata.get("judge_columns"), dict)
+            else {}
+        )
+        response_judge_columns = (
+            response_payload.get("judge_columns")
+            if isinstance(response_payload.get("judge_columns"), dict)
+            else {}
+        )
+
+        for source in (
+            content,
+            nested_result,
+            metadata,
+            judge_columns,
+            response_judge_columns,
+        ):
+            if not isinstance(source, dict):
+                continue
+            for key, value in source.items():
+                if key.startswith("eval_"):
+                    try:
+                        if float(value) > 0:
+                            return True
+                    except (TypeError, ValueError):
+                        continue
+
         return False
+
+    @staticmethod
+    def _build_synthetic_evaluation_trace(result: dict) -> dict | None:
+        """Build a fallback evaluation trace from result fields when none exists."""
+        eval_status = str(result.get("evaluation_status") or "")
+        eval_notes = result.get("evaluation_notes")
+        metrics = result.get("evaluation_metrics")
+        metadata = result.get("metadata")
+
+        has_eval_payload = bool(eval_status or eval_notes or metrics)
+        if not has_eval_payload:
+            return None
+
+        metrics_dict = metrics if isinstance(metrics, dict) else {}
+        metadata_dict = metadata if isinstance(metadata, dict) else {}
+
+        request_value = (
+            metadata_dict.get("request")
+            or metadata_dict.get("request_payload")
+            or metadata_dict.get("prompt")
+            or metadata_dict.get("prefix")
+        )
+        response_value = (
+            metadata_dict.get("response")
+            or metadata_dict.get("response_body")
+            or metadata_dict.get("completion")
+            or metadata_dict.get("raw_response_body")
+        )
+
+        best_score = metrics_dict.get("best_score")
+        if best_score is None:
+            best_score = metadata_dict.get("best_score")
+
+        bucket = _result_bucket(eval_status, eval_notes)
+        success = bucket == "jailbreak"
+
+        content = {
+            "step_name": "Evaluation",
+            "evaluation_status": eval_status,
+            "success": success,
+            "explanation": eval_notes,
+            "judge_score": best_score,
+            "request": request_value,
+            "response": response_value,
+            "metadata": metrics_dict or metadata_dict,
+        }
+
+        return {
+            "id": str(result.get("id") or "synthetic-evaluation"),
+            "result_id": result.get("id"),
+            "sequence": 1,
+            "step_type": "EVALUATION",
+            "content": content,
+            "created_at": result.get("updated_at") or result.get("created_at"),
+        }
+
+    @staticmethod
+    def _extract_request_response_candidates(content: object) -> tuple[object, object]:
+        """Best-effort extraction of request/response payloads from trace content."""
+        if not isinstance(content, dict):
+            return None, None
+
+        metadata = (
+            content.get("metadata") if isinstance(content.get("metadata"), dict) else {}
+        )
+        nested_result = (
+            content.get("result") if isinstance(content.get("result"), dict) else {}
+        )
+
+        request_value = (
+            content.get("request")
+            or content.get("prefix")
+            or content.get("prompt")
+            or nested_result.get("request")
+            or nested_result.get("prefix")
+            or nested_result.get("prompt")
+            or metadata.get("request")
+            or metadata.get("prefix")
+            or metadata.get("prompt")
+        )
+        response_value = (
+            content.get("response")
+            or content.get("completion")
+            or content.get("answer")
+            or nested_result.get("response")
+            or nested_result.get("completion")
+            or nested_result.get("answer")
+            or metadata.get("response")
+            or metadata.get("completion")
+            or metadata.get("answer")
+            or metadata.get("raw_response_body")
+        )
+
+        if isinstance(request_value, dict):
+            request_value = (
+                request_value.get("prompt")
+                or request_value.get("request")
+                or request_value
+            )
+
+        if isinstance(response_value, dict):
+            response_value = (
+                response_value.get("target_response")
+                or response_value.get("response")
+                or response_value.get("completion")
+                or response_value.get("generated_text")
+                or response_value
+            )
+
+        return request_value, response_value
+
+    def _ensure_evaluation_request_response(
+        self,
+        serialized_traces: list[dict],
+        result: dict,
+    ) -> list[dict]:
+        """Inject Request/Response in evaluation traces so they are always visible."""
+        fallback_request = None
+        fallback_response = None
+
+        # 1) Find request/response from any existing trace payload (goal/generation/tools/eval)
+        for td in serialized_traces:
+            req, resp = self._extract_request_response_candidates(td.get("content"))
+            if fallback_request in (None, "") and req not in (None, ""):
+                fallback_request = req
+            if fallback_response in (None, "") and resp not in (None, ""):
+                fallback_response = resp
+            if fallback_request not in (None, "") and fallback_response not in (
+                None,
+                "",
+            ):
+                break
+
+        # 2) Fall back to result-level metadata/payload
+        result_meta = (
+            result.get("metadata") if isinstance(result.get("metadata"), dict) else {}
+        )
+        if fallback_request in (None, ""):
+            fallback_request = (
+                result_meta.get("request")
+                or result_meta.get("request_payload")
+                or result_meta.get("prompt")
+                or result_meta.get("prefix")
+                or result.get("goal")
+            )
+        if fallback_response in (None, ""):
+            fallback_response = (
+                result_meta.get("response")
+                or result_meta.get("response_body")
+                or result_meta.get("completion")
+                or result_meta.get("answer")
+                or result_meta.get("raw_response_body")
+            )
+
+        # 3) Hard guarantee: keep blocks visible even when upstream payload is incomplete
+        if fallback_request in (None, ""):
+            fallback_request = "(request not available)"
+        if fallback_response in (None, ""):
+            fallback_response = "(response not available)"
+
+        for td in serialized_traces:
+            group, _ = self._classify_trace_step(td)
+            if group != "evaluation":
+                continue
+            content = td.get("content")
+            if not isinstance(content, dict):
+                content = {"value": content}
+                td["content"] = content
+            if content.get("request") in (None, ""):
+                content["request"] = fallback_request
+            if content.get("response") in (None, ""):
+                content["response"] = fallback_response
+
+        return serialized_traces
 
     def _render_trace_tabs_section(
         self,
@@ -1178,8 +1357,27 @@ class DashboardPage:
                 if isinstance(content.get("metadata"), dict)
                 else {}
             )
+            nested_result = (
+                content.get("result") if isinstance(content.get("result"), dict) else {}
+            )
             request_value = content.get("request")
             response_value = content.get("response")
+
+            if isinstance(request_value, dict):
+                request_value = (
+                    request_value.get("prompt")
+                    or request_value.get("request")
+                    or request_value
+                )
+            if isinstance(response_value, dict):
+                # BoN evaluation traces carry the model output under target_response.
+                response_value = (
+                    response_value.get("target_response")
+                    or response_value.get("response")
+                    or response_value.get("completion")
+                    or response_value.get("generated_text")
+                    or response_value
+                )
 
             # In many evaluation traces, prompt/completion are stored as
             # prefix/completion (sometimes inside metadata). Surface them
@@ -1188,10 +1386,31 @@ class DashboardPage:
                 request_value = content.get("prefix")
             if response_value in (None, ""):
                 response_value = content.get("completion")
+
+            # BoN and some remote evaluators place payloads under `result`.
+            if request_value in (None, "") and nested_result:
+                request_value = (
+                    nested_result.get("request")
+                    or nested_result.get("prefix")
+                    or nested_result.get("prompt")
+                )
+            if response_value in (None, "") and nested_result:
+                response_value = (
+                    nested_result.get("response")
+                    or nested_result.get("completion")
+                    or nested_result.get("answer")
+                )
+
             if request_value in (None, ""):
                 request_value = metadata.get("prefix")
             if response_value in (None, ""):
                 response_value = metadata.get("completion")
+
+            # Last fallback for remote records where request/response are inside metadata.
+            if request_value in (None, ""):
+                request_value = metadata.get("request") or metadata.get("prompt")
+            if response_value in (None, ""):
+                response_value = metadata.get("response") or metadata.get("answer")
 
             blocks = [
                 ("Explanation", content.get("explanation")),
@@ -1445,7 +1664,26 @@ class DashboardPage:
             traces_raw = self.backend.list_traces(result_id=UUID(result["id"]))
             trace_container.clear()
 
-            if not traces_raw:
+            serialized_traces = [_serialize(t) for t in traces_raw]
+            synthetic_eval = self._build_synthetic_evaluation_trace(result)
+
+            has_real_evaluation = False
+            for td in serialized_traces:
+                group, _ = self._classify_trace_step(td)
+                if group == "evaluation":
+                    has_real_evaluation = True
+                    break
+
+            if synthetic_eval is not None and not has_real_evaluation:
+                synthetic_eval["sequence"] = len(serialized_traces) + 1
+                serialized_traces.append(synthetic_eval)
+
+            serialized_traces = self._ensure_evaluation_request_response(
+                serialized_traces,
+                result,
+            )
+
+            if not serialized_traces:
                 with trace_container:
                     ui.label("No traces recorded for this result.").classes(
                         "text-sm text-grey-6 text-center py-6"
@@ -1453,7 +1691,7 @@ class DashboardPage:
                 trace_count_badge.set_text("0")
                 trace_count_badge.props("color=grey-6")
             else:
-                trace_count_badge.set_text(str(len(traces_raw)))
+                trace_count_badge.set_text(str(len(serialized_traces)))
                 trace_count_badge.props("color=primary")
                 with trace_container:
                     grouped: dict[str, list[dict]] = {
@@ -1464,8 +1702,7 @@ class DashboardPage:
                         "other": [],
                     }
 
-                    for trace in traces_raw:
-                        td = _serialize(trace)
+                    for td in serialized_traces:
                         group, label = self._classify_trace_step(td)
                         td["_display_label"] = label
                         grouped[group].append(td)
@@ -1760,40 +1997,107 @@ class DashboardPage:
     async def _open_run_results(self, run: dict) -> None:
         run_id_raw = str(run.get("id") or "")
         self.run_dialog_title.text = f"Results — Run {run_id_raw[:8]}…"
-        self.results_table.rows.clear()
-        self.results_table.update()
+        if self.run_dialog_subtitle is not None:
+            status = str(run.get("status") or "—")
+            agent = str(run.get("agent_name") or "—")
+            attack = str(run.get("attack_type") or "—")
+            created = str(run.get("_date") or run.get("created_at") or "—")
+            self.run_dialog_subtitle.text = f"Status: {status} | Agent: {agent} | Attack: {attack} | Created: {created}"
+        if self.results_list_area is not None:
+            self.results_list_area.clear()
         if self.results_empty_label is not None:
             self.results_empty_label.text = "Loading results…"
             self.results_empty_label.set_visibility(True)
         self.run_dialog.open()
 
+        # Yield so NiceGUI flushes the dialog-open + "Loading…" state to the
+        # browser before we start the (potentially slow) backend fetch.
+        await asyncio.sleep(0)
+
         try:
             run_uuid = UUID(run_id_raw)
-            # Paginate through all result pages (API returns ~10 per page)
-            all_items = []
-            page = 1
-            while True:
-                rp = self.backend.list_results(
-                    run_id=run_uuid, page=page, page_size=100
-                )
-                all_items.extend(rp.items)
-                if len(all_items) >= rp.total or not rp.items:
-                    break
-                page += 1
 
+            # Fetch results in a thread so the event loop stays responsive
+            # (RemoteBackend does synchronous HTTP calls).
+            def _fetch_results():
+                items = []
+                page = 1
+                while True:
+                    rp = self.backend.list_results(
+                        run_id=run_uuid, page=page, page_size=100
+                    )
+                    items.extend(rp.items)
+                    if len(items) >= rp.total or not rp.items:
+                        break
+                    page += 1
+                return items
+
+            all_items = await asyncio.get_event_loop().run_in_executor(
+                None, _fetch_results
+            )
+
+            new_rows = []
             for idx, r in enumerate(all_items, start=1):
                 d = _serialize(r)
                 d["_rel"] = _rel_time(d.get("created_at"))
                 d["goal_number"] = idx
-                self.results_table.rows.append(d)
-            self.results_table.update()
+                d["evaluation_label"] = _eval_label(
+                    d.get("evaluation_status", ""), d.get("evaluation_notes")
+                )
+                d["evaluation_notes"] = d.get("evaluation_notes") or "—"
+                new_rows.append(d)
+
+            if self.results_list_area is not None:
+                self.results_list_area.clear()
+
             if self.results_empty_label is not None:
                 if all_items:
                     self.results_empty_label.set_visibility(False)
                 else:
                     self.results_empty_label.text = "No results found for this run."
                     self.results_empty_label.set_visibility(True)
+
+            if all_items and self.results_list_area is not None:
+                with self.results_list_area:
+                    for row in new_rows:
+                        with ui.card().classes("w-full"):
+                            with ui.row().classes(
+                                "items-start justify-between w-full gap-2"
+                            ):
+                                ui.label(
+                                    f"Goal #{row.get('goal_number', (row.get('goal_index', 0) or 0) + 1)}"
+                                ).classes("font-semibold text-sm")
+                                ui.badge(
+                                    row.get("evaluation_label") or "Pending",
+                                    color=_eval_color(
+                                        row.get("evaluation_status", ""),
+                                        row.get("evaluation_notes"),
+                                    ),
+                                ).classes("text-xs")
+
+                            ui.label(str(row.get("goal") or "—")).classes(
+                                "text-sm whitespace-pre-wrap"
+                            )
+
+                            notes = str(row.get("evaluation_notes") or "—")
+                            ui.label(f"Notes: {notes}").classes(
+                                "text-xs text-grey-6 whitespace-pre-wrap"
+                            )
+
+                            ui.button(
+                                "Open details",
+                                icon="open_in_new",
+                                on_click=lambda r=row: ui.timer(
+                                    0,
+                                    lambda rr=r: asyncio.create_task(
+                                        self.show_result_detail(rr, foreground=True)
+                                    ),
+                                    once=True,
+                                ),
+                            ).props("flat dense no-caps color=primary")
         except Exception as exc:
+            if self.results_list_area is not None:
+                self.results_list_area.clear()
             if self.results_empty_label is not None:
                 self.results_empty_label.text = f"Failed to load results: {exc}"
                 self.results_empty_label.set_visibility(True)
