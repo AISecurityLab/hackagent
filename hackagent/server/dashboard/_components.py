@@ -97,7 +97,6 @@ def make_run_table(
         row_key="id",
         pagination=pagination or {"rowsPerPage": 5},
         selection=selection,
-        on_select=on_select,
     ).classes("w-full")
 
     tbl.add_slot(
@@ -197,4 +196,6 @@ def make_run_table(
             cb(row)
 
     tbl.on("rowClick", _handle_row_click)
+    if on_select is not None:
+        tbl.on("selection", lambda e, cb=on_select: cb(e))
     return tbl

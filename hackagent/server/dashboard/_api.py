@@ -101,7 +101,8 @@ def register_api(backend) -> None:
             d["successful_jailbreaks"] = sum(
                 1
                 for r in rp.items
-                if _result_bucket(r.evaluation_status, r.evaluation_notes) == "jailbreak"
+                if _result_bucket(r.evaluation_status, r.evaluation_notes)
+                == "jailbreak"
             )
             d["status"] = _derive_run_status(
                 [(r.evaluation_status, r.evaluation_notes) for r in rp.items],

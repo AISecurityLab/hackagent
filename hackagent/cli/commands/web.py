@@ -107,5 +107,38 @@ def web(ctx, host, port, db_path, no_browser):
     console.print()
     console.print("    Press [bold]Ctrl+C[/bold] to stop.\n")
 
+    # ── Free port if still occupied by a previous instance ──────────────────
+    import signal
+    import socket
+
+    def _free_port(host: str, port: int) -> None:
+        """Kill any process listening on host:port so we can bind cleanly."""
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            if s.connect_ex((host, port)) != 0:
+                return  # port already free
+        try:
+            import subprocess
+
+            out = subprocess.check_output(
+                ["lsof", "-t", "-i", f"TCP:{port}", "-sTCP:LISTEN"],
+                text=True,
+            ).strip()
+            for pid in out.splitlines():
+                pid = pid.strip()
+                if pid.isdigit():
+                    console.print(
+                        f"[yellow]Killing previous process on port {port} (PID {pid})…[/yellow]"
+                    )
+                    import os
+
+                    os.kill(int(pid), signal.SIGTERM)
+            import time
+
+            time.sleep(0.5)
+        except Exception:
+            pass
+
+    _free_port(host, port)
+
     # ── Serve (NiceGUI opens the browser automatically when show=True) ────────
     app.run(host=host, port=port, show=not no_browser)

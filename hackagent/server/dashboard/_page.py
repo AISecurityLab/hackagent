@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import json
 import math
 from uuid import UUID
@@ -19,7 +18,6 @@ from ._helpers import (
     _eval_label,
     _rel_time,
     _serialize,
-    _step_color,
     _result_bucket,
     _short_date,
 )
@@ -80,13 +78,8 @@ class DashboardPage:
         self.runs_table: ui.table | None = None
         self.runs_count_label: ui.label | None = None
         self.runs_page_label: ui.label | None = None
-        self.runs_selected_label: ui.label | None = None
         self.runs_current_page: int = 1
         self.runs_total_pages: int = 1
-        self.runs_selected_ids: set[str] = set()
-
-        self.attacks_selected_label: ui.label | None = None
-        self.attacks_selected_ids: set[str] = set()
 
         # Run results dialog
         self.run_dialog: ui.dialog | None = None
@@ -99,6 +92,12 @@ class DashboardPage:
         self.attack_dialog_title: ui.label | None = None
         self.attack_config_area: ui.column | None = None
         self.attack_runs_table: ui.table | None = None
+
+        # Selection state for bulk operations
+        self._selected_run_ids: list[str] = []
+        self._selected_attack_ids: list[str] = []
+        self._runs_delete_btn: ui.button | None = None
+        self._attacks_delete_btn: ui.button | None = None
 
     # ── Public entry point ────────────────────────────────────────────────────
 
@@ -116,7 +115,9 @@ class DashboardPage:
         self._build_attack_dialog()
 
         self._highlight_nav("dashboard")
-        await self._load_dashboard()
+        # Defer heavy data loading so the page skeleton renders first
+        # and the browser WebSocket is established before backend I/O.
+        ui.timer(0.1, self._load_dashboard, once=True)
 
     # ── Layout builders ───────────────────────────────────────────────────────
 
@@ -158,7 +159,7 @@ class DashboardPage:
         self.result_modal_dialog = dialog
 
     def _build_sidebar(self) -> ui.left_drawer:
-        with ui.left_drawer(top_corner=True, bottom_corner=True).props(
+        with ui.left_drawer(top_corner=True, bottom_corner=True, value=True).props(
             "width=220 bordered"
         ) as sidebar:
             with ui.row().classes("items-center gap-3 px-3 py-4 shrink-0"):
@@ -201,19 +202,11 @@ class DashboardPage:
             ui.separator()
 
             with ui.row().classes("px-3 py-3 gap-2 items-center"):
-                mode_dot = ui.icon("circle", size="xs").classes("text-positive text-xs")
-                mode_lbl = ui.label("local mode").classes("text-xs text-grey-6")
-
-            async def _load_mode() -> None:
-                with contextlib.suppress(Exception):
-                    is_remote = self.backend.get_api_key() is not None
-                    mode_dot.classes(
-                        add="text-info" if is_remote else "text-positive",
-                        remove="text-positive text-info",
-                    )
-                    mode_lbl.text = "remote mode" if is_remote else "local mode"
-
-            ui.timer(0.1, _load_mode, once=True)
+                is_remote = self.backend.get_api_key() is not None
+                dot_color = "text-info" if is_remote else "text-positive"
+                mode_text = "remote mode" if is_remote else "local mode"
+                ui.icon("circle", size="xs").classes(f"{dot_color} text-xs")
+                ui.label(mode_text).classes("text-xs text-grey-6")
         return sidebar
 
     def _build_header(self, sidebar: ui.left_drawer) -> None:
@@ -357,8 +350,8 @@ class DashboardPage:
                     on_row_click=lambda run: ui.timer(
                         0, lambda r=run: self._open_run_results(r), once=True
                     ),
-                    include_agent=False,
-                    include_progressive_run=False,
+                    include_agent=True,
+                    include_progressive_run=True,
                     include_results=True,
                 )
 
@@ -439,14 +432,18 @@ class DashboardPage:
         with panel:
             with ui.card().classes("w-full"):
                 with ui.row().classes("items-center justify-between mb-1 px-2"):
-                    self.attacks_selected_label = ui.label("0 selected").classes(
-                        "text-sm text-grey-6"
+                    ui.label("").classes("text-sm text-grey-6")  # spacer
+                    self._attacks_delete_btn = (
+                        ui.button(
+                            "Delete selected",
+                            icon="delete",
+                            on_click=lambda: ui.timer(
+                                0, self._delete_selected_attacks, once=True
+                            ),
+                        )
+                        .props("flat dense no-caps color=negative")
+                        .classes("hidden")
                     )
-                    ui.button(
-                        "Delete selected",
-                        on_click=lambda: ui.timer(0, self._delete_selected_attacks, once=True),
-                    ).props("unelevated color=negative no-caps dense")
-
                 self.attacks_table = ui.table(
                     columns=[
                         {"name": "id", "label": "ID", "field": "id", "align": "left"},
@@ -471,9 +468,8 @@ class DashboardPage:
                     ],
                     rows=[],
                     row_key="id",
-                    selection="multiple",
-                    on_select=self._on_attacks_select,
                     pagination={"rowsPerPage": 25},
+                    selection="multiple",
                 ).classes("w-full")
                 self.attacks_table.add_slot(
                     "body-cell-id",
@@ -494,7 +490,7 @@ class DashboardPage:
                     """,
                 )
                 self.attacks_table.add_slot(
-                                        "body-cell-agent_name",
+                    "body-cell-agent_name",
                     r"""
                     <q-td :props="props" class="cursor-pointer"
                           @click="$emit('rowClick', props.row)">
@@ -524,12 +520,35 @@ class DashboardPage:
 
                 self.attacks_table.on("rowClick", _on_attack_row_click)
 
+                def _on_attack_select(e) -> None:
+                    self._selected_attack_ids = [
+                        row["id"] for row in (self.attacks_table.selected or [])
+                    ]
+                    if self._attacks_delete_btn is not None:
+                        if self._selected_attack_ids:
+                            self._attacks_delete_btn.classes(remove="hidden")
+                        else:
+                            self._attacks_delete_btn.classes(add="hidden")
+
+                self.attacks_table.on("selection", _on_attack_select)
+
     def _build_runs_panel(self, panel: ui.column) -> None:
         with panel:
             with ui.card().classes("w-full"):
                 with ui.row().classes("items-center justify-between mb-1 px-2"):
                     self.runs_count_label = ui.label("").classes("text-sm text-grey-6")
                     with ui.row().classes("items-center gap-2"):
+                        self._runs_delete_btn = (
+                            ui.button(
+                                "Delete selected",
+                                icon="delete",
+                                on_click=lambda: ui.timer(
+                                    0, self._delete_selected_runs, once=True
+                                ),
+                            )
+                            .props("flat dense no-caps color=negative")
+                            .classes("hidden")
+                        )
                         ui.button(
                             "← Prev",
                             on_click=lambda: self._change_runs_page(-1),
@@ -545,22 +564,14 @@ class DashboardPage:
                     on_row_click=lambda run: ui.timer(
                         0, lambda r=run: self._open_run_results(r), once=True
                     ),
-                    pagination={"rowsPerPage": 25},
+                    pagination={"rowsPerPage": 0},
                     include_agent=True,
                     include_progressive_run=True,
                     include_results=False,
                     selection="multiple",
-                    on_select=self._on_runs_select,
+                    on_select=lambda e: self._on_runs_select(),
                 )
                 self.runs_table.props("hide-pagination")
-                with ui.row().classes("items-center justify-between mt-2 px-2"):
-                    self.runs_selected_label = ui.label("0 selected").classes(
-                        "text-sm text-grey-6"
-                    )
-                    ui.button(
-                        "Delete selected",
-                        on_click=lambda: ui.timer(0, self._delete_selected_runs, once=True),
-                    ).props("unelevated color=negative no-caps dense")
 
     def _build_run_dialog(self) -> None:
         with ui.dialog() as dialog:
@@ -572,7 +583,7 @@ class DashboardPage:
                     ui.button(icon="close", on_click=dialog.close).props("flat round")
 
                 self.results_empty_label = ui.label("Loading results...").classes(
-                    "text-sm text-grey-6 px-1"
+                    "text-sm text-grey-8 px-2 py-4"
                 )
 
                 self.results_table = ui.table(
@@ -658,9 +669,7 @@ class DashboardPage:
                     if row is not None:
                         ui.timer(
                             0,
-                            lambda r=row: self.show_result_detail(
-                                r, foreground=True
-                            ),
+                            lambda r=row: self.show_result_detail(r, foreground=True),
                             once=True,
                         )
 
@@ -676,7 +685,9 @@ class DashboardPage:
                     )
                     ui.button(icon="close", on_click=dialog.close).props("flat round")
 
-                self.attack_config_area = ui.column().classes("w-full gap-4 flex-1 overflow-auto")
+                self.attack_config_area = ui.column().classes(
+                    "w-full gap-4 flex-1 overflow-auto"
+                )
 
         self.attack_dialog = dialog
 
@@ -700,8 +711,12 @@ class DashboardPage:
                     with ui.card().classes("flex-1 min-w-40"):
                         with ui.row().classes("items-center gap-2 mb-1"):
                             ui.icon(icon_name, size="xs").classes("text-grey-6")
-                            ui.label(lbl).classes("text-xs text-grey-6 uppercase font-semibold")
-                        ui.label(str(val)).classes("text-sm font-mono select-all break-all")
+                            ui.label(lbl).classes(
+                                "text-xs text-grey-6 uppercase font-semibold"
+                            )
+                        ui.label(str(val)).classes(
+                            "text-sm font-mono select-all break-all"
+                        )
 
             # ── Configuration JSON ────────────────────────────────────────
             config = attack.get("configuration", {})
@@ -752,35 +767,49 @@ class DashboardPage:
                             if "SUCCESSFUL_JAILBREAK" in r.evaluation_status.upper()
                         )
                         d["status"] = self._derive_run_status(
-                            [(r.evaluation_status, r.evaluation_notes) for r in rp.items],
+                            [
+                                (r.evaluation_status, r.evaluation_notes)
+                                for r in rp.items
+                            ],
                             fallback=str(d.get("status", "")),
                         )
                         status = d.get("status", "")
                         status_color = (
-                            "positive" if status == "COMPLETED"
-                            else "info" if status == "RUNNING"
-                            else "negative" if status == "FAILED"
+                            "positive"
+                            if status == "COMPLETED"
+                            else "info"
+                            if status == "RUNNING"
+                            else "negative"
+                            if status == "FAILED"
                             else "warning"
                         )
-                        with ui.card().classes(
-                            "w-full cursor-pointer hover:shadow-md"
-                        ).on(
-                            "click",
-                            lambda _e, r=d: (
-                                self.attack_dialog.close(),
-                                ui.timer(0, lambda: self._open_run_results(r), once=True),
-                            ),
+                        with (
+                            ui.card()
+                            .classes("w-full cursor-pointer hover:shadow-md")
+                            .on(
+                                "click",
+                                lambda _e, r=d: (
+                                    self.attack_dialog.close(),
+                                    ui.timer(
+                                        0, lambda: self._open_run_results(r), once=True
+                                    ),
+                                ),
+                            )
                         ):
-                            with ui.row().classes("items-center justify-between w-full"):
+                            with ui.row().classes(
+                                "items-center justify-between w-full"
+                            ):
                                 with ui.row().classes("items-center gap-3"):
                                     ui.label(str(d["id"])[:8] + "…").classes(
                                         "font-mono text-xs font-medium"
                                     )
-                                    ui.badge(status, color=status_color).classes("text-xs")
+                                    ui.badge(status, color=status_color).classes(
+                                        "text-xs"
+                                    )
                                 with ui.row().classes("items-center gap-3"):
-                                    ui.label(
-                                        f"{d['total_results']} results"
-                                    ).classes("text-xs text-grey-6")
+                                    ui.label(f"{d['total_results']} results").classes(
+                                        "text-xs text-grey-6"
+                                    )
                                     if d["successful_jailbreaks"] > 0:
                                         ui.badge(
                                             f"⚠ {d['successful_jailbreaks']}",
@@ -829,90 +858,49 @@ class DashboardPage:
         if new_page < 1 or new_page > self.runs_total_pages:
             return
         self.runs_current_page = new_page
-        self.runs_selected_ids.clear()
         ui.timer(0, self._load_runs, once=True)
 
-    def _on_runs_select(self, e) -> None:
-        self.runs_selected_ids = {
-            str(item.get("id"))
-            for item in (e.selection or [])
-            if isinstance(item, dict) and item.get("id")
-        }
-        if self.runs_selected_label is not None:
-            n = len(self.runs_selected_ids)
-            self.runs_selected_label.text = f"{n} selected"
-
-    def _on_attacks_select(self, e) -> None:
-        self.attacks_selected_ids = {
-            str(item.get("id"))
-            for item in (e.selection or [])
-            if isinstance(item, dict) and item.get("id")
-        }
-        if self.attacks_selected_label is not None:
-            n = len(self.attacks_selected_ids)
-            self.attacks_selected_label.text = f"{n} selected"
+    def _on_runs_select(self) -> None:
+        self._selected_run_ids = [row["id"] for row in (self.runs_table.selected or [])]
+        if self._runs_delete_btn is not None:
+            if self._selected_run_ids:
+                self._runs_delete_btn.classes(remove="hidden")
+            else:
+                self._runs_delete_btn.classes(add="hidden")
 
     async def _delete_selected_runs(self) -> None:
-        ids = list(self.runs_selected_ids)
+        ids = list(self._selected_run_ids)
         if not ids:
-            ui.notify("No runs selected.", type="warning")
             return
-
-        self.loading_spinner.set_visibility(True)
-        deleted = 0
-        failed = 0
         try:
-            for raw in ids:
-                try:
-                    self.backend.delete_run(UUID(str(raw)))
-                    deleted += 1
-                except Exception:
-                    failed += 1
-
-            self.runs_selected_ids.clear()
-            if self.runs_selected_label is not None:
-                self.runs_selected_label.text = "0 selected"
-            await self._load_runs()
-            await self._load_dashboard()
-            if failed:
-                ui.notify(f"Deleted {deleted} runs, failed {failed}.", type="warning")
-            else:
-                ui.notify(f"Deleted {deleted} runs.", type="positive")
-        finally:
-            self.loading_spinner.set_visibility(False)
+            for rid in ids:
+                self.backend.delete_run(UUID(rid))
+            ui.notify(f"Deleted {len(ids)} run(s)", type="positive")
+        except Exception as exc:
+            ui.notify(f"Delete failed: {exc}", type="negative")
+        self._selected_run_ids.clear()
+        if self.runs_table is not None:
+            self.runs_table.selected.clear()
+        if self._runs_delete_btn is not None:
+            self._runs_delete_btn.classes(add="hidden")
+        await self._load_runs()
 
     async def _delete_selected_attacks(self) -> None:
-        ids = list(self.attacks_selected_ids)
+        ids = list(self._selected_attack_ids)
         if not ids:
-            ui.notify("No attacks selected.", type="warning")
             return
-
-        self.loading_spinner.set_visibility(True)
-        deleted = 0
-        failed = 0
         try:
-            for raw in ids:
-                try:
-                    self.backend.delete_attack(UUID(str(raw)))
-                    deleted += 1
-                except Exception:
-                    failed += 1
-
-            self.attacks_selected_ids.clear()
-            if self.attacks_selected_label is not None:
-                self.attacks_selected_label.text = "0 selected"
-            await self._load_attacks()
-            await self._load_runs()
-            await self._load_dashboard()
-            if failed:
-                ui.notify(
-                    f"Deleted {deleted} attacks, failed {failed}.",
-                    type="warning",
-                )
-            else:
-                ui.notify(f"Deleted {deleted} attacks.", type="positive")
-        finally:
-            self.loading_spinner.set_visibility(False)
+            for aid in ids:
+                self.backend.delete_attack(UUID(aid))
+            ui.notify(f"Deleted {len(ids)} attack(s)", type="positive")
+        except Exception as exc:
+            ui.notify(f"Delete failed: {exc}", type="negative")
+        self._selected_attack_ids.clear()
+        if self.attacks_table is not None:
+            self.attacks_table.selected.clear()
+        if self._attacks_delete_btn is not None:
+            self._attacks_delete_btn.classes(add="hidden")
+        await self._load_attacks()
 
     @staticmethod
     def _extract_row(payload: object) -> dict | None:
@@ -1027,7 +1015,11 @@ class DashboardPage:
             return "generation", "Attack / Generation"
 
         if isinstance(content, dict):
-            if "goal" in content and "request" not in content and "response" not in content:
+            if (
+                "goal" in content
+                and "request" not in content
+                and "response" not in content
+            ):
                 return "goal", "Goal"
             if any(
                 key in content
@@ -1099,9 +1091,11 @@ class DashboardPage:
                 ui.badge(str(len(steps)), color="grey-6").classes("text-xs")
 
             first_name = f"{group_key}-{steps[0].get('sequence', 1)}"
-            with ui.tabs().props("dense align=left no-caps inline-label").classes(
-                "w-full"
-            ) as tabs:
+            with (
+                ui.tabs()
+                .props("dense align=left no-caps inline-label")
+                .classes("w-full") as tabs
+            ):
                 for step in steps:
                     sequence = step.get("sequence", "?")
                     name = f"{group_key}-{sequence}"
@@ -1130,7 +1124,9 @@ class DashboardPage:
 
                                 content = step.get("content")
                                 if content is not None:
-                                    self._render_trace_content(step.get("step_type"), content)
+                                    self._render_trace_content(
+                                        step.get("step_type"), content
+                                    )
 
     def _render_trace_content(self, step_type: str | None, content: object) -> None:
         """Render trace content with a remote-dashboard-like schema."""
@@ -1142,7 +1138,9 @@ class DashboardPage:
             # -----------------------------------------------------------------
             goal = content.get("goal")
             if isinstance(goal, str) and goal.strip():
-                with ui.card().tight().classes("w-full border border-red-200 bg-red-50"):
+                with (
+                    ui.card().tight().classes("w-full border border-red-200 bg-red-50")
+                ):
                     with ui.column().classes("p-3 gap-1"):
                         ui.label("Target Goal").classes("text-xs text-grey-6")
                         ui.label(goal).classes("text-sm font-medium")
@@ -1175,7 +1173,11 @@ class DashboardPage:
             # -----------------------------------------------------------------
             # Evaluation-style blocks
             # -----------------------------------------------------------------
-            metadata = content.get("metadata") if isinstance(content.get("metadata"), dict) else {}
+            metadata = (
+                content.get("metadata")
+                if isinstance(content.get("metadata"), dict)
+                else {}
+            )
             request_value = content.get("request")
             response_value = content.get("response")
 
@@ -1228,8 +1230,12 @@ class DashboardPage:
             if isinstance(metadata, dict) and metadata:
                 with ui.expansion("Metadata", icon="info").classes("w-full"):
                     with ui.column().classes("w-full gap-1 p-2"):
-                        branch_idx = metadata.get("branch_index", content.get("branch_index"))
-                        stream_idx = metadata.get("stream_index", content.get("stream_index"))
+                        branch_idx = metadata.get(
+                            "branch_index", content.get("branch_index")
+                        )
+                        stream_idx = metadata.get(
+                            "stream_index", content.get("stream_index")
+                        )
                         if branch_idx is not None or stream_idx is not None:
                             with ui.row().classes("w-full items-center gap-3"):
                                 if branch_idx is not None:
@@ -1324,9 +1330,7 @@ class DashboardPage:
                 result_num = result.get("goal_number") or (
                     (result.get("goal_index", 0) or 0) + 1
                 )
-                detail_title.text = (
-                    f"Result · #{result_num}"
-                )
+                detail_title.text = f"Result · #{result_num}"
 
                 # Evaluation banner
                 if bucket == "jailbreak":
@@ -1406,9 +1410,7 @@ class DashboardPage:
                         _eval_label(eval_status, eval_notes),
                         color=_eval_color(eval_status, eval_notes),
                     ).classes("text-xs px-2 py-0.5")
-                    ui.label(f"Goal #{result_num}").classes(
-                        "text-xs text-grey-6"
-                    )
+                    ui.label(f"Goal #{result_num}").classes("text-xs text-grey-6")
 
                 # Metrics
                 metrics = result.get("evaluation_metrics")
@@ -1468,9 +1470,7 @@ class DashboardPage:
                         td["_display_label"] = label
                         grouped[group].append(td)
 
-                    self._render_trace_tabs_section(
-                        "Goal", grouped["goal"], "goal"
-                    )
+                    self._render_trace_tabs_section("Goal", grouped["goal"], "goal")
                     self._render_trace_tabs_section(
                         "Evaluation", grouped["evaluation"], "evaluation"
                     )
@@ -1479,12 +1479,8 @@ class DashboardPage:
                         grouped["generation"],
                         "generation",
                     )
-                    self._render_trace_tabs_section(
-                        "Tools", grouped["tools"], "tools"
-                    )
-                    self._render_trace_tabs_section(
-                        "Other", grouped["other"], "other"
-                    )
+                    self._render_trace_tabs_section("Tools", grouped["tools"], "tools")
+                    self._render_trace_tabs_section("Other", grouped["other"], "other")
         except Exception as exc:
             trace_container.clear()
             with trace_container:
@@ -1500,26 +1496,14 @@ class DashboardPage:
         agents_p = self.backend.list_agents(page=1, page_size=1)
         attacks_p = self.backend.list_attacks(page=1, page_size=1)
         runs_p = self.backend.list_runs(page=1, page_size=_DASHBOARD_RUN_SCAN_LIMIT)
-        run_attack_ids = {str(run.attack_id) for run in runs_p.items}
-        run_agent_ids = {str(run.agent_id) for run in runs_p.items}
-        attack_type_by_id = self._attack_type_map_for_ids(run_attack_ids)
-        agent_name_by_id = self._agent_name_map_for_ids(run_agent_ids)
-        total_results = jailbreaks = mitigated = failed = pending = 0
-        for run in runs_p.items:
-            rp = self.backend.list_results(
-                run_id=run.id, page=1, page_size=_RESULTS_FETCH_LIMIT
-            )
-            total_results += rp.total
-            for r in rp.items:
-                bucket = _result_bucket(r.evaluation_status, r.evaluation_notes)
-                if bucket == "jailbreak":
-                    jailbreaks += 1
-                elif bucket == "mitigated":
-                    mitigated += 1
-                elif bucket == "failed":
-                    failed += 1
-                elif bucket == "pending":
-                    pending += 1
+
+        # ── Fast, accurate counts via backend aggregation ─────────────
+        buckets = self.backend.count_result_buckets()
+        total_results = buckets["total"]
+        jailbreaks = buckets["jailbreaks"]
+        mitigated = buckets["mitigated"]
+        failed = buckets["failed"]
+        pending = buckets["pending"]
 
         risk_pct = (
             round(100 * jailbreaks / max(total_results, 1)) if total_results else 0
@@ -1662,24 +1646,25 @@ class DashboardPage:
 
         # Recent runs table
         recent_p = self.backend.list_runs(page=1, page_size=5)
+        run_attack_ids = {str(run.attack_id) for run in recent_p.items}
+        run_agent_ids = {str(run.agent_id) for run in recent_p.items}
+        attack_type_by_id = self._attack_type_map_for_ids(run_attack_ids)
+        agent_name_by_id = self._agent_name_map_for_ids(run_agent_ids)
         rows = []
-        for run in recent_p.items:
+        for idx, run in enumerate(recent_p.items):
             d = _serialize(run)
-            rp = self.backend.list_results(
-                run_id=run.id, page=1, page_size=_RESULTS_FETCH_LIMIT
-            )
-            d["total_results"] = rp.total
-            d["successful_jailbreaks"] = sum(
-                1
-                for r in rp.items
-                if _result_bucket(r.evaluation_status, r.evaluation_notes) == "jailbreak"
-            )
-            d["status"] = self._derive_run_status(
-                [(r.evaluation_status, r.evaluation_notes) for r in rp.items],
-                fallback=str(d.get("status", "")),
-            )
+            d["status"] = str(d.get("status", "") or "PENDING")
             d["attack_type"] = attack_type_by_id.get(str(d.get("attack_id")), "—")
-            d["agent_name"] = agent_name_by_id.get(str(d.get("agent_id")), "—")
+            agent_id = str(d.get("agent_id") or "")
+            d["agent_name"] = agent_name_by_id.get(
+                agent_id,
+                d.get("run_config", {}).get("_agent_name")
+                or (f"{agent_id[:8]}…" if agent_id else "—"),
+            )
+            d["run_progress"] = max(1, recent_p.total - idx)
+            # Fetch result count per run
+            rp = self.backend.list_results(run_id=run.id, page=1, page_size=1)
+            d["total_results"] = rp.total
             d["_rel"] = _rel_time(d.get("created_at"))
             d["_date"] = _short_date(d.get("created_at"))
             rows.append(d)
@@ -1700,23 +1685,17 @@ class DashboardPage:
 
     async def _load_attacks(self) -> None:
         result = self.backend.list_attacks(page=1, page_size=100)
-        agent_ids = {str(a.agent_id) for a in result.items}
-        agent_name_by_id = self._agent_name_map_for_ids(agent_ids)
+        agent_name_by_id = self._agent_name_map()
         rows = []
         for a in result.items:
             d = _serialize(a)
-            agent_id = str(d.get("agent_id") or "")
-            d["agent_name"] = agent_name_by_id.get(
-                agent_id,
-                f"{agent_id[:8]}…" if agent_id else "—",
-            )
+            d["agent_name"] = agent_name_by_id.get(str(d.get("agent_id")), "—")
             d["_rel"] = _rel_time(d.get("created_at"))
             d["_date"] = _short_date(d.get("created_at"))
             rows.append(d)
         self.attacks_table.rows.clear()
         self.attacks_table.rows.extend(rows)
         self.attacks_table.update()
-        self.attacks_table.set_selection([])
 
     async def _load_runs(self) -> None:
         result = self.backend.list_runs(
@@ -1746,14 +1725,14 @@ class DashboardPage:
             d["status"] = str(d.get("status", "") or "PENDING")
             attack_id = str(d.get("attack_id") or "")
             agent_id = str(d.get("agent_id") or "")
-            run_cfg = d.get("run_config") if isinstance(d.get("run_config"), dict) else {}
             d["attack_type"] = attack_type_by_id.get(
                 attack_id,
-                str(run_cfg.get("attack_type") or (f"{attack_id[:8]}…" if attack_id else "—")),
+                f"{attack_id[:8]}…" if attack_id else "—",
             )
             d["agent_name"] = agent_name_by_id.get(
                 agent_id,
-                str(run_cfg.get("_agent_name") or (f"{agent_id[:8]}…" if agent_id else "—")),
+                d.get("run_config", {}).get("_agent_name")
+                or (f"{agent_id[:8]}…" if agent_id else "—"),
             )
             d["run_progress"] = max(
                 1,
@@ -1766,38 +1745,39 @@ class DashboardPage:
         self.runs_table.rows.clear()
         self.runs_table.rows.extend(rows)
         self.runs_table.update()
-        self.runs_table.set_selection([])
-        start = (self.runs_current_page - 1) * _RUNS_VIEW_PAGE_SIZE + 1 if result.total else 0
-        end = start + len(rows) - 1 if rows else 0
-        self.runs_count_label.text = (
-            f"Showing {start}-{end} of {result.total} run{'s' if result.total != 1 else ''}"
+        start = (
+            (self.runs_current_page - 1) * _RUNS_VIEW_PAGE_SIZE + 1
+            if result.total
+            else 0
         )
+        end = start + len(rows) - 1 if rows else 0
+        self.runs_count_label.text = f"Showing {start}-{end} of {result.total} run{'s' if result.total != 1 else ''}"
         if self.runs_page_label is not None:
             self.runs_page_label.text = (
                 f"Page {self.runs_current_page} / {self.runs_total_pages}"
             )
 
     async def _open_run_results(self, run: dict) -> None:
-        self.run_dialog_title.text = f"Results — Run {run['id'][:8]}…"
+        run_id_raw = str(run.get("id") or "")
+        self.run_dialog_title.text = f"Results — Run {run_id_raw[:8]}…"
         self.results_table.rows.clear()
         self.results_table.update()
         if self.results_empty_label is not None:
-            self.results_empty_label.text = "Loading results..."
+            self.results_empty_label.text = "Loading results…"
+            self.results_empty_label.set_visibility(True)
         self.run_dialog.open()
+
         try:
-            run_id_raw = str(run.get("id") or "")
             run_uuid = UUID(run_id_raw)
-            page = 1
-            page_size = 200
+            # Paginate through all result pages (API returns ~10 per page)
             all_items = []
+            page = 1
             while True:
-                rp = self.backend.list_results(run_id=run_uuid, page=page, page_size=page_size)
-                if not rp.items:
-                    break
+                rp = self.backend.list_results(
+                    run_id=run_uuid, page=page, page_size=100
+                )
                 all_items.extend(rp.items)
-                if len(all_items) >= rp.total:
-                    break
-                if len(rp.items) < page_size:
+                if len(all_items) >= rp.total or not rp.items:
                     break
                 page += 1
 
@@ -1809,10 +1789,12 @@ class DashboardPage:
             self.results_table.update()
             if self.results_empty_label is not None:
                 if all_items:
-                    self.results_empty_label.text = ""
+                    self.results_empty_label.set_visibility(False)
                 else:
                     self.results_empty_label.text = "No results found for this run."
+                    self.results_empty_label.set_visibility(True)
         except Exception as exc:
             if self.results_empty_label is not None:
-                self.results_empty_label.text = "Failed to load results for this run."
+                self.results_empty_label.text = f"Failed to load results: {exc}"
+                self.results_empty_label.set_visibility(True)
             ui.notify(f"Error loading results: {exc}", type="negative")
