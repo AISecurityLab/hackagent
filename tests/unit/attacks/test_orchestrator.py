@@ -251,8 +251,12 @@ class TestAttackOrchestratorExecution(unittest.TestCase):
         mock_create_run.assert_called_once()
         mock_execute_local.assert_called_once()
 
-        # Verify results
-        self.assertEqual(results, self.test_results)
+        # Verify results are normalized by evaluation pipeline
+        self.assertEqual(len(results), len(self.test_results))
+        self.assertTrue(all(isinstance(row, dict) for row in results))
+        self.assertEqual([row["completion"] for row in results], self.test_results)
+        self.assertTrue(all(row["_run_id"] == "run-456" for row in results))
+        self.assertTrue(all("result_id" in row for row in results))
 
     @patch.object(AttackOrchestrator, "_create_server_attack_record")
     @patch.object(AttackOrchestrator, "_create_server_run_record")

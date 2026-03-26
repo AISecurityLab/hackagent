@@ -52,7 +52,7 @@ signature.
   
   &gt;&gt;&gt; # With custom extractors
   &gt;&gt;&gt; def get_input(args, kwargs):
-  ...     return {&quot;goals&quot;: kwargs.get(&quot;goals&quot;, [])}
+  ...     return \{&quot;goals&quot;: kwargs.get(&quot;goals&quot;, [])\}
   &gt;&gt;&gt;
   &gt;&gt;&gt; @track_operation(
   ...     &quot;Process Data&quot;,

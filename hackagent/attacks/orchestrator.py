@@ -141,9 +141,19 @@ class AttackOrchestrator:
         """Create Run record via the storage backend."""
         logger.info(f"Creating Run record for Attack ID: {attack_id}")
         try:
+            from uuid import UUID, uuid4
+
+            def safe_uuid(val: str) -> UUID:
+                try:
+                    return UUID(val)
+                except Exception:
+                    # Log warning and fallback to a new UUID
+                    logger.warning(f"Invalid UUID '{val}', generating fallback UUID")
+                    return uuid4()
+
             record = self.hack_agent.backend.create_run(
-                attack_id=UUID(attack_id),
-                agent_id=UUID(victim_agent_id),
+                attack_id=safe_uuid(attack_id),
+                agent_id=safe_uuid(victim_agent_id),
                 run_config=run_config_override or {},
             )
             logger.info(f"Run record created. ID: {record.id}")
@@ -500,6 +510,7 @@ class AttackOrchestrator:
         # 5. Execute locally
         try:
             _total_t0 = time.perf_counter()
+
             results = self._execute_local_attack(
                 attack_id=attack_id,
                 run_id=run_id,
@@ -507,10 +518,45 @@ class AttackOrchestrator:
                 attack_config=attack_config,
                 run_config_override=run_config_override,
             )
+
+            # =========================
+            # RUN EVALUATION PIPELINE
+            # =========================
+            try:
+                from hackagent.attacks.evaluator.evaluation_step import (
+                    BaseEvaluationStep,
+                )
+
+                logger.info("Starting evaluation pipeline")
+
+                evaluator = BaseEvaluationStep(
+                    config={
+                        **attack_config,
+                        **(run_config_override or {}),
+                        "_run_id": run_id,
+                        "_backend": self.hack_agent.backend,
+                    },
+                    logger=logger,
+                    client=self.hack_agent.backend,
+                )
+
+                # Run evaluation pipeline
+                final_results = evaluator.run_full_evaluation(results)
+
+                # Sync metrics to backend
+                evaluator.prepare_and_sync(final_results, run_id)
+
+                logger.info("Evaluation pipeline completed")
+
+            except Exception as e:
+                logger.warning(f"Evaluation failed: {e}", exc_info=True)
+                final_results = results  # fallback
+
+            # ⏱ timing AFTER evaluation
             _total_elapsed = round(time.perf_counter() - _total_t0, 3)
             logger.info(f"Total run time: {_total_elapsed:.1f}s")
 
-            # 6. Update run status to COMPLETED
+            # ✅ Update run status to COMPLETED
             try:
                 logger.info(f"Updating run {run_id} status to COMPLETED")
                 self.hack_agent.backend.update_run(
@@ -520,10 +566,10 @@ class AttackOrchestrator:
             except Exception as e:
                 logger.warning(f"Failed to update run status to COMPLETED: {e}")
 
-            return results
+            return final_results
 
         except Exception as e:
-            # Update run status to FAILED on error
+            # ❌ FAILED case (this part is already correct)
             try:
                 logger.error(f"Attack execution failed: {e}")
                 self.hack_agent.backend.update_run(

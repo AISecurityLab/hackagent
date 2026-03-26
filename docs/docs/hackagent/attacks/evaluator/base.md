@@ -5,15 +5,15 @@ title: hackagent.attacks.evaluator.base
 
 Base class for LLM-based judge evaluators.
 
-This module provides the abstract base class ``BaseJudgeEvaluator`` and
-the ``AssertionResult`` dataclass used by all judge evaluator implementations.
+This module provides the abstract base class `BaseJudgeEvaluator` and
+the `AssertionResult` dataclass used by all judge evaluator implementations.
 
-The base class implements a template-method ``evaluate()`` that handles the
+The base class implements a template-method `evaluate()` that handles the
 full pipeline of preparing data, filtering short responses, sending to the
 judge model, and mapping results back. Subclasses only need to implement:
 
-- ``_get_request_data_for_row(row)`` — format the LLM prompt
-- ``_parse_response_content(content, index)`` — parse the LLM reply
+- `_get_request_data_for_row(row)` — format the LLM prompt
+- `_parse_response_content(content, index)` — parse the LLM reply
 
 It also implements a DSPy-inspired assert-and-retry loop for robust
 judge output parsing.
@@ -52,12 +52,12 @@ class BaseJudgeEvaluator(ABC)
 
 Abstract base class for LLM-based judge evaluators.
 
-Provides a template-method ``evaluate()`` that handles the full pipeline
+Provides a template-method `evaluate()` that handles the full pipeline
 of preparing data, filtering short responses, sending to the judge model,
 and mapping results back. Subclasses only need to implement:
 
-- ``_get_request_data_for_row(row)`` — format the LLM prompt
-- ``_parse_response_content(content, index)`` — parse the LLM reply
+- `_get_request_data_for_row(row)` — format the LLM prompt
+- `_parse_response_content(content, index)` — parse the LLM reply
 
 Class attributes for subclasses:
     eval_column (str): Column name for the evaluation score.
@@ -110,5 +110,5 @@ Pipeline:
 6. Map results back by index
 7. Clean up temporary indices
 
-Subclasses control filtering via ``skip_length_filter``.
+Subclasses control filtering via `skip_length_filter`.
 

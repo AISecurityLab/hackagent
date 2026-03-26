@@ -904,7 +904,7 @@ def _format_result_summary(result: Any, index: int) -> str:
         try:
             timing = f"  [dim]⏱ {float(elapsed):.1f}s[/dim]"
         except (TypeError, ValueError):
-            pass
+            timing = ""
 
     # Best score from metadata
     score_str = ""
@@ -914,7 +914,7 @@ def _format_result_summary(result: Any, index: int) -> str:
             score_color = "bright_green" if float(best) > 0 else "dim"
             score_str = f"  [{score_color}]▸{float(best):.2f}[/{score_color}]"
         except (TypeError, ValueError):
-            pass
+            score_str = ""
 
     return f"{status_icon} [bold]#{index}[/bold] [{status_color}]{_escape(eval_status)}[/]{goal_text}{timing}{score_str}"
 
@@ -944,7 +944,7 @@ def _format_result_full_details(
         try:
             details += f"  [dim]⏱ {float(elapsed):.1f}s[/dim]"
         except (TypeError, ValueError):
-            pass
+            details += ""
     attack_type = meta.get("attack_type", "")
     # Try request_payload for attack_type
     if not attack_type:
@@ -1289,7 +1289,65 @@ class ResultsTab(BaseTab):
         if run_id_str in self._run_id_map:
             self.selected_result = self._run_id_map[run_id_str]
             self._detail_page = 0  # Reset page when selecting new result
+            # Show summary in right panel
+            self._show_result_summary(self.selected_result)
             self._show_result_details()
+
+    def action_show_summary(self) -> None:
+        """Show a quick summary for the selected run."""
+        if self.selected_result:
+            self._show_result_summary(self.selected_result)
+
+    def _show_result_summary(self, run: Any) -> None:
+        """Render a concise run summary in the right-side header panel."""
+        header_widget = self.query_one("#run-header-static", Static)
+
+        status_display = "Unknown"
+        if hasattr(run, "status"):
+            status_val = run.status
+            status_display = (
+                status_val.value if hasattr(status_val, "value") else str(status_val)
+            )
+
+        created = "Unknown"
+        ts = getattr(run, "timestamp", None) or getattr(run, "created_at", None)
+        if ts:
+            created = _format_local_datetime(
+                ts, fmt="%Y-%m-%d %H:%M:%S", fallback=str(ts)
+            )
+
+        run_cfg = getattr(run, "run_config", None)
+        eval_summary = (
+            run_cfg.get("evaluation_summary", {}) if isinstance(run_cfg, dict) else {}
+        )
+        total_attacks = int(eval_summary.get("total_attacks", 0) or 0)
+        asr = float(eval_summary.get("overall_success_rate", 0.0) or 0.0) * 100.0
+        mv_asr = float(eval_summary.get("majority_vote_asr", 0.0) or 0.0) * 100.0
+        fleiss = eval_summary.get("fleiss_kappa")
+
+        summary = (
+            f"[bold cyan]▌ Selected Run[/bold cyan]\n"
+            f"  🆔 [dim]{str(getattr(run, 'id', ''))[:8]}...[/dim]  "
+            f"📅 {_escape(created)}  "
+            f"Status: [bold]{_escape(status_display)}[/bold]\n"
+        )
+        if eval_summary:
+            summary += (
+                f"\n[bold bright_green]▌ Evaluation Summary[/bold bright_green]\n"
+                f"  Total: [bold]{total_attacks}[/bold]  "
+                f"ASR: [bold]{asr:.1f}%[/bold]  "
+                f"Majority ASR: [bold]{mv_asr:.1f}%[/bold]"
+            )
+            if fleiss is not None:
+                try:
+                    summary += f"  Fleiss κ: [bold]{float(fleiss):.3f}[/bold]"
+                except (TypeError, ValueError):
+                    summary += f"  Fleiss κ: [bold]{_escape(str(fleiss))}[/bold]"
+            summary += "\n"
+        else:
+            summary += "\n[dim]No evaluation summary synced yet for this run.[/dim]\n"
+
+        header_widget.update(summary)
 
     def action_next_page(self) -> None:
         """Navigate to next page of results details."""
@@ -1914,6 +1972,39 @@ class ResultsTab(BaseTab):
                     header += f"  {_escape(run.run_config)}\n"
             except Exception:
                 header += f"  {_escape(run.run_config)}\n"
+
+        # Add synced evaluation summary metrics if available
+        eval_summary = None
+        if isinstance(getattr(run, "run_config", None), dict):
+            eval_summary = run.run_config.get("evaluation_summary")
+        if isinstance(eval_summary, dict) and eval_summary:
+            total_attacks = int(eval_summary.get("total_attacks", 0) or 0)
+            overall_asr = float(eval_summary.get("overall_success_rate", 0.0) or 0.0)
+            majority_asr = float(eval_summary.get("majority_vote_asr", 0.0) or 0.0)
+            fleiss_kappa = eval_summary.get("fleiss_kappa")
+            strictness = eval_summary.get("per_judge_strictness")
+
+            header += "\n[bold bright_green]▌ Evaluation Metrics[/bold bright_green]\n"
+            header += (
+                f"  • Total Attacks: [bold]{total_attacks}[/bold]\n"
+                f"  • Overall ASR: [bold]{overall_asr * 100:.1f}%[/bold]\n"
+                f"  • Majority-vote ASR: [bold]{majority_asr * 100:.1f}%[/bold]\n"
+            )
+            if fleiss_kappa is not None:
+                try:
+                    header += (
+                        f"  • Fleiss' Kappa: [bold]{float(fleiss_kappa):.3f}[/bold]\n"
+                    )
+                except (TypeError, ValueError):
+                    header += f"  • Fleiss' Kappa: [bold]{_escape(str(fleiss_kappa))}[/bold]\n"
+
+            if isinstance(strictness, dict) and strictness:
+                header += "  • Per-Judge Strictness:\n"
+                for judge_name, judge_val in strictness.items():
+                    try:
+                        header += f"    - {_escape(str(judge_name))}: [bold]{float(judge_val):.3f}[/bold]\n"
+                    except (TypeError, ValueError):
+                        header += f"    - {_escape(str(judge_name))}: {_escape(str(judge_val))}\n"
 
         # Add run notes if available
         if hasattr(run, "run_notes") and run.run_notes:

@@ -9,6 +9,10 @@ Starts a NiceGUI server that reads from the local SQLite backend
 dashboard at http://<host>:<port>/.
 """
 
+import threading
+import time
+import webbrowser
+
 import click
 from rich.console import Console
 
@@ -55,6 +59,19 @@ def web(ctx, host, port, db_path, no_browser):
       hackagent web --host 0.0.0.0     # expose on all interfaces
       hackagent web --no-browser       # skip opening a browser tab
     """
+    try:
+        from flask import Flask  # noqa: F401
+    except ImportError:
+        console.print(
+            "[bold red]❌ Flask is required for the web dashboard.[/bold red]"
+        )
+        console.print("\n[cyan]Install with:[/cyan]")
+        console.print("  pip install 'hackagent[web]'")
+        console.print("  # or")
+        console.print("  pip install flask")
+        ctx.exit(1)
+        return
+
     from hackagent.cli.config import CLIConfig
     from hackagent.server.dashboard import create_app
 
@@ -102,3 +119,14 @@ def web(ctx, host, port, db_path, no_browser):
 
     # ── Serve (NiceGUI opens the browser automatically when show=True) ────────
     app.run(host=host, port=port, show=not no_browser)
+    # ── Auto-open browser ─────────────────────────────────────────────────────
+    if not no_browser:
+
+        def _open_browser():
+            time.sleep(1.0)
+            webbrowser.open(url)
+
+        threading.Thread(target=_open_browser, daemon=True).start()
+
+    # ── Serve ─────────────────────────────────────────────────────────────────
+    app.run(host=host, port=port, debug=False, use_reloader=False)

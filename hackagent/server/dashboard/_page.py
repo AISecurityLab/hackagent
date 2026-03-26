@@ -547,6 +547,30 @@ class DashboardPage:
                 )
         self.run_dialog = dialog
 
+    def _extract_run_asr_display(self, run, run_results) -> str:
+        """Return ASR string for a run, preferring synced evaluation_summary."""
+        run_cfg = getattr(run, "run_config", None)
+        if isinstance(run_cfg, dict):
+            summary = run_cfg.get("evaluation_summary")
+            if isinstance(summary, dict):
+                try:
+                    return (
+                        f"{float(summary.get('overall_success_rate', 0.0)) * 100:.1f}%"
+                    )
+                except (TypeError, ValueError):
+                    pass
+
+        total = len(run_results)
+        if total <= 0:
+            return "—"
+
+        jailbreaks = sum(
+            1
+            for r in run_results
+            if "SUCCESSFUL_JAILBREAK" in r.evaluation_status.upper()
+        )
+        return f"{(jailbreaks / total) * 100:.1f}%"
+
     # ── Dark mode ─────────────────────────────────────────────────────────────
 
     def _toggle_dark(self) -> None:
@@ -957,6 +981,7 @@ class DashboardPage:
                 for r in rp.items
                 if "SUCCESSFUL_JAILBREAK" in r.evaluation_status.upper()
             )
+            d["overall_asr"] = self._extract_run_asr_display(run, list(rp.items))
             d["_rel"] = _rel_time(d.get("created_at"))
             rows.append(d)
         self.recent_runs_table.rows.clear()
@@ -997,6 +1022,7 @@ class DashboardPage:
                 for r in rp.items
                 if "SUCCESSFUL_JAILBREAK" in r.evaluation_status.upper()
             )
+            d["overall_asr"] = self._extract_run_asr_display(run, list(rp.items))
             d["_rel"] = _rel_time(d.get("created_at"))
             rows.append(d)
         self.runs_table.rows.clear()

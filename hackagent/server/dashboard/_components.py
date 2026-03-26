@@ -39,6 +39,12 @@ def make_run_table(on_row_click, pagination=None) -> ui.table:
                 "align": "left",
             },
             {
+                "name": "asr",
+                "label": "ASR",
+                "field": "overall_asr",
+                "align": "left",
+            },
+            {
                 "name": "created_at",
                 "label": "Created",
                 "field": "created_at",
@@ -90,6 +96,16 @@ def make_run_table(on_row_click, pagination=None) -> ui.table:
                    color="negative" class="ml-2">
             ⚠ {{ props.row.successful_jailbreaks }}
           </q-badge>
+        </q-td>
+        """,
+    )
+    tbl.add_slot(
+        "body-cell-asr",
+        r"""
+        <q-td :props="props">
+          <span class="tabular-nums font-medium">
+            {{ props.row.overall_asr ?? '—' }}
+          </span>
         </q-td>
         """,
     )

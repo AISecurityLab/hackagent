@@ -34,16 +34,16 @@ prompt based on the *target* model&#x27;s responses and a judge score:
 3. A judge rates the response on a 1–10 jailbreak success scale.
 4. The score and response are fed back to the attacker as context
 for the next refinement.
-5. Steps 1–4 repeat for ``n_iterations`` rounds or until early stop.
+5. Steps 1–4 repeat for `n_iterations` rounds or until early stop.
 
-Multiple independent ``n_streams`` are run in parallel (one per goal);
+Multiple independent `n_streams` are run in parallel (one per goal);
 each stream maintains its own conversation history with the attacker.
 
 The attack requires three separate model roles:
 
-* **Attacker** (``config[&quot;attacker&quot;]``) — an LLM that proposes prompt
+* **Attacker** (`config[&quot;attacker&quot;]`) — an LLM that proposes prompt
 improvements based on feedback.
-* **Target** — the victim model reached via ``agent_router``.
+* **Target** — the victim model reached via `agent_router`.
 * **Judge** — same router as attacker (called with the judge prompt
 from :data:`~hackagent.attacks.techniques.pair.config.JUDGE_SYSTEM_PROMPT`).
 
@@ -53,9 +53,9 @@ from :data:`~hackagent.attacks.techniques.pair.config.JUDGE_SYSTEM_PROMPT`).
 - ``0 - Authenticated HackAgent API client.
 - ``1 - Router for the victim model.
 - ``2 - Router for the attacker/judge LLM.
-- ``3 - Loaded :class:``4
-  instance for the configured ``objective`` key.
-- ``7 - Hierarchical logger at ``hackagent.attacks.pair``.
+- `3 - Loaded :class:`4
+  instance for the configured `objective` key.
+- `7 - Hierarchical logger at `hackagent.attacks.pair``.
 
 #### \_\_init\_\_
 
@@ -77,9 +77,9 @@ Initialize PAIR attack.
 
 **Raises**:
 
-- `ValueError` - If ``client`` or ``agent_router`` is ``None``, if
+- `ValueError` - If `client` or `agent_router` is `None`, if
   the attacker router cannot be initialised, or if the
-  configured ``objective`` key is not in
+  configured `objective` key is not in
   :data:`~hackagent.attacks.techniques.pair.config.DEFAULT_PAIR_CONFIG`3.
 
 #### run

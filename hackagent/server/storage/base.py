@@ -179,6 +179,7 @@ class StorageBackend(Protocol):
         run_id: UUID,
         status: Optional[str] = None,
         run_notes: Optional[str] = None,
+        run_config: Optional[Dict[str, Any]] = None,
     ) -> RunRecord: ...
 
     def list_runs(

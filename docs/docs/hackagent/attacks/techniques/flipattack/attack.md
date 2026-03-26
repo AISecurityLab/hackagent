@@ -10,10 +10,10 @@ to bypass LLM safety measures.
 
 Based on: https://arxiv.org/abs/2410.02832
 
-The ``FlipAttack`` class serves as both the HackAgent pipeline orchestrator
-(``BaseAttack`` subclass) and the algorithm itself.  The obfuscation methods
-(``flip_word_order``, ``flip_char_in_word``, ``flip_char_in_sentence``,
-``generate``, etc.) live directly on the class, kept stateless so they can
+The `FlipAttack` class serves as both the HackAgent pipeline orchestrator
+(`BaseAttack` subclass) and the algorithm itself.  The obfuscation methods
+(`flip_word_order`, `flip_char_in_word`, `flip_char_in_sentence`,
+`generate`, etc.) live directly on the class, kept stateless so they can
 be called safely for multiple goals in sequence.
 
 Result Tracking:
@@ -34,11 +34,11 @@ Liu et al., &quot;FlipAttack: Jailbreak LLMs via Flipping&quot; (2024)
 https://arxiv.org/abs/2410.02832
 
 This class serves as both the **HackAgent pipeline orchestrator**
-(``BaseAttack`` subclass) and the **algorithm** itself.  The obfuscation
-methods (``flip_word_order``, ``flip_char_in_word``, ``flip_char_in_sentence``,
-``generate``, etc.) live directly on the class.
+(`BaseAttack` subclass) and the **algorithm** itself.  The obfuscation
+methods (`flip_word_order`, `flip_char_in_word`, `flip_char_in_sentence`,
+`generate`, etc.) live directly on the class.
 
-Flip modes (set via ``config[&quot;flipattack_params&quot;][&quot;flip_mode&quot;]``):
+Flip modes (set via `config[&quot;flipattack_params&quot;][&quot;flip_mode&quot;]`):
 FWO  Reverses the word order of the input sentence.
 FCW  Reverses characters inside each individual word.
 FCS  Reverses all characters of the entire sentence (default).
@@ -79,7 +79,7 @@ Initialize FlipAttack with configuration.
 
 **Raises**:
 
-- `ValueError` - If ``client`` or ``agent_router`` is ``None``.
+- `ValueError` - If `client` or `agent_router` is `None`.
 
 #### flip\_word\_order
 
@@ -160,7 +160,7 @@ Used internally to build few-shot demonstration examples.
 **Arguments**:
 
 - `input_str` - Short example phrase to transform.
-- `mode` - One of ``&quot;FWO&quot;``, ``&quot;FCW&quot;``, ``&quot;FCS&quot;``, or ``&quot;FMM&quot;``.
+- `mode` - One of `&quot;FWO&quot;`, `&quot;FCW&quot;`, `&quot;FCS&quot;`, or `&quot;FMM&quot;`.
   
 
 **Returns**:
@@ -182,7 +182,7 @@ Split *input_str* roughly in half at a word boundary.
 
 **Returns**:
 
-  Tuple of ``(first_half, second_half)`` strings.
+  Tuple of `(first_half, second_half)` strings.
 
 #### generate
 
@@ -203,14 +203,14 @@ method is safe to call for multiple goals in sequence.
 **Returns**:
 
   Tuple of:
-  - ``log`` (str): Debug string, e.g. ``&quot;TASK is &#x27;...&#x27;&quot;``.
-  - ``attack`` (list[dict]): OpenAI chat-format message list
-  with ``&quot;system&quot;`` and ``&quot;user&quot;`` entries.
+  - `log` (str): Debug string, e.g. `&quot;TASK is &#x27;...&#x27;&quot;`.
+  - `attack` (list[dict]): OpenAI chat-format message list
+  with `&quot;system&quot;` and `&quot;user&quot;` entries.
   
 
 **Raises**:
 
-- ``1 - If ``self.flip_mode`` is not a recognised mode.
+- `1 - If `self.flip_mode`` is not a recognised mode.
 
 #### run
 

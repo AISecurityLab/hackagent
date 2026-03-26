@@ -15,17 +15,17 @@ Algorithm overview
 TAP performs a bounded tree search where each node represents an
 attacker-generated prompt candidate:
 
-1. **Branching** — an attacker LLM generates ``branching_factor``
-   refinements of the current prompt in parallel ``n_streams`` streams.
+1. **Branching** — an attacker LLM generates `branching_factor`
+   refinements of the current prompt in parallel `n_streams` streams.
 2. **On-topic pruning** — a judge (or the main judge) discards branches
-   whose prompts have drifted off-topic (``min_on_topic_score`` threshold).
+   whose prompts have drifted off-topic (`min_on_topic_score` threshold).
 3. **Target query** — surviving prompts are sent to the victim model.
-4. **Score pruning** — only the top-``width`` branches by jailbreak score
+4. **Score pruning** — only the top-`width` branches by jailbreak score
    are kept for the next depth level.
-5. **Termination** — search stops when ``depth`` levels are exhausted or
-   a branch exceeds ``success_score_threshold``.
+5. **Termination** — search stops when `depth` levels are exhausted or
+   a branch exceeds `success_score_threshold`.
 
-Key parameters (``tap_params`` in config)
+Key parameters (`tap_params` in config)
 -----------------------------------------
 depth
     Maximum tree depth (number of refinement rounds per stream).
@@ -58,16 +58,16 @@ and target queries) and
 :mod:`~hackagent.attacks.techniques.tap.evaluation` (judge scoring).
 
 The attack expects three collaborating models configured via
-``config``:
+`config`:
 
-* **Attacker** (``config[&quot;attacker&quot;]``) — LLM that proposes prompt
+* **Attacker** (`config[&quot;attacker&quot;]`) — LLM that proposes prompt
 refinements from conversation history.
-* **Target** — the victim model reached via ``agent_router``.
-* **Judge** (``config[&quot;judge&quot;]``) — LLM that rates jailbreak success
+* **Target** — the victim model reached via `agent_router`.
+* **Judge** (`config[&quot;judge&quot;]`) — LLM that rates jailbreak success
 0–10 (or 0/1 for binary judges such as HarmBench).
-* **On-topic judge** (``config[&quot;on_topic_judge&quot;]``, optional) —
+* **On-topic judge** (`config[&quot;on_topic_judge&quot;]`, optional) —
 separate evaluator that checks whether a prompt stays on-topic.
-When ``None``, the configured judge is reused with the on-topic
+When `None`, the configured judge is reused with the on-topic
 evaluation type.
 
 The :meth:`~hackagent.attacks.techniques.tap.evaluation`4 method manages the full pipeline via
@@ -81,7 +81,7 @@ checkpointing.
 - `~hackagent.attacks.techniques.tap.evaluation`8 - Merged TAP configuration dictionary.
 - `~hackagent.attacks.techniques.tap.evaluation`9 - Authenticated HackAgent API client.
 - ``0 - Router for the victim model.
-- ``1 - Hierarchical logger at ``hackagent.attacks.tap``.
+- `1 - Hierarchical logger at `hackagent.attacks.tap``.
 
 #### \_\_init\_\_
 
@@ -97,7 +97,7 @@ Initialize TAP with configuration and routers.
 
 - `config` - Optional config overrides merged into
   :data:`~hackagent.attacks.techniques.tap.config.DEFAULT_TAP_CONFIG`.
-  Keys from ``config`` win over defaults; nested dicts are
+  Keys from `config` win over defaults; nested dicts are
   deep-merged via :func:`_recursive_update`.
 - `client` - Authenticated API client.
 - `agent_router` - Router for the victim model.
@@ -105,7 +105,7 @@ Initialize TAP with configuration and routers.
 
 **Raises**:
 
-- `ValueError` - If ``client`` or ``agent_router`` is ``None``.
+- `ValueError` - If `client` or `agent_router` is `None`.
 
 #### run
 

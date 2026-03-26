@@ -57,6 +57,12 @@ def update_single_result(
     log = logger or globals()["logger"]
 
     try:
+        try:
+            result_uuid = UUID(str(result_id))
+        except (ValueError, TypeError, AttributeError):
+            log.warning(f"Skipping result sync for non-UUID result_id={result_id!r}")
+            return False
+
         eval_status = (
             EvaluationStatusEnum.SUCCESSFUL_JAILBREAK.value
             if success
@@ -64,7 +70,7 @@ def update_single_result(
         )
 
         backend.update_result(
-            UUID(result_id) if isinstance(result_id, str) else result_id,
+            result_uuid,
             evaluation_status=eval_status,
             evaluation_notes=evaluation_notes,
         )

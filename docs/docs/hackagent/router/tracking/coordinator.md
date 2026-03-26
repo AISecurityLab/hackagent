@@ -30,7 +30,7 @@ Usage:
         logger=logger,
         attack_type=&quot;advprefix&quot;,
     )
-    coordinator.initialize_goals(goals, initial_metadata={...})
+    coordinator.initialize_goals(goals, initial_metadata=\{...\})
 
     # Pass coordinator.goal_tracker to sub-modules explicitly
     # (not via config dict)
@@ -269,7 +269,7 @@ def finalize_pipeline(results: Any,
 Finalize pipeline-level tracking (StepTracker).
 
 Updates the run status to COMPLETED.  Per-goal evaluation statuses
-are already set by ``finalize_all_goals``.
+are already set by `finalize_all_goals`.
 
 **Arguments**:
 

@@ -25,12 +25,12 @@ Implements a multi-stage pipeline that:
 
 1. **Generation** — uses an uncensored generator LLM to produce
 candidate adversarial prefixes for each harmless meta-prompt.
-Prefixes are filtered by cross-entropy (``max_ce``) and token
+Prefixes are filtered by cross-entropy (`max_ce`) and token
 segment count before being passed downstream.
 2. **Execution** — appends each surviving prefix to the target model
-prompt and collects completions (``n_samples`` per prefix).
+prompt and collects completions (`n_samples` per prefix).
 3. **Evaluation** — LLM judges (e.g. HarmBench) rate each completion;
-the top-``n_prefixes_per_goal`` prefixes per goal are selected and
+the top-`n_prefixes_per_goal` prefixes per goal are selected and
 returned.
 
 The class delegates stage logic to dedicated sub-modules:
@@ -54,7 +54,7 @@ the dashboard shows all goals from the moment the run starts.
 - ``4 - Merged AdvPrefix configuration dictionary.
 - ``5 - Authenticated HackAgent API client.
 - ``6 - Router for the victim model.
-- ``7 - Hierarchical logger at ``hackagent.attacks.advprefix``.
+- `7 - Hierarchical logger at `hackagent.attacks.advprefix``.
 
 #### \_\_init\_\_
 
@@ -71,14 +71,14 @@ Initialize the AdvPrefix attack pipeline.
 - `config` - Optional dictionary of parameter overrides merged into
   :data:`~hackagent.attacks.techniques.advprefix.config.DEFAULT_PREFIX_GENERATION_CONFIG`
   using a deep-merge strategy (nested dicts are merged;
-  internal keys starting with ``_`` are passed by reference).
+  internal keys starting with `_` are passed by reference).
 - `client` - Authenticated HackAgent API client.
 - `agent_router` - Router for the victim model.
   
 
 **Raises**:
 
-- `ValueError` - If ``client`` or ``agent_router`` is ``None``.
+- `ValueError` - If `client` or `agent_router` is `None`.
 
 #### run
 
