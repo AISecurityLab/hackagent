@@ -43,7 +43,12 @@ from .config import (
 
 
 def _deep_update(target: Dict[str, Any], source: Dict[str, Any]) -> None:
-    """Recursively merge user config into defaults."""
+    """Recursively merge user config into defaults.
+
+    Internal keys (prefixed with ``_``) are assigned by reference because
+    they may hold runtime objects (for example clients or trackers) that are
+    not deepcopy-safe.
+    """
     for key, value in source.items():
         if isinstance(value, dict) and isinstance(target.get(key), dict):
             _deep_update(target[key], value)
