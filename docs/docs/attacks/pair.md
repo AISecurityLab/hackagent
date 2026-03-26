@@ -324,6 +324,6 @@ for target in targets:
 
 ## Related
 
-- [Attack Overview](./index.md) — Compare all attack types
+- [Attack Overview](./index.mdx) — Compare all attack types
 - [AdvPrefix Attacks](./advprefix) — Alternative sophisticated attack
 - [Baseline Attacks](./baseline) — Quick template-based testing
