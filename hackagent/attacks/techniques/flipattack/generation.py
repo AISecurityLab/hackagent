@@ -79,6 +79,11 @@ def execute(
     # All goals are independent — fire them in parallel so the victim GPU
     # receives batch_size requests concurrently instead of one at a time.
     batch_size = max(1, config.get("batch_size", 16))
+    raw_goal_index_offset = config.get("_goal_index_offset", 0)
+    try:
+        goal_index_offset = int(raw_goal_index_offset)
+    except (TypeError, ValueError):
+        goal_index_offset = 0
     _lock = threading.Lock()
     results_map: Dict[int, Dict[str, Any]] = {}
 
@@ -162,7 +167,7 @@ def execute(
             _goal_elapsed = round(time.perf_counter() - _t0, 3)
             # Add trace to goal's Result via Tracker
             if tracker:
-                goal_ctx = tracker.get_goal_context(idx)
+                goal_ctx = tracker.get_goal_context(goal_index_offset + idx)
                 if goal_ctx:
                     tracker.add_interaction_trace(
                         ctx=goal_ctx,

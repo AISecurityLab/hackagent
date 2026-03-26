@@ -434,6 +434,14 @@ class OpenAIAgent(ChatCompletionsAgent):
         """Build OpenAI-specific response data including tool calls."""
         data = super()._build_agent_specific_data(completion_result, parameters)
 
+        # Expose provider completion metadata for latency/quality diagnostics.
+        if completion_result.get("finish_reason") is not None:
+            data["finish_reason"] = completion_result.get("finish_reason")
+        if completion_result.get("usage") is not None:
+            data["usage"] = completion_result.get("usage")
+        if completion_result.get("model") is not None:
+            data["provider_model"] = completion_result.get("model")
+
         # Add tool calls if present
         if completion_result.get("tool_calls"):
             data["tool_calls"] = completion_result["tool_calls"]

@@ -74,6 +74,12 @@ def make_run_table(
                 "align": "left",
             },
             {
+                "name": "latency",
+                "label": "Latency",
+                "field": "_latency",
+                "align": "left",
+            },
+            {
                 "name": "created_at",
                 "label": "Timestamp",
                 "field": "created_at",
@@ -149,6 +155,15 @@ def make_run_table(
         """,
     )
     tbl.add_slot(
+        "body-cell-latency",
+        r"""
+        <q-td :props="props" class="cursor-pointer"
+              @click="$emit('rowClick', props.row)">
+          <span class="tabular-nums text-sm">{{ props.row._latency || '—' }}</span>
+        </q-td>
+        """,
+    )
+    tbl.add_slot(
         "body-cell-results",
         r"""
         <q-td :props="props" class="cursor-pointer"
@@ -158,7 +173,11 @@ def make_run_table(
           </span>
           <q-badge v-if="(props.row.successful_jailbreaks ?? 0) > 0"
                    color="negative" class="ml-2">
-            ⚠ {{ props.row.successful_jailbreaks }}
+                        jailbreaks: {{ props.row.successful_jailbreaks }}
+                    </q-badge>
+                    <q-badge v-if="(props.row.failed_attacks ?? 0) > 0"
+                                     color="positive" class="ml-2">
+                        failed attacks: {{ props.row.failed_attacks }}
           </q-badge>
         </q-td>
         """,

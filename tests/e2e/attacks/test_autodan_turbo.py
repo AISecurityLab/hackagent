@@ -39,9 +39,6 @@ def main():
     goal_batch_size = 5
     goal_batch_workers = 5
     batch_size_judge = 5
-    disable_target_reasoning = (
-        os.getenv("DISABLE_TARGET_REASONING", "true").lower() == "true"
-    )
 
     # Use a cheap model via OpenRouter as the *target* to attack
     agent = HackAgent(
@@ -64,24 +61,13 @@ def main():
             "seed": dataset_seed,
         },
         "max_tokens": 400,
-        # Provider-specific passthrough options for target model requests.
-        # Useful to disable reasoning output and force direct final answer style.
-        # For OpenRouter via OpenAI SDK client, provider-specific params should
-        # go in `extra_body` (top-level `reasoning` causes unexpected kwarg errors).
-        # OpenRouter example: {"extra_body": {"reasoning": {"enabled": false}}}
-        # OpenAI reasoning models may use: {"reasoning_effort": "minimal"}
-        "target_request_overrides": (
-            {"extra_body": {"reasoning": {"enabled": False}}}
-            if disable_target_reasoning
-            else {}
-        ),
-        # Keep iterations minimal for a quick smoke-test
         "autodan_turbo_params": {
             "warm_up_iterations": 1,
             "lifelong_iterations": 3,
             "epochs": 3,
-            "break_score": 6,
+            "break_score": 8,
             "retrieval_top_k": 3,
+            "attacker_max_tokens": 1000,
             "embedding_model": "text-embedding-3-small",
             "embedding_api_key": openrouter_api_key,
             "embedding_api_base": OPENROUTER_ENDPOINT,
@@ -111,7 +97,7 @@ def main():
         "judges": [
             {
                 "identifier": "openai/gpt-4o-mini",
-                "type": "harmbench",
+                "type": "harmbench_variant",
                 "agent_type": AgentTypeEnum.OPENAI_SDK,
                 "api_key": openrouter_api_key,
                 "endpoint": OPENROUTER_ENDPOINT,

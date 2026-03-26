@@ -151,6 +151,8 @@ class BaselineAttack(BaseAttack):
                     "max_tokens",
                     "temperature",
                     "n_samples_per_template",
+                    "_goal_index_offset",  # Global goal index offset in batched runs
+                    "_tracker",  # Shared goal tracker from coordinator
                     "_run_id",  # For real-time result tracking
                     "_backend",  # For real-time result tracking (StorageBackend)
                     "_client",  # Legacy fallback
@@ -166,6 +168,8 @@ class BaselineAttack(BaseAttack):
                     "objective",
                     "evaluator_type",
                     "min_response_length",
+                    "_goal_index_offset",  # Global goal index offset in batched runs
+                    "_tracker",  # Shared goal tracker from coordinator
                     "_run_id",  # For real-time result tracking
                     "_backend",  # For real-time result tracking (StorageBackend)
                     "_client",  # Legacy fallback
@@ -174,6 +178,19 @@ class BaselineAttack(BaseAttack):
                 "required_args": ["logger", "config"],
             },
         ]
+
+    def _build_step_args(
+        self,
+        step_info: Dict,
+        step_config: Dict,
+        input_data: Any,
+    ) -> Dict:
+        """Inject shared goal tracker into baseline stage functions."""
+        args = super()._build_step_args(step_info, step_config, input_data)
+        if self.coordinator and self.coordinator.goal_tracker:
+            args["goal_tracker"] = self.coordinator.goal_tracker
+            args["config"]["_tracker"] = self.coordinator.goal_tracker
+        return args
 
     @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
     def run(self, goals: List[str]) -> Dict[str, Any]:
@@ -197,6 +214,9 @@ class BaselineAttack(BaseAttack):
             goals=goals,
             initial_metadata={"objective": self.config.get("objective")},
         )
+
+        # Keep tracker in attack config for compatibility paths that still read config.
+        self.config["_tracker"] = coordinator.goal_tracker
 
         try:
             # Execute pipeline using base class

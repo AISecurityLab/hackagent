@@ -27,6 +27,23 @@ from hackagent.router.tracking import Tracker
 logger = logging.getLogger("hackagent.attacks.baseline.generation")
 
 
+def _safe_goal_index(value: Any, fallback: int = -1) -> int:
+    """Best-effort conversion of goal index to int."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _safe_positive_int(value: Any, fallback: int) -> int:
+    """Best-effort conversion to positive int with fallback."""
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return fallback
+    return parsed if parsed > 0 else fallback
+
+
 def generate_prompts(
     goals: List[str],
     config: Dict[str, Any],
@@ -47,28 +64,60 @@ def generate_prompts(
 
     # Get template configuration
     categories = config.get("template_categories", [])
-    templates_per_cat = config.get("templates_per_category", 3)
+    templates_per_cat = _safe_positive_int(config.get("templates_per_category", 3), 3)
+    requested_batch_size = _safe_positive_int(config.get("batch_size", 0), 0)
+    goal_index_offset = _safe_goal_index(config.get("_goal_index_offset", 0), 0)
 
     results = []
 
-    for goal in goals:
+    # If batch_size is provided, build exactly batch_size prompts per goal.
+    # This enables "N parallel prompts per goal" behavior requested by users.
+    use_per_goal_batch = requested_batch_size > 0
+
+    def _build_goal_prompts(local_goal_index: int, goal: str) -> List[Dict[str, Any]]:
+        goal_index = goal_index_offset + local_goal_index
+        candidates: List[Dict[str, Any]] = []
+
         for category in categories:
-            # Get templates for this category
             all_templates = AttackTemplates.get_by_category(category)
-            templates = all_templates[:templates_per_cat]  # Limit number of templates
-
+            templates = all_templates[:templates_per_cat]
             for template in templates:
-                # Format template with goal
-                attack_prompt = template.format(goal=goal)
-
-                results.append(
+                candidates.append(
                     {
                         "goal": goal,
+                        "goal_index": goal_index,
                         "template_category": category,
                         "template": template,
-                        "attack_prompt": attack_prompt,
                     }
                 )
+
+        if not candidates:
+            return []
+
+        selected: List[Dict[str, Any]] = []
+        if use_per_goal_batch:
+            # Repeat candidates cyclically if the template pool is smaller than batch_size.
+            for i in range(requested_batch_size):
+                selected.append(candidates[i % len(candidates)])
+        else:
+            selected = candidates
+
+        def _format_entry(entry: Dict[str, Any]) -> Dict[str, Any]:
+            return {
+                **entry,
+                "attack_prompt": entry["template"].format(goal=goal),
+            }
+
+        # Parallelize prompt materialization per goal when batch mode is requested.
+        if use_per_goal_batch:
+            max_workers = min(len(selected), requested_batch_size)
+            with ThreadPoolExecutor(max_workers=max_workers) as pool:
+                return list(pool.map(_format_entry, selected))
+
+        return [_format_entry(entry) for entry in selected]
+
+    for local_goal_index, goal in enumerate(goals):
+        results.extend(_build_goal_prompts(local_goal_index, goal))
 
     logger.info(
         f"Generated {len(results)} attack prompts across {len(categories)} categories"
@@ -110,6 +159,10 @@ def execute_prompts(
     run_id = config.get("_run_id")
     client = config.get("_backend") or config.get("_client")
 
+    # Prefer explicit argument, then config-injected tracker from caller.
+    if not goal_tracker:
+        goal_tracker = config.get("_tracker")
+
     # Use Tracker if provided, otherwise log warning
     if goal_tracker:
         logger.info("📊 Using Tracker for per-goal result tracking")
@@ -127,41 +180,48 @@ def execute_prompts(
     total_requests = len(data) * n_samples
 
     # Group data by goal for organized tracking
-    goals_data: Dict[str, List[Dict[str, Any]]] = {}
+    goals_data: Dict[int, List[Dict[str, Any]]] = {}
     for row in data:
-        goal = row.get("goal", "unknown")
-        if goal not in goals_data:
-            goals_data[goal] = []
-        goals_data[goal].append(row)
+        goal_idx = _safe_goal_index(row.get("goal_index", -1), -1)
+        if goal_idx not in goals_data:
+            goals_data[goal_idx] = []
+        goals_data[goal_idx].append(row)
 
     # Create goal results upfront if using Tracker
-    goal_contexts = {}
+    goal_contexts: Dict[int, Any] = {}
     if goal_tracker:
-        for goal_idx, goal in enumerate(goals_data.keys()):
-            ctx = goal_tracker.create_goal_result(
-                goal=goal,
-                goal_index=goal_idx,
-                initial_metadata={
-                    "num_templates": len(goals_data[goal]),
-                    "n_samples_per_template": n_samples,
-                },
-            )
-            goal_contexts[goal] = ctx
+        for goal_idx, goal_rows in goals_data.items():
+            goal = goal_rows[0].get("goal", "unknown")
+            ctx = goal_tracker.get_goal_context(goal_idx)
+            if not ctx:
+                ctx = goal_tracker.create_goal_result(
+                    goal=goal,
+                    goal_index=goal_idx,
+                    initial_metadata={
+                        "num_templates": len(goal_rows),
+                        "n_samples_per_template": n_samples,
+                    },
+                )
+            goal_contexts[goal_idx] = ctx
 
     # Parallel execution: each row's HTTP calls are independent.
     # n_samples inner loop stays sequential per row (usually 1; ordering matters).
-    batch_size = max(1, config.get("batch_size", 16))
+    batch_size = _safe_positive_int(config.get("batch_size", 16), 16)
     _lock = threading.Lock()
     # results_map[row_idx] = list of completion dicts for that row
     results_map: Dict[int, List[Dict[str, Any]]] = {}
-    goals_keys = list(goals_data.keys())
 
-    def _execute_row(idx_row: tuple) -> None:
+    # Build an index map so we can preserve global order at the end.
+    grouped_rows: Dict[int, List[tuple[int, Dict[str, Any]]]] = {}
+    for idx, row in enumerate(data):
+        goal_index = _safe_goal_index(row.get("goal_index", idx), idx)
+        grouped_rows.setdefault(goal_index, []).append((idx, row))
+
+    def _execute_row(idx_row: tuple[int, Dict[str, Any]]) -> None:
         idx, row = idx_row
-        goal = row.get("goal", "unknown")
-        goal_ctx = goal_contexts.get(goal) if goal_tracker else None
+        goal_index = _safe_goal_index(row.get("goal_index", idx), idx)
+        goal_ctx = goal_contexts.get(goal_index) if goal_tracker else None
         row_completions: List[Dict[str, Any]] = []
-        goal_index = goals_keys.index(goal) if goal in goals_data else idx
 
         try:
             request_data = {
@@ -193,7 +253,6 @@ def execute_prompts(
                         **row,
                         "completion": completion,
                         "response_length": len(completion),
-                        "goal_index": goal_index,
                     }
                 )
         except Exception as e:
@@ -215,7 +274,6 @@ def execute_prompts(
                     "completion": "",
                     "response_length": 0,
                     "error": str(e),
-                    "goal_index": goal_index,
                 }
             )
         with _lock:
@@ -225,9 +283,14 @@ def execute_prompts(
         progress_bar,
         task,
     ):
-        with ThreadPoolExecutor(max_workers=batch_size) as pool:
-            for _ in pool.map(_execute_row, enumerate(data)):
-                progress_bar.update(task, advance=n_samples)
+        # Execute per-goal batches so that each goal gets up to `batch_size`
+        # concurrent prompt requests as requested.
+        for goal_idx in sorted(grouped_rows.keys()):
+            goal_rows = grouped_rows[goal_idx]
+            goal_workers = min(len(goal_rows), batch_size)
+            with ThreadPoolExecutor(max_workers=goal_workers) as pool:
+                for _ in pool.map(_execute_row, goal_rows):
+                    progress_bar.update(task, advance=n_samples)
 
     # Reconstruct completions in original row order
     completions = []
@@ -235,11 +298,6 @@ def execute_prompts(
         completions.extend(results_map.get(i, []))
 
     logger.info(f"Execution complete. Got {len(completions)} completions")
-
-    # Store goal_tracker in config for evaluation phase to use
-    if goal_tracker:
-        config["_tracker"] = goal_tracker
-        config["_goal_contexts"] = goal_contexts
 
     return completions
 
@@ -249,6 +307,7 @@ def execute(
     agent_router: AgentRouter,
     config: Dict[str, Any],
     logger: logging.Logger,
+    goal_tracker: Optional[Tracker] = None,
 ) -> List[Dict[str, Any]]:
     """
     Complete generation pipeline: generate prompts and execute them.
@@ -266,6 +325,12 @@ def execute(
     prompts_data = generate_prompts(goals, config, logger)
 
     # Step 2: Execute prompts
-    results_data = execute_prompts(prompts_data, agent_router, config, logger)
+    results_data = execute_prompts(
+        prompts_data,
+        agent_router,
+        config,
+        logger,
+        goal_tracker=goal_tracker,
+    )
 
     return results_data

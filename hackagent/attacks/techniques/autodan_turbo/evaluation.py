@@ -111,8 +111,12 @@ class AutoDANTurboEvaluation(BaseEvaluationStep):
 
         for item in input_data:
             auto_score = self._extract_autodan_score(item)
+            judge_best_score = float(item.get("best_score", 0.0) or 0.0)
             item["autodan_score"] = auto_score
             item["attack_score"] = auto_score
+            item["judge_best_score"] = judge_best_score
+            # For AutoDAN dashboard summaries, best_score must represent scorer score.
+            item["best_score"] = auto_score
             item["judge_success"] = bool(item.get("success", False))
 
         for idx, item in enumerate(input_data):
@@ -140,7 +144,7 @@ class AutoDANTurboEvaluation(BaseEvaluationStep):
                     "prompt": item.get("full_prompt", item.get("prompt", "")),
                     "response": item.get("response", ""),
                     "autodan_score": item.get("autodan_score", 0.0),
-                    "judge_best_score": item.get("best_score", 0.0),
+                    "judge_best_score": item.get("judge_best_score", 0.0),
                     "judge_success": item.get("judge_success", False),
                     "eval_hb": item.get("eval_hb"),
                     "eval_jb": item.get("eval_jb"),

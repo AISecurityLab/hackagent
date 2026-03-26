@@ -6,8 +6,10 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import math
+import re
 from uuid import UUID
 
 from nicegui import app as _fastapi_app
@@ -15,8 +17,10 @@ from nicegui import ui
 
 from ._components import make_run_table
 from ._helpers import (
+    _duration_seconds,
     _eval_color,
     _eval_label,
+    _format_latency,
     _rel_time,
     _serialize,
     _result_bucket,
@@ -313,7 +317,12 @@ class DashboardPage:
                         {
                             "xAxis": {
                                 "type": "category",
-                                "data": ["Jailbreaks", "Passed", "Errors", "Pending"],
+                                "data": [
+                                    "Jailbreaks",
+                                    "Failed attacks",
+                                    "Errors",
+                                    "Pending",
+                                ],
                                 "axisLine": {"show": False},
                                 "axisTick": {"show": False},
                             },
@@ -681,22 +690,14 @@ class DashboardPage:
                 with runs_container:
                     for run in runs_p.items:
                         d = _serialize(run)
-                        rp = self.backend.list_results(
-                            run_id=run.id, page=1, page_size=_RESULTS_FETCH_LIMIT
+                        summary = self._summarize_run_results(run.id)
+                        d["total_results"] = int(summary["total_results"])
+                        d["successful_jailbreaks"] = int(
+                            summary["successful_jailbreaks"]
                         )
-                        d["total_results"] = rp.total
-                        d["successful_jailbreaks"] = sum(
-                            1
-                            for r in rp.items
-                            if "SUCCESSFUL_JAILBREAK" in r.evaluation_status.upper()
-                        )
-                        d["status"] = self._derive_run_status(
-                            [
-                                (r.evaluation_status, r.evaluation_notes)
-                                for r in rp.items
-                            ],
-                            fallback=str(d.get("status", "")),
-                        )
+                        d["failed_attacks"] = int(summary["failed_attacks"])
+                        d["mitigations"] = int(summary["mitigations"])
+                        d["status"] = str(summary["status"])
                         status = d.get("status", "")
                         status_color = (
                             "positive"
@@ -922,6 +923,96 @@ class DashboardPage:
         if buckets:
             return "COMPLETED"
         return fallback or "PENDING"
+
+    def _summarize_run_results(self, run_id: UUID) -> dict[str, object]:
+        """Return per-run result counts and derived run status."""
+        page = 1
+        page_size = 100
+        fetched = 0
+        total = 0
+        successful_jailbreaks = 0
+        mitigations = 0
+        statuses: list[tuple[str, str | None]] = []
+
+        while True:
+            rp = self.backend.list_results(
+                run_id=run_id, page=page, page_size=page_size
+            )
+            if page == 1:
+                total = int(rp.total or 0)
+            if not rp.items:
+                break
+
+            for result in rp.items:
+                bucket = _result_bucket(
+                    result.evaluation_status, result.evaluation_notes
+                )
+                if bucket == "jailbreak":
+                    successful_jailbreaks += 1
+                elif bucket == "mitigated":
+                    mitigations += 1
+                statuses.append((result.evaluation_status, result.evaluation_notes))
+
+            fetched += len(rp.items)
+            if total > 0 and fetched >= total:
+                break
+            page += 1
+
+        if total == 0:
+            total = fetched
+
+        return {
+            "total_results": total,
+            "successful_jailbreaks": successful_jailbreaks,
+            "mitigations": mitigations,
+            "failed_attacks": mitigations,
+            "status": self._derive_run_status(statuses),
+        }
+
+    @staticmethod
+    def _compute_run_latency_seconds(run_data: dict) -> float | None:
+        """Best-effort run wall-time latency from run timestamps."""
+        return _duration_seconds(
+            str(run_data.get("created_at") or "") or None,
+            str(run_data.get("updated_at") or "") or None,
+        )
+
+    @staticmethod
+    def _extract_goal_latency_seconds(result_data: dict) -> float | None:
+        """Best-effort per-goal latency from metadata/metrics or timestamps."""
+        metadata = (
+            result_data.get("metadata")
+            if isinstance(result_data.get("metadata"), dict)
+            else {}
+        )
+        metrics = (
+            result_data.get("evaluation_metrics")
+            if isinstance(result_data.get("evaluation_metrics"), dict)
+            else {}
+        )
+
+        # Prefer end-to-end goal elapsed_s written by Tracker.finalize_goal().
+        for key in ("elapsed_s",):
+            value = metadata.get(key)
+            if isinstance(value, (int, float)):
+                return max(0.0, float(value))
+            value = metrics.get(key)
+            if isinstance(value, (int, float)):
+                return max(0.0, float(value))
+
+        # Secondary explicit fields if elapsed_s is missing.
+        for key in ("latency_s", "duration_s"):
+            value = metadata.get(key)
+            if isinstance(value, (int, float)):
+                return max(0.0, float(value))
+            value = metrics.get(key)
+            if isinstance(value, (int, float)):
+                return max(0.0, float(value))
+
+        return _duration_seconds(
+            str(result_data.get("created_at") or "") or None,
+            str(result_data.get("updated_at") or "") or None,
+        )
 
     @staticmethod
     def _classify_trace_step(trace_data: dict) -> tuple[str, str]:
@@ -1306,6 +1397,527 @@ class DashboardPage:
                                     self._render_trace_content(
                                         step.get("step_type"), content
                                     )
+
+    @staticmethod
+    def _is_phase_trace(trace_data: dict) -> bool:
+        """Return True when trace content includes phase metadata."""
+        content = trace_data.get("content")
+        return isinstance(content, dict) and bool(content.get("phase"))
+
+    @staticmethod
+    def _autodan_phase_title(phase_key: str) -> str:
+        mapping = {
+            "WARMUP": "Warmup",
+            "LIFELONG": "Lifelong",
+            "EVALUATION": "Evaluation",
+        }
+        key = str(phase_key or "").upper()
+        return mapping.get(key, key.replace("_", " ").title() or "Phase")
+
+    @staticmethod
+    def _phase_sort_key(phase_key: str) -> tuple[int, str]:
+        order = {
+            "WARMUP": 0,
+            "LIFELONG": 1,
+            "EVALUATION": 2,
+        }
+        key = str(phase_key or "").upper()
+        return order.get(key, 99), key
+
+    @staticmethod
+    def _render_trace_value_block(title: str, value: object) -> None:
+        if value in (None, ""):
+            return
+        text = (
+            json.dumps(value, indent=2)
+            if isinstance(value, (dict, list))
+            else str(value)
+        )
+        with ui.card().tight().classes("w-full"):
+            with ui.column().classes("p-3 gap-1"):
+                ui.label(title).classes("text-xs text-grey-6")
+                ui.label(text).classes("text-sm whitespace-pre-wrap")
+
+    def _render_autodan_role_section(
+        self,
+        title: str,
+        role: object,
+        fields: list[tuple[str, object]],
+    ) -> None:
+        visible = [(label, value) for label, value in fields if value not in (None, "")]
+        if not visible:
+            return
+
+        with ui.card().tight().classes("w-full border border-grey-3"):
+            with ui.column().classes("p-3 gap-2"):
+                with ui.row().classes("items-center gap-2"):
+                    ui.label(title).classes("text-xs font-semibold")
+                    if role not in (None, ""):
+                        ui.badge(str(role), color="primary").classes("text-xs")
+                for label, value in visible:
+                    self._render_trace_value_block(label, value)
+
+    def _render_autodan_trace_content(self, content: dict) -> None:
+        """Render AutoDAN phase trace with explicit role-labeled blocks."""
+        phase = str(content.get("phase") or "").upper()
+        subphase = str(content.get("subphase") or "").upper()
+        is_evaluation_trace = phase == "EVALUATION" or "JUDGE_SCORING" in subphase
+
+        with ui.row().classes("w-full flex-wrap gap-2"):
+            for label, value in (
+                ("Goal Index", content.get("goal_index")),
+                ("Iteration", content.get("iteration")),
+                ("Epoch", content.get("epoch")),
+                ("Subphase", content.get("subphase")),
+            ):
+                if value is None:
+                    continue
+                ui.badge(f"{label}: {value}", color="grey-7").classes("text-xs")
+
+        if is_evaluation_trace:
+            hb_raw = content.get("eval_hb")
+            hb_norm = "unknown"
+
+            def _is_yes_marker(value: object) -> bool:
+                if isinstance(value, bool):
+                    return value
+                if isinstance(value, (int, float)):
+                    return float(value) > 0.0
+                if isinstance(value, str):
+                    token = value.strip().lower()
+                    if token in {"yes", "true", "harmful", "hb", "jailbreak"}:
+                        return True
+                    with contextlib.suppress(ValueError):
+                        return float(token) > 0.0
+                return False
+
+            def _is_no_marker(value: object) -> bool:
+                if isinstance(value, bool):
+                    return not value
+                if isinstance(value, (int, float)):
+                    return float(value) <= 0.0
+                if isinstance(value, str):
+                    token = value.strip().lower()
+                    if token in {"no", "false", "benign", "safe"}:
+                        return True
+                    with contextlib.suppress(ValueError):
+                        return float(token) <= 0.0
+                return False
+
+            if _is_yes_marker(hb_raw):
+                hb_norm = "yes"
+            elif _is_no_marker(hb_raw):
+                hb_norm = "no"
+            elif _is_yes_marker(content.get("eval_jb")):
+                hb_norm = "yes"
+            elif _is_yes_marker(content.get("judge_success")):
+                hb_norm = "yes"
+
+            if hb_norm == "unknown":
+                hb_expl = str(content.get("explanation_hb") or "").strip().lower()
+                if "harmbenchvariant" in hb_expl and "yes" in hb_expl:
+                    hb_norm = "yes"
+                elif "harmbenchvariant" in hb_expl and "no" in hb_expl:
+                    hb_norm = "no"
+                elif "harmful" in hb_expl and "not harmful" not in hb_expl:
+                    hb_norm = "yes"
+
+            if hb_norm == "unknown":
+                hb_norm = "no"
+
+            verdict = (
+                "Harmful (HarmBenchVariant: yes)"
+                if hb_norm == "yes"
+                else "Safe (HarmBenchVariant: no)"
+            )
+            with ui.card().tight().classes("w-full border border-grey-3"):
+                with ui.column().classes("p-3 gap-1"):
+                    ui.label("Explanation").classes("text-xs text-grey-6")
+                    ui.label(verdict).classes("text-sm font-medium")
+
+        target_prompt = None if is_evaluation_trace else content.get("prompt")
+        target_response = content.get("target_response")
+        if is_evaluation_trace and target_response in (None, ""):
+            target_response = content.get("response")
+
+        self._render_autodan_role_section(
+            "Attacker",
+            content.get("attacker_role"),
+            [
+                ("System Prompt", content.get("system_prompt")),
+                ("Attacker Raw Response", content.get("attacker_raw_response")),
+                ("Generated Prompt", content.get("generated_prompt")),
+            ],
+        )
+
+        self._render_autodan_role_section(
+            "Target",
+            content.get("target_role"),
+            [
+                ("Prompt", target_prompt),
+                ("Target Response", target_response),
+            ],
+        )
+
+        self._render_autodan_role_section(
+            "Scorer",
+            content.get("scorer_role"),
+            [
+                ("Assessment", content.get("assessment")),
+                ("Score", content.get("score")),
+                ("Previous Score", content.get("prev_score")),
+            ],
+        )
+
+        self._render_autodan_role_section(
+            "Summarizer",
+            content.get("summarizer_role"),
+            [
+                ("Weak Prompt", content.get("weak_prompt")),
+                ("Strong Prompt", content.get("strong_prompt")),
+                ("Strategy", content.get("strategy")),
+                ("Score Delta", content.get("score_delta")),
+            ],
+        )
+
+        ignored = {
+            "phase",
+            "subphase",
+            "timestamp_utc",
+            "goal",
+            "goal_index",
+            "dashboard_section",
+            "dashboard_group",
+            "dashboard_item",
+            "step_name",
+            "iteration",
+            "epoch",
+            "attacker_role",
+            "target_role",
+            "scorer_role",
+            "summarizer_role",
+            "system_prompt",
+            "attacker_raw_response",
+            "generated_prompt",
+            "prompt",
+            "target_response",
+            "response",
+            "assessment",
+            "score",
+            "prev_score",
+            "weak_prompt",
+            "strong_prompt",
+            "strategy",
+            "score_delta",
+            "autodan_score",
+            "judge_best_score",
+            "judge_success",
+            "eval_hb",
+            "eval_jb",
+            "eval_nj",
+            "explanation_hb",
+            "explanation_jb",
+            "explanation_nj",
+        }
+
+        extras = [
+            (k, v)
+            for k, v in content.items()
+            if k not in ignored and v not in (None, "")
+        ]
+        if extras:
+            with ui.expansion("Additional Fields", icon="notes").classes("w-full"):
+                with ui.column().classes("w-full gap-2 p-2"):
+                    for key, value in extras:
+                        self._render_trace_value_block(key, value)
+
+        with ui.expansion("View Raw JSON", icon="code").classes("w-full"):
+            ui.code(json.dumps(content, indent=2), language="json").classes(
+                "w-full text-xs max-h-72 overflow-auto"
+            )
+
+    def _render_standard_trace_sections(self, traces: list[dict]) -> None:
+        grouped: dict[str, list[dict]] = {
+            "goal": [],
+            "evaluation": [],
+            "generation": [],
+            "tools": [],
+            "other": [],
+        }
+
+        for td in traces:
+            group, label = self._classify_trace_step(td)
+            td["_display_label"] = label
+            grouped[group].append(td)
+
+        self._render_trace_tabs_section("Goal", grouped["goal"], "goal")
+        self._render_trace_tabs_section(
+            "Evaluation", grouped["evaluation"], "evaluation"
+        )
+        self._render_trace_tabs_section(
+            "Attack / Generation",
+            grouped["generation"],
+            "generation",
+        )
+        self._render_trace_tabs_section("Tools", grouped["tools"], "tools")
+        self._render_trace_tabs_section("Other", grouped["other"], "other")
+
+    @staticmethod
+    def _autodan_step_bucket(content: dict) -> str:
+        """Map an AutoDAN step payload to the requested role bucket."""
+        subphase = str(content.get("subphase") or "").upper()
+        dashboard_item = str(content.get("dashboard_item") or "").upper()
+        token = f"{subphase} {dashboard_item}"
+
+        if "SUMMAR" in token:
+            return "summarizer"
+        if "TARGET" in token:
+            return "target"
+        if "SCOR" in token or "JUDGE" in token:
+            return "scorer"
+        if "GENERATION" in token or "ATTACK" in token:
+            return "attacker"
+
+        if any(
+            key in content
+            for key in ("attacker_role", "system_prompt", "generated_prompt")
+        ):
+            return "attacker"
+        if any(key in content for key in ("target_role", "target_response")):
+            return "target"
+        if any(
+            key in content
+            for key in (
+                "scorer_role",
+                "score",
+                "assessment",
+                "autodan_score",
+                "judge_best_score",
+            )
+        ):
+            return "scorer"
+        if any(
+            key in content
+            for key in ("summarizer_role", "strategy", "weak_prompt", "strong_prompt")
+        ):
+            return "summarizer"
+
+        return "attacker"
+
+    def _render_autodan_steps_cards(self, steps: list[dict]) -> None:
+        if not steps:
+            ui.label("No traces for this section.").classes("text-xs text-grey-6")
+            return
+
+        for step in steps:
+            with ui.card().tight().classes("w-full"):
+                with ui.column().classes("p-3 gap-2"):
+                    with ui.row().classes("items-center justify-between w-full"):
+                        ui.label(
+                            str(
+                                step.get("content", {}).get("step_name")
+                                or step.get("_display_label")
+                                or "Step"
+                            )
+                        ).classes("text-xs font-semibold")
+                        ui.label(_rel_time(step.get("created_at"))).classes(
+                            "text-xs text-grey-6"
+                        )
+
+                    content = step.get("content")
+                    if isinstance(content, dict):
+                        self._render_autodan_trace_content(content)
+                    elif content is not None:
+                        self._render_trace_content(step.get("step_type"), content)
+
+    def _render_autodan_epoch_group(
+        self,
+        steps: list[dict],
+    ) -> None:
+        ordered = sorted(steps, key=lambda td: td.get("sequence", 0))
+        sections: dict[str, list[dict]] = {
+            "attacker": [],
+            "target": [],
+            "scorer": [],
+            "summarizer": [],
+        }
+
+        for step in ordered:
+            content = (
+                step.get("content") if isinstance(step.get("content"), dict) else {}
+            )
+            bucket = self._autodan_step_bucket(content)
+            sections.setdefault(bucket, []).append(step)
+
+        menu_spec = [
+            ("Attacker", "smart_toy", "attacker"),
+            ("Target", "ads_click", "target"),
+            ("Scorer", "analytics", "scorer"),
+        ]
+        if sections.get("summarizer"):
+            menu_spec.append(("Summarizer", "summarize", "summarizer"))
+
+        for label, icon, key in menu_spec:
+            entries = sections.get(key, [])
+            with ui.expansion(f"{label} ({len(entries)})", icon=icon).classes("w-full"):
+                with ui.column().classes("w-full gap-2 p-2"):
+                    self._render_autodan_steps_cards(entries)
+
+    @staticmethod
+    def _extract_autodan_iteration_index(content: dict) -> int | None:
+        """Best-effort extraction of zero-based iteration index."""
+        iteration_value = content.get("iteration")
+        if isinstance(iteration_value, int) and iteration_value >= 0:
+            return iteration_value
+
+        dashboard_group = str(content.get("dashboard_group") or "")
+        match = re.search(r"iteration\s+(\d+)", dashboard_group, flags=re.IGNORECASE)
+        if match:
+            parsed = int(match.group(1)) - 1
+            return parsed if parsed >= 0 else 0
+
+        step_name = str(content.get("step_name") or "")
+        match = re.search(r"iteration\s+(\d+)", step_name, flags=re.IGNORECASE)
+        if match:
+            parsed = int(match.group(1)) - 1
+            return parsed if parsed >= 0 else 0
+
+        return None
+
+    def _render_autodan_phase_timeline(self, traces: list[dict]) -> bool:
+        """Render phase-first timeline for AutoDAN traces."""
+        phase_traces = [td for td in traces if self._is_phase_trace(td)]
+        if not phase_traces:
+            return False
+
+        phase_groups: dict[str, dict[str, list[dict]]] = {}
+        ordered_phase_keys: list[str] = []
+        # Track latest explicit iteration seen, keyed by phase+goal_index for
+        # robust summarizer placement in the correct iteration tab.
+        phase_goal_last_iteration: dict[tuple[str, object], int] = {}
+        phase_last_iteration: dict[str, int] = {}
+
+        sorted_traces = sorted(phase_traces, key=lambda td: td.get("sequence", 0))
+        for td in sorted_traces:
+            content = td.get("content") if isinstance(td.get("content"), dict) else {}
+            phase_key = str(
+                content.get("phase") or content.get("dashboard_section") or "OTHER"
+            ).upper()
+
+            if phase_key in {"WARMUP", "LIFELONG"}:
+                iteration_idx = self._extract_autodan_iteration_index(content)
+                step_bucket = self._autodan_step_bucket(content)
+                goal_key = content.get("goal_index")
+
+                if iteration_idx is None and step_bucket == "summarizer":
+                    iteration_idx = phase_goal_last_iteration.get(
+                        (phase_key, goal_key),
+                        phase_last_iteration.get(phase_key),
+                    )
+
+                # Hide non-iteration tabs like "Warmup" and "Warmup Summary".
+                if iteration_idx is None:
+                    continue
+
+                # Keep "last seen" (not max) to avoid dragging late summarizers
+                # into a newer iteration when traces are slightly out of order.
+                phase_last_iteration[phase_key] = iteration_idx
+                phase_goal_last_iteration[(phase_key, goal_key)] = iteration_idx
+                group_name = f"{self._autodan_phase_title(phase_key)} Iteration {iteration_idx + 1}"
+            else:
+                group_name = str(
+                    content.get("dashboard_group")
+                    or content.get("dashboard_item")
+                    or content.get("subphase")
+                    or td.get("_display_label")
+                    or f"Step {td.get('sequence', '?')}"
+                )
+
+            if phase_key not in phase_groups:
+                phase_groups[phase_key] = {}
+                ordered_phase_keys.append(phase_key)
+            phase_groups[phase_key].setdefault(group_name, []).append(td)
+
+        ordered_phase_keys.sort(key=self._phase_sort_key)
+
+        for phase_key in ordered_phase_keys:
+            groups = phase_groups[phase_key]
+            total_steps = sum(len(steps) for steps in groups.values())
+            phase_title = self._autodan_phase_title(phase_key)
+
+            with ui.column().classes("w-full gap-2 pb-2"):
+                with ui.row().classes("items-center gap-2"):
+                    ui.label(phase_title).classes("text-sm font-semibold")
+                    ui.badge(str(total_steps), color="grey-6").classes("text-xs")
+
+                group_items = list(groups.items())
+                first_name = f"{phase_key.lower()}-0"
+                with (
+                    ui.tabs()
+                    .props("dense align=left no-caps inline-label")
+                    .classes("w-full") as tabs
+                ):
+                    for idx, (group_name, steps) in enumerate(group_items):
+                        tab_name = f"{phase_key.lower()}-{idx}"
+                        ui.tab(
+                            name=tab_name,
+                            label=f"{group_name} ({len(steps)})",
+                        )
+
+                with ui.tab_panels(tabs, value=first_name).classes("w-full"):
+                    for idx, (_, steps) in enumerate(group_items):
+                        tab_name = f"{phase_key.lower()}-{idx}"
+                        with ui.tab_panel(tab_name).classes("w-full p-0"):
+                            with ui.column().classes("w-full gap-2"):
+                                if phase_key in {"WARMUP", "LIFELONG"}:
+                                    epoch_groups: dict[int, list[dict]] = {}
+
+                                    ordered_steps = sorted(
+                                        steps, key=lambda td: td.get("sequence", 0)
+                                    )
+                                    for step in ordered_steps:
+                                        content = (
+                                            step.get("content")
+                                            if isinstance(step.get("content"), dict)
+                                            else {}
+                                        )
+                                        epoch_value = content.get("epoch")
+                                        if (
+                                            isinstance(epoch_value, int)
+                                            and epoch_value >= 0
+                                        ):
+                                            epoch_key = epoch_value
+                                        else:
+                                            epoch_key = max(
+                                                epoch_groups.keys(),
+                                                default=0,
+                                            )
+                                        epoch_groups.setdefault(epoch_key, []).append(
+                                            step
+                                        )
+
+                                    for epoch_key in sorted(epoch_groups.keys()):
+                                        epoch_steps = epoch_groups[epoch_key]
+                                        epoch_label = f"Epoch {epoch_key + 1}"
+                                        with ui.expansion(
+                                            f"{epoch_label} ({len(epoch_steps)} traces)",
+                                            icon="expand_more",
+                                        ).classes("w-full"):
+                                            with ui.column().classes(
+                                                "w-full gap-2 p-2"
+                                            ):
+                                                self._render_autodan_epoch_group(
+                                                    epoch_steps
+                                                )
+                                else:
+                                    self._render_autodan_steps_cards(
+                                        sorted(
+                                            steps,
+                                            key=lambda td: td.get("sequence", 0),
+                                        )
+                                    )
+
+        return True
 
     def _render_trace_content(self, step_type: str | None, content: object) -> None:
         """Render trace content with a remote-dashboard-like schema."""
@@ -1694,30 +2306,20 @@ class DashboardPage:
                 trace_count_badge.set_text(str(len(serialized_traces)))
                 trace_count_badge.props("color=primary")
                 with trace_container:
-                    grouped: dict[str, list[dict]] = {
-                        "goal": [],
-                        "evaluation": [],
-                        "generation": [],
-                        "tools": [],
-                        "other": [],
-                    }
-
                     for td in serialized_traces:
-                        group, label = self._classify_trace_step(td)
+                        _, label = self._classify_trace_step(td)
                         td["_display_label"] = label
-                        grouped[group].append(td)
 
-                    self._render_trace_tabs_section("Goal", grouped["goal"], "goal")
-                    self._render_trace_tabs_section(
-                        "Evaluation", grouped["evaluation"], "evaluation"
+                    rendered_phase_view = self._render_autodan_phase_timeline(
+                        serialized_traces
                     )
-                    self._render_trace_tabs_section(
-                        "Attack / Generation",
-                        grouped["generation"],
-                        "generation",
-                    )
-                    self._render_trace_tabs_section("Tools", grouped["tools"], "tools")
-                    self._render_trace_tabs_section("Other", grouped["other"], "other")
+                    if rendered_phase_view:
+                        # AutoDAN phase view is authoritative; hide generic
+                        # fallback sections to avoid duplicated Evaluation/Goal
+                        # blocks below Lifelong/Evaluation.
+                        pass
+                    else:
+                        self._render_standard_trace_sections(serialized_traces)
         except Exception as exc:
             trace_container.clear()
             with trace_container:
@@ -1890,7 +2492,8 @@ class DashboardPage:
         rows = []
         for idx, run in enumerate(recent_p.items):
             d = _serialize(run)
-            d["status"] = str(d.get("status", "") or "PENDING")
+            summary = self._summarize_run_results(run.id)
+            d["status"] = str(summary["status"])
             d["attack_type"] = attack_type_by_id.get(str(d.get("attack_id")), "—")
             agent_id = str(d.get("agent_id") or "")
             d["agent_name"] = agent_name_by_id.get(
@@ -1899,11 +2502,14 @@ class DashboardPage:
                 or (f"{agent_id[:8]}…" if agent_id else "—"),
             )
             d["run_progress"] = max(1, recent_p.total - idx)
-            # Fetch result count per run
-            rp = self.backend.list_results(run_id=run.id, page=1, page_size=1)
-            d["total_results"] = rp.total
+            d["total_results"] = int(summary["total_results"])
+            d["successful_jailbreaks"] = int(summary["successful_jailbreaks"])
+            d["failed_attacks"] = int(summary["failed_attacks"])
+            d["mitigations"] = int(summary["mitigations"])
             d["_rel"] = _rel_time(d.get("created_at"))
             d["_date"] = _short_date(d.get("created_at"))
+            d["_latency_s"] = self._compute_run_latency_seconds(d)
+            d["_latency"] = _format_latency(d.get("_latency_s"))
             rows.append(d)
         self.recent_runs_table.rows.clear()
         self.recent_runs_table.rows.extend(rows)
@@ -1957,9 +2563,8 @@ class DashboardPage:
         rows = []
         for idx, run in enumerate(result.items):
             d = _serialize(run)
-            # Keep History lightweight: status and metadata come from RunRecord;
-            # detailed goal/result aggregates are loaded only when opening a run.
-            d["status"] = str(d.get("status", "") or "PENDING")
+            summary = self._summarize_run_results(run.id)
+            d["status"] = str(summary["status"])
             attack_id = str(d.get("attack_id") or "")
             agent_id = str(d.get("agent_id") or "")
             d["attack_type"] = attack_type_by_id.get(
@@ -1976,8 +2581,14 @@ class DashboardPage:
                 result.total
                 - ((self.runs_current_page - 1) * _RUNS_VIEW_PAGE_SIZE + idx),
             )
+            d["total_results"] = int(summary["total_results"])
+            d["successful_jailbreaks"] = int(summary["successful_jailbreaks"])
+            d["failed_attacks"] = int(summary["failed_attacks"])
+            d["mitigations"] = int(summary["mitigations"])
             d["_rel"] = _rel_time(d.get("created_at"))
             d["_date"] = _short_date(d.get("created_at"))
+            d["_latency_s"] = self._compute_run_latency_seconds(d)
+            d["_latency"] = _format_latency(d.get("_latency_s"))
             rows.append(d)
         self.runs_table.rows.clear()
         self.runs_table.rows.extend(rows)
@@ -2002,7 +2613,15 @@ class DashboardPage:
             agent = str(run.get("agent_name") or "—")
             attack = str(run.get("attack_type") or "—")
             created = str(run.get("_date") or run.get("created_at") or "—")
-            self.run_dialog_subtitle.text = f"Status: {status} | Agent: {agent} | Attack: {attack} | Created: {created}"
+            run_latency_s = self._compute_run_latency_seconds(run)
+            run_latency = _format_latency(run_latency_s)
+            jailbreaks = int(run.get("successful_jailbreaks") or 0)
+            failed_attacks = int(run.get("failed_attacks") or 0)
+            self.run_dialog_subtitle.text = (
+                f"Status: {status} | Agent: {agent} | Attack: {attack} | "
+                f"Created: {created} | Total latency: {run_latency} | "
+                f"Jailbreaks: {jailbreaks} | Failed attacks: {failed_attacks}"
+            )
         if self.results_list_area is not None:
             self.results_list_area.clear()
         if self.results_empty_label is not None:
@@ -2036,15 +2655,28 @@ class DashboardPage:
                 None, _fetch_results
             )
 
+            sorted_items = sorted(
+                all_items,
+                key=lambda item: (
+                    int(getattr(item, "goal_index", 0)),
+                    getattr(item, "created_at", None),
+                ),
+            )
+
             new_rows = []
-            for idx, r in enumerate(all_items, start=1):
+            for idx, r in enumerate(sorted_items, start=1):
                 d = _serialize(r)
                 d["_rel"] = _rel_time(d.get("created_at"))
-                d["goal_number"] = idx
+                goal_index = d.get("goal_index")
+                d["goal_number"] = (
+                    int(goal_index) + 1 if isinstance(goal_index, int) else idx
+                )
                 d["evaluation_label"] = _eval_label(
                     d.get("evaluation_status", ""), d.get("evaluation_notes")
                 )
                 d["evaluation_notes"] = d.get("evaluation_notes") or "—"
+                d["_goal_latency_s"] = self._extract_goal_latency_seconds(d)
+                d["_goal_latency"] = _format_latency(d.get("_goal_latency_s"))
                 new_rows.append(d)
 
             if self.results_list_area is not None:
@@ -2067,13 +2699,18 @@ class DashboardPage:
                                 ui.label(
                                     f"Goal #{row.get('goal_number', (row.get('goal_index', 0) or 0) + 1)}"
                                 ).classes("font-semibold text-sm")
-                                ui.badge(
-                                    row.get("evaluation_label") or "Pending",
-                                    color=_eval_color(
-                                        row.get("evaluation_status", ""),
-                                        row.get("evaluation_notes"),
-                                    ),
-                                ).classes("text-xs")
+                                with ui.row().classes("items-center gap-2"):
+                                    ui.badge(
+                                        row.get("evaluation_label") or "Pending",
+                                        color=_eval_color(
+                                            row.get("evaluation_status", ""),
+                                            row.get("evaluation_notes"),
+                                        ),
+                                    ).classes("text-xs")
+                                    ui.badge(
+                                        f"Latency: {row.get('_goal_latency', '—')}",
+                                        color="grey-7",
+                                    ).classes("text-xs")
 
                             ui.label(str(row.get("goal") or "—")).classes(
                                 "text-sm whitespace-pre-wrap"

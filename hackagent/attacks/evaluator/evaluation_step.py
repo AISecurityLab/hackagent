@@ -42,7 +42,7 @@ Usage:
 
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import fields
+from dataclasses import fields as dataclass_fields, is_dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from hackagent.attacks.evaluator.judge_evaluators import EVALUATOR_MAP
@@ -319,6 +319,9 @@ class BaseEvaluationStep:
             in the first row of *data*.
         """
         available: Dict[str, str] = {}
+        if not data:
+            return available
+
         sample_keys = set(data[0].keys()) if data else set()
 
         for judge_type, col_name in self.JUDGE_AGG_COLUMN_MAP.items():
@@ -562,7 +565,12 @@ class BaseEvaluationStep:
         evaluator = None
         try:
             # Filter config to EvaluatorConfig fields only
-            expected_fields = {f.name for f in fields(EvaluatorConfig)}
+            if hasattr(EvaluatorConfig, "model_fields"):
+                expected_fields = set(EvaluatorConfig.model_fields.keys())
+            elif is_dataclass(EvaluatorConfig):
+                expected_fields = {f.name for f in dataclass_fields(EvaluatorConfig)}
+            else:
+                expected_fields = set(config.keys())
             filtered_config = {k: v for k, v in config.items() if k in expected_fields}
 
             # Resolve agent_type

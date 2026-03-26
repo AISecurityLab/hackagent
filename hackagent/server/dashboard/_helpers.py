@@ -43,6 +43,33 @@ def _short_date(iso: str | None) -> str:
     return "—"
 
 
+def _duration_seconds(start_iso: str | None, end_iso: str | None) -> float | None:
+    """Return duration in seconds between two ISO timestamps, or None."""
+    if not start_iso or not end_iso:
+        return None
+    with contextlib.suppress(Exception):
+        start_dt = datetime.fromisoformat(start_iso.replace("Z", "+00:00"))
+        end_dt = datetime.fromisoformat(end_iso.replace("Z", "+00:00"))
+        return max(0.0, (end_dt - start_dt).total_seconds())
+    return None
+
+
+def _format_latency(seconds: float | None) -> str:
+    """Format seconds as a compact human-friendly latency string."""
+    if seconds is None:
+        return "—"
+    if seconds < 1.0:
+        return f"{int(round(seconds * 1000.0))}ms"
+    if seconds < 60.0:
+        return f"{seconds:.1f}s"
+    total = int(round(seconds))
+    minutes, sec = divmod(total, 60)
+    if minutes < 60:
+        return f"{minutes}m {sec:02d}s"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h {minutes:02d}m {sec:02d}s"
+
+
 def _result_bucket(status: str | None, notes: str | None = None) -> str:
     """Classify a result into dashboard buckets.
 

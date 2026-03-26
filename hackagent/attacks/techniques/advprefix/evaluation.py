@@ -192,6 +192,12 @@ class EvaluationPipeline(BaseEvaluationStep):
             except ValueError:
                 self.logger.warning(f"Invalid max_ce value: {max_ce_threshold}")
 
+        # If NLL filtering removes all rows, this is a valid outcome.
+        # Avoid downstream "missing key" warnings that are misleading on empty input.
+        if not input_data:
+            self.logger.info("Aggregation skipped: no items left after NLL filtering")
+            return []
+
         # Get available judge columns
         config_judges = [
             j.get("type") or j.get("evaluator_type")
