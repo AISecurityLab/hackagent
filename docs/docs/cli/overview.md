@@ -7,13 +7,13 @@ sidebar_position: 1
 
 The **HackAgent CLI** provides a powerful command-line interface for AI agent security testing. With beautiful ASCII branding, rich terminal output, and comprehensive functionality, it's the fastest way to run attacks.
 
-For installation instructions, see the [Installation Guide](../getting-started/installation.md).
+For installation instructions, see the [Installation Guide](../getting-started/installation.mdx).
 
 ## Commands
 
 | Command | Description | Documentation |
 |---------|-------------|---------------|
-| `hackagent` | Launch TUI interface | [Quick Start](../getting-started/quick-start.md) |
+| `hackagent` | Launch TUI interface | [Quick Start](../getting-started/quick-start.mdx) |
 | `hackagent init` | Interactive setup wizard | [Initialization](./initialization.md) |
 | `hackagent config` | Manage configuration | [Config](./config.md) |
 | `hackagent attack` | Execute security attacks | [Attack](./attack.md) |

@@ -392,6 +392,6 @@ For more sophisticated testing, consider [AdvPrefix](./advprefix) or [PAIR](./pa
 
 ## Related
 
-- [Attack Overview](./index.md) — Compare all attack types
+- [Attack Overview](./index.mdx) — Compare all attack types
 - [AdvPrefix Attacks](./advprefix) — Sophisticated prefix optimization
 - [PAIR Attacks](./pair) — Adaptive iterative refinement

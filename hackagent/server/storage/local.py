@@ -471,6 +471,64 @@ class LocalBackend:
             updated_at=_to_dt(row["updated_at"]),
         )
 
+    def delete_run(self, run_id: UUID) -> None:
+        sid = str(run_id)
+        with self._lock:
+            # traces → results → run
+            self._conn.execute(
+                "DELETE FROM traces WHERE result_id IN (SELECT id FROM results WHERE run_id = ?)",
+                (sid,),
+            )
+            self._conn.execute("DELETE FROM results WHERE run_id = ?", (sid,))
+            self._conn.execute("DELETE FROM runs WHERE id = ?", (sid,))
+            self._conn.commit()
+
+    def delete_attack(self, attack_id: UUID) -> None:
+        sid = str(attack_id)
+        with self._lock:
+            # traces → results → runs → attack
+            self._conn.execute(
+                "DELETE FROM traces WHERE result_id IN "
+                "(SELECT id FROM results WHERE run_id IN "
+                "(SELECT id FROM runs WHERE attack_id = ?))",
+                (sid,),
+            )
+            self._conn.execute(
+                "DELETE FROM results WHERE run_id IN (SELECT id FROM runs WHERE attack_id = ?)",
+                (sid,),
+            )
+            self._conn.execute("DELETE FROM runs WHERE attack_id = ?", (sid,))
+            self._conn.execute("DELETE FROM attacks WHERE id = ?", (sid,))
+            self._conn.commit()
+
+    def count_result_buckets(self) -> dict:
+        """Return {total, jailbreaks, mitigated, failed, pending} via SQL."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT evaluation_status, evaluation_notes FROM results"
+            ).fetchall()
+        from hackagent.server.dashboard._helpers import _result_bucket
+
+        buckets = {
+            "total": 0,
+            "jailbreaks": 0,
+            "mitigated": 0,
+            "failed": 0,
+            "pending": 0,
+        }
+        for r in rows:
+            buckets["total"] += 1
+            b = _result_bucket(r["evaluation_status"], r["evaluation_notes"])
+            if b == "jailbreak":
+                buckets["jailbreaks"] += 1
+            elif b == "mitigated":
+                buckets["mitigated"] += 1
+            elif b == "failed":
+                buckets["failed"] += 1
+            elif b == "pending":
+                buckets["pending"] += 1
+        return buckets
+
     # ── Result ────────────────────────────────────────────────────────────────
 
     def create_result(

@@ -308,6 +308,43 @@ class TestAttackOrchestratorExecution(unittest.TestCase):
 
         self.assertEqual(results, [{"goal": "goal-1"}, {"goal": "goal-2"}])
 
+    def test_parallel_batches_propagate_global_goal_index_offsets(self):
+        """Parallel batch workers must receive globally unique goal index offsets."""
+
+        orchestrator = self.TestOrchestrator(self.mock_hack_agent)
+
+        attack_params = {"goals": ["goal-1", "goal-2", "goal-3"]}
+        attack_config = {
+            "goals": ["goal-1", "goal-2", "goal-3"],
+            "output_dir": "/tmp/test",
+            "goal_batch_size": 2,
+            "goal_batch_workers": 2,
+        }
+
+        with patch.object(self.TestAttack, "__init__", return_value=None) as mock_init:
+            with patch.object(
+                self.TestAttack,
+                "run",
+                side_effect=lambda **kwargs: [{"goal": kwargs["goals"][0]}],
+            ):
+                orchestrator._execute_local_attack(
+                    "attack-123",
+                    "run-456",
+                    attack_params,
+                    attack_config,
+                    None,
+                )
+
+        seen_offsets = [
+            c.kwargs.get("config", {}).get("_goal_index_offset")
+            for c in mock_init.call_args_list
+            if "config" in c.kwargs
+        ]
+
+        # One shared impl init may not set _goal_index_offset; worker inits must.
+        worker_offsets = [v for v in seen_offsets if v is not None]
+        self.assertCountEqual(worker_offsets, [0, 1, 2])
+
 
 class TestAttackOrchestratorHTTPHelpers(unittest.TestCase):
     """Test AttackOrchestrator HTTP response helpers."""

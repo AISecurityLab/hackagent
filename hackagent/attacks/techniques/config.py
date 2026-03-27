@@ -32,7 +32,7 @@ for attack modules that still build top-level ``DEFAULT_*_CONFIG`` mappings.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -139,7 +139,7 @@ class GoalsDatasetConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
     goals: List[str] = Field(default_factory=list)
-    dataset: Optional[str] = None
+    dataset: Optional[Union[str, Dict[str, Any]]] = None
 
 
 class RunConfig(BaseModel):

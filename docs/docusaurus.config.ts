@@ -35,9 +35,9 @@ const config: Config = {
   // Enable Mermaid diagrams
   markdown: {
     mermaid: true,
-    // Treat .md files as CommonMark (not MDX) so that literal { } in
-    // generated API docs are not misinterpreted as JSX expressions.
-    // Files using MDX features should use the .mdx extension.
+    // Use extension-based parsing: .md as CommonMark, .mdx as MDX.
+    // This avoids MDX parsing errors in generated API docs while preserving JSX support
+    // for authored pages explicitly saved as .mdx.
     format: 'detect',
     hooks: {
       onBrokenMarkdownLinks: 'warn',

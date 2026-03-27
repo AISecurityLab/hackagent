@@ -152,6 +152,6 @@ Example GitHub Actions workflow:
 
 ## See Also
 
-- [Attack Tutorial](../getting-started/attack-tutorial.md) — Step-by-step guide
+- [Attack Tutorial](../getting-started/attack-tutorial.mdx) — Step-by-step guide
 - [AdvPrefix Attacks](../attacks/advprefix.md) — Detailed attack documentation
 - [Results](./results.md) — View and manage attack results

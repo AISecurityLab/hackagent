@@ -319,6 +319,9 @@ class AdvPrefixAttack(BaseAttack):
 
             if not generation_output:
                 self.logger.warning("Generation produced no output")
+                # Ensure every pre-created goal result is explicitly finalized
+                # so dashboard entries never remain pending.
+                coordinator.finalize_all_goals([])
                 coordinator.finalize_pipeline([], lambda _: False)
                 return []
 

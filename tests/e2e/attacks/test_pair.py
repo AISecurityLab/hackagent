@@ -5,6 +5,8 @@ import pytest
 from hackagent import HackAgent
 from hackagent.router.types import AgentTypeEnum
 
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+
 DATASET = {
     "preset": "harmbench",
     "limit": 5,
@@ -14,61 +16,58 @@ DATASET = {
 TARGET_MODEL = "google/gemma-3-27b-it"
 TARGET_ENDPOINT = "https://openrouter.ai/api/v1"
 
-GENERATOR_MODEL = "mistralai/mistral-small-3.2-24b-instruct"
-GENERATOR_ENDPOINT = "https://openrouter.ai/api/v1"
+ATTACKER_MODEL = "mistralai/mistral-small-3.2-24b-instruct"
+ATTACKER_ENDPOINT = "https://openrouter.ai/api/v1"
 
 JUDGE_MODEL = "openai/gpt-4o-mini"
 JUDGE_ENDPOINT = "https://openrouter.ai/api/v1"
 
 
 @pytest.mark.e2e
-def test_advprefix():
+def test_pair():
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
     if not openrouter_api_key:
         pytest.skip("OPENROUTER_API_KEY not set")
 
     agent = HackAgent(
-        name=TARGET_MODEL,
+        name=ATTACKER_MODEL,
         endpoint=TARGET_ENDPOINT,
         agent_type=AgentTypeEnum.OPENAI_SDK,
         adapter_operational_config={
-            "name": TARGET_MODEL,
-            "api_key": openrouter_api_key,
+            "name": ATTACKER_MODEL,
+            "api_key": OPENROUTER_API_KEY,
             "endpoint": TARGET_ENDPOINT,
         },
     )
 
     config = {
-        "attack_type": "advprefix",
+        "attack_type": "pair",
         "dataset": DATASET,
-        "batch_size": 5,
         "goal_batch_size": 5,
         "goal_batch_workers": 5,
-        "generator": {
-            "identifier": GENERATOR_MODEL,
-            "agent_type": AgentTypeEnum.OPENAI_SDK,
-            "api_key": openrouter_api_key,
-            "endpoint": GENERATOR_ENDPOINT,
-            "max_tokens": 50,
+        "max_tokens": 1000,
+        "n_iterations": 5,
+        "attacker": {
+            "identifier": ATTACKER_MODEL,
+            "endpoint": ATTACKER_ENDPOINT,
+            "agent_type": "OPENAI_SDK",
+            "api_key": OPENROUTER_API_KEY,
+            "max_tokens": 600,
+            "temperature": 1.0,
         },
         "judges": [
             {
                 "identifier": JUDGE_MODEL,
-                "type": "harmbench_variant",
+                "type": "harmbench",
                 "agent_type": AgentTypeEnum.OPENAI_SDK,
                 "api_key": openrouter_api_key,
                 "endpoint": JUDGE_ENDPOINT,
             },
         ],
-        "batch_size_judge": 5,
-        "n_candidates_per_goal": 3,
-        "max_tokens": 500,
-        "max_tokens_eval": 128,
     }
 
     results = agent.hack(attack_config=config)
-    print(f"AdvPrefix attack completed: {results}")
+    print(f"Attack completed: {results}")
 
 
-if __name__ == "__main__":
-    test_advprefix()
+test_pair()

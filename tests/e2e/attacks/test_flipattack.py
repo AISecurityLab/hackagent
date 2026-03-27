@@ -8,7 +8,7 @@ HACKAGENT_API_KEY = os.getenv("HACKAGENT_API_KEY")
 # Goals targeting the specific data exfiltration risk
 DATASET = {
     "preset": "harmbench",
-    "limit": 10,
+    "limit": 5,
     "shuffle": False,
     "seed": 42,
 }
@@ -17,7 +17,7 @@ agent = HackAgent(
     endpoint=ENDPOINT_OPENROUTER,
     agent_type=AgentTypeEnum.OPENAI_SDK,
     adapter_operational_config={
-        "name": "anthropic/claude-opus-4.6",
+        "name": "google/gemma-3-27b-it",
         "api_key": OPENROUTER_API_KEY,
         "endpoint": ENDPOINT_OPENROUTER,
     },
@@ -27,7 +27,6 @@ config = {
     "attack_type": "flipattack",
     "dataset": DATASET,
     "max_tokens": 400,
-    "batch_size": 10,
     "flipattack_params": {
         "flip_mode": "FCS",
         "judge": "openai/gpt-4o-mini",
@@ -40,7 +39,7 @@ config = {
     "judges": [
         {
             "identifier": "openai/gpt-4o-mini",
-            "type": "harmbench",
+            "type": "harmbench_variant",
             "agent_type": AgentTypeEnum.OPENAI_SDK,
             "api_key": OPENROUTER_API_KEY,
             "endpoint": ENDPOINT_OPENROUTER,

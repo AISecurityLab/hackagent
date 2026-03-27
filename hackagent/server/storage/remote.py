@@ -22,8 +22,9 @@ from pydantic import AnyUrl
 from hackagent.server.client import AuthenticatedClient
 from hackagent.server.api.agent import agent_create, agent_list, agent_partial_update
 from hackagent.server.api.organization import organization_me_retrieve
-from hackagent.server.api.attack import attack_create, attack_list
+from hackagent.server.api.attack import attack_create, attack_destroy, attack_list
 from hackagent.server.api.run import (
+    run_destroy,
     run_list,
     run_partial_update,
     run_retrieve,
@@ -464,6 +465,11 @@ class RemoteBackend:
             total = resp.parsed.count or total
 
             for r in page_results:
+                rc = r.run_config if isinstance(r.run_config, dict) else {}
+                # Inject agent_name from API response for dashboard display
+                agent_name = getattr(r, "agent_name", None)
+                if agent_name:
+                    rc = {**rc, "_agent_name": agent_name}
                 items.append(
                     RunRecord(
                         id=r.id,
@@ -473,9 +479,7 @@ class RemoteBackend:
                         agent_id=r.agent
                         if isinstance(r.agent, UUID)
                         else UUID(str(r.agent)),
-                        run_config=r.run_config
-                        if isinstance(r.run_config, dict)
-                        else {},
+                        run_config=rc,
                         status=r.status.value
                         if hasattr(r.status, "value")
                         else str(r.status),
@@ -655,6 +659,44 @@ class RemoteBackend:
                 break
             current_page += 1
 
+        # Fallback: if result_list returned nothing for a specific run,
+        # try run_retrieve which embeds results directly on the Run object.
+        if not items and run_id is not None:
+            try:
+                rr = run_retrieve.sync_detailed(id=run_id, client=self._client)
+                if rr.status_code == 200 and rr.parsed:
+                    embedded = getattr(rr.parsed, "results", None) or []
+                    for r in embedded:
+                        goal = ""
+                        goal_index = 0
+                        if isinstance(r.agent_specific_data, dict):
+                            goal = r.agent_specific_data.get("goal", "")
+                            goal_index = r.agent_specific_data.get("goal_index", 0)
+                        items.append(
+                            ResultRecord(
+                                id=r.id,
+                                run_id=r.run
+                                if isinstance(r.run, UUID)
+                                else UUID(str(r.run)),
+                                goal=goal,
+                                goal_index=goal_index,
+                                evaluation_status=r.evaluation_status.value
+                                if hasattr(r.evaluation_status, "value")
+                                else str(r.evaluation_status or ""),
+                                evaluation_notes=getattr(r, "evaluation_notes", None),
+                                evaluation_metrics=getattr(r, "evaluation_metrics", {})
+                                or {},
+                                metadata=r.agent_specific_data
+                                if isinstance(r.agent_specific_data, dict)
+                                else {},
+                                created_at=_pick_dt(r, "timestamp", "created_at"),
+                                updated_at=_pick_dt(r, "updated_at", "timestamp"),
+                            )
+                        )
+                    total = len(items)
+            except Exception:
+                pass
+
         return PaginatedResult(items=items, total=total or len(items))
 
     def get_result(self, result_id: UUID) -> ResultRecord:
@@ -728,8 +770,82 @@ class RemoteBackend:
         )
 
     def list_traces(self, result_id: UUID) -> List[TraceRecord]:
-        # Traces are written-only via the API; return empty list for now
-        return []
+        resp = result_retrieve.sync_detailed(id=result_id, client=self._client)
+        if resp.status_code != 200 or not resp.parsed:
+            return []
+
+        traces = []
+        for t in getattr(resp.parsed, "traces", []) or []:
+            step_type = (
+                t.step_type.value if hasattr(t.step_type, "value") else t.step_type
+            )
+            raw_content = getattr(t, "content", None)
+            content = (
+                raw_content if isinstance(raw_content, dict) else {"value": raw_content}
+            )
+            sequence = int(getattr(t, "sequence", 0) or 0)
+            traces.append(
+                TraceRecord(
+                    id=_coerce_trace_id(t.id, result_id=result_id, sequence=sequence),
+                    result_id=result_id,
+                    sequence=sequence,
+                    step_type=str(step_type or "OTHER"),
+                    content=content,
+                    created_at=_pick_dt(t, "timestamp", "created_at"),
+                )
+            )
+
+        traces.sort(key=lambda tr: tr.sequence)
+        return traces
+
+    # ── Delete ────────────────────────────────────────────────────────────────
+
+    def count_result_buckets(self) -> Dict[str, int]:
+        """Efficiently count results by evaluation status using filtered API calls."""
+        from hackagent.server.api.models import ResultListEvaluationStatus
+
+        def _count(status: ResultListEvaluationStatus | None = None) -> int:
+            kwargs: Dict[str, Any] = {"client": self._client, "page": 1}
+            if status is not None:
+                kwargs["evaluation_status"] = status
+            resp = result_list.sync_detailed(**kwargs)
+            if resp.status_code == 200 and resp.parsed:
+                return resp.parsed.count or 0
+            return 0
+
+        total = _count()
+        jailbreaks = _count(ResultListEvaluationStatus.SUCCESSFUL_JAILBREAK)
+        mitigated = _count(ResultListEvaluationStatus.PASSED_CRITERIA) + _count(
+            ResultListEvaluationStatus.FAILED_JAILBREAK
+        )
+        failed = (
+            _count(ResultListEvaluationStatus.FAILED_CRITERIA)
+            + _count(ResultListEvaluationStatus.ERROR_AGENT_RESPONSE)
+            + _count(ResultListEvaluationStatus.ERROR_TEST_FRAMEWORK)
+        )
+        pending = _count(ResultListEvaluationStatus.NOT_EVALUATED)
+        return {
+            "total": total,
+            "jailbreaks": jailbreaks,
+            "mitigated": mitigated,
+            "failed": failed,
+            "pending": pending,
+        }
+
+    def delete_run(self, run_id: UUID) -> None:
+        run_destroy.sync_detailed(id=run_id, client=self._client)
+
+    def delete_attack(self, attack_id: UUID) -> None:
+        # Delete all runs belonging to the attack first, then the attack.
+        page = 1
+        while True:
+            rp = self.list_runs(attack_id=attack_id, page=page, page_size=100)
+            for run in rp.items:
+                self.delete_run(run.id)
+            if len(rp.items) < 100:
+                break
+            page += 1
+        attack_destroy.sync_detailed(id=attack_id, client=self._client)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 

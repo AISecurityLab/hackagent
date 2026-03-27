@@ -338,7 +338,7 @@ for target in targets:
 
 ## Related
 
-- [Attack Overview](./index.md) — Compare all attack types
+- [Attack Overview](./index.mdx) — Compare all attack types
 - [PAIR Attacks](./pair.md) — Linear iterative refinement
 - [AdvPrefix Attacks](./advprefix.md) — Prefix optimisation approach
 - [Baseline Attacks](./baseline.md) — Quick template-based testing

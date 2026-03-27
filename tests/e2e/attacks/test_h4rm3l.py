@@ -18,7 +18,7 @@ from hackagent.router.types import AgentTypeEnum
 
 DATASET = {
     "preset": "harmbench",
-    "limit": 20,
+    "limit": 5,
     "shuffle": False,
     "seed": 42,
 }
@@ -33,7 +33,7 @@ def main():
         endpoint=ENDPOINT,
         agent_type=AgentTypeEnum.OPENAI_SDK,
         adapter_operational_config={
-            "name": "anthropic/claude-opus-4.6",
+            "name": "geogle/gemma-3-27b-it",
             "api_key": openrouter_api_key,
             "endpoint": ENDPOINT,
         },

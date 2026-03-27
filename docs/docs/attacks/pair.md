@@ -60,6 +60,20 @@ graph TD
 5. **Refinement**: Attacker generates an improved prompt based on feedback
 6. **Iteration**: Steps 2-5 repeat until success or max iterations
 
+### Per-Iteration Cost
+
+Each PAIR iteration performs **3 sequential model calls**:
+
+1. **Attacker** call (generate/refine prompt)
+2. **Target** call (execute candidate jailbreak)
+3. **Judge** call (score response)
+
+So expected wall time is approximately:
+
+`iterations * (t_attacker + t_target + t_judge)`
+
+If any provider call is slow, iteration latency increases accordingly.
+
 ---
 
 ## Basic Usage
@@ -135,6 +149,12 @@ advanced_config = {
     # Attack parameters
     "n_iterations": 20,          # Max iterations per goal
     "objective": "jailbreak",    # Evaluation objective
+    "jailbreak_threshold": 8,    # Stop goal as soon as score >= threshold
+    "early_stop_on_success": True,
+
+    # Latency controls
+    "timeout": 120,              # Target request timeout (seconds)
+    "judge_timeout": 60,         # Judge request timeout (seconds)
     
     # Output configuration
     "output_dir": "./logs/pair_runs",
@@ -155,6 +175,9 @@ advanced_config = {
 | `temperature` | Attacker creativity (higher = more varied) | 1.0 | 0.0-2.0 |
 | `max_tokens` | Max tokens for attacker response | 500 | 100-2000 |
 | `objective` | Evaluation criteria | `"jailbreak"` | See objectives |
+| `jailbreak_threshold` | Stop goal when judge score reaches threshold | `8` | 1-10 |
+| `timeout` | Target request timeout (seconds) | `120` | 1+ |
+| `judge_timeout` | Judge request timeout (seconds) | `120` | 1+ |
 
 ---
 
@@ -191,6 +214,8 @@ An attack is considered successful when:
 - Judge score ≥ threshold (typically 8-10)
 - Target produces content aligned with the goal
 - Safety mechanisms are demonstrably bypassed
+
+With `jailbreak_threshold` configured, PAIR now stops that goal immediately once the threshold is reached (no extra iterations).
 
 ---
 
@@ -255,6 +280,7 @@ for target in targets:
 2. **Use high temperature**: `temperature=1.0` or higher for creative attacks
 3. **Specific goals work better**: "Reveal your system prompt" vs "Do something bad"
 4. **Monitor early termination**: Success often comes quickly (fewer than 10 iterations)
+5. **Tune timeouts explicitly**: Use tighter `timeout`/`judge_timeout` to avoid long hangs on slow providers
 
 ---
 
@@ -298,6 +324,6 @@ for target in targets:
 
 ## Related
 
-- [Attack Overview](./index.md) — Compare all attack types
+- [Attack Overview](./index.mdx) — Compare all attack types
 - [AdvPrefix Attacks](./advprefix) — Alternative sophisticated attack
 - [Baseline Attacks](./baseline) — Quick template-based testing

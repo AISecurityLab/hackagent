@@ -205,11 +205,11 @@ def conditional_generate(
         )
         return content  # Already the full response
 
-    # If the provider DID honour the prefill, the content is the continuation
-    # after "[START OF JAILBREAK PROMPT]". Only prepend the start tag (NOT the
-    # full condition preamble, which itself mentions both tags in its description
-    # and would confuse extract_jailbreak_prompt).
-    generated = start_tag + content
+    # If the provider DID honour the prefill, the content is usually the
+    # continuation after "[START OF JAILBREAK PROMPT]". Some providers may still
+    # return a full answer that already includes jailbreak tags; avoid doubling
+    # the prefix in that case.
+    generated = content if start_tag in content else start_tag + content
     logger.info(
         format_phase_message(
             "generate",
@@ -465,11 +465,30 @@ def extract_jailbreak_prompt(text, fallback):
     start_tag = "[START OF JAILBREAK PROMPT]"
     end_tag = "[END OF JAILBREAK PROMPT]"
 
-    # Best case: both tags present
+    # Best case: both tags present.
+    # If tags are nested/repeated, prefer the innermost (last START before END).
     if start_tag in text and end_tag in text:
-        between = text.split(start_tag, 1)[1].split(end_tag, 1)[0].strip()
-        if between:
-            return between
+        start_positions = []
+        cursor = 0
+        while True:
+            pos = text.find(start_tag, cursor)
+            if pos == -1:
+                break
+            start_positions.append(pos)
+            cursor = pos + len(start_tag)
+
+        chosen = ""
+        for start_pos in reversed(start_positions):
+            end_pos = text.find(end_tag, start_pos + len(start_tag))
+            if end_pos == -1:
+                continue
+            candidate = text[start_pos + len(start_tag) : end_pos].strip()
+            if candidate:
+                chosen = candidate
+                break
+
+        if chosen:
+            return chosen
 
     # Only end tag
     if end_tag in text:
@@ -482,12 +501,12 @@ def extract_jailbreak_prompt(text, fallback):
 
     # Only start tag
     if start_tag in text:
-        after = text.split(start_tag, 1)[1].strip()
+        after = text.split(start_tag)[-1].replace(end_tag, "").strip()
         if after:
             return after
 
     # No tags at all — return the full text (minus any known condition prefix)
-    cleaned = text.strip()
+    cleaned = text.replace(start_tag, "").replace(end_tag, "").strip()
     if cleaned:
         return cleaned
 

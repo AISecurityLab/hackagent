@@ -37,6 +37,20 @@ def _deep_update(target, source):
             )
 
 
+def _split_internal_keys(
+    config: Dict[str, Any],
+) -> tuple[Dict[str, Any], Dict[str, Any]]:
+    """Return (user_config, internal_config) split by top-level '_' keys."""
+    user_config: Dict[str, Any] = {}
+    internal_config: Dict[str, Any] = {}
+    for key, value in config.items():
+        if isinstance(key, str) and key.startswith("_"):
+            internal_config[key] = value
+        else:
+            user_config[key] = value
+    return user_config, internal_config
+
+
 class AutoDANTurboAttack(BaseAttack):
     """AutoDAN-Turbo: Lifelong agent for strategy self-exploration in jailbreaking LLMs.
 
@@ -66,9 +80,12 @@ class AutoDANTurboAttack(BaseAttack):
             raise ValueError("AgentRouter required")
 
         cfg = copy.deepcopy(DEFAULT_AUTODAN_TURBO_CONFIG)
+        internal_config: Dict[str, Any] = {}
         if config:
-            _deep_update(cfg, config)
+            user_config, internal_config = _split_internal_keys(config)
+            _deep_update(cfg, user_config)
         cfg = AutoDANTurboConfig.from_dict(cfg).to_dict()
+        cfg.update(internal_config)
 
         self.logger = logging.getLogger("hackagent.attacks.autodan_turbo")
         super().__init__(cfg, client, agent_router)
@@ -301,7 +318,7 @@ class AutoDANTurboAttack(BaseAttack):
                     format_phase_message(
                         "final",
                         f"Goal {idx}: autodan_score={result.get('autodan_score', result.get('attack_score', 0.0)):.1f}/10 | "
-                        f"judge_best_score={result.get('best_score', 0.0):.1f} | "
+                        f"judge_best_score={result.get('judge_best_score', result.get('best_score', 0.0)):.1f} | "
                         f"success={result.get('success', False)}",
                     )
                 )

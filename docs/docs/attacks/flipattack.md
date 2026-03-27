@@ -407,7 +407,7 @@ for target in targets:
 
 ## Related
 
-- [Attack Overview](./index.md) — Compare all attack types
+- [Attack Overview](./index.mdx) — Compare all attack types
 - [TAP Attacks](./tap.md) — Tree-search based adaptive attack
 - [PAIR Attacks](./pair.md) — Iterative refinement with attacker LLM
 - [AdvPrefix Attacks](./advprefix.md) — Prefix optimisation approach

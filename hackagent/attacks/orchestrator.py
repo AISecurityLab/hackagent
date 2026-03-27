@@ -326,7 +326,7 @@ class AttackOrchestrator:
 
         if goal_batch_size and isinstance(goals, list):
             batches = [
-                goals[i : i + goal_batch_size]
+                (i, goals[i : i + goal_batch_size])
                 for i in range(0, len(goals), goal_batch_size)
             ]
             n_batches = len(batches)
@@ -339,7 +339,7 @@ class AttackOrchestrator:
             all_results: List[Dict[str, Any]] = []
             batch_timings: List[float] = []
 
-            for batch_idx, batch_goals in enumerate(batches):
+            for batch_idx, (batch_start_idx, batch_goals) in enumerate(batches):
                 batch_label = f"B{batch_idx + 1}/{n_batches}"
                 n_goals_in_batch = len(batch_goals)
                 logger.info(f"[{batch_label}] Starting ({n_goals_in_batch} goals)")
@@ -347,6 +347,10 @@ class AttackOrchestrator:
 
                 if goal_batch_workers <= 1:
                     # Sequential: pass all goals at once to a single run()
+                    attack_impl.config["_goal_index_offset"] = batch_start_idx
+                    # This run() call is only a sub-batch within a larger run.
+                    # Global run status is finalized once in execute().
+                    attack_impl.config["_suppress_run_status_updates"] = True
                     batch_params = {**attack_params, "goals": batch_goals}
                     batch_results = attack_impl.run(**batch_params) or []
                 else:
@@ -356,6 +360,7 @@ class AttackOrchestrator:
                     def _run_single_goal(
                         goal_idx_goal: Tuple[int, str],
                         _batch_label: str = batch_label,
+                        _batch_start_idx: int = batch_start_idx,
                     ) -> Tuple[int, List[Dict[str, Any]]]:
                         goal_idx, goal = goal_idx_goal
 
@@ -367,7 +372,17 @@ class AttackOrchestrator:
 
                         # Each goal gets its own attack instance to avoid
                         # shared mutable state across threads.
-                        local_impl = self.attack_impl_class(**impl_kwargs)
+                        local_impl_kwargs = {
+                            **impl_kwargs,
+                            "config": {
+                                **impl_kwargs["config"],
+                                "_goal_index_offset": _batch_start_idx + goal_idx,
+                                # Per-goal worker is a sub-run; avoid premature
+                                # global run status updates from attack_impl.run().
+                                "_suppress_run_status_updates": True,
+                            },
+                        }
+                        local_impl = self.attack_impl_class(**local_impl_kwargs)
                         goal_params = {**attack_params, "goals": [goal]}
                         goal_results = local_impl.run(**goal_params) or []
 

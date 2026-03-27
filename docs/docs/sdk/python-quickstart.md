@@ -6,7 +6,7 @@ sidebar_position: 1
 
 The HackAgent SDK provides a powerful interface for conducting AI security testing programmatically.
 
-For installation instructions, see the [Installation Guide](../getting-started/installation.md).
+For installation instructions, see the [Installation Guide](../getting-started/installation.mdx).
 
 ## SDK vs HTTP API
 
@@ -437,8 +437,8 @@ mypy hackagent/
 Explore these advanced topics:
 
 1. **[AdvPrefix Attacks](../attacks/advprefix.md)** - Advanced attack techniques
-2. **[Google ADK Integration](../agents/google-adk.md)** - Framework-specific setup
-3. **[Attack Tutorial](../getting-started/attack-tutorial.md)** - Getting started with attacks
+2. **[Google ADK Integration](../agents/google-adk.mdx)** - Framework-specific setup
+3. **[Attack Tutorial](../getting-started/attack-tutorial.mdx)** - Getting started with attacks
 4. **[Security Guidelines](../security/responsible-disclosure.md)** - Responsible disclosure and ethics
 
 ## Support
