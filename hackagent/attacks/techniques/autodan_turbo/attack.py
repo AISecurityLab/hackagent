@@ -1,6 +1,6 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-"""AutoDAN-Turbo attack orchestrator — 3-step pipeline (WarmUp → Lifelong → Evaluation)."""
+"""AutoDAN-Turbo orchestrator — WarmUp → Lifelong → scorer finalization."""
 
 import copy
 import logging
@@ -57,7 +57,7 @@ class AutoDANTurboAttack(BaseAttack):
     Three-phase pipeline:
     1. WarmUp — free exploration to bootstrap a strategy library
     2. Lifelong — strategy-guided attacks with retrieval + summarization
-    3. Evaluation — multi-judge scoring for consistent metrics
+    3. Evaluation — scorer-only result finalization
     """
 
     def __init__(self, config=None, client=None, agent_router=None):
@@ -120,18 +120,18 @@ class AutoDANTurboAttack(BaseAttack):
 
     @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
     def run(self, goals: List[str]) -> List[Dict[str, Any]]:
-        """Execute full 3-step AutoDAN-Turbo pipeline.
+        """Execute full AutoDAN-Turbo pipeline.
 
         Pipeline mapping to paper/integration:
         1) WarmUp: free exploration + strategy library bootstrap
         2) Lifelong: retrieval-guided attack with online strategy growth
-        3) Evaluation: hackagent multi-judge scoring harmonization
+        3) Evaluation: scorer-only normalization and success finalization
 
         Args:
             goals: List of malicious goals to attack.
 
         Returns:
-            Final per-goal result list, enriched with attack and judge metrics.
+            Final per-goal result list, enriched with scorer-based metrics.
 
         Raises:
             Exception: Re-raises any runtime failure after coordinator finalization.
@@ -301,10 +301,10 @@ class AutoDANTurboAttack(BaseAttack):
 
             results = coordinator.enrich_with_result_ids(results)
 
-            # Step 3: Evaluation — multi-judge scoring
+            # Step 3: Evaluation — scorer-only finalization
             self.logger.info(phase_separator("evaluation", "starting phase"))
             with self.tracker.track_step(
-                "Evaluation: Multi-judge scoring",
+                "Evaluation: Scorer-threshold finalization",
                 "EVALUATION",
                 results[:3],
                 {},
@@ -318,13 +318,18 @@ class AutoDANTurboAttack(BaseAttack):
                     format_phase_message(
                         "final",
                         f"Goal {idx}: autodan_score={result.get('autodan_score', result.get('attack_score', 0.0)):.1f}/10 | "
-                        f"judge_best_score={result.get('judge_best_score', result.get('best_score', 0.0)):.1f} | "
+                        f"best_score={result.get('best_score', 0.0):.1f} | "
                         f"success={result.get('success', False)}",
                     )
                 )
 
-            # Finalize
-            coordinator.finalize_all_goals(results)
+            # Finalize using scorer-derived success flag only.
+            coordinator.finalize_all_goals(
+                results,
+                scorer=lambda goal_data: any(
+                    bool(row.get("success", False)) for row in goal_data
+                ),
+            )
             coordinator.log_summary()
             coordinator.finalize_pipeline(results)
 

@@ -455,6 +455,127 @@ class TestLocalBackendTrace(unittest.TestCase):
         self.assertEqual(theirs[0].content["msg"], "theirs")
 
 
+class TestLocalBackendDeleteAndBuckets(unittest.TestCase):
+    """Test deletion cascades and dashboard bucket counters."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.backend = _make_backend(self.tmp)
+        self.agent = self.backend.create_or_update_agent(
+            "agent", "LITELLM", "http://localhost", {}
+        )
+        org = self.backend.get_context().org_id
+        self.attack = self.backend.create_attack("pair", self.agent.id, org, {})
+
+    def _create_result_with_status(
+        self,
+        run_id: UUID,
+        goal: str,
+        goal_index: int,
+        status: str,
+        notes: str | None = None,
+    ) -> ResultRecord:
+        result = self.backend.create_result(run_id, goal, goal_index, {}, {})
+        return self.backend.update_result(
+            result.id,
+            evaluation_status=status,
+            evaluation_notes=notes,
+        )
+
+    def test_count_result_buckets(self):
+        run = self.backend.create_run(self.attack.id, self.agent.id, {})
+
+        self._create_result_with_status(
+            run.id,
+            "g-jb",
+            0,
+            "SUCCESSFUL_JAILBREAK",
+        )
+        self._create_result_with_status(
+            run.id,
+            "g-mitigated",
+            1,
+            "PASSED_CRITERIA",
+        )
+        self._create_result_with_status(
+            run.id,
+            "g-failed",
+            2,
+            "FAILED_CRITERIA",
+        )
+        self._create_result_with_status(
+            run.id,
+            "g-pending",
+            3,
+            "NOT_EVALUATED",
+        )
+        self._create_result_with_status(
+            run.id,
+            "g-exception",
+            4,
+            "FAILED_JAILBREAK",
+            notes="Model failed with exception: timeout",
+        )
+
+        buckets = self.backend.count_result_buckets()
+        self.assertEqual(
+            buckets,
+            {
+                "total": 5,
+                "jailbreaks": 1,
+                "mitigated": 1,
+                "failed": 2,
+                "pending": 1,
+            },
+        )
+
+    def test_delete_run_cascades_results_and_traces(self):
+        run_to_delete = self.backend.create_run(self.attack.id, self.agent.id, {})
+        run_to_keep = self.backend.create_run(self.attack.id, self.agent.id, {})
+
+        deleted_result = self.backend.create_result(run_to_delete.id, "g1", 0, {}, {})
+        kept_result = self.backend.create_result(run_to_keep.id, "g2", 1, {}, {})
+
+        self.backend.create_trace(deleted_result.id, 1, "OTHER", {"msg": "bye"})
+        self.backend.create_trace(kept_result.id, 1, "OTHER", {"msg": "stay"})
+
+        self.backend.delete_run(run_to_delete.id)
+
+        with self.assertRaises(RuntimeError):
+            self.backend.get_run(run_to_delete.id)
+        self.assertEqual(self.backend.list_results(run_id=run_to_delete.id).total, 0)
+        self.assertEqual(self.backend.list_traces(deleted_result.id), [])
+
+        self.assertEqual(self.backend.list_results(run_id=run_to_keep.id).total, 1)
+        self.assertEqual(len(self.backend.list_traces(kept_result.id)), 1)
+
+    def test_delete_attack_cascades_runs_results_and_traces(self):
+        org = self.backend.get_context().org_id
+        other_attack = self.backend.create_attack("baseline", self.agent.id, org, {})
+
+        run_a = self.backend.create_run(self.attack.id, self.agent.id, {})
+        run_b = self.backend.create_run(other_attack.id, self.agent.id, {})
+
+        res_a = self.backend.create_result(run_a.id, "ga", 0, {}, {})
+        res_b = self.backend.create_result(run_b.id, "gb", 0, {}, {})
+
+        self.backend.create_trace(res_a.id, 1, "OTHER", {"scope": "attack-a"})
+        self.backend.create_trace(res_b.id, 1, "OTHER", {"scope": "attack-b"})
+
+        self.backend.delete_attack(self.attack.id)
+
+        attacks = self.backend.list_attacks()
+        self.assertEqual(attacks.total, 1)
+        self.assertEqual(attacks.items[0].id, other_attack.id)
+        self.assertEqual(self.backend.list_runs(attack_id=self.attack.id).total, 0)
+        self.assertEqual(self.backend.list_results(run_id=run_a.id).total, 0)
+        self.assertEqual(self.backend.list_traces(res_a.id), [])
+
+        self.assertEqual(self.backend.list_runs(attack_id=other_attack.id).total, 1)
+        self.assertEqual(self.backend.list_results(run_id=run_b.id).total, 1)
+        self.assertEqual(len(self.backend.list_traces(res_b.id)), 1)
+
+
 class TestLocalBackendThreadSafety(unittest.TestCase):
     """Concurrent writes should not corrupt the database."""
 

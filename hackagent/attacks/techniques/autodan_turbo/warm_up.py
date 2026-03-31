@@ -137,8 +137,11 @@ def execute(
     attack_log: List[Dict] = []
 
     # --- Phase 1: Free exploration ---
+    successful_goal_indices = set()
     for iteration in range(iterations):
         for goal_idx, request in enumerate(goals):
+            if goal_idx in successful_goal_indices:
+                continue
             for epoch in range(epochs):
                 system = _warm_up_system(request)
                 resp = conditional_generate(
@@ -168,6 +171,7 @@ def execute(
                         "iteration": iteration,
                         "epoch": epoch,
                         "attacker_role": attacker_label,
+                        "attacker_max_tokens": attacker_max_tokens,
                         "system_prompt": system,
                         "attacker_raw_response": resp,
                         "generated_prompt": prompt,
@@ -201,11 +205,11 @@ def execute(
                     },
                 )
                 score, assessment = score_response(
-                    sc_router,
-                    sc_key,
-                    request,
-                    target_resp,
-                    logger,
+                    scorer_router=sc_router,
+                    scorer_key=sc_key,
+                    goal=request,
+                    target_response=target_resp,
+                    logger=logger,
                     max_retries=max_parse_retries,
                     scorer_max_tokens=scorer_max_tokens,
                     role_label=scorer_label,
@@ -251,6 +255,46 @@ def execute(
                     logger.info(
                         format_phase_message("warmup", f"Goal {goal_idx} jailbroken!")
                     )
+                    successful_goal_indices.add(goal_idx)
+                    # Immediate tracker update: persist final attempt and finalize goal
+                    try:
+                        tracker = (
+                            config.get("_tracker") if isinstance(config, dict) else None
+                        )
+                        if tracker:
+                            ctx = tracker.get_goal_context_by_goal(request)
+                            if ctx is None:
+                                ctx = tracker.get_goal_context(goal_idx)
+                            if ctx:
+                                tracker.add_interaction_trace(
+                                    ctx,
+                                    request={"prompt": prompt},
+                                    response={"content": target_resp},
+                                    step_name="Final Jailbreak Attempt",
+                                )
+                                tracker.add_evaluation_trace(
+                                    ctx=ctx,
+                                    evaluation_result={
+                                        "jailbreak_prompt": prompt,
+                                        "target_response": target_resp,
+                                    },
+                                    score=score,
+                                    explanation=f"WarmUp detected jailbreak (score={score:.1f})",
+                                    evaluator_name="autodan_turbo_scorer",
+                                )
+                                tracker.finalize_goal(
+                                    ctx=ctx,
+                                    success=True,
+                                    evaluation_notes=f"Jailbroken during WarmUp with score {score:.1f}",
+                                    final_metadata={
+                                        "jailbreak_prompt": prompt,
+                                        "target_response": target_resp,
+                                        "autodan_score": score,
+                                        "best_score": score,
+                                    },
+                                )
+                    except Exception as e:
+                        logger.warning(f"Tracker finalization failed: {e}")
                     break
 
     # --- Phase 2: Build strategy library from warm-up logs ---

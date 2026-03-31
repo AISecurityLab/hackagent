@@ -8,20 +8,20 @@ AutoDAN-Turbo is a lifelong jailbreak attack that **discovers, stores, and reuse
 
 ## Overview
 
-AutoDAN-Turbo combines four LLM roles:
+AutoDAN-Turbo combines three LLM roles:
 
 - **Attacker**: generates jailbreak prompts
 - **Scorer**: rates target responses on a 1-10 jailbreak intensity scale
 - **Summarizer**: extracts reusable strategies from prompt pairs
-- **Judge**: final evaluation of attack success
 
 It uses these roles to build a strategy library, then reuses that library across iterations to improve success rates.
+An attack attempt is considered jailbroken as soon as the scorer reports a value greater than or equal to `break_score`.
 
 ### Key Features
 
 - **Strategy Library**: stores reusable jailbreak strategies
 - **Warm-up + Lifelong Phases**: discovery first, reuse second
-- **Multi-Role LLMs**: attacker, scorer, summarizer, and judge
+- **Multi-Role LLMs**: attacker, scorer, summarizer
 - **Research-Backed**: based on AutoDAN-Turbo (lifelong red teaming)
 
 ---
@@ -47,16 +47,16 @@ graph TD
     L3 --> L4[Scorer 1-10]
     L4 --> L5[Summarizer]
     L5 --> W5
-
-    L3 --> J0[Final Judge Evaluation]
-    J0 --> R0[Results]
+    L4 --> T0{Score >= break_score?}
+    T0 -->|Yes| R0[Results: success]
+    T0 -->|No| L0
 ```
 
 ### Phase Summary
 
 1. **Warm-up**: attacker explores prompts, scorer rates responses, summarizer extracts strategies.
 2. **Lifelong**: strategies are retrieved and reused to guide new attacker prompts.
-3. **Evaluation**: a final judge evaluates the best results for reporting.
+3. **Finalization**: per-goal success is set from scorer output only (`score >= break_score`).
 
 ---
 
@@ -88,14 +88,7 @@ attack_config = {
     "summarizer": {
         "identifier": "gpt-4",
         "endpoint": "https://api.openai.com/v1"
-    },
-    "judges": [
-        {
-            "identifier": "gpt-4o-mini",
-            "type": "harmbench",
-            "agent_type": "OPENAI_SDK"
-        }
-    ]
+    }
 }
 
 results = agent.hack(attack_config=attack_config)
@@ -148,19 +141,8 @@ advanced_config = {
         "api_key": "${OPENROUTER_API_KEY}"
     },
 
-    "judges": [
-        {
-            "identifier": "openai/gpt-4o-mini",
-            "type": "harmbench",
-            "agent_type": "OPENAI_SDK",
-            "api_key": "${OPENROUTER_API_KEY}",
-            "endpoint": "https://openrouter.ai/api/v1"
-        }
-    ],
-
     "goal_batch_size": 10,
     "goal_batch_workers": 2,
-    "batch_size_judge": 2,
 
     "output_dir": "./logs/autodan_turbo_runs"
 }
@@ -177,7 +159,7 @@ advanced_config = {
 | `autodan_turbo_params.warm_up_iterations` | Warm-up outer loops | `1` |
 | `autodan_turbo_params.lifelong_iterations` | Lifelong outer loops | `1` |
 | `autodan_turbo_params.epochs` | Attempts per iteration | `1` |
-| `autodan_turbo_params.break_score` | Success threshold (1-10) | `8.5` |
+| `autodan_turbo_params.break_score` | Success threshold (jailbreak if `score >= break_score`) | `8.5` |
 | `autodan_turbo_params.retrieval_top_k` | Strategies retrieved per query | `5` |
 | `autodan_turbo_params.embedding_model` | Embedding model for retrieval | `text-embedding-3-small` |
 | `autodan_turbo_params.strategy_library_path` | Load a prebuilt library | `None` |
@@ -189,17 +171,15 @@ advanced_config = {
 | `attacker` | `identifier`, `endpoint`, `agent_type`, `api_key` |
 | `scorer` | `identifier`, `endpoint`, `agent_type`, `api_key` |
 | `summarizer` | `identifier`, `endpoint`, `agent_type`, `api_key` |
-| `judges[]` | `identifier`, `type`, `agent_type`, `api_key`, `endpoint` |
 
 ---
 
 ## Parallelization and Batching
 
-AutoDAN-Turbo currently supports **goal-level batching** and **judge parallelization**.
+AutoDAN-Turbo currently supports **goal-level batching**.
 
 - `goal_batch_size`: how many goals go into each macro-batch (sequential batches)
 - `goal_batch_workers`: how many macro-batches are processed concurrently
-- `batch_size_judge`: concurrent judge evaluations
 
 > Note: `batch_size` is **not used** by AutoDAN-Turbo in the current implementation.
 
@@ -210,3 +190,4 @@ AutoDAN-Turbo currently supports **goal-level batching** and **judge paralleliza
 - Warm-up and lifelong phases share a single strategy library per run.
 - For custom endpoints, pass `agent_type="OPENAI_SDK"` with the appropriate `endpoint`.
 - Use a fast, cheap scorer to reduce cost. The scorer runs for every attempt.
+- The jailbreak condition uses scorer threshold: success when `score >= break_score`.

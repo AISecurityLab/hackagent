@@ -101,7 +101,7 @@ def execute(
 
     Returns:
         List of best result dictionaries per goal, including prompt/response,
-        AutoDAN score, and success flag against ``break_score``.
+        AutoDAN score, and success flag when ``score >= break_score``.
     """
     params = config.get("autodan_turbo_params", {})
     epochs = params.get("epochs", 100)
@@ -165,8 +165,64 @@ def execute(
         )
     )
     results = []
+    tracker = config.get("_tracker") if isinstance(config, dict) else None
 
     for goal_idx, request in enumerate(goals):
+        if tracker:
+            ctx = tracker.get_goal_context_by_goal(request)
+            if ctx is None:
+                ctx = tracker.get_goal_context(goal_idx)
+            if ctx and ctx.is_finalized and bool(ctx.final_success):
+                metadata = ctx.metadata if isinstance(ctx.metadata, dict) else {}
+                score_value = metadata.get(
+                    "autodan_score", metadata.get("best_score", break_score)
+                )
+                try:
+                    score_value = float(score_value)
+                except (TypeError, ValueError):
+                    score_value = float(break_score)
+
+                prompt_value = metadata.get("jailbreak_prompt", "")
+                response_value = metadata.get("target_response", "")
+                logger.info(
+                    format_phase_message(
+                        "lifelong",
+                        f"Goal {goal_idx} already jailbroken in warm-up (score={score_value:.1f}); skipping lifelong iterations",
+                    )
+                )
+                emit_phase_trace(
+                    config,
+                    phase="LIFELONG",
+                    subphase="SKIP_FINALIZED",
+                    step_name="Lifelong - Skip Finalized Goal",
+                    goal=request,
+                    goal_idx=goal_idx,
+                    payload={
+                        "dashboard_section": "Lifelong",
+                        "dashboard_group": "Lifelong",
+                        "dashboard_item": "Skip Finalized Goal",
+                        "reason": "Goal already finalized as successful during warm-up",
+                        "autodan_score": score_value,
+                        "break_score": break_score,
+                        "jailbreak_prompt": prompt_value,
+                        "target_response": response_value,
+                    },
+                )
+                results.append(
+                    {
+                        "goal": request,
+                        "prompt": prompt_value,
+                        "full_prompt": prompt_value,
+                        "response": response_value,
+                        "score": score_value,
+                        "autodan_score": score_value,
+                        "best_score": score_value,
+                        "attack_score": score_value,
+                        "success": True,
+                    }
+                )
+                continue
+
         prev_score, prev_prompt, prev_response = (
             1.0,
             request,
@@ -218,6 +274,7 @@ def execute(
                         "iteration": iteration,
                         "epoch": epoch,
                         "attacker_role": attacker_label,
+                        "attacker_max_tokens": attacker_max_tokens,
                         "system_prompt": system,
                         "attacker_raw_response": resp,
                         "generated_prompt": prompt,
@@ -251,11 +308,11 @@ def execute(
                     },
                 )
                 score, assessment = score_response(
-                    sc_router,
-                    sc_key,
-                    request,
-                    target_resp,
-                    logger,
+                    scorer_router=sc_router,
+                    scorer_key=sc_key,
+                    goal=request,
+                    target_response=target_resp,
+                    logger=logger,
                     max_retries=max_parse_retries,
                     scorer_max_tokens=scorer_max_tokens,
                     role_label=scorer_label,
@@ -348,6 +405,47 @@ def execute(
                     logger.info(
                         format_phase_message("lifelong", f"Goal {goal_idx} jailbroken!")
                     )
+                    # Immediate tracker update: persist final attempt and finalize goal
+                    try:
+                        tracker = (
+                            config.get("_tracker") if isinstance(config, dict) else None
+                        )
+                        if tracker:
+                            ctx = tracker.get_goal_context_by_goal(request)
+                            if ctx is None:
+                                ctx = tracker.get_goal_context(goal_idx)
+                            if ctx:
+                                # Record the interaction that produced the jailbreak
+                                tracker.add_interaction_trace(
+                                    ctx,
+                                    request={"prompt": prompt},
+                                    response={"content": target_resp},
+                                    step_name="Final Jailbreak Attempt",
+                                )
+                                # Add evaluation trace with prompt/response/score
+                                tracker.add_evaluation_trace(
+                                    ctx=ctx,
+                                    evaluation_result={
+                                        "jailbreak_prompt": prompt,
+                                        "target_response": target_resp,
+                                    },
+                                    score=score,
+                                    explanation=f"AutoDAN-Turbo detected jailbreak (score={score:.1f})",
+                                    evaluator_name="autodan_turbo_scorer",
+                                )
+                                tracker.finalize_goal(
+                                    ctx=ctx,
+                                    success=True,
+                                    evaluation_notes=f"Jailbroken with score {score:.1f}",
+                                    final_metadata={
+                                        "jailbreak_prompt": prompt,
+                                        "target_response": target_resp,
+                                        "autodan_score": score,
+                                        "best_score": score,
+                                    },
+                                )
+                    except Exception as e:
+                        logger.warning(f"Tracker finalization failed: {e}")
                     break
 
             if best["score"] >= break_score:

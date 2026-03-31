@@ -159,6 +159,7 @@ class BoNAttack(BaseAttack):
                 "config_keys": [
                     "batch_size",
                     "bon_params",
+                    "max_tokens",
                     "_run_id",
                     "_backend",
                     "_client",

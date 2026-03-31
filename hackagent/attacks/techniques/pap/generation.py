@@ -49,6 +49,7 @@ class _StepJudge:
         "nuanced": ["eval_nj", "explanation_nj"],
         "jailbreakbench": ["eval_jb", "explanation_jb"],
         "harmbench": ["eval_hb", "explanation_hb"],
+        "harmbench_variant": ["eval_hbv", "explanation_hbv"],
         "on_topic": ["eval_on_topic", "explanation_on_topic"],
     }
 
@@ -136,16 +137,18 @@ class _StepJudge:
                 evaluated = evaluator.evaluate([row.copy()])
                 if evaluated:
                     ev_row = evaluated[0]
-                    for col in self.JUDGE_COLUMN_MAP.get(judge_type, []):
+                    judge_cols_for_type = self.JUDGE_COLUMN_MAP.get(judge_type, [])
+                    for col in judge_cols_for_type:
                         if col in ev_row:
                             judge_cols[col] = ev_row[col]
-                    eval_col = self.JUDGE_COLUMN_MAP[judge_type][0]
-                    val = ev_row.get(eval_col)
-                    if val is not None:
-                        try:
-                            best_score = max(best_score, float(val))
-                        except (TypeError, ValueError):
-                            pass
+                    if judge_cols_for_type:
+                        eval_col = judge_cols_for_type[0]
+                        val = ev_row.get(eval_col)
+                        if val is not None:
+                            try:
+                                best_score = max(best_score, float(val))
+                            except (TypeError, ValueError):
+                                pass
             except Exception as exc:
                 self.logger.warning(f"Judge '{judge_type}' failed on candidate: {exc}")
 

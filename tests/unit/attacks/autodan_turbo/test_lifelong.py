@@ -32,6 +32,24 @@ class _FakeStrategyLibrary:
         self.add_calls += 1
 
 
+class _FakeTrackerContext:
+    def __init__(self, metadata):
+        self.is_finalized = True
+        self.final_success = True
+        self.metadata = metadata
+
+
+class _FakeTracker:
+    def __init__(self, metadata):
+        self.ctx = _FakeTrackerContext(metadata)
+
+    def get_goal_context_by_goal(self, _goal):
+        return self.ctx
+
+    def get_goal_context(self, _goal_idx):
+        return self.ctx
+
+
 @unittest.skipIf(lifelong is None, f"lifelong unavailable: {_IMPORT_ERROR}")
 class TestLifelong(unittest.TestCase):
     def setUp(self):
@@ -119,6 +137,10 @@ class TestLifelong(unittest.TestCase):
         self.assertEqual(len(out), 1)
         self.assertTrue(out[0]["success"])
         self.assertGreaterEqual(lib.add_calls, 1)
+        self.assertEqual(mock_score.call_args.kwargs["goal"], "goal-1")
+        self.assertEqual(
+            mock_score.call_args.kwargs["target_response"], "target_response"
+        )
 
     @patch("hackagent.attacks.techniques.autodan_turbo.lifelong.emit_phase_trace")
     @patch("hackagent.attacks.techniques.autodan_turbo.lifelong.summarize_strategy")
@@ -248,6 +270,55 @@ class TestLifelong(unittest.TestCase):
 
         self.assertEqual(len(out), 1)
         self.assertGreaterEqual(lib.retrieve_calls, 1)
+
+    @patch("hackagent.attacks.techniques.autodan_turbo.lifelong.emit_phase_trace")
+    @patch("hackagent.attacks.techniques.autodan_turbo.lifelong.conditional_generate")
+    @patch("hackagent.attacks.techniques.autodan_turbo.lifelong.init_routers")
+    def test_execute_skips_goal_already_finalized_in_warmup(
+        self,
+        mock_init_routers,
+        mock_conditional,
+        _mock_trace,
+    ):
+        mock_init_routers.return_value = (
+            MagicMock(),
+            "a",
+            MagicMock(),
+            "s",
+            MagicMock(),
+            "z",
+        )
+
+        tracker = _FakeTracker(
+            {
+                "jailbreak_prompt": "warmup prompt",
+                "target_response": "warmup response",
+                "autodan_score": 9.2,
+                "best_score": 9.2,
+            }
+        )
+        agent_router = MagicMock()
+        agent_router.backend_agent.id = "victim"
+        lib = _FakeStrategyLibrary()
+
+        out = lifelong.execute(
+            goals=["goal-1"],
+            config={
+                **self.config,
+                "_tracker": tracker,
+            },
+            client=MagicMock(),
+            agent_router=agent_router,
+            logger=MagicMock(),
+            strategy_library=lib,
+        )
+
+        self.assertEqual(len(out), 1)
+        self.assertTrue(out[0]["success"])
+        self.assertEqual(out[0]["autodan_score"], 9.2)
+        self.assertEqual(out[0]["prompt"], "warmup prompt")
+        self.assertEqual(out[0]["response"], "warmup response")
+        mock_conditional.assert_not_called()
 
 
 if __name__ == "__main__":

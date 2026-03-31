@@ -105,7 +105,10 @@ class StrategyLibrary:
                 kwargs["api_key"] = self.embedding_api_key
 
             response = litellm.embedding(**kwargs)
-            return np.array(response.data[0].embedding, dtype=np.float32)
+            vector = self._extract_embedding_vector(response)
+            if vector is None:
+                raise ValueError("No embedding data received")
+            return np.array(vector, dtype=np.float32)
         except Exception as e:
             message = str(e)
             if "No embedding data received" in message:
@@ -122,6 +125,36 @@ class StrategyLibrary:
             else:
                 self.logger.error(f"Embedding failed: {message}")
             return None
+
+    @staticmethod
+    def _extract_embedding_vector(response: Any) -> Optional[List[float]]:
+        """Extract first embedding vector from LiteLLM response payload.
+
+        Supports both object-style payloads (response.data[0].embedding)
+        and dict-style payloads ({"data": [{"embedding": [...]}]}).
+        """
+        if response is None:
+            return None
+
+        data = None
+        if isinstance(response, dict):
+            data = response.get("data")
+        else:
+            data = getattr(response, "data", None)
+
+        if not isinstance(data, list) or not data:
+            return None
+
+        first = data[0]
+        vector = (
+            first.get("embedding")
+            if isinstance(first, dict)
+            else getattr(first, "embedding", None)
+        )
+        if not isinstance(vector, list):
+            return None
+
+        return vector
 
     def _local_embed(self, text: str, _dim: int = 512) -> np.ndarray:
         """Deterministic hashing-trick bag-of-words embedding (``local/bag-of-words``).

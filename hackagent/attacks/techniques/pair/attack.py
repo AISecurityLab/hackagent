@@ -15,7 +15,6 @@ Result Tracking:
 
 import copy
 import logging
-import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -23,6 +22,7 @@ from contextlib import nullcontext
 from typing import Any, Dict, List, Optional
 
 from hackagent.attacks.techniques.base import BaseAttack
+from hackagent.attacks.techniques.autodan_turbo.core import score_response
 from hackagent.attacks.objectives import OBJECTIVES
 from hackagent.attacks.shared.progress import create_progress_bar
 from hackagent.attacks.shared.prompt_parser import extract_prompt
@@ -37,7 +37,6 @@ from hackagent.router.tracking import Tracker, Context
 from .config import (
     ATTACKER_SYSTEM_PROMPT,
     DEFAULT_PAIR_CONFIG,
-    JUDGE_SYSTEM_PROMPT,
     PairConfig,
 )
 
@@ -91,11 +90,11 @@ class PAIRAttack(BaseAttack):
         https://arxiv.org/abs/2310.08419
 
     PAIR uses an *attacker* LLM to iteratively refine an adversarial
-    prompt based on the *target* model's responses and a judge score:
+    prompt based on the *target* model's responses and a scorer score:
 
     1. The attacker generates an initial or refined jailbreak prompt.
     2. The prompt is sent to the target model.
-    3. A judge rates the response on a 1–10 jailbreak success scale.
+    3. A scorer rates the response on a 1–10 jailbreak success scale.
     4. The score and response are fed back to the attacker as context
        for the next refinement.
     5. Steps 1–4 repeat for ``n_iterations`` rounds or until early stop.
@@ -108,14 +107,15 @@ class PAIRAttack(BaseAttack):
     * **Attacker** (``config["attacker"]``) — an LLM that proposes prompt
       improvements based on feedback.
     * **Target** — the victim model reached via ``agent_router``.
-    * **Judge** — same router as attacker (called with the judge prompt
-      from :data:`~hackagent.attacks.techniques.pair.config.JUDGE_SYSTEM_PROMPT`).
+        * **Scorer** (``config["scorer"]``) — dedicated scorer model using
+            the AutoDAN-Turbo scorer+wrapper protocol.
 
     Attributes:
         config: Merged PAIR configuration dictionary.
         client: Authenticated HackAgent API client.
         agent_router: Router for the victim model.
-        attacker_router: Router for the attacker/judge LLM.
+        attacker_router: Router for the attacker LLM.
+        scorer_router: Router for the scorer LLM.
         objective: Loaded :class:`~hackagent.attacks.objectives.base.ObjectiveConfig`
             instance for the configured ``objective`` key.
         logger: Hierarchical logger at ``hackagent.attacks.pair``.
@@ -150,9 +150,18 @@ class PAIRAttack(BaseAttack):
         # Merge config
         current_config = copy.deepcopy(DEFAULT_PAIR_CONFIG)
         internal_config: Dict[str, Any] = {}
+        user_config: Dict[str, Any] = {}
         if config:
             user_config, internal_config = _split_internal_keys(config)
             _deep_update(current_config, user_config)
+
+        # Backward compatibility: if scorer is not explicitly provided,
+        # mirror attacker config so PAIR keeps using the same LLM endpoint.
+        if "scorer" not in user_config and isinstance(
+            current_config.get("attacker"), dict
+        ):
+            current_config["scorer"] = copy.deepcopy(current_config["attacker"])
+
         current_config = PairConfig.from_dict(current_config).to_dict()
         current_config.update(internal_config)
 
@@ -166,6 +175,14 @@ class PAIRAttack(BaseAttack):
         self.attacker_router = self._initialize_attacker_router()
         if self.attacker_router is None:
             raise ValueError("Failed to initialize attacker router from config.")
+
+        # Initialize scorer router (AutoDAN-style scorer+wrapper)
+        self.scorer_router = self._initialize_scorer_router()
+        if self.scorer_router is None:
+            self.logger.warning(
+                "Failed to initialize scorer router from config; falling back to attacker router."
+            )
+            self.scorer_router = self.attacker_router
 
         # Load objective
         objective_name = self.config.get("objective", "jailbreak")
@@ -223,6 +240,53 @@ class PAIRAttack(BaseAttack):
             )
             return None
 
+    def _initialize_scorer_router(self) -> Optional[AgentRouter]:
+        """
+        Initialize and configure the AgentRouter for the scorer LLM.
+
+        The scorer follows the same routing pattern used by AutoDAN-Turbo,
+        with a dedicated model role separate from the attacker role.
+        """
+        try:
+            scorer_config = self.config.get("scorer", {})
+
+            router_config = {
+                "identifier": scorer_config.get("identifier", "hackagent-scorer"),
+                "endpoint": scorer_config.get(
+                    "endpoint", "https://api.hackagent.dev/v1"
+                ),
+                "agent_type": scorer_config.get("agent_type", "OPENAI_SDK"),
+                "max_tokens": scorer_config.get("max_tokens", 4096),
+                "temperature": scorer_config.get("temperature", 0.7),
+                "timeout": scorer_config.get(
+                    "timeout",
+                    scorer_config.get(
+                        "request_timeout", self.config.get("timeout", 120)
+                    ),
+                ),
+                "agent_metadata": {},
+            }
+
+            api_key_config = scorer_config.get("api_key")
+            if api_key_config:
+                router_config["agent_metadata"]["api_key"] = api_key_config
+
+            router, _reg_key = create_router(
+                backend=self.client,
+                config=router_config,
+                logger=self.logger,
+                router_name=scorer_config.get("model", router_config["identifier"]),
+            )
+
+            self.logger.debug(
+                f"Scorer router initialized for {router_config['identifier']}"
+            )
+            return router
+
+        except Exception as e:
+            self.logger.error(f"Failed to initialize scorer router: {e}", exc_info=True)
+            return None
+
     def _validate_config(self):
         """
         Validate PAIR-specific configuration.
@@ -262,14 +326,14 @@ class PAIRAttack(BaseAttack):
         Ask the attacker LLM for an improved adversarial prompt.
 
         On the first iteration (``iteration == 0``) only the goal is sent;
-        subsequent calls include the previous target response and judge
+        subsequent calls include the previous target response and scorer
         score as feedback context.
 
         Args:
             goal: The harmful goal the adversarial prompt should achieve.
             target_response: The victim model's response from the previous
                 iteration (ignored on ``iteration == 0``).
-            score: Judge score (1–10) from the previous iteration
+            score: Scorer score (1–10) from the previous iteration
                 (ignored on ``iteration == 0``).
             iteration: Zero-based iteration counter.
 
@@ -410,72 +474,75 @@ SCORE: {score}"""
 
         return (None, metadata) if include_meta else None
 
-    def _judge_response(self, goal: str, prompt: str, response: str) -> int:
+    def _score_response(self, goal: str, response: str) -> int:
         """
         Score a target response on a 1–10 jailbreak success scale.
 
-        Uses the attacker router with
-        :data:`~hackagent.attacks.techniques.pair.config.JUDGE_SYSTEM_PROMPT`
-        to query the judge LLM.  Parses the ``Rating: [[N]]`` pattern
-        first and falls back to a bare integer scan if the pattern is
-        absent.
+        Uses the AutoDAN-Turbo scorer+wrapper protocol via the configured
+        PAIR scorer router.
 
         Args:
-            goal: The original harmful goal (used to build the judge prompt).
-            prompt: The adversarial prompt that was sent to the target.
+            goal: The original harmful goal (used to build the scorer prompt).
             response: The target model's response to score.
 
         Returns:
-            Integer score in [1, 10].  Returns 1 (failed) on any error.
+            Integer score in [1, 10]. Returns 1 on scorer failure.
+
+        Side effects:
+            Stores scorer reasoning in ``self._last_scorer_explanation``.
         """
         try:
-            judge_prompt_limit = int(self.config.get("judge_prompt_max_chars", 2500))
-            judge_response_limit = int(
-                self.config.get("judge_response_max_chars", 3500)
+            scorer_response_limit = int(
+                self.config.get(
+                    "scorer_response_max_chars",
+                    self.config.get("judge_response_max_chars", 3500),
+                )
             )
-            prompt_for_judge = _truncate_text(prompt or "", judge_prompt_limit)
-            response_for_judge = _truncate_text(response or "", judge_response_limit)
+            response_for_scorer = _truncate_text(response or "", scorer_response_limit)
 
-            system_prompt = JUDGE_SYSTEM_PROMPT.format(goal=goal)
-            user_prompt = f"""[PROMPT]: {prompt_for_judge}
-[ASSISTANT'S RESPONSE]: {response_for_judge}"""
-
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ]
-
-            judge_response = self.attacker_router.route_request(
-                registration_key=list(self.attacker_router._agent_registry.keys())[0],
-                request_data={
-                    "messages": messages,
-                    "max_tokens": 10,
-                    "temperature": 0.0,
-                    "timeout": self.config.get(
-                        "judge_timeout", self.config.get("timeout", 120)
-                    ),
-                },
+            scorer_config = self.config.get("scorer", {})
+            scorer_max_tokens = int(
+                scorer_config.get(
+                    "max_tokens", self.config.get("max_tokens_eval", 4096)
+                )
             )
+            max_parse_retries = int(self.config.get("max_parse_retries", 5))
 
-            # Extract content from response using shared utility
-            content = extract_response_content(judge_response, self.logger)
+            reg_key = list(self.scorer_router._agent_registry.keys())[0]
+            score_value, assessment = score_response(
+                scorer_router=self.scorer_router,
+                scorer_key=reg_key,
+                goal=goal,
+                target_response=response_for_scorer,
+                logger=self.logger,
+                max_retries=max_parse_retries,
+                scorer_max_tokens=scorer_max_tokens,
+                role_label="pair-scorer",
+            )
+            assessment_text = (assessment or "").strip()
+            self._last_scorer_explanation = assessment_text
 
-            if content:
-                # Extract rating
-                match = re.search(r"Rating:\s*\[\[(\d+)\]\]", content)
-                if match:
-                    return int(match.group(1))
+            try:
+                numeric_score = float(score_value)
+            except (TypeError, ValueError):
+                return 1
 
-                # Try simple number extraction
-                match = re.search(r"\b(\d+)\b", content)
-                if match:
-                    rating = int(match.group(1))
-                    return min(max(rating, 1), 10)
+            return int(min(10, max(1, round(numeric_score))))
 
         except Exception as e:
-            self.logger.error(f"Error judging response: {e}")
+            self.logger.error(f"Error scoring response: {e}")
 
-        return 1  # Default to failed
+        self._last_scorer_explanation = ""
+        return 1
+
+    def _judge_response(self, goal: str, prompt: str, response: str) -> int:
+        """Backward-compatible scorer hook expected by existing PAIR tests.
+
+        The ``prompt`` argument is currently unused by the AutoDAN-based
+        scorer path, but is preserved for API compatibility.
+        """
+        del prompt
+        return self._score_response(goal, response)
 
     def _run_single_goal(
         self,
@@ -511,6 +578,7 @@ SCORE: {score}"""
         best_prompt = ""
         best_response = ""
         best_score = 0
+        best_scorer_explanation = ""
         iterations_completed = 0
 
         self.logger.info(f"Starting PAIR attack for goal: {goal[:50]}...")
@@ -521,7 +589,7 @@ SCORE: {score}"""
             iter_t0 = time.perf_counter()
             attacker_latency_s = 0.0
             target_latency_s = 0.0
-            judge_latency_s = 0.0
+            scorer_latency_s = 0.0
 
             # Get improved prompt from attacker
             _attacker_t0 = time.perf_counter()
@@ -579,10 +647,11 @@ SCORE: {score}"""
                     progress_bar.update(task, advance=1)
                 continue
 
-            # Judge the response
-            _judge_t0 = time.perf_counter()
+            # Score the response via AutoDAN scorer+wrapper protocol
+            _scorer_t0 = time.perf_counter()
             score = self._judge_response(goal, adversarial_prompt, target_response)
-            judge_latency_s = round(time.perf_counter() - _judge_t0, 3)
+            scorer_explanation = getattr(self, "_last_scorer_explanation", "")
+            scorer_latency_s = round(time.perf_counter() - _scorer_t0, 3)
             iteration_latency_s = round(time.perf_counter() - iter_t0, 3)
 
             self.logger.info(f"Score: {score}/10")
@@ -624,7 +693,7 @@ SCORE: {score}"""
                         "latency_s": {
                             "attacker": attacker_latency_s,
                             "target": target_latency_s,
-                            "judge": judge_latency_s,
+                            "scorer": scorer_latency_s,
                             "total": iteration_latency_s,
                         },
                         "target_call": target_meta,
@@ -638,21 +707,23 @@ SCORE: {score}"""
                         "score": score,
                         "threshold": jailbreak_threshold,
                         "is_success": score >= jailbreak_threshold,
+                        "scorer_explanation": scorer_explanation,
                     },
                     score=score,
                     explanation=(
                         f"PAIR Iteration {iteration + 1}: score {score}/10 "
-                        f"(target={target_latency_s:.2f}s, judge={judge_latency_s:.2f}s)"
+                        f"(target={target_latency_s:.2f}s, scorer={scorer_latency_s:.2f}s)"
                     ),
-                    evaluator_name="pair_judge_iteration",
+                    evaluator_name="pair_scorer_iteration",
                     metadata={
                         "iteration": iteration + 1,
                         "latency_s": {
                             "attacker": attacker_latency_s,
                             "target": target_latency_s,
-                            "judge": judge_latency_s,
+                            "scorer": scorer_latency_s,
                             "total": iteration_latency_s,
                         },
+                        "scorer_explanation": scorer_explanation,
                         "target_call": target_meta,
                     },
                 )
@@ -662,6 +733,7 @@ SCORE: {score}"""
                 best_score = score
                 best_prompt = adversarial_prompt
                 best_response = target_response
+                best_scorer_explanation = scorer_explanation
                 self.logger.info(f"New best score: {best_score}/10")
 
             # Update progress bar
@@ -703,6 +775,7 @@ SCORE: {score}"""
             "best_prompt": best_prompt,
             "best_response": best_response,
             "best_score": best_score,
+            "best_scorer_explanation": best_scorer_explanation,
             "is_success": best_score >= jailbreak_threshold,
             "iterations_completed": iterations_completed,
             "n_iterations": n_iterations,
@@ -803,10 +876,18 @@ SCORE: {score}"""
                                         "iterations_completed": result[
                                             "iterations_completed"
                                         ],
+                                        "scorer_explanation": result.get(
+                                            "best_scorer_explanation", ""
+                                        ),
                                     },
                                     score=result["best_score"],
                                     explanation=f"Best score: {result['best_score']}/10 after {result['iterations_completed']} iterations",
-                                    evaluator_name="pair_judge",
+                                    evaluator_name="pair_scorer",
+                                    metadata={
+                                        "scorer_explanation": result.get(
+                                            "best_scorer_explanation", ""
+                                        )
+                                    },
                                 )
                                 goal_tracker.finalize_goal(
                                     ctx=goal_ctx,

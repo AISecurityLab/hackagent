@@ -223,6 +223,14 @@ class BaseAttack(abc.ABC):
         """
         run_id = self.config.get("_run_id") or self.run_id
         backend = self.config.get("_backend") or self.backend
+        raw_run_start_time = self.config.get("_global_run_start_time")
+        run_start_time: Optional[float]
+        try:
+            run_start_time = (
+                float(raw_run_start_time) if raw_run_start_time is not None else None
+            )
+        except (TypeError, ValueError):
+            run_start_time = None
         raw_goal_index_start = self.config.get("_goal_index_offset", 0)
         try:
             goal_index_start = int(raw_goal_index_start)
@@ -237,6 +245,7 @@ class BaseAttack(abc.ABC):
             goals=goals,
             initial_metadata=initial_metadata,
             goal_index_start=goal_index_start,
+            run_start_time=run_start_time,
         )
 
         # Backward-compat: expose step_tracker as self.tracker

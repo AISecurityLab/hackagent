@@ -251,6 +251,26 @@ class EvaluationPipeline(BaseEvaluationStep):
             if result_id:
                 result["result_id"] = result_id
 
+            # Find the best-scoring completion (the one that led to jailbreak)
+            # so it can be displayed in the evaluation details.
+            best_item = None
+            best_item_score = -1.0
+            for item in group_items:
+                score = 0.0
+                for _jt, col_name in available_judges_agg_cols.items():
+                    val = item.get(col_name)
+                    if val is not None:
+                        try:
+                            score += float(val)
+                        except (ValueError, TypeError):
+                            pass
+                if score > best_item_score:
+                    best_item_score = score
+                    best_item = item
+            if best_item:
+                result["best_completion"] = best_item.get("completion", "")
+                result["best_prompt"] = best_item.get("prefix", "")
+
             # Calculate judge statistics
             for judge_type, col_name in available_judges_agg_cols.items():
                 values = []
