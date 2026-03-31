@@ -79,7 +79,7 @@ class TestOllamaAdapterIntegration:
 
         request = {
             "prompt": "What is 2 + 2? Answer briefly.",
-            "max_new_tokens": 15,
+            "max_tokens": 15,
         }
 
         response = adapter.handle_request(request)
@@ -103,7 +103,7 @@ class TestOllamaAdapterIntegration:
             "messages": [
                 {"role": "user", "content": "Hello, how are you? Answer briefly."}
             ],
-            "max_new_tokens": 15,
+            "max_tokens": 15,
         }
 
         response = adapter.handle_request(request)
@@ -125,7 +125,7 @@ class TestOllamaAdapterIntegration:
 
         request = {
             "prompt": "Generate a random word.",
-            "max_new_tokens": 20,
+            "max_tokens": 20,
             "temperature": 1.5,  # Higher temperature for more randomness
             "top_p": 0.9,
         }
@@ -334,7 +334,7 @@ class TestOllamaRouterIntegration:
         agent_id = str(router.backend_agent.id)
         request_data = {
             "prompt": "Say hello!",
-            "max_new_tokens": 20,
+            "max_tokens": 20,
         }
 
         response = router.route_request(

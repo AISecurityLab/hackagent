@@ -107,20 +107,28 @@ class TestRemoteBackendGetContext(unittest.TestCase):
 
         self.assertEqual(ctx1.org_id, ctx2.org_id)
 
-    def test_context_raises_when_no_agents(self):
+    def test_context_from_organization_me_when_no_agents(self):
         client = _mock_client()
         backend = RemoteBackend(client)
 
         parsed = MagicMock()
         parsed.results = []
         resp = _mock_response(200, parsed=parsed)
+        org = MagicMock()
+        org.id = _uid()
 
-        with patch("hackagent.server.storage.remote.agent_list") as mock_list:
+        with (
+            patch("hackagent.server.storage.remote.agent_list") as mock_list,
+            patch(
+                "hackagent.server.storage.remote.organization_me_retrieve"
+            ) as mock_org,
+        ):
             mock_list.sync_detailed.return_value = resp
-            with self.assertRaises(RuntimeError) as ctx:
-                backend.get_context()
+            mock_org.sync_detailed.return_value = _mock_response(200, parsed=org)
+            ctx = backend.get_context()
 
-        self.assertIn("organization context", str(ctx.exception))
+        self.assertEqual(ctx.org_id, org.id)
+        self.assertEqual(ctx.user_id, "unknown")
 
     def test_context_raises_on_http_error(self):
         client = _mock_client()
@@ -128,8 +136,14 @@ class TestRemoteBackendGetContext(unittest.TestCase):
 
         resp = _mock_response(401, parsed=None)
 
-        with patch("hackagent.server.storage.remote.agent_list") as mock_list:
+        with (
+            patch("hackagent.server.storage.remote.agent_list") as mock_list,
+            patch(
+                "hackagent.server.storage.remote.organization_me_retrieve"
+            ) as mock_org,
+        ):
             mock_list.sync_detailed.return_value = resp
+            mock_org.sync_detailed.return_value = _mock_response(500, parsed=None)
             with self.assertRaises(RuntimeError):
                 backend.get_context()
 
@@ -185,6 +199,7 @@ class TestRemoteBackendCreateOrUpdateAgent(unittest.TestCase):
     def _no_existing_agent_resp(self):
         parsed = MagicMock()
         parsed.results = []
+        parsed.next = None
         parsed.next_ = None
         return _mock_response(200, parsed=parsed)
 
@@ -533,6 +548,50 @@ class TestRemoteBackendResult(unittest.TestCase):
         self.assertEqual(result.items[0].run_id, run_id)
         _, kwargs = mock_list.sync_detailed.call_args
         self.assertEqual(kwargs.get("run"), run_id)
+
+    def test_list_traces_from_result_retrieve(self):
+        result_id = _uid()
+
+        trace_1 = MagicMock()
+        trace_1.id = 101
+        trace_1.sequence = 2
+        trace_1.step_type = MagicMock()
+        trace_1.step_type.value = "TOOL_RESPONSE"
+        trace_1.content = {"tool": "web", "status": "ok"}
+        trace_1.timestamp = _dt()
+
+        trace_2 = MagicMock()
+        trace_2.id = 100
+        trace_2.sequence = 1
+        trace_2.step_type = MagicMock()
+        trace_2.step_type.value = "TOOL_CALL"
+        trace_2.content = {"tool": "web", "args": {"q": "x"}}
+        trace_2.timestamp = _dt()
+
+        parsed_result = MagicMock()
+        parsed_result.traces = [trace_1, trace_2]
+
+        with patch("hackagent.server.storage.remote.result_retrieve") as mock_retrieve:
+            mock_retrieve.sync_detailed.return_value = _mock_response(
+                200, parsed=parsed_result
+            )
+            traces = self.backend.list_traces(result_id)
+
+        self.assertEqual(len(traces), 2)
+        self.assertIsInstance(traces[0], TraceRecord)
+        self.assertEqual(traces[0].sequence, 1)
+        self.assertEqual(traces[1].sequence, 2)
+        self.assertEqual(traces[0].step_type, "TOOL_CALL")
+        self.assertEqual(traces[1].step_type, "TOOL_RESPONSE")
+
+    def test_list_traces_empty_on_error(self):
+        result_id = _uid()
+
+        with patch("hackagent.server.storage.remote.result_retrieve") as mock_retrieve:
+            mock_retrieve.sync_detailed.return_value = _mock_response(500, parsed=None)
+            traces = self.backend.list_traces(result_id)
+
+        self.assertEqual(traces, [])
 
 
 if __name__ == "__main__":

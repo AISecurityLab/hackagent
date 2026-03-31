@@ -154,18 +154,18 @@ class AdvPrefixAttack(BaseAttack):
             "meta_prefixes",
             "meta_prefix_samples",
             "batch_size",
-            "max_new_tokens",
+            "max_tokens",
             "guided_topk",
             "temperature",
             # Keys needed for Step 4
             "surrogate_attack_prompt",
             # Keys needed for Step 6
-            "max_new_tokens_completion",
+            "max_tokens_completion",
             "n_samples",
             # Keys needed for Step 7: Evaluation (includes judge evaluation, aggregation, and selection)
             "judges",
             "batch_size_judge",
-            "max_new_tokens_eval",
+            "max_tokens_eval",
             "filter_len",
             "n_prefixes_per_goal",
             "max_ce",  # Used in Step 5 (Preprocessor) and Step 7 (NLL filtering in aggregation)
@@ -218,7 +218,7 @@ class AdvPrefixAttack(BaseAttack):
                 "config_keys": [
                     "generator",
                     "batch_size",
-                    "max_new_tokens",
+                    "max_tokens",
                     "guided_topk",
                     "temperature",
                     "meta_prefixes",
@@ -239,7 +239,7 @@ class AdvPrefixAttack(BaseAttack):
                 "step_type_enum": "EXECUTION",
                 "config_keys": [
                     "batch_size",
-                    "max_new_tokens_completion",
+                    "max_tokens_completion",
                     "n_samples",
                     "_tracker",  # For per-goal result tracking via Tracker
                 ],
@@ -257,7 +257,7 @@ class AdvPrefixAttack(BaseAttack):
                 "config_keys": [
                     "judges",
                     "batch_size_judge",
-                    "max_new_tokens_eval",
+                    "max_tokens_eval",
                     "filter_len",
                     "n_prefixes_per_goal",
                     "max_ce",
@@ -319,6 +319,9 @@ class AdvPrefixAttack(BaseAttack):
 
             if not generation_output:
                 self.logger.warning("Generation produced no output")
+                # Ensure every pre-created goal result is explicitly finalized
+                # so dashboard entries never remain pending.
+                coordinator.finalize_all_goals([])
                 coordinator.finalize_pipeline([], lambda _: False)
                 return []
 

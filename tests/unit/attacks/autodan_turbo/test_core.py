@@ -64,6 +64,23 @@ class TestCoreGenerationAndScoring(unittest.TestCase):
         self.assertTrue(output.startswith("[START OF JAILBREAK PROMPT]"))
 
     @patch("hackagent.attacks.techniques.autodan_turbo.core.extract_response_content")
+    def test_conditional_generate_does_not_double_start_tag(self, mock_extract):
+        router = MagicMock()
+        router.route_request.return_value = {"dummy": True}
+        mock_extract.return_value = (
+            "[START OF JAILBREAK PROMPT]inner[END OF JAILBREAK PROMPT]"
+        )
+
+        output = core.conditional_generate(
+            router=router,
+            key="k",
+            system="sys",
+            condition="cond",
+            logger=MagicMock(),
+        )
+        self.assertEqual(output.count("[START OF JAILBREAK PROMPT]"), 1)
+
+    @patch("hackagent.attacks.techniques.autodan_turbo.core.extract_response_content")
     def test_conditional_generate_fallback_no_prefill(self, mock_extract):
         router = MagicMock()
         router.route_request.return_value = {"dummy": True}
@@ -86,7 +103,7 @@ class TestCoreGenerationAndScoring(unittest.TestCase):
     def test_query_target(self, _):
         agent_router = MagicMock()
         agent_router.route_request.return_value = {"dummy": True}
-        cfg = {"max_new_tokens": 10, "temperature": 0.1}
+        cfg = {"max_tokens": 10, "temperature": 0.1}
         out = core.query_target(agent_router, "v-key", "prompt", cfg, MagicMock())
         self.assertEqual(out, "target out")
 
@@ -254,11 +271,17 @@ class TestPromptExtraction(unittest.TestCase):
         text = "[START OF JAILBREAK PROMPT]abc[END OF JAILBREAK PROMPT]"
         self.assertEqual(core.extract_jailbreak_prompt(text, "fallback"), "abc")
 
+    def test_extract_with_nested_start_tags_prefers_innermost_prompt(self):
+        text = (
+            "[START OF JAILBREAK PROMPT]header "
+            "[START OF JAILBREAK PROMPT]real prompt"
+            "[END OF JAILBREAK PROMPT]"
+        )
+        self.assertEqual(core.extract_jailbreak_prompt(text, "fallback"), "real prompt")
+
     def test_extract_end_tag_cleanup_when_between_empty(self):
         text = "[START OF JAILBREAK PROMPT][END OF JAILBREAK PROMPT]"
-        self.assertEqual(
-            core.extract_jailbreak_prompt(text, "fallback"), "[END OF JAILBREAK PROMPT]"
-        )
+        self.assertEqual(core.extract_jailbreak_prompt(text, "fallback"), "fallback")
 
     def test_check_refusal(self):
         self.assertEqual(core.check_refusal("I cannot do this", "req"), "req")

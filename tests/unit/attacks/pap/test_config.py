@@ -1,5 +1,7 @@
 import unittest
 
+from pydantic import ValidationError
+
 from hackagent.attacks.techniques.pap.config import (
     DEFAULT_PAP_CONFIG,
     PAPParams,
@@ -18,9 +20,9 @@ class TestDefaultConfig(unittest.TestCase):
             "batch_size",
             "batch_size_judge",
             "goal_batch_size",
-            "max_new_tokens_eval",
+            "max_tokens_eval",
             "filter_len",
-            "judge_request_timeout",
+            "judge_timeout",
             "judge_temperature",
             "max_judge_retries",
             "output_dir",
@@ -54,18 +56,18 @@ class TestPAPParams(unittest.TestCase):
         params = PAPParams()
         self.assertEqual(params.techniques, "top5")
         self.assertEqual(params.attacker_temperature, 1.0)
-        self.assertEqual(params.attacker_max_tokens, 1024)
+        self.assertEqual(params.attacker_max_tokens, 4096)
 
     def test_invalid_techniques_string(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValidationError):
             PAPParams(techniques="invalid")
 
     def test_invalid_techniques_type(self):
-        with self.assertRaises(TypeError):
+        with self.assertRaises(ValidationError):
             PAPParams(techniques=42)
 
     def test_empty_techniques_list(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValidationError):
             PAPParams(techniques=[])
 
     def test_valid_techniques_list(self):
@@ -73,11 +75,11 @@ class TestPAPParams(unittest.TestCase):
         self.assertEqual(len(params.techniques), 2)
 
     def test_negative_temperature(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValidationError):
             PAPParams(attacker_temperature=-1.0)
 
     def test_zero_max_tokens(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValidationError):
             PAPParams(attacker_max_tokens=0)
 
 

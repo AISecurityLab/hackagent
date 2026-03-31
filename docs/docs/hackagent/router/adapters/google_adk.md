@@ -46,7 +46,7 @@ response parsing, and error handling.
 - `name` _str_ - The name of the ADK application (used for router registration AND as ADK app identifier).
 - `endpoint` _str_ - The base API endpoint for the ADK agent.
 - `user_id` _str_ - The user identifier for ADK sessions.
-- `request_timeout` _int_ - Timeout in seconds for requests to the ADK agent.
+- `timeout` _int_ - Timeout in seconds for requests to the ADK agent.
 - `logger` _logging.Logger_ - Logger instance for this adapter.
 
 #### \_\_init\_\_
@@ -65,7 +65,7 @@ Initializes the ADKAgent.
   - &#x27;name&#x27;: Name of the ADK application (e.g., &#x27;multi_tool_agent&#x27;).
   - &#x27;endpoint&#x27;: Base URL of the ADK agent.
   - &#x27;user_id&#x27;: User ID for the ADK session.
-  - &#x27;request_timeout&#x27; (optional): Request timeout in seconds
+  - &#x27;timeout&#x27; (optional): Request timeout in seconds
   (defaults to 120).
   
 

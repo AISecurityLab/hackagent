@@ -25,7 +25,7 @@ class TestADKAgentInit(unittest.TestCase):
             "name": "multi_tool_agent_app",
             "endpoint": "http://fake-adk-endpoint.com/api",
             "user_id": "test_user_adk",
-            "request_timeout": 60,
+            "timeout": 60,
         }
         try:
             adapter = ADKAgent(id=adapter_id, config=config)
@@ -33,7 +33,7 @@ class TestADKAgentInit(unittest.TestCase):
             self.assertEqual(adapter.name, config["name"])
             self.assertEqual(adapter.endpoint, config["endpoint"].strip("/"))
             self.assertEqual(adapter.user_id, config["user_id"])
-            self.assertEqual(adapter.request_timeout, config["request_timeout"])
+            self.assertEqual(adapter.timeout, config["timeout"])
         except AgentConfigurationError:
             self.fail("ADKAgent initialization failed unexpectedly with valid config.")
 
@@ -45,7 +45,7 @@ class TestADKAgentInit(unittest.TestCase):
             "user_id": "user_abc",
         }
         adapter = ADKAgent(id=adapter_id, config=config)
-        self.assertEqual(adapter.request_timeout, 120)  # Default timeout
+        self.assertEqual(adapter.timeout, 120)  # Default timeout
 
     def test_init_missing_name_raises_error(self):
         with self.assertRaisesRegex(

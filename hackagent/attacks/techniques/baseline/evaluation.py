@@ -302,6 +302,7 @@ def _sync_evaluation_to_server(
     evaluated_data: List[Dict[str, Any]],
     config: Dict[str, Any],
     logger: logging.Logger,
+    goal_tracker: Optional[Tracker] = None,
 ) -> int:
     """
     Sync evaluation results to the server using Tracker (preferred) or legacy method.
@@ -323,14 +324,11 @@ def _sync_evaluation_to_server(
     Returns:
         Number of results/goals successfully updated
     """
-    goal_tracker: Optional[Tracker] = config.get("_tracker")
-    goal_contexts: Optional[Dict[str, Any]] = config.get("_goal_contexts")
+    tracker = goal_tracker or config.get("_tracker")
 
     # Preferred: Use Tracker for organized per-goal results
-    if goal_tracker and goal_contexts:
-        return _finalize_goals_with_tracker(
-            evaluated_data, goal_tracker, goal_contexts, logger
-        )
+    if tracker:
+        return _finalize_goals_with_tracker(evaluated_data, tracker, logger)
 
     # Legacy fallback: Update individual result_id records
     client = config.get("_backend") or config.get("_client")
@@ -368,7 +366,6 @@ def _sync_evaluation_to_server(
 def _finalize_goals_with_tracker(
     evaluated_data: List[Dict[str, Any]],
     goal_tracker: Tracker,
-    goal_contexts: Dict[str, Any],
     logger: logging.Logger,
 ) -> int:
     """
@@ -389,7 +386,7 @@ def _finalize_goals_with_tracker(
     logger.info("Finalizing goals using Tracker...")
 
     # Aggregate results per goal
-    goal_results: Dict[str, Dict[str, Any]] = defaultdict(
+    goal_results: Dict[tuple, Dict[str, Any]] = defaultdict(
         lambda: {
             "total": 0,
             "successful": 0,
@@ -398,11 +395,13 @@ def _finalize_goals_with_tracker(
     )
 
     for row in evaluated_data:
+        goal_idx = row.get("goal_index")
         goal = row.get("goal", "unknown")
-        goal_results[goal]["total"] += 1
+        goal_key = (goal_idx, goal)
+        goal_results[goal_key]["total"] += 1
         if row.get("success", False):
-            goal_results[goal]["successful"] += 1
-        goal_results[goal]["evaluations"].append(
+            goal_results[goal_key]["successful"] += 1
+        goal_results[goal_key]["evaluations"].append(
             {
                 "template_category": row.get("template_category"),
                 "success": row.get("success", False),
@@ -411,17 +410,31 @@ def _finalize_goals_with_tracker(
             }
         )
 
-    # Finalize each goal
+    all_contexts = goal_tracker.get_all_contexts()
+
+    # Finalize each known goal context (including goals with zero attempts)
     finalized_count = 0
-    for goal, ctx in goal_contexts.items():
+    for goal_index, ctx in sorted(all_contexts.items(), key=lambda item: item[0]):
         if ctx.is_finalized:
             continue
 
         results = goal_results.get(
-            goal, {"total": 0, "successful": 0, "evaluations": []}
+            (goal_index, ctx.goal),
+            {"total": 0, "successful": 0, "evaluations": []},
         )
         total = results["total"]
         successful = results["successful"]
+
+        if total == 0:
+            goal_tracker.add_custom_trace(
+                ctx=ctx,
+                step_name="No Prompt Generated",
+                content={
+                    "goal": ctx.goal,
+                    "goal_index": goal_index,
+                    "reason": "No baseline prompt/completion rows were produced for this goal",
+                },
+            )
 
         # Goal is successful if ANY template attempt succeeded
         goal_success = successful > 0
@@ -447,7 +460,11 @@ def _finalize_goals_with_tracker(
         if goal_tracker.finalize_goal(
             ctx=ctx,
             success=goal_success,
-            evaluation_notes=evaluation_notes,
+            evaluation_notes=(
+                "Baseline attack: no prompts/completions generated for this goal"
+                if total == 0
+                else evaluation_notes
+            ),
             final_metadata={
                 "total_attempts": total,
                 "successful_attempts": successful,
@@ -456,7 +473,7 @@ def _finalize_goals_with_tracker(
         ):
             finalized_count += 1
 
-    logger.info(f"Finalized {finalized_count}/{len(goal_contexts)} goals with Tracker")
+    logger.info(f"Finalized {finalized_count}/{len(all_contexts)} goals with Tracker")
 
     # Log summary
     summary = goal_tracker.get_summary()
@@ -473,6 +490,7 @@ def execute(
     input_data: List[Dict[str, Any]],
     config: Dict[str, Any],
     logger: logging.Logger,
+    goal_tracker: Optional[Tracker] = None,
 ) -> Dict[str, List[Dict[str, Any]]]:
     """
     Complete evaluation pipeline.
@@ -489,7 +507,7 @@ def execute(
     evaluated_data = evaluate_responses(input_data, config, logger)
 
     # Sync evaluation results to server (Bug 3 fix)
-    _sync_evaluation_to_server(evaluated_data, config, logger)
+    _sync_evaluation_to_server(evaluated_data, config, logger, goal_tracker)
 
     # Aggregate results
     summary_data = aggregate_results(evaluated_data, logger)

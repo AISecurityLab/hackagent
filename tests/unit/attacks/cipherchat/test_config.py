@@ -18,9 +18,9 @@ class TestConfig(unittest.TestCase):
             "output_dir",
             "batch_size",
             "goal_batch_size",
-            "max_new_tokens_eval",
+            "max_tokens_eval",
             "filter_len",
-            "judge_request_timeout",
+            "judge_timeout",
             "judge_temperature",
             "max_judge_retries",
         ]

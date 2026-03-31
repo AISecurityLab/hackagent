@@ -78,9 +78,9 @@ configuration for both local and remote evaluation setups.
 - `organization_id` - Optional organization identifier for backend agent.
 - `agent_metadata` - Optional dictionary containing agent-specific metadata.
 - `batch_size` - Number of evaluation requests to process in batches.
-- `max_new_tokens_eval` - Maximum tokens to generate per evaluation.
+- `max_tokens_eval` - Maximum tokens to generate per evaluation.
 - `filter_len` - Minimum response length threshold for pre-filtering.
-- `request_timeout` - Timeout in seconds for individual evaluation requests.
+- `timeout` - Timeout in seconds for individual evaluation requests.
 - `agent_type`0 - Sampling temperature for judge model responses (0.0 for deterministic).
 
 #### agent\_type

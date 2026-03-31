@@ -146,14 +146,14 @@ advanced_config = {
         "endpoint": "https://api.openai.com/v1",
         "agent_type": "OPENAI_SDK",
         "model": "gpt-4",
-        "max_new_tokens": 400,
+        "max_tokens": 400,
         "temperature": 1.0,
         "top_p": 0.9,
         "api_key": None
     },
 
     # Target model generation settings
-    "max_new_tokens": 256,
+    "max_tokens": 256,
     "temperature": 0.7,
     "top_p": 1.0,
 
@@ -338,7 +338,7 @@ for target in targets:
 
 ## Related
 
-- [Attack Overview](./index.md) — Compare all attack types
+- [Attack Overview](./index.mdx) — Compare all attack types
 - [PAIR Attacks](./pair.md) — Linear iterative refinement
 - [AdvPrefix Attacks](./advprefix.md) — Prefix optimisation approach
 - [Baseline Attacks](./baseline.md) — Quick template-based testing

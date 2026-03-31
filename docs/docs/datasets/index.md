@@ -169,7 +169,7 @@ When both `shuffle` and `offset` are used, shuffling happens **first**, then off
 
 ## Next Steps
 
-- 📖 [**Datasets Tutorial**](../getting-started/datasets-tutorial.md) — Complete walkthrough with examples
+- 📖 [**Datasets Tutorial**](../getting-started/datasets-tutorial.mdx) — Complete walkthrough with examples
 - 🎯 [**Presets**](./presets.md) — All 30+ pre-configured benchmarks
 - 🤗 [**HuggingFace Provider**](./huggingface.md) — Load any HuggingFace dataset
 - 📁 [**File Provider**](./file.md) — Load from local JSON, CSV, or TXT files

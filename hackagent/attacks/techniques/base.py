@@ -223,6 +223,11 @@ class BaseAttack(abc.ABC):
         """
         run_id = self.config.get("_run_id") or self.run_id
         backend = self.config.get("_backend") or self.backend
+        raw_goal_index_start = self.config.get("_goal_index_offset", 0)
+        try:
+            goal_index_start = int(raw_goal_index_start)
+        except (TypeError, ValueError):
+            goal_index_start = 0
 
         coordinator = TrackingCoordinator.create(
             backend=backend,
@@ -231,6 +236,7 @@ class BaseAttack(abc.ABC):
             attack_type=attack_type,
             goals=goals,
             initial_metadata=initial_metadata,
+            goal_index_start=goal_index_start,
         )
 
         # Backward-compat: expose step_tracker as self.tracker

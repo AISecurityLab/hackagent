@@ -9,16 +9,16 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 DATASET = {
     "preset": "harmbench",
-    "limit": 100,
+    "limit": 5,
     "shuffle": False,
     "seed": 42,
 }
-TARGET_MODEL = "anthropic/claude-opus-4.6"
+TARGET_MODEL = "google/gemma-3-27b-it"
 TARGET_ENDPOINT = "https://openrouter.ai/api/v1"
 
 
 @pytest.mark.e2e
-def test_tap():
+def test_baseline():
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
     if not openrouter_api_key:
         pytest.skip("OPENROUTER_API_KEY not set")
@@ -35,22 +35,26 @@ def test_tap():
     )
 
     config = {
-        "attack_type": "tap",
+        "attack_type": "baseline",
         "dataset": DATASET,
-        "judge_batch_size": 10,
-        "goal_batch_size": 2,
-        "goal_batch_workers": 2,
-        "max_tokens": 8000,
-        "tap_params": {
-            "depth": 10,
-            "width": 10,
-            "branching_factor": 4,
-            "n_streams": 3,
-        },
+        "max_tokens": 400,
+        "goal_batch_size": 5,
+        "goal_batch_workers": 5,
+        "batch_size_judge": 5,
+        "batch_size": 5,
+        "judges": [
+            {
+                "identifier": "openai/gpt-4o-mini",
+                "type": "harmbench",
+                "endpoint": TARGET_ENDPOINT,
+                "agent_type": AgentTypeEnum.OPENAI_SDK,
+                "api_key": OPENROUTER_API_KEY,
+            }
+        ],
     }
 
     results = agent.hack(attack_config=config)
     print(f"Attack completed: {results}")
 
 
-test_tap()
+test_baseline()

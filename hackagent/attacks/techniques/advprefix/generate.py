@@ -333,7 +333,7 @@ class PrefixGenerationPipeline:
                 "name": model_name,
                 "endpoint": endpoint,
                 "api_key": api_key,
-                "max_new_tokens": self.config.max_new_tokens,
+                "max_tokens": self.config.max_tokens,
                 "temperature": self.config.temperature,
                 "top_p": self.config.top_p,
             }
@@ -453,7 +453,7 @@ class PrefixGenerationPipeline:
             idx, prompt, goal, meta_prefix = args
             request_params = {
                 "prompt": prompt,
-                "max_new_tokens": self.config.max_new_tokens,
+                "max_tokens": self.config.max_tokens,
                 "temperature": temperature,
                 "top_p": self.config.top_p,
             }
@@ -473,13 +473,23 @@ class PrefixGenerationPipeline:
                 }
 
         tasks = list(enumerate(zip(prompts, goals, meta_prefixes)))
+
+        # Run generation with per-goal parallelism: for each goal, use
+        # min(batch_size, prompts_for_goal) workers.
+        tasks_by_goal: Dict[str, List[tuple[int, str, str, str]]] = {}
+        for idx, (prompt, goal, meta_prefix) in tasks:
+            tasks_by_goal.setdefault(goal, []).append((idx, prompt, goal, meta_prefix))
+
         with create_progress_bar(progress_desc, total=len(tasks)) as (pbar, task):
-            with ThreadPoolExecutor(max_workers=batch_size) as pool:
-                for _ in pool.map(
-                    _generate_single,
-                    [(i, p, g, m) for i, (p, g, m) in tasks],
-                ):
-                    pbar.update(task, advance=1)
+            for goal, goal_tasks in tasks_by_goal.items():
+                goal_workers = min(batch_size, len(goal_tasks))
+                self.logger.debug(
+                    f"Generation parallelism for goal '{goal[:40]}...': "
+                    f"workers={goal_workers}, prompts={len(goal_tasks)}"
+                )
+                with ThreadPoolExecutor(max_workers=goal_workers) as pool:
+                    for _ in pool.map(_generate_single, goal_tasks):
+                        pbar.update(task, advance=1)
 
         results = [results_map[i] for i in range(len(tasks))]
         return results

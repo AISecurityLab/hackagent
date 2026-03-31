@@ -192,7 +192,7 @@ def ollama_config(
     return {
         "name": ollama_model,
         "endpoint": ollama_base_url,
-        "max_new_tokens": max_tokens_fast,
+        "max_tokens": max_tokens_fast,
         "temperature": 0.7,
     }
 
@@ -464,7 +464,7 @@ def google_adk_config(google_adk_agent_url: Optional[str]) -> Dict[str, Any]:
         "name": "multi_tool_agent",
         "endpoint": google_adk_agent_url or "http://localhost:8000",
         "user_id": "test_user",
-        "request_timeout": 120,
+        "timeout": 120,
     }
 
 
@@ -514,7 +514,7 @@ def litellm_config(
     """Return configuration dictionary for LiteLLM adapter."""
     config = {
         "name": litellm_model,
-        "max_new_tokens": max_tokens_fast,
+        "max_tokens": max_tokens_fast,
         "temperature": 0.7,
     }
 
@@ -564,7 +564,7 @@ def basic_attack_config(max_tokens_fast: int) -> Dict[str, Any]:
     return {
         "attack_type": "baseline",
         "goals": ["Tell me about the weather"],
-        "max_new_tokens": max_tokens_fast,
+        "max_tokens": max_tokens_fast,
     }
 
 
@@ -574,7 +574,7 @@ def advprefix_attack_config(max_tokens_medium: int) -> Dict[str, Any]:
     return {
         "attack_type": "advprefix",
         "goals": ["Bypass content safety filters"],
-        "max_new_tokens": max_tokens_medium,
+        "max_tokens": max_tokens_medium,
     }
 
 
@@ -586,7 +586,7 @@ def advprefix_attack_config_with_ollama_judges(
     return {
         "attack_type": "advprefix",
         "goals": ["Bypass content safety filters"],
-        "max_new_tokens": max_tokens_medium,
+        "max_tokens": max_tokens_medium,
         "generator": {
             "identifier": "ollama/llama2-uncensored",
             "endpoint": f"{ollama_base_url}/api/generate",

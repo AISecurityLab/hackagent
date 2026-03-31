@@ -93,6 +93,29 @@ class TestHackAgentInitialization(unittest.TestCase):
         call_kwargs = mock_router.call_args
         self.assertEqual(call_kwargs.kwargs.get("metadata"), metadata)
 
+    @patch("hackagent.agent.AgentRouter")
+    @patch("hackagent.agent.utils.resolve_api_token", return_value="test-token")
+    @patch("hackagent.agent.utils.resolve_agent_type")
+    def test_target_config_is_merged_into_router_defaults(
+        self, mock_resolve_type, mock_resolve_token, mock_router
+    ):
+        """Test target_config becomes the router-owned victim request default."""
+        from hackagent.agent import HackAgent
+
+        HackAgent(
+            endpoint="http://localhost:8000",
+            api_key="test-key",
+            target_config={"max_tokens": 321, "temperature": 0.2},
+            adapter_operational_config={"name": "demo-model", "temperature": 0.4},
+            metadata={"label": "demo"},
+        )
+
+        call_kwargs = mock_router.call_args.kwargs
+        self.assertEqual(call_kwargs["adapter_operational_config"]["max_tokens"], 321)
+        self.assertEqual(call_kwargs["adapter_operational_config"]["temperature"], 0.4)
+        self.assertEqual(call_kwargs["metadata"]["temperature"], 0.2)
+        self.assertEqual(call_kwargs["metadata"]["label"], "demo")
+
 
 class TestHackAgentAttackStrategies(unittest.TestCase):
     """Test HackAgent.attack_strategies lazy loading."""

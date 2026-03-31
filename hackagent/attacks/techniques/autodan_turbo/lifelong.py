@@ -5,6 +5,8 @@
 import json
 from typing import Dict, List
 
+from hackagent.attacks.techniques.config import DEFAULT_MAX_OUTPUT_TOKENS
+
 from .config import (
     ATTACKER_CONDITION,
     FIND_NEW_STRATEGY_SYSTEM_PROMPT,
@@ -107,9 +109,11 @@ def execute(
     iterations = params.get("lifelong_iterations", 1)
     attacker_temperature = params.get("attacker_temperature", 1.0)
     attacker_top_p = params.get("attacker_top_p", 1.0)
-    attacker_max_tokens = params.get("attacker_max_tokens", 512)
-    scorer_max_tokens = params.get("scorer_max_tokens", 512)
-    summarizer_max_tokens = params.get("summarizer_max_tokens", 512)
+    attacker_max_tokens = params.get("attacker_max_tokens", DEFAULT_MAX_OUTPUT_TOKENS)
+    scorer_max_tokens = params.get("scorer_max_tokens", DEFAULT_MAX_OUTPUT_TOKENS)
+    summarizer_max_tokens = params.get(
+        "summarizer_max_tokens", DEFAULT_MAX_OUTPUT_TOKENS
+    )
     max_parse_retries = params.get("max_parse_retries", 5)
     victim_key = str(agent_router.backend_agent.id)
 

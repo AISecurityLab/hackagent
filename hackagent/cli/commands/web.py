@@ -14,6 +14,7 @@ import time
 import webbrowser
 
 import click
+import httpx
 from rich.console import Console
 
 console = Console()
@@ -87,8 +88,14 @@ def web(ctx, host, port, db_path, no_browser):
             client = AuthenticatedClient(
                 base_url=cli_config.base_url,
                 token=cli_config.api_key,
+                # Never disable HTTP timeouts in web mode: a stuck remote call
+                # would otherwise keep the dashboard loading forever.
+                timeout=httpx.Timeout(15.0, connect=5.0, read=15.0, write=15.0),
             )
-            backend = RemoteBackend(client=client)
+            candidate_backend = RemoteBackend(client=client)
+            # Preflight check to fail fast on invalid/unreachable remote config.
+            candidate_backend.get_context()
+            backend = candidate_backend
             console.print("[dim]Using remote backend.[/dim]")
         except Exception as exc:
             console.print(
@@ -109,13 +116,46 @@ def web(ctx, host, port, db_path, no_browser):
     console.print()
     console.print("[bold]🌐  HackAgent Dashboard[/bold]")
     console.print(f"    [cyan]→  {url}[/cyan]")
-    mode_label = "remote" if cli_config.api_key else "local"
+    mode_label = "remote" if backend.__class__.__name__ == "RemoteBackend" else "local"
     console.print(f"    Mode : [cyan]{mode_label}[/cyan]")
-    if not cli_config.api_key:
+    if mode_label == "local":
         resolved_db = db_path or "~/.local/share/hackagent/hackagent.db"
         console.print(f"    DB   : [dim]{resolved_db}[/dim]")
     console.print()
     console.print("    Press [bold]Ctrl+C[/bold] to stop.\n")
+
+    # ── Free port if still occupied by a previous instance ──────────────────
+    import signal
+    import socket
+
+    def _free_port(host: str, port: int) -> None:
+        """Kill any process listening on host:port so we can bind cleanly."""
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            if s.connect_ex((host, port)) != 0:
+                return  # port already free
+        try:
+            import subprocess
+
+            out = subprocess.check_output(
+                ["lsof", "-t", "-i", f"TCP:{port}", "-sTCP:LISTEN"],
+                text=True,
+            ).strip()
+            for pid in out.splitlines():
+                pid = pid.strip()
+                if pid.isdigit():
+                    console.print(
+                        f"[yellow]Killing previous process on port {port} (PID {pid})…[/yellow]"
+                    )
+                    import os
+
+                    os.kill(int(pid), signal.SIGTERM)
+            import time
+
+            time.sleep(0.5)
+        except Exception:
+            pass
+
+    _free_port(host, port)
 
     # ── Serve (NiceGUI opens the browser automatically when show=True) ────────
     app.run(host=host, port=port, show=not no_browser)

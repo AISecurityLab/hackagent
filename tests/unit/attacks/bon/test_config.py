@@ -1,5 +1,7 @@
 import unittest
 
+from pydantic import ValidationError
+
 from hackagent.attacks.techniques.bon.config import DEFAULT_BON_CONFIG, BoNParams
 
 
@@ -12,9 +14,9 @@ class TestDefaultConfig(unittest.TestCase):
             "batch_size",
             "batch_size_judge",
             "goal_batch_size",
-            "max_new_tokens_eval",
+            "max_tokens_eval",
             "filter_len",
-            "judge_request_timeout",
+            "judge_timeout",
             "judge_temperature",
             "max_judge_retries",
             "goals",
@@ -52,19 +54,19 @@ class TestBoNParams(unittest.TestCase):
         self.assertAlmostEqual(p.sigma, 0.4)
 
     def test_invalid_n_steps(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValidationError):
             BoNParams(n_steps=0)
 
     def test_invalid_num_concurrent_k(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValidationError):
             BoNParams(num_concurrent_k=0)
 
     def test_invalid_sigma_zero(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValidationError):
             BoNParams(sigma=0.0)
 
     def test_invalid_sigma_above_one(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValidationError):
             BoNParams(sigma=1.5)
 
 

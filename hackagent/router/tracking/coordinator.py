@@ -92,6 +92,7 @@ class TrackingCoordinator:
         self.goal_tracker = goal_tracker
         self.logger = logger or get_logger(__name__)
         self._goals: List[str] = []
+        self._goal_indices: List[int] = []
         self._run_start_time: float = time.perf_counter()
 
     @classmethod
@@ -103,6 +104,7 @@ class TrackingCoordinator:
         attack_type: str = "unknown",
         goals: Optional[List[str]] = None,
         initial_metadata: Optional[Dict[str, Any]] = None,
+        goal_index_start: int = 0,
     ) -> "TrackingCoordinator":
         """
         Factory method to create a fully-initialized coordinator.
@@ -114,6 +116,7 @@ class TrackingCoordinator:
             attack_type: Attack identifier (e.g., "advprefix", "pair")
             goals: Optional list of goals to initialize upfront
             initial_metadata: Optional metadata for goal results
+            goal_index_start: Starting index to assign to the first goal
 
         Returns:
             Initialized TrackingCoordinator
@@ -148,7 +151,11 @@ class TrackingCoordinator:
 
         # Initialize goals if provided
         if goals:
-            coordinator.initialize_goals(goals, initial_metadata)
+            coordinator.initialize_goals(
+                goals,
+                initial_metadata,
+                goal_index_start=goal_index_start,
+            )
 
         return coordinator
 
@@ -191,6 +198,7 @@ class TrackingCoordinator:
         self,
         goals: List[str],
         initial_metadata: Optional[Dict[str, Any]] = None,
+        goal_index_start: int = 0,
     ) -> None:
         """
         Create Result records for all goals upfront.
@@ -201,17 +209,20 @@ class TrackingCoordinator:
         Args:
             goals: List of goal strings
             initial_metadata: Optional metadata to attach to each goal result
+            goal_index_start: Starting index to assign to the first goal
         """
         self._goals = list(goals)
+        self._goal_indices = [goal_index_start + i for i in range(len(goals))]
 
         if not self.has_goal_tracking:
             self.logger.debug("Goal tracking disabled — skipping goal initialization")
             return
 
         for i, goal in enumerate(goals):
+            goal_index = goal_index_start + i
             self.goal_tracker.create_goal_result(
                 goal=goal,
-                goal_index=i,
+                goal_index=goal_index,
                 initial_metadata=initial_metadata or {},
             )
 
@@ -328,8 +339,8 @@ class TrackingCoordinator:
 
         if not results:
             # Mark all unfinalized goals as failed
-            for i, goal in enumerate(self._goals):
-                ctx = self.goal_tracker.get_goal_context(i)
+            for goal_idx in self._goal_indices:
+                ctx = self.goal_tracker.get_goal_context(goal_idx)
                 if ctx and not ctx.is_finalized:
                     self.goal_tracker.finalize_goal(
                         ctx=ctx,
@@ -345,8 +356,8 @@ class TrackingCoordinator:
             goal_results.setdefault(goal, []).append(r)
 
         # Finalize each goal
-        for i, goal in enumerate(self._goals):
-            ctx = self.goal_tracker.get_goal_context(i)
+        for goal_idx, goal in zip(self._goal_indices, self._goals):
+            ctx = self.goal_tracker.get_goal_context(goal_idx)
             if not ctx or ctx.is_finalized:
                 continue
 
@@ -410,8 +421,8 @@ class TrackingCoordinator:
             error_message: Description of the failure
         """
         if self.has_goal_tracking:
-            for i in range(len(self._goals)):
-                ctx = self.goal_tracker.get_goal_context(i)
+            for goal_idx in self._goal_indices:
+                ctx = self.goal_tracker.get_goal_context(goal_idx)
                 if ctx and not ctx.is_finalized:
                     self.goal_tracker.finalize_goal(
                         ctx=ctx,

@@ -44,7 +44,7 @@ Ollama API Endpoints:
 Configuration:
 - &#x27;name&#x27;: Model name (e.g., &quot;llama3&quot;, &quot;mistral&quot;, &quot;codellama&quot;)
 - &#x27;endpoint&#x27;: Ollama API base URL (default: &quot;http://localhost:11434&quot;)
-- &#x27;max_new_tokens&#x27;: Maximum tokens to generate (default: 100)
+- &#x27;max_tokens&#x27;: Maximum tokens to generate (default: 100)
 - &#x27;temperature&#x27;: Sampling temperature (default: 0.8)
 - &#x27;top_p&#x27;: Top-p sampling parameter (default: 0.95)
 - &#x27;top_k&#x27;: Top-k sampling parameter (optional)
@@ -66,7 +66,7 @@ Initializes the OllamaAgent.
   Expected keys:
   - &#x27;name&#x27;: Model name (required, e.g., &quot;llama3&quot;, &quot;mistral&quot;)
   - &#x27;endpoint&#x27; (optional): Ollama API base URL (default: http://localhost:11434)
-  - &#x27;max_new_tokens&#x27; (optional): Default max tokens for generation (default: 100)
+  - &#x27;max_tokens&#x27; (optional): Default max tokens for generation (default: 100)
   - &#x27;temperature&#x27; (optional): Default temperature (default: 0.8)
   - &#x27;top_p&#x27; (optional): Default top_p (default: 0.95)
   - &#x27;top_k&#x27; (optional): Default top_k sampling
@@ -88,7 +88,7 @@ This method handles both &#x27;prompt&#x27; (for /api/generate) and &#x27;messag
 
 - `request_data` - The data for the agent to process. Expected keys:
   - &#x27;prompt&#x27; or &#x27;messages&#x27;: The input for generation
-  - &#x27;max_new_tokens&#x27; or &#x27;max_tokens&#x27; (optional): Override default max tokens
+  - &#x27;max_tokens&#x27; or &#x27;max_tokens&#x27; (optional): Override default max tokens
   - &#x27;temperature&#x27; (optional): Override default temperature
   - &#x27;top_p&#x27; (optional): Override default top_p
   - &#x27;top_k&#x27; (optional): Override default top_k

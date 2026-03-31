@@ -44,10 +44,11 @@ from uuid import UUID, uuid4
 from hackagent.attacks.evaluator.metrics import generate_summary_report
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import fields
+from dataclasses import fields as dataclass_fields, is_dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from hackagent.attacks.evaluator.judge_evaluators import EVALUATOR_MAP
+from hackagent.attacks.shared.router_factory import extract_passthrough_request_config
 from hackagent.attacks.evaluator.sync import sync_evaluation_to_server
 from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
 from hackagent.server.client import AuthenticatedClient
@@ -66,6 +67,7 @@ MERGE_KEYS: List[str] = ["goal", "prefix", "completion"]
 JUDGE_TYPE_LABELS: Dict[str, str] = {
     "jailbreakbench": "JailbreakBench",
     "harmbench": "HarmBench",
+    "harmbench_variant": "HarmBenchVariant",
     "nuanced": "Nuanced",
     "on_topic": "OnTopic",
 }
@@ -74,6 +76,7 @@ JUDGE_COLUMN_MAP: Dict[str, List[str]] = {
     "nuanced": ["eval_nj", "explanation_nj"],
     "jailbreakbench": ["eval_jb", "explanation_jb"],
     "harmbench": ["eval_hb", "explanation_hb"],
+    "harmbench_variant": ["eval_hbv", "explanation_hbv"],
     "on_topic": ["eval_on_topic", "explanation_on_topic"],
 }
 
@@ -81,6 +84,7 @@ JUDGE_AGG_COLUMN_MAP: Dict[str, str] = {
     "nuanced": "eval_nj",
     "jailbreakbench": "eval_jb",
     "harmbench": "eval_hb",
+    "harmbench_variant": "eval_hbv",
     "on_topic": "eval_on_topic",
 }
 
@@ -88,6 +92,7 @@ JUDGE_MEAN_COLUMN_MAP: Dict[str, str] = {
     "nuanced": "eval_nj_mean",
     "jailbreakbench": "eval_jb_mean",
     "harmbench": "eval_hb_mean",
+    "harmbench_variant": "eval_hbv_mean",
     "strongreject": "eval_sj_binary_mean",
     "on_topic": "eval_on_topic_mean",
 }
@@ -177,6 +182,8 @@ class BaseEvaluationStep:
         identifier_lower = identifier.lower()
         if "harmbench" in identifier_lower:
             return "harmbench"
+        if "harmclassifier" in identifier_lower:
+            return "harmbench_variant"
         if "nuanced" in identifier_lower:
             return "nuanced"
         if "jailbreak" in identifier_lower:
@@ -256,13 +263,15 @@ class BaseEvaluationStep:
                 or cfg.get("batch_size_judge")
                 or tp.get("judge_batch_size", 1)
             ),
-            "max_new_tokens_eval": (
-                cfg.get("max_new_tokens_eval")
-                or tp.get("judge_max_new_tokens_eval", 256)
+            "max_tokens_eval": (
+                cfg.get("max_tokens_eval") or tp.get("judge_max_tokens_eval", 256)
             ),
             "filter_len": (cfg.get("filter_len") or tp.get("judge_filter_len", 10)),
-            "request_timeout": (
-                cfg.get("judge_request_timeout") or tp.get("judge_request_timeout", 120)
+            "timeout": (
+                cfg.get("judge_timeout")
+                or cfg.get("judge_request_timeout")
+                or tp.get("judge_timeout")
+                or tp.get("judge_request_timeout", 120)
             ),
             "temperature": (
                 cfg.get("judge_temperature") or tp.get("judge_temperature", 0.0)
@@ -342,6 +351,9 @@ class BaseEvaluationStep:
             in the first row of *data*.
         """
         available: Dict[str, str] = {}
+        if not data:
+            return available
+
         sample_keys = set(data[0].keys()) if data else set()
 
         for judge_type, col_name in self.JUDGE_AGG_COLUMN_MAP.items():
@@ -568,6 +580,9 @@ class BaseEvaluationStep:
             subprocess_config["agent_metadata"] = dict(
                 judge_config_item.get("agent_metadata", {}) or {}
             )
+            subprocess_config["agent_metadata"].update(
+                extract_passthrough_request_config(judge_config_item)
+            )
 
             # Inject API key into metadata
             api_key = judge_config_item.get("api_key") or judge_config_item.get(
@@ -599,7 +614,12 @@ class BaseEvaluationStep:
         evaluator = None
         try:
             # Filter config to EvaluatorConfig fields only
-            expected_fields = {f.name for f in fields(EvaluatorConfig)}
+            if hasattr(EvaluatorConfig, "model_fields"):
+                expected_fields = set(EvaluatorConfig.model_fields.keys())
+            elif is_dataclass(EvaluatorConfig):
+                expected_fields = {f.name for f in dataclass_fields(EvaluatorConfig)}
+            else:
+                expected_fields = set(config.keys())
             filtered_config = {k: v for k, v in config.items() if k in expected_fields}
 
             # Resolve agent_type

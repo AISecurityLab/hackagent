@@ -188,7 +188,7 @@ advanced_config = {
     
     # Evaluation configuration
     "objective": "jailbreak",
-    "max_new_tokens": 500,
+    "max_tokens": 500,
     
     # Output configuration
     "output_dir": "./logs/baseline_runs",
@@ -208,7 +208,7 @@ advanced_config = {
 | `template_categories` | Which template types to use | All categories |
 | `templates_per_category` | Templates to sample per category | 5 |
 | `objective` | Evaluation criteria | `"jailbreak"` |
-| `max_new_tokens` | Max tokens in target response | 500 |
+| `max_tokens` | Max tokens in target response | 500 |
 | `custom_templates` | Your own template patterns | `[]` |
 
 ---
@@ -392,6 +392,6 @@ For more sophisticated testing, consider [AdvPrefix](./advprefix) or [PAIR](./pa
 
 ## Related
 
-- [Attack Overview](./index.md) — Compare all attack types
+- [Attack Overview](./index.mdx) — Compare all attack types
 - [AdvPrefix Attacks](./advprefix) — Sophisticated prefix optimization
 - [PAIR Attacks](./pair) — Adaptive iterative refinement

@@ -53,7 +53,7 @@ agent = HackAgent(
 config = {
     "attack_type": "advprefix",
     "goals": GOALS,
-    "max_new_tokens": 300,
+    "max_tokens": 300,
     "generator": GENERATOR,
 }
 

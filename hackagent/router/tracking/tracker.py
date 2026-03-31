@@ -265,6 +265,10 @@ class Tracker:
             evaluator_name: Name of the evaluator used
             metadata: Optional additional metadata
         """
+        evaluator_norm = (evaluator_name or "").strip().lower()
+        if evaluator_norm in {"ontopicevaluator", "on_topic", "ontopic"}:
+            return
+
         content = {
             "step_name": "Evaluation",
             "evaluator": evaluator_name,

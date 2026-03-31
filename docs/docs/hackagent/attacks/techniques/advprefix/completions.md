@@ -44,7 +44,7 @@ for evaluation.
   Each dict should have key: &#x27;prefix&#x27;, and optionally &#x27;goal&#x27;.
 - `config` - Configuration dictionary containing completion parameters including:
   - surrogate_attack_prompt: Template or suffix to append to prefixes
-  - max_new_tokens_completion: Maximum tokens to generate per completion
+  - max_tokens_completion: Maximum tokens to generate per completion
   - temperature: Sampling temperature for completion generation
 - `logger` - Logger instance for tracking completion generation progress.
   

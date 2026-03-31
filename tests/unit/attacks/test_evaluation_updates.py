@@ -20,9 +20,11 @@ ISSUES FIXED:
 import logging
 import unittest
 from unittest.mock import MagicMock
+from types import SimpleNamespace
 from uuid import uuid4
 
 from hackagent.server.api.models import EvaluationStatusEnum
+from hackagent.router.tracking import Tracker
 
 
 class TestEvaluationStatusUpdates(unittest.TestCase):
@@ -206,6 +208,126 @@ class TestEvaluationEndToEnd(unittest.TestCase):
 
         self.assertTrue(result)
         mock_backend.update_result.assert_called_once()
+
+
+class _DummyRouter:
+    """Minimal router stub for execute_prompts tests."""
+
+    def __init__(self):
+        self._agent_registry = {"victim": object()}
+
+    def route_request(self, registration_key, request_data):  # noqa: ARG002
+        return {"generated_text": "dummy completion"}
+
+
+class TestBaselineTrackerConsistency(unittest.TestCase):
+    """Regression tests for baseline tracker wiring and goal finalization."""
+
+    def _build_backend(self):
+        backend = MagicMock()
+        backend.create_result.side_effect = lambda *args, **kwargs: SimpleNamespace(
+            id=uuid4()
+        )
+        backend.create_trace.side_effect = lambda *args, **kwargs: SimpleNamespace(
+            id=uuid4()
+        )
+        return backend
+
+    def test_execute_prompts_reuses_existing_goal_context(self):
+        from hackagent.attacks.techniques.baseline.generation import execute_prompts
+
+        backend = self._build_backend()
+        tracker = Tracker(
+            backend=backend, run_id=str(uuid4()), logger=logging.getLogger("test")
+        )
+
+        tracker.create_goal_result("goal-0", goal_index=0)
+        pre_count = backend.create_result.call_count
+
+        data = [
+            {
+                "goal": "goal-0",
+                "goal_index": 0,
+                "template_category": "role_play",
+                "template": "Template {goal}",
+                "attack_prompt": "Prompt for goal-0",
+            }
+        ]
+        config = {"n_samples_per_template": 1, "max_tokens": 32, "temperature": 0.1}
+
+        execute_prompts(
+            data=data,
+            agent_router=_DummyRouter(),
+            config=config,
+            logger=logging.getLogger("test"),
+            goal_tracker=tracker,
+        )
+
+        self.assertEqual(
+            backend.create_result.call_count,
+            pre_count,
+            "execute_prompts should not create duplicate Result records when context already exists",
+        )
+
+    def test_finalize_goals_marks_missing_prompts_as_failed(self):
+        from hackagent.attacks.techniques.baseline.evaluation import (
+            _finalize_goals_with_tracker,
+        )
+
+        backend = self._build_backend()
+        tracker = Tracker(
+            backend=backend, run_id=str(uuid4()), logger=logging.getLogger("test")
+        )
+
+        tracker.create_goal_result("goal-0", goal_index=0)
+        tracker.create_goal_result("goal-1", goal_index=1)
+
+        evaluated_data = [
+            {
+                "goal": "goal-0",
+                "goal_index": 0,
+                "template_category": "role_play",
+                "success": True,
+                "evaluation_notes": "success",
+                "response_length": 42,
+            }
+        ]
+
+        finalized = _finalize_goals_with_tracker(
+            evaluated_data=evaluated_data,
+            goal_tracker=tracker,
+            logger=logging.getLogger("test"),
+        )
+
+        self.assertEqual(finalized, 2)
+        self.assertEqual(backend.update_result.call_count, 2)
+
+        notes = [
+            call.kwargs.get("evaluation_notes", "")
+            for call in backend.update_result.call_args_list
+        ]
+        self.assertTrue(
+            any("no prompts/completions generated" in note.lower() for note in notes),
+            "A goal with no rows must be explicitly finalized with no-prompt notes",
+        )
+
+    def test_generate_prompts_respects_goal_index_offset(self):
+        from hackagent.attacks.techniques.baseline.generation import generate_prompts
+
+        config = {
+            "template_categories": ["role_play"],
+            "templates_per_category": 1,
+            "_goal_index_offset": 10,
+        }
+
+        rows = generate_prompts(
+            goals=["goal-a", "goal-b"],
+            config=config,
+            logger=logging.getLogger("test"),
+        )
+
+        indexes = sorted({row.get("goal_index") for row in rows})
+        self.assertEqual(indexes, [10, 11])
 
 
 if __name__ == "__main__":

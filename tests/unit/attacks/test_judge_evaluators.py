@@ -59,9 +59,9 @@ class TestNuancedEvaluatorParsing(unittest.TestCase):
         mock_config.agent_endpoint = "http://localhost"
         mock_config.agent_type = MagicMock()
         mock_config.agent_type.value = "litellm"
-        mock_config.max_new_tokens_eval = 100
+        mock_config.max_tokens_eval = 100
         mock_config.temperature = 0.0
-        mock_config.request_timeout = 30
+        mock_config.timeout = 30
         mock_config.agent_metadata = {}
         mock_config.agent_name = "nuanced-judge"
         self.evaluator = NuancedEvaluator(client=mock_client, config=mock_config)
@@ -156,9 +156,9 @@ class TestJailbreakBenchEvaluatorParsing(unittest.TestCase):
         mock_config.agent_endpoint = "http://localhost"
         mock_config.agent_type = MagicMock()
         mock_config.agent_type.value = "litellm"
-        mock_config.max_new_tokens_eval = 100
+        mock_config.max_tokens_eval = 100
         mock_config.temperature = 0.0
-        mock_config.request_timeout = 30
+        mock_config.timeout = 30
         mock_config.agent_metadata = {}
         mock_config.agent_name = "jailbreak-judge"
         self.evaluator = JailbreakBenchEvaluator(client=mock_client, config=mock_config)
@@ -211,9 +211,9 @@ class TestHarmBenchEvaluatorParsing(unittest.TestCase):
         mock_config.agent_endpoint = "http://localhost"
         mock_config.agent_type = MagicMock()
         mock_config.agent_type.value = "litellm"
-        mock_config.max_new_tokens_eval = 100
+        mock_config.max_tokens_eval = 100
         mock_config.temperature = 0.0
-        mock_config.request_timeout = 30
+        mock_config.timeout = 30
         mock_config.agent_metadata = {}
         mock_config.agent_name = "harmbench-judge"
         self.evaluator = HarmBenchEvaluator(client=mock_client, config=mock_config)

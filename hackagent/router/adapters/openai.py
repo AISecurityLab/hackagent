@@ -111,6 +111,7 @@ class OpenAIAgent(ChatCompletionsAgent):
                             or the API key itself. Defaults to OPENAI_API_KEY env var.
                           - 'max_tokens' (optional): Default max tokens for generation.
                           - 'temperature' (optional): Default temperature (defaults to 1.0).
+                          - 'timeout' (optional): Default request timeout.
                           - 'tools' (optional): List of tool/function definitions for function calling.
                           - 'tool_choice' (optional): Controls which tools the model can call.
         """
@@ -139,7 +140,7 @@ class OpenAIAgent(ChatCompletionsAgent):
                     "name", OpenAIConfigurationError
                 )
         else:
-            self.model_name: str = self.config["name"]
+            self.model_name = self.config["name"]
 
         # Handle API key resolution
         self.actual_api_key = self._resolve_api_key(
@@ -163,6 +164,8 @@ class OpenAIAgent(ChatCompletionsAgent):
         else:
             # Lazy load the module
             openai = _get_openai()
+            if openai is None:
+                raise OpenAIConfigurationError("OpenAI SDK is unavailable")
             openai_client_class = openai.OpenAI
 
         client_kwargs = {}
@@ -170,6 +173,11 @@ class OpenAIAgent(ChatCompletionsAgent):
             client_kwargs["api_key"] = self.actual_api_key
         if self.api_base_url:
             client_kwargs["base_url"] = self.api_base_url
+
+        timeout = self._get_config_key(
+            "timeout", self._get_config_key("request_timeout", 120)
+        )
+        client_kwargs["timeout"] = timeout
 
         self.client = openai_client_class(**client_kwargs)
 
@@ -179,11 +187,15 @@ class OpenAIAgent(ChatCompletionsAgent):
         )
 
         # Store default generation parameters
-        self.default_max_tokens = self._get_config_key("max_tokens")
-        self.default_max_new_tokens = self.default_max_tokens  # Alias for base class
+        self.default_max_tokens = self._get_config_key(
+            "max_tokens", self.DEFAULT_MAX_TOKENS
+        )
         self.default_temperature = self._get_config_key(
             "temperature", self.DEFAULT_TEMPERATURE
         )
+        # Provider-specific request payload (e.g., OpenRouter "reasoning").
+        # This can be overridden per-call via request_data["extra_body"].
+        self.default_extra_body = self._get_config_key("extra_body")
         self.default_tools = self._get_config_key("tools")
         self.default_tool_choice = self._get_config_key("tool_choice")
 
@@ -203,6 +215,13 @@ class OpenAIAgent(ChatCompletionsAgent):
         params["tool_choice"] = request_data.get(
             "tool_choice", self.default_tool_choice
         )
+        if "extra_body" in request_data:
+            params["extra_body"] = request_data.get("extra_body")
+        elif self.default_extra_body is not None:
+            if isinstance(self.default_extra_body, dict):
+                params["extra_body"] = dict(self.default_extra_body)
+            else:
+                params["extra_body"] = self.default_extra_body
 
         return params
 
@@ -414,6 +433,14 @@ class OpenAIAgent(ChatCompletionsAgent):
     ) -> Dict[str, Any]:
         """Build OpenAI-specific response data including tool calls."""
         data = super()._build_agent_specific_data(completion_result, parameters)
+
+        # Expose provider completion metadata for latency/quality diagnostics.
+        if completion_result.get("finish_reason") is not None:
+            data["finish_reason"] = completion_result.get("finish_reason")
+        if completion_result.get("usage") is not None:
+            data["usage"] = completion_result.get("usage")
+        if completion_result.get("model") is not None:
+            data["provider_model"] = completion_result.get("model")
 
         # Add tool calls if present
         if completion_result.get("tool_calls"):

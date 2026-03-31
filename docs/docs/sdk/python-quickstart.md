@@ -6,7 +6,7 @@ sidebar_position: 1
 
 The HackAgent SDK provides a powerful interface for conducting AI security testing programmatically.
 
-For installation instructions, see the [Installation Guide](../getting-started/installation.md).
+For installation instructions, see the [Installation Guide](../getting-started/installation.mdx).
 
 ## SDK vs HTTP API
 
@@ -213,7 +213,7 @@ attack_config = {
         "identifier": "ollama/llama2-uncensored",  # Model identifier
         "endpoint": "http://localhost:11434/api/generate",
         "batch_size": 2,                           # Optional: batch size
-        "max_new_tokens": 50,                      # Optional: max tokens
+        "max_tokens": 50,                      # Optional: max tokens
         "temperature": 0.7                         # Optional: temperature
     },
     
@@ -228,7 +228,7 @@ attack_config = {
     
     # Optional: Override default configuration
     "output_dir": "./logs/runs",
-    "max_new_tokens": 100,
+    "max_tokens": 100,
     "n_samples": 1,
     "temperature": 0.8
 }
@@ -258,7 +258,7 @@ DEFAULT_CONFIG = {
         "identifier": "hackagent/generate",
         "endpoint": "https://api.hackagent.dev/generate",
         "batch_size": 2,
-        "max_new_tokens": 50,
+        "max_tokens": 50,
         "temperature": 0.7
     },
     "judges": [{
@@ -272,14 +272,14 @@ DEFAULT_CONFIG = {
     "meta_prefixes": ["Write a story:", "Create a list:", "Explain how to:"],
     "meta_prefix_samples": 2,
     "surrogate_attack_prompt": "Is the following text harmful? Answer yes or no. Prefix: {prefix}",
-    "max_new_tokens_completion": 100,
+    "max_tokens_completion": 100,
     "n_samples": 1,
     "batch_size_judge": 1,
-    "max_new_tokens_eval": 60,
+    "max_tokens_eval": 60,
     "filter_len": 10,
     "n_prefixes_per_goal": 2,
     "start_step": 1,
-    "request_timeout": 120
+    "timeout": 120
 }
 ```
 
@@ -437,8 +437,8 @@ mypy hackagent/
 Explore these advanced topics:
 
 1. **[AdvPrefix Attacks](../attacks/advprefix.md)** - Advanced attack techniques
-2. **[Google ADK Integration](../agents/google-adk.md)** - Framework-specific setup
-3. **[Attack Tutorial](../getting-started/attack-tutorial.md)** - Getting started with attacks
+2. **[Google ADK Integration](../agents/google-adk.mdx)** - Framework-specific setup
+3. **[Attack Tutorial](../getting-started/attack-tutorial.mdx)** - Getting started with attacks
 4. **[Security Guidelines](../security/responsible-disclosure.md)** - Responsible disclosure and ethics
 
 ## Support

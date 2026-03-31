@@ -425,9 +425,9 @@ As a/an <Role> with the <Profile>, you must follow the <Rules>, and you must com
                     "_tracker",
                     "judges",
                     "batch_size_judge",
-                    "max_new_tokens_eval",
+                    "max_tokens_eval",
                     "filter_len",
-                    "judge_request_timeout",
+                    "judge_timeout",
                     "judge_temperature",
                     "max_judge_retries",
                 ],
@@ -455,9 +455,22 @@ As a/an <Role> with the <Profile>, you must follow the <Rules>, and you must com
         if not goals:
             return []
 
-        # Phase 1: Create coordinator WITHOUT goal results — deferred until
-        # after Generation so we only create results for surviving goals.
-        coordinator = self._initialize_coordinator(attack_type="flipattack")
+        flipattack_params = self.config.get("flipattack_params", {})
+        goal_metadata = {
+            "flip_mode": flipattack_params.get("flip_mode", "FCS"),
+            "cot": flipattack_params.get("cot", False),
+            "lang_gpt": flipattack_params.get("lang_gpt", False),
+            "few_shot": flipattack_params.get("few_shot", False),
+            "judge": flipattack_params.get("judge", "gpt-4-0613"),
+        }
+
+        # Initialize goal contexts upfront so goal elapsed_s covers the full
+        # lifecycle (generation + evaluation), not only post-generation phases.
+        coordinator = self._initialize_coordinator(
+            attack_type="flipattack",
+            goals=goals,
+            initial_metadata=goal_metadata,
+        )
 
         # Expose self so generation.execute can call self.generate() directly.
         self.config["_self"] = self
@@ -465,46 +478,15 @@ As a/an <Role> with the <Profile>, you must follow the <Rules>, and you must com
         pipeline_steps = self._get_pipeline_steps()
         start_step = self.config.get("start_step", 1) - 1
 
+        # Keep tracker in config for generation/evaluation compatibility paths.
+        if coordinator.goal_tracker:
+            self.config["_tracker"] = coordinator.goal_tracker
+
         try:
-            # Phase 2: Run Generation step only (no goal results yet,
-            # generation traces are harmlessly skipped)
-            generation_output = self._execute_pipeline(
-                pipeline_steps, goals, start_step=start_step, end_step=start_step + 1
-            )
-
-            if not generation_output:
-                self.logger.warning("Generation produced no output")
-                coordinator.finalize_pipeline([], lambda _: False)
-                return []
-
-            # Phase 3: Create goal results ONLY for surviving goals
-            flipattack_params = self.config.get("flipattack_params", {})
-            goal_metadata = {
-                "flip_mode": flipattack_params.get("flip_mode", "FCS"),
-                "cot": flipattack_params.get("cot", False),
-                "lang_gpt": flipattack_params.get("lang_gpt", False),
-                "few_shot": flipattack_params.get("few_shot", False),
-                "judge": flipattack_params.get("judge", "gpt-4-0613"),
-            }
-            coordinator.initialize_goals_from_pipeline_data(
-                pipeline_data=generation_output,
-                initial_metadata=goal_metadata,
-            )
-
-            # Inject per-goal result_id into generation rows so Evaluation can
-            # sync judge outcomes to the correct backend Result records.
-            generation_output = coordinator.enrich_with_result_ids(generation_output)
-
-            if coordinator.has_goal_tracking:
-                self.logger.info("📊 Using TrackingCoordinator for per-goal tracking")
-
-            # Pass goal_tracker through config for Evaluation step
-            if coordinator.goal_tracker:
-                self.config["_tracker"] = coordinator.goal_tracker
-
-            # Phase 4: Run remaining steps (Evaluation)
+            # Run full pipeline. Result IDs are available from the start,
+            # and per-goal tracker elapsed_s now represents true start->finish time.
             results = self._execute_pipeline(
-                pipeline_steps, generation_output, start_step=start_step + 1
+                pipeline_steps, goals, start_step=start_step
             )
 
             # Finalize goal results via coordinator

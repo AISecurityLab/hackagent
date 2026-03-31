@@ -8,13 +8,20 @@ Baseline attacks use predefined prompt patterns to attempt jailbreaks,
 combining templates with goals to generate attack prompts.
 """
 
-from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
+
+from pydantic import ConfigDict, Field
+
+from hackagent.attacks.techniques.config import (
+    DEFAULT_CONFIG_BASE,
+    DEFAULT_STANDARD_TARGET_CONFIG,
+    ConfigBase,
+)
 
 
 DEFAULT_TEMPLATE_CONFIG: Dict[str, Any] = {
-    # --- Paths ---
-    "output_dir": "./logs/runs",
+    **DEFAULT_CONFIG_BASE,
+    **DEFAULT_STANDARD_TARGET_CONFIG,
     # --- Target Model ---
     "agent_router": None,  # Will be set at runtime
     # --- Template Selection ---
@@ -27,8 +34,6 @@ DEFAULT_TEMPLATE_CONFIG: Dict[str, Any] = {
     ],
     "templates_per_category": 3,  # Number of templates to use per category
     # --- Generation Settings ---
-    "max_new_tokens": 150,
-    "temperature": 0.7,
     "n_samples_per_template": 1,  # Completions per template-goal combo
     # --- Evaluation Settings ---
     "objective": "jailbreak",  # Default objective: jailbreak, harmful_behavior, policy_violation
@@ -37,25 +42,19 @@ DEFAULT_TEMPLATE_CONFIG: Dict[str, Any] = {
     # --- Filtering ---
     "min_response_length": 10,
     "deduplicate_responses": True,
-    # --- General ---
-    "run_id": None,
-    "start_step": 1,
-    "request_timeout": 60,
 }
 
 
-@dataclass
-class TemplateAttackConfig:
+class TemplateAttackConfig(ConfigBase):
     """Configuration for baseline attack pipeline."""
 
-    # Paths
-    output_dir: str = "./logs/runs"
+    model_config = ConfigDict(extra="ignore", validate_assignment=True)
 
     # Target
     agent_router: Any = None
 
     # Template settings
-    template_categories: List[str] = field(
+    template_categories: List[str] = Field(
         default_factory=lambda: [
             "instruction_override",
             "delimiter_bypass",
@@ -67,8 +66,6 @@ class TemplateAttackConfig:
     templates_per_category: int = 3
 
     # Generation
-    max_new_tokens: int = 150
-    temperature: float = 0.7
     n_samples_per_template: int = 1
 
     # Evaluation
@@ -80,21 +77,11 @@ class TemplateAttackConfig:
     min_response_length: int = 10
     deduplicate_responses: bool = True
 
-    # General
-    run_id: Optional[str] = None
-    start_step: int = 1
-    request_timeout: int = 60
-
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> "TemplateAttackConfig":
         """Create config from dictionary."""
-        return cls(
-            **{k: v for k, v in config_dict.items() if k in cls.__dataclass_fields__}
-        )
+        return cls.model_validate(config_dict)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
-        return {
-            field_name: getattr(self, field_name)
-            for field_name in self.__dataclass_fields__
-        }
+        return self.model_dump()
