@@ -592,7 +592,9 @@ class DashboardPage:
     def _build_run_dialog(self) -> None:
         with ui.dialog() as dialog:
             with ui.card().classes("w-full max-w-5xl h-[80vh] flex flex-col gap-0"):
-                with ui.row().classes("items-center justify-between w-full shrink-0 px-4 py-3 border-b"):
+                with ui.row().classes(
+                    "items-center justify-between w-full shrink-0 px-4 py-3 border-b"
+                ):
                     self.run_dialog_title = ui.label("Run Results").classes(
                         "font-semibold text-lg"
                     )
@@ -607,15 +609,23 @@ class DashboardPage:
                     results_tab = ui.tab("Results", icon="list_alt")
                     metrics_tab = ui.tab("Metrics", icon="analytics")
 
-                with ui.tab_panels(tabs, value=results_tab).classes("w-full flex-1 gap-0"):
-                    with ui.tab_panel(results_tab).classes("w-full flex-1 flex flex-col"):
-                        self.results_empty_label = ui.label("Loading results...").classes(
-                            "text-sm text-grey-8 px-4 py-4"
-                        )
+                with ui.tab_panels(tabs, value=results_tab).classes(
+                    "w-full flex-1 gap-0"
+                ):
+                    with ui.tab_panel(results_tab).classes(
+                        "w-full flex-1 flex flex-col"
+                    ):
+                        self.results_empty_label = ui.label(
+                            "Loading results..."
+                        ).classes("text-sm text-grey-8 px-4 py-4")
                         with ui.scroll_area().classes("w-full flex-1"):
-                            self.results_list_area = ui.column().classes("w-full gap-3 p-4")
+                            self.results_list_area = ui.column().classes(
+                                "w-full gap-3 p-4"
+                            )
 
-                    with ui.tab_panel(metrics_tab).classes("w-full flex-1 overflow-auto"):
+                    with ui.tab_panel(metrics_tab).classes(
+                        "w-full flex-1 overflow-auto"
+                    ):
                         with ui.scroll_area().classes("w-full h-full"):
                             self.metrics_area = ui.column().classes("w-full gap-4 p-4")
         self.run_dialog = dialog
@@ -2662,13 +2672,15 @@ class DashboardPage:
         if self.results_empty_label is not None:
             self.results_empty_label.text = "Loading results…"
             self.results_empty_label.set_visibility(True)
-        
+
         # ── Populate metrics tab ──────────────────────────────────────────
         if self.metrics_area is not None:
             self.metrics_area.clear()
             run_cfg = run.get("run_config") or {}
-            eval_summary = run_cfg.get("evaluation_summary") if isinstance(run_cfg, dict) else None
-            
+            eval_summary = (
+                run_cfg.get("evaluation_summary") if isinstance(run_cfg, dict) else None
+            )
+
             if isinstance(eval_summary, dict):
                 with self.metrics_area:
                     ui.label("EVALUATION METRICS").classes(
@@ -2683,17 +2695,33 @@ class DashboardPage:
 
                         for label, value, color in [
                             ("Total Attacks", str(total), "grey-7"),
-                            ("Overall ASR", f"{float(overall) * 100:.1f}%", "negative" if float(overall) > 0 else "positive"),
-                            ("Majority-vote ASR", f"{float(mv_asr) * 100:.1f}%", "negative" if float(mv_asr) > 0 else "positive"),
-                            *([("Fleiss' Kappa", f"{float(kappa):.3f}", "grey-7")] if kappa is not None else []),
+                            (
+                                "Overall ASR",
+                                f"{float(overall) * 100:.1f}%",
+                                "negative" if float(overall) > 0 else "positive",
+                            ),
+                            (
+                                "Majority-vote ASR",
+                                f"{float(mv_asr) * 100:.1f}%",
+                                "negative" if float(mv_asr) > 0 else "positive",
+                            ),
+                            *(
+                                [("Fleiss' Kappa", f"{float(kappa):.3f}", "grey-7")]
+                                if kappa is not None
+                                else []
+                            ),
                         ]:
                             with ui.card().classes("flex-none px-3 py-2"):
                                 ui.label(label).classes("text-xs text-grey-6")
-                                ui.badge(value, color=color).classes("text-sm font-semibold")
+                                ui.badge(value, color=color).classes(
+                                    "text-sm font-semibold"
+                                )
 
                         if per_judge:
                             with ui.column().classes("w-full gap-1 mt-1"):
-                                ui.label("Per-Judge Strictness:").classes("text-xs text-grey-6")
+                                ui.label("Per-Judge Strictness:").classes(
+                                    "text-xs text-grey-6"
+                                )
                                 with ui.row().classes("flex-wrap gap-2"):
                                     for judge_name, asr_val in per_judge.items():
                                         try:
@@ -2709,7 +2737,7 @@ class DashboardPage:
                     ui.label("No evaluation metrics available yet.").classes(
                         "text-sm text-grey-6 py-4"
                     )
-        
+
         self.run_dialog.open()
 
         # Yield so NiceGUI flushes the dialog-open + "Loading…" state to the
