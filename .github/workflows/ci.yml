@@ -127,7 +127,7 @@ jobs:
         run: uv run pytest tests/unit/ --cov --cov-report=xml:reports/coverage.xml
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: reports/coverage.xml
@@ -336,7 +336,7 @@ jobs:
           uv run coverage report --skip-covered
 
       - name: Upload merged coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: reports/coverage-merged.xml
