@@ -40,6 +40,8 @@ Usage:
             ...
 """
 
+from uuid import UUID, uuid4
+from hackagent.attacks.evaluator.metrics import generate_summary_report
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import fields as dataclass_fields, is_dataclass
@@ -191,6 +193,36 @@ class BaseEvaluationStep:
         if "jailbreak" in identifier_lower:
             return "jailbreakbench"
         return default
+
+    def _sync_metrics_to_backend_structured(self, summary: Dict[str, Any]):
+        try:
+            run_id = self._run_id
+            if not run_id:
+                self.logger.warning("No run_id in summary; cannot sync metrics")
+                return
+
+            # send structured metrics
+            if self._tracking_client:
+                merged_run_config: Dict[str, Any] = {}
+                try:
+                    existing_run = self._tracking_client.get_run(UUID(run_id))
+                    if isinstance(existing_run.run_config, dict):
+                        merged_run_config = dict(existing_run.run_config)
+                except Exception:
+                    merged_run_config = {}
+
+                merged_run_config["evaluation_summary"] = summary
+
+                self._tracking_client.update_run(
+                    UUID(run_id),
+                    run_config=merged_run_config,
+                )
+                self.logger.info(f"Structured metrics synced for run {run_id}")
+            else:
+                self.logger.warning("No tracking client available; cannot sync metrics")
+
+        except Exception as e:
+            self.logger.warning(f"Failed to sync structured metrics: {e}")
 
     def resolve_agent_type(self, agent_type_value: Any) -> AgentTypeEnum:
         """Convert a string, enum, or ``None`` into an ``AgentTypeEnum``."""
@@ -389,7 +421,24 @@ class BaseEvaluationStep:
             self.logger.warning("No judges configured — skipping evaluation")
             return input_data
 
-        original_data = [row.copy() for row in input_data]
+        original_data: List[Dict[str, Any]] = []
+        for index, row in enumerate(input_data):
+            if isinstance(row, dict):
+                normalized_row = row.copy()
+            else:
+                self.logger.warning(
+                    f"Evaluation row {index} is {type(row).__name__}, coercing to dict"
+                )
+                normalized_row = {
+                    "goal": "",
+                    "prefix": "",
+                    "completion": "" if row is None else str(row),
+                }
+
+            for key in self.MERGE_KEYS:
+                normalized_row.setdefault(key, "")
+            original_data.append(normalized_row)
+
         base_config = evaluator_base_config or {}
 
         judges_to_run = self._prepare_judge_configs(judges_config, base_config)
@@ -591,7 +640,16 @@ class BaseEvaluationStep:
                 tracking_client=self._tracking_client,
                 tracker=self._tracker,
             )
-            evaluated_data = evaluator.evaluate(data)
+            # Some attack techniques may omit merge keys; normalize here so
+            # strict evaluators can still run and merging stays consistent.
+            normalized_data: List[Dict[str, Any]] = []
+            for row in data:
+                normalized_row = dict(row)
+                for key in self.MERGE_KEYS:
+                    normalized_row.setdefault(key, "")
+                normalized_data.append(normalized_row)
+
+            evaluated_data = evaluator.evaluate(normalized_data)
 
             # Validate and filter to merge keys + judge columns
             eval_cols = self.JUDGE_COLUMN_MAP.get(judge_type, [])
@@ -691,6 +749,25 @@ class BaseEvaluationStep:
     # ====================================================================
     # SERVER SYNC
     # ====================================================================
+
+    def prepare_and_sync(self, evaluated_items: list, run_id: str):
+        """
+        Prepare evaluated items for backend sync:
+        - Add _run_id if missing
+        - Ensure result_id exists
+        - Build judge_keys
+        - Call _sync_to_server
+        """
+        for idx, item in enumerate(evaluated_items):
+            if "_run_id" not in item:
+                item["_run_id"] = run_id
+            if "result_id" not in item:
+                # fallback to goal_id or generated UUID
+                item["result_id"] = item.get("goal_id") or str(uuid4())
+
+        # Build judge_keys automatically
+        judge_keys = self._build_judge_keys_from_data(evaluated_items)
+        self._sync_to_server(evaluated_items, judge_keys=judge_keys)
 
     def _sync_to_server(
         self,
@@ -819,6 +896,39 @@ class BaseEvaluationStep:
                 explanation=explanation,
                 evaluator_name=f"{evaluator_prefix}_{'_'.join(judges_used)}",
             )
+
+    def run_full_evaluation(self, input_data: List[Dict[str, Any]]):
+        # 1. Resolve judges
+        judges_config = self._resolve_judges_from_config()
+        evaluator_base_config = self._build_base_eval_config()
+
+        # 2. Run evaluation
+        evaluated_items = self._run_evaluation(
+            input_data, judges_config, evaluator_base_config
+        )
+
+        # 3. Enrich
+        self._enrich_items_with_scores(evaluated_items)
+
+        # 4. Logging
+        self._log_evaluation_asr(evaluated_items)
+
+        # 5. Tracker
+        self._update_tracker(evaluated_items)
+
+        # 6. Sync row-level results
+        self._sync_to_server(evaluated_items)
+
+        # 7. Generate metrics summary
+        summary = generate_summary_report(evaluated_items)
+
+        # Attach summary to statistics for TUI access
+        self._statistics["metrics_summary"] = summary
+
+        # 8. Sync summary to backend
+        self._sync_metrics_to_backend_structured(summary)
+
+        return evaluated_items
 
     # ====================================================================
     # STATISTICS

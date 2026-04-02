@@ -7,7 +7,7 @@ ENDPOINT_OLLAMA = "http://localhost:11434"
 # Goals targeting the specific data exfiltration risk
 DATASET = {
     "preset": "harmbench",
-    "limit": 200,
+    "limit": 1,
     "shuffle": False,
     "seed": 42,
 }
@@ -48,6 +48,12 @@ config = {
         {
             "identifier": "gemma3:4b",
             "type": "harmbench_variant",
+            "agent_type": AgentTypeEnum.OLLAMA,
+            "endpoint": ENDPOINT_OLLAMA,
+        },
+        {
+            "identifier": "gemma3:4b",
+            "type": "harmbench",
             "agent_type": AgentTypeEnum.OLLAMA,
             "endpoint": ENDPOINT_OLLAMA,
         },

@@ -33,8 +33,8 @@ Implements the Best-of-N technique from:
     Hughes et al., &quot;Best-of-N Jailbreaking&quot; (2024)
     https://arxiv.org/abs/2412.03556
 
-For each goal the attack runs ``n_steps`` sequential search steps.
-Within each step, ``num_concurrent_k`` independently-seeded augmented
+For each goal the attack runs `n_steps` sequential search steps.
+Within each step, `num_concurrent_k` independently-seeded augmented
 candidates are generated and sent to the target model in parallel.
 The best candidate is selected by response length (as a proxy for
 non-refusal), and a final multi-judge evaluation scores the result.
@@ -63,7 +63,7 @@ Initialise BoNAttack with configuration.
 
 **Raises**:
 
-- `ValueError` - If *client* or *agent_router* is ``None``.
+- `ValueError` - If *client* or *agent_router* is `None`.
 
 #### run
 

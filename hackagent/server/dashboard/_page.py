@@ -100,6 +100,7 @@ class DashboardPage:
         self.history_run_config_area: ui.column | None = None
         self.history_results_list_area: ui.column | None = None
         self.history_results_empty_label: ui.label | None = None
+        self.metrics_area: ui.column | None = None
 
         # Attack detail dialog
         self.attack_dialog: ui.dialog | None = None
@@ -666,27 +667,58 @@ class DashboardPage:
                     )
                     ui.button(icon="close", on_click=dialog.close).props("flat round")
 
-                self.history_run_dialog_subtitle = ui.label("—").classes(
-                    "text-xs text-grey-6 px-2"
-                )
-
-                with ui.column().classes("w-full px-2 gap-1"):
-                    ui.label("CONFIGURATION").classes(
-                        "text-[10px] font-semibold tracking-widest text-grey-5 uppercase"
-                    )
-                    self.history_run_config_area = ui.column().classes(
-                        "w-full gap-0 max-h-48 overflow-auto"
-                    )
-
-                self.history_results_empty_label = ui.label(
-                    "Loading results..."
-                ).classes("text-sm text-grey-8 px-2 py-4")
-
                 with ui.scroll_area().classes("w-full flex-1"):
-                    self.history_results_list_area = ui.column().classes(
-                        "w-full gap-3 p-2"
-                    )
+                    with ui.column().classes("w-full gap-3 p-2"):
+                        self.history_run_dialog_subtitle = ui.label("—").classes(
+                            "text-xs text-grey-6"
+                        )
+
+                        with ui.column().classes("w-full gap-1"):
+                            ui.label("CONFIGURATION").classes(
+                                "text-[10px] font-semibold tracking-widest text-grey-5 uppercase"
+                            )
+                            self.history_run_config_area = ui.column().classes(
+                                "w-full gap-0"
+                            )
+
+                        with ui.column().classes("w-full gap-1"):
+                            ui.label("METRICS").classes(
+                                "text-[10px] font-semibold tracking-widest text-grey-5 uppercase"
+                            )
+                            self.metrics_area = ui.column().classes("w-full gap-2")
+
+                        self.history_results_empty_label = ui.label(
+                            "Loading results..."
+                        ).classes("text-sm text-grey-8 py-2")
+
+                        self.history_results_list_area = ui.column().classes(
+                            "w-full gap-3"
+                        )
         self.history_run_dialog = dialog
+
+    def _extract_run_asr_display(self, run, run_results) -> str:
+        """Return ASR string for a run, preferring synced evaluation_summary."""
+        run_cfg = getattr(run, "run_config", None)
+        if isinstance(run_cfg, dict):
+            summary = run_cfg.get("evaluation_summary")
+            if isinstance(summary, dict):
+                try:
+                    return (
+                        f"{float(summary.get('overall_success_rate', 0.0)) * 100:.1f}%"
+                    )
+                except (TypeError, ValueError):
+                    pass
+
+        total = len(run_results)
+        if total <= 0:
+            return "—"
+
+        jailbreaks = sum(
+            1
+            for r in run_results
+            if "SUCCESSFUL_JAILBREAK" in r.evaluation_status.upper()
+        )
+        return f"{(jailbreaks / total) * 100:.1f}%"
 
     def _build_attack_dialog(self) -> None:
         with ui.dialog() as dialog:
@@ -3190,15 +3222,6 @@ class DashboardPage:
                     except Exception:
                         run_config = fetched_raw
                         raw_config_is_str = True
-                if not run_config:
-                    attack_id = str(fetched_dict.get("attack_id") or "")
-                    if attack_id:
-                        with contextlib.suppress(Exception):
-                            attack_cfgs = self._attack_config_map_for_ids({attack_id})
-                            cfg = attack_cfgs.get(attack_id)
-                            if isinstance(cfg, dict) and cfg:
-                                run_config = cfg
-                                raw_config_is_str = False
 
         # ── Show loading skeleton immediately ─────────────────────────
         if self.run_report_area is not None:
@@ -3979,6 +4002,7 @@ class DashboardPage:
         raw_run_config = run.get("run_config")
         run_config = {}
         raw_config_is_str = False
+        fetched_dict = None
         if isinstance(raw_run_config, dict):
             run_config = raw_run_config
         elif isinstance(raw_run_config, str) and raw_run_config.strip():
@@ -4003,29 +4027,135 @@ class DashboardPage:
                     except Exception:
                         run_config = fetched_raw
                         raw_config_is_str = True
-                if not run_config:
-                    attack_id = str(fetched_dict.get("attack_id") or "")
-                    if attack_id:
-                        with contextlib.suppress(Exception):
-                            attack_cfgs = self._attack_config_map_for_ids({attack_id})
-                            cfg = attack_cfgs.get(attack_id)
-                            if isinstance(cfg, dict) and cfg:
-                                run_config = cfg
-                                raw_config_is_str = False
+        # Configuration panel should show ATTACK configuration (not run metrics payload).
+        display_config: object = {}
+        display_config_is_str = False
+        attack_id = str(run.get("attack_id") or "")
+        if not attack_id and isinstance(fetched_dict, dict):
+            attack_id = str(fetched_dict.get("attack_id") or "")
+
+        if attack_id:
+            with contextlib.suppress(Exception):
+                attack_cfgs = self._attack_config_map_for_ids({attack_id})
+                cfg = attack_cfgs.get(attack_id)
+                if isinstance(cfg, dict) and cfg:
+                    display_config = cfg
+
+        if not display_config:
+            if isinstance(run_config, dict):
+                # Fallback: strip evaluation summary noise from run_config view.
+                display_config = {
+                    k: v for k, v in run_config.items() if k != "evaluation_summary"
+                }
+            elif run_config:
+                display_config = run_config
+                display_config_is_str = raw_config_is_str or isinstance(run_config, str)
 
         if self.history_run_config_area is not None:
             self.history_run_config_area.clear()
             with self.history_run_config_area:
-                if run_config:
+                if display_config:
                     content = (
-                        json.dumps(run_config, indent=2, default=str)
-                        if not raw_config_is_str and not isinstance(run_config, str)
-                        else str(run_config)
+                        json.dumps(display_config, indent=2, default=str)
+                        if not display_config_is_str
+                        and not isinstance(display_config, str)
+                        else str(display_config)
                     )
                     ui.code(content, language="json").classes("w-full text-xs")
                 else:
                     ui.label("No configuration found for this run.").classes(
                         "text-xs text-grey-6"
+                    )
+
+        # ── Populate metrics area ─────────────────────────────────────────
+        if self.metrics_area is not None:
+            self.metrics_area.clear()
+            eval_summary = (
+                run_config.get("evaluation_summary")
+                if isinstance(run_config, dict)
+                else None
+            )
+
+            if isinstance(eval_summary, dict):
+                with self.metrics_area:
+                    ui.label("EVALUATION METRICS").classes(
+                        "text-[10px] font-semibold tracking-widest text-grey-5 uppercase mt-1"
+                    )
+                    with ui.row().classes("flex-wrap gap-3 w-full"):
+                        total = eval_summary.get("total_attacks", 0)
+                        overall = eval_summary.get("overall_success_rate", 0.0)
+                        mv_asr = eval_summary.get("majority_vote_asr", 0.0)
+                        kappa = eval_summary.get("fleiss_kappa", None)
+                        per_judge = eval_summary.get("per_judge_strictness") or {}
+
+                        def _fmt_pct(value: object) -> str:
+                            try:
+                                return f"{float(value) * 100:.1f}%"
+                            except (TypeError, ValueError):
+                                return str(value)
+
+                        cards: list[tuple[str, str, str]] = [
+                            ("Total Attacks", str(total), "grey-7"),
+                            (
+                                "Overall ASR",
+                                _fmt_pct(overall),
+                                "negative"
+                                if isinstance(overall, (int, float))
+                                and float(overall) > 0
+                                else "positive",
+                            ),
+                            (
+                                "Majority-vote ASR",
+                                _fmt_pct(mv_asr),
+                                "negative"
+                                if isinstance(mv_asr, (int, float))
+                                and float(mv_asr) > 0
+                                else "positive",
+                            ),
+                        ]
+
+                        bias_gap = None
+                        if isinstance(per_judge, dict):
+                            bias_gap = per_judge.get("bias_gap")
+
+                        if bias_gap is not None:
+                            try:
+                                cards.append(("Bias Gap", _fmt_pct(bias_gap), "grey-7"))
+                            except Exception:
+                                cards.append(("Bias Gap", str(bias_gap), "grey-7"))
+
+                        if kappa is not None:
+                            try:
+                                cards.append(
+                                    ("Fleiss' Kappa", f"{float(kappa):.3f}", "grey-7")
+                                )
+                            except (TypeError, ValueError):
+                                cards.append(("Fleiss' Kappa", str(kappa), "grey-7"))
+
+                        for label, value, color in cards:
+                            with ui.card().classes("flex-none px-3 py-2"):
+                                ui.label(label).classes("text-xs text-grey-6")
+                                ui.badge(value, color=color).classes(
+                                    "text-sm font-semibold"
+                                )
+
+                        if per_judge:
+                            with ui.column().classes("w-full gap-1 mt-1"):
+                                ui.label("Per-Judge Strictness:").classes(
+                                    "text-xs text-grey-6"
+                                )
+                                with ui.row().classes("flex-wrap gap-2"):
+                                    for judge_name, asr_val in per_judge.items():
+                                        if judge_name == "bias_gap":
+                                            continue
+                                        ui.badge(
+                                            f"{judge_name}: {_fmt_pct(asr_val)}",
+                                            color="grey-7",
+                                        ).classes("text-xs")
+            else:
+                with self.metrics_area:
+                    ui.label("No evaluation metrics available yet.").classes(
+                        "text-sm text-grey-6 py-4"
                     )
 
         if self.history_results_list_area is not None:

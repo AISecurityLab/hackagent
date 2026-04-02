@@ -224,6 +224,16 @@ def make_run_table(
         """,
     )
     tbl.add_slot(
+        "body-cell-asr",
+        r"""
+        <q-td :props="props">
+          <span class="tabular-nums font-medium">
+            {{ props.row.overall_asr ?? '—' }}
+          </span>
+        </q-td>
+        """,
+    )
+    tbl.add_slot(
         "body-cell-created_at",
         r"""
         <q-td :props="props" class="cursor-pointer"

@@ -10,7 +10,7 @@ This module provides the concrete judge evaluator classes:
 - JailbreakBenchEvaluator: Binary yes/no jailbreak classification
 - HarmBenchEvaluator: Binary yes/no harmful behavior classification
 
-All classes extend ``BaseJudgeEvaluator`` from ``evaluator.base``.
+All classes extend `BaseJudgeEvaluator` from `evaluator.base`.
 
 Usage:
     from hackagent.attacks.evaluator.judge_evaluators import (

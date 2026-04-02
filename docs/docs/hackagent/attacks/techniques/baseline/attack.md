@@ -24,12 +24,12 @@ configurable evaluator (pattern-matching, keyword, or LLM judge).
 Pipeline stages
 ---------------
 1. **Generation** (:func:`~hackagent.attacks.techniques.baseline.generation.execute`) —
-selects up to ``templates_per_category`` templates from each
-category in ``template_categories``, injects each goal, and
+selects up to `templates_per_category` templates from each
+category in `template_categories`, injects each goal, and
 collects target-model responses.
 2. **Evaluation** (:func:`~hackagent.attacks.techniques.baseline.evaluation.execute`) —
 scores responses for jailbreak success using the configured
-``evaluator_type`` (``&quot;pattern&quot;``, ``&quot;keyword&quot;``, or ``&quot;llm_judge&quot;``).
+`evaluator_type` (`&quot;pattern&quot;`, `&quot;keyword&quot;`, or `&quot;llm_judge&quot;`).
 
 This attack is useful as a **sanity-check baseline**: it requires no
 additional LLM (unlike PAIR/TAP/AdvPrefix) and surfaces naive template
@@ -40,7 +40,7 @@ weaknesses in the target model.
 - ``4 - Merged baseline configuration dictionary.
 - ``5 - Authenticated HackAgent API client.
 - ``6 - Router for the victim model.
-- ``7 - Hierarchical logger at ``hackagent.attacks.baseline``.
+- `7 - Hierarchical logger at `hackagent.attacks.baseline``.
 
 #### \_\_init\_\_
 
@@ -62,7 +62,7 @@ Initialize baseline attack.
 
 **Raises**:
 
-- `ValueError` - If ``client`` or ``agent_router`` is ``None``.
+- `ValueError` - If `client` or `agent_router` is `None`.
 
 #### run
 

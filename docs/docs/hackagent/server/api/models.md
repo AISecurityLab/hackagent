@@ -42,10 +42,10 @@ The specific SDK, ADK, or API type the agent is built upon (e.g., OpenAI SDK, Ge
 #### metadata
 
 Optional JSON data providing specific details and configuration. Structure depends heavily on Agent Type. Examples:
-- For GENERIC_ADK: {&#x27;adk_app_name&#x27;: &#x27;my_adk_app&#x27;, &#x27;protocol_version&#x27;: &#x27;1.0&#x27;}
-- For OPENAI_SDK: {&#x27;model&#x27;: &#x27;gpt-4-turbo&#x27;, &#x27;api_key_secret_name&#x27;: &#x27;MY_OPENAI_KEY&#x27;, &#x27;instructions&#x27;: &#x27;You are a helpful assistant.&#x27;}
-- For GOOGLE_ADK: {&#x27;project_id&#x27;: &#x27;my-gcp-project&#x27;, &#x27;location&#x27;: &#x27;us-central1&#x27;}
-- General applicable: {&#x27;version&#x27;: &#x27;1.2.0&#x27;, &#x27;custom_headers&#x27;: {&#x27;X-Custom-Header&#x27;: &#x27;value&#x27;}}
+- For GENERIC_ADK: \{&#x27;adk_app_name&#x27;: &#x27;my_adk_app&#x27;, &#x27;protocol_version&#x27;: &#x27;1.0&#x27;\}
+- For OPENAI_SDK: \{&#x27;model&#x27;: &#x27;gpt-4-turbo&#x27;, &#x27;api_key_secret_name&#x27;: &#x27;MY_OPENAI_KEY&#x27;, &#x27;instructions&#x27;: &#x27;You are a helpful assistant.&#x27;\}
+- For GOOGLE_ADK: \{&#x27;project_id&#x27;: &#x27;my-gcp-project&#x27;, &#x27;location&#x27;: &#x27;us-central1&#x27;\}
+- General applicable: \{&#x27;version&#x27;: &#x27;1.2.0&#x27;, &#x27;custom_headers&#x27;: \{&#x27;X-Custom-Header&#x27;: &#x27;value&#x27;\}\}
 
 ## Attack Objects
 
@@ -164,10 +164,10 @@ The specific SDK, ADK, or API type the agent is built upon (e.g., OpenAI SDK, Ge
 #### metadata
 
 Optional JSON data providing specific details and configuration. Structure depends heavily on Agent Type. Examples:
-- For GENERIC_ADK: {&#x27;adk_app_name&#x27;: &#x27;my_adk_app&#x27;, &#x27;protocol_version&#x27;: &#x27;1.0&#x27;}
-- For OPENAI_SDK: {&#x27;model&#x27;: &#x27;gpt-4-turbo&#x27;, &#x27;api_key_secret_name&#x27;: &#x27;MY_OPENAI_KEY&#x27;, &#x27;instructions&#x27;: &#x27;You are a helpful assistant.&#x27;}
-- For GOOGLE_ADK: {&#x27;project_id&#x27;: &#x27;my-gcp-project&#x27;, &#x27;location&#x27;: &#x27;us-central1&#x27;}
-- General applicable: {&#x27;version&#x27;: &#x27;1.2.0&#x27;, &#x27;custom_headers&#x27;: {&#x27;X-Custom-Header&#x27;: &#x27;value&#x27;}}
+- For GENERIC_ADK: \{&#x27;adk_app_name&#x27;: &#x27;my_adk_app&#x27;, &#x27;protocol_version&#x27;: &#x27;1.0&#x27;\}
+- For OPENAI_SDK: \{&#x27;model&#x27;: &#x27;gpt-4-turbo&#x27;, &#x27;api_key_secret_name&#x27;: &#x27;MY_OPENAI_KEY&#x27;, &#x27;instructions&#x27;: &#x27;You are a helpful assistant.&#x27;\}
+- For GOOGLE_ADK: \{&#x27;project_id&#x27;: &#x27;my-gcp-project&#x27;, &#x27;location&#x27;: &#x27;us-central1&#x27;\}
+- General applicable: \{&#x27;version&#x27;: &#x27;1.2.0&#x27;, &#x27;custom_headers&#x27;: \{&#x27;X-Custom-Header&#x27;: &#x27;value&#x27;\}\}
 
 ## PatchedAttackRequest Objects
 
@@ -258,10 +258,10 @@ The specific SDK, ADK, or API type the agent is built upon (e.g., OpenAI SDK, Ge
 #### metadata
 
 Optional JSON data providing specific details and configuration. Structure depends heavily on Agent Type. Examples:
-- For GENERIC_ADK: {&#x27;adk_app_name&#x27;: &#x27;my_adk_app&#x27;, &#x27;protocol_version&#x27;: &#x27;1.0&#x27;}
-- For OPENAI_SDK: {&#x27;model&#x27;: &#x27;gpt-4-turbo&#x27;, &#x27;api_key_secret_name&#x27;: &#x27;MY_OPENAI_KEY&#x27;, &#x27;instructions&#x27;: &#x27;You are a helpful assistant.&#x27;}
-- For GOOGLE_ADK: {&#x27;project_id&#x27;: &#x27;my-gcp-project&#x27;, &#x27;location&#x27;: &#x27;us-central1&#x27;}
-- General applicable: {&#x27;version&#x27;: &#x27;1.2.0&#x27;, &#x27;custom_headers&#x27;: {&#x27;X-Custom-Header&#x27;: &#x27;value&#x27;}}
+- For GENERIC_ADK: \{&#x27;adk_app_name&#x27;: &#x27;my_adk_app&#x27;, &#x27;protocol_version&#x27;: &#x27;1.0&#x27;\}
+- For OPENAI_SDK: \{&#x27;model&#x27;: &#x27;gpt-4-turbo&#x27;, &#x27;api_key_secret_name&#x27;: &#x27;MY_OPENAI_KEY&#x27;, &#x27;instructions&#x27;: &#x27;You are a helpful assistant.&#x27;\}
+- For GOOGLE_ADK: \{&#x27;project_id&#x27;: &#x27;my-gcp-project&#x27;, &#x27;location&#x27;: &#x27;us-central1&#x27;\}
+- General applicable: \{&#x27;version&#x27;: &#x27;1.2.0&#x27;, &#x27;custom_headers&#x27;: \{&#x27;X-Custom-Header&#x27;: &#x27;value&#x27;\}\}
 
 ## Choice Objects
 

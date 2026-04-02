@@ -391,23 +391,24 @@ class LocalBackend:
         run_id: UUID,
         status: Optional[str] = None,
         run_notes: Optional[str] = None,
+        run_config: Optional[Dict[str, Any]] = None,
     ) -> RunRecord:
         now = _now_str()
         with self._lock:
-            if status is not None and run_notes is not None:
+            updates: Dict[str, Any] = {"updated_at": now}
+            if status is not None:
+                updates["status"] = status
+            if run_notes is not None:
+                updates["run_notes"] = run_notes
+            if run_config is not None:
+                updates["config_json"] = json.dumps(run_config)
+
+            if len(updates) > 1:
+                set_clause = ", ".join(f"{k}=?" for k in updates)
+                values = list(updates.values()) + [str(run_id)]
                 self._conn.execute(
-                    "UPDATE runs SET status=?, run_notes=?, updated_at=? WHERE id=?",
-                    (status, run_notes, now, str(run_id)),
-                )
-            elif status is not None:
-                self._conn.execute(
-                    "UPDATE runs SET status=?, updated_at=? WHERE id=?",
-                    (status, now, str(run_id)),
-                )
-            elif run_notes is not None:
-                self._conn.execute(
-                    "UPDATE runs SET run_notes=?, updated_at=? WHERE id=?",
-                    (run_notes, now, str(run_id)),
+                    f"UPDATE runs SET {set_clause} WHERE id=?",
+                    values,
                 )
             self._conn.commit()
             row = self._conn.execute(
@@ -419,7 +420,7 @@ class LocalBackend:
             id=run_id,
             attack_id=UUID("00000000-0000-0000-0000-000000000000"),
             agent_id=UUID("00000000-0000-0000-0000-000000000000"),
-            run_config={},
+            run_config=run_config or {},
             status=status or "",
             run_notes=run_notes,
             created_at=_to_dt(now),

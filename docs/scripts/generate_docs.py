@@ -34,12 +34,13 @@ _EXCLUDE_PREFIXES = (
 
 
 def _sanitize_mdx(text: str) -> str:
-    """Normalize pydoc-markdown output for Docusaurus.
+    """Make pydoc-markdown output safe for MDX (Docusaurus).
 
-    With Docusaurus configured to use ``format: 'detect'``, ``.md`` files are
-    parsed as CommonMark (not MDX), so bare ``{`` / ``}`` are not an issue.
-    This function only converts RST double-backtick spans to single-backtick
-    so they render correctly as inline code.
+    MDX treats ``{`` / ``}`` outside code spans as JSX expression delimiters,
+    which causes build failures when docstrings contain dicts or type hints.
+    This function:
+    - Converts RST double-backtick spans (````code````) → single backtick
+    - Escapes bare ``{`` / ``}`` that appear in non-code, non-frontmatter prose
     """
     lines = text.split("\n")
     result = []
@@ -71,7 +72,18 @@ def _sanitize_mdx(text: str) -> str:
         # Convert RST double-backtick inline code to single-backtick
         line = re.sub(r"``(.+?)``", r"`\1`", line)
 
-        result.append(line)
+        # Escape bare { and } that are not inside inline backtick spans
+        # Split around inline code spans to protect their contents
+        parts = re.split(r"(`[^`]+`)", line)
+        escaped_parts = []
+        for j, part in enumerate(parts):
+            if j % 2 == 1:  # inside a backtick span – leave as-is
+                escaped_parts.append(part)
+            else:
+                part = part.replace("{", "\\{")
+                part = part.replace("}", "\\}")
+                escaped_parts.append(part)
+        result.append("".join(escaped_parts))
 
     return "\n".join(result)
 

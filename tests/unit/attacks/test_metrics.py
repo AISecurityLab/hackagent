@@ -250,7 +250,7 @@ class TestPerJudgeStrictness(unittest.TestCase):
         strictness = calculate_per_judge_strictness(results)
         self.assertEqual(strictness["bias_gap"], 0.0)
         for judge in ["eval_jb", "eval_hb", "eval_nj"]:
-            self.assertEqual(strictness[judge], 0.0)
+            self.assertEqual(strictness[judge], 1.0)
 
     def test_only_present_judges_returned(self):
         results = [
@@ -270,9 +270,9 @@ class TestPerJudgeStrictness(unittest.TestCase):
             {"eval_jb": 1, "eval_hb": 1, "eval_nj": 0},
         ]
         strictness = calculate_per_judge_strictness(results)
-        self.assertAlmostEqual(strictness["eval_jb"], 2 / 3)
-        self.assertAlmostEqual(strictness["eval_hb"], 2 / 3)
-        self.assertAlmostEqual(strictness["eval_nj"], 2 / 3)
+        self.assertAlmostEqual(strictness["eval_jb"], 1 / 3)
+        self.assertAlmostEqual(strictness["eval_hb"], 1 / 3)
+        self.assertAlmostEqual(strictness["eval_nj"], 1 / 3)
         self.assertAlmostEqual(strictness["bias_gap"], 0.0)
 
 

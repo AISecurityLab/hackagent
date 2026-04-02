@@ -81,8 +81,8 @@ a complete attack attempt on a single goal/datapoint.
   ...         response = query_target(prompt)
   ...         tracker.add_interaction_trace(
   ...             goal_ctx,
-  ...             request={&quot;prompt&quot;: prompt},
-  ...             response={&quot;content&quot;: response},
+  ...             request=\{&quot;prompt&quot;: prompt\},
+  ...             response=\{&quot;content&quot;: response\},
   ...             step_name=&quot;Attack Attempt&quot;
   ...         )
   ...

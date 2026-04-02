@@ -32,8 +32,9 @@ Finalize generated responses using scorer threshold only.
 
 **Returns**:
 
-  Enriched result list with standardized ``autodan_score``,
-  ``attack_score``, ``best_score``, and ``success`` fields.
+  Enriched result list containing judge columns, aggregated
+  `best_score`, and flags like `judge_success` while preserving
+  `autodan_score`/`attack_score` fields.
 
 #### execute
 

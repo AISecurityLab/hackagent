@@ -399,6 +399,7 @@ class RemoteBackend:
         run_id: UUID,
         status: Optional[str] = None,
         run_notes: Optional[str] = None,
+        run_config: Optional[Dict[str, Any]] = None,
     ) -> RunRecord:
         kwargs: Dict[str, Any] = {}
         if status is not None:
@@ -408,6 +409,8 @@ class RemoteBackend:
                 kwargs["status"] = status
         if run_notes is not None:
             kwargs["run_notes"] = run_notes
+        if run_config is not None:
+            kwargs["run_config"] = run_config
         body = PatchedRunRequest(**kwargs)
         resp = run_partial_update.sync_detailed(
             id=run_id, client=self._client, body=body
@@ -417,7 +420,7 @@ class RemoteBackend:
                 id=run_id,
                 attack_id=UUID("00000000-0000-0000-0000-000000000000"),
                 agent_id=UUID("00000000-0000-0000-0000-000000000000"),
-                run_config={},
+                run_config=run_config or {},
                 status=status or "UNKNOWN",
                 run_notes=run_notes,
                 created_at=_now(),
@@ -430,7 +433,7 @@ class RemoteBackend:
             id=run_id,
             attack_id=UUID("00000000-0000-0000-0000-000000000000"),
             agent_id=UUID("00000000-0000-0000-0000-000000000000"),
-            run_config={},
+            run_config=run_config or {},
             status=status or "",
             run_notes=run_notes,
             created_at=_now(),

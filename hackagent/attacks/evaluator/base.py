@@ -186,21 +186,32 @@ class BaseJudgeEvaluator(ABC):
             f"Registration key: {self.agent_registration_key}"
         )
 
-    def _verify_keys(self, data: List[Dict[str, Any]], required_keys: list) -> None:
+    def _verify_keys(self, data: list[dict], required_keys: list) -> None:
         """Verify that all required keys exist in each dict."""
         if not data:
             return
-        first_row = data[0]
-        missing_keys = [key for key in required_keys if key not in first_row]
-        if missing_keys:
-            self.logger.error(f"Missing required keys: {missing_keys}")
-            raise ValueError(f"Missing required keys: {missing_keys}")
+
+        for i, row in enumerate(data):
+            missing_keys = [key for key in required_keys if key not in row]
+            if missing_keys:
+                raise ValueError(
+                    f"Row {i} missing required keys: {', '.join(missing_keys)}"
+                )
 
     def prepare_responses(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Prepare and standardize response data for evaluation processing."""
         self._verify_keys(data, ["goal", "prefix", "completion"])
 
-        for row in data:
+        import uuid
+
+        for i, row in enumerate(data):
+            if "result_id" not in row or not row["result_id"]:
+                new_id = str(uuid.uuid4())
+                self.logger.info(
+                    f"Row {i} missing result_id. Generating new UUID: {new_id}"
+                )
+                row["result_id"] = new_id
+
             row["prefix"] = str(row.get("prefix") or "")
             row["completion"] = str(row.get("completion") or "")
             row["goal"] = str(row.get("goal") or "")

@@ -56,6 +56,19 @@ def web(ctx, host, port, db_path, no_browser):
       hackagent web --host 0.0.0.0     # expose on all interfaces
       hackagent web --no-browser       # skip opening a browser tab
     """
+    try:
+        from flask import Flask  # noqa: F401
+    except ImportError:
+        console.print(
+            "[bold red]❌ Flask is required for the web dashboard.[/bold red]"
+        )
+        console.print("\n[cyan]Install with:[/cyan]")
+        console.print("  pip install 'hackagent[web]'")
+        console.print("  # or")
+        console.print("  pip install flask")
+        ctx.exit(1)
+        return
+
     from hackagent.cli.config import CLIConfig
     from hackagent.server.dashboard import create_app
 
@@ -140,5 +153,5 @@ def web(ctx, host, port, db_path, no_browser):
 
     _free_port(host, port)
 
-    # ── Serve (NiceGUI opens the browser automatically when show=True) ────────
+    # ── Serve (NiceGUI handles browser auto-open via show=...) ──────────────
     app.run(host=host, port=port, show=not no_browser)
