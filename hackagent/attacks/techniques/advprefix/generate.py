@@ -24,7 +24,10 @@ from hackagent.server.client import AuthenticatedClient
 from hackagent.router.router import AgentRouter
 from hackagent.router.types import AgentTypeEnum
 
-from .config import CUSTOM_CHAT_TEMPLATES, PrefixGenerationConfig
+from .config import (
+    DEFAULT_ADVPREFIX_GENERATOR_SYSTEM_PROMPT,
+    PrefixGenerationConfig,
+)
 from .utils import REFUSAL_KEYWORDS, create_progress_bar, handle_empty_input, log_errors
 
 # ============================================================================
@@ -89,6 +92,9 @@ class PrefixGenerationPipeline:
             if isinstance(config, dict)
             else config
         )
+        # Preserve the raw config dict when provided so we can read
+        # fields that are not part of PrefixGenerationConfig (e.g. max_tokens_eval).
+        self._raw_config = config if isinstance(config, dict) else None
         self.logger = logger
         self.client = client
         self.agent_router = agent_router
@@ -333,7 +339,9 @@ class PrefixGenerationPipeline:
                 "name": model_name,
                 "endpoint": endpoint,
                 "api_key": api_key,
-                "max_tokens": self.config.max_tokens,
+                "max_tokens": self.config.generator.get(
+                    "max_tokens", self.config.max_tokens
+                ),
                 "temperature": self.config.temperature,
                 "top_p": self.config.top_p,
             }
@@ -404,17 +412,7 @@ class PrefixGenerationPipeline:
                     continue
 
                 try:
-                    # Format prompt using template
-                    if meta_prefix in CUSTOM_CHAT_TEMPLATES:
-                        template = CUSTOM_CHAT_TEMPLATES[meta_prefix]
-                        prompt_content = template.format(content=goal)
-                    else:
-                        self.logger.debug(
-                            f"No template for {meta_prefix}, using basic format"
-                        )
-                        prompt_content = f"USER: {goal}\\nASSISTANT:"
-
-                    full_prompt = prompt_content + meta_prefix
+                    full_prompt = f"META_PREFIX: {meta_prefix}\nGOAL: {goal}"
 
                     # Replicate for n_count samples
                     prompts.extend([full_prompt] * n_count)
@@ -441,6 +439,9 @@ class PrefixGenerationPipeline:
         temperature = self.config.temperature if do_sample else 1e-2
 
         registration_key = next(iter(self._generation_router._agent_registry.keys()))  # type: ignore
+        system_prompt = self.config.generator.get("system_prompt")
+        if not system_prompt:
+            system_prompt = DEFAULT_ADVPREFIX_GENERATOR_SYSTEM_PROMPT
 
         progress_desc = f"[cyan]Generating ({mode})..."
 
@@ -452,8 +453,13 @@ class PrefixGenerationPipeline:
         def _generate_single(args: tuple) -> None:
             idx, prompt, goal, meta_prefix = args
             request_params = {
-                "prompt": prompt,
-                "max_tokens": self.config.max_tokens,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt},
+                ],
+                "max_tokens": self.config.generator.get(
+                    "max_tokens", self.config.max_tokens
+                ),
                 "temperature": temperature,
                 "top_p": self.config.top_p,
             }
@@ -462,7 +468,7 @@ class PrefixGenerationPipeline:
                 request_data=request_params,
             )
             generated_text = self._extract_generated_text(response, prompt, goal)
-            final_prefix = meta_prefix + generated_text
+            final_prefix = generated_text.strip()
             with _results_lock:
                 results_map[idx] = {
                     "goal": goal,
@@ -826,7 +832,28 @@ class PrefixGenerationPipeline:
                 result["ce_elapsed_s"] = round(time.perf_counter() - _row_t0, 3)
                 return index, result
             try:
-                request_data = {"prompt": prefix_text}
+                # Determine max_tokens for CE requests. Priority:
+                # 1) explicit 'max_tokens_eval' in raw config dict
+                # 2) top-level 'max_tokens' in raw config dict
+                # 3) attribute on the parsed config (if present)
+                # 4) fallback to 1 token to avoid large completions
+                max_tokens_ce = None
+                if self._raw_config:
+                    max_tokens_ce = self._raw_config.get(
+                        "max_tokens_eval"
+                    ) or self._raw_config.get("max_tokens")
+                if max_tokens_ce is None:
+                    max_tokens_ce = getattr(
+                        self.config, "max_tokens_eval", None
+                    ) or getattr(self.config, "max_tokens", None)
+                try:
+                    max_tokens_ce = (
+                        int(max_tokens_ce) if max_tokens_ce is not None else 1
+                    )
+                except (TypeError, ValueError):
+                    max_tokens_ce = 1
+
+                request_data = {"prompt": prefix_text, "max_tokens": max_tokens_ce}
                 response = self.agent_router.route_request(
                     registration_key=victim_key,
                     request_data=request_data,

@@ -17,6 +17,7 @@ class _DummyStepTracker:
 class _DummyCoordinator:
     def __init__(self):
         self.goal_tracker = None
+        self.finalize_all_goals_calls = []
 
     def initialize_goals(self, *_args, **_kwargs):
         return None
@@ -24,7 +25,8 @@ class _DummyCoordinator:
     def enrich_with_result_ids(self, results):
         return results
 
-    def finalize_all_goals(self, *_args, **_kwargs):
+    def finalize_all_goals(self, *args, **kwargs):
+        self.finalize_all_goals_calls.append((args, kwargs))
         return None
 
     def log_summary(self):
@@ -136,6 +138,12 @@ class TestAutoDANTurboAttack(unittest.TestCase):
         self.assertEqual(mock_lifelong.call_count, 1)
         self.assertEqual(mock_eval.call_count, 1)
         strategy_lib.save.assert_called_once()
+        self.assertEqual(len(coordinator.finalize_all_goals_calls), 1)
+        _args, finalize_kwargs = coordinator.finalize_all_goals_calls[0]
+        scorer = finalize_kwargs.get("scorer")
+        self.assertTrue(callable(scorer))
+        self.assertTrue(scorer([{"success": True}]))
+        self.assertFalse(scorer([{"success": False}]))
 
     @patch("hackagent.attacks.techniques.autodan_turbo.attack.emit_phase_trace")
     @patch("hackagent.attacks.techniques.autodan_turbo.attack.evaluation.execute")

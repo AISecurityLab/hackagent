@@ -38,6 +38,7 @@ def make_run_table(
     include_agent: bool = False,
     include_progressive_run: bool = False,
     include_results: bool = True,
+    include_goal_latency_avg: bool = False,
     selection: str | None = None,
     on_select=None,
 ) -> ui.table:
@@ -46,7 +47,13 @@ def make_run_table(
     run_field = "run_progress" if include_progressive_run else "id"
 
     columns = [
-        {"name": "id", "label": run_label, "field": run_field, "align": "left"},
+        {
+            "name": "id",
+            "label": run_label,
+            "field": run_field,
+            "align": "left",
+            "sortable": True,
+        },
     ]
     if include_agent:
         columns.append(
@@ -55,6 +62,7 @@ def make_run_table(
                 "label": "Agent",
                 "field": "agent_name",
                 "align": "left",
+                "sortable": True,
             }
         )
     columns.append(
@@ -63,6 +71,7 @@ def make_run_table(
             "label": "Attack",
             "field": "attack_type",
             "align": "left",
+            "sortable": True,
         }
     )
     columns.extend(
@@ -72,21 +81,35 @@ def make_run_table(
                 "label": "Status",
                 "field": "status",
                 "align": "left",
+                "sortable": True,
             },
             {
                 "name": "latency",
                 "label": "Latency",
-                "field": "_latency",
+                "field": "_latency_s",
                 "align": "left",
+                "sortable": True,
             },
             {
                 "name": "created_at",
                 "label": "Timestamp",
                 "field": "created_at",
                 "align": "left",
+                "sortable": True,
             },
         ]
     )
+    if include_goal_latency_avg:
+        columns.insert(
+            len(columns) - 1,
+            {
+                "name": "goal_latency_avg",
+                "label": "Per-Goal Latency (AVG)",
+                "field": "_goal_latency_avg_s",
+                "align": "left",
+                "sortable": True,
+            },
+        )
     if include_results:
         columns.insert(
             len(columns) - 1,
@@ -95,6 +118,7 @@ def make_run_table(
                 "label": "Results",
                 "field": "total_results",
                 "align": "left",
+                "sortable": True,
             },
         )
 
@@ -164,6 +188,15 @@ def make_run_table(
         """,
     )
     tbl.add_slot(
+        "body-cell-goal_latency_avg",
+        r"""
+        <q-td :props="props" class="cursor-pointer"
+              @click="$emit('rowClick', props.row)">
+          <span class="tabular-nums text-sm">{{ props.row._goal_latency_avg || '—' }}</span>
+        </q-td>
+        """,
+    )
+    tbl.add_slot(
         "body-cell-results",
         r"""
         <q-td :props="props" class="cursor-pointer"
@@ -179,6 +212,14 @@ def make_run_table(
                                      color="positive" class="ml-2">
                         failed attacks: {{ props.row.failed_attacks }}
           </q-badge>
+                    <q-badge
+                        v-if="((props.row.successful_jailbreaks ?? 0) + (props.row.failed_attacks ?? 0)) > 0"
+                        color="info"
+                        class="ml-2"
+                    >
+                        ASR:
+                        {{ (((props.row.successful_jailbreaks ?? 0) * 100) / ((props.row.successful_jailbreaks ?? 0) + (props.row.failed_attacks ?? 0))).toFixed(1) }}%
+                    </q-badge>
         </q-td>
         """,
     )

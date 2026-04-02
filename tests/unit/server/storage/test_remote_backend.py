@@ -333,6 +333,32 @@ class TestRemoteBackendRun(unittest.TestCase):
         self.assertEqual(result.total, 1)
         self.assertIsInstance(result.items[0], RunRecord)
 
+    def test_list_runs_injects_agent_name_into_run_config(self):
+        run_m = MagicMock()
+        run_m.id = _uid()
+        run_m.attack = _uid()
+        run_m.agent = _uid()
+        run_m.run_config = {"mode": "fast"}
+        run_m.agent_name = "assistant-a"
+        run_m.status = MagicMock()
+        run_m.status.value = "COMPLETED"
+        run_m.run_notes = None
+        run_m.created_at = _dt()
+        run_m.updated_at = _dt()
+
+        parsed = MagicMock()
+        parsed.results = [run_m]
+        parsed.count = 1
+        parsed.next = None
+
+        with patch("hackagent.server.storage.remote.run_list") as mock_list:
+            mock_list.sync_detailed.return_value = _mock_response(200, parsed=parsed)
+            result = self.backend.list_runs()
+
+        self.assertEqual(result.total, 1)
+        self.assertEqual(result.items[0].run_config.get("mode"), "fast")
+        self.assertEqual(result.items[0].run_config.get("_agent_name"), "assistant-a")
+
     def test_list_runs_uses_run_timestamp_for_created_at(self):
         run_m = MagicMock()
         run_m.id = _uid()
@@ -549,6 +575,71 @@ class TestRemoteBackendResult(unittest.TestCase):
         _, kwargs = mock_list.sync_detailed.call_args
         self.assertEqual(kwargs.get("run"), run_id)
 
+    def test_list_results_falls_back_to_run_retrieve_when_empty(self):
+        run_id = _uid()
+
+        empty_page = MagicMock()
+        empty_page.results = []
+        empty_page.count = 0
+        empty_page.next = None
+
+        embedded = MagicMock()
+        embedded.id = _uid()
+        embedded.run = run_id
+        embedded.agent_specific_data = {"goal": "fallback-goal", "goal_index": 7}
+        embedded.evaluation_status = MagicMock()
+        embedded.evaluation_status.value = "NOT_EVALUATED"
+        embedded.evaluation_notes = None
+        embedded.evaluation_metrics = {}
+        embedded.created_at = _dt()
+        embedded.updated_at = _dt()
+
+        run_with_embedded = MagicMock()
+        run_with_embedded.results = [embedded]
+
+        with (
+            patch("hackagent.server.storage.remote.result_list") as mock_list,
+            patch("hackagent.server.storage.remote.run_retrieve") as mock_run_retrieve,
+        ):
+            mock_list.sync_detailed.return_value = _mock_response(
+                200, parsed=empty_page
+            )
+            mock_run_retrieve.sync_detailed.return_value = _mock_response(
+                200, parsed=run_with_embedded
+            )
+
+            result = self.backend.list_results(run_id=run_id)
+
+        self.assertEqual(result.total, 1)
+        self.assertEqual(len(result.items), 1)
+        self.assertEqual(result.items[0].run_id, run_id)
+        self.assertEqual(result.items[0].goal, "fallback-goal")
+        self.assertEqual(result.items[0].goal_index, 7)
+
+    def test_count_result_buckets_aggregates_filtered_counts(self):
+        counts = [12, 4, 2, 1, 3, 2, 1, 5]
+
+        def _resp(count: int):
+            parsed = MagicMock()
+            parsed.count = count
+            return _mock_response(200, parsed=parsed)
+
+        with patch("hackagent.server.storage.remote.result_list") as mock_result_list:
+            mock_result_list.sync_detailed.side_effect = [_resp(c) for c in counts]
+            result = self.backend.count_result_buckets()
+
+        self.assertEqual(
+            result,
+            {
+                "total": 12,
+                "jailbreaks": 4,
+                "mitigated": 3,
+                "failed": 6,
+                "pending": 5,
+            },
+        )
+        self.assertEqual(mock_result_list.sync_detailed.call_count, 8)
+
     def test_list_traces_from_result_retrieve(self):
         result_id = _uid()
 
@@ -592,6 +683,73 @@ class TestRemoteBackendResult(unittest.TestCase):
             traces = self.backend.list_traces(result_id)
 
         self.assertEqual(traces, [])
+
+
+class TestRemoteBackendDelete(unittest.TestCase):
+    """Test delete operations delegated to remote API."""
+
+    def setUp(self):
+        self.client = _mock_client()
+        self.backend = RemoteBackend(self.client)
+
+    def test_delete_run_calls_run_destroy(self):
+        run_id = _uid()
+        with patch("hackagent.server.storage.remote.run_destroy") as mock_destroy:
+            mock_destroy.sync_detailed.return_value = _mock_response(204, parsed=None)
+            self.backend.delete_run(run_id)
+
+        mock_destroy.sync_detailed.assert_called_once_with(
+            id=run_id, client=self.client
+        )
+
+    def test_delete_attack_deletes_runs_then_attack(self):
+        attack_id = _uid()
+
+        run_a = RunRecord(
+            id=_uid(),
+            attack_id=attack_id,
+            agent_id=_uid(),
+            run_config={},
+            status="COMPLETED",
+            run_notes=None,
+            created_at=_dt(),
+            updated_at=_dt(),
+        )
+        run_b = RunRecord(
+            id=_uid(),
+            attack_id=attack_id,
+            agent_id=_uid(),
+            run_config={},
+            status="FAILED",
+            run_notes=None,
+            created_at=_dt(),
+            updated_at=_dt(),
+        )
+
+        with (
+            patch.object(self.backend, "list_runs") as mock_list_runs,
+            patch.object(self.backend, "delete_run") as mock_delete_run,
+            patch(
+                "hackagent.server.storage.remote.attack_destroy"
+            ) as mock_attack_destroy,
+        ):
+            mock_list_runs.return_value = PaginatedResult(items=[run_a, run_b], total=2)
+            mock_attack_destroy.sync_detailed.return_value = _mock_response(
+                204, parsed=None
+            )
+
+            self.backend.delete_attack(attack_id)
+
+        mock_list_runs.assert_called_once_with(
+            attack_id=attack_id, page=1, page_size=100
+        )
+        self.assertEqual(mock_delete_run.call_count, 2)
+        deleted_ids = {call.args[0] for call in mock_delete_run.call_args_list}
+        self.assertEqual(deleted_ids, {run_a.id, run_b.id})
+        mock_attack_destroy.sync_detailed.assert_called_once_with(
+            id=attack_id,
+            client=self.client,
+        )
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ sidebar_label: attack
 title: hackagent.attacks.techniques.autodan_turbo.attack
 ---
 
-AutoDAN-Turbo attack orchestrator — 3-step pipeline (WarmUp → Lifelong → Evaluation).
+AutoDAN-Turbo orchestrator — WarmUp → Lifelong → scorer finalization.
 
 ## AutoDANTurboAttack Objects
 
@@ -16,7 +16,7 @@ AutoDAN-Turbo: Lifelong agent for strategy self-exploration in jailbreaking LLMs
 Three-phase pipeline:
 1. WarmUp — free exploration to bootstrap a strategy library
 2. Lifelong — strategy-guided attacks with retrieval + summarization
-3. Evaluation — multi-judge scoring for consistent metrics
+3. Evaluation — scorer-only result finalization
 
 #### \_\_init\_\_
 
@@ -49,12 +49,12 @@ Initialize AutoDAN-Turbo attack with merged defaults.
 def run(goals: List[str]) -> List[Dict[str, Any]]
 ```
 
-Execute full 3-step AutoDAN-Turbo pipeline.
+Execute full AutoDAN-Turbo pipeline.
 
 Pipeline mapping to paper/integration:
 1) WarmUp: free exploration + strategy library bootstrap
 2) Lifelong: retrieval-guided attack with online strategy growth
-3) Evaluation: hackagent multi-judge scoring harmonization
+3) Evaluation: scorer-only normalization and success finalization
 
 **Arguments**:
 
@@ -63,7 +63,7 @@ Pipeline mapping to paper/integration:
 
 **Returns**:
 
-  Final per-goal result list, enriched with attack and judge metrics.
+  Final per-goal result list, enriched with scorer-based metrics.
   
 
 **Raises**:

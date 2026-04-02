@@ -364,6 +364,65 @@ class TestOpenAIAgentHandleRequest(unittest.TestCase):
         self.assertEqual(response["status_code"], 500)
         self.assertIn("connection", response["error_message"])
 
+    @patch("hackagent.router.adapters.openai.time.sleep", return_value=None)
+    def test_handle_request_connection_error_retries_then_succeeds(self, _mock_sleep):
+        """Test transient connection errors are retried and can recover."""
+        import openai
+
+        mock_request = MagicMock()
+        error = openai.APIConnectionError(
+            message="Connection failed", request=mock_request
+        )
+
+        mock_message = MagicMock()
+        mock_message.content = "Recovered response"
+        mock_message.tool_calls = None
+
+        mock_choice = MagicMock()
+        mock_choice.message = mock_message
+        mock_choice.finish_reason = "stop"
+
+        mock_usage = MagicMock()
+        mock_usage.model_dump.return_value = {"total_tokens": 10}
+
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_response.usage = mock_usage
+        mock_response.model = "gpt-4"
+
+        self.mock_client.chat.completions.create.side_effect = [
+            error,
+            error,
+            mock_response,
+        ]
+
+        response = self.adapter.handle_request({"prompt": "Hello"})
+
+        self.assertEqual(response["status_code"], 200)
+        self.assertEqual(response["generated_text"], "Recovered response")
+        self.assertEqual(self.mock_client.chat.completions.create.call_count, 3)
+
+    @patch("hackagent.router.adapters.openai.time.sleep", return_value=None)
+    def test_handle_request_connection_error_stops_after_five_retries(
+        self, _mock_sleep
+    ):
+        """Test connection retry budget is capped at 5 retries."""
+        import openai
+
+        mock_request = MagicMock()
+        error = openai.APIConnectionError(
+            message="Connection failed", request=mock_request
+        )
+
+        self.mock_client.chat.completions.create.side_effect = [error] * 6
+
+        response = self.adapter.handle_request({"prompt": "Hello"})
+
+        self.assertEqual(response["status_code"], 500)
+        self.assertIn("connection", response["error_message"])
+        # First attempt + 5 retries = 6 total calls.
+        self.assertEqual(self.mock_client.chat.completions.create.call_count, 6)
+
     def test_handle_request_with_parameter_overrides(self):
         """Test that request parameters override defaults."""
         mock_message = MagicMock()

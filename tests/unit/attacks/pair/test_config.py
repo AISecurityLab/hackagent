@@ -16,6 +16,7 @@ class TestPairConfig(unittest.TestCase):
         required = [
             "objective",
             "attacker",
+            "category_classifier",
             "n_iterations",
             "n_streams",
             "judge",

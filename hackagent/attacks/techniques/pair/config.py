@@ -10,15 +10,24 @@ from typing import Any, Dict
 from pydantic import Field
 
 from hackagent.attacks.techniques.config import (
+    AttackerConfig,
     ConfigBase,
     DEFAULT_CONFIG_BASE,
 )
+
+
+def _default_role_config(identifier: str) -> Dict[str, Any]:
+    """Build a standard shared role config with a custom identifier."""
+    return AttackerConfig(identifier=identifier).model_dump()
+
 
 DEFAULT_PAIR_CONFIG: Dict[str, Any] = {
     **DEFAULT_CONFIG_BASE,
     "attack_type": "pair",
     # Objective
     "objective": "jailbreak",
+    # Dedicated scorer role (AutoDAN-style scorer+wrapper)
+    "scorer": _default_role_config("hackagent-scorer"),
     # Iteration settings
     "n_iterations": 5,  # Number of refinement iterations
     "n_streams": 5,  # Number of parallel refinement streams
@@ -31,6 +40,8 @@ DEFAULT_PAIR_CONFIG: Dict[str, Any] = {
     "judge_response_max_chars": 3500,
     # Dashboard trace preview length for target response text.
     "target_trace_response_max_chars": 2000,
+    # Maximum retries for scorer/wrapper parsing
+    "max_parse_retries": 5,
 }
 
 
@@ -39,6 +50,11 @@ class PairConfig(ConfigBase):
 
     attack_type: str = "pair"
     objective: str = "jailbreak"
+    scorer: Dict[str, Any] = Field(
+        default_factory=lambda: AttackerConfig(
+            identifier="hackagent-scorer"
+        ).model_dump()
+    )
     n_iterations: int = Field(default=5, ge=1)
     n_streams: int = Field(default=5, ge=1)
     early_stop_on_success: bool = True
@@ -47,6 +63,7 @@ class PairConfig(ConfigBase):
     judge_prompt_max_chars: int = Field(default=2500, ge=1)
     judge_response_max_chars: int = Field(default=3500, ge=1)
     target_trace_response_max_chars: int = Field(default=2000, ge=1)
+    max_parse_retries: int = Field(default=5, ge=0)
 
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> "PairConfig":

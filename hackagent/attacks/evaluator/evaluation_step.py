@@ -180,10 +180,14 @@ class BaseEvaluationStep:
         if not identifier:
             return default
         identifier_lower = identifier.lower()
+        if (
+            "harmclassifier" in identifier_lower
+            or "harmbenchvariant" in identifier_lower
+            or "harmbench_variant" in identifier_lower
+        ):
+            return "harmbench_variant"
         if "harmbench" in identifier_lower:
             return "harmbench"
-        if "harmclassifier" in identifier_lower:
-            return "harmbench_variant"
         if "nuanced" in identifier_lower:
             return "nuanced"
         if "jailbreak" in identifier_lower:
@@ -543,9 +547,9 @@ class BaseEvaluationStep:
                 continue
 
             # Determine judge type
-            judge_type_str = judge_config_item.get(
+            judge_type_str = judge_config_item.get("type") or judge_config_item.get(
                 "evaluator_type"
-            ) or judge_config_item.get("type")
+            )
             judge_identifier = judge_config_item.get("identifier")
 
             if not judge_type_str:

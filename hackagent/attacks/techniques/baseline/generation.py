@@ -173,6 +173,7 @@ def execute_prompts(
             run_id=run_id,
             logger=logger,
             attack_type="baseline",
+            category_classifier_config=config.get("category_classifier"),
         )
     else:
         logger.warning("⚠️ Missing tracking context - results will NOT be created!")

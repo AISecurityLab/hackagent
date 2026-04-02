@@ -9,10 +9,6 @@ Starts a NiceGUI server that reads from the local SQLite backend
 dashboard at http://<host>:<port>/.
 """
 
-import threading
-import time
-import webbrowser
-
 import click
 import httpx
 from rich.console import Console
@@ -157,16 +153,5 @@ def web(ctx, host, port, db_path, no_browser):
 
     _free_port(host, port)
 
-    # ── Serve (NiceGUI opens the browser automatically when show=True) ────────
+    # ── Serve (NiceGUI handles browser auto-open via show=...) ──────────────
     app.run(host=host, port=port, show=not no_browser)
-    # ── Auto-open browser ─────────────────────────────────────────────────────
-    if not no_browser:
-
-        def _open_browser():
-            time.sleep(1.0)
-            webbrowser.open(url)
-
-        threading.Thread(target=_open_browser, daemon=True).start()
-
-    # ── Serve ─────────────────────────────────────────────────────────────────
-    app.run(host=host, port=port, debug=False, use_reloader=False)

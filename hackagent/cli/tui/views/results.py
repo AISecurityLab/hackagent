@@ -607,7 +607,14 @@ def _format_trace_block(
         # ── Attack-specific evaluator ──────────────────────────────────────
         score = content.get("score", "?")
         explanation = content.get("explanation", "")
+        meta = content.get("metadata", {}) or {}
         result_inner = content.get("result", {}) or {}
+        scorer_explanation = (
+            content.get("scorer_explanation")
+            or result_inner.get("scorer_explanation")
+            or meta.get("scorer_explanation")
+            or ""
+        )
         score_color = (
             "bright_green" if (isinstance(score, (int, float)) and score > 0) else "red"
         )
@@ -620,6 +627,11 @@ def _format_trace_block(
                 body += f"  [dim]│[/dim]    {_escape(k)}: [{vc}]{v}[/{vc}]\n"
             else:
                 body += f"  [dim]│[/dim]    [yellow]{_escape(k)}:[/yellow] [{score_color}]{_escape(str(v))}[/{score_color}]\n"
+        if scorer_explanation:
+            body += (
+                f"  [dim]│[/dim]  [bold]Scorer:[/bold] "
+                f"[dim]{_escape(scorer_explanation[:180])}[/dim]\n"
+            )
         if explanation:
             body += f"  [dim]│[/dim]  [dim]{_escape(explanation[:150])}[/dim]\n"
     elif evaluator == "tracking_coordinator":
@@ -922,13 +934,15 @@ def _format_result_summary(result: Any, index: int) -> str:
 def _format_result_full_details(
     result: Any, index: int, max_traces: int = 5, traces: list | None = None
 ) -> str:
-    """Format full details for a single result.
+    """Format full details for a single result with 3 sections: Result, Traces, Config.
+
+    Mirrors the remote dashboard layout with tabbed sections.
 
     Args:
         result: Result object
         index: Result index (1-based)
         max_traces: Maximum number of traces to display
-        traces: Pre-fetched list of TraceRecord objects (used when result has no embedded traces)
+        traces: Pre-fetched list of TraceRecord objects
 
     Returns:
         Formatted details string
@@ -936,8 +950,14 @@ def _format_result_full_details(
     eval_status, status_color, status_icon = _get_result_status_info(result)
     meta: dict = getattr(result, "metadata", None) or {}
 
-    # ── Header ─────────────────────────────────────────────────────────────
-    details = f"[bold {status_color}]{'━' * 48}[/bold {status_color}]\n"
+    details = ""
+
+    # ══════════════════════════════════════════════════════════════════════
+    # SECTION 1: RESULT
+    # ══════════════════════════════════════════════════════════════════════
+    details += "[bold bright_cyan]┌─ 📋 Result ──────────────────────────────────┐[/bold bright_cyan]\n\n"
+
+    # Status + timing
     details += f"  {status_icon} [bold {status_color}]{_escape(eval_status)}[/bold {status_color}]"
     elapsed = meta.get("elapsed_s")
     if elapsed is not None:
@@ -946,26 +966,23 @@ def _format_result_full_details(
         except (TypeError, ValueError):
             details += ""
     attack_type = meta.get("attack_type", "")
-    # Try request_payload for attack_type
     if not attack_type:
         rp = getattr(result, "request_payload", None) or {}
         if isinstance(rp, dict):
             attack_type = rp.get("attack_type", "")
     if attack_type:
         details += f"  [dim]via {_escape(attack_type.upper())}[/dim]"
-    details += "\n"
-    details += f"[bold {status_color}]{'━' * 48}[/bold {status_color}]\n\n"
+    details += "\n\n"
 
-    # ── Goal ────────────────────────────────────────────────────────────────
+    # Goal
     goal_text = getattr(result, "goal", None) or meta.get("goal", "")
     goal_index = getattr(result, "goal_index", None)
     if goal_text:
-        gi_str = f"[dim] #{goal_index}[/dim]" if goal_index is not None else ""
-        details += f"[bold cyan]🎯 GOAL{gi_str}[/bold cyan]\n"
-        # Word-wrap goal at 80 chars
+        gi_str = f" #{goal_index}" if goal_index is not None else ""
+        details += f"  [dim]GOAL{gi_str}:[/dim]\n"
         words, line, wrapped = goal_text.split(), "", []
         for w in words:
-            if len(line) + len(w) + 1 > 78:
+            if len(line) + len(w) + 1 > 76:
                 wrapped.append(line)
                 line = w
             else:
@@ -973,65 +990,84 @@ def _format_result_full_details(
         if line:
             wrapped.append(line)
         for ln in wrapped:
-            details += f"  [yellow]{_escape(ln)}[/yellow]\n"
+            details += f"    [yellow]{_escape(ln)}[/yellow]\n"
         details += "\n"
 
-    # ── Attack configuration ────────────────────────────────────────────────
-    config_keys = [
-        "flip_mode",
-        "cot",
-        "lang_gpt",
-        "few_shot",
-        "judge",
-        "num_results",
-        "best_score",
-        "success",
-        "total_traces",
-    ]
-    cfg_items = {k: meta[k] for k in config_keys if k in meta}
-    if cfg_items:
-        details += "[bold bright_yellow]⚙️  ATTACK CONFIG[/bold bright_yellow]\n"
-        row_parts = []
-        labels = {
-            "flip_mode": "Mode",
-            "cot": "CoT",
-            "lang_gpt": "LangGPT",
-            "few_shot": "FewShot",
-            "judge": "Judge",
-            "num_results": "Attempts",
-            "best_score": "Best",
-            "success": "Jailbreak",
-            "total_traces": "Traces",
-        }
-        for k, v in cfg_items.items():
-            label = labels.get(k, k)
-            if isinstance(v, bool):
-                val_s = "[bright_green]✓[/bright_green]" if v else "[dim]✗[/dim]"
-            elif isinstance(v, float):
-                val_s = f"[bright_cyan]{v:.2f}[/bright_cyan]"
-            elif isinstance(v, str):
-                val_s = f"[bright_white]{_escape(v)}[/bright_white]"
-            else:
-                val_s = f"[bright_cyan]{v}[/bright_cyan]"
-            row_parts.append(f"[dim]{label}:[/dim] {val_s}")
-        # 2-column layout
-        for i in range(0, len(row_parts), 2):
-            left = row_parts[i]
-            right = row_parts[i + 1] if i + 1 < len(row_parts) else ""
-            details += f"  {left:<50}{right}\n"
-        details += "\n"
-
-    # ── Evaluation notes ────────────────────────────────────────────────────
+    # Evaluation notes
     notes = getattr(result, "evaluation_notes", None)
     if notes:
-        details += f"[bold magenta]💬 NOTES[/bold magenta]\n  [italic dim]{_escape(notes[:200])}[/italic dim]\n\n"
+        details += f"  [dim]Evaluation Notes:[/dim]\n    [italic]{_escape(notes[:300])}[/italic]\n\n"
 
-    # ── Traces ──────────────────────────────────────────────────────────────
+    # Key metrics table
+    metric_keys = [
+        ("elapsed_s", "Elapsed", lambda v: f"{float(v):.1f}s"),
+        ("objective", "Objective", str),
+        (
+            "best_score",
+            "Best Score",
+            lambda v: f"{float(v):.2f}" if isinstance(v, (int, float)) else str(v),
+        ),
+        (
+            "success",
+            "Success",
+            lambda v: "[green]✓ Yes[/green]" if v else "[red]✗ No[/red]",
+        ),
+        ("goal_index", "Goal Index", str),
+        ("n_iterations", "Iterations Config", str),
+        ("iterations_completed", "Iterations Done", str),
+        ("total_traces", "Total Traces", str),
+    ]
+    shown = []
+    for key, label, fmt in metric_keys:
+        val = meta.get(key)
+        if val is not None:
+            try:
+                shown.append((label, fmt(val)))
+            except (TypeError, ValueError):
+                shown.append((label, str(val)))
+    if shown:
+        details += "  [dim]─── Key Metrics ───[/dim]\n"
+        for label, val in shown:
+            details += f"  [dim]{label}:[/dim] {val}\n"
+        details += "\n"
+
+    # Jailbreak prompt/response (when available — e.g. advprefix, PAIR)
+    jb_prompt = meta.get("jailbreak_prompt") or meta.get("best_prompt", "")
+    jb_response = meta.get("jailbreak_response") or meta.get("best_response", "")
+    if jb_prompt or jb_response:
+        details += "  [bold red]─── Jailbreak Details ───[/bold red]\n"
+        if jb_prompt:
+            details += "  [dim]Prompt:[/dim]\n"
+            prompt_preview = jb_prompt[:500]
+            for p_line in prompt_preview.split("\n")[:8]:
+                details += (
+                    f"    [bright_yellow]{_escape(p_line[:120])}[/bright_yellow]\n"
+                )
+            if len(jb_prompt) > 500:
+                details += f"    [dim]... ({len(jb_prompt) - 500} more chars)[/dim]\n"
+            details += "\n"
+        if jb_response:
+            details += "  [dim]Response:[/dim]\n"
+            resp_preview = jb_response[:500]
+            for r_line in resp_preview.split("\n")[:8]:
+                details += f"    [bright_red]{_escape(r_line[:120])}[/bright_red]\n"
+            if len(jb_response) > 500:
+                details += f"    [dim]... ({len(jb_response) - 500} more chars)[/dim]\n"
+            details += "\n"
+
+    details += "[bold bright_cyan]└──────────────────────────────────────────────┘[/bold bright_cyan]\n\n"
+
+    # ══════════════════════════════════════════════════════════════════════
+    # SECTION 2: TRACES
+    # ══════════════════════════════════════════════════════════════════════
     _raw_traces = (
         (result.traces if hasattr(result, "traces") and result.traces else None)
         or traces
         or []
     )
+
+    details += f"[bold bright_magenta]┌─ 🔍 Traces ({len(_raw_traces)}) ────────────────────────────┐[/bold bright_magenta]\n\n"
+
     if _raw_traces:
         sorted_traces = sorted(
             _raw_traces,
@@ -1039,9 +1075,6 @@ def _format_result_full_details(
         )
         total_traces = len(sorted_traces)
         display_traces = sorted_traces[:max_traces]
-
-        details += f"[bold magenta]🔍 EXECUTION TRACE[/bold magenta]  [dim]({total_traces} steps)[/dim]\n"
-        details += f"[dim]{'─' * 48}[/dim]\n"
 
         for i, trace in enumerate(display_traces, 1):
             step_type = str(getattr(trace, "step_type", "OTHER"))
@@ -1066,9 +1099,60 @@ def _format_result_full_details(
             details += _format_trace_block(i, seq, step_type, content, ts_str)
 
         if total_traces > max_traces:
-            details += f"\n[dim]  … {total_traces - max_traces} more steps (use export for full trace)[/dim]\n"
+            details += f"\n  [dim]… {total_traces - max_traces} more steps (use export for full trace)[/dim]\n"
     else:
-        details += "[dim]  No execution traces recorded.[/dim]\n"
+        details += "  [dim]No execution traces recorded.[/dim]\n"
+
+    details += "\n[bold bright_magenta]└──────────────────────────────────────────────┘[/bold bright_magenta]\n\n"
+
+    # ══════════════════════════════════════════════════════════════════════
+    # SECTION 3: CONFIG
+    # ══════════════════════════════════════════════════════════════════════
+    details += "[bold bright_yellow]┌─ ⚙️  Config ─────────────────────────────────┐[/bold bright_yellow]\n\n"
+
+    config_keys = [
+        "flip_mode",
+        "cot",
+        "lang_gpt",
+        "few_shot",
+        "judge",
+        "num_results",
+        "attack_type",
+        "program",
+        "syntax_version",
+        "objective",
+        "n_iterations",
+    ]
+    cfg_items = {k: meta[k] for k in config_keys if k in meta}
+    if cfg_items:
+        labels = {
+            "flip_mode": "Mode",
+            "cot": "CoT",
+            "lang_gpt": "LangGPT",
+            "few_shot": "FewShot",
+            "judge": "Judge",
+            "num_results": "Attempts",
+            "attack_type": "Attack Type",
+            "program": "Program",
+            "syntax_version": "Syntax Version",
+            "objective": "Objective",
+            "n_iterations": "N Iterations",
+        }
+        for k, v in cfg_items.items():
+            label = labels.get(k, k)
+            if isinstance(v, bool):
+                val_s = "[green]✓[/green]" if v else "[dim]✗[/dim]"
+            elif isinstance(v, float):
+                val_s = f"[bright_cyan]{v:.2f}[/bright_cyan]"
+            elif isinstance(v, str):
+                val_s = f"[bright_white]{_escape(v[:80])}[/bright_white]"
+            else:
+                val_s = f"[bright_cyan]{v}[/bright_cyan]"
+            details += f"  [dim]{label}:[/dim] {val_s}\n"
+    else:
+        details += "  [dim]No configuration metadata available.[/dim]\n"
+
+    details += "\n[bold bright_yellow]└──────────────────────────────────────────────┘[/bold bright_yellow]\n"
 
     return details
 
@@ -1916,101 +2000,161 @@ class ResultsTab(BaseTab):
                 else:
                     eval_summary["OTHER"] += 1
 
-        # Build run header with visual progress bar
-        total_evaluated = (
-            eval_summary["SUCCESSFUL_JAILBREAK"] + eval_summary["FAILED_JAILBREAK"]
-        )
-        success_rate = (
-            (eval_summary["SUCCESSFUL_JAILBREAK"] / total_evaluated * 100)
-            if total_evaluated > 0
-            else 0
-        )
-
-        # Create visual progress bar for this run
-        bar_width = 25
-        if results_count > 0:
-            success_blocks = int(
-                (eval_summary["SUCCESSFUL_JAILBREAK"] / results_count * bar_width)
-            )
-            failed_blocks = int(
-                (eval_summary["FAILED_JAILBREAK"] / results_count * bar_width)
-            )
-            other_blocks = bar_width - success_blocks - failed_blocks
-            progress_bar = (
-                f"[green]{'█' * success_blocks}[/green]"
-                f"[red]{'█' * failed_blocks}[/red]"
-                f"[yellow]{'░' * other_blocks}[/yellow]"
-            )
-        else:
-            progress_bar = f"[dim]{'░' * bar_width}[/dim]"
-
         header = f"""[bold cyan]╔{"═" * 50}╗[/bold cyan]
-[bold cyan]║[/bold cyan] [bold bright_white]🎯 RUN DETAILS[/bold bright_white]{" " * 35}[bold cyan]║[/bold cyan]
+[bold cyan]║[/bold cyan] [bold bright_white]📊 Report Details[/bold bright_white]{" " * 33}[bold cyan]║[/bold cyan]
 [bold cyan]╚{"═" * 50}╝[/bold cyan]
 
-[bold bright_cyan]▌ Overview[/bold bright_cyan]
-  🆔 [bold]ID:[/bold]     [dim]{str(run.id)[:8]}...[/dim]
-  🤖 [bold]Agent:[/bold]  [bright_cyan]{_escape(agent_display)}[/bright_cyan]
-  🏢 [bold]Org:[/bold]    [bright_cyan]{_escape(org_display)}[/bright_cyan]
-  📅 [bold]Time:[/bold]   {_escape(created)}
-  {status_icon} [bold]Status:[/bold] [bright_{status_color}]{_escape(status_display)}[/bright_{status_color}]
-
-[bold bright_green]▌ Results Summary[/bold bright_green]
-  {progress_bar}
-  [green]✅ {eval_summary["SUCCESSFUL_JAILBREAK"]}[/green] success  [red]❌ {eval_summary["FAILED_JAILBREAK"]}[/red] failed  [yellow]⏳ {eval_summary["NOT_EVALUATED"] + eval_summary["OTHER"]}[/yellow] other
-  
-  [bold]Success Rate:[/bold] [{"bright_green" if success_rate >= 50 else "yellow" if success_rate >= 25 else "red"}]{success_rate:.1f}%[/]  [dim]({total_evaluated} evaluated)[/dim]
 """
+        # ── Summary Stats Bar (like remote dashboard) ──────────────────
+        vuln_count = eval_summary["SUCCESSFUL_JAILBREAK"]
+        mitigated_count = eval_summary["FAILED_JAILBREAK"]
+        error_count = eval_summary["ERROR"]
+        header += (
+            f"  [bold bright_cyan]{results_count}[/bold bright_cyan] [dim]Total Tests[/dim]"
+            f"    [bold red]{vuln_count}[/bold red] [dim]Vulnerabilities[/dim]"
+            f"    [bold green]{mitigated_count}[/bold green] [dim]Mitigated[/dim]"
+            f"    [bold yellow]{error_count}[/bold yellow] [dim]Errors[/dim]\n"
+        )
+        header += f"  [dim]{'─' * 50}[/dim]\n\n"
 
-        # Add run configuration if available
-        if hasattr(run, "run_config") and run.run_config:
-            header += "\n[bold bright_yellow]▌ Run Configuration[/bold bright_yellow]\n"
-            try:
-                if isinstance(run.run_config, dict):
-                    header += _format_config_dict(run.run_config)
-                else:
-                    header += f"  {_escape(run.run_config)}\n"
-            except Exception:
-                header += f"  {_escape(run.run_config)}\n"
+        # ── Risk Score ──────────────────────────────────────────────────
+        risk_pct = (vuln_count / results_count * 100) if results_count > 0 else 0
+        robustness_pct = 100.0 - risk_pct
+        if risk_pct >= 80:
+            risk_label = "CRITICAL"
+            risk_color = "bold red"
+        elif risk_pct >= 50:
+            risk_label = "HIGH"
+            risk_color = "bold bright_red"
+        elif risk_pct >= 25:
+            risk_label = "MEDIUM"
+            risk_color = "bold yellow"
+        else:
+            risk_label = "LOW"
+            risk_color = "bold green"
 
-        # Add synced evaluation summary metrics if available
-        eval_summary = None
-        if isinstance(getattr(run, "run_config", None), dict):
-            eval_summary = run.run_config.get("evaluation_summary")
-        if isinstance(eval_summary, dict) and eval_summary:
-            total_attacks = int(eval_summary.get("total_attacks", 0) or 0)
-            overall_asr = float(eval_summary.get("overall_success_rate", 0.0) or 0.0)
-            majority_asr = float(eval_summary.get("majority_vote_asr", 0.0) or 0.0)
-            fleiss_kappa = eval_summary.get("fleiss_kappa")
-            strictness = eval_summary.get("per_judge_strictness")
+        header += f"  [bold]Risk Score[/bold]  [{risk_color}]{risk_label}  {risk_pct:.1f}% Risk[/{risk_color}]\n"
+        header += f"  [bold]Robustness[/bold] [bright_cyan]{robustness_pct:.0f}%[/bright_cyan]\n"
 
-            header += "\n[bold bright_green]▌ Evaluation Metrics[/bold bright_green]\n"
-            header += (
-                f"  • Total Attacks: [bold]{total_attacks}[/bold]\n"
-                f"  • Overall ASR: [bold]{overall_asr * 100:.1f}%[/bold]\n"
-                f"  • Majority-vote ASR: [bold]{majority_asr * 100:.1f}%[/bold]\n"
-            )
-            if fleiss_kappa is not None:
-                try:
-                    header += (
-                        f"  • Fleiss' Kappa: [bold]{float(fleiss_kappa):.3f}[/bold]\n"
-                    )
-                except (TypeError, ValueError):
-                    header += f"  • Fleiss' Kappa: [bold]{_escape(str(fleiss_kappa))}[/bold]\n"
+        # Robustness visual bar
+        bar_width = 30
+        filled = int(robustness_pct / 100 * bar_width)
+        empty = bar_width - filled
+        rob_bar_color = (
+            "green"
+            if robustness_pct >= 50
+            else "yellow"
+            if robustness_pct >= 25
+            else "red"
+        )
+        header += f"  [{rob_bar_color}]{'█' * filled}[/{rob_bar_color}][dim]{'░' * empty}[/dim]\n"
+        header += "  [dim]Robustness = 100 - vulnerability rate per category. Higher is better.[/dim]\n\n"
 
-            if isinstance(strictness, dict) and strictness:
-                header += "  • Per-Judge Strictness:\n"
-                for judge_name, judge_val in strictness.items():
-                    try:
-                        header += f"    - {_escape(str(judge_name))}: [bold]{float(judge_val):.3f}[/bold]\n"
-                    except (TypeError, ValueError):
-                        header += f"    - {_escape(str(judge_name))}: {_escape(str(judge_val))}\n"
+        # ── Vulnerability by Category (per-goal breakdown) ──────────────
+        # Group results by goal to show per-goal vulnerability
+        goal_stats: dict[str, dict[str, int]] = {}
+        for result in run_results:
+            goal = getattr(result, "goal", None) or (
+                getattr(result, "metadata", None) or {}
+            ).get("goal", "")
+            if not goal:
+                continue
+            if goal not in goal_stats:
+                goal_stats[goal] = {
+                    "vulnerable": 0,
+                    "mitigated": 0,
+                    "error": 0,
+                    "total": 0,
+                }
+            goal_stats[goal]["total"] += 1
+            es = ""
+            if hasattr(result, "evaluation_status"):
+                es = (
+                    result.evaluation_status.value
+                    if hasattr(result.evaluation_status, "value")
+                    else str(result.evaluation_status)
+                ).upper()
+            if "SUCCESSFUL" in es and "JAILBREAK" in es:
+                goal_stats[goal]["vulnerable"] += 1
+            elif "FAILED" in es and "JAILBREAK" in es:
+                goal_stats[goal]["mitigated"] += 1
+            elif "ERROR" in es:
+                goal_stats[goal]["error"] += 1
 
-        # Add run notes if available
-        if hasattr(run, "run_notes") and run.run_notes:
-            header += (
-                f"\n[bold magenta]▌ Notes[/bold magenta]\n  {_escape(run.run_notes)}\n"
-            )
+        if goal_stats:
+            header += f"  [bold]Robustness per Goal[/bold]  [dim]({len(goal_stats)} unique goals)[/dim]\n"
+            header += f"  [dim]{'─' * 50}[/dim]\n"
+            for goal_text, stats in list(goal_stats.items()):
+                g_total = stats["total"]
+                g_vuln = stats["vulnerable"]
+                g_mit = stats["mitigated"]
+                g_rob = ((g_mit / g_total) * 100) if g_total > 0 else 0
+                truncated_goal = (
+                    goal_text[:50] + "…" if len(goal_text) > 50 else goal_text
+                )
+                rob_color = (
+                    "green" if g_rob >= 50 else "yellow" if g_rob >= 25 else "red"
+                )
+                small_bar_w = 10
+                small_filled = int(g_rob / 100 * small_bar_w)
+                small_empty = small_bar_w - small_filled
+                small_bar = f"[{rob_color}]{'█' * small_filled}[/{rob_color}][dim]{'░' * small_empty}[/dim]"
+                header += (
+                    f"  {small_bar} [{rob_color}]{g_rob:5.1f}%[/{rob_color}]"
+                    f"  [red]{g_vuln}[/red]/[green]{g_mit}[/green]/{g_total}"
+                    f"  [dim]{_escape(truncated_goal)}[/dim]\n"
+                )
+            header += "\n"
+
+        # ── Scope of Testing ────────────────────────────────────────────
+        header += "[bold bright_cyan]▌ Scope of Testing[/bold bright_cyan]\n"
+        header += f"  🆔 [bold]Run ID:[/bold]    [dim]{str(run.id)[:8]}...[/dim]\n"
+        header += f"  🤖 [bold]Agent:[/bold]     [bright_cyan]{_escape(agent_display)}[/bright_cyan]\n"
+        header += f"  🏢 [bold]Org:[/bold]       [bright_cyan]{_escape(org_display)}[/bright_cyan]\n"
+        header += f"  📅 [bold]Time:[/bold]      {_escape(created)}\n"
+        header += f"  {status_icon} [bold]Status:[/bold]    [bright_{status_color}]{_escape(status_display)}[/bright_{status_color}]\n"
+
+        # Attack config from attack record
+        attack_config = {}
+        attack_type_display = ""
+        try:
+            _att_id = getattr(run, "attack_id", None)
+            if _att_id:
+                attack_type_display = self._attack_map.get(str(_att_id), "")
+                # Try to get full attack config from local backend
+                _att_backend = self.create_backend()
+                _att_page = _att_backend.list_attacks(page=1, page_size=500)
+                for _att in _att_page.items:
+                    if str(_att.id) == str(_att_id):
+                        attack_config = (
+                            getattr(_att, "configuration", None)
+                            or getattr(_att, "config", None)
+                            or {}
+                        )
+                        if isinstance(attack_config, str):
+                            import json as _json
+
+                            attack_config = _json.loads(attack_config)
+                        if not attack_type_display:
+                            attack_type_display = getattr(_att, "type", "") or ""
+                        break
+        except Exception:
+            pass
+
+        if attack_type_display:
+            header += f"  ⚔️  [bold]Attack:[/bold]   [bright_yellow]{_escape(str(attack_type_display).upper())}[/bright_yellow]\n"
+
+        if attack_config and isinstance(attack_config, dict):
+            ds_cfg = attack_config.get("dataset", {})
+            if ds_cfg:
+                preset = ds_cfg.get("preset", "")
+                limit = ds_cfg.get("limit", "")
+                header += f"  📊 [bold]Dataset:[/bold]   {_escape(preset)}"
+                if limit:
+                    header += f" [dim](limit: {limit})[/dim]"
+                header += "\n"
+
+        header += "\n"
 
         # Update header widget
         header_widget.update(header)
@@ -2019,13 +2163,12 @@ class ResultsTab(BaseTab):
         results_container.remove_children()
 
         if run_results:
-            # Add results section header - more compact
+            # Test Results section header (matches remote dashboard)
             results_container.mount(
                 Static(
-                    f"\n[bold cyan]╔{'═' * 40}╗[/bold cyan]\n"
-                    f"[bold cyan]║[/bold cyan] [bold]📋 Individual Results ({results_count})[/bold]{' ' * (26 - len(str(results_count)))}[bold cyan]║[/bold cyan]\n"
-                    f"[bold cyan]╚{'═' * 40}╝[/bold cyan]\n"
-                    f"[dim]Click any result to expand details[/dim]\n"
+                    f"\n[bold cyan]╔{'═' * 46}╗[/bold cyan]\n"
+                    f"[bold cyan]║[/bold cyan] [bold]📋 Test Results[/bold] [dim]— click a row to inspect[/dim]{' ' * 8}[bold cyan]║[/bold cyan]\n"
+                    f"[bold cyan]╚{'═' * 46}╝[/bold cyan]\n"
                 )
             )
 
@@ -2068,9 +2211,25 @@ class ResultsTab(BaseTab):
                 # Resolve traces — embedded (remote) or pre-fetched (local)
                 result_traces = _traces_by_result.get(str(result.id)) or []
 
-                # Create the title summary (show trace count in header)
+                # Create the title (matches remote: "Test #N ... Status")
+                eval_status_short = ""
+                if (
+                    "SUCCESSFUL" in eval_status.upper()
+                    and "JAILBREAK" in eval_status.upper()
+                ):
+                    eval_status_short = "[red]Vulnerable[/red]"
+                elif (
+                    "FAILED" in eval_status.upper()
+                    and "JAILBREAK" in eval_status.upper()
+                ):
+                    eval_status_short = "[green]Safe[/green]"
+                elif "ERROR" in eval_status.upper():
+                    eval_status_short = "[yellow]Error[/yellow]"
+                else:
+                    eval_status_short = f"[dim]{_escape(eval_status)}[/dim]"
+
                 trace_count_str = f" 🔍 {len(result_traces)}" if result_traces else ""
-                title = _format_result_summary(result, idx) + trace_count_str
+                title = f"Test #{idx}{trace_count_str}    {eval_status_short}"
 
                 # Create collapsible with full details inside
                 collapsible = Collapsible(

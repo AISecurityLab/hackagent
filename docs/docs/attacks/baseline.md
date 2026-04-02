@@ -211,6 +211,21 @@ advanced_config = {
 | `max_tokens` | Max tokens in target response | 500 |
 | `custom_templates` | Your own template patterns | `[]` |
 
+### Shared Goal Category Classifier
+
+All attacks accept a top-level `category_classifier` block. It runs once per goal to attach a normalized category to tracking metadata (independent from judge scoring).
+
+```python
+"category_classifier": {
+    "identifier": "gemma3:4b",
+    "endpoint": "http://localhost:11434",
+    "agent_type": "OLLAMA",
+    "api_key": None,
+    "max_tokens": 100,
+    "temperature": 0.0
+}
+```
+
 ---
 
 ## Custom Templates
