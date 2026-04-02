@@ -3146,14 +3146,14 @@ class DashboardPage:
                                         )
                                         ui.button(
                                             icon="visibility",
-                                            on_click=lambda r=run_item.get(
-                                                "row"
-                                            ): ui.timer(
-                                                0,
-                                                lambda rr=r: asyncio.create_task(
-                                                    self._open_run_results(rr)
-                                                ),
-                                                once=True,
+                                            on_click=lambda r=run_item.get("row"): (
+                                                ui.timer(
+                                                    0,
+                                                    lambda rr=r: asyncio.create_task(
+                                                        self._open_run_results(rr)
+                                                    ),
+                                                    once=True,
+                                                )
                                             ),
                                         ).props("flat round dense")
 
