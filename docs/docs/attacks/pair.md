@@ -179,6 +179,21 @@ advanced_config = {
 | `timeout` | Target request timeout (seconds) | `120` | 1+ |
 | `judge_timeout` | Judge request timeout (seconds) | `120` | 1+ |
 
+### Shared Goal Category Classifier
+
+All attacks accept a top-level `category_classifier` block. It runs once per goal to attach a normalized category to tracking metadata (independent from judge scoring).
+
+```python
+"category_classifier": {
+    "identifier": "gemma3:4b",
+    "endpoint": "http://localhost:11434",
+    "agent_type": "OLLAMA",
+    "api_key": None,
+    "max_tokens": 100,
+    "temperature": 0.0
+}
+```
+
 ---
 
 ## Attacker System Prompt

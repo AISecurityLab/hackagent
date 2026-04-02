@@ -3,7 +3,7 @@ sidebar_label: evaluation
 title: hackagent.attacks.techniques.autodan_turbo.evaluation
 ---
 
-AutoDAN-Turbo evaluation — multi-judge scoring via BaseEvaluationStep.
+AutoDAN-Turbo scorer-only finalization (no judge stage).
 
 ## AutoDANTurboEvaluation Objects
 
@@ -11,10 +11,11 @@ AutoDAN-Turbo evaluation — multi-judge scoring via BaseEvaluationStep.
 class AutoDANTurboEvaluation(BaseEvaluationStep)
 ```
 
-Run standardized hackagent multi-judge evaluation on attack outputs.
+Finalize AutoDAN-Turbo outputs using scorer threshold only.
 
-Paper relation: this is an integration-layer extension (not in original
-AutoDAN-Turbo paper code) used to align metrics with other techniques.
+The original attack already produces a continuous 1-10 scorer value
+(``autodan_score``). This step standardizes result fields and marks
+jailbreak success when ``autodan_score >= break_score``.
 
 #### execute
 
@@ -22,7 +23,7 @@ AutoDAN-Turbo paper code) used to align metrics with other techniques.
 def execute(input_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]
 ```
 
-Evaluate generated responses with configured judges and merge scores.
+Finalize generated responses using scorer threshold only.
 
 **Arguments**:
 
@@ -31,9 +32,8 @@ Evaluate generated responses with configured judges and merge scores.
 
 **Returns**:
 
-  Enriched result list containing judge columns, aggregated
-  ``best_score``, and flags like ``judge_success`` while preserving
-  ``autodan_score``/``attack_score`` fields.
+  Enriched result list with standardized ``autodan_score``,
+  ``attack_score``, ``best_score``, and ``success`` fields.
 
 #### execute
 
@@ -47,11 +47,11 @@ Module-level pipeline entry point used by attack orchestrator.
 
 - `input_data` - Lifelong phase outputs to evaluate.
 - `config` - Full attack configuration.
-- `client` - Authenticated client for judge routing.
+- `client` - Authenticated client for result sync.
 - `logger` - Logger instance.
   
 
 **Returns**:
 
-  Evaluated and enriched results list.
+  Finalized and enriched results list.
 

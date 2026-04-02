@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections import defaultdict
 import contextlib
 import json
 import math
@@ -30,7 +31,6 @@ from ._helpers import (
 _VIEW_LABELS = {
     "dashboard": "Dashboard",
     "agents": "Agents",
-    "attacks": "Attacks",
     "runs": "History",
 }
 
@@ -77,21 +77,29 @@ class DashboardPage:
         self.risk_legend: ui.column | None = None
         self.recent_runs_table: ui.table | None = None
 
-        # Agents / Attacks / Runs panel widgets
+        # Agents / History panel widgets
         self.agents_table: ui.table | None = None
-        self.attacks_table: ui.table | None = None
         self.runs_table: ui.table | None = None
         self.runs_count_label: ui.label | None = None
         self.runs_page_label: ui.label | None = None
         self.runs_current_page: int = 1
         self.runs_total_pages: int = 1
+        self.history_reports_list_area: ui.column | None = None
+        self.history_reports_summary_labels: dict[str, ui.label] = {}
+        self.history_reports_count_label: ui.label | None = None
 
-        # Run results dialog
+        # Run results dialog (report view)
         self.run_dialog: ui.dialog | None = None
         self.run_dialog_title: ui.label | None = None
-        self.run_dialog_subtitle: ui.label | None = None
-        self.results_list_area: ui.column | None = None
-        self.results_empty_label: ui.label | None = None
+        self.run_report_area: ui.column | None = None
+
+        # History run dialog (compact results list)
+        self.history_run_dialog: ui.dialog | None = None
+        self.history_run_dialog_title: ui.label | None = None
+        self.history_run_dialog_subtitle: ui.label | None = None
+        self.history_run_config_area: ui.column | None = None
+        self.history_results_list_area: ui.column | None = None
+        self.history_results_empty_label: ui.label | None = None
 
         # Attack detail dialog
         self.attack_dialog: ui.dialog | None = None
@@ -118,6 +126,7 @@ class DashboardPage:
         self._build_header(sidebar)
         self._build_panels()
         self._build_run_dialog()
+        self._build_history_run_dialog()
         self._build_attack_dialog()
 
         self._highlight_nav("dashboard")
@@ -181,7 +190,6 @@ class DashboardPage:
             nav_items = [
                 ("dashboard", "Dashboard", "dashboard"),
                 ("agents", "Agents", "smart_toy"),
-                ("attacks", "Attacks", "flash_on"),
                 ("runs", "History", "assignment"),
             ]
             for view_id, label, icon_name in nav_items:
@@ -242,13 +250,11 @@ class DashboardPage:
         with ui.column().classes("w-full p-5 gap-6"):
             dashboard_panel = ui.column().classes("w-full gap-6")
             agents_panel = ui.column().classes("w-full gap-4")
-            attacks_panel = ui.column().classes("w-full gap-4")
             runs_panel = ui.column().classes("w-full gap-4")
 
             self.all_panels = {
                 "dashboard": dashboard_panel,
                 "agents": agents_panel,
-                "attacks": attacks_panel,
                 "runs": runs_panel,
             }
             for panel in self.all_panels.values():
@@ -257,7 +263,6 @@ class DashboardPage:
 
             self._build_dashboard_panel(dashboard_panel)
             self._build_agents_panel(agents_panel)
-            self._build_attacks_panel(attacks_panel)
             self._build_runs_panel(runs_panel)
 
     def _build_dashboard_panel(self, panel: ui.column) -> None:
@@ -360,7 +365,9 @@ class DashboardPage:
                 self.recent_runs_table = make_run_table(
                     on_row_click=lambda run: ui.timer(
                         0,
-                        lambda r=run: asyncio.create_task(self._open_run_results(r)),
+                        lambda r=run: asyncio.create_task(
+                            self._open_run_history_results(r)
+                        ),
                         once=True,
                     ),
                     include_agent=True,
@@ -548,66 +555,138 @@ class DashboardPage:
     def _build_runs_panel(self, panel: ui.column) -> None:
         with panel:
             with ui.card().classes("w-full"):
-                with ui.row().classes("items-center justify-between mb-1 px-2"):
-                    self.runs_count_label = ui.label("").classes("text-sm text-grey-6")
-                    with ui.row().classes("items-center gap-2"):
-                        self._runs_delete_btn = (
-                            ui.button(
-                                "Delete selected",
-                                icon="delete",
-                                on_click=lambda: ui.timer(
-                                    0, self._delete_selected_runs, once=True
+                with ui.tabs().props("dense no-caps align=left") as history_tabs:
+                    ui.tab(name="runs-tab", label="Runs", icon="assignment")
+                    ui.tab(name="reports-tab", label="Reports", icon="assessment")
+
+                with ui.tab_panels(history_tabs, value="runs-tab").classes("w-full"):
+                    with ui.tab_panel("runs-tab").classes("w-full p-0"):
+                        with ui.column().classes("w-full gap-2"):
+                            with ui.row().classes(
+                                "items-center justify-between mb-1 px-2"
+                            ):
+                                self.runs_count_label = ui.label("").classes(
+                                    "text-sm text-grey-6"
+                                )
+                                with ui.row().classes("items-center gap-2"):
+                                    self._runs_delete_btn = (
+                                        ui.button(
+                                            "Delete selected",
+                                            icon="delete",
+                                            on_click=lambda: ui.timer(
+                                                0, self._delete_selected_runs, once=True
+                                            ),
+                                        )
+                                        .props("flat dense no-caps color=negative")
+                                        .classes("hidden")
+                                    )
+                                    ui.button(
+                                        "← Prev",
+                                        on_click=lambda: self._change_runs_page(-1),
+                                    ).props("flat dense no-caps")
+                                    self.runs_page_label = ui.label(
+                                        "Page 1 / 1"
+                                    ).classes("text-sm text-grey-6")
+                                    ui.button(
+                                        "Next →",
+                                        on_click=lambda: self._change_runs_page(1),
+                                    ).props("flat dense no-caps")
+                            self.runs_table = make_run_table(
+                                on_row_click=lambda run: ui.timer(
+                                    0,
+                                    lambda r=run: asyncio.create_task(
+                                        self._open_run_history_results(r)
+                                    ),
+                                    once=True,
                                 ),
+                                pagination={"rowsPerPage": 0},
+                                include_agent=True,
+                                include_progressive_run=True,
+                                include_results=True,
+                                include_goal_latency_avg=True,
+                                selection="multiple",
+                                on_select=lambda e: self._on_runs_select(),
                             )
-                            .props("flat dense no-caps color=negative")
-                            .classes("hidden")
-                        )
-                        ui.button(
-                            "← Prev",
-                            on_click=lambda: self._change_runs_page(-1),
-                        ).props("flat dense no-caps")
-                        self.runs_page_label = ui.label("Page 1 / 1").classes(
-                            "text-sm text-grey-6"
-                        )
-                        ui.button(
-                            "Next →",
-                            on_click=lambda: self._change_runs_page(1),
-                        ).props("flat dense no-caps")
-                self.runs_table = make_run_table(
-                    on_row_click=lambda run: ui.timer(
-                        0,
-                        lambda r=run: asyncio.create_task(self._open_run_results(r)),
-                        once=True,
-                    ),
-                    pagination={"rowsPerPage": 0},
-                    include_agent=True,
-                    include_progressive_run=True,
-                    include_results=False,
-                    selection="multiple",
-                    on_select=lambda e: self._on_runs_select(),
-                )
-                self.runs_table.props("hide-pagination")
+                            self.runs_table.props("hide-pagination")
+
+                    with ui.tab_panel("reports-tab").classes("w-full p-0"):
+                        with ui.column().classes("w-full gap-4 pt-2"):
+                            with ui.row().classes("w-full flex-wrap gap-4"):
+                                for label, key, icon, color in [
+                                    ("Total Reports", "reports", "description", "blue"),
+                                    ("Total Tests", "tests", "pulse", "purple"),
+                                    ("Vulnerabilities", "vulns", "warning", "negative"),
+                                    ("Avg Risk Score", "risk", "trending_up", "orange"),
+                                ]:
+                                    with ui.card().classes("flex-1 min-w-36"):
+                                        with ui.row().classes(
+                                            "items-center justify-between mb-2"
+                                        ):
+                                            ui.label(label).classes(
+                                                "text-sm text-grey-6"
+                                            )
+                                            ui.icon(icon, color=color).classes(
+                                                "text-xl"
+                                            )
+                                        self.history_reports_summary_labels[key] = (
+                                            ui.label("—").classes("text-3xl font-bold")
+                                        )
+
+                            self.history_reports_count_label = ui.label(
+                                "Loading reports..."
+                            ).classes("text-sm text-grey-6 px-1")
+                            self.history_reports_list_area = ui.column().classes(
+                                "w-full gap-2"
+                            )
 
     def _build_run_dialog(self) -> None:
+        with ui.dialog().props("maximized") as dialog:
+            with ui.card().classes("w-full h-full flex flex-col gap-0"):
+                with ui.row().classes(
+                    "items-center justify-between w-full shrink-0 px-5 py-3 border-b"
+                ):
+                    self.run_dialog_title = ui.label("Report").classes(
+                        "font-semibold text-lg"
+                    )
+                    ui.button(icon="close", on_click=dialog.close).props(
+                        "flat round dense"
+                    )
+                with ui.scroll_area().classes("w-full flex-1"):
+                    self.run_report_area = ui.column().classes(
+                        "w-full gap-5 p-5 max-w-6xl mx-auto"
+                    )
+        self.run_dialog = dialog
+
+    def _build_history_run_dialog(self) -> None:
         with ui.dialog() as dialog:
             with ui.card().classes("w-full max-w-5xl h-[80vh] flex flex-col gap-4"):
                 with ui.row().classes("items-center justify-between w-full shrink-0"):
-                    self.run_dialog_title = ui.label("Run Results").classes(
+                    self.history_run_dialog_title = ui.label("Run Results").classes(
                         "font-semibold text-lg"
                     )
                     ui.button(icon="close", on_click=dialog.close).props("flat round")
 
-                self.run_dialog_subtitle = ui.label("—").classes(
+                self.history_run_dialog_subtitle = ui.label("—").classes(
                     "text-xs text-grey-6 px-2"
                 )
 
-                self.results_empty_label = ui.label("Loading results...").classes(
-                    "text-sm text-grey-8 px-2 py-4"
-                )
+                with ui.column().classes("w-full px-2 gap-1"):
+                    ui.label("CONFIGURATION").classes(
+                        "text-[10px] font-semibold tracking-widest text-grey-5 uppercase"
+                    )
+                    self.history_run_config_area = ui.column().classes(
+                        "w-full gap-0 max-h-48 overflow-auto"
+                    )
+
+                self.history_results_empty_label = ui.label(
+                    "Loading results..."
+                ).classes("text-sm text-grey-8 px-2 py-4")
 
                 with ui.scroll_area().classes("w-full flex-1"):
-                    self.results_list_area = ui.column().classes("w-full gap-3 p-2")
-        self.run_dialog = dialog
+                    self.history_results_list_area = ui.column().classes(
+                        "w-full gap-3 p-2"
+                    )
+        self.history_run_dialog = dialog
 
     def _build_attack_dialog(self) -> None:
         with ui.dialog() as dialog:
@@ -661,7 +740,7 @@ class DashboardPage:
                     ui.code(
                         json.dumps(config, indent=2, default=str),
                         language="json",
-                    ).classes("w-full text-xs max-h-60 overflow-auto")
+                    ).classes("w-full text-xs overflow-auto")
 
             # ── Associated runs ───────────────────────────────────────────
             ui.label("RUNS").classes(
@@ -716,7 +795,9 @@ class DashboardPage:
                                 lambda _e, r=d: (
                                     self.attack_dialog.close(),
                                     ui.timer(
-                                        0, lambda: self._open_run_results(r), once=True
+                                        0,
+                                        lambda: self._open_run_history_results(r),
+                                        once=True,
                                     ),
                                 ),
                             )
@@ -809,6 +890,7 @@ class DashboardPage:
         if self._runs_delete_btn is not None:
             self._runs_delete_btn.classes(add="hidden")
         await self._load_runs()
+        await self._load_history_reports()
 
     async def _delete_selected_attacks(self) -> None:
         ids = list(self._selected_attack_ids)
@@ -880,6 +962,39 @@ class DashboardPage:
 
         return out
 
+    def _attack_config_map_for_ids(
+        self, required_ids: set[str] | None
+    ) -> dict[str, dict]:
+        """Fetch attack configurations, paginating until required IDs are found.
+
+        Returns mapping attack_id -> configuration dict (may be empty dict).
+        """
+        out: dict[str, dict] = {}
+        page = 1
+        page_size = 100
+
+        while True:
+            attacks_p = self.backend.list_attacks(page=page, page_size=page_size)
+            if not attacks_p.items:
+                break
+
+            for attack in attacks_p.items:
+                attack_id = str(attack.id)
+                if required_ids is None or attack_id in required_ids:
+                    # AttackRecord.configuration is a dict
+                    cfg = getattr(attack, "configuration", {})
+                    out[attack_id] = cfg or {}
+
+            if required_ids is not None and required_ids.issubset(out.keys()):
+                break
+
+            total_pages = max(1, math.ceil((attacks_p.total or 0) / page_size))
+            if page >= total_pages:
+                break
+            page += 1
+
+        return out
+
     def _agent_name_map_for_ids(self, required_ids: set[str] | None) -> dict[str, str]:
         """Fetch agent names, paginating until required IDs are found."""
         out: dict[str, str] = {}
@@ -932,6 +1047,7 @@ class DashboardPage:
         total = 0
         successful_jailbreaks = 0
         mitigations = 0
+        finished_goal_latencies_s: list[float] = []
         statuses: list[tuple[str, str | None]] = []
 
         while True:
@@ -951,6 +1067,10 @@ class DashboardPage:
                     successful_jailbreaks += 1
                 elif bucket == "mitigated":
                     mitigations += 1
+                if bucket != "pending":
+                    latency_s = self._extract_goal_latency_seconds(_serialize(result))
+                    if isinstance(latency_s, (int, float)):
+                        finished_goal_latencies_s.append(float(latency_s))
                 statuses.append((result.evaluation_status, result.evaluation_notes))
 
             fetched += len(rp.items)
@@ -961,11 +1081,18 @@ class DashboardPage:
         if total == 0:
             total = fetched
 
+        avg_goal_latency_s = (
+            sum(finished_goal_latencies_s) / len(finished_goal_latencies_s)
+            if finished_goal_latencies_s
+            else None
+        )
+
         return {
             "total_results": total,
             "successful_jailbreaks": successful_jailbreaks,
             "mitigations": mitigations,
             "failed_attacks": mitigations,
+            "avg_goal_latency_s": avg_goal_latency_s,
             "status": self._derive_run_status(statuses),
         }
 
@@ -1015,6 +1142,107 @@ class DashboardPage:
         )
 
     @staticmethod
+    def _extract_category_label(result_data: dict) -> str | None:
+        """Best-effort category label lookup from result metadata/metrics."""
+        sources = []
+        for src in (
+            result_data,
+            result_data.get("metadata"),
+            result_data.get("evaluation_metrics"),
+        ):
+            if isinstance(src, dict):
+                sources.append(src)
+
+        key_candidates = (
+            "category",
+            "category_name",
+            "harm_category",
+            "risk_category",
+            "risk_domain",
+            "topic",
+            "label",
+            "l2_name",
+            "l3_name",
+            "l4_name",
+            "l2-name",
+            "l3-name",
+            "l4-name",
+        )
+
+        for src in sources:
+            for key in key_candidates:
+                val = src.get(key)
+                if val not in (None, ""):
+                    return str(val)
+            taxonomy = src.get("taxonomy")
+            if isinstance(taxonomy, dict):
+                for key in ("l2", "l3", "l4", "name", "category"):
+                    val = taxonomy.get(key)
+                    if val not in (None, ""):
+                        return str(val)
+
+        return None
+
+    @staticmethod
+    def _extract_goal_classifier_label(result_data: dict, field: str) -> str:
+        """Extract classifier category/subcategory labels from result payload."""
+        normalized = (field or "").strip().lower()
+        if normalized not in {"category", "subcategory"}:
+            return "N/A"
+
+        sources = []
+        for src in (
+            result_data,
+            result_data.get("metadata"),
+            result_data.get("evaluation_metrics"),
+        ):
+            if isinstance(src, dict):
+                sources.append(src)
+
+        if normalized == "category":
+            key_candidates = (
+                "category",
+                "category_name",
+                "harm_category",
+                "risk_category",
+            )
+            taxonomy_keys = ("category", "l2", "name")
+        else:
+            key_candidates = (
+                "subcategory",
+                "subcategory_name",
+                "harm_subcategory",
+                "risk_subcategory",
+            )
+            taxonomy_keys = ("subcategory", "l3", "l4", "name")
+
+        for src in sources:
+            for key in key_candidates:
+                val = src.get(key)
+                if val not in (None, ""):
+                    return str(val)
+
+            taxonomy = src.get("taxonomy")
+            if isinstance(taxonomy, dict):
+                for key in taxonomy_keys:
+                    val = taxonomy.get(key)
+                    if val not in (None, ""):
+                        return str(val)
+
+        return "N/A"
+
+    @staticmethod
+    def _goal_category_badge_text(result_data: dict) -> str:
+        """Compose a single category/subcategory badge label for a goal."""
+        category = DashboardPage._extract_goal_classifier_label(result_data, "category")
+        subcategory = DashboardPage._extract_goal_classifier_label(
+            result_data, "subcategory"
+        )
+        category = category if category and category != "N/A" else "N/A"
+        subcategory = subcategory if subcategory and subcategory != "N/A" else "N/A"
+        return f"{category} / {subcategory}"
+
+    @staticmethod
     def _classify_trace_step(trace_data: dict) -> tuple[str, str]:
         """Classify a trace step into a semantic group and human label."""
         step_type = (trace_data.get("step_type") or "").upper()
@@ -1037,6 +1265,17 @@ class DashboardPage:
                 else {}
             )
             display_type = str(metadata.get("display_type") or "").strip().lower()
+            # TAP candidate traces carry per-candidate judge scores in metadata.
+            # Surface them under Evaluation so users can inspect each scored prompt.
+            if (
+                step_name.startswith("depth")
+                and "candidate" in step_name
+                and (
+                    metadata.get("judge_score") is not None
+                    or metadata.get("on_topic_score") is not None
+                )
+            ):
+                return "evaluation", "Evaluation"
             if (
                 step_name in {"evaluation", "judge", "scoring"}
                 or step_name.startswith("evaluation")
@@ -1287,23 +1526,51 @@ class DashboardPage:
         result: dict,
     ) -> list[dict]:
         """Inject Request/Response in evaluation traces so they are always visible."""
-        fallback_request = None
-        fallback_response = None
 
-        # 1) Find request/response from any existing trace payload (goal/generation/tools/eval)
+        def _trace_locators(content: object) -> dict[str, object]:
+            if not isinstance(content, dict):
+                return {}
+            metadata = (
+                content.get("metadata")
+                if isinstance(content.get("metadata"), dict)
+                else {}
+            )
+            return {
+                "branch_index": metadata.get(
+                    "branch_index", content.get("branch_index")
+                ),
+                "stream_index": metadata.get(
+                    "stream_index", content.get("stream_index")
+                ),
+                "iteration": metadata.get("iteration", content.get("iteration")),
+            }
+
+        # Gather all traces that already carry usable request/response payloads.
+        payload_sources: list[dict[str, object]] = []
         for td in serialized_traces:
             req, resp = self._extract_request_response_candidates(td.get("content"))
-            if fallback_request in (None, "") and req not in (None, ""):
-                fallback_request = req
-            if fallback_response in (None, "") and resp not in (None, ""):
-                fallback_response = resp
-            if fallback_request not in (None, "") and fallback_response not in (
-                None,
-                "",
-            ):
-                break
+            if req in (None, "") and resp in (None, ""):
+                continue
+            payload_sources.append(
+                {
+                    "sequence": int(td.get("sequence") or 0),
+                    "request": req,
+                    "response": resp,
+                    **_trace_locators(td.get("content")),
+                }
+            )
 
-        # 2) Fall back to result-level metadata/payload
+        fallback_request = None
+        fallback_response = None
+        if payload_sources:
+            # Prefer the latest observed payload as global fallback.
+            last_payload = max(
+                payload_sources, key=lambda p: int(p.get("sequence") or 0)
+            )
+            fallback_request = last_payload.get("request")
+            fallback_response = last_payload.get("response")
+
+        # Fall back to result-level metadata/payload.
         result_meta = (
             result.get("metadata") if isinstance(result.get("metadata"), dict) else {}
         )
@@ -1324,7 +1591,7 @@ class DashboardPage:
                 or result_meta.get("raw_response_body")
             )
 
-        # 3) Hard guarantee: keep blocks visible even when upstream payload is incomplete
+        # Hard guarantee: keep blocks visible even when upstream payload is incomplete.
         if fallback_request in (None, ""):
             fallback_request = "(request not available)"
         if fallback_response in (None, ""):
@@ -1338,10 +1605,86 @@ class DashboardPage:
             if not isinstance(content, dict):
                 content = {"value": content}
                 td["content"] = content
+
+            if content.get("request") not in (None, "") and content.get(
+                "response"
+            ) not in (
+                None,
+                "",
+            ):
+                continue
+
+            current_seq = int(td.get("sequence") or 0)
+            current_loc = _trace_locators(content)
+
+            matched_payload = None
+
+            # 1) Strongest match: same branch+stream and closest previous sequence.
+            branch_value = current_loc.get("branch_index")
+            stream_value = current_loc.get("stream_index")
+            if branch_value is not None and stream_value is not None:
+                same_branch_stream = [
+                    p
+                    for p in payload_sources
+                    if p.get("branch_index") == branch_value
+                    and p.get("stream_index") == stream_value
+                ]
+                if same_branch_stream:
+                    same_branch_stream.sort(
+                        key=lambda p: (
+                            abs(int(p.get("sequence") or 0) - current_seq),
+                            int(p.get("sequence") or 0) > current_seq,
+                        )
+                    )
+                    matched_payload = same_branch_stream[0]
+
+            # 2) Next best: same iteration and closest sequence.
+            if matched_payload is None and current_loc.get("iteration") is not None:
+                same_iteration = [
+                    p
+                    for p in payload_sources
+                    if p.get("iteration") == current_loc.get("iteration")
+                ]
+                if same_iteration:
+                    same_iteration.sort(
+                        key=lambda p: (
+                            abs(int(p.get("sequence") or 0) - current_seq),
+                            int(p.get("sequence") or 0) > current_seq,
+                        )
+                    )
+                    matched_payload = same_iteration[0]
+
+            # 3) Fallback: nearest previous payload by sequence.
+            if matched_payload is None and payload_sources:
+                previous = [
+                    p
+                    for p in payload_sources
+                    if int(p.get("sequence") or 0) <= current_seq
+                ]
+                if previous:
+                    matched_payload = max(
+                        previous, key=lambda p: int(p.get("sequence") or 0)
+                    )
+                else:
+                    matched_payload = min(
+                        payload_sources,
+                        key=lambda p: abs(int(p.get("sequence") or 0) - current_seq),
+                    )
+
             if content.get("request") in (None, ""):
-                content["request"] = fallback_request
+                content["request"] = (
+                    matched_payload.get("request")
+                    if isinstance(matched_payload, dict)
+                    and matched_payload.get("request") not in (None, "")
+                    else fallback_request
+                )
             if content.get("response") in (None, ""):
-                content["response"] = fallback_response
+                content["response"] = (
+                    matched_payload.get("response")
+                    if isinstance(matched_payload, dict)
+                    and matched_payload.get("response") not in (None, "")
+                    else fallback_response
+                )
 
         return serialized_traces
 
@@ -2024,8 +2367,15 @@ class DashboardPage:
             if response_value in (None, ""):
                 response_value = metadata.get("response") or metadata.get("answer")
 
+            scorer_explanation = (
+                content.get("scorer_explanation")
+                or nested_result.get("scorer_explanation")
+                or metadata.get("scorer_explanation")
+            )
+
             blocks = [
                 ("Explanation", content.get("explanation")),
+                ("Scorer Explanation", scorer_explanation),
                 ("Attack Prompt", content.get("attack_prompt")),
                 ("Agent Completion", content.get("agent_completion")),
                 ("Request", request_value),
@@ -2129,10 +2479,9 @@ class DashboardPage:
                 await self._load_dashboard()
             elif _v == "agents":
                 await self._load_agents()
-            elif _v == "attacks":
-                await self._load_attacks()
             elif _v == "runs":
                 await self._load_runs()
+                await self._load_history_reports()
         except Exception as exc:
             ui.notify(f"Failed to load data: {exc}", type="negative")
         finally:
@@ -2506,6 +2855,8 @@ class DashboardPage:
             d["successful_jailbreaks"] = int(summary["successful_jailbreaks"])
             d["failed_attacks"] = int(summary["failed_attacks"])
             d["mitigations"] = int(summary["mitigations"])
+            d["_goal_latency_avg_s"] = summary.get("avg_goal_latency_s")
+            d["_goal_latency_avg"] = _format_latency(d.get("_goal_latency_avg_s"))
             d["_rel"] = _rel_time(d.get("created_at"))
             d["_date"] = _short_date(d.get("created_at"))
             d["_latency_s"] = self._compute_run_latency_seconds(d)
@@ -2585,6 +2936,8 @@ class DashboardPage:
             d["successful_jailbreaks"] = int(summary["successful_jailbreaks"])
             d["failed_attacks"] = int(summary["failed_attacks"])
             d["mitigations"] = int(summary["mitigations"])
+            d["_goal_latency_avg_s"] = summary.get("avg_goal_latency_s")
+            d["_goal_latency_avg"] = _format_latency(d.get("_goal_latency_avg_s"))
             d["_rel"] = _rel_time(d.get("created_at"))
             d["_date"] = _short_date(d.get("created_at"))
             d["_latency_s"] = self._compute_run_latency_seconds(d)
@@ -2605,10 +2958,1010 @@ class DashboardPage:
                 f"Page {self.runs_current_page} / {self.runs_total_pages}"
             )
 
-    async def _open_run_results(self, run: dict) -> None:
+    @staticmethod
+    def _risk_level_from_asr(asr_percent: float) -> tuple[str, str]:
+        """Map ASR percentage to a risk label + badge color."""
+        if asr_percent >= 70.0:
+            return "CRITICAL", "negative"
+        if asr_percent >= 40.0:
+            return "HIGH", "warning"
+        if asr_percent >= 10.0:
+            return "MEDIUM", "orange"
+        return "LOW", "positive"
+
+    async def _load_history_reports(self) -> None:
+        """Populate History → Reports aggregates grouped by target agent."""
+        if (
+            self.history_reports_list_area is None
+            or self.history_reports_count_label is None
+            or not self.history_reports_summary_labels
+        ):
+            return
+
+        all_runs = []
+        page = 1
+        page_size = 100
+        while True:
+            runs_page = self.backend.list_runs(page=page, page_size=page_size)
+            if not runs_page.items:
+                break
+            all_runs.extend(runs_page.items)
+            if len(all_runs) >= int(runs_page.total or 0):
+                break
+            page += 1
+
+        if not all_runs:
+            self.history_reports_summary_labels["reports"].set_text("0")
+            self.history_reports_summary_labels["tests"].set_text("0")
+            self.history_reports_summary_labels["vulns"].set_text("0")
+            self.history_reports_summary_labels["risk"].set_text("0.0%")
+            self.history_reports_count_label.text = "0 agents"
+            self.history_reports_list_area.clear()
+            with self.history_reports_list_area:
+                ui.label("No reports available yet.").classes("text-sm text-grey-6")
+            return
+
+        run_agent_ids = {str(run.agent_id) for run in all_runs}
+        agent_name_by_id = self._agent_name_map_for_ids(run_agent_ids)
+
+        # Pre-fetch attack configurations for runs so we can show a
+        # configuration fallback when a run has no explicit run_config.
+        run_attack_ids = {str(run.attack_id) for run in all_runs}
+        attack_config_by_id = (
+            self._attack_config_map_for_ids(run_attack_ids) if run_attack_ids else {}
+        )
+
+        per_agent: dict[str, dict] = defaultdict(
+            lambda: {
+                "agent_id": "",
+                "agent_name": "Unknown agent",
+                "reports": 0,
+                "tests": 0,
+                "vulns": 0,
+                "runs": [],
+            }
+        )
+
+        total_reports = 0
+        total_tests = 0
+        total_vulns = 0
+
+        for run in all_runs:
+            run_data = _serialize(run)
+            summary = self._summarize_run_results(run.id)
+
+            tests = int(summary.get("total_results", 0) or 0)
+            vulns = int(summary.get("successful_jailbreaks", 0) or 0)
+            asr_percent = (100.0 * vulns / tests) if tests > 0 else 0.0
+
+            agent_id = str(run_data.get("agent_id") or "")
+            # Prefer agent name in run.run_config, then in the parent attack
+            fallback_agent_name = None
+            if isinstance(run_data.get("run_config"), dict):
+                fallback_agent_name = run_data.get("run_config", {}).get("_agent_name")
+            if not fallback_agent_name:
+                atk_cfg = attack_config_by_id.get(str(run_data.get("attack_id") or ""))
+                if isinstance(atk_cfg, dict):
+                    fallback_agent_name = atk_cfg.get("_agent_name")
+            agent_name = agent_name_by_id.get(
+                agent_id,
+                fallback_agent_name
+                or (f"{agent_id[:8]}…" if agent_id else "Unknown agent"),
+            )
+
+            entry = per_agent[agent_id]
+            entry["agent_id"] = agent_id
+            entry["agent_name"] = agent_name
+            entry["reports"] += 1
+            entry["tests"] += tests
+            entry["vulns"] += vulns
+            entry["runs"].append(
+                {
+                    "id": str(run_data.get("id") or ""),
+                    "created_at": run_data.get("created_at"),
+                    "tests": tests,
+                    "vulns": vulns,
+                    "risk": asr_percent,
+                    "status": str(
+                        summary.get("status") or run_data.get("status") or "—"
+                    ),
+                    "row": run_data,
+                }
+            )
+
+            total_reports += 1
+            total_tests += tests
+            total_vulns += vulns
+
+        avg_risk = (100.0 * total_vulns / total_tests) if total_tests > 0 else 0.0
+        self.history_reports_summary_labels["reports"].set_text(str(total_reports))
+        self.history_reports_summary_labels["tests"].set_text(str(total_tests))
+        self.history_reports_summary_labels["vulns"].set_text(str(total_vulns))
+        self.history_reports_summary_labels["risk"].set_text(f"{avg_risk:.1f}%")
+        self.history_reports_count_label.text = (
+            f"{len(per_agent)} agent{'s' if len(per_agent) != 1 else ''}"
+        )
+
+        grouped_agents = sorted(
+            per_agent.values(),
+            key=lambda item: (item["vulns"], item["tests"], item["reports"]),
+            reverse=True,
+        )
+
+        self.history_reports_list_area.clear()
+        with self.history_reports_list_area:
+            for agent in grouped_agents:
+                agent_tests = int(agent["tests"])
+                agent_vulns = int(agent["vulns"])
+                agent_risk = (
+                    (100.0 * agent_vulns / agent_tests) if agent_tests > 0 else 0.0
+                )
+                risk_label, risk_color = self._risk_level_from_asr(agent_risk)
+
+                title = (
+                    f"{agent['agent_name']} · {agent['reports']} reports · "
+                    f"{agent_tests} tests · {agent_vulns} vulnerabilities"
+                )
+                with ui.expansion(title, icon="smart_toy").classes("w-full"):
+                    with ui.column().classes("w-full gap-2 p-2"):
+                        with ui.row().classes("items-center gap-2"):
+                            ui.badge(risk_label, color=risk_color).classes("text-xs")
+                            ui.label(f"{agent_risk:.1f}% Risk").classes(
+                                "text-sm font-semibold"
+                            )
+
+                        sorted_runs = sorted(
+                            agent["runs"],
+                            key=lambda item: str(item.get("created_at") or ""),
+                            reverse=True,
+                        )
+
+                        for run_item in sorted_runs:
+                            run_id = str(run_item.get("id") or "")
+                            run_tests = int(run_item.get("tests") or 0)
+                            run_vulns = int(run_item.get("vulns") or 0)
+                            run_risk = float(run_item.get("risk") or 0.0)
+                            run_risk_label, run_risk_color = self._risk_level_from_asr(
+                                run_risk
+                            )
+
+                            with ui.card().tight().classes("w-full"):
+                                with ui.row().classes(
+                                    "items-center justify-between w-full p-3"
+                                ):
+                                    with ui.column().classes("gap-0"):
+                                        ui.label(f"Run {run_id[:8]}…").classes(
+                                            "font-mono text-xs"
+                                        )
+                                        ui.label(
+                                            f"{_short_date(run_item.get('created_at'))} · {run_tests} tests · {run_vulns} vulnerabilities"
+                                        ).classes("text-sm text-grey-7")
+                                    with ui.row().classes("items-center gap-2"):
+                                        ui.badge(
+                                            run_risk_label,
+                                            color=run_risk_color,
+                                        ).classes("text-xs")
+                                        ui.label(f"{run_risk:.1f}% Risk").classes(
+                                            "text-sm font-semibold"
+                                        )
+                                        ui.button(
+                                            icon="visibility",
+                                            on_click=lambda r=run_item.get("row"): (
+                                                ui.timer(
+                                                    0,
+                                                    lambda rr=r: asyncio.create_task(
+                                                        self._open_run_results(rr)
+                                                    ),
+                                                    once=True,
+                                                )
+                                            ),
+                                        ).props("flat round dense")
+
+    async def _open_run_results(self, run: dict) -> None:  # noqa: C901
+        """Open a full-page report for a single run."""
         run_id_raw = str(run.get("id") or "")
-        self.run_dialog_title.text = f"Results — Run {run_id_raw[:8]}…"
-        if self.run_dialog_subtitle is not None:
+        self.run_dialog_title.text = f"Report — Run {run_id_raw[:8]}…"
+
+        # ── Resolve run configuration ─────────────────────────────────
+        raw_run_config = run.get("run_config")
+        run_config: object = {}
+        raw_config_is_str = False
+        if isinstance(raw_run_config, dict):
+            run_config = raw_run_config
+        elif isinstance(raw_run_config, str) and raw_run_config.strip():
+            try:
+                run_config = json.loads(raw_run_config)
+            except Exception:
+                run_config = raw_run_config
+                raw_config_is_str = True
+
+        if not run_config:
+            with contextlib.suppress(Exception):
+                fetched_run = self.backend.get_run(UUID(run_id_raw))
+                fetched_dict = _serialize(fetched_run)
+                fetched_raw = fetched_dict.get("run_config")
+                if isinstance(fetched_raw, dict):
+                    run_config = fetched_raw
+                    raw_config_is_str = False
+                elif isinstance(fetched_raw, str) and fetched_raw.strip():
+                    try:
+                        run_config = json.loads(fetched_raw)
+                        raw_config_is_str = False
+                    except Exception:
+                        run_config = fetched_raw
+                        raw_config_is_str = True
+                if not run_config:
+                    attack_id = str(fetched_dict.get("attack_id") or "")
+                    if attack_id:
+                        with contextlib.suppress(Exception):
+                            attack_cfgs = self._attack_config_map_for_ids({attack_id})
+                            cfg = attack_cfgs.get(attack_id)
+                            if isinstance(cfg, dict) and cfg:
+                                run_config = cfg
+                                raw_config_is_str = False
+
+        # ── Show loading skeleton immediately ─────────────────────────
+        if self.run_report_area is not None:
+            self.run_report_area.clear()
+            with self.run_report_area:
+                with ui.row().classes("items-center gap-2 py-8 justify-center w-full"):
+                    ui.spinner("dots", size="xl")
+                    ui.label("Loading report…").classes("text-sm text-grey-6")
+        self.run_dialog.open()
+        await asyncio.sleep(0)
+
+        # ── Fetch results ─────────────────────────────────────────────
+        try:
+            run_uuid = UUID(run_id_raw)
+
+            def _fetch_results():
+                items = []
+                pg = 1
+                while True:
+                    rp = self.backend.list_results(
+                        run_id=run_uuid, page=pg, page_size=100
+                    )
+                    items.extend(rp.items)
+                    if len(items) >= rp.total or not rp.items:
+                        break
+                    pg += 1
+                return items
+
+            all_items = await asyncio.get_event_loop().run_in_executor(
+                None, _fetch_results
+            )
+
+            sorted_items = sorted(
+                all_items,
+                key=lambda item: (
+                    int(getattr(item, "goal_index", 0)),
+                    getattr(item, "created_at", None),
+                ),
+            )
+
+            goal_indices = [getattr(it, "goal_index", None) for it in sorted_items]
+            valid_int_indices = [i for i in goal_indices if isinstance(i, int)]
+            use_goal_index = len(valid_int_indices) == len(sorted_items) and len(
+                set(valid_int_indices)
+            ) == len(sorted_items)
+
+            new_rows = []
+            n_jailbreaks = n_mitigated = n_errors = 0
+            goal_latencies: list[float] = []
+            for idx, r in enumerate(sorted_items, start=1):
+                d = _serialize(r)
+                d["_rel"] = _rel_time(d.get("created_at"))
+                goal_index = d.get("goal_index")
+                if use_goal_index and isinstance(goal_index, int):
+                    d["goal_number"] = int(goal_index) + 1
+                else:
+                    d["goal_number"] = idx
+                d["_goal_category"] = self._extract_goal_classifier_label(d, "category")
+                d["_goal_subcategory"] = self._extract_goal_classifier_label(
+                    d, "subcategory"
+                )
+                d["evaluation_label"] = _eval_label(
+                    d.get("evaluation_status", ""), d.get("evaluation_notes")
+                )
+                d["evaluation_notes"] = d.get("evaluation_notes") or "—"
+                d["_goal_latency_s"] = self._extract_goal_latency_seconds(d)
+                d["_goal_latency"] = _format_latency(d.get("_goal_latency_s"))
+                bucket = _result_bucket(
+                    d.get("evaluation_status", ""), d.get("evaluation_notes")
+                )
+                d["_bucket"] = bucket
+                if bucket == "jailbreak":
+                    n_jailbreaks += 1
+                elif bucket == "mitigated":
+                    n_mitigated += 1
+                elif bucket == "failed":
+                    n_errors += 1
+                lat = d.get("_goal_latency_s")
+                if isinstance(lat, (int, float)):
+                    goal_latencies.append(float(lat))
+                new_rows.append(d)
+
+            total_tests = len(new_rows)
+            asr_pct = (100.0 * n_jailbreaks / total_tests) if total_tests > 0 else 0.0
+            robustness_pct = 100.0 - asr_pct
+            risk_label, risk_badge_color = self._risk_level_from_asr(asr_pct)
+            risk_hex = (
+                "#ef4444"
+                if asr_pct >= 70
+                else "#f97316"
+                if asr_pct >= 40
+                else "#eab308"
+                if asr_pct >= 10
+                else "#22c55e"
+            )
+
+            category_stats: dict[str, dict[str, int]] = defaultdict(
+                lambda: {"total": 0, "vulnerable": 0, "mitigated": 0, "errors": 0}
+            )
+            category_subcategory_stats: dict[str, dict[str, dict[str, int]]] = (
+                defaultdict(lambda: defaultdict(lambda: {"total": 0, "vulnerable": 0}))
+            )
+            for row in new_rows:
+                label = self._extract_category_label(row)
+                if not label:
+                    continue
+                bucket = row.get("_bucket", "pending")
+                entry = category_stats[label]
+                entry["total"] += 1
+                if bucket == "jailbreak":
+                    entry["vulnerable"] += 1
+                elif bucket == "mitigated":
+                    entry["mitigated"] += 1
+                elif bucket == "failed":
+                    entry["errors"] += 1
+
+                sub_label = row.get("_goal_subcategory") or "N/A"
+                sub_entry = category_subcategory_stats[str(label)][str(sub_label)]
+                sub_entry["total"] += 1
+                if bucket == "jailbreak":
+                    sub_entry["vulnerable"] += 1
+
+            status_str = str(run.get("status") or "—")
+            agent_str = str(run.get("agent_name") or "—")
+            attack_str = str(run.get("attack_type") or "—")
+            created_str = _short_date(run.get("created_at"))
+            run_latency_s = self._compute_run_latency_seconds(run)
+            run_latency_str = _format_latency(run_latency_s)
+            avg_goal_latency_str = _format_latency(
+                sum(goal_latencies) / len(goal_latencies) if goal_latencies else None
+            )
+
+        except Exception as exc:
+            if self.run_report_area is not None:
+                self.run_report_area.clear()
+                with self.run_report_area:
+                    with ui.row().classes("gap-2 items-center py-8"):
+                        ui.icon("error_outline", color="negative")
+                        ui.label(f"Failed to load results: {exc}").classes(
+                            "text-sm text-negative"
+                        )
+            ui.notify(f"Error loading results: {exc}", type="negative")
+            return
+
+        # ── Build report UI ───────────────────────────────────────────
+        if self.run_report_area is None:
+            return
+        self.run_report_area.clear()
+
+        with self.run_report_area:
+            # ── 1) Summary stat cards ─────────────────────────────────
+            with ui.row().classes("w-full flex-wrap gap-4"):
+                for s_label, s_value, s_icon, s_color in [
+                    ("Total Tests", str(total_tests), "quiz", "blue"),
+                    ("Vulnerabilities", str(n_jailbreaks), "lock_open", "red"),
+                    ("Mitigated", str(n_mitigated), "security", "green"),
+                    ("Errors", str(n_errors), "warning_amber", "orange"),
+                ]:
+                    with ui.card().classes("flex-1 min-w-36"):
+                        with ui.row().classes("items-center justify-between mb-2"):
+                            ui.label(s_label).classes("text-sm text-grey-6")
+                            ui.icon(s_icon, color=s_color).classes("text-xl")
+                        ui.label(s_value).classes("text-3xl font-bold")
+
+            # ── 2) Risk Score + Robustness ────────────────────────────
+            with ui.row().classes("w-full flex-wrap gap-4 items-stretch"):
+                # Risk donut
+                with ui.card().classes("flex-1 min-w-64"):
+                    ui.label("Risk Score").classes("font-semibold text-sm mb-1")
+                    ui.label(
+                        "Attack Success Rate across all tests in this run"
+                    ).classes("text-xs text-grey-6 mb-3")
+                    with ui.row().classes("items-center gap-6 flex-wrap"):
+                        no_data = total_tests == 0
+                        ui.echart(
+                            {
+                                "series": [
+                                    {
+                                        "type": "pie",
+                                        "radius": ["58%", "80%"],
+                                        "data": (
+                                            [
+                                                {
+                                                    "value": 1,
+                                                    "name": "No data",
+                                                    "itemStyle": {"color": "#94a3b8"},
+                                                }
+                                            ]
+                                            if no_data
+                                            else [
+                                                {
+                                                    "value": n_jailbreaks,
+                                                    "name": "Jailbreaks",
+                                                    "itemStyle": {"color": "#ef4444"},
+                                                },
+                                                {
+                                                    "value": n_mitigated,
+                                                    "name": "Mitigated",
+                                                    "itemStyle": {"color": "#22c55e"},
+                                                },
+                                                {
+                                                    "value": n_errors,
+                                                    "name": "Errors",
+                                                    "itemStyle": {"color": "#f97316"},
+                                                },
+                                                {
+                                                    "value": max(
+                                                        0,
+                                                        total_tests
+                                                        - n_jailbreaks
+                                                        - n_mitigated
+                                                        - n_errors,
+                                                    ),
+                                                    "name": "Pending",
+                                                    "itemStyle": {"color": "#94a3b8"},
+                                                },
+                                            ]
+                                        ),
+                                        "label": {"show": False},
+                                        "emphasis": {"scale": False},
+                                    }
+                                ],
+                                "graphic": (
+                                    []
+                                    if no_data
+                                    else [
+                                        {
+                                            "type": "group",
+                                            "left": "center",
+                                            "top": "center",
+                                            "children": [
+                                                {
+                                                    "type": "text",
+                                                    "style": {
+                                                        "text": f"{asr_pct:.0f}%",
+                                                        "textAlign": "center",
+                                                        "fontSize": 22,
+                                                        "fontWeight": "bold",
+                                                        "fill": risk_hex,
+                                                    },
+                                                    "top": -14,
+                                                },
+                                                {
+                                                    "type": "text",
+                                                    "style": {
+                                                        "text": risk_label,
+                                                        "textAlign": "center",
+                                                        "fontSize": 11,
+                                                        "fill": risk_hex,
+                                                    },
+                                                    "top": 12,
+                                                },
+                                            ],
+                                        }
+                                    ]
+                                ),
+                                "tooltip": {
+                                    "trigger": "item" if not no_data else "none"
+                                },
+                            }
+                        ).classes("w-36 h-36 shrink-0")
+
+                        # Legend beside donut
+                        with ui.column().classes("gap-1"):
+                            for leg_label, leg_count, leg_color in [
+                                ("Jailbreaks", n_jailbreaks, "#ef4444"),
+                                ("Mitigated", n_mitigated, "#22c55e"),
+                                ("Errors", n_errors, "#f97316"),
+                                (
+                                    "Pending",
+                                    max(
+                                        0,
+                                        total_tests
+                                        - n_jailbreaks
+                                        - n_mitigated
+                                        - n_errors,
+                                    ),
+                                    "#94a3b8",
+                                ),
+                            ]:
+                                if leg_count > 0 or not no_data:
+                                    with ui.row().classes("items-center gap-2"):
+                                        ui.element("div").classes(
+                                            "w-2.5 h-2.5 rounded-full shrink-0"
+                                        ).style(f"background:{leg_color}")
+                                        ui.label(f"{leg_label}: {leg_count}").classes(
+                                            "text-xs"
+                                        )
+
+                # Robustness bar
+                with ui.card().classes("flex-1 min-w-64"):
+                    ui.label("Robustness").classes("font-semibold text-sm mb-1")
+                    ui.label(
+                        "Percentage of tests the agent successfully resisted"
+                    ).classes("text-xs text-grey-6 mb-3")
+
+                    with ui.column().classes("gap-3 w-full"):
+                        with ui.row().classes("items-end gap-2"):
+                            ui.label(f"{robustness_pct:.0f}%").classes(
+                                "text-4xl font-bold"
+                            )
+                            robustness_color = (
+                                "positive"
+                                if robustness_pct >= 80
+                                else "warning"
+                                if robustness_pct >= 50
+                                else "negative"
+                            )
+                            robustness_word = (
+                                "Strong"
+                                if robustness_pct >= 80
+                                else "Moderate"
+                                if robustness_pct >= 50
+                                else "Weak"
+                            )
+                            ui.badge(robustness_word, color=robustness_color).classes(
+                                "text-xs mb-1"
+                            )
+
+                        ui.linear_progress(
+                            value=robustness_pct / 100.0,
+                            show_value=False,
+                            color=(
+                                "positive"
+                                if robustness_pct >= 80
+                                else "warning"
+                                if robustness_pct >= 50
+                                else "negative"
+                            ),
+                        ).classes("w-full").props("rounded size=12px")
+
+                        with ui.row().classes("w-full justify-between"):
+                            ui.label(f"{n_mitigated} mitigated").classes(
+                                "text-xs text-grey-6"
+                            )
+                            ui.label(f"{n_jailbreaks} vulnerable").classes(
+                                "text-xs text-grey-6"
+                            )
+
+            # ── 2b) Robustness by Category (radar) ───────────────────
+            if category_stats:
+                category_items = []
+                for label, stats in category_stats.items():
+                    total = int(stats.get("total") or 0)
+                    vulnerable = int(stats.get("vulnerable") or 0)
+                    mitigated = int(stats.get("mitigated") or 0)
+                    if total <= 0:
+                        continue
+                    robustness = 100.0 * (total - vulnerable) / total
+                    sub_stats = category_subcategory_stats.get(label, {})
+                    sub_rows = []
+                    for sub_label, sub_counts in sub_stats.items():
+                        sub_total = int(sub_counts.get("total") or 0)
+                        sub_vulnerable = int(sub_counts.get("vulnerable") or 0)
+                        if sub_total <= 0:
+                            continue
+                        sub_rows.append(
+                            {
+                                "label": str(sub_label),
+                                "total": sub_total,
+                                "vulnerable": sub_vulnerable,
+                                "rate": sub_vulnerable / sub_total,
+                            }
+                        )
+                    sub_rows.sort(
+                        key=lambda item: (item["rate"], item["total"]), reverse=True
+                    )
+                    category_items.append(
+                        {
+                            "label": label,
+                            "total": total,
+                            "vulnerable": vulnerable,
+                            "mitigated": mitigated,
+                            "errors": int(stats.get("errors") or 0),
+                            "robustness": robustness,
+                            "vuln_rate": vulnerable / total,
+                            "subcategories": sub_rows,
+                        }
+                    )
+
+                category_items.sort(
+                    key=lambda item: (item["vuln_rate"], item["total"]),
+                    reverse=True,
+                )
+                top_items = category_items[:9]
+                top_items.sort(key=lambda item: item["label"])
+                if len(top_items) > 1:
+                    top_items = [top_items[0], *reversed(top_items[1:])]
+
+                def _truncate_label(text: str, limit: int = 20) -> str:
+                    text = str(text)
+                    if len(text) <= limit:
+                        return text
+                    return f"{text[: max(1, limit - 3)].rstrip()}..."
+
+                def _build_category_tooltip(item: dict) -> str:
+                    lines = [
+                        f"<div style='font-size:14px;font-weight:700;margin-bottom:4px'>{item['label']}</div>",
+                        f"<div>Robustness: <span style='color:#16a34a;font-weight:700'>{item['robustness']:.0f}%</span></div>",
+                        f"<div>Vulnerable: <span style='color:#ef4444;font-weight:700'>{item['vulnerable']} / {item['total']}</span></div>",
+                        f"<div>Mitigated: <span style='color:#22c55e;font-weight:700'>{item['mitigated']}</span></div>",
+                        f"<div>Error: <span style='color:#f59e0b;font-weight:700'>{item['errors']}</span></div>",
+                    ]
+                    if item["subcategories"]:
+                        lines.append(
+                            "<div style='margin-top:6px;font-weight:600'>Subcategory vulnerabilities</div>"
+                        )
+                        for sub_item in item["subcategories"][:8]:
+                            lines.append(
+                                f"<div>{sub_item['label']}: {sub_item['vulnerable']} / {sub_item['total']}</div>"
+                            )
+                    return "".join(lines)
+
+                indicators = [
+                    {"name": _truncate_label(item["label"]), "max": 100}
+                    for item in top_items
+                ]
+                indicator_labels = [indicator["name"] for indicator in indicators]
+                full_labels = [item["label"] for item in top_items]
+                values = [round(item["robustness"], 1) for item in top_items]
+                category_tooltips = [
+                    _build_category_tooltip(item) for item in top_items
+                ]
+
+                with ui.card().classes("w-full"):
+                    with ui.row().classes("w-full items-start justify-between mb-1"):
+                        with ui.column().classes("gap-0"):
+                            ui.label("OVERALL ROBUSTNESS").classes(
+                                "text-[10px] tracking-[0.24em] text-grey-6 font-semibold"
+                            )
+                            ui.label(f"{robustness_pct:.0f}%").classes(
+                                "text-[44px] leading-none font-bold text-green-7"
+                            )
+
+                    with ui.row().classes("w-full justify-center"):
+                        ui.echart(
+                            {
+                                "toolbox": {
+                                    "show": True,
+                                    "right": 8,
+                                    "top": 4,
+                                    "feature": {
+                                        "saveAsImage": {
+                                            "show": True,
+                                            "type": "svg",
+                                            "title": "Download SVG",
+                                            "name": "robustness-by-category",
+                                        }
+                                    },
+                                },
+                                "tooltip": {
+                                    "trigger": "axis",
+                                    ":formatter": (
+                                        "function(params) {"
+                                        "const p = Array.isArray(params) ? (params[0] || {}) : (params || {});"
+                                        "const d = (p && p.data) || {};"
+                                        "const categoryTooltips = Array.isArray(d.categoryTooltips) ? d.categoryTooltips : [];"
+                                        "if (!categoryTooltips.length) { return ''; }"
+                                        "const indicatorLabels = Array.isArray(d.indicatorLabels) ? d.indicatorLabels : [];"
+                                        "const fullLabels = Array.isArray(d.fullLabels) ? d.fullLabels : [];"
+                                        "const candidates = [];"
+                                        "if (typeof p.axisValueLabel === 'string' && p.axisValueLabel.length > 0) { candidates.push(p.axisValueLabel); }"
+                                        "if (typeof p.axisValue === 'string' && p.axisValue.length > 0) { candidates.push(p.axisValue); }"
+                                        "if (typeof p.name === 'string' && p.name.length > 0) { candidates.push(p.name); }"
+                                        "for (const name of candidates) {"
+                                        "  let idx = indicatorLabels.indexOf(name);"
+                                        "  if (idx < 0) { idx = fullLabels.indexOf(name); }"
+                                        "  if (idx >= 0 && idx < categoryTooltips.length) { return categoryTooltips[idx] || ''; }"
+                                        "}"
+                                        "const dimensionIndex = typeof p.dimensionIndex === 'number' ? p.dimensionIndex : -1;"
+                                        "if (dimensionIndex >= 0 && dimensionIndex < categoryTooltips.length) {"
+                                        "  return categoryTooltips[dimensionIndex] || '';"
+                                        "}"
+                                        "return categoryTooltips[0] || '';"
+                                        "}"
+                                    ),
+                                    "backgroundColor": "#ffffff",
+                                    "borderColor": "#d1d5db",
+                                    "borderWidth": 1,
+                                    "textStyle": {"color": "#111827", "fontSize": 13},
+                                    "padding": 10,
+                                },
+                                "radar": {
+                                    "shape": "polygon",
+                                    "indicator": indicators,
+                                    "splitNumber": 5,
+                                    "center": ["50%", "53%"],
+                                    "radius": "70%",
+                                    "axisName": {
+                                        "fontSize": 16,
+                                        "color": "#111827",
+                                        "fontWeight": 500,
+                                    },
+                                    "splitLine": {"lineStyle": {"color": "#d1d5db"}},
+                                    "splitArea": {"areaStyle": {"color": ["#ffffff"]}},
+                                },
+                                "series": [
+                                    {
+                                        "type": "radar",
+                                        "silent": False,
+                                        "z": 3,
+                                        "symbol": "circle",
+                                        "symbolSize": 11,
+                                        "itemStyle": {
+                                            "color": "#dc2626",
+                                            "borderColor": "#ffffff",
+                                            "borderWidth": 1.5,
+                                        },
+                                        "lineStyle": {
+                                            "color": "#3b82f6",
+                                            "width": 2,
+                                        },
+                                        "areaStyle": {
+                                            "color": "rgba(59, 130, 246, 0.18)"
+                                        },
+                                        "data": [
+                                            {
+                                                "value": values,
+                                                "name": "Robustness",
+                                                "categoryTooltips": category_tooltips,
+                                                "indicatorLabels": indicator_labels,
+                                                "fullLabels": full_labels,
+                                            }
+                                        ],
+                                    },
+                                ],
+                            }
+                        ).classes("w-[740px] h-[420px] max-w-full").props(
+                            "renderer=svg"
+                        )
+
+                    ui.label(
+                        "Robustness = 100 - vulnerability rate per category. Hover a point for details."
+                    ).classes("text-xs text-grey-6 w-full text-center mt-2")
+
+                with ui.card().classes("w-full"):
+                    ui.label("Vulnerability by Category").classes(
+                        "font-semibold text-sm mb-1"
+                    )
+                    ui.label(
+                        "Stacked distribution of outcomes per harm category"
+                    ).classes("text-xs text-grey-6 mb-3")
+
+                    bar_items = list(reversed(top_items))
+                    bar_y_labels = [item["label"] for item in bar_items]
+                    vulnerable_data = []
+                    mitigated_data = []
+                    error_data = []
+
+                    for item in bar_items:
+                        tooltip_text = _build_category_tooltip(item)
+                        vulnerable_data.append(
+                            {
+                                "value": int(item["vulnerable"]),
+                                "name": item["label"],
+                                "tooltip": {"formatter": tooltip_text},
+                            }
+                        )
+                        mitigated_data.append(
+                            {
+                                "value": int(item["mitigated"]),
+                                "name": item["label"],
+                                "tooltip": {"formatter": tooltip_text},
+                            }
+                        )
+                        error_data.append(
+                            {
+                                "value": int(item["errors"]),
+                                "name": item["label"],
+                                "tooltip": {"formatter": tooltip_text},
+                            }
+                        )
+
+                    ui.echart(
+                        {
+                            "tooltip": {
+                                "trigger": "item",
+                                "backgroundColor": "#ffffff",
+                                "borderColor": "#d1d5db",
+                                "borderWidth": 1,
+                                "textStyle": {"color": "#111827", "fontSize": 13},
+                                "padding": 10,
+                            },
+                            "legend": {
+                                "bottom": 0,
+                                "itemWidth": 12,
+                                "itemHeight": 10,
+                                "textStyle": {"fontSize": 12},
+                            },
+                            "grid": {
+                                "left": "16%",
+                                "right": "2%",
+                                "top": "8%",
+                                "bottom": "18%",
+                                "containLabel": True,
+                            },
+                            "xAxis": {
+                                "type": "value",
+                                "splitLine": {
+                                    "lineStyle": {"type": "dashed", "color": "#e5e7eb"}
+                                },
+                            },
+                            "yAxis": {
+                                "type": "category",
+                                "data": bar_y_labels,
+                                "axisTick": {"show": False},
+                                "axisLabel": {
+                                    "fontSize": 11,
+                                    "lineHeight": 14,
+                                    "interval": 0,
+                                },
+                            },
+                            "series": [
+                                {
+                                    "name": "Vulnerable",
+                                    "type": "bar",
+                                    "stack": "total",
+                                    "itemStyle": {"color": "#ef4444"},
+                                    "emphasis": {"disabled": True},
+                                    "data": vulnerable_data,
+                                },
+                                {
+                                    "name": "Mitigated",
+                                    "type": "bar",
+                                    "stack": "total",
+                                    "itemStyle": {"color": "#22c55e"},
+                                    "emphasis": {"disabled": True},
+                                    "data": mitigated_data,
+                                },
+                                {
+                                    "name": "Error",
+                                    "type": "bar",
+                                    "stack": "total",
+                                    "itemStyle": {"color": "#f59e0b"},
+                                    "emphasis": {"disabled": True},
+                                    "data": error_data,
+                                },
+                            ],
+                        }
+                    ).classes("w-full h-[320px]")
+
+            # ── 3) Scope of Testing ───────────────────────────────────
+            with ui.card().classes("w-full"):
+                ui.label("Scope of Testing").classes("font-semibold text-sm mb-3")
+                with ui.row().classes("w-full flex-wrap gap-x-8 gap-y-2"):
+                    for info_label, info_value, info_icon in [
+                        ("Run ID", f"{run_id_raw[:12]}…", "fingerprint"),
+                        ("Agent", agent_str, "smart_toy"),
+                        ("Attack", attack_str, "flash_on"),
+                        ("Status", status_str, "flag"),
+                        ("Created", created_str, "schedule"),
+                        ("Duration", run_latency_str, "timer"),
+                        ("Avg Goal Latency", avg_goal_latency_str, "speed"),
+                    ]:
+                        with ui.row().classes("items-center gap-2"):
+                            ui.icon(info_icon, size="xs").classes(
+                                "text-grey-6 shrink-0"
+                            )
+                            ui.label(f"{info_label}:").classes(
+                                "text-xs text-grey-6 font-semibold"
+                            )
+                            ui.label(str(info_value)).classes(
+                                "text-xs font-mono select-all"
+                            )
+
+            # ── 4) Configuration (expandable) ─────────────────────────
+            if run_config:
+                with ui.expansion("Configuration", icon="settings").classes("w-full"):
+                    config_text = (
+                        json.dumps(run_config, indent=2, default=str)
+                        if not raw_config_is_str and not isinstance(run_config, str)
+                        else str(run_config)
+                    )
+                    ui.code(config_text, language="json").classes("w-full text-xs")
+
+            # ── 5) Test Results ───────────────────────────────────────
+            with ui.column().classes("w-full gap-3"):
+                with ui.row().classes("items-center gap-2"):
+                    ui.label("TEST RESULTS").classes(
+                        "text-[10px] font-semibold tracking-widest "
+                        "text-grey-5 uppercase"
+                    )
+                    ui.badge(str(total_tests), color="primary").classes("text-xs")
+
+                if not new_rows:
+                    ui.label("No results found for this run.").classes(
+                        "text-sm text-grey-6 py-4"
+                    )
+                else:
+                    for row in new_rows:
+                        bucket = row.get("_bucket", "pending")
+                        border_color = (
+                            "border-red-400"
+                            if bucket == "jailbreak"
+                            else "border-green-400"
+                            if bucket == "mitigated"
+                            else "border-orange-400"
+                            if bucket == "failed"
+                            else "border-grey-300"
+                        )
+                        with (
+                            ui.card()
+                            .tight()
+                            .classes(f"w-full border-l-4 {border_color}")
+                        ):
+                            with ui.column().classes("w-full gap-2 p-4"):
+                                with ui.row().classes(
+                                    "items-center justify-between w-full"
+                                ):
+                                    with ui.column().classes("gap-1"):
+                                        ui.label(
+                                            f"Goal #{row.get('goal_number', '?')}"
+                                        ).classes("font-semibold text-sm")
+                                        ui.badge(
+                                            self._goal_category_badge_text(row),
+                                            color="blue-7",
+                                        ).classes("text-sm px-3 py-2 font-medium")
+
+                                    with ui.row().classes("items-center gap-3"):
+                                        ui.badge(
+                                            row.get("evaluation_label") or "Pending",
+                                            color=_eval_color(
+                                                row.get("evaluation_status", ""),
+                                                row.get("evaluation_notes"),
+                                            ),
+                                        ).classes("text-xs")
+
+                                    with ui.row().classes("items-center gap-2"):
+                                        ui.badge(
+                                            f"Latency: {row.get('_goal_latency', '—')}",
+                                            color="grey-7",
+                                        ).classes("text-xs")
+                                        ui.button(
+                                            "Details",
+                                            icon="open_in_new",
+                                            on_click=lambda r=row: ui.timer(
+                                                0,
+                                                lambda rr=r: asyncio.create_task(
+                                                    self.show_result_detail(
+                                                        rr, foreground=True
+                                                    )
+                                                ),
+                                                once=True,
+                                            ),
+                                        ).props("flat dense no-caps color=primary")
+
+                                ui.label(str(row.get("goal") or "—")).classes(
+                                    "text-sm whitespace-pre-wrap"
+                                )
+
+                                notes = str(row.get("evaluation_notes") or "—")
+                                if notes != "—":
+                                    ui.label(notes).classes(
+                                        "text-xs text-grey-6 whitespace-pre-wrap"
+                                    )
+
+    async def _open_run_history_results(self, run: dict) -> None:
+        """Open the compact results list dialog for History/Dashboard views."""
+        run_id_raw = str(run.get("id") or "")
+
+        if self.history_run_dialog_title is not None:
+            self.history_run_dialog_title.text = f"Run Results — {run_id_raw[:8]}…"
+        if self.history_run_dialog_subtitle is not None:
             status = str(run.get("status") or "—")
             agent = str(run.get("agent_name") or "—")
             attack = str(run.get("attack_type") or "—")
@@ -2617,27 +3970,78 @@ class DashboardPage:
             run_latency = _format_latency(run_latency_s)
             jailbreaks = int(run.get("successful_jailbreaks") or 0)
             failed_attacks = int(run.get("failed_attacks") or 0)
-            self.run_dialog_subtitle.text = (
+            self.history_run_dialog_subtitle.text = (
                 f"Status: {status} | Agent: {agent} | Attack: {attack} | "
                 f"Created: {created} | Total latency: {run_latency} | "
                 f"Jailbreaks: {jailbreaks} | Failed attacks: {failed_attacks}"
             )
-        if self.results_list_area is not None:
-            self.results_list_area.clear()
-        if self.results_empty_label is not None:
-            self.results_empty_label.text = "Loading results…"
-            self.results_empty_label.set_visibility(True)
-        self.run_dialog.open()
 
-        # Yield so NiceGUI flushes the dialog-open + "Loading…" state to the
-        # browser before we start the (potentially slow) backend fetch.
+        raw_run_config = run.get("run_config")
+        run_config = {}
+        raw_config_is_str = False
+        if isinstance(raw_run_config, dict):
+            run_config = raw_run_config
+        elif isinstance(raw_run_config, str) and raw_run_config.strip():
+            try:
+                run_config = json.loads(raw_run_config)
+            except Exception:
+                run_config = raw_run_config
+                raw_config_is_str = True
+
+        if not run_config:
+            with contextlib.suppress(Exception):
+                fetched_run = self.backend.get_run(UUID(run_id_raw))
+                fetched_dict = _serialize(fetched_run)
+                fetched_raw = fetched_dict.get("run_config")
+                if isinstance(fetched_raw, dict):
+                    run_config = fetched_raw
+                    raw_config_is_str = False
+                elif isinstance(fetched_raw, str) and fetched_raw.strip():
+                    try:
+                        run_config = json.loads(fetched_raw)
+                        raw_config_is_str = False
+                    except Exception:
+                        run_config = fetched_raw
+                        raw_config_is_str = True
+                if not run_config:
+                    attack_id = str(fetched_dict.get("attack_id") or "")
+                    if attack_id:
+                        with contextlib.suppress(Exception):
+                            attack_cfgs = self._attack_config_map_for_ids({attack_id})
+                            cfg = attack_cfgs.get(attack_id)
+                            if isinstance(cfg, dict) and cfg:
+                                run_config = cfg
+                                raw_config_is_str = False
+
+        if self.history_run_config_area is not None:
+            self.history_run_config_area.clear()
+            with self.history_run_config_area:
+                if run_config:
+                    content = (
+                        json.dumps(run_config, indent=2, default=str)
+                        if not raw_config_is_str and not isinstance(run_config, str)
+                        else str(run_config)
+                    )
+                    ui.code(content, language="json").classes("w-full text-xs")
+                else:
+                    ui.label("No configuration found for this run.").classes(
+                        "text-xs text-grey-6"
+                    )
+
+        if self.history_results_list_area is not None:
+            self.history_results_list_area.clear()
+        if self.history_results_empty_label is not None:
+            self.history_results_empty_label.text = "Loading results…"
+            self.history_results_empty_label.set_visibility(True)
+
+        if self.history_run_dialog is not None:
+            self.history_run_dialog.open()
+
         await asyncio.sleep(0)
 
         try:
             run_uuid = UUID(run_id_raw)
 
-            # Fetch results in a thread so the event loop stays responsive
-            # (RemoteBackend does synchronous HTTP calls).
             def _fetch_results():
                 items = []
                 page = 1
@@ -2663,13 +4067,24 @@ class DashboardPage:
                 ),
             )
 
+            goal_indices = [getattr(it, "goal_index", None) for it in sorted_items]
+            valid_int_indices = [i for i in goal_indices if isinstance(i, int)]
+            use_goal_index = len(valid_int_indices) == len(sorted_items) and len(
+                set(valid_int_indices)
+            ) == len(sorted_items)
+
             new_rows = []
             for idx, r in enumerate(sorted_items, start=1):
                 d = _serialize(r)
                 d["_rel"] = _rel_time(d.get("created_at"))
                 goal_index = d.get("goal_index")
-                d["goal_number"] = (
-                    int(goal_index) + 1 if isinstance(goal_index, int) else idx
+                if use_goal_index and isinstance(goal_index, int):
+                    d["goal_number"] = int(goal_index) + 1
+                else:
+                    d["goal_number"] = idx
+                d["_goal_category"] = self._extract_goal_classifier_label(d, "category")
+                d["_goal_subcategory"] = self._extract_goal_classifier_label(
+                    d, "subcategory"
                 )
                 d["evaluation_label"] = _eval_label(
                     d.get("evaluation_status", ""), d.get("evaluation_notes")
@@ -2679,26 +4094,34 @@ class DashboardPage:
                 d["_goal_latency"] = _format_latency(d.get("_goal_latency_s"))
                 new_rows.append(d)
 
-            if self.results_list_area is not None:
-                self.results_list_area.clear()
+            if self.history_results_list_area is not None:
+                self.history_results_list_area.clear()
 
-            if self.results_empty_label is not None:
+            if self.history_results_empty_label is not None:
                 if all_items:
-                    self.results_empty_label.set_visibility(False)
+                    self.history_results_empty_label.set_visibility(False)
                 else:
-                    self.results_empty_label.text = "No results found for this run."
-                    self.results_empty_label.set_visibility(True)
+                    self.history_results_empty_label.text = (
+                        "No results found for this run."
+                    )
+                    self.history_results_empty_label.set_visibility(True)
 
-            if all_items and self.results_list_area is not None:
-                with self.results_list_area:
+            if all_items and self.history_results_list_area is not None:
+                with self.history_results_list_area:
                     for row in new_rows:
                         with ui.card().classes("w-full"):
                             with ui.row().classes(
                                 "items-start justify-between w-full gap-2"
                             ):
-                                ui.label(
-                                    f"Goal #{row.get('goal_number', (row.get('goal_index', 0) or 0) + 1)}"
-                                ).classes("font-semibold text-sm")
+                                with ui.column().classes("gap-1"):
+                                    ui.label(
+                                        f"Goal #{row.get('goal_number', (row.get('goal_index', 0) or 0) + 1)}"
+                                    ).classes("font-semibold text-sm")
+                                    ui.badge(
+                                        self._goal_category_badge_text(row),
+                                        color="blue-7",
+                                    ).classes("text-sm px-3 py-2 font-medium")
+
                                 with ui.row().classes("items-center gap-2"):
                                     ui.badge(
                                         row.get("evaluation_label") or "Pending",
@@ -2733,9 +4156,9 @@ class DashboardPage:
                                 ),
                             ).props("flat dense no-caps color=primary")
         except Exception as exc:
-            if self.results_list_area is not None:
-                self.results_list_area.clear()
-            if self.results_empty_label is not None:
-                self.results_empty_label.text = f"Failed to load results: {exc}"
-                self.results_empty_label.set_visibility(True)
+            if self.history_results_list_area is not None:
+                self.history_results_list_area.clear()
+            if self.history_results_empty_label is not None:
+                self.history_results_empty_label.text = f"Failed to load results: {exc}"
+                self.history_results_empty_label.set_visibility(True)
             ui.notify(f"Error loading results: {exc}", type="negative")

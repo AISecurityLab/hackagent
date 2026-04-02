@@ -4,6 +4,7 @@
 
 from hackagent.logger import get_logger
 import re
+import time
 from typing import Any, Dict, List, Optional
 
 from .base import ChatCompletionsAgent, AdapterConfigurationError
@@ -96,6 +97,7 @@ class OpenAIAgent(ChatCompletionsAgent):
 
     ADAPTER_TYPE = "OpenAIAgent"
     DEFAULT_TEMPERATURE = 1.0  # OpenAI default
+    MAX_CONNECTION_RETRIES_CAP = 5
 
     def __init__(self, id: str, config: Dict[str, Any]):
         """
@@ -198,6 +200,8 @@ class OpenAIAgent(ChatCompletionsAgent):
         self.default_extra_body = self._get_config_key("extra_body")
         self.default_tools = self._get_config_key("tools")
         self.default_tool_choice = self._get_config_key("tool_choice")
+        # Retry only transient transport failures and cap retries to avoid long hangs.
+        self.max_connection_retries = self._get_max_connection_retries()
 
     def _get_excluded_request_keys(self) -> set:
         """Returns keys to exclude when extracting additional kwargs."""
@@ -277,21 +281,52 @@ class OpenAIAgent(ChatCompletionsAgent):
             )
 
             # Make the API call (with one automatic retry for context-limit token errors)
-            try:
-                response = self.client.chat.completions.create(**openai_params)
-            except Exception as first_error:
-                adjusted_max_tokens = self._get_adjusted_max_tokens_from_error(
-                    first_error, openai_params.get("max_tokens")
-                )
-                if adjusted_max_tokens is not None:
-                    self.logger.warning(
-                        "OpenAI request exceeded context window; retrying with "
-                        f"max_tokens={adjusted_max_tokens} for model '{self.model_name}'"
+            openai = _get_openai()
+            api_connection_error_type = openai.APIConnectionError if openai else tuple()
+
+            connection_retry_count = 0
+            while True:
+                try:
+                    try:
+                        response = self.client.chat.completions.create(**openai_params)
+                    except Exception as first_error:
+                        adjusted_max_tokens = self._get_adjusted_max_tokens_from_error(
+                            first_error, openai_params.get("max_tokens")
+                        )
+                        if adjusted_max_tokens is not None:
+                            self.logger.warning(
+                                "OpenAI request exceeded context window; retrying with "
+                                f"max_tokens={adjusted_max_tokens} for model '{self.model_name}'"
+                            )
+                            openai_params["max_tokens"] = adjusted_max_tokens
+                            response = self.client.chat.completions.create(
+                                **openai_params
+                            )
+                        else:
+                            raise first_error
+                    break
+                except Exception as connection_error:
+                    is_connection_error = isinstance(
+                        connection_error, api_connection_error_type
                     )
-                    openai_params["max_tokens"] = adjusted_max_tokens
-                    response = self.client.chat.completions.create(**openai_params)
-                else:
-                    raise first_error
+                    if (
+                        is_connection_error
+                        and connection_retry_count < self.max_connection_retries
+                    ):
+                        connection_retry_count += 1
+                        backoff_seconds = min(
+                            0.5 * (2 ** (connection_retry_count - 1)), 4.0
+                        )
+                        self.logger.warning(
+                            "OpenAI API connection error for model '%s'; retry %d/%d in %.1fs",
+                            self.model_name,
+                            connection_retry_count,
+                            self.max_connection_retries,
+                            backoff_seconds,
+                        )
+                        time.sleep(backoff_seconds)
+                        continue
+                    raise connection_error
 
             # Extract response data
             message = response.choices[0].message
@@ -399,6 +434,17 @@ class OpenAIAgent(ChatCompletionsAgent):
                     "error_type": "unexpected",
                     "error_message": f"{type(e).__name__}: {str(e)}",
                 }
+
+    def _get_max_connection_retries(self) -> int:
+        """Get connection-retry budget from config, capped to avoid excessive waits."""
+        raw_value = self._get_config_key(
+            "max_connection_retries", self.MAX_CONNECTION_RETRIES_CAP
+        )
+        try:
+            parsed = int(raw_value)
+        except (TypeError, ValueError):
+            parsed = self.MAX_CONNECTION_RETRIES_CAP
+        return max(0, min(parsed, self.MAX_CONNECTION_RETRIES_CAP))
 
     def _get_adjusted_max_tokens_from_error(
         self, error: Exception, current_max_tokens: Any

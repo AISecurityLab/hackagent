@@ -17,8 +17,10 @@ from typing import Any, Dict, List, Optional
 
 from hackagent.attacks.objectives import OBJECTIVES
 from hackagent.attacks.evaluator import PatternEvaluator, KeywordEvaluator
+from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
 from hackagent.server.api.result import result_partial_update
 from hackagent.server.api.models import EvaluationStatusEnum, PatchedResultRequest
+from hackagent.server.client import AuthenticatedClient
 from hackagent.router.tracking import Tracker
 
 
@@ -486,6 +488,54 @@ def _finalize_goals_with_tracker(
     return finalized_count
 
 
+class BaselineEvaluation(BaseEvaluationStep):
+    """
+    Evaluation step for baseline attacks.
+
+    Extends ``BaseEvaluationStep`` to wrap the objective-based pattern/keyword
+    evaluation logic into the shared evaluation framework.
+    """
+
+    def __init__(
+        self,
+        config: Dict[str, Any],
+        logger: logging.Logger,
+        client: AuthenticatedClient,
+    ):
+        super().__init__(config, logger, client)
+
+    def execute(
+        self,
+        input_data: List[Dict[str, Any]],
+        goal_tracker: Optional[Tracker] = None,
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Execute the complete baseline evaluation pipeline.
+
+        Args:
+            input_data: List of dicts with completions
+            goal_tracker: Optional Tracker instance for per-goal tracking
+
+        Returns:
+            Dictionary with 'evaluated' and 'summary' lists of dicts
+        """
+        config = self._raw_config
+
+        # Evaluate responses using pattern/keyword evaluators
+        evaluated_data = evaluate_responses(input_data, config, self.logger)
+
+        # Sync evaluation results to server
+        _sync_evaluation_to_server(evaluated_data, config, self.logger, goal_tracker)
+
+        # Aggregate results
+        summary_data = aggregate_results(evaluated_data, self.logger)
+
+        return {
+            "evaluated": evaluated_data,
+            "summary": summary_data,
+        }
+
+
 def execute(
     input_data: List[Dict[str, Any]],
     config: Dict[str, Any],
@@ -502,17 +552,11 @@ def execute(
 
     Returns:
         Dictionary with 'evaluated' and 'summary' lists of dicts
+
+    Notes:
+        Syncing is performed by ``BaselineEvaluation.execute`` via
+        ``_sync_evaluation_to_server``.
     """
-    # Evaluate responses
-    evaluated_data = evaluate_responses(input_data, config, logger)
-
-    # Sync evaluation results to server (Bug 3 fix)
-    _sync_evaluation_to_server(evaluated_data, config, logger, goal_tracker)
-
-    # Aggregate results
-    summary_data = aggregate_results(evaluated_data, logger)
-
-    return {
-        "evaluated": evaluated_data,
-        "summary": summary_data,
-    }
+    return BaselineEvaluation(
+        config=config, logger=logger, client=config.get("_backend")
+    ).execute(input_data, goal_tracker=goal_tracker)

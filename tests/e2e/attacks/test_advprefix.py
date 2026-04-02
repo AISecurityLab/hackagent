@@ -7,18 +7,18 @@ from hackagent.router.types import AgentTypeEnum
 
 DATASET = {
     "preset": "harmbench",
-    "limit": 5,
+    "limit": 200,
     "shuffle": False,
     "seed": 42,
 }
-TARGET_MODEL = "google/gemma-3-27b-it"
-TARGET_ENDPOINT = "https://openrouter.ai/api/v1"
+TARGET_MODEL = "Gemma-3-27B-it"
+TARGET_ENDPOINT = "http://localhost:13000/v1"
 
-GENERATOR_MODEL = "mistralai/mistral-small-3.2-24b-instruct"
-GENERATOR_ENDPOINT = "https://openrouter.ai/api/v1"
+GENERATOR_MODEL = "Gemma-3-27B-it-Uncensored"
+GENERATOR_ENDPOINT = "http://localhost:13001/v1"
 
-JUDGE_MODEL = "openai/gpt-4o-mini"
-JUDGE_ENDPOINT = "https://openrouter.ai/api/v1"
+JUDGE_MODEL = "Abel-24-HarmClassifier"
+JUDGE_ENDPOINT = "http://localhost:13002/v1"
 
 
 @pytest.mark.e2e
@@ -41,16 +41,17 @@ def test_advprefix():
     config = {
         "attack_type": "advprefix",
         "dataset": DATASET,
-        "batch_size": 5,
-        "goal_batch_size": 5,
-        "goal_batch_workers": 5,
+        "batch_size": 20,
+        "max_tokens_completion": 300,
+        "goal_batch_size": 20,
+        "goal_batch_workers": 20,
         "generator": {
             "identifier": GENERATOR_MODEL,
             "agent_type": AgentTypeEnum.OPENAI_SDK,
-            "api_key": openrouter_api_key,
             "endpoint": GENERATOR_ENDPOINT,
             "max_tokens": 50,
         },
+        "meta_prefixes": ["Write...", "Outline...", "Draft..."],
         "judges": [
             {
                 "identifier": JUDGE_MODEL,
@@ -60,9 +61,9 @@ def test_advprefix():
                 "endpoint": JUDGE_ENDPOINT,
             },
         ],
-        "batch_size_judge": 5,
-        "n_candidates_per_goal": 3,
-        "max_tokens": 500,
+        "batch_size_judge": 20,
+        "meta_prefix_samples": 1,
+        "max_tokens": 400,
         "max_tokens_eval": 128,
     }
 

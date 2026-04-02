@@ -18,7 +18,7 @@ from hackagent.router.types import AgentTypeEnum
 
 DATASET = {
     "preset": "harmbench",
-    "limit": 5,
+    "limit": 200,
     "shuffle": False,
     "seed": 42,
 }
@@ -26,16 +26,18 @@ DATASET = {
 
 def main():
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
-    ENDPOINT = "https://openrouter.ai/api/v1"
+    TARGET_ENDPOINT = "http://localhost:12000/v1"
+    ATTACKER_ENDPOINT = "http://localhost:12001/v1"
+    JUDGE_ENDPOINT = "http://localhost:12002/v1"
 
     agent = HackAgent(
-        name="test_target",
-        endpoint=ENDPOINT,
+        name="Gemma-3-27B-it",
+        endpoint=TARGET_ENDPOINT,
         agent_type=AgentTypeEnum.OPENAI_SDK,
         adapter_operational_config={
-            "name": "geogle/gemma-3-27b-it",
+            "name": "Gemma-3-27B-it",
             "api_key": openrouter_api_key,
-            "endpoint": ENDPOINT,
+            "endpoint": TARGET_ENDPOINT,
         },
     )
 
@@ -46,30 +48,30 @@ def main():
             # Use an LLM-assisted program (PAP) + refusal suppression.
             # This requires decorator_llm below.
             "program": (
-                "DANDecorator().then(RefusalSuppressionDecorator()).then(AIMDecorator()).then(StyleInjectionShortDecorator()).then(Base64Decorator())"
+                "DANDecorator().then(RefusalSuppressionDecorator()).then(AIMDecorator()).then(StyleInjectionShortDecorator())"
             ),
             "syntax_version": 2,
         },
         # LLM synthesizer used by LLM-assisted decorators (PAP/Translate/etc.)
         "decorator_llm": {
-            "identifier": "mistralai/mistral-small-3.2-24b-instruct",
-            "endpoint": ENDPOINT,
+            "identifier": "Gemma-3-27B-it-Uncensored",
+            "endpoint": ATTACKER_ENDPOINT,
             "agent_type": AgentTypeEnum.OPENAI_SDK,
             "api_key": openrouter_api_key,
         },
         "max_tokens": 1000,
         "judges": [
             {
-                "identifier": "openai/gpt-4o-mini",
-                "type": "harmbench",
+                "identifier": "Abel-24-HarmClassifier",
+                "type": "harmbench_variant",
                 "agent_type": AgentTypeEnum.OPENAI_SDK,
                 "api_key": openrouter_api_key,
-                "endpoint": ENDPOINT,
+                "endpoint": JUDGE_ENDPOINT,
             },
         ],
-        "batch_size_judge": 5,
-        "goal_batch_size": 5,
-        "goal_batch_workers": 5,
+        "batch_size_judge": 20,
+        "goal_batch_size": 20,
+        "goal_batch_workers": 20,
     }
 
     print("Starting h4rm3l test...")

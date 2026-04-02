@@ -319,6 +319,34 @@ class TestPAIRAttack(unittest.TestCase):
         self.assertEqual(meta.get("requested_max_tokens"), 1000)
         self.assertEqual(meta.get("finish_reason"), "stop")
 
+    def test_score_response_passes_original_goal_to_scorer(self):
+        dummy_router = MagicMock()
+        dummy_router._agent_registry = {"k": object()}
+
+        with (
+            patch.object(
+                PAIRAttack, "_initialize_attacker_router", return_value=dummy_router
+            ),
+            patch.object(
+                PAIRAttack, "_initialize_scorer_router", return_value=dummy_router
+            ),
+        ):
+            attack = PAIRAttack(
+                config={"output_dir": "./logs/runs"},
+                client=MagicMock(),
+                agent_router=MagicMock(),
+            )
+
+        with patch(
+            "hackagent.attacks.techniques.pair.attack.score_response",
+            return_value=(8.0, "ok"),
+        ) as mock_score:
+            out = attack._score_response("ORIGINAL GOAL", "target reply")
+
+        self.assertEqual(out, 8)
+        self.assertEqual(mock_score.call_args.kwargs["goal"], "ORIGINAL GOAL")
+        self.assertEqual(mock_score.call_args.kwargs["target_response"], "target reply")
+
     def test_single_goal_records_response_length_and_preview_truncation(self):
         dummy_attacker = MagicMock()
         dummy_attacker._agent_registry = {"a": object()}

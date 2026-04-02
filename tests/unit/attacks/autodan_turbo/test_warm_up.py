@@ -104,6 +104,10 @@ class TestWarmUp(unittest.TestCase):
 
         self.assertEqual(len(attack_log), 1)
         self.assertGreaterEqual(lib.add_calls, 1)
+        self.assertEqual(mock_score.call_args.kwargs["goal"], "goal-1")
+        self.assertEqual(
+            mock_score.call_args.kwargs["target_response"], "target_response"
+        )
 
     @patch("hackagent.attacks.techniques.autodan_turbo.warm_up.emit_phase_trace")
     @patch(

@@ -77,6 +77,7 @@ class TrackingCoordinator:
         step_tracker: StepTracker,
         goal_tracker: Optional[Tracker],
         logger: Optional[logging.Logger] = None,
+        run_start_time: Optional[float] = None,
     ):
         """
         Initialize coordinator with pre-built trackers.
@@ -87,13 +88,19 @@ class TrackingCoordinator:
             step_tracker: StepTracker for pipeline steps
             goal_tracker: Optional Tracker for per-goal tracking
             logger: Logger instance
+            run_start_time: Optional perf_counter timestamp to use as
+                global run start across nested/sub-run attack instances.
         """
         self.step_tracker = step_tracker
         self.goal_tracker = goal_tracker
         self.logger = logger or get_logger(__name__)
         self._goals: List[str] = []
         self._goal_indices: List[int] = []
-        self._run_start_time: float = time.perf_counter()
+        self._run_start_time: float = (
+            float(run_start_time)
+            if isinstance(run_start_time, (int, float))
+            else time.perf_counter()
+        )
 
     @classmethod
     def create(
@@ -102,9 +109,11 @@ class TrackingCoordinator:
         run_id: Optional[str],
         logger: Optional[logging.Logger] = None,
         attack_type: str = "unknown",
+        category_classifier_config: Optional[Dict[str, Any]] = None,
         goals: Optional[List[str]] = None,
         initial_metadata: Optional[Dict[str, Any]] = None,
         goal_index_start: int = 0,
+        run_start_time: Optional[float] = None,
     ) -> "TrackingCoordinator":
         """
         Factory method to create a fully-initialized coordinator.
@@ -114,9 +123,12 @@ class TrackingCoordinator:
             run_id: Server-side run record ID (or None to disable)
             logger: Logger instance
             attack_type: Attack identifier (e.g., "advprefix", "pair")
+            category_classifier_config: Optional per-goal classifier router config.
             goals: Optional list of goals to initialize upfront
             initial_metadata: Optional metadata for goal results
             goal_index_start: Starting index to assign to the first goal
+            run_start_time: Optional perf_counter timestamp used as
+                run start for latency calculations.
 
         Returns:
             Initialized TrackingCoordinator
@@ -131,6 +143,7 @@ class TrackingCoordinator:
                 run_id=run_id,
                 logger=_logger,
                 attack_type=attack_type,
+                category_classifier_config=category_classifier_config,
             )
 
         tracking_context = TrackingContext(
@@ -147,6 +160,7 @@ class TrackingCoordinator:
             step_tracker=step_tracker,
             goal_tracker=goal_tracker,
             logger=_logger,
+            run_start_time=run_start_time,
         )
 
         # Initialize goals if provided
@@ -264,6 +278,26 @@ class TrackingCoordinator:
         )
         self.initialize_goals(surviving_goals, initial_metadata)
 
+        # Backdate _start_time for each goal using generation elapsed_s so that
+        # the tracked goal latency covers the entire lifecycle (generation + evaluation).
+        if self.has_goal_tracking:
+            goal_gen_elapsed: Dict[str, float] = {}
+            for row in pipeline_data:
+                goal = row.get("goal", "")
+                elapsed = row.get("elapsed_s")
+                if goal and elapsed is not None:
+                    try:
+                        goal_gen_elapsed[goal] = max(
+                            goal_gen_elapsed.get(goal, 0.0), float(elapsed)
+                        )
+                    except (TypeError, ValueError):
+                        pass
+
+            for goal, gen_elapsed in goal_gen_elapsed.items():
+                ctx = self.goal_tracker.get_goal_context_by_goal(goal)
+                if ctx and gen_elapsed > 0:
+                    ctx._start_time -= gen_elapsed
+
     def get_goal_context(self, goal_index: int) -> Optional[Context]:
         """Get tracking context for a specific goal by index."""
         if not self.has_goal_tracking:
@@ -338,6 +372,20 @@ class TrackingCoordinator:
             return
 
         if not results:
+            has_intermediate_traces = False
+            for goal_idx in self._goal_indices:
+                ctx = self.goal_tracker.get_goal_context(goal_idx)
+                if ctx and ctx.traces:
+                    has_intermediate_traces = True
+                    break
+
+            empty_note = (
+                "No final selected results produced by pipeline "
+                "(intermediate traces exist)"
+                if has_intermediate_traces
+                else "No results produced by pipeline"
+            )
+
             # Mark all unfinalized goals as failed
             for goal_idx in self._goal_indices:
                 ctx = self.goal_tracker.get_goal_context(goal_idx)
@@ -345,7 +393,7 @@ class TrackingCoordinator:
                     self.goal_tracker.finalize_goal(
                         ctx=ctx,
                         success=False,
-                        evaluation_notes="No results produced by pipeline",
+                        evaluation_notes=empty_note,
                     )
             return
 
@@ -407,8 +455,42 @@ class TrackingCoordinator:
                 final_metadata={
                     "num_results": len(goal_data),
                     "best_score": best_score,
+                    **self._extract_best_jailbreak_data(goal_data, is_success),
                 },
             )
+
+    @staticmethod
+    def _extract_best_jailbreak_data(
+        goal_data: List[Dict], is_success: bool
+    ) -> Dict[str, Any]:
+        """Extract the prompt/response that led to the jailbreak (if any).
+
+        Looks for ``best_completion`` and ``best_prompt`` fields set by
+        the evaluation pipeline's aggregation step, falling back to
+        ``completion`` and ``prefix`` from the best-scoring item.
+        """
+        if not is_success or not goal_data:
+            return {}
+
+        extra: Dict[str, Any] = {}
+
+        # Prefer explicit best_completion/best_prompt from aggregation
+        for item in goal_data:
+            if item.get("best_completion"):
+                extra["jailbreak_response"] = item["best_completion"]
+                extra["jailbreak_prompt"] = item.get("best_prompt", "")
+                return extra
+
+        # Fallback: pick item with highest best_score / pasr
+        best_item = max(
+            goal_data,
+            key=lambda x: x.get("best_score", x.get("pasr", 0)) or 0,
+        )
+        if best_item.get("completion"):
+            extra["jailbreak_response"] = best_item["completion"]
+            extra["jailbreak_prompt"] = best_item.get("prefix", "")
+
+        return extra
 
     def finalize_on_error(self, error_message: str = "Pipeline failed") -> None:
         """
@@ -525,9 +607,11 @@ class TrackingCoordinator:
             "eval_nj",
             "eval_jb",
             "eval_hb",
+            "eval_hbv",
             "eval_nj_mean",
             "eval_jb_mean",
             "eval_hb_mean",
+            "eval_hbv_mean",
             "best_score",
         ]
         for row in goal_data:
@@ -548,9 +632,11 @@ class TrackingCoordinator:
             "eval_nj",
             "eval_jb",
             "eval_hb",
+            "eval_hbv",
             "eval_nj_mean",
             "eval_jb_mean",
             "eval_hb_mean",
+            "eval_hbv_mean",
             "best_score",
         ]
         best = 0.0

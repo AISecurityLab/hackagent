@@ -11,8 +11,10 @@ class TestAutoDANTurboConfig(unittest.TestCase):
         self.assertEqual(cfg["attack_type"], "autodan_turbo")
         self.assertIn("autodan_turbo_params", cfg)
         self.assertIn("attacker", cfg)
+        self.assertIn("category_classifier", cfg)
         self.assertIn("scorer", cfg)
         self.assertIn("summarizer", cfg)
+        self.assertIn("embedder", cfg)
         self.assertIn("judges", cfg)
 
     def test_default_params_have_core_thresholds(self):
@@ -21,7 +23,10 @@ class TestAutoDANTurboConfig(unittest.TestCase):
         self.assertIn("epochs", params)
         self.assertIn("warm_up_iterations", params)
         self.assertIn("lifelong_iterations", params)
-        self.assertIn("embedding_model", params)
+        embedder = autodan_config.DEFAULT_AUTODAN_TURBO_CONFIG["embedder"]
+        self.assertIn("identifier", embedder)
+        self.assertIn("endpoint", embedder)
+        self.assertIn("agent_type", embedder)
 
     def test_typed_config_validates_and_dumps_nested_roles(self):
         typed = autodan_config.AutoDANTurboConfig.from_dict(
