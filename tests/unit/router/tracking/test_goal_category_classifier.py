@@ -49,7 +49,9 @@ class TestTrackerGoalClassification(unittest.TestCase):
         self.assertEqual(metadata["subcategory"], "D1. Fraud or Scams")
 
     @patch("hackagent.router.tracking.tracker.GoalCategoryClassifier")
-    def test_create_goal_result_uses_fallback_labels_when_missing(self, mock_classifier_cls):
+    def test_create_goal_result_uses_fallback_labels_when_missing(
+        self, mock_classifier_cls
+    ):
         mock_classifier = MagicMock()
         mock_classifier.classify_goal.return_value = {}
         mock_classifier_cls.return_value = mock_classifier
@@ -72,7 +74,9 @@ class TestTrackerGoalClassification(unittest.TestCase):
 
 class TestCoordinatorCategoryClassifierConfig(unittest.TestCase):
     @patch("hackagent.router.tracking.coordinator.Tracker")
-    def test_create_passes_category_classifier_config_to_tracker(self, mock_tracker_cls):
+    def test_create_passes_category_classifier_config_to_tracker(
+        self, mock_tracker_cls
+    ):
         backend = MagicMock()
         mock_tracker_cls.return_value = MagicMock(is_enabled=True)
 

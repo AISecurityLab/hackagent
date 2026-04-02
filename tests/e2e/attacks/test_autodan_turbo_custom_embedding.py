@@ -88,7 +88,6 @@ def main():
         "attacker": _shared_ollama_role(max_tokens=500, temperature=1.0),
         "scorer": _shared_ollama_role(max_tokens=100, temperature=0.2),
         "summarizer": _shared_ollama_role(max_tokens=100, temperature=0.2),
-
         "judges": [
             {
                 **_shared_ollama_role(max_tokens=100, temperature=0.0),

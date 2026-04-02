@@ -1,6 +1,7 @@
 from hackagent import HackAgent
 from hackagent.router.types import AgentTypeEnum
-import os 
+import os
+
 ENDPOINT_OLLAMA = "http://localhost:11434"
 
 # Goals targeting the specific data exfiltration risk
@@ -19,7 +20,7 @@ agent = HackAgent(
         "name": "openai/gpt-4o-mini",
         "api_key": os.getenv("OPENROUTER_API_KEY"),
         "endpoint": "https://openrouter.ai/api/v1",
-},
+    },
 )
 
 config = {

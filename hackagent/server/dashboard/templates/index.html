@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HackAgent — Community Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind = {
+      config: {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: { sans: ['Inter','system-ui','sans-serif'], mono: ['JetBrains Mono','monospace'] },
+            colors: {
+              border:      'hsl(var(--border))',
+              input:       'hsl(var(--input))',
+              background:  'hsl(var(--background))',
+              foreground:  'hsl(var(--foreground))',
+              primary:    { DEFAULT: 'hsl(var(--primary))',    foreground: 'hsl(var(--primary-foreground))' },
+              secondary:  { DEFAULT: 'hsl(var(--secondary))',  foreground: 'hsl(var(--secondary-foreground))' },
+              muted:      { DEFAULT: 'hsl(var(--muted))',      foreground: 'hsl(var(--muted-foreground))' },
+              accent:     { DEFAULT: 'hsl(var(--accent))',     foreground: 'hsl(var(--accent-foreground))' },
+              destructive:{ DEFAULT: 'hsl(var(--destructive))', foreground: 'hsl(var(--destructive-foreground))' },
+              card:       { DEFAULT: 'hsl(var(--card))',        foreground: 'hsl(var(--card-foreground))' },
+            },
+            borderRadius: { lg: 'var(--radius)', md: 'calc(var(--radius) - 2px)', sm: 'calc(var(--radius) - 4px)' },
+          }
+        }
+      }
+    };
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+  <style>
+    /* ── CSS token layer (mirrors globals.css) ────────────────── */
+    :root {
+      --background:   0 0% 100%;
+      --foreground:   240 10% 3.9%;
+      --card:         0 0% 100%;
+      --card-foreground: 240 10% 3.9%;
+      --border:       240 5.9% 90%;
+      --input:        240 5.9% 90%;
+      --primary:      240 5.9% 10%;
+      --primary-foreground: 0 0% 98%;
+      --secondary:    240 4.8% 95.9%;
+      --secondary-foreground: 240 5.9% 10%;
+      --muted:        240 4.8% 95.9%;
+      --muted-foreground: 240 3.8% 46.1%;
+      --accent:       240 4.8% 95.9%;
+      --accent-foreground: 240 5.9% 10%;
+      --destructive:  0 84.2% 60.2%;
+      --destructive-foreground: 0 0% 98%;
+      --radius:       0.5rem;
+      /* brand red used for sidebar active state */
+      --brand: 0 72% 51%;
+    }
+    .dark {
+      --background:   240 10% 3.9%;
+      --foreground:   0 0% 98%;
+      --card:         240 10% 3.9%;
+      --card-foreground: 0 0% 98%;
+      --border:       240 3.7% 15.9%;
+      --input:        240 3.7% 15.9%;
+      --primary:      0 0% 98%;
+      --primary-foreground: 240 5.9% 10%;
+      --secondary:    240 3.7% 15.9%;
+      --secondary-foreground: 0 0% 98%;
+      --muted:        240 3.7% 15.9%;
+      --muted-foreground: 240 5% 64.9%;
+      --accent:       240 3.7% 15.9%;
+      --accent-foreground: 0 0% 98%;
+      --destructive:  0 62.8% 30.6%;
+      --destructive-foreground: 0 0% 98%;
+    }
+
+    /* ── Base ────────────────────────────────────────────────── */
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    [x-cloak] { display: none !important; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 99px; }
+
+    /* ── Custom sidebar width transition ─────────────────────── */
+    .sidebar-expanded { width: 208px; }
+    .sidebar-collapsed { width: 64px; }
+    .main-expanded  { margin-left: 208px; }
+    .main-collapsed { margin-left: 64px; }
+    aside, main { transition: width 250ms ease, margin-left 250ms ease; }
+
+    /* ── Table-specific ──────────────────────────────────────── */
+    table { border-collapse: collapse; width: 100%; }
+    th { font-weight: 500; font-size: 0.75rem; color: hsl(var(--muted-foreground)); text-align: left; }
+    .result-row-success { border-left: 2px solid #10b981; }
+    .result-row-jailbreak { border-left: 2px solid hsl(var(--destructive)); }
+    .result-row-error   { border-left: 2px solid #f97316; }
+    .result-row-pending { border-left: 2px solid transparent; }
+
+    /* ── Shimmer skeleton ────────────────────────────────────── */
+    @keyframes shimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+    .skeleton {
+      background: linear-gradient(90deg, hsl(var(--muted)) 25%, hsl(var(--accent)) 50%, hsl(var(--muted)) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: var(--radius);
+    }
+  </style>
+</head>
+
+<body class="bg-background text-foreground font-sans min-h-screen antialiased"
+      x-data="hackagentApp()"
+      x-init="init()"
+      x-cloak>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SIDEBAR
+  ════════════════════════════════════════════════════════════ -->
+  <aside :class="sidebarOpen ? 'sidebar-expanded' : 'sidebar-collapsed'"
+         class="fixed inset-y-0 left-0 bg-background border-r border-border flex flex-col z-20 overflow-hidden">
+
+    <!-- Logo row -->
+    <div class="flex items-center justify-between px-4 py-4 mb-2">
+      <div class="flex items-center gap-2 min-w-0">
+        <!-- Shield icon in brand red -->
+        <div class="w-6 h-6 bg-red-600 rounded flex items-center justify-center flex-shrink-0">
+          <svg class="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001c0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+          </svg>
+        </div>
+        <span x-show="sidebarOpen" class="font-semibold text-base text-foreground whitespace-nowrap">HackAgent</span>
+      </div>
+      <!-- Collapse toggle -->
+      <button @click="sidebarOpen = !sidebarOpen"
+              class="text-muted-foreground hover:text-foreground hover:bg-accent rounded-md p-1 transition-colors flex-shrink-0"
+              :title="sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'">
+        <svg x-show="sidebarOpen" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7M18 19l-7-7 7-7"/>
+        </svg>
+        <svg x-show="!sidebarOpen" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M6 5l7 7-7 7"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Nav -->
+    <nav class="flex-1 px-2 space-y-1 overflow-y-auto overflow-x-hidden">
+
+      <!-- Home group -->
+      <template x-for="item in homeNavItems" :key="item.id">
+        <button
+          @click="navigate(item.id)"
+          :class="currentView === item.id
+            ? 'bg-secondary text-secondary-foreground font-semibold'
+            : 'text-foreground hover:bg-accent hover:text-accent-foreground'"
+          class="w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors cursor-pointer"
+          :title="!sidebarOpen ? item.label : ''"
+        >
+          <span x-html="item.icon" class="w-4 h-4 flex-shrink-0"></span>
+          <span x-show="sidebarOpen" class="truncate" x-text="item.label"></span>
+        </button>
+      </template>
+
+      <!-- Separator -->
+      <div class="border-t border-border my-2"></div>
+
+      <!-- Analytics section label -->
+      <div x-show="sidebarOpen" class="px-2 py-1">
+        <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Analytics</p>
+      </div>
+      <template x-for="item in analyticsNavItems" :key="item.id">
+        <button
+          @click="navigate(item.id)"
+          :class="currentView === item.id
+            ? 'bg-secondary text-secondary-foreground font-semibold'
+            : 'text-foreground hover:bg-accent hover:text-accent-foreground'"
+          class="w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors cursor-pointer"
+          :title="!sidebarOpen ? item.label : ''"
+        >
+          <span x-html="item.icon" class="w-4 h-4 flex-shrink-0"></span>
+          <span x-show="sidebarOpen" class="truncate" x-text="item.label"></span>
+        </button>
+      </template>
+
+      <!-- Separator -->
+      <div class="border-t border-border my-2"></div>
+
+      <!-- Resources section label -->
+      <div x-show="sidebarOpen" class="px-2 py-1">
+        <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Resources</p>
+      </div>
+      <a href="https://docs.hackagent.dev" target="_blank" rel="noopener noreferrer"
+         class="w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm text-foreground hover:bg-accent transition-colors"
+         :title="!sidebarOpen ? 'Docs' : ''">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+        </svg>
+        <span x-show="sidebarOpen" class="truncate">Docs</span>
+        <svg x-show="sidebarOpen" class="w-3 h-3 ml-auto text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+        </svg>
+      </a>
+
+    </nav>
+
+    <!-- Footer status -->
+    <div class="px-3 py-3 border-t border-border">
+      <div class="flex items-center gap-2 min-w-0">
+        <span :class="status.mode === 'local' ? 'bg-emerald-500' : 'bg-blue-500'"
+              class="w-2 h-2 rounded-full flex-shrink-0"></span>
+        <span x-show="sidebarOpen" class="text-xs text-muted-foreground capitalize truncate"
+              x-text="status.mode + ' mode'"></span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       MAIN CONTENT
+  ════════════════════════════════════════════════════════════ -->
+  <main :class="sidebarOpen ? 'main-expanded' : 'main-collapsed'" class="min-h-screen flex flex-col bg-background">
+
+    <!-- Top bar -->
+    <header class="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border px-6 py-3.5 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <h1 class="text-lg font-semibold text-foreground"
+            x-text="allNavItems.find(n => n.id === currentView)?.label || 'Dashboard'"></h1>
+        <span x-show="loading"
+              class="inline-block w-4 h-4 border-2 border-destructive border-t-transparent rounded-full animate-spin"></span>
+      </div>
+      <div class="flex items-center gap-2">
+        <!-- Dark mode toggle -->
+        <button @click="toggleDark()"
+                class="inline-flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
+                :title="dark ? 'Light mode' : 'Dark mode'">
+          <svg x-show="!dark" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+          </svg>
+          <svg x-show="dark" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+          </svg>
+        </button>
+        <!-- Refresh -->
+        <button @click="refreshCurrentView()"
+                class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-md border border-border hover:bg-accent">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M4 4v5h5M20 20v-5h-5M4 9a9 9 0 0114.83-4.83M20 15a9 9 0 01-14.83 4.83"/>
+          </svg>
+          Refresh
+        </button>
+      </div>
+    </header>
+
+    <div class="flex-1 p-6 space-y-6">
+
+      <!-- ───────────────── DASHBOARD VIEW ───────────────── -->
+      <div x-show="currentView === 'dashboard'" class="space-y-6">
+
+        <!-- Stat cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <template x-for="card in statCards" :key="card.label">
+            <div class="rounded-lg border border-border bg-card p-5">
+              <div class="flex items-center justify-between mb-3">
+                <p class="text-sm font-medium text-muted-foreground" x-text="card.label"></p>
+                <span x-html="card.icon" class="w-4 h-4 text-muted-foreground"></span>
+              </div>
+              <div class="text-3xl font-bold text-card-foreground" :class="card.color" x-text="card.value"></div>
+            </div>
+          </template>
+        </div>
+
+        <!-- Charts row -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Risk gauge -->
+          <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+            <h3 class="text-sm font-semibold text-slate-600 mb-1">Risk Overview</h3>
+            <p class="text-xs text-slate-400 mb-5">Jailbreak rate across all evaluated results</p>
+            <div class="flex items-center gap-8">
+              <!-- Donut chart -->
+              <div class="relative flex-shrink-0" style="width:130px;height:130px;">
+                <canvas id="riskChart" width="130" height="130"></canvas>
+                <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
+                  <span class="text-2xl font-bold leading-none" :class="riskColor" x-text="stats.risk_percentage + '%'"></span>
+                  <span class="text-xs font-medium mt-1" :class="riskLevelColor" x-text="riskLevel"></span>
+                </div>
+              </div>
+              <!-- Legend -->
+              <div class="flex-1 space-y-2.5">
+                <div class="flex items-center gap-2.5 text-sm">
+                  <span class="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0"></span>
+                  <span class="text-muted-foreground flex-1">Jailbreaks</span>
+                  <span class="font-semibold tabular-nums text-red-600" x-text="stats.successful_jailbreaks"></span>
+                </div>
+                <div class="flex items-center gap-2.5 text-sm">
+                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0"></span>
+                  <span class="text-muted-foreground flex-1">Passed / Safe</span>
+                  <span class="font-semibold tabular-nums text-emerald-600" x-text="stats.passed"></span>
+                </div>
+                <div class="flex items-center gap-2.5 text-sm">
+                  <span class="w-2.5 h-2.5 rounded-full bg-orange-400 flex-shrink-0"></span>
+                  <span class="text-muted-foreground flex-1">Errors</span>
+                  <span class="font-semibold tabular-nums text-orange-500" x-text="stats.errors"></span>
+                </div>
+                <div class="flex items-center gap-2.5 text-sm">
+                  <span class="w-2.5 h-2.5 rounded-full bg-muted-foreground/30 flex-shrink-0"></span>
+                  <span class="text-muted-foreground flex-1">Not evaluated</span>
+                  <span class="font-semibold tabular-nums text-muted-foreground" x-text="stats.not_evaluated"></span>
+                </div>
+                <div class="pt-1 border-t border-border text-xs text-muted-foreground">
+                  <span class="font-medium tabular-nums" x-text="stats.total_results"></span> total results
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Distribution bar chart -->
+          <div class="rounded-lg border border-border bg-card p-6">
+            <h3 class="text-sm font-semibold text-card-foreground mb-0.5">Result Distribution</h3>
+            <p class="text-xs text-muted-foreground mb-4">Evaluation outcomes across all runs</p>
+            <div style="height:170px;">
+              <canvas id="distChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent runs table -->
+        <div class="rounded-lg border border-border bg-card overflow-hidden">
+          <div class="px-4 py-3.5 border-b border-border flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-card-foreground">Recent Runs</h3>
+            <button @click="navigate('stats')"
+                    class="text-xs text-muted-foreground hover:text-foreground font-medium hover:underline transition-colors">
+              View all →
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-border bg-muted/30">
+                  <th class="px-4 py-2.5 text-left">Run</th>
+                  <th class="px-3 py-2.5 text-left">Status</th>
+                  <th class="px-3 py-2.5 text-left">Results</th>
+                  <th class="px-3 py-2.5 text-left">Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="run in recentRuns" :key="run.id">
+                  <tr class="border-b border-border hover:bg-muted/30 cursor-pointer transition-colors"
+                      @click="openRunDetail(run)">
+                    <td class="px-4 py-3">
+                      <p class="font-mono text-xs text-foreground" x-text="run.id.slice(0,8) + '…'"></p>
+                      <p class="text-xs text-muted-foreground mt-0.5 truncate max-w-xs" x-text="run.run_notes || '—'"></p>
+                    </td>
+                    <td class="px-3 py-3">
+                      <span :class="statusBadgeClass(run.status) + ' inline-flex items-center gap-1'"
+                            class="px-2 py-0.5 rounded-full text-xs font-medium"
+                            x-text="run.status"></span>
+                    </td>
+                    <td class="px-3 py-3 text-sm text-foreground">
+                      <span class="tabular-nums" x-text="run.total_results ?? 0"></span>
+                      <span x-show="(run.successful_jailbreaks ?? 0) > 0"
+                            class="ml-2 text-xs text-destructive font-semibold"
+                            x-text="'⚠ ' + run.successful_jailbreaks"></span>
+                    </td>
+                    <td class="px-3 py-3 text-xs text-muted-foreground" x-text="formatRelative(run.created_at)"></td>
+                  </tr>
+                </template>
+                <tr x-show="recentRuns.length === 0">
+                  <td colspan="4" class="px-4 py-10 text-center text-muted-foreground text-sm">
+                    No runs yet — start a security test with
+                    <code class="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">hackagent attack</code>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ───────────────── AGENTS VIEW ───────────────── -->
+      <div x-show="currentView === 'agents'">
+        <div class="rounded-lg border border-border bg-card overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-border bg-muted/30">
+                  <th class="px-4 py-2.5">Agent</th>
+                  <th class="px-3 py-2.5">Type</th>
+                  <th class="px-3 py-2.5">Endpoint</th>
+                  <th class="px-3 py-2.5">Owner</th>
+                  <th class="px-3 py-2.5">Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="agent in agents.items" :key="agent.id">
+                  <tr class="border-b border-border hover:bg-muted/30 transition-colors">
+                    <td class="px-4 py-3">
+                      <p class="font-medium text-foreground" x-text="agent.name"></p>
+                      <p class="text-xs text-muted-foreground font-mono mt-0.5"
+                         x-text="agent.id.slice(0,8) + '…'"></p>
+                    </td>
+                    <td class="px-3 py-3">
+                      <span :class="agentTypeBadgeClass(agent.agent_type)"
+                            class="px-2 py-0.5 rounded-full text-xs font-medium"
+                            x-text="agent.agent_type"></span>
+                    </td>
+                    <td class="px-3 py-3 font-mono text-xs text-muted-foreground max-w-xs truncate"
+                        x-text="agent.endpoint" :title="agent.endpoint"></td>
+                    <td class="px-3 py-3 text-muted-foreground text-xs" x-text="agent.owner"></td>
+                    <td class="px-3 py-3 text-muted-foreground text-xs" x-text="formatRelative(agent.created_at)"></td>
+                  </tr>
+                </template>
+                <tr x-show="agents.items.length === 0">
+                  <td colspan="5" class="px-4 py-10 text-center text-muted-foreground text-sm">
+                    No agents registered yet.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="px-4 py-2.5 border-t border-border bg-muted/30 text-xs text-muted-foreground"
+               x-text="`${agents.total} agent${agents.total !== 1 ? 's' : ''} total`"></div>
+        </div>
+      </div>
+
+      <!-- ───────────────── ATTACKS VIEW ───────────────── -->
+      <div x-show="currentView === 'attacks'">
+        <div class="rounded-lg border border-border bg-card overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-border bg-muted/30">
+                  <th class="px-4 py-2.5">Attack</th>
+                  <th class="px-3 py-2.5">Type</th>
+                  <th class="px-3 py-2.5">Agent</th>
+                  <th class="px-3 py-2.5">Config</th>
+                  <th class="px-3 py-2.5">Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="attack in attacks.items" :key="attack.id">
+                  <tr class="border-b border-border hover:bg-muted/30 transition-colors">
+                    <td class="px-4 py-3 font-mono text-xs text-muted-foreground"
+                        x-text="attack.id.slice(0,8) + '…'"></td>
+                    <td class="px-3 py-3">
+                      <span class="px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs font-medium"
+                            x-text="attack.type"></span>
+                    </td>
+                    <td class="px-3 py-3 font-mono text-xs text-muted-foreground"
+                        x-text="attack.agent_id.slice(0,8) + '…'"></td>
+                    <td class="px-3 py-3">
+                      <button @click="expandAttackConfig = expandAttackConfig === attack.id ? null : attack.id"
+                              class="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline">
+                        <span x-text="expandAttackConfig === attack.id ? 'Hide' : 'View'"></span>
+                      </button>
+                      <div x-show="expandAttackConfig === attack.id"
+                           x-transition class="mt-2">
+                        <pre class="text-xs bg-muted rounded p-2 max-h-32 overflow-auto font-mono"
+                             x-text="JSON.stringify(attack.configuration, null, 2)"></pre>
+                      </div>
+                    </td>
+                    <td class="px-3 py-3 text-muted-foreground text-xs" x-text="formatRelative(attack.created_at)"></td>
+                  </tr>
+                </template>
+                <tr x-show="attacks.items.length === 0">
+                  <td colspan="5" class="px-4 py-10 text-center text-muted-foreground text-sm">
+                    No attacks configured yet.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="px-4 py-2.5 border-t border-border bg-muted/30 text-xs text-muted-foreground"
+               x-text="`${attacks.total} attack${attacks.total !== 1 ? 's' : ''} total`"></div>
+        </div>
+      </div>
+
+      <!-- ───────────────── STATS / RUNS VIEW ───────────────── -->
+      <div x-show="currentView === 'stats'">
+        <div class="rounded-lg border border-border bg-card overflow-hidden">
+
+          <!-- Toolbar -->
+          <div class="px-4 py-3 border-b border-border flex items-center justify-between gap-3">
+            <p class="text-sm text-muted-foreground">
+              <span class="font-semibold text-foreground" x-text="runs.total"></span>
+              run<span x-text="runs.total !== 1 ? 's' : ''"></span>
+            </p>
+            <div class="flex items-center gap-2">
+              <button @click="runsPage > 1 && loadRuns(runsPage - 1)"
+                      :disabled="runsPage <= 1"
+                      class="px-3 py-1.5 border border-border rounded-md text-xs text-muted-foreground hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                ← Prev
+              </button>
+              <span class="text-xs text-muted-foreground" x-text="`${runsPage} / ${Math.ceil(runs.total / runsPageSize) || 1}`"></span>
+              <button @click="runs.total > runsPage * runsPageSize && loadRuns(runsPage + 1)"
+                      :disabled="runs.total <= runsPage * runsPageSize"
+                      class="px-3 py-1.5 border border-border rounded-md text-xs text-muted-foreground hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                Next →
+              </button>
+            </div>
+          </div>
+
+          <!-- Table -->
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-border bg-muted/30">
+                  <th class="px-2 py-2.5 w-8"></th><!-- expand chevron -->
+                  <th class="px-3 py-2.5">#</th>
+                  <th class="px-3 py-2.5 min-w-32">Attack</th>
+                  <th class="px-3 py-2.5">Status</th>
+                  <th class="px-3 py-2.5">Results</th>
+                  <th class="px-3 py-2.5">Notes</th>
+                  <th class="px-3 py-2.5">Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="(run, idx) in runs.items" :key="run.id">
+                  <!-- Row wrapper -->
+                  <tr>
+                    <td :colspan="8" class="border-b border-border p-0">
+
+                      <!-- Summary row -->
+                      <div class="flex items-center gap-3 px-3 py-3 hover:bg-muted/30 cursor-pointer transition-colors select-none"
+                           @click="toggleRunExpand(run.id)">
+                        <!-- Chevron -->
+                        <svg class="w-4 h-4 text-muted-foreground flex-shrink-0 transition-transform duration-200"
+                             :class="{'rotate-180': expandedRun === run.id}"
+                             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                        <!-- # number -->
+                        <span class="text-xs text-muted-foreground w-8 tabular-nums flex-shrink-0"
+                              x-text="runs.total - ((runsPage-1)*runsPageSize + idx)"></span>
+                        <!-- Attack ID -->
+                        <span class="font-mono text-xs text-foreground flex-shrink-0 min-w-0"
+                              x-text="run.attack_id.slice(0,8) + '…'"></span>
+                        <!-- Status badge -->
+                        <span :class="statusBadgeClass(run.status)"
+                              class="px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 inline-flex items-center gap-1">
+                          <!-- Spinner for running -->
+                          <span x-show="run.status === 'RUNNING'"
+                                class="inline-block w-2.5 h-2.5 border border-current border-t-transparent rounded-full animate-spin"></span>
+                          <span x-text="run.status"></span>
+                        </span>
+                        <!-- Result summary mini-bar -->
+                        <div class="flex items-center gap-1.5 text-xs flex-shrink-0">
+                          <span class="tabular-nums text-foreground font-medium" x-text="run.total_results ?? 0"></span>
+                          <template x-if="(run.successful_jailbreaks ?? 0) > 0">
+                            <span class="inline-flex items-center gap-0.5 text-destructive font-semibold">
+                              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                              </svg>
+                              <span x-text="run.successful_jailbreaks"></span>
+                            </span>
+                          </template>
+                        </div>
+                        <!-- Notes -->
+                        <span class="text-xs text-muted-foreground truncate flex-1 max-w-48 hidden md:block"
+                              x-text="run.run_notes || '—'"></span>
+                        <!-- Time -->
+                        <span class="text-xs text-muted-foreground flex-shrink-0 ml-auto"
+                              x-text="formatRelative(run.created_at)"></span>
+                      </div>
+
+                      <!-- Expanded panel -->
+                      <div x-show="expandedRun === run.id"
+                           x-transition:enter="transition-all duration-150"
+                           x-transition:enter-start="opacity-0"
+                           x-transition:enter-end="opacity-100"
+                           class="border-t border-border bg-muted/20">
+
+                        <!-- Loading -->
+                        <div x-show="resultsLoading"
+                             class="px-6 py-4 flex items-center gap-2 text-sm text-muted-foreground">
+                          <span class="inline-block w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin"></span>
+                          Loading results…
+                        </div>
+
+                        <!-- Results summary bar (mirrors ResultsSummary component) -->
+                        <div x-show="!resultsLoading && currentResults.length > 0"
+                             class="flex flex-wrap items-center gap-x-4 gap-y-1 px-6 py-2 border-b border-border text-xs bg-muted/30">
+                          <span class="text-muted-foreground font-medium"
+                                x-text="currentResults.length + ' result' + (currentResults.length !== 1 ? 's' : '')"></span>
+                          <template x-if="resultSummary.jailbreaks > 0">
+                            <span class="inline-flex items-center gap-1 text-destructive font-medium">
+                              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                              </svg>
+                              <span x-text="resultSummary.jailbreaks + ' jailbroken'"></span>
+                            </span>
+                          </template>
+                          <template x-if="resultSummary.passed > 0">
+                            <span class="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                              </svg>
+                              <span x-text="resultSummary.passed + ' passed'"></span>
+                            </span>
+                          </template>
+                          <template x-if="resultSummary.errors > 0">
+                            <span class="inline-flex items-center gap-1 text-orange-600 font-medium">
+                              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                              </svg>
+                              <span x-text="resultSummary.errors + ' error' + (resultSummary.errors !== 1 ? 's' : '')"></span>
+                            </span>
+                          </template>
+                          <template x-if="resultSummary.pending > 0">
+                            <span class="inline-flex items-center gap-1 text-muted-foreground">
+                              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                              </svg>
+                              <span x-text="resultSummary.pending + ' pending'"></span>
+                            </span>
+                          </template>
+                        </div>
+
+                        <!-- Results table (mirrors ResultsTable component) -->
+                        <div x-show="!resultsLoading">
+                          <table class="w-full text-xs">
+                            <thead>
+                              <tr class="text-left border-b border-border bg-muted/20">
+                                <th class="px-6 py-2">#</th>
+                                <th class="px-3 py-2">Goal</th>
+                                <th class="px-3 py-2">Evaluation</th>
+                                <th class="px-3 py-2 hidden md:table-cell">Notes</th>
+                                <th class="px-3 py-2">Traces</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <template x-for="result in currentResults" :key="result.id">
+                                <tr :class="resultRowClass(result.evaluation_status)"
+                                    class="border-b border-border hover:bg-muted/30 transition-colors cursor-pointer"
+                                    @click="openResultDetail(result)">
+                                  <td class="px-6 py-2 text-muted-foreground tabular-nums"
+                                      x-text="result.goal_index + 1"></td>
+                                  <td class="px-3 py-2 max-w-xs truncate text-foreground"
+                                      x-text="result.goal" :title="result.goal"></td>
+                                  <td class="px-3 py-2">
+                                    <span :class="evalBadgeClass(result.evaluation_status)"
+                                          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium">
+                                      <span x-html="evalIcon(result.evaluation_status)" class="w-3 h-3"></span>
+                                      <span x-text="evalLabel(result.evaluation_status)"></span>
+                                    </span>
+                                  </td>
+                                  <td class="px-3 py-2 text-muted-foreground truncate max-w-xs hidden md:table-cell"
+                                      x-text="result.evaluation_notes || '—'"></td>
+                                  <td class="px-3 py-2 text-muted-foreground">
+                                    <span class="inline-flex items-center gap-1">
+                                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                      </svg>
+                                      <span x-text="(result.trace_count ?? 0)"></span>
+                                    </span>
+                                  </td>
+                                </tr>
+                              </template>
+                              <tr x-show="currentResults.length === 0 && !resultsLoading">
+                                <td colspan="5" class="px-6 py-6 text-muted-foreground text-center">
+                                  No results recorded for this run yet.
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="runs.items.length === 0">
+                  <td colspan="8" class="px-4 py-12 text-center text-muted-foreground text-sm">
+                    No runs yet — start a security test with
+                    <code class="bg-muted px-1.5 py-0.5 rounded font-mono">hackagent attack</code>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /p-6 -->
+  </main>
+
+
+  <!-- ═══════════════════════════════════════════════════════════
+       RESULT DETAIL SLIDE-OVER
+  ════════════════════════════════════════════════════════════ -->
+  <div x-show="selectedResult !== null"
+       x-transition:enter="transition-opacity duration-200"
+       x-transition:enter-start="opacity-0"
+       x-transition:enter-end="opacity-100"
+       x-transition:leave="transition-opacity duration-150"
+       x-transition:leave-start="opacity-100"
+       x-transition:leave-end="opacity-0"
+       class="fixed inset-0 bg-black/40 z-50 flex justify-end"
+       @click.self="selectedResult = null">
+
+    <div class="bg-background w-full max-w-xl h-full overflow-y-auto shadow-2xl flex flex-col border-l border-border"
+         x-show="selectedResult !== null"
+         x-transition:enter="transition-transform duration-200 ease-out"
+         x-transition:enter-start="translate-x-full"
+         x-transition:enter-end="translate-x-0"
+         @click.stop>
+
+      <!-- Panel header -->
+      <div class="sticky top-0 bg-background/95 backdrop-blur border-b border-border z-10 px-5 py-4 flex items-start justify-between gap-4">
+        <div class="min-w-0">
+          <h2 class="font-semibold text-foreground">Result Detail</h2>
+          <p class="text-xs text-muted-foreground font-mono truncate mt-0.5" x-text="selectedResult?.id"></p>
+        </div>
+        <button @click="selectedResult = null"
+                class="flex-shrink-0 text-muted-foreground hover:text-foreground p-1.5 rounded-md hover:bg-accent transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Panel body -->
+      <div class="flex-1 p-5 space-y-5" x-show="selectedResult">
+
+        <!-- Evaluation summary banner (mirrors EvaluationSummaryBanner) -->
+        <div x-show="evalBannerInfo !== null"
+             :class="evalBannerInfo?.variant === 'jailbreak'
+               ? 'border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40'
+               : evalBannerInfo?.variant === 'safe'
+               ? 'border-green-300 dark:border-green-800 bg-green-50 dark:bg-green-950/40'
+               : 'border-border bg-muted/30'"
+             class="flex items-center gap-3 rounded-lg border px-4 py-3">
+          <span x-show="evalBannerInfo?.variant === 'jailbreak'"
+                class="text-destructive flex-shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+            </svg>
+          </span>
+          <span x-show="evalBannerInfo?.variant === 'safe'"
+                class="text-emerald-600 dark:text-emerald-400 flex-shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+            </svg>
+          </span>
+          <div class="flex-1 min-w-0">
+            <p class="text-xs font-semibold"
+               :class="evalBannerInfo?.variant === 'jailbreak'
+                 ? 'text-red-700 dark:text-red-300'
+                 : evalBannerInfo?.variant === 'safe'
+                 ? 'text-emerald-700 dark:text-emerald-300'
+                 : 'text-muted-foreground'"
+               x-text="evalBannerInfo?.verdict || ''"></p>
+            <p x-show="evalBannerInfo?.notes"
+               class="text-xs text-muted-foreground mt-0.5 truncate"
+               x-text="evalBannerInfo?.notes"></p>
+          </div>
+        </div>
+
+        <!-- Goal -->
+        <div>
+          <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Goal</p>
+          <p class="text-sm text-foreground leading-relaxed" x-text="selectedResult?.goal || '—'"></p>
+        </div>
+
+        <!-- Evaluation + Index -->
+        <div class="flex items-center justify-between">
+          <span :class="evalBadgeClass(selectedResult?.evaluation_status)"
+                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium">
+            <span x-html="evalIcon(selectedResult?.evaluation_status)" class="w-3 h-3"></span>
+            <span x-text="evalLabel(selectedResult?.evaluation_status)"></span>
+          </span>
+          <span class="text-xs text-muted-foreground">Goal #<span class="font-mono font-semibold text-foreground"
+                x-text="(selectedResult?.goal_index ?? 0) + 1"></span></span>
+        </div>
+
+        <!-- Notes -->
+        <div x-show="selectedResult?.evaluation_notes">
+          <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Notes</p>
+          <p class="text-sm text-foreground" x-text="selectedResult?.evaluation_notes"></p>
+        </div>
+
+        <!-- Metrics -->
+        <div x-show="selectedResult?.evaluation_metrics && Object.keys(selectedResult.evaluation_metrics).length > 0">
+          <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Metrics</p>
+          <pre class="text-xs bg-muted border border-border rounded-md p-3 overflow-x-auto leading-relaxed font-mono"
+               x-text="JSON.stringify(selectedResult?.evaluation_metrics, null, 2)"></pre>
+        </div>
+
+        <!-- Separator before traces -->
+        <div class="border-t border-border"></div>
+
+        <!-- Trace timeline (mirrors TraceTimeline component) -->
+        <div>
+          <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-4">Trace Timeline</p>
+
+          <div x-show="tracesLoading" class="flex items-center gap-2 text-sm text-muted-foreground">
+            <span class="inline-block w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin"></span>
+            Loading traces…
+          </div>
+
+          <div x-show="!tracesLoading" class="space-y-0">
+            <template x-for="(trace, ti) in currentTraces" :key="trace.id">
+              <div class="flex gap-3">
+                <!-- Timeline connector -->
+                <div class="flex flex-col items-center flex-shrink-0">
+                  <div :class="stepTypeIconClass(trace.step_type)"
+                       class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                    <span x-text="trace.sequence"></span>
+                  </div>
+                  <div x-show="ti < currentTraces.length - 1"
+                       class="w-px flex-1 min-h-4 bg-border mt-0.5 mb-0.5"></div>
+                </div>
+                <!-- Step body -->
+                <div class="flex-1 min-w-0 pb-3">
+                  <div class="flex items-center gap-2 mb-1.5">
+                    <span class="text-xs font-semibold"
+                          :class="stepTypeTextClass(trace.step_type)"
+                          x-text="trace.step_type.replace(/_/g,' ')"></span>
+                    <span class="text-xs text-muted-foreground ml-auto" x-text="formatRelative(trace.created_at)"></span>
+                  </div>
+                  <pre class="text-xs bg-muted border border-border rounded-md p-3 overflow-x-auto whitespace-pre-wrap break-words max-h-48 leading-relaxed font-mono"
+                       x-text="JSON.stringify(trace.content, null, 2)"></pre>
+                </div>
+              </div>
+            </template>
+
+            <div x-show="currentTraces.length === 0"
+                 class="text-sm text-muted-foreground py-6 text-center">
+              No traces recorded for this result.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════
+       APP SCRIPT
+  ════════════════════════════════════════════════════════════ -->
+  <script>
+    function hackagentApp() {
+      return {
+        // ── State ────────────────────────────────────────────────────────────
+        currentView: 'dashboard',
+        sidebarOpen: true,
+        dark: false,
+        expandAttackConfig: null,
+
+        // Nav definitions (split by section for sidebar rendering)
+        homeNavItems: [
+          {
+            id: 'dashboard',
+            label: 'Dashboard',
+            icon: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                       d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0
+                          01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                   </svg>`
+          },
+          {
+            id: 'agents',
+            label: 'Agents',
+            icon: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                       d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0
+                          012-2h14a2 2 0 012 2v10a2 2 0 01-2 2h-2"/>
+                   </svg>`
+          },
+          {
+            id: 'attacks',
+            label: 'Attacks',
+            icon: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                       d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                   </svg>`
+          },
+          {
+            id: 'runs',
+            label: 'Runs',
+            icon: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                       d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0
+                          00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                   </svg>`
+          },
+        ],
+
+        // ── Runtime state ─────────────────────────────────────────────────
+        loading: false,
+        status: { mode: 'local', db_path: '', org_id: '', user_id: '' },
+        stats: {
+          total_agents: 0, total_attacks: 0, total_runs: 0, total_results: 0,
+          successful_jailbreaks: 0, passed: 0, errors: 0, not_evaluated: 0,
+          risk_percentage: 0,
+        },
+        agents:  { items: [], total: 0 },
+        attacks: { items: [], total: 0 },
+        runs:    { items: [], total: 0 },
+        runsPage: 1,
+        runsPageSize: 20,
+        recentRuns: [],
+
+        expandedRun: null,
+        currentResults: [],
+        resultsLoading: false,
+
+        selectedResult: null,
+        currentTraces: [],
+        tracesLoading: false,
+
+        _riskChart: null,
+        _distChart: null,
+
+        // ── Computed ─────────────────────────────────────────────────────────
+        get allNavItems() {
+          return [...this.homeNavItems, ...this.analyticsNavItems];
+        },
+
+        get statCards() {
+          const BOT_ICON  = `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2h-2"/></svg>`;
+          const ZAP_ICON  = `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>`;
+          const LIST_ICON = `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>`;
+          const WARN_ICON = `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>`;
+          return [
+            { label: 'Agents',     value: this.stats.total_agents,          color: '', icon: BOT_ICON },
+            { label: 'Attacks',    value: this.stats.total_attacks,         color: '', icon: ZAP_ICON },
+            { label: 'Runs',       value: this.stats.total_runs,            color: '', icon: LIST_ICON },
+            { label: 'Jailbreaks', value: this.stats.successful_jailbreaks, color: this.stats.successful_jailbreaks > 0 ? 'text-destructive' : '', icon: WARN_ICON },
+          ];
+        },
+
+        get riskColor() {
+          const p = this.stats.risk_percentage;
+          if (p >= 70) return 'text-red-600';
+          if (p >= 40) return 'text-orange-500';
+          if (p >= 10) return 'text-yellow-500';
+          return 'text-emerald-600';
+        },
+
+        get riskLevelColor() {
+          const p = this.stats.risk_percentage;
+          if (p >= 70) return 'text-red-500';
+          if (p >= 40) return 'text-orange-500';
+          if (p >= 10) return 'text-yellow-500';
+          return 'text-emerald-500';
+        },
+
+        get riskLevel() {
+          const p = this.stats.risk_percentage;
+          if (this.stats.total_results === 0) return 'No data';
+          if (p >= 70) return 'Critical';
+          if (p >= 40) return 'High';
+          if (p >= 10) return 'Medium';
+          return 'Low';
+        },
+
+        get evalBannerInfo() {
+          if (!this.selectedResult) return null;
+          const s = (this.selectedResult.evaluation_status || '').toUpperCase();
+          const notes = this.selectedResult.evaluation_notes;
+          if (s.includes('SUCCESSFUL_JAILBREAK'))
+            return { variant: 'jailbreak', verdict: 'Jailbreak successful', notes };
+          if (s.includes('FAILED_JAILBREAK') || s.includes('PASSED_CRITERIA'))
+            return { variant: 'safe', verdict: 'Model resisted', notes };
+          if (s.includes('ERROR'))
+            return { variant: 'error', verdict: 'Evaluation error', notes };
+          return null;
+        },
+
+        get resultSummary() {
+          const jailbreaks = this.currentResults.filter(r => r.evaluation_status?.toUpperCase().includes('SUCCESSFUL_JAILBREAK')).length;
+          const passed = this.currentResults.filter(r => {
+            const s = r.evaluation_status?.toUpperCase() || '';
+            return s.includes('FAILED_JAILBREAK') || s.includes('PASSED_CRITERIA');
+          }).length;
+          const errors = this.currentResults.filter(r => r.evaluation_status?.toUpperCase().includes('ERROR')).length;
+          const pending = this.currentResults.filter(r => r.evaluation_status?.toUpperCase().includes('NOT_EVALUATED')).length;
+          return { jailbreaks, passed, errors, pending };
+        },
+
+        // ── Lifecycle ────────────────────────────────────────────────────────
+        async init() {
+          // Persist dark mode
+          if (localStorage.getItem('hackagent-dark') === 'true') {
+            this.dark = true;
+            document.documentElement.classList.add('dark');
+          }
+          await this.loadStatus();
+          await this.loadDashboard();
+        },
+
+        toggleDark() {
+          this.dark = !this.dark;
+          document.documentElement.classList.toggle('dark', this.dark);
+          localStorage.setItem('hackagent-dark', this.dark);
+          // Re-render charts in correct theme
+          this.$nextTick(() => this.renderCharts());
+        },
+
+        // ── Navigation ───────────────────────────────────────────────────────
+        navigate(view) {
+          this.currentView = view;
+          this.refreshCurrentView();
+        },
+
+        refreshCurrentView() {
+          if (this.currentView === 'dashboard') this.loadDashboard();
+          else if (this.currentView === 'agents')  this.loadAgents();
+          else if (this.currentView === 'attacks') this.loadAttacks();
+          else if (this.currentView === 'stats')   this.loadRuns(this.runsPage);
+        },
+
+        // ── API helpers ──────────────────────────────────────────────────────
+        async fetchJSON(url) {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+          return res.json();
+        },
+
+        // ── Data loaders ─────────────────────────────────────────────────────
+        async loadStatus() {
+          try { this.status = await this.fetchJSON('/api/status'); }
+          catch (_) { /* best-effort */ }
+        },
+
+        async loadDashboard() {
+          this.loading = true;
+          try {
+            [this.stats, { items: this.recentRuns }] = await Promise.all([
+              this.fetchJSON('/api/stats'),
+              this.fetchJSON('/api/runs?page=1&page_size=5'),
+            ]);
+            this.$nextTick(() => this.renderCharts());
+          } catch (_) {
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        async loadAgents() {
+          this.loading = true;
+          try { this.agents = await this.fetchJSON('/api/agents?page=1&page_size=100'); }
+          finally { this.loading = false; }
+        },
+
+        async loadAttacks() {
+          this.loading = true;
+          try { this.attacks = await this.fetchJSON('/api/attacks?page=1&page_size=100'); }
+          finally { this.loading = false; }
+        },
+
+        async loadRuns(page = 1) {
+          this.loading = true;
+          this.runsPage = page;
+          try {
+            this.runs = await this.fetchJSON(
+              `/api/runs?page=${page}&page_size=${this.runsPageSize}`
+            );
+          } finally { this.loading = false; }
+        },
+
+        // ── Run expand / results ─────────────────────────────────────────────
+        async toggleRunExpand(runId) {
+          if (this.expandedRun === runId) { this.expandedRun = null; return; }
+          this.expandedRun = runId;
+          this.currentResults = [];
+          this.resultsLoading = true;
+          try {
+            const data = await this.fetchJSON(`/api/results?run_id=${runId}&page_size=200`);
+            this.currentResults = data.items;
+          } finally { this.resultsLoading = false; }
+        },
+
+        async openRunDetail(run) {
+          this.navigate('stats');
+          await this.$nextTick();
+          this.toggleRunExpand(run.id);
+        },
+
+        // ── Result detail / traces ───────────────────────────────────────────
+        async openResultDetail(result) {
+          this.selectedResult = result;
+          this.currentTraces = [];
+          this.tracesLoading = true;
+          try {
+            const data = await this.fetchJSON(`/api/traces?result_id=${result.id}`);
+            this.currentTraces = data.items;
+          } finally { this.tracesLoading = false; }
+        },
+
+        // ── Charts ───────────────────────────────────────────────────────────
+        renderCharts() {
+          const isDark = this.dark;
+          const gridColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)';
+          const tickColor = isDark ? '#94a3b8' : '#64748b';
+          const noData    = this.stats.total_results === 0;
+
+          // Risk donut
+          const riskEl = document.getElementById('riskChart');
+          if (riskEl) {
+            if (this._riskChart) this._riskChart.destroy();
+            const other = noData ? 100 : Math.max(0, 100 - this.stats.risk_percentage);
+            this._riskChart = new Chart(riskEl, {
+              type: 'doughnut',
+              data: {
+                labels: noData ? ['No data'] : ['Jailbreaks', 'Safe'],
+                datasets: [{
+                  data: noData ? [100] : [this.stats.risk_percentage, other],
+                  backgroundColor: noData
+                    ? [isDark ? '#334155' : '#e2e8f0']
+                    : ['#ef4444', '#22c55e'],
+                  borderWidth: 0,
+                  hoverOffset: 4,
+                }],
+              },
+              options: {
+                cutout: '74%',
+                plugins: { legend: { display: false }, tooltip: { enabled: !noData } },
+                animation: { animateRotate: true, duration: 700 },
+              },
+            });
+          }
+
+          // Distribution bar
+          const distEl = document.getElementById('distChart');
+          if (distEl) {
+            if (this._distChart) this._distChart.destroy();
+            this._distChart = new Chart(distEl, {
+              type: 'bar',
+              data: {
+                labels: ['Jailbreaks', 'Passed / Safe', 'Errors', 'Not Evaluated'],
+                datasets: [{
+                  data: [
+                    this.stats.successful_jailbreaks,
+                    this.stats.passed,
+                    this.stats.errors,
+                    this.stats.not_evaluated,
+                  ],
+                  backgroundColor: ['#ef4444', '#22c55e', '#f97316', isDark ? '#475569' : '#cbd5e1'],
+                  borderRadius: 5,
+                  borderSkipped: false,
+                }],
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    ticks: { stepSize: 1, precision: 0, color: tickColor },
+                    grid: { color: gridColor },
+                    border: { display: false },
+                  },
+                  x: {
+                    ticks: { color: tickColor },
+                    grid: { display: false },
+                    border: { display: false },
+                  },
+                },
+                animation: { duration: 500 },
+              },
+            });
+          }
+        },
+
+        // ── Formatters ────────────────────────────────────────────────────────
+        formatRelative(iso) {
+          if (!iso) return '—';
+          try {
+            const diff = Date.now() - new Date(iso).getTime();
+            const s = diff / 1000, m = s / 60, h = m / 60, d = h / 24;
+            if (s < 60)  return 'just now';
+            if (m < 60)  return `${Math.floor(m)}m ago`;
+            if (h < 24)  return `${Math.floor(h)}h ago`;
+            if (d < 7)   return `${Math.floor(d)}d ago`;
+            return new Date(iso).toLocaleDateString();
+          } catch (_) { return iso; }
+        },
+
+        // ── Badge helpers ─────────────────────────────────────────────────────
+        statusBadgeClass(status) {
+          switch ((status || '').toUpperCase()) {
+            case 'COMPLETED': return 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300';
+            case 'RUNNING':   return 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300';
+            case 'PENDING':   return 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300';
+            case 'FAILED':    return 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300';
+            case 'CANCELLED': return 'bg-muted text-muted-foreground';
+            default:          return 'bg-muted text-muted-foreground';
+          }
+        },
+
+        evalBadgeClass(status) {
+          const s = (status || '').toUpperCase();
+          if (s.includes('SUCCESSFUL_JAILBREAK'))
+            return 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300';
+          if (s.includes('FAILED_JAILBREAK') || s.includes('PASSED_CRITERIA'))
+            return 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300';
+          if (s.includes('FAILED_CRITERIA'))
+            return 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300';
+          if (s.includes('ERROR'))
+            return 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300';
+          return 'bg-secondary text-secondary-foreground';
+        },
+
+        evalLabel(status) {
+          const s = (status || '').toUpperCase();
+          if (s.includes('SUCCESSFUL_JAILBREAK')) return 'Jailbreak';
+          if (s.includes('FAILED_JAILBREAK'))     return 'Mitigated';
+          if (s.includes('PASSED_CRITERIA'))      return 'Passed';
+          if (s.includes('FAILED_CRITERIA'))      return 'Failed';
+          if (s.includes('ERROR_AGENT'))          return 'Agent Error';
+          if (s.includes('ERROR'))                return 'Error';
+          if (s.includes('NOT_EVALUATED'))        return 'Pending';
+          return status || 'N/A';
+        },
+
+        evalIcon(status) {
+          const s = (status || '').toUpperCase();
+          const check = `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
+          const x     = `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
+          const warn  = `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>`;
+          const clock = `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
+          if (s.includes('SUCCESSFUL_JAILBREAK')) return x;
+          if (s.includes('FAILED_JAILBREAK') || s.includes('PASSED_CRITERIA')) return check;
+          if (s.includes('ERROR')) return warn;
+          return clock;
+        },
+
+        resultRowClass(status) {
+          const s = (status || '').toUpperCase();
+          if (s.includes('SUCCESSFUL_JAILBREAK')) return 'result-row-jailbreak';
+          if (s.includes('FAILED_JAILBREAK') || s.includes('PASSED_CRITERIA')) return 'result-row-success';
+          if (s.includes('ERROR')) return 'result-row-error';
+          return 'result-row-pending';
+        },
+
+        agentTypeBadgeClass(type) {
+          switch ((type || '').toUpperCase()) {
+            case 'LITELLM':    return 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300';
+            case 'OPENAI_SDK': return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300';
+            case 'GOOGLE_ADK': return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300';
+            case 'OTHER':      return 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300';
+            default:           return 'bg-secondary text-secondary-foreground';
+          }
+        },
+
+        stepTypeIconClass(stepType) {
+          const s = (stepType || '').toUpperCase();
+          if (s.includes('TOOL_RESPONSE')) return 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300';
+          if (s.includes('TOOL_CALL'))     return 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300';
+          if (s.includes('AGENT_THOUGHT')) return 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300';
+          if (s.includes('AGENT_RESPONSE'))return 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300';
+          if (s.includes('MCP'))           return 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300';
+          if (s.includes('A2A'))           return 'bg-cyan-100 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300';
+          return 'bg-secondary text-secondary-foreground';
+        },
+
+        stepTypeTextClass(stepType) {
+          const s = (stepType || '').toUpperCase();
+          if (s.includes('TOOL_RESPONSE')) return 'text-indigo-600 dark:text-indigo-400';
+          if (s.includes('TOOL_CALL'))     return 'text-purple-600 dark:text-purple-400';
+          if (s.includes('AGENT_THOUGHT')) return 'text-blue-600 dark:text-blue-400';
+          if (s.includes('AGENT_RESPONSE'))return 'text-emerald-600 dark:text-emerald-400';
+          if (s.includes('MCP'))           return 'text-teal-600 dark:text-teal-400';
+          if (s.includes('A2A'))           return 'text-cyan-600 dark:text-cyan-400';
+          return 'text-muted-foreground';
+        },
+      };
+    }
+  </script>
+
+</body>
+</html>
