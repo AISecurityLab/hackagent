@@ -70,30 +70,34 @@ def main():
             "attacker_max_tokens": 500,
             "scorer_temperature": 0.2,
             "scorer_max_tokens": 100,
-            "embedding_model": "text-embedding-3-small",
-            "embedding_api_key": openrouter_api_key,
-            "embedding_api_base": "https://openrouter.ai/api/v1",
+        },
+        # Embedder for strategy retrieval. local/bag-of-words is deterministic
+        # and requires no external embedding endpoint.
+        "embedder": {
+            "identifier": "local/bag-of-words",
+            "endpoint": "http://localhost:11434",
+            "agent_type": AgentTypeEnum.OLLAMA,
+            "api_key": None,
+            "max_tokens": 100,
+            "temperature": 0.0,
         },
         # Attacker LLM (generates jailbreak prompts) — needs a capable model
         "attacker": {
             "identifier": "Gemma-3-27B-it-Uncensored",
             "endpoint": ATTACKER_ENDPOINT,
             "agent_type": AgentTypeEnum.OPENAI_SDK,
-            "api_key": openrouter_api_key,
         },
         # Scorer LLM (rates target responses 1-10)
         "scorer": {
             "identifier": "Gemma-3-27B-it-Uncensored",
             "endpoint": ATTACKER_ENDPOINT,
             "agent_type": AgentTypeEnum.OPENAI_SDK,
-            "api_key": openrouter_api_key,
         },
         # Summarizer LLM (extracts strategies from prompt pairs)
         "summarizer": {
             "identifier": "Gemma-3-27B-it-Uncensored",
             "endpoint": ATTACKER_ENDPOINT,
             "agent_type": AgentTypeEnum.OPENAI_SDK,
-            "api_key": openrouter_api_key,
         },
         "goal_batch_size": goal_batch_size,
         "goal_batch_workers": goal_batch_workers,  # parallelize batches for faster testing

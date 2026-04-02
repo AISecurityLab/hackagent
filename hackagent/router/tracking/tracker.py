@@ -30,6 +30,11 @@ from uuid import UUID
 from hackagent.server.storage.base import StorageBackend
 from hackagent.server.api.models import EvaluationStatusEnum, StepTypeEnum
 
+from .category_classifier import (
+    GoalCategoryClassifier,
+    UNKNOWN_CATEGORY,
+    UNKNOWN_SUBCATEGORY,
+)
 from .utils import deep_clean, sanitize_for_json
 
 
@@ -108,6 +113,7 @@ class Tracker:
         run_id: str,
         logger: Optional[logging.Logger] = None,
         attack_type: Optional[str] = None,
+        category_classifier_config: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize tracker.
@@ -122,6 +128,11 @@ class Tracker:
         self.run_id = run_id
         self.logger = logger or get_logger(__name__)
         self.attack_type = attack_type
+        self._goal_category_classifier = GoalCategoryClassifier(
+            backend=backend,
+            config=category_classifier_config,
+            logger=self.logger,
+        )
         self._goal_contexts: Dict[int, Context] = {}
 
     @property
@@ -172,6 +183,10 @@ class Tracker:
                 self._goal_contexts[goal_index] = ctx
                 return ctx
 
+            # Classify each goal as soon as its result record is created.
+            classification = self._classify_goal_labels(goal)
+            ctx.metadata.update(classification)
+
             # Create result via backend
             record = self.backend.create_result(
                 run_uuid,
@@ -186,6 +201,7 @@ class Tracker:
                     "goal": goal,
                     "goal_index": goal_index,
                     **(initial_metadata or {}),
+                    **classification,
                 },
             )
             ctx.result_id = str(record.id)
@@ -210,6 +226,35 @@ class Tracker:
 
         self._goal_contexts[goal_index] = ctx
         return ctx
+
+    def _classify_goal_labels(self, goal: str) -> Dict[str, str]:
+        """Return normalized category labels for goal metadata."""
+        fallback = {
+            "category": UNKNOWN_CATEGORY,
+            "subcategory": UNKNOWN_SUBCATEGORY,
+        }
+
+        classifier = self._goal_category_classifier
+        if not classifier:
+            return fallback
+
+        try:
+            labels = classifier.classify_goal(goal)
+            category = labels.get("category")
+            subcategory = labels.get("subcategory")
+            if category and subcategory:
+                return {
+                    "category": category,
+                    "subcategory": subcategory,
+                }
+        except Exception as e:
+            self.logger.warning(
+                "Goal classification failed for goal %s: %s",
+                goal[:80],
+                e,
+            )
+
+        return fallback
 
     def add_interaction_trace(
         self,

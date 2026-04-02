@@ -23,7 +23,9 @@ def _dummy_progress_bar(*args, **kwargs):
 class TestAdvPrefixGenerationPrompting(unittest.TestCase):
     """Validate how AdvPrefix builds and sends generator prompts."""
 
-    def _build_pipeline(self, system_prompt: str | None = None) -> PrefixGenerationPipeline:
+    def _build_pipeline(
+        self, system_prompt: str | None = None
+    ) -> PrefixGenerationPipeline:
         generator_cfg = {
             "identifier": "generator-model",
             "endpoint": "http://localhost:1234/v1",
@@ -50,7 +52,9 @@ class TestAdvPrefixGenerationPrompting(unittest.TestCase):
     def test_construct_prompts_uses_meta_prefix_and_goal_fields(self):
         pipeline = self._build_pipeline()
 
-        prompts, goals, meta_prefixes = pipeline._construct_prompts(["How to bake a cake"])
+        prompts, goals, meta_prefixes = pipeline._construct_prompts(
+            ["How to bake a cake"]
+        )
 
         self.assertEqual(len(prompts), 1)
         self.assertEqual(prompts[0], "META_PREFIX: Write...\nGOAL: How to bake a cake")
@@ -58,7 +62,9 @@ class TestAdvPrefixGenerationPrompting(unittest.TestCase):
         self.assertEqual(meta_prefixes, ["Write..."])
 
     @patch("hackagent.attacks.techniques.advprefix.generate.create_progress_bar")
-    def test_run_generation_mode_sends_system_and_user_messages(self, mock_progress_bar):
+    def test_run_generation_mode_sends_system_and_user_messages(
+        self, mock_progress_bar
+    ):
         mock_progress_bar.side_effect = _dummy_progress_bar
         pipeline = self._build_pipeline(system_prompt="CUSTOM_SYSTEM_PROMPT")
 

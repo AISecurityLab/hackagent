@@ -28,10 +28,14 @@ class _FakeBackend:
         return self._api_key
 
     def list_agents(self, page=1, page_size=100):
-        return PaginatedResult(items=[SimpleNamespace(model_dump=lambda mode="json": {})], total=1)
+        return PaginatedResult(
+            items=[SimpleNamespace(model_dump=lambda mode="json": {})], total=1
+        )
 
     def list_attacks(self, page=1, page_size=100):
-        return PaginatedResult(items=[SimpleNamespace(model_dump=lambda mode="json": {})], total=1)
+        return PaginatedResult(
+            items=[SimpleNamespace(model_dump=lambda mode="json": {})], total=1
+        )
 
     def list_runs(self, page=1, page_size=100):
         start = (page - 1) * page_size
@@ -60,7 +64,9 @@ class TestDashboardApiRoutes(unittest.TestCase):
 
         from unittest.mock import patch
 
-        with patch("hackagent.server.dashboard._api._fastapi_app.get", side_effect=_fake_get):
+        with patch(
+            "hackagent.server.dashboard._api._fastapi_app.get", side_effect=_fake_get
+        ):
             register_api(backend)
 
         return routes
@@ -124,7 +130,9 @@ class TestDashboardApiRoutes(unittest.TestCase):
             ),
         ]
 
-        backend = _FakeBackend(runs=[run], results_by_run={run.id: results}, api_key="k")
+        backend = _FakeBackend(
+            runs=[run], results_by_run={run.id: results}, api_key="k"
+        )
         routes = self._register(backend)
 
         stats_payload = asyncio.run(routes["/api/stats"]())

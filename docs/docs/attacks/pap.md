@@ -111,6 +111,21 @@ results = agent.hack(attack_config=attack_config)
 | `batch_size_judge` | int | `1` | Parallelism for judge evaluation |
 | `goal_batch_size` | int | `1` | Goals processed per batch |
 
+### Shared Goal Category Classifier
+
+All attacks accept a top-level `category_classifier` block. It runs once per goal to attach a normalized category to tracking metadata (independent from judge scoring).
+
+```python
+"category_classifier": {
+    "identifier": "gemma3:4b",
+    "endpoint": "http://localhost:11434",
+    "agent_type": "OLLAMA",
+    "api_key": None,
+    "max_tokens": 100,
+    "temperature": 0.0
+}
+```
+
 ### Available Persuasion Techniques
 
 The top-5 most effective techniques (default):

@@ -44,6 +44,10 @@ graph LR
 All attacks support loading goals from AI safety benchmarks like **AgentHarm**, **StrongREJECT**, and **HarmBench**. See [Dataset Providers](../datasets/) for details.
 :::
 
+:::tip Shared Category Classifier
+All attacks accept a top-level `category_classifier` config block to classify each goal at tracking time. You can customize model, endpoint, and adapter type directly in `attack_config`.
+:::
+
 ---
 
 ## AdvPrefix — Advanced Prefix Optimization
@@ -100,6 +104,8 @@ AutoDAN-Turbo is a lifelong red-teaming attack that **discovers and reuses jailb
 
 An attacker model explores prompts, a scorer rates target responses, and a summarizer extracts reusable strategies. These strategies are stored in a library and retrieved in later iterations, turning the attack into a strategy-guided lifelong loop.
 
+AutoDAN-Turbo also supports a dedicated top-level `embedder` role in `attack_config`, so retrieval embeddings can be routed to a custom model/provider.
+
 </div>
 
 ```python
@@ -109,6 +115,7 @@ attack_config = {
     "attacker": {"identifier": "gpt-4", "endpoint": "https://api.openai.com/v1"},
     "scorer": {"identifier": "gpt-4o-mini", "endpoint": "https://api.openai.com/v1"},
     "summarizer": {"identifier": "gpt-4", "endpoint": "https://api.openai.com/v1"},
+    "embedder": {"identifier": "gemma3:4b", "endpoint": "http://localhost:11434", "agent_type": "OLLAMA"},
     "judges": [{"identifier": "gpt-4o-mini", "type": "harmbench"}]
 }
 ```

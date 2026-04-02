@@ -10,6 +10,10 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
+from hackagent.attacks.shared.response_utils import extract_response_content
+from hackagent.attacks.shared.router_factory import create_router
+from hackagent.attacks.techniques.config import default_category_classifier
+
 try:
     import faiss
 except ImportError:
@@ -29,47 +33,110 @@ class StrategyLibrary:
 
     def __init__(
         self,
-        embedding_model: str = "text-embedding-3-small",
+        embedder_config: Optional[Dict[str, Any]] = None,
+        backend: Any = None,
+        embedding_model: Optional[str] = None,
         embedding_api_key: Optional[str] = None,
         embedding_api_base: Optional[str] = None,
         logger=None,
     ):
-        """Initialize in-memory strategy store and embedding client.
+        """Initialize in-memory strategy store and embedding backend.
 
         Args:
-            embedding_model: Embedding model used for retrieval vectors.
-            embedding_api_key: Optional API key for embedding endpoint.
-            embedding_api_base: Optional OpenAI-compatible base URL.
+            embedder_config: Top-level ``embedder`` config from attack config.
+                Uses category-classifier schema/defaults.
+            backend: Storage backend used to initialize an embedder router.
+            embedding_model: Legacy embedding model argument kept for backward
+                compatibility. Prefer ``embedder_config``.
+            embedding_api_key: Legacy API key for OpenAI-compatible embeddings.
+            embedding_api_base: Legacy API base for OpenAI-compatible embeddings.
             logger: Optional logger for retrieval/embedding diagnostics.
 
         Returns:
             None.
         """
         self.library: Dict[str, Dict[str, Any]] = {}
-        self.embedding_model = embedding_model
-        self.embedding_api_key = embedding_api_key
-        self.embedding_api_base = embedding_api_base
         self.logger = logger or logging.getLogger(__name__)
         self._embedding_disabled_reason: Optional[str] = None
-        # "local/<name>" models are handled entirely in-process by _local_embed();
-        # all other model strings are forwarded to litellm.embedding(), which
-        # supports every provider the rest of the project uses (openai/, huggingface/,
-        # cohere/, etc.).  No client object is pre-built — litellm is called lazily.
-        #
-        # ROUTING NOTE: for the "openai/" prefix, litellm uses api_base to decide
-        # where the call goes:
-        #   api_base set   → that server   (e.g. a local vLLM embedding instance)
-        #   api_base unset → OpenAI cloud  (requires a valid OPENAI_API_KEY)
-        # The model string prefix alone does NOT determine cloud vs local.
-        if embedding_model.startswith("local/"):
-            endpoint_display = "<built-in>"
+        self._embedder_router = None
+        self._embedder_registration_key: Optional[str] = None
+
+        # Backward compatibility mode: preserve direct embedding endpoint usage
+        # when old parameters are explicitly provided.
+        self._legacy_embedding_mode = any(
+            value is not None
+            for value in (embedding_model, embedding_api_key, embedding_api_base)
+        )
+
+        if self._legacy_embedding_mode:
+            self.embedding_model = embedding_model or "local/bag-of-words"
+            self.embedding_api_key = embedding_api_key
+            self.embedding_api_base = embedding_api_base
+            self.embedder_config = {
+                **default_category_classifier(),
+                "identifier": self.embedding_model,
+                "endpoint": self.embedding_api_base,
+                "api_key": self.embedding_api_key,
+                "agent_type": "OPENAI_SDK",
+            }
         else:
-            endpoint_display = embedding_api_base or "<provider default / cloud>"
+            self.embedder_config = self._resolve_embedder_config(embedder_config)
+            self.embedding_model = str(
+                self.embedder_config.get("identifier") or "local/bag-of-words"
+            )
+            self.embedding_api_key = self.embedder_config.get("api_key")
+            self.embedding_api_base = self.embedder_config.get("endpoint")
+
+            if not self.embedding_model.startswith("local/") and backend is not None:
+                try:
+                    router, registration_key = create_router(
+                        backend=backend,
+                        config=self.embedder_config,
+                        logger=self.logger,
+                        router_name="autodan-embedder",
+                    )
+                    self._embedder_router = router
+                    self._embedder_registration_key = registration_key
+                except Exception as exc:
+                    self._embedding_disabled_reason = (
+                        "Embedder router unavailable; falling back to local embedding."
+                    )
+                    self.logger.warning(
+                        "%s reason=%s",
+                        self._embedding_disabled_reason,
+                        exc,
+                    )
+
+        backend_mode = "local"
+        if self._legacy_embedding_mode and not self.embedding_model.startswith(
+            "local/"
+        ):
+            backend_mode = "legacy-openai-embeddings"
+        elif self._embedder_router is not None:
+            backend_mode = "router-semantic-signature"
+
+        endpoint_display = (
+            self.embedding_api_base
+            if self.embedding_api_base
+            else "<provider default / local>"
+        )
         self.logger.info(
-            "Embedding backend: model=%s  endpoint=%s",
-            embedding_model,
+            "Embedding backend: mode=%s model=%s endpoint=%s",
+            backend_mode,
+            self.embedding_model,
             endpoint_display,
         )
+
+    @staticmethod
+    def _resolve_embedder_config(config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        resolved = default_category_classifier()
+        if not config:
+            return resolved
+
+        for key, value in config.items():
+            if value is not None:
+                resolved[key] = value
+        return resolved
 
     def embed(self, text: str) -> Optional[np.ndarray]:
         """Encode text to an embedding vector for strategy retrieval.
@@ -86,6 +153,59 @@ class StrategyLibrary:
         if self.embedding_model.startswith("local/"):
             return self._local_embed(text)
 
+        if self._legacy_embedding_mode:
+            return self._embed_legacy_openai(text)
+
+        signature = self._build_router_semantic_signature(text)
+        if signature:
+            return self._local_embed(signature)
+
+        # Keep the run alive even if external embedding infrastructure fails.
+        return self._local_embed(text)
+
+    def _build_router_semantic_signature(self, text: str) -> Optional[str]:
+        if not self._embedder_router or not self._embedder_registration_key:
+            return None
+
+        system_prompt = (
+            "You are an embedding proxy. Convert input text into a compact, "
+            "deterministic semantic signature for vector retrieval. "
+            "Output plain text only: key entities, actions, intent, and constraints."
+        )
+        user_prompt = (
+            f"Input:\n{text}\n\nReturn a short semantic signature (max 80 words)."
+        )
+
+        request_data: Dict[str, Any] = {
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "max_tokens": self.embedder_config.get("max_tokens", 100),
+            "temperature": self.embedder_config.get("temperature", 0.0),
+        }
+
+        try:
+            response = self._embedder_router.route_request(
+                registration_key=self._embedder_registration_key,
+                request_data=request_data,
+            )
+            if isinstance(response, dict) and response.get("error_message"):
+                self.logger.warning(
+                    "Embedder router error: %s",
+                    response.get("error_message"),
+                )
+                return None
+
+            signature = extract_response_content(response, self.logger)
+            if not signature:
+                return None
+            return str(signature).strip()
+        except Exception as exc:
+            self.logger.warning("Embedder semantic signature failed: %s", exc)
+            return None
+
+    def _embed_legacy_openai(self, text: str) -> Optional[np.ndarray]:
         if self._embedding_disabled_reason is not None:
             return None
 
@@ -109,8 +229,8 @@ class StrategyLibrary:
             if vector is None:
                 raise ValueError("No embedding data received")
             return np.array(vector, dtype=np.float32)
-        except Exception as e:
-            message = str(e)
+        except Exception as exc:
+            message = str(exc)
             if "No embedding data received" in message:
                 self._embedding_disabled_reason = (
                     "Embedding endpoint returned no vectors; the selected model "
@@ -123,7 +243,7 @@ class StrategyLibrary:
                     self.embedding_api_base or "<provider-default>",
                 )
             else:
-                self.logger.error(f"Embedding failed: {message}")
+                self.logger.error("Embedding failed: %s", message)
             return None
 
     @staticmethod

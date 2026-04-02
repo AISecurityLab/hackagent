@@ -49,7 +49,9 @@ class TestWebCommand(unittest.TestCase):
                 return_value=remote_backend,
             ) as mock_remote_cls,
             patch("hackagent.server.storage.local.LocalBackend") as mock_local_cls,
-            patch("hackagent.server.dashboard.create_app", return_value=app) as mock_create_app,
+            patch(
+                "hackagent.server.dashboard.create_app", return_value=app
+            ) as mock_create_app,
             patch("socket.socket", return_value=self._free_port_socket()),
         ):
             result = runner.invoke(
@@ -95,7 +97,9 @@ class TestWebCommand(unittest.TestCase):
                 "hackagent.server.storage.local.LocalBackend",
                 return_value=local_backend,
             ) as mock_local_cls,
-            patch("hackagent.server.dashboard.create_app", return_value=app) as mock_create_app,
+            patch(
+                "hackagent.server.dashboard.create_app", return_value=app
+            ) as mock_create_app,
             patch("socket.socket", return_value=self._free_port_socket()),
         ):
             result = runner.invoke(

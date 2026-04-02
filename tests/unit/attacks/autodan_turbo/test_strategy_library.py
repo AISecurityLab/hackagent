@@ -53,6 +53,45 @@ class TestStrategyLibrary(unittest.TestCase):
         self.assertEqual(lib.embedding_api_key, "k")
         self.assertEqual(lib.embedding_api_base, "http://base")
 
+    @patch("hackagent.attacks.techniques.autodan_turbo.strategy_library.create_router")
+    def test_embed_with_router_semantic_signature(self, mock_create_router):
+        router = MagicMock()
+        router.route_request.return_value = {"processed_response": "risk phishing bank"}
+        mock_create_router.return_value = (router, "embedder-key")
+
+        lib = StrategyLibrary(
+            embedder_config={
+                "identifier": "gemma3:4b",
+                "endpoint": "http://localhost:11434",
+                "agent_type": "OLLAMA",
+            },
+            backend=MagicMock(),
+            logger=MagicMock(),
+        )
+        vec = lib.embed("how to steal credentials")
+
+        self.assertIsInstance(vec, np.ndarray)
+        self.assertEqual(vec.dtype, np.float32)
+        router.route_request.assert_called_once()
+
+    @patch(
+        "hackagent.attacks.techniques.autodan_turbo.strategy_library.create_router",
+        side_effect=RuntimeError("router init failed"),
+    )
+    def test_embedder_router_init_failure_falls_back_local(self, _mock_create_router):
+        lib = StrategyLibrary(
+            embedder_config={
+                "identifier": "gemma3:4b",
+                "endpoint": "http://localhost:11434",
+                "agent_type": "OLLAMA",
+            },
+            backend=MagicMock(),
+            logger=MagicMock(),
+        )
+        vec = lib.embed("fallback local embedding")
+        self.assertIsInstance(vec, np.ndarray)
+        self.assertEqual(vec.dtype, np.float32)
+
     def test_add_merge_all_size(self):
         lib = StrategyLibrary(logger=MagicMock())
         lib.logger.info.reset_mock()  # ignore the init-time "Embedding backend" log

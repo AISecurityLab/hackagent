@@ -242,6 +242,7 @@ class BaseAttack(abc.ABC):
             run_id=run_id,
             logger=self.logger,
             attack_type=attack_type,
+            category_classifier_config=self.config.get("category_classifier"),
             goals=goals,
             initial_metadata=initial_metadata,
             goal_index_start=goal_index_start,

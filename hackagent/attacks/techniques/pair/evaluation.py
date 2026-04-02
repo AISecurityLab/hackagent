@@ -15,7 +15,7 @@ for other techniques.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
 from hackagent.server.client import AuthenticatedClient
@@ -41,9 +41,7 @@ class PAIREvaluation(BaseEvaluationStep):
     ):
         super().__init__(config, logger, client)
 
-    def execute(
-        self, input_data: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+    def execute(self, input_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         Enrich PAIR results with standard evaluation fields.
 

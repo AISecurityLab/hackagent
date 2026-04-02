@@ -109,6 +109,7 @@ class TrackingCoordinator:
         run_id: Optional[str],
         logger: Optional[logging.Logger] = None,
         attack_type: str = "unknown",
+        category_classifier_config: Optional[Dict[str, Any]] = None,
         goals: Optional[List[str]] = None,
         initial_metadata: Optional[Dict[str, Any]] = None,
         goal_index_start: int = 0,
@@ -122,6 +123,7 @@ class TrackingCoordinator:
             run_id: Server-side run record ID (or None to disable)
             logger: Logger instance
             attack_type: Attack identifier (e.g., "advprefix", "pair")
+            category_classifier_config: Optional per-goal classifier router config.
             goals: Optional list of goals to initialize upfront
             initial_metadata: Optional metadata for goal results
             goal_index_start: Starting index to assign to the first goal
@@ -141,6 +143,7 @@ class TrackingCoordinator:
                 run_id=run_id,
                 logger=_logger,
                 attack_type=attack_type,
+                category_classifier_config=category_classifier_config,
             )
 
         tracking_context = TrackingContext(

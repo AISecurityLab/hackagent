@@ -126,9 +126,8 @@ def execute(
         )
     )
     strategy_lib = StrategyLibrary(
-        embedding_model=params.get("embedding_model", "local/bag-of-words"),
-        embedding_api_key=params.get("embedding_api_key"),
-        embedding_api_base=params.get("embedding_api_base"),
+        embedder_config=config.get("embedder"),
+        backend=client,
         logger=logger,
     )
     if params.get("strategy_library_path"):

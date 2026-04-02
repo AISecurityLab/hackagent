@@ -16,6 +16,7 @@ class TestDefaultTapConfig(unittest.TestCase):
             "attack_type",
             "tap_params",
             "attacker",
+            "category_classifier",
             "judge",
             "target_str",
             "output_dir",

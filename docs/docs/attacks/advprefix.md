@@ -166,6 +166,23 @@ For `advprefix`, batching is controlled by four top-level keys in `attack_config
 
 > Note: set these at top level of `attack_config` (not inside `generator`).
 
+### Shared Goal Category Classifier
+
+All attacks accept a top-level `category_classifier` block. It runs once per goal to attach a normalized category to tracking metadata (independent from judge scoring).
+
+```python
+"category_classifier": {
+    "identifier": "gemma3:4b",
+    "endpoint": "http://localhost:11434",
+    "agent_type": "OLLAMA",
+    "api_key": None,
+    "max_tokens": 100,
+    "temperature": 0.0
+}
+```
+
+If omitted, these defaults are applied automatically.
+
 ## Understanding Components
 
 ### Generator Models

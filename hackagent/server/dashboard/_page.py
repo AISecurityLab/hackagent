@@ -740,7 +740,7 @@ class DashboardPage:
                     ui.code(
                         json.dumps(config, indent=2, default=str),
                         language="json",
-                    ).classes("w-full text-xs max-h-60 overflow-auto")
+                    ).classes("w-full text-xs overflow-auto")
 
             # ── Associated runs ───────────────────────────────────────────
             ui.label("RUNS").classes(
@@ -1182,6 +1182,65 @@ class DashboardPage:
                         return str(val)
 
         return None
+
+    @staticmethod
+    def _extract_goal_classifier_label(result_data: dict, field: str) -> str:
+        """Extract classifier category/subcategory labels from result payload."""
+        normalized = (field or "").strip().lower()
+        if normalized not in {"category", "subcategory"}:
+            return "N/A"
+
+        sources = []
+        for src in (
+            result_data,
+            result_data.get("metadata"),
+            result_data.get("evaluation_metrics"),
+        ):
+            if isinstance(src, dict):
+                sources.append(src)
+
+        if normalized == "category":
+            key_candidates = (
+                "category",
+                "category_name",
+                "harm_category",
+                "risk_category",
+            )
+            taxonomy_keys = ("category", "l2", "name")
+        else:
+            key_candidates = (
+                "subcategory",
+                "subcategory_name",
+                "harm_subcategory",
+                "risk_subcategory",
+            )
+            taxonomy_keys = ("subcategory", "l3", "l4", "name")
+
+        for src in sources:
+            for key in key_candidates:
+                val = src.get(key)
+                if val not in (None, ""):
+                    return str(val)
+
+            taxonomy = src.get("taxonomy")
+            if isinstance(taxonomy, dict):
+                for key in taxonomy_keys:
+                    val = taxonomy.get(key)
+                    if val not in (None, ""):
+                        return str(val)
+
+        return "N/A"
+
+    @staticmethod
+    def _goal_category_badge_text(result_data: dict) -> str:
+        """Compose a single category/subcategory badge label for a goal."""
+        category = DashboardPage._extract_goal_classifier_label(result_data, "category")
+        subcategory = DashboardPage._extract_goal_classifier_label(
+            result_data, "subcategory"
+        )
+        category = category if category and category != "N/A" else "N/A"
+        subcategory = subcategory if subcategory and subcategory != "N/A" else "N/A"
+        return f"{category} / {subcategory}"
 
     @staticmethod
     def _classify_trace_step(trace_data: dict) -> tuple[str, str]:
@@ -3197,6 +3256,10 @@ class DashboardPage:
                     d["goal_number"] = int(goal_index) + 1
                 else:
                     d["goal_number"] = idx
+                d["_goal_category"] = self._extract_goal_classifier_label(d, "category")
+                d["_goal_subcategory"] = self._extract_goal_classifier_label(
+                    d, "subcategory"
+                )
                 d["evaluation_label"] = _eval_label(
                     d.get("evaluation_status", ""), d.get("evaluation_notes")
                 )
@@ -3235,6 +3298,9 @@ class DashboardPage:
             category_stats: dict[str, dict[str, int]] = defaultdict(
                 lambda: {"total": 0, "vulnerable": 0, "mitigated": 0, "errors": 0}
             )
+            category_subcategory_stats: dict[str, dict[str, dict[str, int]]] = (
+                defaultdict(lambda: defaultdict(lambda: {"total": 0, "vulnerable": 0}))
+            )
             for row in new_rows:
                 label = self._extract_category_label(row)
                 if not label:
@@ -3248,6 +3314,12 @@ class DashboardPage:
                     entry["mitigated"] += 1
                 elif bucket == "failed":
                     entry["errors"] += 1
+
+                sub_label = row.get("_goal_subcategory") or "N/A"
+                sub_entry = category_subcategory_stats[str(label)][str(sub_label)]
+                sub_entry["total"] += 1
+                if bucket == "jailbreak":
+                    sub_entry["vulnerable"] += 1
 
             status_str = str(run.get("status") or "—")
             agent_str = str(run.get("agent_name") or "—")
@@ -3476,14 +3548,34 @@ class DashboardPage:
                     if total <= 0:
                         continue
                     robustness = 100.0 * (total - vulnerable) / total
+                    sub_stats = category_subcategory_stats.get(label, {})
+                    sub_rows = []
+                    for sub_label, sub_counts in sub_stats.items():
+                        sub_total = int(sub_counts.get("total") or 0)
+                        sub_vulnerable = int(sub_counts.get("vulnerable") or 0)
+                        if sub_total <= 0:
+                            continue
+                        sub_rows.append(
+                            {
+                                "label": str(sub_label),
+                                "total": sub_total,
+                                "vulnerable": sub_vulnerable,
+                                "rate": sub_vulnerable / sub_total,
+                            }
+                        )
+                    sub_rows.sort(
+                        key=lambda item: (item["rate"], item["total"]), reverse=True
+                    )
                     category_items.append(
                         {
                             "label": label,
                             "total": total,
                             "vulnerable": vulnerable,
                             "mitigated": mitigated,
+                            "errors": int(stats.get("errors") or 0),
                             "robustness": robustness,
                             "vuln_rate": vulnerable / total,
+                            "subcategories": sub_rows,
                         }
                     )
 
@@ -3491,79 +3583,262 @@ class DashboardPage:
                     key=lambda item: (item["vuln_rate"], item["total"]),
                     reverse=True,
                 )
-                top_items = category_items[:6]
+                top_items = category_items[:9]
+                top_items.sort(key=lambda item: item["label"])
+                if len(top_items) > 1:
+                    top_items = [top_items[0], *reversed(top_items[1:])]
 
-                indicators = [{"name": item["label"], "max": 100} for item in top_items]
+                def _truncate_label(text: str, limit: int = 20) -> str:
+                    text = str(text)
+                    if len(text) <= limit:
+                        return text
+                    return f"{text[: max(1, limit - 3)].rstrip()}..."
+
+                def _build_category_tooltip(item: dict) -> str:
+                    lines = [
+                        f"<div style='font-size:14px;font-weight:700;margin-bottom:4px'>{item['label']}</div>",
+                        f"<div>Robustness: <span style='color:#16a34a;font-weight:700'>{item['robustness']:.0f}%</span></div>",
+                        f"<div>Vulnerable: <span style='color:#ef4444;font-weight:700'>{item['vulnerable']} / {item['total']}</span></div>",
+                        f"<div>Mitigated: <span style='color:#22c55e;font-weight:700'>{item['mitigated']}</span></div>",
+                        f"<div>Error: <span style='color:#f59e0b;font-weight:700'>{item['errors']}</span></div>",
+                    ]
+                    if item["subcategories"]:
+                        lines.append(
+                            "<div style='margin-top:6px;font-weight:600'>Subcategory vulnerabilities</div>"
+                        )
+                        for sub_item in item["subcategories"][:8]:
+                            lines.append(
+                                f"<div>{sub_item['label']}: {sub_item['vulnerable']} / {sub_item['total']}</div>"
+                            )
+                    return "".join(lines)
+
+                indicators = [
+                    {"name": _truncate_label(item["label"]), "max": 100}
+                    for item in top_items
+                ]
+                indicator_labels = [indicator["name"] for indicator in indicators]
+                full_labels = [item["label"] for item in top_items]
                 values = [round(item["robustness"], 1) for item in top_items]
+                category_tooltips = [
+                    _build_category_tooltip(item) for item in top_items
+                ]
 
                 with ui.card().classes("w-full"):
-                    ui.label("Robustness by Category").classes(
-                        "font-semibold text-sm mb-1"
-                    )
-                    ui.label("Per-category robustness (higher is better)").classes(
-                        "text-xs text-grey-6 mb-3"
-                    )
+                    with ui.row().classes("w-full items-start justify-between mb-1"):
+                        with ui.column().classes("gap-0"):
+                            ui.label("OVERALL ROBUSTNESS").classes(
+                                "text-[10px] tracking-[0.24em] text-grey-6 font-semibold"
+                            )
+                            ui.label(f"{robustness_pct:.0f}%").classes(
+                                "text-[44px] leading-none font-bold text-green-7"
+                            )
 
-                    with ui.row().classes("w-full flex-wrap gap-6 items-start"):
+                    with ui.row().classes("w-full justify-center"):
                         ui.echart(
                             {
-                                "tooltip": {"trigger": "item"},
+                                "toolbox": {
+                                    "show": True,
+                                    "right": 8,
+                                    "top": 4,
+                                    "feature": {
+                                        "saveAsImage": {
+                                            "show": True,
+                                            "type": "svg",
+                                            "title": "Download SVG",
+                                            "name": "robustness-by-category",
+                                        }
+                                    },
+                                },
+                                "tooltip": {
+                                    "trigger": "axis",
+                                    ":formatter": (
+                                        "function(params) {"
+                                        "const p = Array.isArray(params) ? (params[0] || {}) : (params || {});"
+                                        "const d = (p && p.data) || {};"
+                                        "const categoryTooltips = Array.isArray(d.categoryTooltips) ? d.categoryTooltips : [];"
+                                        "if (!categoryTooltips.length) { return ''; }"
+                                        "const indicatorLabels = Array.isArray(d.indicatorLabels) ? d.indicatorLabels : [];"
+                                        "const fullLabels = Array.isArray(d.fullLabels) ? d.fullLabels : [];"
+                                        "const candidates = [];"
+                                        "if (typeof p.axisValueLabel === 'string' && p.axisValueLabel.length > 0) { candidates.push(p.axisValueLabel); }"
+                                        "if (typeof p.axisValue === 'string' && p.axisValue.length > 0) { candidates.push(p.axisValue); }"
+                                        "if (typeof p.name === 'string' && p.name.length > 0) { candidates.push(p.name); }"
+                                        "for (const name of candidates) {"
+                                        "  let idx = indicatorLabels.indexOf(name);"
+                                        "  if (idx < 0) { idx = fullLabels.indexOf(name); }"
+                                        "  if (idx >= 0 && idx < categoryTooltips.length) { return categoryTooltips[idx] || ''; }"
+                                        "}"
+                                        "const dimensionIndex = typeof p.dimensionIndex === 'number' ? p.dimensionIndex : -1;"
+                                        "if (dimensionIndex >= 0 && dimensionIndex < categoryTooltips.length) {"
+                                        "  return categoryTooltips[dimensionIndex] || '';"
+                                        "}"
+                                        "return categoryTooltips[0] || '';"
+                                        "}"
+                                    ),
+                                    "backgroundColor": "#ffffff",
+                                    "borderColor": "#d1d5db",
+                                    "borderWidth": 1,
+                                    "textStyle": {"color": "#111827", "fontSize": 13},
+                                    "padding": 10,
+                                },
                                 "radar": {
                                     "shape": "polygon",
                                     "indicator": indicators,
-                                    "splitNumber": 4,
-                                    "axisName": {"fontSize": 10, "color": "#6b7280"},
-                                    "splitLine": {"lineStyle": {"color": "#e5e7eb"}},
-                                    "splitArea": {
-                                        "areaStyle": {"color": ["#f9fafb", "#ffffff"]}
+                                    "splitNumber": 5,
+                                    "center": ["50%", "53%"],
+                                    "radius": "70%",
+                                    "axisName": {
+                                        "fontSize": 16,
+                                        "color": "#111827",
+                                        "fontWeight": 500,
                                     },
+                                    "splitLine": {"lineStyle": {"color": "#d1d5db"}},
+                                    "splitArea": {"areaStyle": {"color": ["#ffffff"]}},
                                 },
                                 "series": [
                                     {
                                         "type": "radar",
+                                        "silent": False,
+                                        "z": 3,
+                                        "symbol": "circle",
+                                        "symbolSize": 11,
+                                        "itemStyle": {
+                                            "color": "#dc2626",
+                                            "borderColor": "#ffffff",
+                                            "borderWidth": 1.5,
+                                        },
+                                        "lineStyle": {
+                                            "color": "#3b82f6",
+                                            "width": 2,
+                                        },
+                                        "areaStyle": {
+                                            "color": "rgba(59, 130, 246, 0.18)"
+                                        },
                                         "data": [
                                             {
                                                 "value": values,
                                                 "name": "Robustness",
-                                                "areaStyle": {
-                                                    "color": "rgba(239, 68, 68, 0.15)"
-                                                },
-                                                "lineStyle": {
-                                                    "color": "#ef4444",
-                                                    "width": 2,
-                                                },
-                                                "itemStyle": {"color": "#ef4444"},
+                                                "categoryTooltips": category_tooltips,
+                                                "indicatorLabels": indicator_labels,
+                                                "fullLabels": full_labels,
                                             }
                                         ],
-                                    }
+                                    },
                                 ],
                             }
-                        ).classes("w-72 h-64 shrink-0")
+                        ).classes("w-[740px] h-[420px] max-w-full").props(
+                            "renderer=svg"
+                        )
 
-                        with ui.column().classes("gap-2 flex-1 min-w-60"):
-                            for item in top_items:
-                                robustness = item["robustness"]
-                                vuln = item["vulnerable"]
-                                total = item["total"]
-                                label = item["label"]
-                                rob_color = (
-                                    "text-positive"
-                                    if robustness >= 70
-                                    else "text-warning"
-                                    if robustness >= 40
-                                    else "text-negative"
-                                )
-                                with ui.row().classes(
-                                    "items-center justify-between gap-3"
-                                ):
-                                    ui.label(label).classes("text-sm")
-                                    with ui.row().classes("items-center gap-3"):
-                                        ui.label(f"{robustness:.0f}%").classes(
-                                            f"text-sm font-semibold {rob_color}"
-                                        )
-                                        ui.label(
-                                            f"Vulnerable: {vuln} / {total}"
-                                        ).classes("text-xs text-grey-6")
+                    ui.label(
+                        "Robustness = 100 - vulnerability rate per category. Hover a point for details."
+                    ).classes("text-xs text-grey-6 w-full text-center mt-2")
+
+                with ui.card().classes("w-full"):
+                    ui.label("Vulnerability by Category").classes(
+                        "font-semibold text-sm mb-1"
+                    )
+                    ui.label(
+                        "Stacked distribution of outcomes per harm category"
+                    ).classes("text-xs text-grey-6 mb-3")
+
+                    bar_items = list(reversed(top_items))
+                    bar_y_labels = [item["label"] for item in bar_items]
+                    vulnerable_data = []
+                    mitigated_data = []
+                    error_data = []
+
+                    for item in bar_items:
+                        tooltip_text = _build_category_tooltip(item)
+                        vulnerable_data.append(
+                            {
+                                "value": int(item["vulnerable"]),
+                                "name": item["label"],
+                                "tooltip": {"formatter": tooltip_text},
+                            }
+                        )
+                        mitigated_data.append(
+                            {
+                                "value": int(item["mitigated"]),
+                                "name": item["label"],
+                                "tooltip": {"formatter": tooltip_text},
+                            }
+                        )
+                        error_data.append(
+                            {
+                                "value": int(item["errors"]),
+                                "name": item["label"],
+                                "tooltip": {"formatter": tooltip_text},
+                            }
+                        )
+
+                    ui.echart(
+                        {
+                            "tooltip": {
+                                "trigger": "item",
+                                "backgroundColor": "#ffffff",
+                                "borderColor": "#d1d5db",
+                                "borderWidth": 1,
+                                "textStyle": {"color": "#111827", "fontSize": 13},
+                                "padding": 10,
+                            },
+                            "legend": {
+                                "bottom": 0,
+                                "itemWidth": 12,
+                                "itemHeight": 10,
+                                "textStyle": {"fontSize": 12},
+                            },
+                            "grid": {
+                                "left": "16%",
+                                "right": "2%",
+                                "top": "8%",
+                                "bottom": "18%",
+                                "containLabel": True,
+                            },
+                            "xAxis": {
+                                "type": "value",
+                                "splitLine": {
+                                    "lineStyle": {"type": "dashed", "color": "#e5e7eb"}
+                                },
+                            },
+                            "yAxis": {
+                                "type": "category",
+                                "data": bar_y_labels,
+                                "axisTick": {"show": False},
+                                "axisLabel": {
+                                    "fontSize": 11,
+                                    "lineHeight": 14,
+                                    "interval": 0,
+                                },
+                            },
+                            "series": [
+                                {
+                                    "name": "Vulnerable",
+                                    "type": "bar",
+                                    "stack": "total",
+                                    "itemStyle": {"color": "#ef4444"},
+                                    "emphasis": {"disabled": True},
+                                    "data": vulnerable_data,
+                                },
+                                {
+                                    "name": "Mitigated",
+                                    "type": "bar",
+                                    "stack": "total",
+                                    "itemStyle": {"color": "#22c55e"},
+                                    "emphasis": {"disabled": True},
+                                    "data": mitigated_data,
+                                },
+                                {
+                                    "name": "Error",
+                                    "type": "bar",
+                                    "stack": "total",
+                                    "itemStyle": {"color": "#f59e0b"},
+                                    "emphasis": {"disabled": True},
+                                    "data": error_data,
+                                },
+                            ],
+                        }
+                    ).classes("w-full h-[320px]")
 
             # ── 3) Scope of Testing ───────────────────────────────────
             with ui.card().classes("w-full"):
@@ -3597,9 +3872,7 @@ class DashboardPage:
                         if not raw_config_is_str and not isinstance(run_config, str)
                         else str(run_config)
                     )
-                    ui.code(config_text, language="json").classes(
-                        "w-full text-xs max-h-64"
-                    )
+                    ui.code(config_text, language="json").classes("w-full text-xs")
 
             # ── 5) Test Results ───────────────────────────────────────
             with ui.column().classes("w-full gap-3"):
@@ -3635,10 +3908,16 @@ class DashboardPage:
                                 with ui.row().classes(
                                     "items-center justify-between w-full"
                                 ):
-                                    with ui.row().classes("items-center gap-3"):
+                                    with ui.column().classes("gap-1"):
                                         ui.label(
-                                            f"Test #{row.get('goal_number', '?')}"
+                                            f"Goal #{row.get('goal_number', '?')}"
                                         ).classes("font-semibold text-sm")
+                                        ui.badge(
+                                            self._goal_category_badge_text(row),
+                                            color="blue-7",
+                                        ).classes("text-sm px-3 py-2 font-medium")
+
+                                    with ui.row().classes("items-center gap-3"):
                                         ui.badge(
                                             row.get("evaluation_label") or "Pending",
                                             color=_eval_color(
@@ -3803,6 +4082,10 @@ class DashboardPage:
                     d["goal_number"] = int(goal_index) + 1
                 else:
                     d["goal_number"] = idx
+                d["_goal_category"] = self._extract_goal_classifier_label(d, "category")
+                d["_goal_subcategory"] = self._extract_goal_classifier_label(
+                    d, "subcategory"
+                )
                 d["evaluation_label"] = _eval_label(
                     d.get("evaluation_status", ""), d.get("evaluation_notes")
                 )
@@ -3830,9 +4113,15 @@ class DashboardPage:
                             with ui.row().classes(
                                 "items-start justify-between w-full gap-2"
                             ):
-                                ui.label(
-                                    f"Goal #{row.get('goal_number', (row.get('goal_index', 0) or 0) + 1)}"
-                                ).classes("font-semibold text-sm")
+                                with ui.column().classes("gap-1"):
+                                    ui.label(
+                                        f"Goal #{row.get('goal_number', (row.get('goal_index', 0) or 0) + 1)}"
+                                    ).classes("font-semibold text-sm")
+                                    ui.badge(
+                                        self._goal_category_badge_text(row),
+                                        color="blue-7",
+                                    ).classes("text-sm px-3 py-2 font-medium")
+
                                 with ui.row().classes("items-center gap-2"):
                                     ui.badge(
                                         row.get("evaluation_label") or "Pending",

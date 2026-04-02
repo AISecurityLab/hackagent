@@ -46,7 +46,9 @@ class TestDashboardPageStaticMethods(unittest.TestCase):
             ),
             "COMPLETED",
         )
-        self.assertEqual(DashboardPage._derive_run_status([], fallback="QUEUED"), "QUEUED")
+        self.assertEqual(
+            DashboardPage._derive_run_status([], fallback="QUEUED"), "QUEUED"
+        )
         self.assertEqual(DashboardPage._derive_run_status([]), "PENDING")
 
     def test_compute_run_latency_seconds(self):
@@ -110,7 +112,9 @@ class TestDashboardPageStaticMethods(unittest.TestCase):
         self.assertIsNone(DashboardPage._extract_category_label({}))
 
     def test_risk_level_from_asr_thresholds(self):
-        self.assertEqual(DashboardPage._risk_level_from_asr(75.0), ("CRITICAL", "negative"))
+        self.assertEqual(
+            DashboardPage._risk_level_from_asr(75.0), ("CRITICAL", "negative")
+        )
         self.assertEqual(DashboardPage._risk_level_from_asr(40.0), ("HIGH", "warning"))
         self.assertEqual(DashboardPage._risk_level_from_asr(10.0), ("MEDIUM", "orange"))
         self.assertEqual(DashboardPage._risk_level_from_asr(9.9), ("LOW", "positive"))

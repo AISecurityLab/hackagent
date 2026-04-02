@@ -44,6 +44,10 @@ HACKAGENT_API_BASE = "https://api.hackagent.dev/v1"
 HACKAGENT_AGENT_TYPE = "OPENAI_SDK"
 DEFAULT_ATTACKER_IDENTIFIER = "hackagent-attacker"
 DEFAULT_JUDGE_IDENTIFIER = "hackagent-judge"
+DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER = "gemma3:4b"
+DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT = "http://localhost:11434"
+DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE = "OLLAMA"
+DEFAULT_CATEGORY_CLASSIFIER_MAX_TOKENS = 100
 DEFAULT_MAX_OUTPUT_TOKENS = 4096
 
 # ---------------------------------------------------------------------------
@@ -75,6 +79,23 @@ class AttackerConfig(BaseModel):
     extra_body: Optional[Dict[str, Any]] = None
     response_format: Optional[Dict[str, Any]] = None
     logit_bias: Optional[Dict[str, int]] = None
+
+
+class CategoryClassifierConfig(BaseModel):
+    """Configuration for per-goal category classification.
+
+    This classifier is queried once per goal when a tracker result record is
+    created, regardless of the selected attack technique.
+    """
+
+    model_config = ConfigDict(extra="allow", validate_assignment=True)
+
+    identifier: str = DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER
+    endpoint: str = DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT
+    agent_type: str = DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE
+    api_key: Optional[str] = None
+    max_tokens: int = DEFAULT_CATEGORY_CLASSIFIER_MAX_TOKENS
+    temperature: float = 0.0
 
 
 class JudgeConfig(BaseModel):
@@ -176,6 +197,9 @@ class ConfigBase(
     attacker: Dict[str, Any] = Field(
         default_factory=lambda: AttackerConfig().model_dump()
     )
+    category_classifier: Dict[str, Any] = Field(
+        default_factory=lambda: CategoryClassifierConfig().model_dump()
+    )
     judge: Dict[str, Any] = Field(default_factory=lambda: JudgeConfig().model_dump())
     judges: List[Dict[str, Any]] = Field(
         default_factory=lambda: [JudgeConfig().model_dump()]
@@ -203,6 +227,11 @@ def default_attacker() -> Dict[str, Any]:
 def default_judge() -> Dict[str, Any]:
     """Return a fresh single judge config dict."""
     return JudgeConfig().model_dump()
+
+
+def default_category_classifier() -> Dict[str, Any]:
+    """Return a fresh category-classifier config dict."""
+    return CategoryClassifierConfig().model_dump()
 
 
 def default_judges() -> List[Dict[str, Any]]:
@@ -288,8 +317,13 @@ __all__ = [
     "HACKAGENT_AGENT_TYPE",
     "DEFAULT_ATTACKER_IDENTIFIER",
     "DEFAULT_JUDGE_IDENTIFIER",
+    "DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER",
+    "DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT",
+    "DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE",
+    "DEFAULT_CATEGORY_CLASSIFIER_MAX_TOKENS",
     "DEFAULT_MAX_OUTPUT_TOKENS",
     "AttackerConfig",
+    "CategoryClassifierConfig",
     "JudgeConfig",
     "JudgeEvalConfig",
     "TargetConfig",
@@ -304,6 +338,7 @@ __all__ = [
     "JudgeTargetTechniqueConfigBase",
     "default_attacker",
     "default_judge",
+    "default_category_classifier",
     "default_judges",
     "default_judge_eval",
     "default_target",
