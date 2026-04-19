@@ -129,6 +129,10 @@ class AttacksTab(Container):
         display: none;
         height: auto;
     }
+
+    AttacksTab #strategy-config-container {
+        height: auto;
+    }
     """
 
     BINDINGS = [
@@ -243,7 +247,102 @@ class AttacksTab(Container):
                 yield Static("", id="strategy-description")
                 yield Static("")
 
+                # --- Common / advanced attack config overrides ---
+                yield Static(
+                    "[bold]Advanced Attack Configuration[/bold]",
+                    classes="section-title",
+                )
+                yield Static(
+                    "[dim]Defaults are prefilled. You can run as-is or override per run.[/dim]"
+                )
+
+                with Collapsible(
+                    title="Roles (Attacker / Judge / Classifier)", collapsed=False
+                ):
+                    yield Label("Attacker Identifier:")
+                    yield Input(value="hackagent-attacker", id="common-attacker-id")
+                    yield Label("Attacker Endpoint:")
+                    yield Input(
+                        value="https://api.hackagent.dev/v1",
+                        id="common-attacker-endpoint",
+                    )
+
+                    yield Label("Judge Identifier:")
+                    yield Input(value="hackagent-judge", id="common-judge-id")
+                    yield Label("Judge Endpoint:")
+                    yield Input(
+                        value="https://api.hackagent.dev/v1",
+                        id="common-judge-endpoint",
+                    )
+                    yield Label("Judge Type:")
+                    yield Input(value="harmbench", id="common-judge-type")
+
+                    yield Label("Attacker Agent Type:")
+                    yield Input(value="OPENAI_SDK", id="common-attacker-agent-type")
+                    yield Label("Judge Agent Type:")
+                    yield Input(value="OPENAI_SDK", id="common-judge-agent-type")
+                    yield Label("Classifier Agent Type:")
+                    yield Input(value="OLLAMA", id="common-classifier-agent-type")
+
+                    yield Label("Category Classifier Identifier:")
+                    yield Input(
+                        value="gemma3:4b",
+                        id="common-classifier-id",
+                    )
+                    yield Label("Category Classifier Endpoint:")
+                    yield Input(
+                        value="http://localhost:11434",
+                        id="common-classifier-endpoint",
+                    )
+
+                    yield Label("Attacker Max Tokens:")
+                    yield Input(value="4096", id="common-attacker-max-tokens")
+                    yield Label("Attacker Temperature:")
+                    yield Input(value="1.0", id="common-attacker-temperature")
+                    yield Label("Attacker Top P:")
+                    yield Input(value="0.9", id="common-attacker-top-p")
+
+                    yield Label("Judge Top P:")
+                    yield Input(value="", id="common-judge-top-p")
+
+                    yield Label("Classifier Max Tokens:")
+                    yield Input(value="100", id="common-classifier-max-tokens")
+                    yield Label("Classifier Temperature:")
+                    yield Input(value="0.0", id="common-classifier-temperature")
+
+                with Collapsible(title="Judge Evaluation", collapsed=True):
+                    yield Label("Judge Batch Size:")
+                    yield Input(value="1", id="common-judge-batch-size")
+                    yield Label("Max Judge Tokens:")
+                    yield Input(value="4096", id="common-max-tokens-eval")
+                    yield Label("Judge Timeout (s):")
+                    yield Input(value="120", id="common-judge-timeout")
+                    yield Label("Judge Temperature:")
+                    yield Input(value="0.0", id="common-judge-temperature")
+                    yield Label("Max Judge Retries:")
+                    yield Input(value="1", id="common-max-judge-retries")
+
+                with Collapsible(title="Execution Controls", collapsed=True):
+                    yield Label("Batch Size:")
+                    yield Input(value="1", id="common-batch-size")
+                    yield Label("Goal Batch Size:")
+                    yield Input(value="1", id="common-goal-batch-size")
+                    yield Label("Goal Batch Workers:")
+                    yield Input(value="1", id="common-goal-batch-workers")
+                    yield Label("Start Step:")
+                    yield Input(value="1", id="common-start-step")
+                yield Static("")
+
                 # --- Dynamic config container (populated on strategy change) ---
+                yield Static(
+                    "[bold]Attack-Specific Configuration[/bold]",
+                    classes="section-title",
+                    id="strategy-config-title",
+                )
+                yield Static(
+                    "[dim]These fields apply only to the selected attack strategy.[/dim]",
+                    id="strategy-config-note",
+                )
                 yield Vertical(id="strategy-config-container")
 
                 # --- Advanced toggle ---
@@ -398,43 +497,66 @@ class AttacksTab(Container):
         desc_widget = self.query_one("#strategy-description", Static)
         desc_widget.update(f"[dim]{_escape(spec.description)}[/dim]")
 
+        title_widget = self.query_one("#strategy-config-title", Static)
+        title_widget.update(
+            f"[bold]Attack-Specific Configuration ({_escape(spec.display_name)})[/bold]"
+        )
+
         # Remove old config widgets
         container = self.query_one("#strategy-config-container", Vertical)
         container.remove_children()
+        rendered_fields = 0
 
-        # Group fields by section
-        for section in spec.sections():
-            fields = spec.fields_for_section(
-                section, include_advanced=self._show_advanced
-            )
-            if not fields:
-                continue
+        try:
+            # Group fields by section
+            for section in spec.sections():
+                fields = spec.fields_for_section(
+                    section, include_advanced=self._show_advanced
+                )
+                if not fields:
+                    continue
 
-            section_widgets: List[Any] = []
+                section_widgets: List[Any] = []
 
-            for cfg_field in fields:
-                widget_id = _field_widget_id(cfg_field)
-                # Label with optional tooltip
-                label_text = cfg_field.label
-                if cfg_field.required:
-                    label_text += " *"
-                section_widgets.append(Label(label_text))
+                for cfg_field in fields:
+                    widget_id = _field_widget_id(cfg_field)
+                    # Label with optional tooltip
+                    label_text = cfg_field.label
+                    if cfg_field.required:
+                        label_text += " *"
+                    section_widgets.append(Label(label_text))
 
-                if cfg_field.description:
-                    section_widgets.append(
-                        Static(
-                            f"[dim]{_escape(cfg_field.description)}[/dim]",
-                            classes="field-description",
+                    if cfg_field.description:
+                        section_widgets.append(
+                            Static(
+                                f"[dim]{_escape(cfg_field.description)}[/dim]",
+                                classes="field-description",
+                            )
                         )
-                    )
 
-                # Render the appropriate widget
-                widget = self._create_field_widget(cfg_field, widget_id)
-                section_widgets.append(widget)
+                    # Render the appropriate widget
+                    widget = self._create_field_widget(cfg_field, widget_id)
+                    section_widgets.append(widget)
+                    rendered_fields += 1
 
-            # Build collapsible with children upfront to avoid mount-order issues.
-            collapsible = Collapsible(*section_widgets, title=section, collapsed=False)
-            container.mount(collapsible)
+                # Build collapsible with children upfront to avoid mount-order issues.
+                collapsible = Collapsible(
+                    *section_widgets, title=section, collapsed=False
+                )
+                container.mount(collapsible)
+        except Exception as render_exc:
+            container.mount(
+                Static(
+                    f"[bold red]Failed to render attack-specific configuration:[/bold red] {_escape(render_exc)}"
+                )
+            )
+
+        if rendered_fields == 0:
+            container.mount(
+                Static(
+                    "[yellow]No fields are visible for this strategy with current filters. Enable advanced configuration to view all fields.[/yellow]"
+                )
+            )
 
         # Clear validation errors
         self.query_one("#validation-errors", Static).update("")
@@ -767,6 +889,141 @@ class AttacksTab(Container):
         if not isinstance(attack_config, dict):
             attack_config = {}
 
+        def _to_int(raw: str) -> Optional[int]:
+            try:
+                return int(raw.strip())
+            except Exception:
+                return None
+
+        def _to_float(raw: str) -> Optional[float]:
+            try:
+                return float(raw.strip())
+            except Exception:
+                return None
+
+        # Apply common role configs from TUI form (with defaults).
+        attacker_id = self.query_one("#common-attacker-id", Input).value.strip()
+        attacker_endpoint = self.query_one(
+            "#common-attacker-endpoint", Input
+        ).value.strip()
+        attacker_agent_type = self.query_one(
+            "#common-attacker-agent-type", Input
+        ).value.strip()
+        attacker_max_tokens = _to_int(
+            self.query_one("#common-attacker-max-tokens", Input).value
+        )
+        attacker_temperature = _to_float(
+            self.query_one("#common-attacker-temperature", Input).value
+        )
+        attacker_top_p = _to_float(
+            self.query_one("#common-attacker-top-p", Input).value
+        )
+
+        judge_id = self.query_one("#common-judge-id", Input).value.strip()
+        judge_endpoint = self.query_one("#common-judge-endpoint", Input).value.strip()
+        judge_type = self.query_one("#common-judge-type", Input).value.strip()
+        judge_agent_type = self.query_one(
+            "#common-judge-agent-type", Input
+        ).value.strip()
+        judge_top_p = _to_float(self.query_one("#common-judge-top-p", Input).value)
+
+        classifier_id = self.query_one("#common-classifier-id", Input).value.strip()
+        classifier_endpoint = self.query_one(
+            "#common-classifier-endpoint", Input
+        ).value.strip()
+        classifier_agent_type = self.query_one(
+            "#common-classifier-agent-type", Input
+        ).value.strip()
+        classifier_max_tokens = _to_int(
+            self.query_one("#common-classifier-max-tokens", Input).value
+        )
+        classifier_temperature = _to_float(
+            self.query_one("#common-classifier-temperature", Input).value
+        )
+
+        batch_size_judge = _to_int(
+            self.query_one("#common-judge-batch-size", Input).value
+        )
+        max_tokens_eval = _to_int(
+            self.query_one("#common-max-tokens-eval", Input).value
+        )
+        judge_timeout = _to_int(self.query_one("#common-judge-timeout", Input).value)
+        judge_temperature = _to_float(
+            self.query_one("#common-judge-temperature", Input).value
+        )
+        max_judge_retries = _to_int(
+            self.query_one("#common-max-judge-retries", Input).value
+        )
+
+        batch_size = _to_int(self.query_one("#common-batch-size", Input).value)
+        goal_batch_size = _to_int(
+            self.query_one("#common-goal-batch-size", Input).value
+        )
+        goal_batch_workers = _to_int(
+            self.query_one("#common-goal-batch-workers", Input).value
+        )
+        start_step = _to_int(self.query_one("#common-start-step", Input).value)
+
+        attack_config.setdefault("attacker", {})
+        attack_config.setdefault("judge", {})
+        attack_config.setdefault("category_classifier", {})
+
+        if attacker_id:
+            attack_config["attacker"]["identifier"] = attacker_id
+        if attacker_endpoint:
+            attack_config["attacker"]["endpoint"] = attacker_endpoint
+        if attacker_agent_type:
+            attack_config["attacker"]["agent_type"] = attacker_agent_type
+        if attacker_max_tokens is not None:
+            attack_config["attacker"]["max_tokens"] = attacker_max_tokens
+        if attacker_temperature is not None:
+            attack_config["attacker"]["temperature"] = attacker_temperature
+        if attacker_top_p is not None:
+            attack_config["attacker"]["top_p"] = attacker_top_p
+
+        if judge_id:
+            attack_config["judge"]["identifier"] = judge_id
+        if judge_endpoint:
+            attack_config["judge"]["endpoint"] = judge_endpoint
+        if judge_type:
+            attack_config["judge"]["type"] = judge_type
+        if judge_agent_type:
+            attack_config["judge"]["agent_type"] = judge_agent_type
+        if judge_top_p is not None:
+            attack_config["judge"]["top_p"] = judge_top_p
+
+        if classifier_id:
+            attack_config["category_classifier"]["identifier"] = classifier_id
+        if classifier_endpoint:
+            attack_config["category_classifier"]["endpoint"] = classifier_endpoint
+        if classifier_agent_type:
+            attack_config["category_classifier"]["agent_type"] = classifier_agent_type
+        if classifier_max_tokens is not None:
+            attack_config["category_classifier"]["max_tokens"] = classifier_max_tokens
+        if classifier_temperature is not None:
+            attack_config["category_classifier"]["temperature"] = classifier_temperature
+
+        if batch_size_judge is not None:
+            attack_config["batch_size_judge"] = batch_size_judge
+        if max_tokens_eval is not None:
+            attack_config["max_tokens_eval"] = max_tokens_eval
+        if judge_timeout is not None:
+            attack_config["judge_timeout"] = judge_timeout
+        if judge_temperature is not None:
+            attack_config["judge_temperature"] = judge_temperature
+        if max_judge_retries is not None:
+            attack_config["max_judge_retries"] = max_judge_retries
+
+        if batch_size is not None:
+            attack_config["batch_size"] = batch_size
+        if goal_batch_size is not None:
+            attack_config["goal_batch_size"] = goal_batch_size
+        if goal_batch_workers is not None:
+            attack_config["goal_batch_workers"] = goal_batch_workers
+        if start_step is not None:
+            attack_config["start_step"] = start_step
+
+        # Strategy-specific values override the common defaults above.
         self._deep_merge_dicts(attack_config, strategy_config)
         attack_config["attack_type"] = strategy
 
@@ -1120,6 +1377,42 @@ class AttacksTab(Container):
         self.query_one("#dataset-limit", Input).value = "5"
         self.query_one("#dataset-shuffle", Switch).value = True
         self.query_one("#dataset-seed", Input).value = "42"
+
+        self.query_one("#common-attacker-id", Input).value = "hackagent-attacker"
+        self.query_one(
+            "#common-attacker-endpoint", Input
+        ).value = "https://api.hackagent.dev/v1"
+        self.query_one("#common-attacker-agent-type", Input).value = "OPENAI_SDK"
+        self.query_one("#common-attacker-max-tokens", Input).value = "4096"
+        self.query_one("#common-attacker-temperature", Input).value = "1.0"
+        self.query_one("#common-attacker-top-p", Input).value = "0.9"
+
+        self.query_one("#common-judge-id", Input).value = "hackagent-judge"
+        self.query_one(
+            "#common-judge-endpoint", Input
+        ).value = "https://api.hackagent.dev/v1"
+        self.query_one("#common-judge-type", Input).value = "harmbench"
+        self.query_one("#common-judge-agent-type", Input).value = "OPENAI_SDK"
+        self.query_one("#common-judge-top-p", Input).value = ""
+
+        self.query_one("#common-classifier-id", Input).value = "gemma3:4b"
+        self.query_one(
+            "#common-classifier-endpoint", Input
+        ).value = "http://localhost:11434"
+        self.query_one("#common-classifier-agent-type", Input).value = "OLLAMA"
+        self.query_one("#common-classifier-max-tokens", Input).value = "100"
+        self.query_one("#common-classifier-temperature", Input).value = "0.0"
+
+        self.query_one("#common-judge-batch-size", Input).value = "1"
+        self.query_one("#common-max-tokens-eval", Input).value = "4096"
+        self.query_one("#common-judge-timeout", Input).value = "120"
+        self.query_one("#common-judge-temperature", Input).value = "0.0"
+        self.query_one("#common-max-judge-retries", Input).value = "1"
+
+        self.query_one("#common-batch-size", Input).value = "1"
+        self.query_one("#common-goal-batch-size", Input).value = "1"
+        self.query_one("#common-goal-batch-workers", Input).value = "1"
+        self.query_one("#common-start-step", Input).value = "1"
 
         status_widget = self.query_one("#execution-status", Static)
         progress_bar = self.query_one("#attack-progress", ProgressBar)
