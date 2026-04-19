@@ -14,6 +14,17 @@ from hackagent.router.router import AgentRouter
 from hackagent.router.types import AgentTypeEnum
 from hackagent.server.storage.base import StorageBackend
 
+try:
+    from hackagent.router.adapters.ollama_utils import (
+        is_ollama_available,
+        is_ollama_running,
+        pull_ollama_model,
+    )
+
+    OLLAMA_UTILS_AVAILABLE = True
+except ImportError:
+    OLLAMA_UTILS_AVAILABLE = False
+
 UNKNOWN_CATEGORY = "Z. Unclassified Risk"
 UNKNOWN_SUBCATEGORY = "Z0. Unclassified Subcategory"
 
@@ -145,6 +156,55 @@ def _extract_response_content(response: Any) -> Optional[str]:
     return None
 
 
+def _ensure_ollama_model_available(
+    model_name: str,
+    endpoint: str,
+    logger: logging.Logger,
+) -> bool:
+    """
+    Ensure Ollama model is available, attempting to pull it if missing.
+
+    Args:
+        model_name: The model to ensure is available
+        endpoint: The Ollama endpoint URL
+        logger: Logger instance
+
+    Returns:
+        True if model is available or was successfully pulled, False otherwise
+    """
+    if not OLLAMA_UTILS_AVAILABLE:
+        logger.debug("Ollama utilities not available, skipping model check")
+        return True
+
+    # Check if Ollama is installed
+    if not is_ollama_available():
+        logger.warning(
+            "Ollama is not installed or not in PATH. "
+            "Please install Ollama from https://ollama.ai/ to use the category classifier."
+        )
+        return False
+
+    # Check if Ollama is running
+    if not is_ollama_running(endpoint):
+        logger.warning(
+            f"Ollama server is not running at {endpoint}. "
+            "Please start Ollama with 'ollama serve' to use the category classifier."
+        )
+        return False
+
+    # Attempt to pull the model if it's not available
+    logger.info(f"Ensuring Ollama model '{model_name}' is available...")
+    if pull_ollama_model(model_name):
+        logger.info(f"Ollama model '{model_name}' is ready")
+        return True
+    else:
+        logger.warning(
+            f"Failed to pull Ollama model '{model_name}'. "
+            f"Please manually run: ollama pull {model_name}"
+        )
+        return False
+
+
 def _create_classifier_router(
     backend: StorageBackend,
     config: Dict[str, Any],
@@ -162,15 +222,7 @@ def _create_classifier_router(
         env_key = os.environ.get(api_key_config)
         api_key = env_key if env_key else api_key_config
 
-    operational_config: Dict[str, Any] = {
-        "name": config.get("model", model_name),
-        "endpoint": endpoint,
-        "api_key": api_key,
-        "max_tokens": config.get("max_tokens"),
-        "temperature": config.get("temperature"),
-        "timeout": config.get("timeout", config.get("request_timeout")),
-    }
-
+    # Get agent type to determine if we should check for Ollama models
     agent_type_raw = (config.get("agent_type") or AgentTypeEnum.OLLAMA.value).upper()
     try:
         agent_type = AgentTypeEnum(agent_type_raw)
@@ -180,6 +232,23 @@ def _create_classifier_router(
             agent_type_raw,
         )
         agent_type = AgentTypeEnum.OLLAMA
+
+    # For Ollama agents, ensure the model is available
+    if agent_type == AgentTypeEnum.OLLAMA:
+        if not _ensure_ollama_model_available(model_name, endpoint, logger):
+            raise RuntimeError(
+                f"Ollama model '{model_name}' is not available and could not be pulled. "
+                f"Please ensure Ollama is installed and running, then run: ollama pull {model_name}"
+            )
+
+    operational_config: Dict[str, Any] = {
+        "name": config.get("model", model_name),
+        "endpoint": endpoint,
+        "api_key": api_key,
+        "max_tokens": config.get("max_tokens"),
+        "temperature": config.get("temperature"),
+        "timeout": config.get("timeout", config.get("request_timeout")),
+    }
 
     router = AgentRouter(
         backend=backend,

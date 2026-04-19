@@ -8,6 +8,43 @@ Ollama Agent Adapter
 This adapter provides direct integration with Ollama for running local LLMs.
 It uses Ollama&#x27;s native HTTP API for efficient communication.
 
+## Prerequisites
+
+1. **Install Ollama**: Download and install from [https://ollama.ai/](https://ollama.ai/)
+2. **Start Ollama Server**: Run `ollama serve` in a terminal
+3. **Model Management**: Models are automatically pulled when needed by the category classifier. You can also manually pull models:
+   ```bash
+   ollama pull gemma3:4b
+   ollama pull llama2-uncensored
+   ```
+
+## Automatic Model Pulling
+
+The HackAgent framework automatically pulls Ollama models when they are needed:
+
+- **Category Classifier**: Automatically pulls the default model (`gemma3:4b`) when initializing goal classification
+- **CLI Examples**: The `hackagent` CLI automatically pulls required models before running examples
+- **Custom Models**: You can override the default model using the `category_classifier` configuration
+
+### Overriding the Default Category Classifier Model
+
+You can customize the category classifier model in your attack configuration:
+
+```python
+attack_config = {
+    "attack_type": "advprefix",
+    "dataset": {"preset": "harmbench", "limit": 10},
+    "category_classifier": {
+        "identifier": "llama3:8b",  # Custom model
+        "endpoint": "http://localhost:11434",
+        "agent_type": "OLLAMA",
+        "max_tokens": 100,
+        "temperature": 0.0,
+    },
+    # ... rest of your config
+}
+```
+
 ## OllamaConfigurationError Objects
 
 ```python
