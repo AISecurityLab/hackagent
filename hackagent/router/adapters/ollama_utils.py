@@ -12,7 +12,7 @@ import logging
 import shutil
 import subprocess
 from typing import Optional, Set
-from urllib.error import TimeoutError, URLError
+from urllib.error import URLError
 from urllib.parse import urljoin
 from urllib.request import urlopen
 
@@ -98,7 +98,9 @@ def normalize_ollama_model_aliases(model_name: str) -> Set[str]:
     return aliases
 
 
-def is_model_installed(model_name: str, installed_models: Optional[Set[str]] = None) -> bool:
+def is_model_installed(
+    model_name: str, installed_models: Optional[Set[str]] = None
+) -> bool:
     """
     Check if a model is installed locally, accounting for equivalent :latest aliases.
 

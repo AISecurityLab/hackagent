@@ -99,11 +99,15 @@ class TestCoordinatorCategoryClassifierConfig(unittest.TestCase):
 class TestEnsureOllamaModelAvailable(unittest.TestCase):
     """Tests for automatic Ollama model pulling in category classifier."""
 
-    @patch("hackagent.router.tracking.category_classifier.OLLAMA_UTILS_AVAILABLE", False)
+    @patch(
+        "hackagent.router.tracking.category_classifier.OLLAMA_UTILS_AVAILABLE", False
+    )
     def test_ensure_model_available_utils_not_available(self):
         """Test when Ollama utils are not available."""
         logger = MagicMock()
-        result = _ensure_ollama_model_available("gemma3:4b", "http://localhost:11434", logger)
+        result = _ensure_ollama_model_available(
+            "gemma3:4b", "http://localhost:11434", logger
+        )
         self.assertTrue(result)
         logger.debug.assert_called_once()
 
@@ -114,7 +118,9 @@ class TestEnsureOllamaModelAvailable(unittest.TestCase):
         mock_available.return_value = False
         logger = MagicMock()
 
-        result = _ensure_ollama_model_available("gemma3:4b", "http://localhost:11434", logger)
+        result = _ensure_ollama_model_available(
+            "gemma3:4b", "http://localhost:11434", logger
+        )
 
         self.assertFalse(result)
         mock_available.assert_called_once()
@@ -131,7 +137,9 @@ class TestEnsureOllamaModelAvailable(unittest.TestCase):
         mock_running.return_value = False
         logger = MagicMock()
 
-        result = _ensure_ollama_model_available("gemma3:4b", "http://localhost:11434", logger)
+        result = _ensure_ollama_model_available(
+            "gemma3:4b", "http://localhost:11434", logger
+        )
 
         self.assertFalse(result)
         mock_running.assert_called_once_with("http://localhost:11434")
@@ -150,7 +158,9 @@ class TestEnsureOllamaModelAvailable(unittest.TestCase):
         mock_pull.return_value = True
         logger = MagicMock()
 
-        result = _ensure_ollama_model_available("gemma3:4b", "http://localhost:11434", logger)
+        result = _ensure_ollama_model_available(
+            "gemma3:4b", "http://localhost:11434", logger
+        )
 
         self.assertTrue(result)
         mock_pull.assert_called_once_with("gemma3:4b")
@@ -169,12 +179,16 @@ class TestEnsureOllamaModelAvailable(unittest.TestCase):
         mock_pull.return_value = False
         logger = MagicMock()
 
-        result = _ensure_ollama_model_available("gemma3:4b", "http://localhost:11434", logger)
+        result = _ensure_ollama_model_available(
+            "gemma3:4b", "http://localhost:11434", logger
+        )
 
         self.assertFalse(result)
         mock_pull.assert_called_once_with("gemma3:4b")
         # Check that warning was logged
-        self.assertTrue(any("Failed to pull" in str(call) for call in logger.warning.call_args_list))
+        self.assertTrue(
+            any("Failed to pull" in str(call) for call in logger.warning.call_args_list)
+        )
 
 
 class TestCategoryClassifierModelPulling(unittest.TestCase):

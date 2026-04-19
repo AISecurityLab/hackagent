@@ -64,9 +64,7 @@ class TestOllamaUtils(unittest.TestCase):
 
     @patch("hackagent.router.adapters.ollama_utils.subprocess.run")
     @patch("hackagent.router.adapters.ollama_utils.is_ollama_available")
-    def test_get_installed_ollama_models_success(
-        self, mock_available, mock_subprocess
-    ):
+    def test_get_installed_ollama_models_success(self, mock_available, mock_subprocess):
         """Test getting installed models when Ollama is available."""
         mock_available.return_value = True
         mock_subprocess.return_value = MagicMock(
@@ -124,9 +122,7 @@ class TestOllamaUtils(unittest.TestCase):
 
     @patch("hackagent.router.adapters.ollama_utils.is_model_installed")
     @patch("hackagent.router.adapters.ollama_utils.is_ollama_available")
-    def test_pull_ollama_model_already_installed(
-        self, mock_available, mock_installed
-    ):
+    def test_pull_ollama_model_already_installed(self, mock_available, mock_installed):
         """Test pulling model when already installed."""
         mock_available.return_value = True
         mock_installed.return_value = True
@@ -166,9 +162,7 @@ class TestOllamaUtils(unittest.TestCase):
         """Test failing to pull a model."""
         mock_available.return_value = True
         mock_installed.return_value = False
-        mock_subprocess.return_value = MagicMock(
-            returncode=1, stderr="Model not found"
-        )
+        mock_subprocess.return_value = MagicMock(returncode=1, stderr="Model not found")
 
         result = pull_ollama_model("invalid-model")
         self.assertFalse(result)
