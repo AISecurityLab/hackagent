@@ -6,6 +6,7 @@
 import subprocess
 import unittest
 from unittest.mock import MagicMock, patch
+from urllib.error import URLError
 
 from hackagent.router.adapters.ollama_utils import (
     get_installed_ollama_models,
@@ -59,7 +60,7 @@ class TestOllamaUtils(unittest.TestCase):
     @patch("hackagent.router.adapters.ollama_utils.urlopen")
     def test_is_ollama_running_false(self, mock_urlopen):
         """Test checking if Ollama is running when it's not."""
-        mock_urlopen.side_effect = Exception("Connection refused")
+        mock_urlopen.side_effect = URLError("Connection refused")
         self.assertFalse(is_ollama_running())
 
     @patch("hackagent.router.adapters.ollama_utils.subprocess.run")
