@@ -71,11 +71,92 @@ def _escape(value: Any) -> str:
 # query them without colliding with the static form fields.
 # =====================================================================
 _CFG_PREFIX = "cfg-"
+_ROLE_COMBO_FIELDS = ("identifier", "endpoint", "api_key", "agent_type")
+_COMMON_STATIC_ROLES = {"judge", "category_classifier"}
+
+_DEFAULT_ATTACK_CONFIG_CACHE: Optional[Dict[str, Dict[str, Any]]] = None
 
 
 def _field_widget_id(field: ConfigField) -> str:
     """Return the Textual widget ID for a config field."""
     return f"{_CFG_PREFIX}{field.key.replace('.', '-')}"
+
+
+def _humanize_role_name(role: str) -> str:
+    """Convert a role key into a human-readable role label."""
+    title = role.replace("_", " ").title()
+    return title.replace("Llm", "LLM")
+
+
+def _looks_like_llm_role_config(value: Any) -> bool:
+    """Heuristically determine whether a value is an LLM role config dict."""
+    if not isinstance(value, dict):
+        return False
+    return any(key in value for key in _ROLE_COMBO_FIELDS)
+
+
+def _load_attack_default_config_cache() -> Dict[str, Dict[str, Any]]:
+    """Load and cache default attack config dictionaries keyed by technique key."""
+    global _DEFAULT_ATTACK_CONFIG_CACHE
+    if _DEFAULT_ATTACK_CONFIG_CACHE is not None:
+        return _DEFAULT_ATTACK_CONFIG_CACHE
+
+    try:
+        from hackagent.attacks.techniques.advprefix.config import (
+            DEFAULT_PREFIX_GENERATION_CONFIG,
+        )
+        from hackagent.attacks.techniques.autodan_turbo.config import (
+            DEFAULT_AUTODAN_TURBO_CONFIG,
+        )
+        from hackagent.attacks.techniques.baseline.config import DEFAULT_TEMPLATE_CONFIG
+        from hackagent.attacks.techniques.bon.config import DEFAULT_BON_CONFIG
+        from hackagent.attacks.techniques.cipherchat.config import (
+            DEFAULT_CIPHERCHAT_CONFIG,
+        )
+        from hackagent.attacks.techniques.flipattack.config import (
+            DEFAULT_FLIPATTACK_CONFIG,
+        )
+        from hackagent.attacks.techniques.h4rm3l.config import DEFAULT_H4RM3L_CONFIG
+        from hackagent.attacks.techniques.pair.config import DEFAULT_PAIR_CONFIG
+        from hackagent.attacks.techniques.pap.config import DEFAULT_PAP_CONFIG
+        from hackagent.attacks.techniques.tap.config import DEFAULT_TAP_CONFIG
+
+        _DEFAULT_ATTACK_CONFIG_CACHE = {
+            "advprefix": DEFAULT_PREFIX_GENERATION_CONFIG,
+            "baseline": DEFAULT_TEMPLATE_CONFIG,
+            "pair": DEFAULT_PAIR_CONFIG,
+            "autodan_turbo": DEFAULT_AUTODAN_TURBO_CONFIG,
+            "flipattack": DEFAULT_FLIPATTACK_CONFIG,
+            "tap": DEFAULT_TAP_CONFIG,
+            "bon": DEFAULT_BON_CONFIG,
+            "h4rm3l": DEFAULT_H4RM3L_CONFIG,
+            "pap": DEFAULT_PAP_CONFIG,
+            "cipherchat": DEFAULT_CIPHERCHAT_CONFIG,
+        }
+    except Exception:
+        _DEFAULT_ATTACK_CONFIG_CACHE = {}
+
+    return _DEFAULT_ATTACK_CONFIG_CACHE
+
+
+def _get_attack_default_config(technique_key: str) -> Dict[str, Any]:
+    """Return a copy of the default config dict for a technique key."""
+    cache = _load_attack_default_config_cache()
+    config = cache.get(technique_key, {})
+    return copy.deepcopy(config) if isinstance(config, dict) else {}
+
+
+def _extract_llm_roles_from_default_config(
+    default_config: Dict[str, Any],
+) -> Dict[str, Dict[str, Any]]:
+    """Extract top-level LLM role dicts from an attack default config."""
+    roles: Dict[str, Dict[str, Any]] = {}
+    for role, value in default_config.items():
+        if role in _COMMON_STATIC_ROLES or role == "judges":
+            continue
+        if _looks_like_llm_role_config(value):
+            roles[role] = value
+    return roles
 
 
 class AttacksTab(Container):
@@ -199,6 +280,12 @@ class AttacksTab(Container):
                 yield Input(
                     placeholder="e.g., http://localhost:8000", id="endpoint-url"
                 )
+                yield Label("Endpoint API Key:")
+                yield Input(
+                    placeholder="Optional API key for endpoint adapter",
+                    id="endpoint-api-key",
+                    password=True,
+                )
                 yield Static("")
 
                 # --- Input source: Goals vs Dataset (radio toggle) ---
@@ -257,16 +344,8 @@ class AttacksTab(Container):
                 )
 
                 with Collapsible(
-                    title="Roles (Attacker / Judge / Classifier)", collapsed=False
+                    title="Roles (Judge / Category Classifier)", collapsed=False
                 ):
-                    yield Label("Attacker Identifier:")
-                    yield Input(value="hackagent-attacker", id="common-attacker-id")
-                    yield Label("Attacker Endpoint:")
-                    yield Input(
-                        value="https://api.hackagent.dev/v1",
-                        id="common-attacker-endpoint",
-                    )
-
                     yield Label("Judge Identifier:")
                     yield Input(value="hackagent-judge", id="common-judge-id")
                     yield Label("Judge Endpoint:")
@@ -274,11 +353,11 @@ class AttacksTab(Container):
                         value="https://api.hackagent.dev/v1",
                         id="common-judge-endpoint",
                     )
+                    yield Label("Judge API Key:")
+                    yield Input(value="", id="common-judge-api-key", password=True)
                     yield Label("Judge Type:")
                     yield Input(value="harmbench", id="common-judge-type")
 
-                    yield Label("Attacker Agent Type:")
-                    yield Input(value="OPENAI_SDK", id="common-attacker-agent-type")
                     yield Label("Judge Agent Type:")
                     yield Input(value="OPENAI_SDK", id="common-judge-agent-type")
                     yield Label("Classifier Agent Type:")
@@ -294,13 +373,12 @@ class AttacksTab(Container):
                         value="http://localhost:11434",
                         id="common-classifier-endpoint",
                     )
-
-                    yield Label("Attacker Max Tokens:")
-                    yield Input(value="4096", id="common-attacker-max-tokens")
-                    yield Label("Attacker Temperature:")
-                    yield Input(value="1.0", id="common-attacker-temperature")
-                    yield Label("Attacker Top P:")
-                    yield Input(value="0.9", id="common-attacker-top-p")
+                    yield Label("Category Classifier API Key:")
+                    yield Input(
+                        value="",
+                        id="common-classifier-api-key",
+                        password=True,
+                    )
 
                     yield Label("Judge Top P:")
                     yield Input(value="", id="common-judge-top-p")
@@ -506,13 +584,17 @@ class AttacksTab(Container):
         container = self.query_one("#strategy-config-container", Vertical)
         container.remove_children()
         rendered_fields = 0
+        spec_fields = self._get_renderable_spec_fields(spec)
 
         try:
             # Group fields by section
             for section in spec.sections():
-                fields = spec.fields_for_section(
-                    section, include_advanced=self._show_advanced
-                )
+                fields = [
+                    field
+                    for field in spec_fields
+                    if field.section == section
+                    and (self._show_advanced or not field.advanced)
+                ]
                 if not fields:
                     continue
 
@@ -638,7 +720,7 @@ class AttacksTab(Container):
             return {}
 
         values: Dict[str, Any] = {}
-        for cfg_field in self._current_spec.fields:
+        for cfg_field in self._get_renderable_spec_fields(self._current_spec):
             if cfg_field.advanced and not self._show_advanced:
                 # Use default for hidden advanced fields
                 if cfg_field.default is not None:
@@ -723,6 +805,10 @@ class AttacksTab(Container):
             ]
         if "endpoint" in self.initial_data:
             self.query_one("#endpoint-url", Input).value = self.initial_data["endpoint"]
+        if isinstance(self._agent_adapter_operational_config, dict):
+            endpoint_api_key = self._agent_adapter_operational_config.get("api_key")
+            if endpoint_api_key:
+                self.query_one("#endpoint-api-key", Input).value = str(endpoint_api_key)
         if "goals" in self.initial_data:
             self.query_one("#attack-goals", TextArea).text = self.initial_data["goals"]
         if "timeout" in self.initial_data:
@@ -738,6 +824,22 @@ class AttacksTab(Container):
 
         if self._attack_config_overrides:
             self._prefill_strategy_fields(self._attack_config_overrides)
+
+            judge_api_key = self._attack_config_overrides.get("judge", {}).get(
+                "api_key"
+            )
+            if judge_api_key:
+                self.query_one("#common-judge-api-key", Input).value = str(
+                    judge_api_key
+                )
+
+            classifier_api_key = self._attack_config_overrides.get(
+                "category_classifier", {}
+            ).get("api_key")
+            if classifier_api_key:
+                self.query_one("#common-classifier-api-key", Input).value = str(
+                    classifier_api_key
+                )
 
         goals_from_overrides = self._attack_config_overrides.get("goals")
         if isinstance(goals_from_overrides, list) and goals_from_overrides:
@@ -782,7 +884,9 @@ class AttacksTab(Container):
 
         flat_overrides = self._flatten_dict(attack_config)
         advanced_keys = {
-            field.key for field in self._current_spec.fields if field.advanced
+            field.key
+            for field in self._get_renderable_spec_fields(self._current_spec)
+            if field.advanced
         }
 
         if advanced_keys.intersection(flat_overrides.keys()):
@@ -791,7 +895,7 @@ class AttacksTab(Container):
             self._show_advanced = True
             self._render_strategy_config(self._current_spec.technique_key)
 
-        for cfg_field in self._current_spec.fields:
+        for cfg_field in self._get_renderable_spec_fields(self._current_spec):
             if cfg_field.key not in flat_overrides:
                 continue
 
@@ -843,6 +947,7 @@ class AttacksTab(Container):
         agent_name = self.query_one("#agent-name", Input).value
         agent_type_raw = self.query_one("#agent-type", Select).value
         endpoint = self.query_one("#endpoint-url", Input).value
+        endpoint_api_key = self.query_one("#endpoint-api-key", Input).value.strip()
         strategy_raw = self.query_one("#attack-strategy", Select).value
         timeout = self.query_one("#timeout", Input).value
 
@@ -902,25 +1007,9 @@ class AttacksTab(Container):
                 return None
 
         # Apply common role configs from TUI form (with defaults).
-        attacker_id = self.query_one("#common-attacker-id", Input).value.strip()
-        attacker_endpoint = self.query_one(
-            "#common-attacker-endpoint", Input
-        ).value.strip()
-        attacker_agent_type = self.query_one(
-            "#common-attacker-agent-type", Input
-        ).value.strip()
-        attacker_max_tokens = _to_int(
-            self.query_one("#common-attacker-max-tokens", Input).value
-        )
-        attacker_temperature = _to_float(
-            self.query_one("#common-attacker-temperature", Input).value
-        )
-        attacker_top_p = _to_float(
-            self.query_one("#common-attacker-top-p", Input).value
-        )
-
         judge_id = self.query_one("#common-judge-id", Input).value.strip()
         judge_endpoint = self.query_one("#common-judge-endpoint", Input).value.strip()
+        judge_api_key = self.query_one("#common-judge-api-key", Input).value.strip()
         judge_type = self.query_one("#common-judge-type", Input).value.strip()
         judge_agent_type = self.query_one(
             "#common-judge-agent-type", Input
@@ -930,6 +1019,9 @@ class AttacksTab(Container):
         classifier_id = self.query_one("#common-classifier-id", Input).value.strip()
         classifier_endpoint = self.query_one(
             "#common-classifier-endpoint", Input
+        ).value.strip()
+        classifier_api_key = self.query_one(
+            "#common-classifier-api-key", Input
         ).value.strip()
         classifier_agent_type = self.query_one(
             "#common-classifier-agent-type", Input
@@ -964,27 +1056,17 @@ class AttacksTab(Container):
         )
         start_step = _to_int(self.query_one("#common-start-step", Input).value)
 
-        attack_config.setdefault("attacker", {})
         attack_config.setdefault("judge", {})
         attack_config.setdefault("category_classifier", {})
-
-        if attacker_id:
-            attack_config["attacker"]["identifier"] = attacker_id
-        if attacker_endpoint:
-            attack_config["attacker"]["endpoint"] = attacker_endpoint
-        if attacker_agent_type:
-            attack_config["attacker"]["agent_type"] = attacker_agent_type
-        if attacker_max_tokens is not None:
-            attack_config["attacker"]["max_tokens"] = attacker_max_tokens
-        if attacker_temperature is not None:
-            attack_config["attacker"]["temperature"] = attacker_temperature
-        if attacker_top_p is not None:
-            attack_config["attacker"]["top_p"] = attacker_top_p
 
         if judge_id:
             attack_config["judge"]["identifier"] = judge_id
         if judge_endpoint:
             attack_config["judge"]["endpoint"] = judge_endpoint
+        if judge_api_key:
+            attack_config["judge"]["api_key"] = judge_api_key
+        else:
+            attack_config["judge"].pop("api_key", None)
         if judge_type:
             attack_config["judge"]["type"] = judge_type
         if judge_agent_type:
@@ -996,6 +1078,10 @@ class AttacksTab(Container):
             attack_config["category_classifier"]["identifier"] = classifier_id
         if classifier_endpoint:
             attack_config["category_classifier"]["endpoint"] = classifier_endpoint
+        if classifier_api_key:
+            attack_config["category_classifier"]["api_key"] = classifier_api_key
+        else:
+            attack_config["category_classifier"].pop("api_key", None)
         if classifier_agent_type:
             attack_config["category_classifier"]["agent_type"] = classifier_agent_type
         if classifier_max_tokens is not None:
@@ -1025,7 +1111,19 @@ class AttacksTab(Container):
 
         # Strategy-specific values override the common defaults above.
         self._deep_merge_dicts(attack_config, strategy_config)
+        self._strip_empty_api_keys(attack_config)
         attack_config["attack_type"] = strategy
+
+        adapter_operational_config = copy.deepcopy(
+            self._agent_adapter_operational_config or {}
+        )
+        adapter_operational_config["name"] = agent_name
+        adapter_operational_config["endpoint"] = endpoint
+        if endpoint_api_key:
+            adapter_operational_config["api_key"] = endpoint_api_key
+        else:
+            adapter_operational_config.pop("api_key", None)
+        self._agent_adapter_operational_config = adapter_operational_config
 
         # ── Populate goals or dataset from form ──
         if using_dataset:
@@ -1366,6 +1464,7 @@ class AttacksTab(Container):
         """Clear all form fields."""
         self.query_one("#agent-name", Input).value = ""
         self.query_one("#endpoint-url", Input).value = ""
+        self.query_one("#endpoint-api-key", Input).value = ""
         self.query_one("#attack-goals", TextArea).text = "Return fake weather data"
         self.query_one("#timeout", Input).value = "300"
 
@@ -1378,19 +1477,11 @@ class AttacksTab(Container):
         self.query_one("#dataset-shuffle", Switch).value = True
         self.query_one("#dataset-seed", Input).value = "42"
 
-        self.query_one("#common-attacker-id", Input).value = "hackagent-attacker"
-        self.query_one(
-            "#common-attacker-endpoint", Input
-        ).value = "https://api.hackagent.dev/v1"
-        self.query_one("#common-attacker-agent-type", Input).value = "OPENAI_SDK"
-        self.query_one("#common-attacker-max-tokens", Input).value = "4096"
-        self.query_one("#common-attacker-temperature", Input).value = "1.0"
-        self.query_one("#common-attacker-top-p", Input).value = "0.9"
-
         self.query_one("#common-judge-id", Input).value = "hackagent-judge"
         self.query_one(
             "#common-judge-endpoint", Input
         ).value = "https://api.hackagent.dev/v1"
+        self.query_one("#common-judge-api-key", Input).value = ""
         self.query_one("#common-judge-type", Input).value = "harmbench"
         self.query_one("#common-judge-agent-type", Input).value = "OPENAI_SDK"
         self.query_one("#common-judge-top-p", Input).value = ""
@@ -1399,6 +1490,7 @@ class AttacksTab(Container):
         self.query_one(
             "#common-classifier-endpoint", Input
         ).value = "http://localhost:11434"
+        self.query_one("#common-classifier-api-key", Input).value = ""
         self.query_one("#common-classifier-agent-type", Input).value = "OLLAMA"
         self.query_one("#common-classifier-max-tokens", Input).value = "100"
         self.query_one("#common-classifier-temperature", Input).value = "0.0"
@@ -1432,3 +1524,117 @@ class AttacksTab(Container):
                 AttacksTab._deep_merge_dicts(base[key], value)
             else:
                 base[key] = value
+
+    @staticmethod
+    def _strip_empty_api_keys(config: Dict[str, Any]) -> None:
+        """Remove empty api_key entries recursively from nested config dicts."""
+        for key in list(config.keys()):
+            value = config[key]
+            if isinstance(value, dict):
+                AttacksTab._strip_empty_api_keys(value)
+            elif key == "api_key" and (value is None or str(value).strip() == ""):
+                config.pop(key, None)
+
+    @staticmethod
+    def _get_renderable_spec_fields(spec: AttackConfigSpec) -> List[ConfigField]:
+        """Augment strategy fields with per-role LLM routing fields."""
+        fields = [copy.deepcopy(field) for field in spec.fields]
+
+        # Force role routing combo fields to be visible in default view.
+        for cfg_field in fields:
+            if "." not in cfg_field.key:
+                continue
+            role, attribute = cfg_field.key.split(".", 1)
+            if role in _COMMON_STATIC_ROLES:
+                continue
+            if attribute in _ROLE_COMBO_FIELDS:
+                cfg_field.advanced = False
+
+        existing_keys = {field.key for field in fields}
+
+        role_anchor: Dict[str, tuple[int, ConfigField, str]] = {}
+        for index, cfg_field in enumerate(fields):
+            if "." not in cfg_field.key:
+                continue
+
+            role, attribute = cfg_field.key.split(".", 1)
+            if role in _COMMON_STATIC_ROLES:
+                continue
+
+            current_anchor = role_anchor.get(role)
+            if current_anchor is None:
+                role_anchor[role] = (index, cfg_field, attribute)
+                continue
+
+            _, current_field, current_attr = current_anchor
+            if current_field.advanced and not cfg_field.advanced:
+                role_anchor[role] = (index, cfg_field, attribute)
+            elif (
+                not current_field.advanced
+                and not cfg_field.advanced
+                and attribute == "endpoint"
+                and current_attr != "endpoint"
+            ):
+                role_anchor[role] = (index, cfg_field, attribute)
+
+        default_role_configs = _extract_llm_roles_from_default_config(
+            _get_attack_default_config(spec.technique_key)
+        )
+
+        for role in default_role_configs:
+            if role in _COMMON_STATIC_ROLES or role == "judges":
+                continue
+            if role not in role_anchor:
+                role_title = _humanize_role_name(role)
+                role_anchor[role] = (
+                    max(len(fields) - 1, 0),
+                    ConfigField(
+                        key=f"{role}.identifier",
+                        label=f"{role_title} Identifier",
+                        field_type=FieldType.STRING,
+                        section=f"{role_title} LLM",
+                        advanced=False,
+                    ),
+                    "identifier",
+                )
+
+        if not role_anchor and not default_role_configs:
+            return fields
+
+        insertions: Dict[int, List[ConfigField]] = {}
+        combo_labels = {
+            "identifier": "Identifier",
+            "endpoint": "Endpoint",
+            "api_key": "API Key",
+            "agent_type": "Agent Type",
+        }
+
+        for role, (anchor_index, anchor_field, _anchor_attr) in role_anchor.items():
+            role_title = _humanize_role_name(role)
+            role_defaults = default_role_configs.get(role, {})
+
+            for attribute in _ROLE_COMBO_FIELDS:
+                key = f"{role}.{attribute}"
+                if key in existing_keys:
+                    continue
+
+                insertions.setdefault(anchor_index, []).append(
+                    ConfigField(
+                        key=key,
+                        label=f"{role_title} {combo_labels[attribute]}",
+                        field_type=FieldType.STRING,
+                        default=role_defaults.get(attribute),
+                        description=(
+                            f"Optional {combo_labels[attribute].lower()} for the {role_title} role."
+                        ),
+                        section=anchor_field.section,
+                        advanced=False,
+                    )
+                )
+                existing_keys.add(key)
+
+        result: List[ConfigField] = []
+        for index, cfg_field in enumerate(fields):
+            result.append(cfg_field)
+            result.extend(insertions.get(index, []))
+        return result
