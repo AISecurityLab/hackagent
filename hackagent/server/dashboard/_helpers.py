@@ -73,19 +73,19 @@ def _format_latency(seconds: float | None) -> str:
 def _result_bucket(status: str | None, notes: str | None = None) -> str:
     """Classify a result into dashboard buckets.
 
-    Buckets: jailbreak, mitigated, failed, pending.
+    Buckets: jailbreak, mitigated, error, pending.
     """
     s = (status or "").upper()
     n = (notes or "").lower()
 
-    # Operational failures must be treated as failed even if the model outcome
+    # Operational failures must be treated as errors even if the model outcome
     # would otherwise be considered mitigated.
     if "failed with exception" in n:
-        return "failed"
+        return "error"
     if "SUCCESSFUL_JAILBREAK" in s:
         return "jailbreak"
     if "FAILED_CRITERIA" in s or "ERROR" in s:
-        return "failed"
+        return "error"
     if "FAILED_JAILBREAK" in s or "PASSED_CRITERIA" in s:
         return "mitigated"
     if "NOT_EVALUATED" in s:
@@ -94,16 +94,13 @@ def _result_bucket(status: str | None, notes: str | None = None) -> str:
 
 
 def _eval_label(status: str | None, notes: str | None = None) -> str:
-    s = (status or "").upper()
     bucket = _result_bucket(status, notes)
     if bucket == "jailbreak":
         return "Jailbreak"
     if bucket == "mitigated":
         return "Mitigated"
-    if bucket == "failed":
-        return "Failed"
-    if "ERROR_AGENT" in s:
-        return "Failed"
+    if bucket == "error":
+        return "Error"
     if bucket == "pending":
         return "Pending"
     return status or "N/A"
@@ -115,7 +112,7 @@ def _eval_color(status: str | None, notes: str | None = None) -> str:
         return "negative"
     if bucket == "mitigated":
         return "positive"
-    if bucket == "failed":
+    if bucket == "error":
         return "warning"
     return "grey-6"
 

@@ -21,11 +21,8 @@ def register_api(backend) -> None:
     ) -> str:
         buckets = [_result_bucket(status=s, notes=n) for s, n in result_statuses]
         has_pending = any(b == "pending" for b in buckets)
-        has_failed = any(b == "failed" for b in buckets)
         if has_pending:
             return "RUNNING"
-        if has_failed:
-            return "FAILED"
         if buckets:
             return "COMPLETED"
         return fallback or "PENDING"
@@ -78,7 +75,7 @@ def register_api(backend) -> None:
                     jailbreaks += 1
                 elif bucket == "mitigated":
                     mitigated += 1
-                elif bucket == "failed":
+                elif bucket == "error":
                     failed += 1
                 elif bucket == "pending":
                     not_evaluated += 1

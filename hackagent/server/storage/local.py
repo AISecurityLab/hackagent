@@ -503,7 +503,7 @@ class LocalBackend:
             self._conn.commit()
 
     def count_result_buckets(self) -> dict:
-        """Return {total, jailbreaks, mitigated, failed, pending} via SQL."""
+        """Return {total, jailbreaks, mitigated, error, pending} via SQL."""
         with self._lock:
             rows = self._conn.execute(
                 "SELECT evaluation_status, evaluation_notes FROM results"
@@ -514,7 +514,7 @@ class LocalBackend:
             "total": 0,
             "jailbreaks": 0,
             "mitigated": 0,
-            "failed": 0,
+            "error": 0,
             "pending": 0,
         }
         for r in rows:
@@ -524,8 +524,8 @@ class LocalBackend:
                 buckets["jailbreaks"] += 1
             elif b == "mitigated":
                 buckets["mitigated"] += 1
-            elif b == "failed":
-                buckets["failed"] += 1
+            elif b == "error":
+                buckets["error"] += 1
             elif b == "pending":
                 buckets["pending"] += 1
         return buckets

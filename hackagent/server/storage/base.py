@@ -235,5 +235,5 @@ class StorageBackend(Protocol):
     def list_traces(self, result_id: UUID) -> List[TraceRecord]: ...
 
     def count_result_buckets(self) -> Dict[str, int]:
-        """Return {total, jailbreaks, mitigated, failed, pending} across all results."""
+        """Return {total, jailbreaks, mitigated, error, pending} across all results."""
         ...

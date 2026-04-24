@@ -38,7 +38,7 @@ class TestDashboardPageStaticMethods(unittest.TestCase):
             DashboardPage._derive_run_status(
                 [("FAILED_CRITERIA", None), ("PASSED_CRITERIA", None)]
             ),
-            "FAILED",
+            "COMPLETED",
         )
         self.assertEqual(
             DashboardPage._derive_run_status(

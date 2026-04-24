@@ -55,25 +55,25 @@ class TestDashboardEvaluationHelpers(unittest.TestCase):
         self.assertEqual(_result_bucket("SUCCESSFUL_JAILBREAK"), "jailbreak")
         self.assertEqual(_result_bucket("PASSED_CRITERIA"), "mitigated")
         self.assertEqual(_result_bucket("FAILED_JAILBREAK"), "mitigated")
-        self.assertEqual(_result_bucket("FAILED_CRITERIA"), "failed")
+        self.assertEqual(_result_bucket("FAILED_CRITERIA"), "error")
         self.assertEqual(_result_bucket("NOT_EVALUATED"), "pending")
 
     def test_result_bucket_exception_note_overrides_status(self):
         self.assertEqual(
             _result_bucket("FAILED_JAILBREAK", notes="run failed with exception: x"),
-            "failed",
+            "error",
         )
 
     def test_eval_label_uses_bucket_logic(self):
         self.assertEqual(_eval_label("SUCCESSFUL_JAILBREAK"), "Jailbreak")
         self.assertEqual(_eval_label("FAILED_JAILBREAK"), "Mitigated")
-        self.assertEqual(_eval_label("FAILED_CRITERIA"), "Failed")
+        self.assertEqual(_eval_label("FAILED_CRITERIA"), "Error")
         self.assertEqual(_eval_label("NOT_EVALUATED"), "Pending")
 
     def test_eval_label_exception_note_overrides(self):
         self.assertEqual(
             _eval_label("FAILED_JAILBREAK", notes="FAILED WITH EXCEPTION"),
-            "Failed",
+            "Error",
         )
 
     def test_eval_color_uses_bucket_logic(self):

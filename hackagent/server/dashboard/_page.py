@@ -325,7 +325,7 @@ class DashboardPage:
                                 "type": "category",
                                 "data": [
                                     "Jailbreaks",
-                                    "Failed attacks",
+                                    "Mitigated",
                                     "Errors",
                                     "Pending",
                                 ],
@@ -808,6 +808,7 @@ class DashboardPage:
                         )
                         d["failed_attacks"] = int(summary["failed_attacks"])
                         d["mitigations"] = int(summary["mitigations"])
+                        d["errors"] = int(summary["errors"])
                         d["status"] = str(summary["status"])
                         status = d.get("status", "")
                         status_color = (
@@ -1061,12 +1062,9 @@ class DashboardPage:
         """Derive run status from associated goal evaluation statuses."""
         buckets = [_result_bucket(status=s, notes=n) for s, n in result_statuses]
         has_pending = any(b == "pending" for b in buckets)
-        has_failed = any(b == "failed" for b in buckets)
 
         if has_pending:
             return "RUNNING"
-        if has_failed:
-            return "FAILED"
         if buckets:
             return "COMPLETED"
         return fallback or "PENDING"
@@ -1079,6 +1077,7 @@ class DashboardPage:
         total = 0
         successful_jailbreaks = 0
         mitigations = 0
+        errors = 0
         finished_goal_latencies_s: list[float] = []
         statuses: list[tuple[str, str | None]] = []
 
@@ -1099,6 +1098,8 @@ class DashboardPage:
                     successful_jailbreaks += 1
                 elif bucket == "mitigated":
                     mitigations += 1
+                elif bucket == "error":
+                    errors += 1
                 if bucket != "pending":
                     latency_s = self._extract_goal_latency_seconds(_serialize(result))
                     if isinstance(latency_s, (int, float)):
@@ -1124,6 +1125,7 @@ class DashboardPage:
             "successful_jailbreaks": successful_jailbreaks,
             "mitigations": mitigations,
             "failed_attacks": mitigations,
+            "errors": errors,
             "avg_goal_latency_s": avg_goal_latency_s,
             "status": self._derive_run_status(statuses),
         }
@@ -2587,13 +2589,13 @@ class DashboardPage:
                                     ui.label(result["evaluation_notes"]).classes(
                                         "text-xs text-grey-6"
                                     )
-                elif bucket == "failed":
+                elif bucket == "error":
                     with (
                         ui.card()
                         .tight()
                         .classes(
-                            "w-full border border-orange-300 dark:border-orange-700 "
-                            "bg-orange-50 dark:bg-orange-900/30"
+                            "w-full border border-yellow-300 dark:border-yellow-700 "
+                            "bg-yellow-50 dark:bg-yellow-900/30"
                         )
                     ):
                         with ui.row().classes("gap-3 items-start p-4"):
@@ -2601,7 +2603,7 @@ class DashboardPage:
                                 "text-2xl mt-0.5"
                             )
                             with ui.column().classes("gap-0.5"):
-                                ui.label("Evaluation Error").classes(
+                                ui.label("Execution Error").classes(
                                     "font-semibold text-warning text-sm"
                                 )
                                 if result.get("evaluation_notes"):
@@ -2722,7 +2724,7 @@ class DashboardPage:
         total_results = buckets["total"]
         jailbreaks = buckets["jailbreaks"]
         mitigated = buckets["mitigated"]
-        failed = buckets["failed"]
+        failed = buckets["error"]
         pending = buckets["pending"]
 
         risk_pct = (
@@ -2785,8 +2787,8 @@ class DashboardPage:
                                 },
                                 {
                                     "value": failed,
-                                    "name": "Failed",
-                                    "itemStyle": {"color": "#f97316"},
+                                    "name": "Errors",
+                                    "itemStyle": {"color": "#eab308"},
                                 },
                                 {
                                     "value": pending,
@@ -2842,7 +2844,7 @@ class DashboardPage:
         self.dist_chart.options["series"][0]["data"] = [
             {"value": jailbreaks, "itemStyle": {"color": "#ef4444"}},
             {"value": mitigated, "itemStyle": {"color": "#22c55e"}},
-            {"value": failed, "itemStyle": {"color": "#f97316"}},
+            {"value": failed, "itemStyle": {"color": "#eab308"}},
             {"value": pending, "itemStyle": {"color": "#94a3b8"}},
         ]
         self.dist_chart.update()
@@ -2853,7 +2855,7 @@ class DashboardPage:
             for leg_label, val, leg_color in [
                 ("Jailbreaks", jailbreaks, "negative"),
                 ("Mitigated", mitigated, "positive"),
-                ("Failed", failed, "warning"),
+                ("Errors", failed, "warning"),
                 ("Pending", pending, "grey-6"),
             ]:
                 with ui.row().classes("items-center gap-2"):
@@ -2887,6 +2889,7 @@ class DashboardPage:
             d["successful_jailbreaks"] = int(summary["successful_jailbreaks"])
             d["failed_attacks"] = int(summary["failed_attacks"])
             d["mitigations"] = int(summary["mitigations"])
+            d["errors"] = int(summary["errors"])
             d["_goal_latency_avg_s"] = summary.get("avg_goal_latency_s")
             d["_goal_latency_avg"] = _format_latency(d.get("_goal_latency_avg_s"))
             d["_rel"] = _rel_time(d.get("created_at"))
@@ -2968,6 +2971,7 @@ class DashboardPage:
             d["successful_jailbreaks"] = int(summary["successful_jailbreaks"])
             d["failed_attacks"] = int(summary["failed_attacks"])
             d["mitigations"] = int(summary["mitigations"])
+            d["errors"] = int(summary["errors"])
             d["_goal_latency_avg_s"] = summary.get("avg_goal_latency_s")
             d["_goal_latency_avg"] = _format_latency(d.get("_goal_latency_avg_s"))
             d["_rel"] = _rel_time(d.get("created_at"))
@@ -3297,7 +3301,7 @@ class DashboardPage:
                     n_jailbreaks += 1
                 elif bucket == "mitigated":
                     n_mitigated += 1
-                elif bucket == "failed":
+                elif bucket == "error":
                     n_errors += 1
                 lat = d.get("_goal_latency_s")
                 if isinstance(lat, (int, float)):
@@ -3335,7 +3339,7 @@ class DashboardPage:
                     entry["vulnerable"] += 1
                 elif bucket == "mitigated":
                     entry["mitigated"] += 1
-                elif bucket == "failed":
+                elif bucket == "error":
                     entry["errors"] += 1
 
                 sub_label = row.get("_goal_subcategory") or "N/A"
@@ -3378,7 +3382,7 @@ class DashboardPage:
                     ("Total Tests", str(total_tests), "quiz", "blue"),
                     ("Vulnerabilities", str(n_jailbreaks), "lock_open", "red"),
                     ("Mitigated", str(n_mitigated), "security", "green"),
-                    ("Errors", str(n_errors), "warning_amber", "orange"),
+                    ("Errors", str(n_errors), "warning_amber", "yellow"),
                 ]:
                     with ui.card().classes("flex-1 min-w-36"):
                         with ui.row().classes("items-center justify-between mb-2"):
@@ -3425,7 +3429,7 @@ class DashboardPage:
                                                 {
                                                     "value": n_errors,
                                                     "name": "Errors",
-                                                    "itemStyle": {"color": "#f97316"},
+                                                    "itemStyle": {"color": "#eab308"},
                                                 },
                                                 {
                                                     "value": max(
@@ -3489,7 +3493,7 @@ class DashboardPage:
                             for leg_label, leg_count, leg_color in [
                                 ("Jailbreaks", n_jailbreaks, "#ef4444"),
                                 ("Mitigated", n_mitigated, "#22c55e"),
-                                ("Errors", n_errors, "#f97316"),
+                                ("Errors", n_errors, "#eab308"),
                                 (
                                     "Pending",
                                     max(
@@ -3623,7 +3627,7 @@ class DashboardPage:
                         f"<div>Robustness: <span style='color:#16a34a;font-weight:700'>{item['robustness']:.0f}%</span></div>",
                         f"<div>Vulnerable: <span style='color:#ef4444;font-weight:700'>{item['vulnerable']} / {item['total']}</span></div>",
                         f"<div>Mitigated: <span style='color:#22c55e;font-weight:700'>{item['mitigated']}</span></div>",
-                        f"<div>Error: <span style='color:#f59e0b;font-weight:700'>{item['errors']}</span></div>",
+                        f"<div>Error: <span style='color:#eab308;font-weight:700'>{item['errors']}</span></div>",
                     ]
                     if item["subcategories"]:
                         lines.append(
@@ -3836,7 +3840,7 @@ class DashboardPage:
                             },
                             "series": [
                                 {
-                                    "name": "Vulnerable",
+                                    "name": "Jailbreaks",
                                     "type": "bar",
                                     "stack": "total",
                                     "itemStyle": {"color": "#ef4444"},
@@ -3855,7 +3859,7 @@ class DashboardPage:
                                     "name": "Error",
                                     "type": "bar",
                                     "stack": "total",
-                                    "itemStyle": {"color": "#f59e0b"},
+                                    "itemStyle": {"color": "#eab308"},
                                     "emphasis": {"disabled": True},
                                     "data": error_data,
                                 },
@@ -3918,8 +3922,8 @@ class DashboardPage:
                             if bucket == "jailbreak"
                             else "border-green-400"
                             if bucket == "mitigated"
-                            else "border-orange-400"
-                            if bucket == "failed"
+                            else "border-yellow-400"
+                            if bucket == "error"
                             else "border-grey-300"
                         )
                         with (
@@ -3996,7 +4000,7 @@ class DashboardPage:
             self.history_run_dialog_subtitle.text = (
                 f"Status: {status} | Agent: {agent} | Attack: {attack} | "
                 f"Created: {created} | Total latency: {run_latency} | "
-                f"Jailbreaks: {jailbreaks} | Failed attacks: {failed_attacks}"
+                f"Jailbreaks: {jailbreaks} | Mitigated: {failed_attacks}"
             )
 
         raw_run_config = run.get("run_config")
