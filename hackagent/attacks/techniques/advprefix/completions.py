@@ -387,6 +387,7 @@ def execute(
                 f"Exception during completion for original index {index}: {e}",
                 exc_info=e,
             )
+            err_msg = f"Sync Task Exception: {type(e).__name__} - {str(e)}"
             result = {
                 "completion": None,
                 "raw_request_payload": None,
@@ -394,7 +395,8 @@ def execute(
                 "raw_response_headers": None,
                 "raw_response_body": None,
                 "adapter_specific_events": None,
-                "error_message": f"Sync Task Exception: {type(e).__name__} - {str(e)}",
+                "error_message": err_msg,
+                "error": err_msg,
                 "log_message": None,
             }
         result["completion_elapsed_s"] = round(time.perf_counter() - _row_t0, 3)
@@ -458,6 +460,7 @@ def execute(
             "adapter_specific_events"
         )
         result["error_message"] = completion_result.get("error_message")
+        result["error"] = completion_result.get("error")
         result["completion_elapsed_s"] = completion_result.get("completion_elapsed_s")
 
         # Inject result_id from Tracker so downstream evaluation can sync to server
