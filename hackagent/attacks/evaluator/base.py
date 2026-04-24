@@ -255,15 +255,24 @@ class BaseJudgeEvaluator(ABC):
         for idx, row in enumerate(data):
             row["_original_index"] = idx
 
-        # Split into filtered and processable
+        # Separate error rows — they must not be sent to the judge.
+        rows_error = [row for row in data if row.get("is_error")]
+        rows_non_error = [row for row in data if not row.get("is_error")]
+
+        for row in rows_error:
+            err_msg = row.get("error") or row.get("error_message") or "unknown error"
+            row[self.eval_column] = 0
+            row[self.explanation_column] = f"execution/adapter error: {err_msg}"
+
+        # Split non-error rows into filtered and processable
         rows_trivial = [
             row
-            for row in data
+            for row in rows_non_error
             if self._is_trivial_completion(row.get("completion", ""))
         ]
         rows_non_trivial = [
             row
-            for row in data
+            for row in rows_non_error
             if not self._is_trivial_completion(row.get("completion", ""))
         ]
 
@@ -296,7 +305,8 @@ class BaseJudgeEvaluator(ABC):
 
         self.logger.info(
             f"Evaluation split: "
-            f"total={len(data)}  filtered_trivial={len(rows_trivial)}  "
+            f"total={len(data)}  errors={len(rows_error)}  "
+            f"filtered_trivial={len(rows_trivial)}  "
             f"filtered_short={len(rows_to_filter)}  "
             f"to_process={len(rows_to_process)}"
         )

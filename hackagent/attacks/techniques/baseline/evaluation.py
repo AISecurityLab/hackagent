@@ -56,6 +56,24 @@ def evaluate_responses(
     """
     logger.info(f"Evaluating {len(data)} responses...")
 
+    # ------- error-row detection -------
+    # Rows that carry an adapter/execution error and have no real completion
+    # must be excluded from pattern evaluation.
+    for row in data:
+        err = row.get("error") or row.get("error_message")
+        completion = (row.get("completion") or "").strip()
+        if err and not completion:
+            row["success"] = False
+            row["is_error"] = True
+            row["evaluation_notes"] = f"Execution/adapter error: {err}"
+
+    evaluable = [r for r in data if not r.get("is_error")]
+    error_count = len(data) - len(evaluable)
+    if error_count:
+        logger.info(
+            f"Detected {error_count}/{len(data)} error rows — skipping evaluation"
+        )
+
     # Get objective configuration
     objective_name = config.get("objective", "jailbreak")
     objective = OBJECTIVES.get(objective_name)
@@ -80,7 +98,7 @@ def evaluate_responses(
             success_patterns=objective.success_patterns,
             failure_patterns=objective.failure_patterns,
         )
-        for row in data:
+        for row in evaluable:
             row["filtered"] = row.get("response_length", 0) < min_length
             if row["filtered"]:
                 row["success"] = False
@@ -95,7 +113,7 @@ def evaluate_responses(
     elif evaluator_type == "keyword":
         # Use failure patterns as refusal keywords
         evaluator = KeywordEvaluator(keywords=objective.failure_patterns)
-        for row in data:
+        for row in evaluable:
             row["filtered"] = row.get("response_length", 0) < min_length
             row["refused"] = evaluator.has_keywords(row.get("completion", ""))
             if row["filtered"]:
@@ -112,15 +130,17 @@ def evaluate_responses(
         logger.warning(
             f"Unknown evaluator type: {evaluator_type}, defaulting to pattern"
         )
-        for row in data:
+        for row in evaluable:
             row["success"] = False
             row["evaluation_notes"] = f"Unknown evaluator: {evaluator_type}"
 
-    success_count = sum(1 for row in data if row.get("success", False))
-    success_rate = success_count / len(data) * 100 if len(data) > 0 else 0
+    success_count = sum(1 for row in evaluable if row.get("success", False))
+    denominator = len(evaluable)
+    success_rate = success_count / denominator * 100 if denominator > 0 else 0
 
     logger.info(
-        f"Evaluation complete: {success_count}/{len(data)} successful ({success_rate:.1f}%)"
+        f"Evaluation complete: {success_count}/{denominator} successful ({success_rate:.1f}%)"
+        + (f" ({error_count} errors excluded)" if error_count else "")
     )
 
     return data
@@ -392,6 +412,7 @@ def _finalize_goals_with_tracker(
         lambda: {
             "total": 0,
             "successful": 0,
+            "errors": 0,
             "evaluations": [],
         }
     )
@@ -401,12 +422,15 @@ def _finalize_goals_with_tracker(
         goal = row.get("goal", "unknown")
         goal_key = (goal_idx, goal)
         goal_results[goal_key]["total"] += 1
-        if row.get("success", False):
+        if row.get("is_error"):
+            goal_results[goal_key]["errors"] += 1
+        elif row.get("success", False):
             goal_results[goal_key]["successful"] += 1
         goal_results[goal_key]["evaluations"].append(
             {
                 "template_category": row.get("template_category"),
                 "success": row.get("success", False),
+                "is_error": row.get("is_error", False),
                 "evaluation_notes": row.get("evaluation_notes", ""),
                 "response_length": row.get("response_length", 0),
             }
@@ -422,10 +446,12 @@ def _finalize_goals_with_tracker(
 
         results = goal_results.get(
             (goal_index, ctx.goal),
-            {"total": 0, "successful": 0, "evaluations": []},
+            {"total": 0, "successful": 0, "errors": 0, "evaluations": []},
         )
         total = results["total"]
         successful = results["successful"]
+        errors = results["errors"]
+        all_errored = total > 0 and errors == total
 
         if total == 0:
             goal_tracker.add_custom_trace(
@@ -448,31 +474,49 @@ def _finalize_goals_with_tracker(
             evaluation_result={
                 "total_attempts": total,
                 "successful_attempts": successful,
+                "error_attempts": errors,
                 "success_rate": success_rate,
                 "evaluations": results["evaluations"][:10],  # Limit for readability
             },
             score=success_rate,
-            explanation=f"{successful}/{total} attempts successful ({success_rate:.1f}%)",
+            explanation=f"{successful}/{total} attempts successful ({success_rate:.1f}%)"
+            + (f" ({errors} errors)" if errors else ""),
             evaluator_name="baseline_pattern_evaluator",
         )
 
         # Finalize the goal
-        evaluation_notes = f"Baseline attack: {successful}/{total} attempts successful ({success_rate:.1f}%)"
-
-        if goal_tracker.finalize_goal(
-            ctx=ctx,
-            success=goal_success,
-            evaluation_notes=(
+        if all_errored:
+            evaluation_notes = (
+                f"Baseline attack: all {total} attempts failed with "
+                "adapter/execution errors (e.g. timeout)"
+            )
+        elif total == 0:
+            evaluation_notes = (
                 "Baseline attack: no prompts/completions generated for this goal"
-                if total == 0
-                else evaluation_notes
-            ),
-            final_metadata={
+            )
+        else:
+            evaluation_notes = (
+                f"Baseline attack: {successful}/{total} attempts successful "
+                f"({success_rate:.1f}%)" + (f" ({errors} errors)" if errors else "")
+            )
+
+        finalize_kwargs: Dict[str, Any] = {
+            "ctx": ctx,
+            "success": goal_success,
+            "evaluation_notes": evaluation_notes,
+            "final_metadata": {
                 "total_attempts": total,
                 "successful_attempts": successful,
+                "error_attempts": errors,
                 "success_rate": success_rate,
             },
-        ):
+        }
+        if all_errored:
+            finalize_kwargs["evaluation_status"] = (
+                EvaluationStatusEnum.ERROR_AGENT_RESPONSE
+            )
+
+        if goal_tracker.finalize_goal(**finalize_kwargs):
             finalized_count += 1
 
     logger.info(f"Finalized {finalized_count}/{len(all_contexts)} goals with Tracker")

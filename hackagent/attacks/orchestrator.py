@@ -573,6 +573,10 @@ class AttackOrchestrator:
                 run_config_override=run_config_override,
             )
 
+            # Normalize results: some techniques (e.g. baseline) return a dict
+            # with an "evaluated" key; the evaluation pipeline expects a flat list.
+            results = self._normalize_attack_results(results)
+
             # =========================
             # RUN EVALUATION PIPELINE
             # =========================
@@ -634,6 +638,34 @@ class AttackOrchestrator:
             except Exception as update_error:
                 logger.warning(f"Failed to update run status to FAILED: {update_error}")
             raise
+
+    # ========================================================================
+    # Result Normalization
+    # ========================================================================
+
+    @staticmethod
+    def _normalize_attack_results(results: Any) -> List[Dict[str, Any]]:
+        """Normalise the return value of an attack ``run()`` into a flat list.
+
+        Some techniques (e.g. baseline) return a ``dict`` like
+        ``{"evaluated": [...], "summary": [...]}``.  The evaluation
+        pipeline expects ``List[Dict]``.  Iterating a dict directly
+        yields its *keys* as strings, which is the root cause of the
+        ``"Evaluation row N is str, coercing to dict"`` warnings.
+        """
+        if results is None:
+            return []
+        if isinstance(results, list):
+            return results
+        if isinstance(results, dict):
+            # Prefer the "evaluated" key (baseline convention).
+            if "evaluated" in results and isinstance(results["evaluated"], list):
+                return results["evaluated"]
+            # Fallback: if every value is a list, concatenate them.
+            lists = [v for v in results.values() if isinstance(v, list)]
+            if lists:
+                return lists[0]
+        return []
 
     # ========================================================================
     # HTTP Response Helpers

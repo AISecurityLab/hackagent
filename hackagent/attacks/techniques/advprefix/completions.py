@@ -243,11 +243,14 @@ def _get_completion_via_router(
 
     if error_msg:
         result_dict["error_message"] = error_msg
+        result_dict["error"] = error_msg  # normalised key for evaluation pipeline
         result_dict["log_message"] = (
             f"Adapter error for prefix at original index {original_index}: {error_msg}"
         )
     elif completion_text is None:
-        result_dict["error_message"] = "No completion text extracted by adapter"
+        no_text_msg = "No completion text extracted by adapter"
+        result_dict["error_message"] = no_text_msg
+        result_dict["error"] = no_text_msg
         result_dict["log_message"] = (
             f"No completion text from adapter for prefix at original index {original_index}."
         )

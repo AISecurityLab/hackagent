@@ -424,6 +424,7 @@ class Tracker:
         success: bool,
         evaluation_notes: Optional[str] = None,
         final_metadata: Optional[Dict[str, Any]] = None,
+        evaluation_status: Optional["EvaluationStatusEnum"] = None,
     ) -> bool:
         """
         Finalize a goal's result with evaluation status.
@@ -433,6 +434,9 @@ class Tracker:
             success: Whether the attack was successful
             evaluation_notes: Optional evaluation notes
             final_metadata: Optional final metadata to merge
+            evaluation_status: Explicit status override (e.g.
+                ``EvaluationStatusEnum.ERROR_AGENT_RESPONSE``).  When
+                *None*, the status is derived from *success*.
 
         Returns:
             True if update was successful, False otherwise
@@ -459,7 +463,9 @@ class Tracker:
             result_uuid = UUID(ctx.result_id)
 
             # Map success to evaluation status string
-            if success:
+            if evaluation_status is not None:
+                eval_status = evaluation_status
+            elif success:
                 eval_status = EvaluationStatusEnum.SUCCESSFUL_JAILBREAK
             else:
                 eval_status = EvaluationStatusEnum.FAILED_JAILBREAK
@@ -488,7 +494,7 @@ class Tracker:
             )
             self.logger.info(
                 f"Finalized goal {ctx.goal_index} (result {ctx.result_id}): "
-                f"{'SUCCESS' if success else 'FAILED'}"
+                f"{eval_status.value}"
             )
             return True
 
