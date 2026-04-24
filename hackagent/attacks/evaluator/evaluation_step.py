@@ -756,7 +756,7 @@ class BaseEvaluationStep:
         - Add _run_id if missing
         - Ensure result_id exists
         - Build judge_keys
-        - Call _sync_to_server
+        - Call _sync_to_server (only if not already synced by the attack)
         """
         for idx, item in enumerate(evaluated_items):
             if "_run_id" not in item:
@@ -764,6 +764,14 @@ class BaseEvaluationStep:
             if "result_id" not in item:
                 # fallback to goal_id or generated UUID
                 item["result_id"] = item.get("goal_id") or str(uuid4())
+
+        # Skip server sync when results were already evaluated and synced
+        # by the attack technique's own pipeline.
+        if self._already_evaluated(evaluated_items):
+            self.logger.info(
+                "Results already synced by attack pipeline — skipping prepare_and_sync"
+            )
+            return
 
         # Build judge_keys automatically
         judge_keys = self._build_judge_keys_from_data(evaluated_items)
@@ -897,27 +905,71 @@ class BaseEvaluationStep:
                 evaluator_name=f"{evaluator_prefix}_{'_'.join(judges_used)}",
             )
 
+    # Keys whose presence signals that results were already evaluated
+    # by the attack technique's own pipeline (e.g. AdvPrefix aggregation).
+    _EVAL_SCORE_KEYS: frozenset = frozenset(
+        {
+            "best_score",
+            "success",
+            "eval_nj",
+            "eval_jb",
+            "eval_hb",
+            "eval_hbv",
+            "eval_nj_mean",
+            "eval_jb_mean",
+            "eval_hb_mean",
+            "eval_hbv_mean",
+            "pasr",
+        }
+    )
+
+    def _already_evaluated(self, data: List[Dict[str, Any]]) -> bool:
+        """Return True when *data* already carries evaluation scores.
+
+        Attack techniques (AdvPrefix, FlipAttack, etc.) run their own
+        judge evaluation inside ``run()``.  Re-evaluating those results
+        here is at best redundant and at worst destructive — e.g.
+        AdvPrefix aggregated rows lack the ``completion`` field, so
+        judges would evaluate an empty string and overwrite correct
+        statuses with FAILED_JAILBREAK.
+        """
+        if not data:
+            return False
+        sample = data[0]
+        if not isinstance(sample, dict):
+            return False
+        return bool(self._EVAL_SCORE_KEYS & sample.keys())
+
     def run_full_evaluation(self, input_data: List[Dict[str, Any]]):
-        # 1. Resolve judges
-        judges_config = self._resolve_judges_from_config()
-        evaluator_base_config = self._build_base_eval_config()
+        already_evaluated = self._already_evaluated(input_data)
 
-        # 2. Run evaluation
-        evaluated_items = self._run_evaluation(
-            input_data, judges_config, evaluator_base_config
-        )
+        if already_evaluated:
+            self.logger.info(
+                "Results already contain evaluation scores — "
+                "skipping redundant re-evaluation, generating metrics only"
+            )
+            evaluated_items = input_data
+        else:
+            # 1. Resolve judges
+            judges_config = self._resolve_judges_from_config()
+            evaluator_base_config = self._build_base_eval_config()
 
-        # 3. Enrich
-        self._enrich_items_with_scores(evaluated_items)
+            # 2. Run evaluation
+            evaluated_items = self._run_evaluation(
+                input_data, judges_config, evaluator_base_config
+            )
 
-        # 4. Logging
-        self._log_evaluation_asr(evaluated_items)
+            # 3. Enrich
+            self._enrich_items_with_scores(evaluated_items)
 
-        # 5. Tracker
-        self._update_tracker(evaluated_items)
+            # 4. Log ASR
+            self._log_evaluation_asr(evaluated_items)
 
-        # 6. Sync row-level results
-        self._sync_to_server(evaluated_items)
+            # 5. Tracker
+            self._update_tracker(evaluated_items)
+
+            # 6. Sync row-level results
+            self._sync_to_server(evaluated_items)
 
         # 7. Generate metrics summary
         summary = generate_summary_report(evaluated_items)
