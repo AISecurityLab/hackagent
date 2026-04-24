@@ -30,7 +30,7 @@ from hackagent.attacks.shared.response_utils import extract_response_content
 from hackagent.attacks.shared.router_factory import create_router
 from hackagent.attacks.shared.tui import with_tui_logging
 from hackagent.server.client import AuthenticatedClient
-from hackagent.server.api.models import StepTypeEnum
+from hackagent.server.api.models import EvaluationStatusEnum, StepTypeEnum
 from hackagent.router.router import AgentRouter
 from hackagent.router.tracking import Tracker, Context
 
@@ -464,13 +464,14 @@ SCORE: {score}"""
 
             # Check for error message in dict response
             if isinstance(response, dict) and response.get("error_message"):
-                self.logger.warning(
-                    f"Target response error: {response.get('error_message')}"
-                )
+                error_msg = response["error_message"]
+                self.logger.warning(f"Target response error: {error_msg}")
+                metadata["error_message"] = error_msg
                 return (None, metadata) if include_meta else None
 
         except Exception as e:
             self.logger.error(f"Error querying target: {e}")
+            metadata["error_message"] = str(e)
 
         return (None, metadata) if include_meta else None
 
@@ -580,6 +581,9 @@ SCORE: {score}"""
         best_score = 0
         best_scorer_explanation = ""
         iterations_completed = 0
+        target_errors = 0
+        attacker_errors = 0
+        last_error_message = ""
 
         self.logger.info(f"Starting PAIR attack for goal: {goal[:50]}...")
 
@@ -599,6 +603,7 @@ SCORE: {score}"""
             attacker_latency_s = round(time.perf_counter() - _attacker_t0, 3)
 
             if not adversarial_prompt:
+                attacker_errors += 1
                 self.logger.warning(
                     f"Failed to generate prompt at iteration {iteration}"
                 )
@@ -631,6 +636,10 @@ SCORE: {score}"""
             target_latency_s = round(time.perf_counter() - _target_t0, 3)
 
             if not target_response:
+                error_msg = target_meta.get("error_message", "No response")
+                if target_meta.get("error_message"):
+                    target_errors += 1
+                    last_error_message = error_msg
                 self.logger.warning(
                     f"Failed to get target response at iteration {iteration}"
                 )
@@ -641,7 +650,7 @@ SCORE: {score}"""
                         request={"prompt": adversarial_prompt[:500]},
                         response=None,
                         step_name=f"Iteration {iteration + 1}: Target Query Failed",
-                        metadata={"iteration": iteration + 1, "error": "No response"},
+                        metadata={"iteration": iteration + 1, "error": error_msg},
                     )
                 if progress_bar and task is not None:
                     progress_bar.update(task, advance=1)
@@ -769,7 +778,19 @@ SCORE: {score}"""
                     progress_bar.update(task, advance=remaining)
                 break
 
-        return {
+        # Mark as error when all iterations failed due to infrastructure issues
+        # (adapter timeouts, connection failures, etc.) — either the attacker
+        # never produced a usable prompt, or the target always returned errors.
+        total_infra_errors = attacker_errors + target_errors
+        all_errored = (
+            not best_response
+            and total_infra_errors > 0
+            and total_infra_errors == iterations_completed
+        )
+        if all_errored and not last_error_message:
+            last_error_message = "All iterations failed (attacker/target errors)"
+
+        result = {
             "goal": goal,
             "goal_index": goal_index,
             "best_prompt": best_prompt,
@@ -780,6 +801,12 @@ SCORE: {score}"""
             "iterations_completed": iterations_completed,
             "n_iterations": n_iterations,
         }
+        if all_errored:
+            result["error"] = last_error_message
+            result["error_message"] = last_error_message
+            result["is_error"] = True
+
+        return result
 
     @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
     def run(self, goals: List[str]) -> List[Dict[str, Any]]:
@@ -889,10 +916,26 @@ SCORE: {score}"""
                                         )
                                     },
                                 )
+                                is_error = result.get("is_error", False)
+                                if is_error:
+                                    eval_status = (
+                                        EvaluationStatusEnum.ERROR_AGENT_RESPONSE
+                                    )
+                                    eval_notes = (
+                                        f"PAIR attack: adapter/execution error — "
+                                        f"{result.get('error', 'unknown')}"
+                                    )
+                                else:
+                                    eval_status = None
+                                    eval_notes = (
+                                        f"PAIR attack: score {result['best_score']}/10 "
+                                        f"({'SUCCESS' if result['is_success'] else 'FAILED'})"
+                                    )
                                 goal_tracker.finalize_goal(
                                     ctx=goal_ctx,
                                     success=result["is_success"],
-                                    evaluation_notes=f"PAIR attack: score {result['best_score']}/10 ({'SUCCESS' if result['is_success'] else 'FAILED'})",
+                                    evaluation_notes=eval_notes,
+                                    evaluation_status=eval_status,
                                     final_metadata={
                                         "best_score": result["best_score"],
                                         "iterations_completed": result[
