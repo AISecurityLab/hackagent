@@ -46,7 +46,7 @@ import time
 from hackagent.logger import get_logger
 from typing import Any, Callable, Dict, List, Optional
 
-from hackagent.server.api.models import StatusEnum
+from hackagent.server.api.models import EvaluationStatusEnum, StatusEnum
 
 from .context import TrackingContext
 from .step import StepTracker
@@ -420,6 +420,26 @@ class TrackingCoordinator:
                     evaluation_notes=(
                         "Goal filtered during prefix generation: "
                         "no prefixes survived preprocessing"
+                    ),
+                )
+                continue
+
+            # Detect all-error goals
+            total = len(goal_data)
+            errors = sum(
+                1
+                for r in goal_data
+                if r.get("is_error") or (r.get("error") and not r.get("response"))
+            )
+            all_errored = total > 0 and errors == total
+
+            if all_errored:
+                self.goal_tracker.finalize_goal(
+                    ctx=ctx,
+                    success=False,
+                    evaluation_status=EvaluationStatusEnum.ERROR_AGENT_RESPONSE,
+                    evaluation_notes=(
+                        f"All {total} result(s) failed with execution/adapter errors"
                     ),
                 )
                 continue

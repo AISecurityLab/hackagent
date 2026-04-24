@@ -594,6 +594,10 @@ def _search_single_goal(
             logger.info(
                 f"[{_label}] ✗ No valid response from {num_concurrent_k} candidates"
             )
+            # Propagate error to best_result so the evaluation layer can
+            # detect it (best_result.error stays None otherwise).
+            if step_best and step_best.get("error") and not best_result.get("response"):
+                best_result["error"] = step_best["error"]
             # Persist a grouped step trace even when no valid response
             if tracker:
                 goal_ctx = tracker.get_goal_context(goal_idx)

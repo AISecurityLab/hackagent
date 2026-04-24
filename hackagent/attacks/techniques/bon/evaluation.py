@@ -124,6 +124,7 @@ class BoNEvaluation(BaseEvaluationStep):
         for idx, item in enumerate(input_data):
             if item.get("error") and not item.get("response"):
                 error_indices.add(idx)
+                item["is_error"] = True
                 item.setdefault("best_score", 0.0)
                 item.setdefault("success", False)
                 item.setdefault("evaluation_notes", f"Execution error: {item['error']}")
