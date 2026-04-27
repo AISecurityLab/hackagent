@@ -105,7 +105,7 @@ class TestCoreGenerationAndScoring(unittest.TestCase):
         agent_router.route_request.return_value = {"dummy": True}
         cfg = {"max_tokens": 10, "temperature": 0.1}
         out = core.query_target(agent_router, "v-key", "prompt", cfg, MagicMock())
-        self.assertEqual(out, "target out")
+        self.assertEqual(out, ("target out", None))
 
     @patch("hackagent.attacks.techniques.autodan_turbo.core.extract_response_content")
     def test_score_response_wrapper_parsed(self, mock_extract):

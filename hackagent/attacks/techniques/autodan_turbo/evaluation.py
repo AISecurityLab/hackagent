@@ -86,6 +86,33 @@ class AutoDANTurboEvaluation(BaseEvaluationStep):
             self._drop_legacy_judge_fields(item)
             auto_score = self._extract_autodan_score(item)
 
+            is_error_row = bool(
+                item.get("is_error") or (item.get("error") and not item.get("response"))
+            )
+            if is_error_row:
+                err_msg = item.get("error") or item.get("error_message") or "unknown"
+                auto_score = 0.0
+                item["is_error"] = True
+                item["autodan_score"] = 0.0
+                item["attack_score"] = 0.0
+                item["best_score"] = 0.0
+                item["success"] = False
+                item["scorer_verdict"] = "error"
+                item["evaluation_summary"] = (
+                    f"ERROR: adapter/execution error — {err_msg}"
+                )
+                item.setdefault(
+                    "evaluation_notes",
+                    f"Execution/adapter error: {err_msg}",
+                )
+                self.logger.info(
+                    format_phase_message(
+                        "evaluation",
+                        f"Goal {idx}: verdict=error | error={err_msg}",
+                    )
+                )
+                continue
+
             if item.get("error"):
                 auto_score = 0.0
 

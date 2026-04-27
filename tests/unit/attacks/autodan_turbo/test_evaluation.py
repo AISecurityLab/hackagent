@@ -75,11 +75,9 @@ class TestAutoDANTurboEvaluation(unittest.TestCase):
         self.assertEqual(out[0]["best_score"], 0.0)
         self.assertFalse(out[0]["success"])
         self.assertEqual(out[0]["autodan_score"], 0.0)
-        self.assertEqual(out[0]["scorer_verdict"], "safe")
-        self.assertEqual(
-            out[0]["evaluation_summary"],
-            "SAFE by scorer: score=0.0, threshold=8.5",
-        )
+        self.assertEqual(out[0]["scorer_verdict"], "error")
+        self.assertTrue(out[0]["is_error"])
+        self.assertIn("adapter/execution error", out[0]["evaluation_summary"])
 
 
 if __name__ == "__main__":
