@@ -243,11 +243,14 @@ def _get_completion_via_router(
 
     if error_msg:
         result_dict["error_message"] = error_msg
+        result_dict["error"] = error_msg  # normalised key for evaluation pipeline
         result_dict["log_message"] = (
             f"Adapter error for prefix at original index {original_index}: {error_msg}"
         )
     elif completion_text is None:
-        result_dict["error_message"] = "No completion text extracted by adapter"
+        no_text_msg = "No completion text extracted by adapter"
+        result_dict["error_message"] = no_text_msg
+        result_dict["error"] = no_text_msg
         result_dict["log_message"] = (
             f"No completion text from adapter for prefix at original index {original_index}."
         )
@@ -384,6 +387,7 @@ def execute(
                 f"Exception during completion for original index {index}: {e}",
                 exc_info=e,
             )
+            err_msg = f"Sync Task Exception: {type(e).__name__} - {str(e)}"
             result = {
                 "completion": None,
                 "raw_request_payload": None,
@@ -391,7 +395,8 @@ def execute(
                 "raw_response_headers": None,
                 "raw_response_body": None,
                 "adapter_specific_events": None,
-                "error_message": f"Sync Task Exception: {type(e).__name__} - {str(e)}",
+                "error_message": err_msg,
+                "error": err_msg,
                 "log_message": None,
             }
         result["completion_elapsed_s"] = round(time.perf_counter() - _row_t0, 3)
@@ -455,6 +460,7 @@ def execute(
             "adapter_specific_events"
         )
         result["error_message"] = completion_result.get("error_message")
+        result["error"] = completion_result.get("error")
         result["completion_elapsed_s"] = completion_result.get("completion_elapsed_s")
 
         # Inject result_id from Tracker so downstream evaluation can sync to server

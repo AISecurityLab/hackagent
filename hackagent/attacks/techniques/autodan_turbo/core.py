@@ -250,7 +250,11 @@ def query_target(agent_router, victim_key, prompt, config, logger, role_label="t
         role_label: Log label for target role.
 
     Returns:
-        Target model response text (empty string when extraction fails).
+        Tuple ``(target_response, error_message)``. ``target_response`` is the
+        extracted text (empty string when extraction fails); ``error_message``
+        is set when the adapter returned/raised an infrastructure error
+        (timeout, connection failure, etc.) so callers can distinguish empty
+        responses from failures.
     """
     logger.info(
         format_phase_message(
@@ -274,14 +278,25 @@ def query_target(agent_router, victim_key, prompt, config, logger, role_label="t
             )
         )
 
-    resp = agent_router.route_request(
-        registration_key=victim_key,
-        request_data=request_data,
-    )
+    error_message = None
+    try:
+        resp = agent_router.route_request(
+            registration_key=victim_key,
+            request_data=request_data,
+        )
+    except Exception as exc:
+        logger.error(
+            format_phase_message(
+                "target",
+                f"[Role:{role_label}] adapter exception: {exc}",
+            )
+        )
+        return "", str(exc)
+
     target_response = extract_response_content(resp, logger) or ""
     if not target_response:
         if isinstance(resp, dict):
-            error_message = resp.get("error_message")
+            error_message = resp.get("error_message") or resp.get("error")
             status_code = resp.get("status_code") or resp.get("raw_response_status")
             agent_data = resp.get("agent_specific_data") or {}
             finish_reason = agent_data.get("finish_reason")
@@ -306,7 +321,7 @@ def query_target(agent_router, victim_key, prompt, config, logger, role_label="t
             f"[Role:{role_label}] response='{_truncate_for_log(target_response)}'",
         )
     )
-    return target_response
+    return target_response, error_message
 
 
 def score_response(

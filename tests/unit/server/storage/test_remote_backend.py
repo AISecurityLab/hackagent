@@ -634,7 +634,7 @@ class TestRemoteBackendResult(unittest.TestCase):
                 "total": 12,
                 "jailbreaks": 4,
                 "mitigated": 3,
-                "failed": 6,
+                "error": 6,
                 "pending": 5,
             },
         )

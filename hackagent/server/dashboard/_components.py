@@ -22,12 +22,12 @@ EVAL_COLOR_JS = (
 )
 
 EVAL_LABEL_JS = (
-    "(props.row.evaluation_notes || '').toLowerCase().includes('failed with exception') ? 'Failed'"
+    "(props.row.evaluation_notes || '').toLowerCase().includes('failed with exception') ? 'Error'"
     " : props.row.evaluation_status?.toUpperCase().includes('SUCCESSFUL_JAILBREAK') ? 'Jailbreak'"
     " : props.row.evaluation_status?.toUpperCase().includes('PASSED_CRITERIA') ? 'Mitigated'"
     " : props.row.evaluation_status?.toUpperCase().includes('FAILED_JAILBREAK') ? 'Mitigated'"
     " : (props.row.evaluation_status?.toUpperCase().includes('FAILED_CRITERIA') ||"
-    "    props.row.evaluation_status?.toUpperCase().includes('ERROR')) ? 'Failed'"
+    "    props.row.evaluation_status?.toUpperCase().includes('ERROR')) ? 'Error'"
     " : 'Pending'"
 )
 
@@ -210,8 +210,12 @@ def make_run_table(
                     </q-badge>
                     <q-badge v-if="(props.row.failed_attacks ?? 0) > 0"
                                      color="positive" class="ml-2">
-                        failed attacks: {{ props.row.failed_attacks }}
+                        mitigated: {{ props.row.failed_attacks }}
           </q-badge>
+                    <q-badge v-if="(props.row.errors ?? 0) > 0"
+                             color="warning" class="ml-2">
+                        errors: {{ props.row.errors }}
+                    </q-badge>
                     <q-badge
                         v-if="((props.row.successful_jailbreaks ?? 0) + (props.row.failed_attacks ?? 0)) > 0"
                         color="info"

@@ -150,6 +150,13 @@ def sync_evaluation_to_server(
         if not result_id:
             continue
 
+        # Skip error rows — their status (ERROR_AGENT_RESPONSE) is managed
+        # by the TrackingCoordinator via finalize_all_goals, not by the
+        # evaluation sync.  Writing FAILED_JAILBREAK here would overwrite
+        # the correct error status.
+        if row.get("is_error"):
+            continue
+
         success, notes = _evaluate_row(row, judge_keys)
 
         existing = best_per_result.get(result_id)

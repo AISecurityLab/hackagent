@@ -98,7 +98,7 @@
     th { font-weight: 500; font-size: 0.75rem; color: hsl(var(--muted-foreground)); text-align: left; }
     .result-row-success { border-left: 2px solid #10b981; }
     .result-row-jailbreak { border-left: 2px solid hsl(var(--destructive)); }
-    .result-row-error   { border-left: 2px solid #f97316; }
+    .result-row-error   { border-left: 2px solid #eab308; }
     .result-row-pending { border-left: 2px solid transparent; }
 
     /* ── Shimmer skeleton ────────────────────────────────────── */
@@ -300,13 +300,13 @@
                 </div>
                 <div class="flex items-center gap-2.5 text-sm">
                   <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0"></span>
-                  <span class="text-muted-foreground flex-1">Passed / Safe</span>
+                  <span class="text-muted-foreground flex-1">Mitigated</span>
                   <span class="font-semibold tabular-nums text-emerald-600" x-text="stats.passed"></span>
                 </div>
                 <div class="flex items-center gap-2.5 text-sm">
-                  <span class="w-2.5 h-2.5 rounded-full bg-orange-400 flex-shrink-0"></span>
+                  <span class="w-2.5 h-2.5 rounded-full bg-yellow-400 flex-shrink-0"></span>
                   <span class="text-muted-foreground flex-1">Errors</span>
-                  <span class="font-semibold tabular-nums text-orange-500" x-text="stats.errors"></span>
+                  <span class="font-semibold tabular-nums text-yellow-500" x-text="stats.errors"></span>
                 </div>
                 <div class="flex items-center gap-2.5 text-sm">
                   <span class="w-2.5 h-2.5 rounded-full bg-muted-foreground/30 flex-shrink-0"></span>
@@ -603,11 +603,11 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                   d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                               </svg>
-                              <span x-text="resultSummary.passed + ' passed'"></span>
+                              <span x-text="resultSummary.passed + ' mitigated'"></span>
                             </span>
                           </template>
                           <template x-if="resultSummary.errors > 0">
-                            <span class="inline-flex items-center gap-1 text-orange-600 font-medium">
+                            <span class="inline-flex items-center gap-1 text-yellow-600 font-medium">
                               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                   d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
@@ -1142,7 +1142,7 @@
             this._distChart = new Chart(distEl, {
               type: 'bar',
               data: {
-                labels: ['Jailbreaks', 'Passed / Safe', 'Errors', 'Not Evaluated'],
+                labels: ['Jailbreaks', 'Mitigated', 'Errors', 'Not Evaluated'],
                 datasets: [{
                   data: [
                     this.stats.successful_jailbreaks,
@@ -1150,7 +1150,7 @@
                     this.stats.errors,
                     this.stats.not_evaluated,
                   ],
-                  backgroundColor: ['#ef4444', '#22c55e', '#f97316', isDark ? '#475569' : '#cbd5e1'],
+                  backgroundColor: ['#ef4444', '#22c55e', '#eab308', isDark ? '#475569' : '#cbd5e1'],
                   borderRadius: 5,
                   borderSkipped: false,
                 }],
@@ -1211,9 +1211,9 @@
           if (s.includes('FAILED_JAILBREAK') || s.includes('PASSED_CRITERIA'))
             return 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300';
           if (s.includes('FAILED_CRITERIA'))
-            return 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300';
+            return 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300';
           if (s.includes('ERROR'))
-            return 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300';
+            return 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300';
           return 'bg-secondary text-secondary-foreground';
         },
 
@@ -1221,9 +1221,9 @@
           const s = (status || '').toUpperCase();
           if (s.includes('SUCCESSFUL_JAILBREAK')) return 'Jailbreak';
           if (s.includes('FAILED_JAILBREAK'))     return 'Mitigated';
-          if (s.includes('PASSED_CRITERIA'))      return 'Passed';
-          if (s.includes('FAILED_CRITERIA'))      return 'Failed';
-          if (s.includes('ERROR_AGENT'))          return 'Agent Error';
+          if (s.includes('PASSED_CRITERIA'))      return 'Mitigated';
+          if (s.includes('FAILED_CRITERIA'))      return 'Error';
+          if (s.includes('ERROR_AGENT'))          return 'Error';
           if (s.includes('ERROR'))                return 'Error';
           if (s.includes('NOT_EVALUATED'))        return 'Pending';
           return status || 'N/A';

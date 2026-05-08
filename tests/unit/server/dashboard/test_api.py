@@ -146,7 +146,7 @@ class TestDashboardApiRoutes(unittest.TestCase):
         self.assertEqual(runs_payload["total"], 1)
         self.assertEqual(runs_payload["items"][0]["total_results"], 2)
         self.assertEqual(runs_payload["items"][0]["successful_jailbreaks"], 1)
-        self.assertEqual(runs_payload["items"][0]["status"], "FAILED")
+        self.assertEqual(runs_payload["items"][0]["status"], "COMPLETED")
 
 
 if __name__ == "__main__":

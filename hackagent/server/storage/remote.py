@@ -831,7 +831,7 @@ class RemoteBackend:
             "total": total,
             "jailbreaks": jailbreaks,
             "mitigated": mitigated,
-            "failed": failed,
+            "error": failed,
             "pending": pending,
         }
 

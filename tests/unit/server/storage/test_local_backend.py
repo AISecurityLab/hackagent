@@ -524,7 +524,7 @@ class TestLocalBackendDeleteAndBuckets(unittest.TestCase):
                 "total": 5,
                 "jailbreaks": 1,
                 "mitigated": 1,
-                "failed": 2,
+                "error": 2,
                 "pending": 1,
             },
         )
