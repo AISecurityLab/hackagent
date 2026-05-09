@@ -59,6 +59,16 @@ uv add hackagent
 pip install hackagent
 ```
 
+### Using Ollama Models
+
+If you plan to use Ollama for local models:
+
+1. Install Ollama from [https://ollama.ai/](https://ollama.ai/)
+2. Start the Ollama server: `ollama serve`
+3. Models are automatically pulled when needed
+
+**Note**: The category classifier will automatically download the default model (`gemma3:4b`) when needed. You can override this in your attack configuration.
+
 ## 📚 Quick Start
 
 Run the interactive CLI to start testing your AI agents:
