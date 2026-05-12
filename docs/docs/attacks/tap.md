@@ -10,14 +10,6 @@ TAP (Tree of Attacks with Pruning) is an efficient adversarial attack technique 
 
 TAP frames jailbreaking as a **tree search** where each node represents an attacker-generated prompt candidate. Multiple independent search streams run in parallel, and branches that drift off-topic or score poorly are pruned before querying the target, saving cost and improving signal quality.
 
-### Key Features
-
-- **Tree Search**: Explores branching refinements in parallel streams
-- **On-Topic Pruning**: Discards branches that drift from the original goal before querying the target
-- **Score Pruning**: Keeps only the highest-scoring branches at each depth level
-- **Early Stopping**: Returns immediately when a successful jailbreak is found
-- **Research-Backed**: Based on peer-reviewed academic work
-
 ### Research Foundation
 
 TAP is based on the paper:
@@ -99,7 +91,7 @@ results = agent.hack(attack_config=attack_config)
 ### CLI Usage
 
 ```bash
-hackagent attack tap \
+hackagent eval tap \
   --agent-name "my-agent" \
   --agent-type "google-adk" \
   --endpoint "http://localhost:8000" \
@@ -142,10 +134,10 @@ advanced_config = {
 
     # Attacker LLM — proposes prompt refinements
     "attacker": {
-        "identifier": "hackagent-attacker",
-        "endpoint": "https://api.openai.com/v1",
-        "agent_type": "OPENAI_SDK",
-        "model": "gpt-4",
+        "identifier": "gemma3:4b",
+        "endpoint": "http://localhost:11434",
+        "agent_type": "OLLAMA",
+        "model": "gemma3:4b",
         "max_tokens": 400,
         "temperature": 1.0,
         "top_p": 0.9,
@@ -159,9 +151,9 @@ advanced_config = {
 
     # Main judge — scores jailbreak success
     "judge": {
-        "identifier": "hackagent-judge",
-        "endpoint": "https://api.openai.com/v1",
-        "agent_type": "OPENAI_SDK",
+        "identifier": "gemma3:4b",
+        "endpoint": "http://localhost:11434",
+        "agent_type": "OLLAMA",
         "type": "harmbench",
         "api_key": None
     },

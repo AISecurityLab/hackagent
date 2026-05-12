@@ -167,7 +167,17 @@ class BaselineAttack(BaseAttack):
                 "config_keys": [
                     "objective",
                     "evaluator_type",
+                    "judges",
+                    "judge_config",
                     "min_response_length",
+                    "batch_size_judge",
+                    "judge_parallelism",
+                    "max_tokens_eval",
+                    "judge_timeout",
+                    "judge_request_timeout",
+                    "judge_temperature",
+                    "max_judge_retries",
+                    "organization_id",
                     "_goal_index_offset",  # Global goal index offset in batched runs
                     "_tracker",  # Shared goal tracker from coordinator
                     "_run_id",  # For real-time result tracking
@@ -175,7 +185,7 @@ class BaselineAttack(BaseAttack):
                     "_client",  # Legacy fallback
                 ],
                 "input_data_arg_name": "input_data",
-                "required_args": ["logger", "config"],
+                "required_args": ["logger", "config", "client"],
             },
         ]
 

@@ -40,10 +40,10 @@ from pydantic import BaseModel, ConfigDict, Field
 # Canonical service defaults
 # ---------------------------------------------------------------------------
 
-HACKAGENT_API_BASE = "https://api.hackagent.dev/v1"
-HACKAGENT_AGENT_TYPE = "OPENAI_SDK"
-DEFAULT_ATTACKER_IDENTIFIER = "hackagent-attacker"
-DEFAULT_JUDGE_IDENTIFIER = "hackagent-judge"
+DEFAULT_LOCAL_MODEL_ENDPOINT = "http://localhost:11434"
+DEFAULT_LOCAL_AGENT_TYPE = "OLLAMA"
+DEFAULT_ATTACKER_IDENTIFIER = "gemma3:4b"
+DEFAULT_JUDGE_IDENTIFIER = "gemma3:4b"
 DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER = "gemma3:4b"
 DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT = "http://localhost:11434"
 DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE = "OLLAMA"
@@ -58,15 +58,15 @@ DEFAULT_MAX_OUTPUT_TOKENS = 4096
 class AttackerConfig(BaseModel):
     """Configuration for the attacker LLM.
 
-    Defaults to the shared HackAgent attacker endpoint so users only need
-    to override what is different for their deployment.
+    Defaults to a local Ollama attacker endpoint using gemma3:4b so users
+    only need to override what is different for their deployment.
     """
 
     model_config = ConfigDict(extra="allow", validate_assignment=True)
 
     identifier: str = DEFAULT_ATTACKER_IDENTIFIER
-    endpoint: str = HACKAGENT_API_BASE
-    agent_type: str = HACKAGENT_AGENT_TYPE
+    endpoint: str = DEFAULT_LOCAL_MODEL_ENDPOINT
+    agent_type: str = DEFAULT_LOCAL_AGENT_TYPE
     api_key: Optional[str] = None
     max_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS
     temperature: float = 1.0
@@ -101,14 +101,14 @@ class CategoryClassifierConfig(BaseModel):
 class JudgeConfig(BaseModel):
     """Configuration for one judge evaluator.
 
-    Defaults to the HarmBench judge on the shared HackAgent endpoint.
+    Defaults to a HarmBench judge routed through local Ollama (gemma3:4b).
     """
 
     model_config = ConfigDict(extra="allow", validate_assignment=True)
 
     identifier: str = DEFAULT_JUDGE_IDENTIFIER
-    endpoint: Optional[str] = HACKAGENT_API_BASE
-    agent_type: str = HACKAGENT_AGENT_TYPE
+    endpoint: Optional[str] = DEFAULT_LOCAL_MODEL_ENDPOINT
+    agent_type: str = DEFAULT_LOCAL_AGENT_TYPE
     type: str = "harmbench"
     api_key: Optional[str] = None
     top_p: Optional[float] = None
@@ -313,8 +313,8 @@ DEFAULT_MAX_JUDGE_RETRIES: int = JudgeEvalConfig.model_fields[
 ].default
 
 __all__ = [
-    "HACKAGENT_API_BASE",
-    "HACKAGENT_AGENT_TYPE",
+    "DEFAULT_LOCAL_MODEL_ENDPOINT",
+    "DEFAULT_LOCAL_AGENT_TYPE",
     "DEFAULT_ATTACKER_IDENTIFIER",
     "DEFAULT_JUDGE_IDENTIFIER",
     "DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER",

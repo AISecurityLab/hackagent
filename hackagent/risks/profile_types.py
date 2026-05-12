@@ -64,7 +64,6 @@ class AttackRecommendation:
     ----------
     technique : str
         Key in ``hackagent.attacks.registry.ATTACK_REGISTRY``
-        (e.g. ``"Baseline"``, ``"PAIR"``, ``"AdvPrefix"``).
     relevance : Relevance
         How well-suited this technique is for the vulnerability.
     rationale : str

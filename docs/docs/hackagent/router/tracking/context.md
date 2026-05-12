@@ -21,7 +21,7 @@ Shared context for operation tracking.
 This class encapsulates all the state needed for tracking operations
 and synchronizing with the backend API.  Each instance owns its own
 monotonically increasing sequence counter used to order traces for
-the `parent_result_id` Result it is attached to.
+the ``parent_result_id`` Result it is attached to.
 
 **Attributes**:
 

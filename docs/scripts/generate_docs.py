@@ -21,11 +21,6 @@ try:
 except ImportError:
     tomllib = None  # Python < 3.11 fallback handled in get_current_version()
 
-try:
-    import requests
-except ImportError:
-    requests = None  # optional; only needed for --latest
-
 # Prefixes excluded from API docs (CLI internals, dashboard app)
 _EXCLUDE_PREFIXES = (
     "hackagent.cli",
@@ -120,20 +115,6 @@ def _discover_modules(package_dir: Path) -> list[str]:
     return modules
 
 
-def get_latest_version() -> str:
-    """Get the latest published version from PyPI."""
-    if requests is None:
-        print("Warning: 'requests' not installed; run `uv sync --group docs` first.")
-        return "unknown"
-    try:
-        response = requests.get("https://pypi.org/pypi/hackagent/json", timeout=30)
-        response.raise_for_status()
-        return response.json()["info"]["version"]
-    except Exception as e:
-        print(f"Warning: Could not fetch latest version from PyPI: {e}")
-        return "unknown"
-
-
 def get_current_version(project_root: Path) -> str:
     """Read the version from the local pyproject.toml."""
     pyproject = project_root / "pyproject.toml"
@@ -195,7 +176,7 @@ def create_pydoc_config(output_dir: str, modules: list[str]) -> str:
         renderer:
           type: docusaurus
           docs_base_path: {output_dir}
-          sidebar_top_level_label: "🔗 API Reference"
+          sidebar_top_level_label: "🔗 SDK Reference"
         """
     ).strip()
 
@@ -264,7 +245,6 @@ def generate_docs(version: str) -> None:
                 "pydoc-markdown[docusaurus]",
                 "toml",
                 "packaging",
-                "requests",
             ],
             cwd=project_root,
             description="Installing docs dependencies (fallback)",
@@ -289,7 +269,7 @@ def generate_docs(version: str) -> None:
 sidebar_position: 1
 ---
 
-# Python SDK API Reference
+# Python SDK Reference
 
 This section provides detailed documentation for all classes, methods, and functions
 in the HackAgent Python SDK, auto-generated from source-code docstrings.
@@ -338,9 +318,10 @@ For practical usage examples, see the [Python SDK Quickstart](./sdk/python-quick
 def main() -> None:
     parser = argparse.ArgumentParser(description="HackAgent Documentation Generator")
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("-v", "--version", help="Specific PyPI version (e.g. 0.2.4)")
     group.add_argument(
-        "-l", "--latest", action="store_true", help="Use latest PyPI version"
+        "-v",
+        "--version",
+        help="Use a custom version label in generated docs (e.g. 0.6.0)",
     )
     group.add_argument(
         "-c",
@@ -355,8 +336,6 @@ def main() -> None:
 
     if args.version:
         version = args.version
-    elif args.latest:
-        version = get_latest_version()
     else:
         # --current is the default
         version = get_current_version(project_root)

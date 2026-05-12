@@ -177,7 +177,7 @@ def execute(
                     },
                 )
 
-                target_resp = query_target(
+                target_out = query_target(
                     agent_router,
                     victim_key,
                     prompt,
@@ -185,9 +185,10 @@ def execute(
                     logger,
                     role_label=target_label,
                 )
-                target_error = None
-                if isinstance(target_resp, tuple):
-                    target_resp, target_error = target_resp
+                if isinstance(target_out, tuple) and len(target_out) == 2:
+                    target_resp, target_error = target_out
+                else:
+                    target_resp, target_error = target_out, None
                 emit_phase_trace(
                     config,
                     phase="WARMUP",
@@ -204,23 +205,19 @@ def execute(
                         "target_role": target_label,
                         "prompt": prompt,
                         "target_response": target_resp,
+                        "target_error": target_error,
                     },
                 )
-                if target_error and not target_resp:
-                    # Skip scoring on infrastructure errors so the scorer
-                    # cannot hallucinate a high score from an empty response.
-                    score, assessment = 0.0, f"Adapter error: {target_error}"
-                else:
-                    score, assessment = score_response(
-                        scorer_router=sc_router,
-                        scorer_key=sc_key,
-                        goal=request,
-                        target_response=target_resp,
-                        logger=logger,
-                        max_retries=max_parse_retries,
-                        scorer_max_tokens=scorer_max_tokens,
-                        role_label=scorer_label,
-                    )
+                score, assessment = score_response(
+                    scorer_router=sc_router,
+                    scorer_key=sc_key,
+                    goal=request,
+                    target_response=target_resp,
+                    logger=logger,
+                    max_retries=max_parse_retries,
+                    scorer_max_tokens=scorer_max_tokens,
+                    role_label=scorer_label,
+                )
                 emit_phase_trace(
                     config,
                     phase="WARMUP",

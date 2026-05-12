@@ -1,0 +1,50 @@
+---
+sidebar_position: 5
+title: "Dashboard"
+---
+
+# Dashboard
+
+<video controls preload="metadata" playsInline style={{ width: "100%", height: "auto" }}>
+	<source src="/videos/dashboard_demo.mov" type="video/quicktime" />
+	Your browser does not support the video tag.
+</video>
+
+HackAgent includes a local web dashboard to inspect runs, results, and metrics.
+
+
+## Launch Dashboard
+
+```bash
+hackagent web
+```
+
+Default URL:
+
+- `http://127.0.0.1:7860`
+
+The dashboard reads local results from:
+
+- `~/.local/share/hackagent/hackagent.db`
+
+## Useful Options
+
+```bash
+# Custom port
+hackagent web --port 8080
+
+# Expose on all interfaces
+hackagent web --host 0.0.0.0
+
+# Use a custom database path
+hackagent web --db-path /path/to/hackagent.db
+
+# Do not auto-open browser
+hackagent web --no-browser
+```
+
+## Typical Workflow
+
+1. Run one or more attacks with `hackagent eval ...`
+2. Launch dashboard with `hackagent web`
+3. Review results, metrics, and trends in the browser

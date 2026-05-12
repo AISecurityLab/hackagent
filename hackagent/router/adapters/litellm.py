@@ -3,7 +3,6 @@
 
 
 from hackagent.logger import get_logger
-import os
 from typing import Any, Dict, List, Optional
 
 from .base import ChatCompletionsAgent, AdapterConfigurationError
@@ -150,30 +149,11 @@ class LiteLLMAgent(ChatCompletionsAgent):
             config_key="api_key", env_var_fallback=env_var_fallback
         )
 
-        # When using custom endpoint, determine auth strategy
+        # When using custom endpoint without credentials, rely on endpoint-side auth.
         if self.api_base_url and not self.actual_api_key:
-            if self.model_name.startswith("hackagent/"):
-                # hackagent/* models need the HackAgent API key
-                # Try to get from config first (passed by router), then environment
-                hackagent_key = self._get_config_key("hackagent_api_key")
-                if not hackagent_key:
-                    hackagent_key = os.environ.get("HACKAGENT_API_KEY")
-
-                if hackagent_key:
-                    self.actual_api_key = hackagent_key
-                    self.logger.debug(
-                        f"Using HACKAGENT_API_KEY for {self.model_name} service"
-                    )
-                else:
-                    self.logger.warning(
-                        f"HackAgent model '{self.model_name}' requires HACKAGENT_API_KEY but none found. "
-                        f"Requests will likely fail with authentication errors."
-                    )
-            else:
-                # Other custom endpoints (LangChain, local APIs, etc.) - no api_key needed
-                self.logger.debug(
-                    f"Using custom endpoint '{self.api_base_url}' without api_key - endpoint handles its own auth"
-                )
+            self.logger.debug(
+                f"Using custom endpoint '{self.api_base_url}' without api_key - endpoint handles its own auth"
+            )
 
         self.logger.info(
             f"LiteLLMAgent '{self.id}' initialized for model: '{self.model_name}'"
@@ -230,11 +210,6 @@ class LiteLLMAgent(ChatCompletionsAgent):
                 # For OpenAI-compatible endpoints, this should be the base URL (e.g., http://host:port/v1)
                 # and the OpenAI client will append /chat/completions automatically
                 litellm_params["api_base"] = self.api_base_url
-            elif self.model_name.startswith("hackagent/"):
-                # Special handling for hackagent/* models
-                litellm_params["custom_llm_provider"] = "openai"
-                litellm_params["api_base"] = self.api_base_url
-
             litellm_params["extra_headers"] = {"User-Agent": "HackAgent/0.1.0"}
 
         litellm_params.update(kwargs)

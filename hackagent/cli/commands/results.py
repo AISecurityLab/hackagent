@@ -65,29 +65,13 @@ def show(ctx, result_id):
     cli_config.validate()
 
     try:
-        if cli_config.api_key:
-            from hackagent.server.api.result import result_retrieve
-            from hackagent.server.client import AuthenticatedClient
+        from uuid import UUID
 
-            client = AuthenticatedClient(
-                base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
-            )
+        from hackagent.server.storage.local import LocalBackend
 
-            with console.status(f"[bold green]Fetching result {result_id}..."):
-                response = result_retrieve.sync_detailed(client=client, id=result_id)
-
-            if response.status_code == 200 and response.parsed:
-                result = response.parsed
-            else:
-                raise click.ClickException(f"Result not found: {result_id}")
-        else:
-            from uuid import UUID
-
-            from hackagent.server.storage.local import LocalBackend
-
-            backend = LocalBackend()
-            with console.status(f"[bold green]Fetching result {result_id}..."):
-                result = backend.get_result(UUID(result_id))
+        backend = LocalBackend()
+        with console.status(f"[bold green]Fetching result {result_id}..."):
+            result = backend.get_result(UUID(result_id))
 
         _display_result_details(result)
 
@@ -165,50 +149,18 @@ def summary(ctx, status, agent, attack_type, days):
     cli_config.validate()
 
     try:
-        if cli_config.api_key:
-            from hackagent.server.api.result import result_list
-            from hackagent.server.client import AuthenticatedClient
+        from hackagent.server.storage.local import LocalBackend
 
-            client = AuthenticatedClient(
-                base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
-            )
-
-            # Page through all results for statistics
-            all_results = []
-            page = 1
-            with console.status("[bold green]Analyzing results..."):
-                while True:
-                    response = result_list.sync_detailed(client=client, page=page)
-                    if response.status_code != 200 or not response.parsed:
-                        if page == 1:
-                            raise click.ClickException(
-                                f"Failed to fetch results: Status {response.status_code}"
-                            )
-                        break
-                    batch = response.parsed.results or []
-                    all_results.extend(batch)
-                    if not response.parsed.next:
-                        break
-                    page += 1
-
-            # Normalise remote result objects into simple attribute-compatible dicts
-            # (they already have the needed attributes; kept as-is)
-            result_items = all_results
-
-        else:
-            # Local mode — query SQLite directly
-            from hackagent.server.storage.local import LocalBackend
-
-            backend = LocalBackend()
-            result_items = []
-            page = 1
-            with console.status("[bold green]Analyzing local results..."):
-                while True:
-                    page_data = backend.list_results(page=page, page_size=200)
-                    result_items.extend(page_data.items)
-                    if len(result_items) >= page_data.total:
-                        break
-                    page += 1
+        backend = LocalBackend()
+        result_items = []
+        page = 1
+        with console.status("[bold green]Analyzing local results..."):
+            while True:
+                page_data = backend.list_results(page=page, page_size=200)
+                result_items.extend(page_data.items)
+                if len(result_items) >= page_data.total:
+                    break
+                page += 1
 
         # Filter by date range
         from datetime import datetime, timedelta

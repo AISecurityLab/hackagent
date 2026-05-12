@@ -10,14 +10,6 @@ BoN is a stochastic black-box attack that **generates N randomly augmented versi
 
 BoN operates without an external attacker model. The harmful goal is augmented with random text transformations controlled by a single strength parameter σ (sigma), and multiple augmented candidates are tested in parallel against the target. After each step, the best candidate is **evaluated by a judge** (e.g. HarmBench) to determine if it constitutes a successful jailbreak. If the judge confirms success, the search **terminates early**. Otherwise, the attack continues to the next step until the budget is exhausted.
 
-### Key Features
-
-- **No Attacker LLM Required**: Purely algorithmic — random augmentations, no additional model needed
-- **Parallelisable**: All K candidates within a step are independent and evaluated concurrently
-- **Tunable Strength**: A single σ parameter controls augmentation aggressiveness
-- **Multi-Step Search**: Sequential steps with independent candidates for progressive exploration
-- **Research-Backed**: Based on peer-reviewed academic work
-
 ### Research Foundation
 
 BoN is based on the paper:

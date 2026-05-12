@@ -16,6 +16,12 @@ from uuid import UUID
 from nicegui import app as _fastapi_app
 from nicegui import ui
 
+from hackagent.attacks.evaluator.metrics import (
+    calculate_fleiss_kappa,
+    calculate_majority_vote_asr,
+    calculate_per_judge_strictness,
+)
+
 from ._components import make_run_table
 from ._helpers import (
     _duration_seconds,
@@ -30,8 +36,9 @@ from ._helpers import (
 
 _VIEW_LABELS = {
     "dashboard": "Dashboard",
-    "agents": "Agents",
+    "agents": "Targets",
     "runs": "History",
+    "reports": "Reports",
 }
 
 _RESULTS_FETCH_LIMIT = 20
@@ -75,6 +82,8 @@ class DashboardPage:
         self.risk_chart: ui.echart | None = None
         self.dist_chart: ui.echart | None = None
         self.risk_legend: ui.column | None = None
+        self.latest_target_stats_label: ui.label | None = None
+        self.latest_target_agent_label: ui.label | None = None
         self.recent_runs_table: ui.table | None = None
 
         # Agents / History panel widgets
@@ -88,19 +97,44 @@ class DashboardPage:
         self.history_reports_summary_labels: dict[str, ui.label] = {}
         self.history_reports_count_label: ui.label | None = None
 
+        # Reports panel (side-by-side list + detail)
+        self._reports_left_col: ui.column | None = None
+        self._reports_detail_panel: ui.column | None = None
+        self._reports_detail_title: ui.label | None = None
+        self._reports_detail_visible: bool = False
+        self._report_results_left_col: ui.column | None = None
+        self._report_goal_detail_panel: ui.column | None = None
+        self._report_current_run: dict | None = None
+        self._report_current_run_results: list[dict] = []
+
         # Run results dialog (report view)
         self.run_dialog: ui.dialog | None = None
         self.run_dialog_title: ui.label | None = None
         self.run_report_area: ui.column | None = None
 
-        # History run dialog (compact results list)
-        self.history_run_dialog: ui.dialog | None = None
+        # History inline run expansion + side detail panel
+        self.history_run_dialog: ui.dialog | None = None  # kept for compat
         self.history_run_dialog_title: ui.label | None = None
         self.history_run_dialog_subtitle: ui.label | None = None
         self.history_run_config_area: ui.column | None = None
         self.history_results_list_area: ui.column | None = None
         self.history_results_empty_label: ui.label | None = None
         self.metrics_area: ui.column | None = None
+
+        # New side-by-side History layout
+        self._history_runs_area: ui.column | None = None
+        self._history_detail_panel: ui.column | None = None
+        self._history_detail_title: ui.label | None = None
+        self._history_detail_result_tab: ui.scroll_area | None = None
+        self._history_detail_traces_tab: ui.scroll_area | None = None
+        self._history_detail_config_tab: ui.scroll_area | None = None
+        self._history_expanded_run_id: str | None = None
+        self._history_expanded_goals_area: ui.column | None = None
+        self._history_current_run: dict | None = None
+        self._history_current_run_results: list[dict] = []
+        self._history_left_col: ui.column | None = None
+        self._history_detail_visible: bool = False
+        self._history_visible_run_ids: list[str] = []
 
         # Attack detail dialog
         self.attack_dialog: ui.dialog | None = None
@@ -127,7 +161,6 @@ class DashboardPage:
         self._build_header(sidebar)
         self._build_panels()
         self._build_run_dialog()
-        self._build_history_run_dialog()
         self._build_attack_dialog()
 
         self._highlight_nav("dashboard")
@@ -190,8 +223,9 @@ class DashboardPage:
 
             nav_items = [
                 ("dashboard", "Dashboard", "dashboard"),
-                ("agents", "Agents", "smart_toy"),
+                ("agents", "Targets", "smart_toy"),
                 ("runs", "History", "assignment"),
+                ("reports", "Reports", "assessment"),
             ]
             for view_id, label, icon_name in nav_items:
                 btn = (
@@ -217,11 +251,8 @@ class DashboardPage:
             ui.separator()
 
             with ui.row().classes("px-3 py-3 gap-2 items-center"):
-                is_remote = self.backend.get_api_key() is not None
-                dot_color = "text-info" if is_remote else "text-positive"
-                mode_text = "remote mode" if is_remote else "local mode"
-                ui.icon("circle", size="xs").classes(f"{dot_color} text-xs")
-                ui.label(mode_text).classes("text-xs text-grey-6")
+                ui.icon("circle", size="xs").classes("text-positive text-xs")
+                ui.label("local mode").classes("text-xs text-grey-6")
         return sidebar
 
     def _build_header(self, sidebar: ui.left_drawer) -> None:
@@ -252,11 +283,13 @@ class DashboardPage:
             dashboard_panel = ui.column().classes("w-full gap-6")
             agents_panel = ui.column().classes("w-full gap-4")
             runs_panel = ui.column().classes("w-full gap-4")
+            reports_panel = ui.column().classes("w-full gap-4")
 
             self.all_panels = {
                 "dashboard": dashboard_panel,
                 "agents": agents_panel,
                 "runs": runs_panel,
+                "reports": reports_panel,
             }
             for panel in self.all_panels.values():
                 panel.set_visibility(False)
@@ -265,14 +298,14 @@ class DashboardPage:
             self._build_dashboard_panel(dashboard_panel)
             self._build_agents_panel(agents_panel)
             self._build_runs_panel(runs_panel)
+            self._build_reports_panel(reports_panel)
 
     def _build_dashboard_panel(self, panel: ui.column) -> None:
         with panel:
             # Stat cards
             with ui.row().classes("w-full flex-wrap gap-4"):
                 for s_label, s_key, s_icon, s_color in [
-                    ("Agents", "total_agents", "smart_toy", "blue"),
-                    ("Attacks", "total_attacks", "flash_on", "orange"),
+                    ("Targets", "total_agents", "smart_toy", "blue"),
                     ("Runs", "total_runs", "assignment", "green"),
                     ("Jailbreaks", "successful_jailbreaks", "lock_open", "red"),
                 ]:
@@ -284,77 +317,91 @@ class DashboardPage:
                             "text-3xl font-bold"
                         )
 
-            # Charts
-            with ui.row().classes("w-full flex-wrap gap-4 items-start"):
-                with ui.card().classes("flex-1 min-w-72"):
-                    ui.label("Risk Overview").classes("font-semibold text-sm")
-                    ui.label("Jailbreak rate across all evaluated results").classes(
-                        "text-xs text-grey-6 mb-4"
-                    )
-                    with ui.row().classes("items-center gap-6 flex-wrap"):
-                        self.risk_chart = ui.echart(
+            # Charts (single container: label on top, pie left, bar right)
+            with ui.card().classes("w-full"):
+                self.latest_target_stats_label = ui.label(
+                    "Latest Target Statistics"
+                ).classes("text-lg font-bold text-grey-8")
+                with ui.row().classes(
+                    "items-center gap-2 mt-2 w-fit px-3 py-2 rounded-md bg-grey-1 border border-grey-3"
+                ):
+                    ui.icon("smart_toy", color="grey-5").classes("text-base")
+                    with ui.row().classes("items-baseline gap-2"):
+                        ui.label("Agent:").classes("text-sm text-grey-6 font-semibold")
+                        self.latest_target_agent_label = ui.label("N/A").classes(
+                            "font-mono text-sm"
+                        )
+
+                with ui.row().classes("w-full flex-wrap gap-6 items-start mt-4"):
+                    with ui.column().classes("flex-1 min-w-72"):
+                        ui.label("Run Overview").classes("font-semibold text-sm")
+                        ui.label(
+                            "Evaluation outcomes for the latest tested target"
+                        ).classes("text-xs text-grey-6 mb-4")
+                        with ui.row().classes("items-center gap-6 flex-wrap"):
+                            self.risk_chart = ui.echart(
+                                {
+                                    "series": [
+                                        {
+                                            "type": "pie",
+                                            "radius": ["58%", "80%"],
+                                            "data": [
+                                                {
+                                                    "value": 1,
+                                                    "name": "No data",
+                                                    "itemStyle": {"color": "#94a3b8"},
+                                                }
+                                            ],
+                                            "label": {"show": False},
+                                        }
+                                    ],
+                                    "graphic": [],
+                                    "tooltip": {"show": False},
+                                }
+                            ).classes("w-36 h-36 shrink-0")
+                            self.risk_legend = ui.column().classes("gap-2 flex-1")
+
+                    with ui.column().classes("flex-1 min-w-72"):
+                        ui.label("Result Distribution").classes("font-semibold text-sm")
+                        ui.label(
+                            "Evaluation outcomes for the latest tested target"
+                        ).classes("text-xs text-grey-6 mb-4")
+                        self.dist_chart = ui.echart(
                             {
+                                "xAxis": {
+                                    "type": "category",
+                                    "data": [
+                                        "Jailbreaks",
+                                        "Mitigated",
+                                        "Errors",
+                                        "Pending",
+                                    ],
+                                    "axisLine": {"show": False},
+                                    "axisTick": {"show": False},
+                                },
+                                "yAxis": {
+                                    "type": "value",
+                                    "minInterval": 1,
+                                    "splitLine": {"lineStyle": {"type": "dashed"}},
+                                },
                                 "series": [
                                     {
-                                        "type": "pie",
-                                        "radius": ["58%", "80%"],
-                                        "data": [
-                                            {
-                                                "value": 1,
-                                                "name": "No data",
-                                                "itemStyle": {"color": "#94a3b8"},
-                                            }
-                                        ],
-                                        "label": {"show": False},
+                                        "type": "bar",
+                                        "data": [0, 0, 0, 0],
+                                        "itemStyle": {"borderRadius": [4, 4, 0, 0]},
+                                        "barMaxWidth": 60,
                                     }
                                 ],
-                                "graphic": [],
-                                "tooltip": {"show": False},
+                                "grid": {
+                                    "left": "3%",
+                                    "right": "3%",
+                                    "top": "8%",
+                                    "bottom": "3%",
+                                    "containLabel": True,
+                                },
+                                "tooltip": {"trigger": "axis"},
                             }
-                        ).classes("w-36 h-36 shrink-0")
-                        self.risk_legend = ui.column().classes("gap-2 flex-1")
-
-                with ui.card().classes("flex-1 min-w-72"):
-                    ui.label("Result Distribution").classes("font-semibold text-sm")
-                    ui.label("Evaluation outcomes across all runs").classes(
-                        "text-xs text-grey-6 mb-4"
-                    )
-                    self.dist_chart = ui.echart(
-                        {
-                            "xAxis": {
-                                "type": "category",
-                                "data": [
-                                    "Jailbreaks",
-                                    "Mitigated",
-                                    "Errors",
-                                    "Pending",
-                                ],
-                                "axisLine": {"show": False},
-                                "axisTick": {"show": False},
-                            },
-                            "yAxis": {
-                                "type": "value",
-                                "minInterval": 1,
-                                "splitLine": {"lineStyle": {"type": "dashed"}},
-                            },
-                            "series": [
-                                {
-                                    "type": "bar",
-                                    "data": [0, 0, 0, 0],
-                                    "itemStyle": {"borderRadius": [4, 4, 0, 0]},
-                                    "barMaxWidth": 60,
-                                }
-                            ],
-                            "grid": {
-                                "left": "3%",
-                                "right": "3%",
-                                "top": "8%",
-                                "bottom": "3%",
-                                "containLabel": True,
-                            },
-                            "tooltip": {"trigger": "axis"},
-                        }
-                    ).classes("w-full h-44")
+                        ).classes("w-full h-44")
 
             # Recent runs
             with ui.card().classes("w-full"):
@@ -373,7 +420,9 @@ class DashboardPage:
                     ),
                     include_agent=True,
                     include_progressive_run=True,
-                    include_results=True,
+                    include_results=False,
+                    include_goal_latency_avg=True,
+                    include_asr=True,
                 )
 
     def _build_agents_panel(self, panel: ui.column) -> None:
@@ -383,7 +432,7 @@ class DashboardPage:
                     columns=[
                         {
                             "name": "name",
-                            "label": "Agent",
+                            "label": "Target",
                             "field": "name",
                             "align": "left",
                             "sortable": True,
@@ -393,6 +442,13 @@ class DashboardPage:
                             "label": "Type",
                             "field": "agent_type",
                             "align": "left",
+                        },
+                        {
+                            "name": "avg_risk_pct",
+                            "label": "Avg Risk %",
+                            "field": "avg_risk_pct",
+                            "align": "left",
+                            "sortable": True,
                         },
                         {
                             "name": "endpoint",
@@ -441,11 +497,29 @@ class DashboardPage:
                     """,
                 )
                 self.agents_table.add_slot(
+                    "body-cell-avg_risk_pct",
+                    r"""
+                    <q-td :props="props">
+                      <q-badge
+                        :color="props.row.avg_risk_pct >= 70 ? 'negative' : (props.row.avg_risk_pct >= 40 ? 'warning' : 'positive')"
+                        :label="props.row._avg_risk_pct || '0.0%'" />
+                    </q-td>
+                    """,
+                )
+                self.agents_table.add_slot(
                     "body-cell-created_at",
                     r"""
                     <q-td :props="props">
                       <span class="text-xs text-grey-6">{{ props.row._rel }}</span>
                     </q-td>
+                    """,
+                )
+                self.agents_table.add_slot(
+                    "no-data",
+                    r"""
+                    <div class="q-pa-md text-grey-6 text-sm">
+                      No targets with runs yet.
+                    </div>
                     """,
                 )
 
@@ -555,90 +629,106 @@ class DashboardPage:
 
     def _build_runs_panel(self, panel: ui.column) -> None:
         with panel:
-            with ui.card().classes("w-full"):
-                with ui.tabs().props("dense no-caps align=left") as history_tabs:
-                    ui.tab(name="runs-tab", label="Runs", icon="assignment")
-                    ui.tab(name="reports-tab", label="Reports", icon="assessment")
-
-                with ui.tab_panels(history_tabs, value="runs-tab").classes("w-full"):
-                    with ui.tab_panel("runs-tab").classes("w-full p-0"):
-                        with ui.column().classes("w-full gap-2"):
-                            with ui.row().classes(
-                                "items-center justify-between mb-1 px-2"
-                            ):
-                                self.runs_count_label = ui.label("").classes(
+            with ui.card().classes(
+                "w-full h-[calc(100vh-220px)] min-h-[540px] overflow-hidden"
+            ):
+                with ui.row().classes(
+                    "w-full h-full gap-0 items-stretch overflow-hidden"
+                ):
+                    # ── Left column: run list + expanded goals ──
+                    self._history_left_col = ui.column().classes(
+                        "w-full h-full min-h-0 gap-2 transition-all duration-300"
+                    )
+                    with self._history_left_col:
+                        with ui.row().classes("items-center justify-between mb-1 px-2"):
+                            self.runs_count_label = ui.label("").classes(
+                                "text-sm text-grey-6"
+                            )
+                            with ui.row().classes("items-center gap-2"):
+                                self._runs_delete_btn = (
+                                    ui.button(
+                                        "Delete selected",
+                                        icon="delete",
+                                        on_click=lambda: ui.timer(
+                                            0,
+                                            self._delete_selected_runs,
+                                            once=True,
+                                        ),
+                                    )
+                                    .props("flat dense no-caps color=negative")
+                                    .classes("hidden")
+                                )
+                                ui.button(
+                                    "← Prev",
+                                    on_click=lambda: self._change_runs_page(-1),
+                                ).props("flat dense no-caps")
+                                self.runs_page_label = ui.label("Page 1 / 1").classes(
                                     "text-sm text-grey-6"
                                 )
-                                with ui.row().classes("items-center gap-2"):
-                                    self._runs_delete_btn = (
-                                        ui.button(
-                                            "Delete selected",
-                                            icon="delete",
-                                            on_click=lambda: ui.timer(
-                                                0, self._delete_selected_runs, once=True
-                                            ),
-                                        )
-                                        .props("flat dense no-caps color=negative")
-                                        .classes("hidden")
-                                    )
-                                    ui.button(
-                                        "← Prev",
-                                        on_click=lambda: self._change_runs_page(-1),
-                                    ).props("flat dense no-caps")
-                                    self.runs_page_label = ui.label(
-                                        "Page 1 / 1"
-                                    ).classes("text-sm text-grey-6")
-                                    ui.button(
-                                        "Next →",
-                                        on_click=lambda: self._change_runs_page(1),
-                                    ).props("flat dense no-caps")
-                            self.runs_table = make_run_table(
-                                on_row_click=lambda run: ui.timer(
-                                    0,
-                                    lambda r=run: asyncio.create_task(
-                                        self._open_run_history_results(r)
-                                    ),
-                                    once=True,
-                                ),
-                                pagination={"rowsPerPage": 0},
-                                include_agent=True,
-                                include_progressive_run=True,
-                                include_results=True,
-                                include_goal_latency_avg=True,
-                                selection="multiple",
-                                on_select=lambda e: self._on_runs_select(),
+                                ui.button(
+                                    "Next →",
+                                    on_click=lambda: self._change_runs_page(1),
+                                ).props("flat dense no-caps")
+                        with ui.scroll_area().classes("w-full flex-1 min-h-0"):
+                            self._history_runs_area = ui.column().classes(
+                                "w-full gap-0 overflow-x-auto"
                             )
-                            self.runs_table.props("hide-pagination")
 
-                    with ui.tab_panel("reports-tab").classes("w-full p-0"):
-                        with ui.column().classes("w-full gap-4 pt-2"):
-                            with ui.row().classes("w-full flex-wrap gap-4"):
-                                for label, key, icon, color in [
-                                    ("Total Reports", "reports", "description", "blue"),
-                                    ("Total Tests", "tests", "pulse", "purple"),
-                                    ("Vulnerabilities", "vulns", "warning", "negative"),
-                                    ("Avg Risk Score", "risk", "trending_up", "orange"),
-                                ]:
-                                    with ui.card().classes("flex-1 min-w-36"):
-                                        with ui.row().classes(
-                                            "items-center justify-between mb-2"
-                                        ):
-                                            ui.label(label).classes(
-                                                "text-sm text-grey-6"
-                                            )
-                                            ui.icon(icon, color=color).classes(
-                                                "text-xl"
-                                            )
-                                        self.history_reports_summary_labels[key] = (
-                                            ui.label("—").classes("text-3xl font-bold")
-                                        )
+                    # ── Right column: goal detail panel ──
+                    self._history_detail_panel = (
+                        ui.column()
+                        .classes("h-full min-h-0 gap-0 border-l shrink-0")
+                        .style(
+                            "width: 0; min-width: 0; overflow: hidden; "
+                            "transition: all 0.3s ease;"
+                        )
+                    )
 
-                            self.history_reports_count_label = ui.label(
-                                "Loading reports..."
-                            ).classes("text-sm text-grey-6 px-1")
+    def _build_reports_panel(self, panel: ui.column) -> None:
+        with panel:
+            with ui.card().classes(
+                "w-full h-[calc(100vh-220px)] min-h-[540px] overflow-hidden"
+            ):
+                with ui.row().classes(
+                    "w-full h-full gap-0 items-stretch overflow-hidden"
+                ):
+                    self._reports_left_col = ui.column().classes(
+                        "w-full h-full min-h-0 gap-4 transition-all duration-300"
+                    )
+                    with self._reports_left_col:
+                        with ui.row().classes("w-full flex-wrap gap-4"):
+                            for label, key, icon, color in [
+                                ("Total Reports", "reports", "description", "blue"),
+                                ("Total Tests", "tests", "pulse", "purple"),
+                                ("Vulnerabilities", "vulns", "warning", "negative"),
+                                ("Avg Risk Score", "risk", "trending_up", "orange"),
+                            ]:
+                                with ui.card().classes("flex-1 min-w-36"):
+                                    with ui.row().classes(
+                                        "items-center justify-between mb-2"
+                                    ):
+                                        ui.label(label).classes("text-sm text-grey-6")
+                                        ui.icon(icon, color=color).classes("text-xl")
+                                    self.history_reports_summary_labels[key] = ui.label(
+                                        "—"
+                                    ).classes("text-3xl font-bold")
+
+                        self.history_reports_count_label = ui.label(
+                            "Loading reports..."
+                        ).classes("text-sm text-grey-6 px-1")
+                        with ui.scroll_area().classes("w-full flex-1 min-h-0"):
                             self.history_reports_list_area = ui.column().classes(
                                 "w-full gap-2"
                             )
+
+                    self._reports_detail_panel = (
+                        ui.column()
+                        .classes("h-full min-h-0 gap-0 border-l shrink-0")
+                        .style(
+                            "width: 0; min-width: 0; overflow: hidden; "
+                            "transition: all 0.3s ease;"
+                        )
+                    )
 
     def _build_run_dialog(self) -> None:
         with ui.dialog().props("maximized") as dialog:
@@ -659,42 +749,618 @@ class DashboardPage:
         self.run_dialog = dialog
 
     def _build_history_run_dialog(self) -> None:
-        with ui.dialog() as dialog:
-            with ui.card().classes("w-full max-w-5xl h-[80vh] flex flex-col gap-4"):
-                with ui.row().classes("items-center justify-between w-full shrink-0"):
-                    self.history_run_dialog_title = ui.label("Run Results").classes(
-                        "font-semibold text-lg"
+        """No-op: history runs now render inline instead of in a dialog."""
+        pass
+
+    # ── History: close detail panel ──────────────────────────────────────────
+
+    def _close_history_detail(self) -> None:
+        """Close the right detail panel and restore full-width run list."""
+        self._history_detail_visible = False
+        if self._history_detail_panel is not None:
+            self._history_detail_panel.style(
+                "width: 0; min-width: 0; overflow: hidden; height: 100%;"
+            )
+        if self._history_left_col is not None:
+            self._history_left_col.classes(remove="w-1/2", add="w-full")
+
+    def _close_reports_detail(self) -> None:
+        """Close the right detail panel and restore full-width report list."""
+        self._reports_detail_visible = False
+        if self._reports_detail_panel is not None:
+            self._reports_detail_panel.style(
+                "width: 0; min-width: 0; overflow: hidden; height: 100%;"
+            )
+        if self._reports_left_col is not None:
+            self._reports_left_col.classes(remove="w-1/2", add="w-full")
+        self._report_results_left_col = None
+        self._report_goal_detail_panel = None
+        self._report_current_run = None
+        self._report_current_run_results = []
+
+    def _close_report_goal_detail(self) -> None:
+        """Close report goal detail panel inside the run report view."""
+        if self._report_goal_detail_panel is not None:
+            self._report_goal_detail_panel.style(
+                "width: 0; min-width: 0; overflow: hidden; height: 100%;"
+            )
+        if self._report_results_left_col is not None:
+            self._report_results_left_col.classes(remove="w-1/2", add="w-full")
+
+    async def _open_report_goal_detail(self, row: dict) -> None:
+        """Show Result / Traces / Config tabs for a report goal in side panel."""
+        if self._report_goal_detail_panel is None:
+            return
+
+        if self._report_results_left_col is not None:
+            self._report_results_left_col.classes(remove="w-full", add="w-1/2")
+        self._report_goal_detail_panel.style(
+            "width: 50%; min-width: 50%; height: 100%; overflow: hidden;"
+        )
+
+        self._report_goal_detail_panel.clear()
+        with self._report_goal_detail_panel:
+            with ui.scroll_area().classes("w-full h-full"):
+                with ui.column().classes("w-full h-full gap-0"):
+                    result_num = row.get("goal_number") or (
+                        (row.get("goal_index", 0) or 0) + 1
                     )
-                    ui.button(icon="close", on_click=dialog.close).props("flat round")
+                    with ui.row().classes(
+                        "items-center justify-between w-full px-4 py-2 border-b shrink-0"
+                    ):
+                        with ui.row().classes("items-center gap-2"):
+                            eval_status = row.get("evaluation_status", "")
+                            eval_notes = row.get("evaluation_notes")
+                            bucket = _result_bucket(eval_status, eval_notes)
+                            if bucket == "jailbreak":
+                                ui.badge("Jailbreak", color="negative").classes(
+                                    "text-xs"
+                                )
+                            elif bucket == "mitigated":
+                                ui.badge("Mitigated", color="positive").classes(
+                                    "text-xs"
+                                )
+                            elif bucket == "failed":
+                                ui.badge("Error", color="warning").classes("text-xs")
+                            else:
+                                ui.badge("Pending", color="grey-6").classes("text-xs")
 
-                with ui.scroll_area().classes("w-full flex-1"):
-                    with ui.column().classes("w-full gap-3 p-2"):
-                        self.history_run_dialog_subtitle = ui.label("—").classes(
-                            "text-xs text-grey-6"
+                            goal_text = str(row.get("goal") or "—")
+                            if len(goal_text) > 80:
+                                goal_text = goal_text[:80] + "…"
+                            ui.label(
+                                f"Result {result_num} of {len(self._report_current_run_results)}"
+                            ).classes("font-semibold text-sm")
+                            ui.label(goal_text).classes(
+                                "text-xs text-grey-6 truncate max-w-md"
+                            )
+
+                        ui.button(
+                            icon="close", on_click=self._close_report_goal_detail
+                        ).props("flat round dense")
+
+                    with (
+                        ui.tabs()
+                        .props("dense no-caps align=left")
+                        .classes("w-full shrink-0") as detail_tabs
+                    ):
+                        ui.tab(name="result-tab", label="Result")
+                        ui.tab(name="traces-tab", label="Traces")
+                        ui.tab(name="config-tab", label="Config")
+
+                    with ui.tab_panels(detail_tabs, value="result-tab").classes(
+                        "w-full"
+                    ):
+                        with ui.tab_panel("result-tab").classes("w-full p-0"):
+                            with ui.column().classes("w-full gap-4 p-4"):
+                                self._render_result_tab(row)
+
+                        with ui.tab_panel("traces-tab").classes("w-full p-0"):
+                            traces_container = ui.column().classes("w-full gap-4 p-4")
+                            with traces_container:
+                                with ui.row().classes(
+                                    "items-center gap-2 py-4 justify-center"
+                                ):
+                                    ui.spinner("dots")
+                                    ui.label("Loading traces…").classes(
+                                        "text-sm text-grey-6"
+                                    )
+
+                        with ui.tab_panel("config-tab").classes("w-full p-0"):
+                            with ui.column().classes("w-full gap-4 p-4"):
+                                self._render_config_tab(
+                                    row, run=self._report_current_run
+                                )
+
+        await self._load_goal_traces(row, traces_container)
+
+    # ── History: open detail panel for a goal ────────────────────────────────
+
+    async def _open_history_goal_detail(self, row: dict) -> None:
+        """Show Result / Traces / Config tabs in the right panel for a goal."""
+        if self._history_detail_panel is None:
+            return
+
+        self._history_detail_visible = True
+        # Shrink left, expand right
+        if self._history_left_col is not None:
+            self._history_left_col.classes(remove="w-full", add="w-1/2")
+        self._history_detail_panel.style(
+            "width: 50%; min-width: 50%; height: 100%; overflow: hidden;"
+        )
+
+        self._history_detail_panel.clear()
+        with self._history_detail_panel:
+            with ui.scroll_area().classes("w-full h-full"):
+                with ui.column().classes("w-full h-full gap-0"):
+                    # Header
+                    result_num = row.get("goal_number") or (
+                        (row.get("goal_index", 0) or 0) + 1
+                    )
+                    with ui.row().classes(
+                        "items-center justify-between w-full px-4 py-2 border-b shrink-0"
+                    ):
+                        with ui.row().classes("items-center gap-2"):
+                            eval_status = row.get("evaluation_status", "")
+                            eval_notes = row.get("evaluation_notes")
+                            bucket = _result_bucket(eval_status, eval_notes)
+                            if bucket == "jailbreak":
+                                ui.badge("Jailbreak", color="negative").classes(
+                                    "text-xs"
+                                )
+                            elif bucket == "mitigated":
+                                ui.badge("Mitigated", color="positive").classes(
+                                    "text-xs"
+                                )
+                            elif bucket == "failed":
+                                ui.badge("Error", color="warning").classes("text-xs")
+                            else:
+                                ui.badge("Pending", color="grey-6").classes("text-xs")
+
+                            goal_text = str(row.get("goal") or "—")
+                            if len(goal_text) > 80:
+                                goal_text = goal_text[:80] + "…"
+                            ui.label(
+                                f"Result {result_num} of {len(self._history_current_run_results)}"
+                            ).classes("font-semibold text-sm")
+                            ui.label(goal_text).classes(
+                                "text-xs text-grey-6 truncate max-w-md"
+                            )
+
+                        ui.button(
+                            icon="close", on_click=self._close_history_detail
+                        ).props("flat round dense")
+
+                    # Tabs: Result, Traces, Config
+                    with (
+                        ui.tabs()
+                        .props("dense no-caps align=left")
+                        .classes("w-full shrink-0") as detail_tabs
+                    ):
+                        ui.tab(name="result-tab", label="Result")
+                        ui.tab(name="traces-tab", label="Traces")
+                        ui.tab(name="config-tab", label="Config")
+
+                    with ui.tab_panels(detail_tabs, value="result-tab").classes(
+                        "w-full"
+                    ):
+                        # ── Result tab ──
+                        with ui.tab_panel("result-tab").classes("w-full p-0"):
+                            with ui.column().classes("w-full gap-4 p-4"):
+                                self._render_result_tab(row)
+
+                        # ── Traces tab ──
+                        with ui.tab_panel("traces-tab").classes("w-full p-0"):
+                            traces_container = ui.column().classes("w-full gap-4 p-4")
+                            with traces_container:
+                                with ui.row().classes(
+                                    "items-center gap-2 py-4 justify-center"
+                                ):
+                                    ui.spinner("dots")
+                                    ui.label("Loading traces…").classes(
+                                        "text-sm text-grey-6"
+                                    )
+
+                        # ── Config tab ──
+                        with ui.tab_panel("config-tab").classes("w-full p-0"):
+                            with ui.column().classes("w-full gap-4 p-4"):
+                                self._render_config_tab(row)
+
+        # Load traces asynchronously
+        await self._load_goal_traces(row, traces_container)
+
+    # ── History: render Result tab ───────────────────────────────────────────
+
+    def _render_result_tab(self, row: dict) -> None:
+        """Render the Result tab content for a goal detail."""
+        eval_status = row.get("evaluation_status", "")
+        eval_notes = row.get("evaluation_notes")
+        bucket = _result_bucket(eval_status, eval_notes)
+
+        # Evaluation banner
+        if bucket == "jailbreak":
+            with (
+                ui.card()
+                .tight()
+                .classes(
+                    "w-full border border-red-300 bg-red-50 dark:border-red-700 dark:bg-red-900/30"
+                )
+            ):
+                with ui.row().classes("gap-3 items-center p-4"):
+                    ui.icon("lock_open", color="negative").classes("text-2xl")
+                    with ui.column().classes("gap-0.5"):
+                        ui.label("Jailbreak Successful").classes(
+                            "font-semibold text-negative text-sm"
                         )
-
-                        with ui.column().classes("w-full gap-1"):
-                            ui.label("CONFIGURATION").classes(
-                                "text-[10px] font-semibold tracking-widest text-grey-5 uppercase"
-                            )
-                            self.history_run_config_area = ui.column().classes(
-                                "w-full gap-0"
-                            )
-
-                        with ui.column().classes("w-full gap-1"):
-                            ui.label("METRICS").classes(
-                                "text-[10px] font-semibold tracking-widest text-grey-5 uppercase"
-                            )
-                            self.metrics_area = ui.column().classes("w-full gap-2")
-
-                        self.history_results_empty_label = ui.label(
-                            "Loading results..."
-                        ).classes("text-sm text-grey-8 py-2")
-
-                        self.history_results_list_area = ui.column().classes(
-                            "w-full gap-3"
+                    evaluator = ""
+                    if isinstance(row.get("evaluation_metrics"), dict):
+                        evaluator = str(row["evaluation_metrics"].get("evaluator", ""))
+                    if not evaluator and isinstance(row.get("metadata"), dict):
+                        evaluator = str(row["metadata"].get("evaluator", ""))
+                    if evaluator:
+                        ui.label(evaluator).classes(
+                            "ml-2 text-xs text-grey-6 font-mono"
                         )
-        self.history_run_dialog = dialog
+        elif bucket == "mitigated":
+            with (
+                ui.card()
+                .tight()
+                .classes(
+                    "w-full border border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-900/30"
+                )
+            ):
+                with ui.row().classes("gap-3 items-center p-4"):
+                    ui.icon("security", color="positive").classes("text-2xl")
+                    with ui.column().classes("gap-0.5"):
+                        ui.label("Model resisted").classes(
+                            "font-semibold text-positive text-sm"
+                        )
+                    evaluator = ""
+                    if isinstance(row.get("evaluation_metrics"), dict):
+                        evaluator = str(row["evaluation_metrics"].get("evaluator", ""))
+                    if not evaluator and isinstance(row.get("metadata"), dict):
+                        evaluator = str(row["metadata"].get("evaluator", ""))
+                    if evaluator:
+                        ui.label(evaluator).classes(
+                            "ml-2 text-xs text-grey-6 font-mono"
+                        )
+        elif bucket == "failed":
+            with (
+                ui.card()
+                .tight()
+                .classes(
+                    "w-full border border-orange-300 bg-orange-50 dark:border-orange-700 dark:bg-orange-900/30"
+                )
+            ):
+                with ui.row().classes("gap-3 items-center p-4"):
+                    ui.icon("warning_amber", color="warning").classes("text-2xl")
+                    ui.label("Evaluation Error").classes(
+                        "font-semibold text-warning text-sm"
+                    )
+
+        # Summary cards row
+        with ui.row().classes("w-full flex-wrap gap-3"):
+            latency = row.get("_goal_latency", "—")
+            with ui.card().tight().classes("min-w-32"):
+                with ui.column().classes("px-3 py-2 gap-0"):
+                    ui.label("LATENCY").classes(
+                        "text-[10px] font-semibold tracking-widest text-grey-5 uppercase"
+                    )
+                    ui.label(str(latency)).classes("text-sm font-medium")
+            with ui.card().tight().classes("min-w-32"):
+                with ui.column().classes("px-3 py-2 gap-0"):
+                    ui.label("HTTP STATUS").classes(
+                        "text-[10px] font-semibold tracking-widest text-grey-5 uppercase"
+                    )
+                    http_status = "—"
+                    if isinstance(row.get("metadata"), dict):
+                        http_status = str(
+                            row["metadata"].get("http_status")
+                            or row["metadata"].get("status_code")
+                            or "—"
+                        )
+                    ui.label(http_status).classes("text-sm font-medium")
+            with ui.card().tight().classes("flex-1 min-w-48"):
+                with ui.column().classes("px-3 py-2 gap-0"):
+                    ui.label("GOAL").classes(
+                        "text-[10px] font-semibold tracking-widest text-grey-5 uppercase"
+                    )
+                    ui.label(str(row.get("goal") or "—")).classes(
+                        "text-sm font-medium whitespace-normal break-words leading-snug"
+                    ).style("overflow-wrap:anywhere;")
+
+        # Evaluation Notes
+        notes = str(row.get("evaluation_notes") or "—")
+        with ui.column().classes("w-full gap-1"):
+            ui.label("Evaluation Notes").classes(
+                "text-[10px] font-semibold tracking-widest text-grey-5 uppercase"
+            )
+            ui.label(notes).classes("text-sm")
+
+        # Key-value detail table
+        detail_fields = self._build_result_detail_fields(row)
+        if detail_fields:
+            with ui.column().classes("w-full gap-0"):
+                for k, v in detail_fields:
+                    with ui.row().classes(
+                        "w-full items-start gap-4 py-2 border-b border-grey-2"
+                    ):
+                        ui.label(f"{k}:").classes(
+                            "text-sm text-grey-6 font-medium min-w-32"
+                        )
+                        ui.label(str(v)).classes("text-sm")
+
+    @staticmethod
+    def _build_result_detail_fields(row: dict) -> list[tuple[str, str]]:
+        """Build key-value pairs for the Result tab detail table."""
+        fields = []
+        metrics = (
+            row.get("evaluation_metrics")
+            if isinstance(row.get("evaluation_metrics"), dict)
+            else {}
+        )
+        metadata = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
+
+        # Combine metrics + metadata for display
+        combined: dict[str, object] = {}
+        for src in (metadata, metrics):
+            if isinstance(src, dict):
+                for k, v in src.items():
+                    if v not in (None, "", {}, []):
+                        combined[k] = v
+
+        # Also add some top-level result fields
+        for key in ("goal", "goal_index"):
+            val = row.get(key)
+            if val not in (None, ""):
+                combined[key] = val
+
+        for k, v in combined.items():
+            display_val = v
+            if isinstance(v, dict):
+                display_val = json.dumps(v, indent=2, default=str)
+            elif isinstance(v, list):
+                display_val = json.dumps(v, default=str)
+            fields.append((k, str(display_val)))
+        return fields
+
+    # ── History: render Config tab ───────────────────────────────────────────
+
+    def _render_config_tab(self, row: dict, run: dict | None = None) -> None:
+        """Render the Config tab showing structured attack configuration."""
+        run = run or self._history_current_run or {}
+        attack_id = str(run.get("attack_id") or "")
+        agent_name = str(run.get("agent_name") or "—")
+        attack_type = str(run.get("attack_type") or "—")
+        created = str(run.get("_date") or run.get("created_at") or "—")
+
+        # Resolve missing display fields from IDs to avoid "-" in report configs.
+        if (not agent_name or agent_name == "—") and run.get("agent_id"):
+            agent_id = str(run.get("agent_id") or "")
+            if agent_id:
+                agent_name = self._agent_name_map_for_ids({agent_id}).get(
+                    agent_id, agent_name
+                )
+        if (not attack_type or attack_type == "—") and attack_id:
+            attack_type = self._attack_type_map_for_ids({attack_id}).get(
+                attack_id, attack_type
+            )
+
+        # Header card
+        with ui.card().tight().classes("w-full border border-primary/30 bg-primary/5"):
+            with ui.column().classes("p-4 gap-1"):
+                with ui.row().classes("items-center gap-2"):
+                    ui.icon("bolt", color="primary").classes("text-lg")
+                    ui.label(attack_type).classes("font-semibold text-sm")
+                with ui.row().classes("items-center gap-4 text-xs text-grey-6"):
+                    ui.icon("smart_toy", size="xs")
+                    ui.label(agent_name)
+                    ui.icon("calendar_today", size="xs")
+                    ui.label(created)
+
+        # Fetch attack config
+        display_config: dict = {}
+        if attack_id:
+            with contextlib.suppress(Exception):
+                attack_cfgs = self._attack_config_map_for_ids({attack_id})
+                cfg = attack_cfgs.get(attack_id)
+                if isinstance(cfg, dict) and cfg:
+                    display_config = cfg
+
+        if not display_config:
+            raw_run_config = run.get("run_config")
+            if isinstance(raw_run_config, dict):
+                display_config = {
+                    k: v for k, v in raw_run_config.items() if k != "evaluation_summary"
+                }
+            elif isinstance(raw_run_config, str) and raw_run_config.strip():
+                try:
+                    display_config = json.loads(raw_run_config)
+                except Exception:
+                    pass
+
+        if not display_config:
+            ui.label("No configuration found for this run.").classes(
+                "text-xs text-grey-6"
+            )
+            return
+
+        # Dataset section
+        dataset_info = display_config.get("dataset") or display_config.get(
+            "dataset_config"
+        )
+        if isinstance(dataset_info, dict):
+            with ui.column().classes("w-full gap-1"):
+                ui.label("DATASET").classes(
+                    "text-[10px] font-semibold tracking-widest text-grey-5 uppercase"
+                )
+                with ui.row().classes("flex-wrap gap-3"):
+                    for dk, dv in dataset_info.items():
+                        if dv not in (None, "", {}, []):
+                            with ui.card().tight().classes("min-w-24"):
+                                with ui.column().classes("px-3 py-2 gap-0"):
+                                    ui.label(dk.upper()).classes(
+                                        "text-[10px] font-semibold text-grey-5"
+                                    )
+                                    ui.label(str(dv)).classes("text-sm font-medium")
+
+        # Parameters section
+        ignored_keys = {
+            "dataset",
+            "dataset_config",
+            "models",
+            "model",
+            "evaluation_summary",
+        }
+        params = {
+            k: v
+            for k, v in display_config.items()
+            if k not in ignored_keys and not isinstance(v, (dict, list))
+        }
+        if params:
+            with ui.column().classes("w-full gap-1"):
+                ui.label("PARAMETERS").classes(
+                    "text-[10px] font-semibold tracking-widest text-grey-5 uppercase"
+                )
+                with ui.row().classes("flex-wrap gap-3"):
+                    for pk, pv in params.items():
+                        with ui.card().tight().classes("min-w-24"):
+                            with ui.column().classes("px-3 py-2 gap-0"):
+                                ui.label(pk.upper().replace("_", " ")).classes(
+                                    "text-[10px] font-semibold text-grey-5"
+                                )
+                                ui.label(str(pv)).classes("text-sm font-medium")
+
+        # Models section
+        models_info = display_config.get("models") or display_config.get("model")
+        if models_info:
+            with ui.column().classes("w-full gap-1"):
+                ui.label("MODELS").classes(
+                    "text-[10px] font-semibold tracking-widest text-grey-5 uppercase"
+                )
+                if isinstance(models_info, dict):
+                    for mk, mv in models_info.items():
+                        with ui.card().tight().classes("w-full"):
+                            with ui.column().classes("px-3 py-2 gap-0"):
+                                ui.label(mk.upper()).classes(
+                                    "text-[10px] font-semibold text-grey-5"
+                                )
+                                if isinstance(mv, dict):
+                                    for mmk, mmv in mv.items():
+                                        if mmv not in (None, ""):
+                                            with ui.row().classes("items-center gap-2"):
+                                                ui.icon(
+                                                    "circle",
+                                                    size="6px",
+                                                    color="grey-6",
+                                                )
+                                                ui.label(f"{mmk}: {mmv}").classes(
+                                                    "text-sm"
+                                                )
+                                else:
+                                    ui.label(str(mv)).classes("text-sm")
+                elif isinstance(models_info, list):
+                    for m in models_info:
+                        ui.label(str(m)).classes("text-sm")
+                else:
+                    ui.label(str(models_info)).classes("text-sm")
+
+        # IDs
+        with ui.column().classes("w-full gap-1 pt-2"):
+            for id_label, id_val in [
+                ("Attack ID", str(run.get("attack_id") or "—")),
+                ("Agent ID", str(run.get("agent_id") or "—")),
+                (
+                    "Organization",
+                    str(
+                        run.get("organization_id")
+                        or run.get("run_config", {}).get("organization_id")
+                        or "—"
+                    )
+                    if isinstance(run.get("run_config"), dict)
+                    else str(run.get("organization_id") or "—"),
+                ),
+            ]:
+                with ui.row().classes("items-center gap-2"):
+                    ui.label(id_label).classes("text-xs text-grey-6 font-medium")
+                    ui.label(id_val).classes("text-xs font-mono text-grey-5")
+
+        # Always expose raw config for completeness.
+        with ui.column().classes("w-full gap-1 pt-3"):
+            ui.label("RAW CONFIG").classes(
+                "text-[10px] font-semibold tracking-widest text-grey-5 uppercase"
+            )
+            ui.code(
+                json.dumps(display_config, indent=2, default=str), language="json"
+            ).classes("w-full text-xs")
+
+    # ── History: load traces for a goal ──────────────────────────────────────
+
+    async def _load_goal_traces(self, row: dict, container: ui.column) -> None:
+        """Load and render traces for a specific goal result."""
+        try:
+            result_id = row.get("id")
+            if not result_id:
+                container.clear()
+                with container:
+                    ui.label("No result ID available.").classes("text-sm text-grey-6")
+                return
+
+            traces_raw = self.backend.list_traces(result_id=UUID(result_id))
+            container.clear()
+
+            serialized_traces = [_serialize(t) for t in traces_raw]
+            synthetic_eval = self._build_synthetic_evaluation_trace(row)
+
+            has_real_evaluation = False
+            for td in serialized_traces:
+                group, _ = self._classify_trace_step(td)
+                if group == "evaluation":
+                    has_real_evaluation = True
+                    break
+
+            if synthetic_eval is not None and not has_real_evaluation:
+                synthetic_eval["sequence"] = len(serialized_traces) + 1
+                serialized_traces.append(synthetic_eval)
+
+            serialized_traces = self._ensure_evaluation_request_response(
+                serialized_traces, row
+            )
+
+            if not serialized_traces:
+                with container:
+                    ui.label("No traces recorded for this result.").classes(
+                        "text-sm text-grey-6 text-center py-6"
+                    )
+                return
+
+            with container:
+                with ui.row().classes("items-center gap-2 mb-2"):
+                    ui.label(
+                        f"{len(serialized_traces)} step{'s' if len(serialized_traces) != 1 else ''}"
+                    ).classes("text-xs text-grey-6")
+                    ui.label(
+                        f"{len([t for t in serialized_traces if self._classify_trace_step(t)[0] == 'evaluation'])} traces"
+                    ).classes("text-xs text-grey-6")
+
+                for td in serialized_traces:
+                    _, label = self._classify_trace_step(td)
+                    td["_display_label"] = label
+
+                rendered_phase_view = self._render_autodan_phase_timeline(
+                    serialized_traces
+                )
+                if not rendered_phase_view:
+                    self._render_standard_trace_sections(serialized_traces)
+
+        except Exception as exc:
+            container.clear()
+            with container:
+                with ui.row().classes("gap-2 items-center py-4"):
+                    ui.icon("error_outline", color="negative")
+                    ui.label(f"Error loading traces: {exc}").classes(
+                        "text-sm text-negative"
+                    )
 
     def _extract_run_asr_display(self, run, run_results) -> str:
         """Return ASR string for a run, preferring synced evaluation_summary."""
@@ -703,9 +1369,15 @@ class DashboardPage:
             summary = run_cfg.get("evaluation_summary")
             if isinstance(summary, dict):
                 try:
-                    return (
-                        f"{float(summary.get('overall_success_rate', 0.0)) * 100:.1f}%"
-                    )
+                    judge_count = int(summary.get("judge_count") or 0)
+                    is_multi = bool(summary.get("is_multi_judge")) or (judge_count > 1)
+                    if is_multi:
+                        value = summary.get("majority_vote_asr")
+                        if value is None:
+                            value = summary.get("overall_majority_vote_asr")
+                    else:
+                        value = summary.get("overall_success_rate", 0.0)
+                    return f"{float(value or 0.0) * 100:.1f}%"
                 except (TypeError, ValueError):
                     pass
 
@@ -808,7 +1480,6 @@ class DashboardPage:
                         )
                         d["failed_attacks"] = int(summary["failed_attacks"])
                         d["mitigations"] = int(summary["mitigations"])
-                        d["errors"] = int(summary["errors"])
                         d["status"] = str(summary["status"])
                         status = d.get("status", "")
                         status_color = (
@@ -882,15 +1553,18 @@ class DashboardPage:
             else:
                 btn.props(remove="unelevated color=primary", add="flat")
 
-    def navigate(self, view: str) -> None:
+    def navigate(self, view: str, schedule_refresh: bool = True) -> None:
         if view == "runs" and self.current_view.get("value") != "runs":
             self.runs_current_page = 1
+        if view != "reports":
+            self._close_reports_detail()
         self.current_view["value"] = view
         for v, panel in self.all_panels.items():
             panel.set_visibility(v == view)
         self.page_title.text = _VIEW_LABELS.get(view, "Dashboard")
         self._highlight_nav(view)
-        ui.timer(0, self.refresh_view, once=True)
+        if schedule_refresh:
+            asyncio.create_task(self.refresh_view())
 
     def _change_runs_page(self, delta: int) -> None:
         new_page = self.runs_current_page + delta
@@ -900,7 +1574,10 @@ class DashboardPage:
         ui.timer(0, self._load_runs, once=True)
 
     def _on_runs_select(self) -> None:
-        self._selected_run_ids = [row["id"] for row in (self.runs_table.selected or [])]
+        if self.runs_table is not None:
+            self._selected_run_ids = [
+                row["id"] for row in (self.runs_table.selected or [])
+            ]
         if self._runs_delete_btn is not None:
             if self._selected_run_ids:
                 self._runs_delete_btn.classes(remove="hidden")
@@ -1054,32 +1731,254 @@ class DashboardPage:
 
         return out
 
+    def _agent_records_map_for_ids(
+        self, required_ids: set[str] | None
+    ) -> dict[str, dict]:
+        """Fetch serialized agent records, paginating until required IDs are found."""
+        out: dict[str, dict] = {}
+        page = 1
+        page_size = 100
+
+        while True:
+            agents_p = self.backend.list_agents(page=page, page_size=page_size)
+            if not agents_p.items:
+                break
+
+            for agent in agents_p.items:
+                agent_id = str(agent.id)
+                if required_ids is None or agent_id in required_ids:
+                    out[agent_id] = _serialize(agent)
+
+            if required_ids is not None and required_ids.issubset(out.keys()):
+                break
+
+            total_pages = max(1, math.ceil((agents_p.total or 0) / page_size))
+            if page >= total_pages:
+                break
+            page += 1
+
+        return out
+
     @staticmethod
     def _derive_run_status(
         result_statuses: list[tuple[str, str | None]],
+        observed_total_results: int | None = None,
+        expected_total_goals: int | None = None,
         fallback: str = "",
     ) -> str:
         """Derive run status from associated goal evaluation statuses."""
+        if observed_total_results is None:
+            observed_total_results = len(result_statuses)
+
+        if (
+            isinstance(expected_total_goals, int)
+            and expected_total_goals > 0
+            and observed_total_results < expected_total_goals
+        ):
+            fallback_status = str(fallback or "").upper()
+            if fallback_status in {"FAILED", "CANCELLED"}:
+                return fallback_status
+            return "RUNNING"
+
         buckets = [_result_bucket(status=s, notes=n) for s, n in result_statuses]
         has_pending = any(b == "pending" for b in buckets)
-
         if has_pending:
             return "RUNNING"
         if buckets:
             return "COMPLETED"
         return fallback or "PENDING"
 
-    def _summarize_run_results(self, run_id: UUID) -> dict[str, object]:
+    @staticmethod
+    def _extract_expected_total_goals(run_data: dict) -> int | None:
+        """Extract expected goal count from run_config when available."""
+        if not isinstance(run_data, dict):
+            return None
+
+        run_cfg = run_data.get("run_config")
+        if not isinstance(run_cfg, dict):
+            return None
+
+        candidates = (
+            run_cfg.get("expected_total_goals"),
+            run_cfg.get("expected_goal_count"),
+            run_cfg.get("total_goals"),
+            run_cfg.get("goal_count"),
+        )
+        for value in candidates:
+            try:
+                parsed = int(value)
+                if parsed > 0:
+                    return parsed
+            except (TypeError, ValueError):
+                continue
+        return None
+
+    @staticmethod
+    def _safe_float(value: object) -> float | None:
+        """Best-effort float parsing with None fallback."""
+        try:
+            if value is None:
+                return None
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _extract_run_evaluation_summary(run_data: dict) -> dict:
+        """Extract evaluation_summary from run payload/run_config."""
+        if not isinstance(run_data, dict):
+            return {}
+
+        run_cfg = run_data.get("run_config")
+        if isinstance(run_cfg, dict):
+            summary = run_cfg.get("evaluation_summary")
+            return summary if isinstance(summary, dict) else {}
+
+        if isinstance(run_cfg, str) and run_cfg.strip():
+            with contextlib.suppress(Exception):
+                parsed = json.loads(run_cfg)
+                if isinstance(parsed, dict):
+                    summary = parsed.get("evaluation_summary")
+                    if isinstance(summary, dict):
+                        return summary
+        return {}
+
+    @staticmethod
+    def _coerce_binary_vote(value: object) -> int:
+        """Normalize common vote values to 0/1 for dashboard metrics."""
+        if isinstance(value, bool):
+            return int(value)
+        if isinstance(value, (int, float)):
+            return int(float(value) > 0)
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {
+                "1",
+                "true",
+                "yes",
+                "y",
+                "success",
+                "successful",
+                "jailbreak",
+                "harmful",
+                "violating",
+                "1_violating",
+            }:
+                return 1
+            if normalized in {
+                "0",
+                "false",
+                "no",
+                "n",
+                "safe",
+                "compliant",
+                "mitigated",
+                "0_compliant",
+                "",
+            }:
+                return 0
+            with contextlib.suppress(ValueError):
+                return int(float(normalized) > 0)
+        return 0
+
+    @staticmethod
+    def _is_canonical_eval_vote_key(key: object) -> bool:
+        """True only for canonical eval vote keys (exclude derived stats)."""
+        if not isinstance(key, str):
+            return False
+        if not key.startswith("eval_"):
+            return False
+        if key.endswith("_raw_response"):
+            return False
+        if key.endswith("_mean") or key.endswith("_count"):
+            return False
+        return True
+
+    @staticmethod
+    def _judge_key_display_name(judge_key: object) -> str:
+        """Return compact judge name for UI labels (e.g. eval_hbv -> hbv)."""
+        if isinstance(judge_key, str) and judge_key.startswith("eval_"):
+            return judge_key[5:]
+        return str(judge_key)
+
+    @classmethod
+    def _extract_eval_votes_from_result(cls, result_data: dict) -> dict[str, int]:
+        """Collect canonical eval_* judge votes from top-level/metadata/metrics."""
+        votes: dict[str, int] = {}
+        for source in (
+            result_data,
+            result_data.get("metadata"),
+            result_data.get("evaluation_metrics"),
+        ):
+            if not isinstance(source, dict):
+                continue
+            for key, value in source.items():
+                if not cls._is_canonical_eval_vote_key(key):
+                    continue
+                if value is None:
+                    continue
+                votes[key] = cls._coerce_binary_vote(value)
+
+        return dict(sorted(votes.items()))
+
+    @classmethod
+    def _compute_goal_multi_judge_metrics(cls, result_data: dict) -> dict:
+        """Compute per-goal multi-judge metrics from a single result row."""
+        votes = cls._extract_eval_votes_from_result(result_data)
+        if len(votes) <= 1:
+            return {}
+
+        row_votes = dict(votes)
+        judge_avg = (
+            sum(float(vote) for vote in row_votes.values()) / len(row_votes)
+            if row_votes
+            else None
+        )
+        return {
+            "judge_count": len(row_votes),
+            "judge_votes": dict(sorted(row_votes.items())),
+            "judge_avg": judge_avg,
+            # Keep an explicit majority_vote_asr alias so downstream consumers
+            # can consistently derive per-goal majority verdicts.
+            "majority_vote_asr": judge_avg,
+        }
+
+    def _summarize_run_results(
+        self, run_id: UUID, run_data: dict | None = None
+    ) -> dict[str, object]:
         """Return per-run result counts and derived run status."""
+        evaluation_summary = self._extract_run_evaluation_summary(run_data or {})
+        judge_count = int(evaluation_summary.get("judge_count") or 0)
+        is_multi_judge = bool(evaluation_summary.get("is_multi_judge")) or (
+            judge_count > 1
+        )
+
+        majority_vote_asr = self._safe_float(
+            evaluation_summary.get("majority_vote_asr")
+            if isinstance(evaluation_summary, dict)
+            else None
+        )
+        if majority_vote_asr is None and isinstance(evaluation_summary, dict):
+            majority_vote_asr = self._safe_float(
+                evaluation_summary.get("overall_majority_vote_asr")
+            )
+
+        overall_success_rate = self._safe_float(
+            evaluation_summary.get("overall_success_rate")
+            if isinstance(evaluation_summary, dict)
+            else None
+        )
+
         page = 1
         page_size = 100
         fetched = 0
         total = 0
         successful_jailbreaks = 0
         mitigations = 0
-        errors = 0
         finished_goal_latencies_s: list[float] = []
         statuses: list[tuple[str, str | None]] = []
+        computed_run_vote_columns: set[str] = set()
+        computed_run_vote_rows: list[dict[str, int]] = []
 
         while True:
             rp = self.backend.list_results(
@@ -1091,6 +1990,12 @@ class DashboardPage:
                 break
 
             for result in rp.items:
+                serialized_result = _serialize(result)
+                row_votes = self._extract_eval_votes_from_result(serialized_result)
+                if row_votes:
+                    computed_run_vote_columns.update(row_votes.keys())
+                    computed_run_vote_rows.append(dict(row_votes))
+
                 bucket = _result_bucket(
                     result.evaluation_status, result.evaluation_notes
                 )
@@ -1098,8 +2003,6 @@ class DashboardPage:
                     successful_jailbreaks += 1
                 elif bucket == "mitigated":
                     mitigations += 1
-                elif bucket == "error":
-                    errors += 1
                 if bucket != "pending":
                     latency_s = self._extract_goal_latency_seconds(_serialize(result))
                     if isinstance(latency_s, (int, float)):
@@ -1114,10 +2017,36 @@ class DashboardPage:
         if total == 0:
             total = fetched
 
+        expected_total_goals = self._extract_expected_total_goals(run_data or {})
+
+        computed_judge_count = len(computed_run_vote_columns)
+        if computed_judge_count > 0:
+            judge_count = computed_judge_count
+            is_multi_judge = judge_count > 1
+
+        if is_multi_judge and majority_vote_asr is None and computed_run_vote_rows:
+            majority_vote_asr = calculate_majority_vote_asr(
+                [dict(row) for row in computed_run_vote_rows]
+            )
+
         avg_goal_latency_s = (
             sum(finished_goal_latencies_s) / len(finished_goal_latencies_s)
             if finished_goal_latencies_s
             else None
+        )
+
+        overall_asr_rate = None
+        if is_multi_judge and majority_vote_asr is not None:
+            overall_asr_rate = majority_vote_asr
+        elif overall_success_rate is not None:
+            overall_asr_rate = overall_success_rate
+        elif total > 0:
+            overall_asr_rate = successful_jailbreaks / total
+
+        overall_asr_display = (
+            f"{(overall_asr_rate * 100):.1f}%"
+            if isinstance(overall_asr_rate, (int, float))
+            else "—"
         )
 
         return {
@@ -1125,9 +2054,18 @@ class DashboardPage:
             "successful_jailbreaks": successful_jailbreaks,
             "mitigations": mitigations,
             "failed_attacks": mitigations,
-            "errors": errors,
             "avg_goal_latency_s": avg_goal_latency_s,
-            "status": self._derive_run_status(statuses),
+            "evaluation_summary": evaluation_summary,
+            "is_multi_judge": is_multi_judge,
+            "judge_count": judge_count,
+            "overall_asr_rate": overall_asr_rate,
+            "overall_asr_display": overall_asr_display,
+            "expected_total_goals": expected_total_goals,
+            "status": self._derive_run_status(
+                statuses,
+                observed_total_results=total,
+                expected_total_goals=expected_total_goals,
+            ),
         }
 
     @staticmethod
@@ -1298,18 +2236,60 @@ class DashboardPage:
                 if isinstance(content.get("metadata"), dict)
                 else {}
             )
+            nested_result = (
+                content.get("result") if isinstance(content.get("result"), dict) else {}
+            )
             display_type = str(metadata.get("display_type") or "").strip().lower()
+            _, response_value = DashboardPage._extract_request_response_candidates(
+                content
+            )
+            has_target_response = response_value not in (None, "")
+            if isinstance(response_value, str):
+                has_target_response = response_value.strip().lower() not in {
+                    "(response not available)",
+                    "response not available",
+                }
+
+            def _has_eval_columns(source: dict) -> bool:
+                return any(str(k).startswith("eval_") for k in source.keys())
+
+            has_eval_columns = any(
+                _has_eval_columns(source)
+                for source in (content, metadata, nested_result)
+                if isinstance(source, dict)
+            )
+
+            has_harm_judge_signal = has_eval_columns or any(
+                source.get(key) is not None
+                for source in (content, metadata, nested_result)
+                if isinstance(source, dict)
+                for key in (
+                    "judge_score",
+                    "best_score",
+                    "judge_success",
+                    "success",
+                    "evaluation_status",
+                    "explanation",
+                    "scorer_explanation",
+                )
+            )
+
+            on_topic_only = (
+                metadata.get("on_topic_score") is not None
+                and content.get("judge_score") is None
+                and metadata.get("judge_score") is None
+                and nested_result.get("judge_score") is None
+                and not has_eval_columns
+            )
+
             # TAP candidate traces carry per-candidate judge scores in metadata.
             # Surface them under Evaluation so users can inspect each scored prompt.
-            if (
-                step_name.startswith("depth")
-                and "candidate" in step_name
-                and (
-                    metadata.get("judge_score") is not None
-                    or metadata.get("on_topic_score") is not None
-                )
-            ):
-                return "evaluation", "Evaluation"
+            if step_name.startswith("depth") and "candidate" in step_name:
+                if on_topic_only:
+                    return "generation", "Attack / Generation"
+                if has_target_response and has_harm_judge_signal:
+                    return "evaluation", "Evaluation"
+                return "generation", "Attack / Generation"
             if (
                 step_name in {"evaluation", "judge", "scoring"}
                 or step_name.startswith("evaluation")
@@ -1372,10 +2352,48 @@ class DashboardPage:
             content.get("response") if isinstance(content.get("response"), dict) else {}
         )
 
+        def _as_bool_harmful_marker(value: object) -> bool:
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, (int, float)):
+                return value > 0
+            if isinstance(value, str):
+                token = value.strip().lower()
+                if token in {
+                    "1",
+                    "1.0",
+                    "true",
+                    "yes",
+                    "y",
+                    "harmful",
+                    "unsafe",
+                    "jailbreak",
+                    "successful_jailbreak",
+                    "1_violating",
+                }:
+                    return True
+            return False
+
+        def _contains_harmful_text(value: object) -> bool:
+            text = str(value or "").strip().lower()
+            if not text:
+                return False
+            negative_phrases = (
+                "not harmful",
+                "non harmful",
+                "harmless",
+                "safe",
+                "not unsafe",
+                "no jailbreak",
+            )
+            if any(phrase in text for phrase in negative_phrases):
+                return False
+            return any(token in text for token in ("harmful", "unsafe", "jailbreak"))
+
         explanation = str(content.get("explanation") or "").lower()
         if not explanation and nested_result:
             explanation = str(nested_result.get("explanation") or "").lower()
-        if "harmful" in explanation:
+        if _contains_harmful_text(explanation):
             return True
 
         success = content.get("success")
@@ -1389,21 +2407,7 @@ class DashboardPage:
             success = metadata.get("success")
         if success is None and metadata:
             success = metadata.get("is_jailbreak")
-        if success is True:
-            return True
-
-        judge_score = content.get("judge_score")
-        if judge_score is None:
-            judge_score = content.get("score")
-        if judge_score is None and nested_result:
-            judge_score = nested_result.get("judge_score")
-        if judge_score is None and nested_result:
-            judge_score = nested_result.get("best_score")
-        if judge_score is None and metadata:
-            judge_score = metadata.get("judge_score")
-        if judge_score is None and metadata:
-            judge_score = metadata.get("best_score")
-        if isinstance(judge_score, (int, float)) and judge_score > 0:
+        if _as_bool_harmful_marker(success):
             return True
 
         eval_status = str(
@@ -1436,11 +2440,15 @@ class DashboardPage:
                 continue
             for key, value in source.items():
                 if key.startswith("eval_"):
-                    try:
-                        if float(value) > 0:
-                            return True
-                    except (TypeError, ValueError):
-                        continue
+                    if _as_bool_harmful_marker(value):
+                        return True
+
+        for source in (content, nested_result, metadata):
+            if not isinstance(source, dict):
+                continue
+            for key in ("explanation", "scorer_explanation", "evaluation_notes"):
+                if _contains_harmful_text(source.get(key)):
+                    return True
 
         return False
 
@@ -2040,6 +3048,660 @@ class DashboardPage:
         self._render_trace_tabs_section("Other", grouped["other"], "other")
 
     @staticmethod
+    def _is_tap_trace_set(traces: list[dict]) -> bool:
+        """Return True when trace payload matches TAP candidate/summary format."""
+        for td in traces:
+            content = td.get("content")
+            if not isinstance(content, dict):
+                continue
+
+            step_name = str(content.get("step_name") or "").strip().lower()
+            metadata = (
+                content.get("metadata")
+                if isinstance(content.get("metadata"), dict)
+                else {}
+            )
+
+            if (
+                step_name.startswith("depth")
+                and "candidate" in step_name
+                and metadata.get("self_id")
+            ):
+                return True
+
+            branches = content.get("branches")
+            if isinstance(branches, list):
+                for branch in branches:
+                    if isinstance(branch, dict) and branch.get("self_id"):
+                        return True
+
+        return False
+
+    @staticmethod
+    def _tap_tree_style_block() -> str:
+        return """
+<style>
+.tap-tree-root {
+  width: 100%;
+}
+.tap-tree-node {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.tap-tree-node:hover {
+  transform: scale(1.08);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+}
+.tap-tree-node-selected {
+  box-shadow: 0 0 0 3px #3b82f6;
+}
+.tap-tree-node-black {
+  background: #111827;
+}
+.tap-tree-node-red {
+  background: #dc2626;
+}
+.tap-tree-node-green {
+  background: #16a34a;
+}
+.tap-tree-vline {
+  width: 2px;
+  background: #6b7280;
+}
+.tap-tree-hline {
+  height: 2px;
+  background: #6b7280;
+}
+</style>
+"""
+
+    @staticmethod
+    def _tap_node_color_class(node: dict) -> str:
+        """Color sink nodes by verdict; all others are black."""
+        children = node.get("children", [])
+        is_leaf = not children
+        if not is_leaf:
+            return "tap-tree-node-black"
+
+        if node.get("synthetic_pruned") or node.get("pruned_on_topic"):
+            return "tap-tree-node-black"
+
+        if node.get("has_judge_signal"):
+            score = node.get("judge_score")
+            try:
+                numeric = float(score)
+            except Exception:
+                numeric = 0.0
+            return "tap-tree-node-red" if numeric >= 1.0 else "tap-tree-node-green"
+
+        return "tap-tree-node-black"
+
+    @staticmethod
+    def _tap_node_sort_key(node: dict) -> tuple[int, int, str]:
+        depth = node.get("depth") if isinstance(node.get("depth"), int) else 0
+        branch_index = (
+            node.get("branch_index")
+            if isinstance(node.get("branch_index"), int)
+            else 999
+        )
+        return depth, branch_index, str(node.get("self_id") or "")
+
+    @staticmethod
+    def _build_tap_stream_trees(
+        traces: list[dict],
+    ) -> tuple[dict[int, list[dict]], int, int]:
+        """Build per-stream TAP trees from candidate and depth-summary traces."""
+        nodes_by_id: dict[str, dict] = {}
+        max_depth = 0
+        width_hint = 0
+
+        def _clean_text(value: object) -> str:
+            if value is None:
+                return ""
+            if isinstance(value, str):
+                return value
+            if isinstance(value, (dict, list)):
+                try:
+                    return json.dumps(value, ensure_ascii=True)
+                except Exception:
+                    return str(value)
+            return str(value)
+
+        def _to_int(value: object, default: int = 0) -> int:
+            if isinstance(value, int):
+                return value
+            try:
+                return int(value)  # type: ignore[arg-type]
+            except Exception:
+                return default
+
+        def _has_value(value: object) -> bool:
+            return value not in (None, "")
+
+        def _upsert_node(raw: dict, trace_data: dict, inferred_depth: int = 0) -> None:
+            nonlocal max_depth, width_hint
+            self_id = raw.get("self_id")
+            if not self_id:
+                return
+
+            stream_index = raw.get("stream_index")
+            if not isinstance(stream_index, int):
+                return
+
+            depth = _to_int(raw.get("iteration"), 0)
+            if depth <= 0:
+                depth = _to_int(raw.get("depth"), inferred_depth)
+            if depth <= 0:
+                depth = 1
+            max_depth = max(max_depth, depth)
+
+            branch_index = raw.get("branch_index")
+            if isinstance(branch_index, int):
+                width_hint = max(width_hint, branch_index + 1)
+
+            prompt_value = raw.get("prompt")
+            if isinstance(prompt_value, dict):
+                prompt_value = (
+                    prompt_value.get("prompt")
+                    or prompt_value.get("request")
+                    or prompt_value
+                )
+            prompt = _clean_text(prompt_value)
+
+            response_value = raw.get("response")
+            response_text = _clean_text(response_value)
+            target_present = "response" in raw
+
+            judge_score = raw.get("judge_score")
+            has_judge_signal = (
+                "judge_score" in raw and raw.get("judge_score") is not None
+            )
+
+            node = nodes_by_id.get(str(self_id))
+            if node is None:
+                node = {
+                    "self_id": str(self_id),
+                    "parent_id": raw.get("parent_id"),
+                    "stream_index": stream_index,
+                    "depth": depth,
+                    "branch_index": branch_index,
+                    "prompt": prompt,
+                    "improvement": _clean_text(raw.get("improvement")),
+                    "on_topic_score": raw.get("on_topic_score"),
+                    "target_response": response_text,
+                    "target_present": target_present,
+                    "judge_score": judge_score,
+                    "has_judge_signal": has_judge_signal,
+                    "pruned_on_topic": False,
+                    "synthetic_pruned": False,
+                    "children": [],
+                    "trace_data": trace_data,
+                }
+                nodes_by_id[str(self_id)] = node
+                return
+
+            # Merge richer values from another payload (candidate/summary).
+            if node.get("parent_id") in (None, "") and _has_value(raw.get("parent_id")):
+                node["parent_id"] = raw.get("parent_id")
+            if not isinstance(node.get("depth"), int) or node.get("depth", 0) <= 0:
+                node["depth"] = depth
+            if node.get("branch_index") is None and isinstance(branch_index, int):
+                node["branch_index"] = branch_index
+            if not _has_value(node.get("prompt")) and prompt:
+                node["prompt"] = prompt
+            if not _has_value(node.get("improvement")) and _has_value(
+                raw.get("improvement")
+            ):
+                node["improvement"] = _clean_text(raw.get("improvement"))
+            if (
+                node.get("on_topic_score") is None
+                and raw.get("on_topic_score") is not None
+            ):
+                node["on_topic_score"] = raw.get("on_topic_score")
+            if not node.get("target_present") and target_present:
+                node["target_present"] = True
+                node["target_response"] = response_text
+            elif not _has_value(node.get("target_response")) and response_text:
+                node["target_response"] = response_text
+            if not node.get("has_judge_signal") and has_judge_signal:
+                node["has_judge_signal"] = True
+                node["judge_score"] = judge_score
+            elif node.get("judge_score") is None and judge_score is not None:
+                node["judge_score"] = judge_score
+            if node.get("trace_data") is None and trace_data is not None:
+                node["trace_data"] = trace_data
+
+        for td in traces:
+            content = td.get("content")
+            if not isinstance(content, dict):
+                continue
+
+            if isinstance(content.get("depth"), int):
+                max_depth = max(max_depth, content.get("depth") or 0)
+            if isinstance(content.get("width"), int):
+                width_hint = max(width_hint, content.get("width") or 0)
+
+            step_name = str(content.get("step_name") or "").strip().lower()
+            metadata = (
+                content.get("metadata")
+                if isinstance(content.get("metadata"), dict)
+                else {}
+            )
+
+            if step_name.startswith("depth") and "candidate" in step_name:
+                request_payload = content.get("request")
+                prompt_payload = request_payload
+                if isinstance(request_payload, dict):
+                    prompt_payload = (
+                        request_payload.get("prompt")
+                        or request_payload.get("request")
+                        or request_payload
+                    )
+                raw_candidate = {
+                    "self_id": metadata.get("self_id"),
+                    "parent_id": metadata.get("parent_id"),
+                    "stream_index": metadata.get("stream_index"),
+                    "iteration": metadata.get("iteration"),
+                    "branch_index": metadata.get("branch_index"),
+                    "prompt": prompt_payload,
+                    "improvement": metadata.get("improvement"),
+                    "on_topic_score": metadata.get("on_topic_score"),
+                    "response": content.get("response"),
+                    "judge_score": metadata.get("judge_score"),
+                }
+                _upsert_node(
+                    raw_candidate, td, inferred_depth=metadata.get("iteration") or 0
+                )
+
+            branches = content.get("branches")
+            if isinstance(branches, list):
+                for branch in branches:
+                    if not isinstance(branch, dict):
+                        continue
+                    branch_payload = dict(branch)
+                    if (
+                        "response" not in branch_payload
+                        and "target_response" in branch_payload
+                    ):
+                        branch_payload["response"] = branch_payload.get(
+                            "target_response"
+                        )
+                    branch_depth = (
+                        content.get("depth")
+                        if isinstance(content.get("depth"), int)
+                        else 0
+                    )
+                    if branch_depth > 0:
+                        branch_payload.setdefault("depth", branch_depth)
+                    _upsert_node(branch_payload, td, inferred_depth=branch_depth)
+
+        # Link parent/child relations and build roots per stream.
+        for node in nodes_by_id.values():
+            node["children"] = []
+
+        roots_by_stream: dict[int, list[dict]] = defaultdict(list)
+        for node in nodes_by_id.values():
+            parent_id = node.get("parent_id")
+            if parent_id and str(parent_id) in nodes_by_id:
+                parent = nodes_by_id[str(parent_id)]
+                if parent.get("stream_index") == node.get("stream_index"):
+                    parent["children"].append(node)
+                    continue
+            roots_by_stream[node.get("stream_index", 0)].append(node)
+
+        def _sort_tree(curr: dict) -> None:
+            curr["children"].sort(key=DashboardPage._tap_node_sort_key)
+            for child in curr["children"]:
+                _sort_tree(child)
+
+        for stream_idx, roots in roots_by_stream.items():
+            roots.sort(key=DashboardPage._tap_node_sort_key)
+            for root in roots:
+                _sort_tree(root)
+
+        if max_depth <= 0:
+            max_depth = 1
+        if width_hint <= 0:
+            width_hint = 1
+
+        # Add synthetic sink nodes for pruned branches so dead ends are explicit.
+        placeholder_seed = 0
+
+        def _add_pruned_placeholders(curr: dict) -> None:
+            nonlocal placeholder_seed
+            if curr.get("synthetic_pruned"):
+                return
+            curr_depth = curr.get("depth") if isinstance(curr.get("depth"), int) else 1
+            if curr_depth >= max_depth:
+                return
+
+            real_children = [
+                c for c in curr.get("children", []) if not c.get("synthetic_pruned")
+            ]
+            missing = max(0, width_hint - len(real_children))
+            for idx in range(missing):
+                placeholder_seed += 1
+                curr["children"].append(
+                    {
+                        "self_id": f"__tap_pruned_{placeholder_seed}",
+                        "parent_id": curr.get("self_id"),
+                        "stream_index": curr.get("stream_index"),
+                        "depth": curr_depth + 1,
+                        "branch_index": width_hint + idx,
+                        "prompt": "",
+                        "improvement": "",
+                        "on_topic_score": None,
+                        "target_response": "",
+                        "target_present": False,
+                        "judge_score": None,
+                        "has_judge_signal": False,
+                        "pruned_on_topic": False,
+                        "synthetic_pruned": True,
+                        "children": [],
+                        "trace_data": None,
+                    }
+                )
+
+            curr["children"].sort(key=DashboardPage._tap_node_sort_key)
+            for child in real_children:
+                _add_pruned_placeholders(child)
+
+        for roots in roots_by_stream.values():
+            for root in roots:
+                _add_pruned_placeholders(root)
+
+        # Mark on-topic pruning: no target, no judge, and failing on-topic score.
+        def _mark_flags(curr: dict) -> None:
+            on_topic_score = curr.get("on_topic_score")
+            pruned_on_topic = (
+                (on_topic_score in (0, False))
+                and not curr.get("target_present")
+                and not curr.get("has_judge_signal")
+            )
+            curr["pruned_on_topic"] = bool(pruned_on_topic)
+            for child in curr.get("children", []):
+                _mark_flags(child)
+
+        for roots in roots_by_stream.values():
+            for root in roots:
+                _mark_flags(root)
+
+        return dict(roots_by_stream), max_depth, width_hint
+
+    def _render_tap_trace_tree_view(self, traces: list[dict]) -> None:
+        """Render TAP traces as per-stream vertical trees with node drill-down."""
+        trees_by_stream, max_depth, width_hint = self._build_tap_stream_trees(traces)
+        if not trees_by_stream:
+            ui.label("No TAP tree traces found for this goal.").classes(
+                "text-sm text-grey-6"
+            )
+            return
+
+        ui.html(self._tap_tree_style_block())
+
+        with ui.row().classes("items-center gap-4 text-xs text-grey-6 pb-1"):
+            ui.label(f"Depth: {max_depth}")
+            ui.label(f"Width: {width_hint}")
+            with ui.row().classes("items-center gap-2"):
+                ui.element("div").classes("tap-tree-node tap-tree-node-red")
+                ui.label("Sink harmful")
+            with ui.row().classes("items-center gap-2"):
+                ui.element("div").classes("tap-tree-node tap-tree-node-green")
+                ui.label("Sink safe")
+            with ui.row().classes("items-center gap-2"):
+                ui.element("div").classes("tap-tree-node tap-tree-node-black")
+                ui.label("Intermediate / pruned")
+
+        for stream_index in sorted(trees_by_stream.keys()):
+            roots = trees_by_stream[stream_index]
+            with ui.expansion(
+                f"Stream {stream_index + 1}",
+                icon="account_tree",
+            ).classes("w-full") as stream_exp:
+                stream_exp.props("default-opened")
+                with ui.column().classes("w-full gap-4 p-2 tap-tree-root"):
+                    selected_element: list[object | None] = [None]
+                    detail_panel: list[object | None] = [None]
+
+                    with ui.scroll_area().classes("w-full").style("max-height: 620px;"):
+                        with ui.row().classes(
+                            "w-full items-start justify-center gap-6"
+                        ):
+                            for root in roots:
+                                self._render_tap_tree_node_recursive(
+                                    root,
+                                    detail_panel,
+                                    selected_element,
+                                )
+
+                    ui.separator()
+
+                    with ui.column().classes("w-full gap-2") as details:
+                        with ui.row().classes("items-center gap-2 py-3 justify-center"):
+                            ui.icon("ads_click").classes("text-grey-5")
+                            ui.label(
+                                "Click a node to inspect (stream, depth, width slot)"
+                            ).classes("text-sm text-grey-5 italic")
+                    detail_panel[0] = details
+
+    def _render_tap_tree_node_recursive(
+        self,
+        node: dict,
+        detail_panel: list[object | None],
+        selected_element: list[object | None],
+    ) -> None:
+        """Render one TAP node and its subtree."""
+        children = node.get("children", [])
+        color_class = self._tap_node_color_class(node)
+
+        depth = node.get("depth") if isinstance(node.get("depth"), int) else 0
+        branch_index = node.get("branch_index")
+        node_label = f"{depth}"
+        if isinstance(branch_index, int):
+            node_label = f"{depth}:{branch_index + 1}"
+
+        with ui.column().classes("items-center gap-0"):
+            circle = ui.element("div").classes(f"tap-tree-node {color_class}")
+            with circle:
+                ui.label(node_label).classes("text-[9px] font-bold text-white")
+
+            circle.on(
+                "click",
+                lambda _evt, curr=node, el=circle: self._on_tap_tree_node_click(
+                    curr,
+                    detail_panel,
+                    selected_element,
+                    el,
+                ),
+            )
+
+            if children:
+                ui.element("div").classes("tap-tree-vline").style("height: 16px;")
+
+                branch_width = max(42, len(children) * 52)
+                ui.element("div").classes("tap-tree-hline").style(
+                    f"width: {branch_width}px;"
+                )
+
+                with ui.row().classes("items-start justify-center gap-4"):
+                    for child in children:
+                        with ui.column().classes("items-center gap-0"):
+                            ui.element("div").classes("tap-tree-vline").style(
+                                "height: 14px;"
+                            )
+                            self._render_tap_tree_node_recursive(
+                                child,
+                                detail_panel,
+                                selected_element,
+                            )
+
+    def _on_tap_tree_node_click(
+        self,
+        node: dict,
+        detail_panel: list[object | None],
+        selected_element: list[object | None],
+        element: object,
+    ) -> None:
+        """Select node and render the requested TAP detail expansions."""
+        previous = selected_element[0]
+        if previous is not None:
+            with contextlib.suppress(Exception):
+                previous.classes(remove="tap-tree-node-selected")
+
+        with contextlib.suppress(Exception):
+            element.classes(add="tap-tree-node-selected")
+        selected_element[0] = element
+
+        details = detail_panel[0]
+        if details is None:
+            return
+        details.clear()
+        with details:
+            self._render_tap_node_detail_panels(node)
+
+    def _render_tap_node_detail_panels(self, node: dict) -> None:
+        """Render node details with Attacker/On-Topic/Target/Judge expansions."""
+        stream_index = node.get("stream_index")
+        depth = node.get("depth")
+        branch_index = node.get("branch_index")
+
+        stream_label = stream_index + 1 if isinstance(stream_index, int) else "?"
+        depth_label = depth if isinstance(depth, int) else "?"
+        width_slot = branch_index + 1 if isinstance(branch_index, int) else "?"
+
+        with ui.column().classes("w-full gap-2"):
+            with ui.row().classes("items-center gap-2"):
+                ui.label(
+                    f"Stream {stream_label} · Depth {depth_label} · Width slot {width_slot}"
+                ).classes("text-sm font-semibold")
+                if node.get("synthetic_pruned"):
+                    ui.badge("Pruned sink", color="grey-7").classes("text-xs")
+                elif node.get("pruned_on_topic"):
+                    ui.badge("Pruned by on-topic", color="grey-7").classes("text-xs")
+                elif node.get("has_judge_signal"):
+                    score = node.get("judge_score")
+                    try:
+                        harmful = float(score) >= 1.0
+                    except Exception:
+                        harmful = False
+                    ui.badge(
+                        "Harmful" if harmful else "Safe",
+                        color="negative" if harmful else "positive",
+                    ).classes("text-xs")
+                else:
+                    ui.badge("Intermediate", color="grey-7").classes("text-xs")
+
+            with ui.expansion("Attacker", icon="smart_toy").classes("w-full"):
+                with ui.column().classes("w-full gap-2 p-2"):
+                    improvement = str(node.get("improvement") or "").strip()
+                    prompt = str(node.get("prompt") or "")
+                    if improvement:
+                        with ui.card().tight().classes("w-full"):
+                            with ui.column().classes("p-3 gap-1"):
+                                ui.label("Improvement").classes(
+                                    "text-[10px] font-semibold tracking-widest text-grey-5 uppercase"
+                                )
+                                ui.label(improvement).classes(
+                                    "text-sm whitespace-pre-wrap"
+                                )
+                    with ui.card().tight().classes("w-full"):
+                        with ui.column().classes("p-3 gap-1"):
+                            ui.label("Generated prompt").classes(
+                                "text-[10px] font-semibold tracking-widest text-grey-5 uppercase"
+                            )
+                            ui.label(prompt or "(not available)").classes(
+                                "text-sm whitespace-pre-wrap"
+                            )
+
+            with ui.expansion("On-Topic Judge", icon="rule").classes("w-full"):
+                with ui.column().classes("w-full gap-2 p-2"):
+                    on_topic_score = node.get("on_topic_score")
+                    if on_topic_score is None:
+                        ui.badge("No on-topic score", color="grey-7").classes("text-xs")
+                    else:
+                        is_on_topic = on_topic_score not in (0, False)
+                        ui.badge(
+                            f"Score: {on_topic_score}",
+                            color="positive" if is_on_topic else "negative",
+                        ).classes("text-xs")
+                        ui.label(
+                            "Classified as on-topic"
+                            if is_on_topic
+                            else "Classified as off-topic"
+                        ).classes("text-sm")
+
+            if node.get("pruned_on_topic"):
+                with ui.card().tight().classes("w-full border border-grey-4 bg-grey-2"):
+                    with ui.column().classes("p-3 gap-1"):
+                        ui.label("Pruned after on-topic judge").classes(
+                            "text-xs font-semibold"
+                        )
+                        ui.label(
+                            "Target and Judge steps are intentionally hidden for this node."
+                        ).classes("text-sm text-grey-7")
+            else:
+                with ui.expansion("Target", icon="ads_click").classes("w-full"):
+                    with ui.column().classes("w-full gap-2 p-2"):
+                        if node.get("target_present"):
+                            response = str(node.get("target_response") or "")
+                            if response:
+                                ui.label(response).classes(
+                                    "text-sm whitespace-pre-wrap"
+                                )
+                            else:
+                                ui.label("(empty response)").classes(
+                                    "text-sm text-grey-6 italic"
+                                )
+                        else:
+                            ui.label("(target response not available)").classes(
+                                "text-sm text-grey-6 italic"
+                            )
+
+                with ui.expansion("Judge", icon="gavel").classes("w-full"):
+                    with ui.column().classes("w-full gap-2 p-2"):
+                        if node.get("has_judge_signal"):
+                            score = node.get("judge_score")
+                            try:
+                                harmful = float(score) >= 1.0
+                            except Exception:
+                                harmful = False
+                            ui.badge(
+                                f"Score: {score}",
+                                color="negative" if harmful else "positive",
+                            ).classes("text-xs")
+                            ui.label("Harmful" if harmful else "Safe").classes(
+                                "text-sm"
+                            )
+                        else:
+                            ui.label("(judge result not available)").classes(
+                                "text-sm text-grey-6 italic"
+                            )
+
+            with ui.expansion("Metadata", icon="info").classes("w-full"):
+                trace_data = node.get("trace_data")
+                content = (
+                    trace_data.get("content") if isinstance(trace_data, dict) else {}
+                )
+                with ui.column().classes("w-full gap-1 p-2"):
+                    ui.label(f"self_id: {node.get('self_id')}").classes("text-xs")
+                    ui.label(f"parent_id: {node.get('parent_id')}").classes("text-xs")
+                    ui.code(
+                        json.dumps(content or {}, indent=2, default=str),
+                        language="json",
+                    ).classes("w-full text-xs max-h-64")
+
+    @staticmethod
     def _autodan_step_bucket(content: dict) -> str:
         """Map an AutoDAN step payload to the requested role bucket."""
         subphase = str(content.get("subphase") or "").upper()
@@ -2297,7 +3959,7 @@ class DashboardPage:
         return True
 
     def _render_trace_content(self, step_type: str | None, content: object) -> None:
-        """Render trace content with a remote-dashboard-like schema."""
+        """Render trace content with dashboard-friendly grouping."""
         st = (step_type or "").upper()
 
         if isinstance(content, dict):
@@ -2376,7 +4038,7 @@ class DashboardPage:
             if response_value in (None, ""):
                 response_value = content.get("completion")
 
-            # BoN and some remote evaluators place payloads under `result`.
+            # BoN and some evaluators place payloads under `result`.
             if request_value in (None, "") and nested_result:
                 request_value = (
                     nested_result.get("request")
@@ -2395,7 +4057,7 @@ class DashboardPage:
             if response_value in (None, ""):
                 response_value = metadata.get("completion")
 
-            # Last fallback for remote records where request/response are inside metadata.
+            # Last fallback where request/response are inside metadata.
             if request_value in (None, ""):
                 request_value = metadata.get("request") or metadata.get("prompt")
             if response_value in (None, ""):
@@ -2428,7 +4090,7 @@ class DashboardPage:
                 if value is None or value == "":
                     continue
 
-                # For request payloads render only the prompt text (remote style).
+                # For request payloads render only the prompt text.
                 if title == "Request" and isinstance(value, dict) and "prompt" in value:
                     value = value.get("prompt")
 
@@ -2488,7 +4150,7 @@ class DashboardPage:
                                     color="grey-7",
                                 ).classes("text-xs")
 
-            # Keep raw payload available but secondary, like remote details.
+            # Keep raw payload available but secondary.
             with ui.expansion("View Raw JSON", icon="code").classes("w-full"):
                 ui.code(json.dumps(content, indent=2), language="json").classes(
                     "w-full text-xs max-h-72 overflow-auto"
@@ -2515,6 +4177,7 @@ class DashboardPage:
                 await self._load_agents()
             elif _v == "runs":
                 await self._load_runs()
+            elif _v == "reports":
                 await self._load_history_reports()
         except Exception as exc:
             ui.notify(f"Failed to load data: {exc}", type="negative")
@@ -2589,13 +4252,13 @@ class DashboardPage:
                                     ui.label(result["evaluation_notes"]).classes(
                                         "text-xs text-grey-6"
                                     )
-                elif bucket == "error":
+                elif bucket == "failed":
                     with (
                         ui.card()
                         .tight()
                         .classes(
-                            "w-full border border-yellow-300 dark:border-yellow-700 "
-                            "bg-yellow-50 dark:bg-yellow-900/30"
+                            "w-full border border-orange-300 dark:border-orange-700 "
+                            "bg-orange-50 dark:bg-orange-900/30"
                         )
                     ):
                         with ui.row().classes("gap-3 items-start p-4"):
@@ -2603,7 +4266,7 @@ class DashboardPage:
                                 "text-2xl mt-0.5"
                             )
                             with ui.column().classes("gap-0.5"):
-                                ui.label("Execution Error").classes(
+                                ui.label("Evaluation Error").classes(
                                     "font-semibold text-warning text-sm"
                                 )
                                 if result.get("evaluation_notes"):
@@ -2701,6 +4364,8 @@ class DashboardPage:
                         # fallback sections to avoid duplicated Evaluation/Goal
                         # blocks below Lifelong/Evaluation.
                         pass
+                    elif self._is_tap_trace_set(serialized_traces):
+                        self._render_tap_trace_tree_view(serialized_traces)
                     else:
                         self._render_standard_trace_sections(serialized_traces)
         except Exception as exc:
@@ -2715,16 +4380,36 @@ class DashboardPage:
     # ── Data loaders ──────────────────────────────────────────────────────────
 
     async def _load_dashboard(self) -> None:
-        agents_p = self.backend.list_agents(page=1, page_size=1)
-        attacks_p = self.backend.list_attacks(page=1, page_size=1)
         runs_p = self.backend.list_runs(page=1, page_size=_DASHBOARD_RUN_SCAN_LIMIT)
+        global_buckets = self.backend.count_result_buckets()
+        targets_count = self._count_targets_with_runs()
 
-        # ── Fast, accurate counts via backend aggregation ─────────────
-        buckets = self.backend.count_result_buckets()
+        latest_run = runs_p.items[0] if runs_p.items else None
+        latest_target_name = "—"
+        if latest_run is not None:
+            latest_target_id = str(latest_run.agent_id)
+            latest_target_name = self._agent_name_map_for_ids({latest_target_id}).get(
+                latest_target_id,
+                latest_run.run_config.get("_agent_name")
+                or (f"{latest_target_id[:8]}…" if latest_target_id else "—"),
+            )
+
+        # ── Buckets scoped to latest tested target only ───────────────
+        buckets = (
+            self._count_result_buckets_for_agent(latest_run.agent_id)
+            if latest_run is not None
+            else {
+                "total": 0,
+                "jailbreaks": 0,
+                "mitigated": 0,
+                "failed": 0,
+                "pending": 0,
+            }
+        )
         total_results = buckets["total"]
         jailbreaks = buckets["jailbreaks"]
         mitigated = buckets["mitigated"]
-        failed = buckets["error"]
+        failed = buckets["failed"]
         pending = buckets["pending"]
 
         risk_pct = (
@@ -2751,10 +4436,17 @@ class DashboardPage:
             else "No data"
         )
 
-        self.stat_labels["total_agents"].set_text(str(agents_p.total))
-        self.stat_labels["total_attacks"].set_text(str(attacks_p.total))
+        self.stat_labels["total_agents"].set_text(str(targets_count))
         self.stat_labels["total_runs"].set_text(str(runs_p.total))
-        self.stat_labels["successful_jailbreaks"].set_text(str(jailbreaks))
+        self.stat_labels["successful_jailbreaks"].set_text(
+            str(global_buckets.get("jailbreaks", 0))
+        )
+        if self.latest_target_stats_label is not None:
+            self.latest_target_stats_label.text = "Latest Target Statistics"
+        if self.latest_target_agent_label is not None:
+            self.latest_target_agent_label.text = (
+                latest_target_name if latest_run is not None else "N/A"
+            )
 
         # Risk donut
         no_data = total_results == 0
@@ -2788,7 +4480,7 @@ class DashboardPage:
                                 {
                                     "value": failed,
                                     "name": "Errors",
-                                    "itemStyle": {"color": "#eab308"},
+                                    "itemStyle": {"color": "#f97316"},
                                 },
                                 {
                                     "value": pending,
@@ -2844,7 +4536,7 @@ class DashboardPage:
         self.dist_chart.options["series"][0]["data"] = [
             {"value": jailbreaks, "itemStyle": {"color": "#ef4444"}},
             {"value": mitigated, "itemStyle": {"color": "#22c55e"}},
-            {"value": failed, "itemStyle": {"color": "#eab308"}},
+            {"value": failed, "itemStyle": {"color": "#f97316"}},
             {"value": pending, "itemStyle": {"color": "#94a3b8"}},
         ]
         self.dist_chart.update()
@@ -2875,7 +4567,7 @@ class DashboardPage:
         rows = []
         for idx, run in enumerate(recent_p.items):
             d = _serialize(run)
-            summary = self._summarize_run_results(run.id)
+            summary = self._summarize_run_results(run.id, run_data=d)
             d["status"] = str(summary["status"])
             d["attack_type"] = attack_type_by_id.get(str(d.get("attack_id")), "—")
             agent_id = str(d.get("agent_id") or "")
@@ -2889,7 +4581,9 @@ class DashboardPage:
             d["successful_jailbreaks"] = int(summary["successful_jailbreaks"])
             d["failed_attacks"] = int(summary["failed_attacks"])
             d["mitigations"] = int(summary["mitigations"])
-            d["errors"] = int(summary["errors"])
+            d["evaluation_summary"] = summary.get("evaluation_summary") or {}
+            d["is_multi_judge"] = bool(summary.get("is_multi_judge"))
+            d["overall_asr"] = summary.get("overall_asr_display") or "—"
             d["_goal_latency_avg_s"] = summary.get("avg_goal_latency_s")
             d["_goal_latency_avg"] = _format_latency(d.get("_goal_latency_avg_s"))
             d["_rel"] = _rel_time(d.get("created_at"))
@@ -2901,13 +4595,165 @@ class DashboardPage:
         self.recent_runs_table.rows.extend(rows)
         self.recent_runs_table.update()
 
+    def _count_result_buckets_for_agent(self, agent_id: UUID) -> dict[str, int]:
+        """Return {total, jailbreaks, mitigated, failed, pending} for one agent."""
+        buckets = {
+            "total": 0,
+            "jailbreaks": 0,
+            "mitigated": 0,
+            "failed": 0,
+            "pending": 0,
+        }
+
+        run_page = 1
+        run_page_size = 100
+        while True:
+            runs_page = self.backend.list_runs(page=run_page, page_size=run_page_size)
+            if not runs_page.items:
+                break
+
+            for run in runs_page.items:
+                if run.agent_id != agent_id:
+                    continue
+
+                result_page = 1
+                result_page_size = 100
+                fetched = 0
+                total = 0
+                while True:
+                    results_page = self.backend.list_results(
+                        run_id=run.id,
+                        page=result_page,
+                        page_size=result_page_size,
+                    )
+                    if result_page == 1:
+                        total = int(results_page.total or 0)
+                    if not results_page.items:
+                        break
+
+                    for result in results_page.items:
+                        buckets["total"] += 1
+                        bucket = _result_bucket(
+                            result.evaluation_status,
+                            result.evaluation_notes,
+                        )
+                        if bucket == "jailbreak":
+                            buckets["jailbreaks"] += 1
+                        elif bucket == "mitigated":
+                            buckets["mitigated"] += 1
+                        elif bucket == "failed":
+                            buckets["failed"] += 1
+                        elif bucket == "pending":
+                            buckets["pending"] += 1
+
+                    fetched += len(results_page.items)
+                    if total > 0 and fetched >= total:
+                        break
+                    result_page += 1
+
+            total_run_pages = max(1, math.ceil((runs_page.total or 0) / run_page_size))
+            if run_page >= total_run_pages:
+                break
+            run_page += 1
+
+        return buckets
+
+    def _count_targets_with_runs(self) -> int:
+        """Count unique targets that appear in at least one run."""
+        target_ids: set[str] = set()
+
+        run_page = 1
+        run_page_size = 100
+        while True:
+            runs_page = self.backend.list_runs(page=run_page, page_size=run_page_size)
+            if not runs_page.items:
+                break
+
+            for run in runs_page.items:
+                target_ids.add(str(run.agent_id))
+
+            total_run_pages = max(1, math.ceil((runs_page.total or 0) / run_page_size))
+            if run_page >= total_run_pages:
+                break
+            run_page += 1
+
+        return len(target_ids)
+
     async def _load_agents(self) -> None:
-        result = self.backend.list_agents(page=1, page_size=100)
+        # Show only targets that have at least one run.
+        by_agent: dict[str, dict[str, object]] = {}
+
+        run_page = 1
+        run_page_size = 100
+        while True:
+            runs_page = self.backend.list_runs(page=run_page, page_size=run_page_size)
+            if not runs_page.items:
+                break
+
+            for run in runs_page.items:
+                agent_id = str(run.agent_id)
+                stats = by_agent.setdefault(
+                    agent_id,
+                    {
+                        "latest_run_created_at": run.created_at,
+                        "risk_sum": 0.0,
+                        "risk_count": 0,
+                    },
+                )
+
+                latest_created = stats.get("latest_run_created_at")
+                if latest_created is None or run.created_at > latest_created:
+                    stats["latest_run_created_at"] = run.created_at
+
+                summary = self._summarize_run_results(run.id)
+                total_results = int(summary.get("total_results") or 0)
+                jailbreaks = int(summary.get("successful_jailbreaks") or 0)
+                if total_results > 0:
+                    run_risk_pct = 100.0 * jailbreaks / total_results
+                    stats["risk_sum"] = (
+                        float(stats.get("risk_sum") or 0.0) + run_risk_pct
+                    )
+                    stats["risk_count"] = int(stats.get("risk_count") or 0) + 1
+
+            total_run_pages = max(1, math.ceil((runs_page.total or 0) / run_page_size))
+            if run_page >= total_run_pages:
+                break
+            run_page += 1
+
+        required_agent_ids = set(by_agent.keys())
+        agent_by_id = self._agent_records_map_for_ids(required_agent_ids)
+
         rows = []
-        for a in result.items:
-            d = _serialize(a)
-            d["_rel"] = _rel_time(d.get("created_at"))
-            rows.append(d)
+        for agent_id, stats in by_agent.items():
+            agent_record = agent_by_id.get(agent_id, {})
+            risk_sum = float(stats.get("risk_sum") or 0.0)
+            risk_count = int(stats.get("risk_count") or 0)
+            avg_risk_pct = (risk_sum / risk_count) if risk_count > 0 else 0.0
+
+            created_at = agent_record.get("created_at") or stats.get(
+                "latest_run_created_at"
+            )
+            rows.append(
+                {
+                    "id": agent_id,
+                    "name": agent_record.get("name")
+                    or (f"{agent_id[:8]}..." if agent_id else "—"),
+                    "agent_type": agent_record.get("agent_type") or "—",
+                    "endpoint": agent_record.get("endpoint") or "—",
+                    "owner": agent_record.get("owner") or "local",
+                    "created_at": created_at,
+                    "_rel": _rel_time(created_at),
+                    "avg_risk_pct": avg_risk_pct,
+                    "_avg_risk_pct": f"{avg_risk_pct:.1f}%",
+                    "_latest_run_created_at": stats.get("latest_run_created_at"),
+                }
+            )
+
+        rows.sort(
+            key=lambda r: r.get("_latest_run_created_at") or r.get("created_at"),
+            reverse=True,
+        )
+
         self.agents_table.rows.clear()
         self.agents_table.rows.extend(rows)
         self.agents_table.update()
@@ -2949,7 +4795,7 @@ class DashboardPage:
         rows = []
         for idx, run in enumerate(result.items):
             d = _serialize(run)
-            summary = self._summarize_run_results(run.id)
+            summary = self._summarize_run_results(run.id, run_data=d)
             d["status"] = str(summary["status"])
             attack_id = str(d.get("attack_id") or "")
             agent_id = str(d.get("agent_id") or "")
@@ -2971,7 +4817,9 @@ class DashboardPage:
             d["successful_jailbreaks"] = int(summary["successful_jailbreaks"])
             d["failed_attacks"] = int(summary["failed_attacks"])
             d["mitigations"] = int(summary["mitigations"])
-            d["errors"] = int(summary["errors"])
+            d["evaluation_summary"] = summary.get("evaluation_summary") or {}
+            d["is_multi_judge"] = bool(summary.get("is_multi_judge"))
+            d["overall_asr"] = summary.get("overall_asr_display") or "—"
             d["_goal_latency_avg_s"] = summary.get("avg_goal_latency_s")
             d["_goal_latency_avg"] = _format_latency(d.get("_goal_latency_avg_s"))
             d["_rel"] = _rel_time(d.get("created_at"))
@@ -2979,9 +4827,13 @@ class DashboardPage:
             d["_latency_s"] = self._compute_run_latency_seconds(d)
             d["_latency"] = _format_latency(d.get("_latency_s"))
             rows.append(d)
-        self.runs_table.rows.clear()
-        self.runs_table.rows.extend(rows)
-        self.runs_table.update()
+
+        # Render expandable run list in the runs area
+        if self._history_runs_area is not None:
+            self._history_runs_area.clear()
+            with self._history_runs_area:
+                self._render_runs_table(rows, result.total)
+
         start = (
             (self.runs_current_page - 1) * _RUNS_VIEW_PAGE_SIZE + 1
             if result.total
@@ -2993,6 +4845,523 @@ class DashboardPage:
             self.runs_page_label.text = (
                 f"Page {self.runs_current_page} / {self.runs_total_pages}"
             )
+
+    def _render_runs_table(self, rows: list[dict], total: int) -> None:
+        """Render expandable run rows as a table-like layout."""
+        self._history_visible_run_ids = [str(r.get("id") or "") for r in rows]
+
+        def _toggle_all(e) -> None:
+            checked = bool(e.value)
+            page_ids = [rid for rid in self._history_visible_run_ids if rid]
+            if checked:
+                for rid in page_ids:
+                    if rid not in self._selected_run_ids:
+                        self._selected_run_ids.append(rid)
+            else:
+                self._selected_run_ids = [
+                    rid for rid in self._selected_run_ids if rid not in page_ids
+                ]
+            self._on_runs_select()
+            ui.timer(0, self._load_runs, once=True)
+
+        all_checked = bool(self._history_visible_run_ids) and all(
+            rid in self._selected_run_ids for rid in self._history_visible_run_ids
+        )
+
+        # Header row
+        with ui.row().classes(
+            "w-full min-w-[1220px] flex-nowrap items-center px-3 py-2 border-b "
+            "border-grey-3 text-xs font-semibold text-grey-6 gap-0"
+        ):
+            with ui.element("div").classes("w-10 flex items-center justify-center"):
+                ui.checkbox(value=all_checked, on_change=_toggle_all).props("dense")
+            ui.label("").classes("w-8")  # expand chevron
+            ui.label("Run #").classes("w-16")
+            ui.label("Agent").classes("flex-1 min-w-24")
+            ui.label("Attack").classes("w-32")
+            ui.label("Status").classes("w-28")
+            ui.label("Total Latency").classes("w-24")
+            ui.label("Per-Goal Latency (AVG)").classes("w-32")
+            ui.label("Timestamp").classes("w-28")
+            ui.label("ASR").classes("w-16")
+
+        for run_row in rows:
+            self._render_expandable_run_row(run_row)
+
+    def _render_expandable_run_row(self, run: dict) -> None:
+        """Render a single run row with inline expansion for goals."""
+        run_id = str(run.get("id") or "")
+        status = str(run.get("status") or "—")
+        status_color = (
+            "positive"
+            if status == "COMPLETED"
+            else "info"
+            if status == "RUNNING"
+            else "negative"
+            if status == "FAILED"
+            else "warning"
+        )
+
+        # Container for the run + its expanded goals
+        run_container = ui.column().classes("w-full gap-0")
+        with run_container:
+            row_shell = ui.row().classes(
+                "w-full min-w-[1220px] flex-nowrap items-center px-3 py-2 border-b "
+                "border-grey-2 gap-0 hover:bg-grey-1 dark:hover:bg-grey-9 transition-colors"
+            )
+
+            run_checked = run_id in self._selected_run_ids
+
+            def _toggle_selected(e, rid=run_id) -> None:
+                checked = bool(e.value)
+                if checked:
+                    if rid not in self._selected_run_ids:
+                        self._selected_run_ids.append(rid)
+                else:
+                    self._selected_run_ids = [
+                        x for x in self._selected_run_ids if x != rid
+                    ]
+                self._on_runs_select()
+
+            with row_shell:
+                with ui.element("div").classes("w-10 flex items-center justify-center"):
+                    ui.checkbox(value=run_checked, on_change=_toggle_selected).props(
+                        "dense"
+                    )
+
+                run_header = ui.row().classes(
+                    "flex-1 flex-nowrap items-center gap-0 cursor-pointer"
+                )
+                with run_header:
+                    chevron = ui.icon("expand_more", size="sm").classes(
+                        "w-8 text-grey-6 transition-transform"
+                    )
+                    ui.label(str(run.get("run_progress", "—"))).classes(
+                        "w-16 font-mono text-sm font-medium whitespace-nowrap"
+                    )
+                    ui.label(str(run.get("agent_name") or "—")).classes(
+                        "flex-1 min-w-24 text-sm truncate whitespace-nowrap"
+                    )
+                    with ui.element("div").classes("w-32"):
+                        ui.badge(
+                            str(run.get("attack_type") or "—"), color="orange"
+                        ).classes("text-xs")
+                    with ui.element("div").classes("w-28"):
+                        ui.badge(status, color=status_color).classes("text-xs")
+                        if status == "RUNNING":
+                            ui.spinner(color="info", size="xs").classes("ml-1")
+                    ui.label(str(run.get("_latency") or "—")).classes("w-24 text-sm")
+                    ui.label(str(run.get("_goal_latency_avg") or "—")).classes(
+                        "w-32 text-sm"
+                    )
+                    with ui.column().classes("w-28 gap-0"):
+                        ui.label(str(run.get("_rel") or "—")).classes("text-xs")
+                        ui.label(str(run.get("_date") or "—")).classes(
+                            "text-[10px] text-grey-6"
+                        )
+
+                    jb = int(run.get("successful_jailbreaks") or 0)
+                    failed_attacks = int(run.get("failed_attacks") or 0)
+                    denominator = jb + failed_attacks
+                    asr_value = str(run.get("overall_asr") or "").strip()
+                    if not asr_value:
+                        asr_value = (
+                            f"{(jb * 100.0 / denominator):.1f}%"
+                            if denominator > 0
+                            else "—"
+                        )
+                    ui.label(asr_value).classes("w-16 text-sm")
+
+            # Goals area (initially hidden)
+            goals_area = ui.column().classes("w-full gap-0").style("display:none")
+
+            def _toggle_expand(ga=goals_area, ch=chevron, r=run, rid=run_id):
+                if self._history_expanded_run_id == rid:
+                    # Collapse
+                    ga.style("display:none")
+                    ch.style("transform: rotate(0deg)")
+                    self._history_expanded_run_id = None
+                    self._history_expanded_goals_area = None
+                    # Also close detail panel if open
+                    self._close_history_detail()
+                else:
+                    # Collapse previous if any
+                    if (
+                        self._history_expanded_goals_area is not None
+                        and self._history_expanded_goals_area != ga
+                    ):
+                        self._history_expanded_goals_area.style("display:none")
+                    # Close detail panel from previous run
+                    self._close_history_detail()
+                    self._history_expanded_run_id = rid
+                    self._history_expanded_goals_area = ga
+                    self._history_current_run = r
+                    ga.style("display:block")
+                    ch.style("transform: rotate(180deg)")
+                    # Load goals
+                    ui.timer(
+                        0,
+                        lambda: asyncio.create_task(self._load_run_goals_inline(r, ga)),
+                        once=True,
+                    )
+
+            run_header.on("click", lambda e, t=_toggle_expand: t())
+
+            # Auto-expand when navigation requested from Dashboard -> Recent Runs.
+            if self._history_expanded_run_id == run_id:
+                self._history_expanded_goals_area = goals_area
+                self._history_current_run = run
+                goals_area.style("display:block")
+                chevron.style("transform: rotate(180deg)")
+                ui.timer(
+                    0,
+                    lambda: asyncio.create_task(
+                        self._load_run_goals_inline(run, goals_area)
+                    ),
+                    once=True,
+                )
+
+    async def _load_run_goals_inline(self, run: dict, goals_area: ui.column) -> None:
+        """Load and render goals as a table inside the expanded run row."""
+        run_id_raw = str(run.get("id") or "")
+        goals_area.clear()
+
+        with goals_area:
+            with ui.row().classes("items-center gap-2 px-6 py-2"):
+                ui.spinner("dots", size="sm")
+                ui.label("Loading results…").classes("text-xs text-grey-6")
+
+        try:
+            run_uuid = UUID(run_id_raw)
+
+            def _fetch():
+                items = []
+                page = 1
+                while True:
+                    rp = self.backend.list_results(
+                        run_id=run_uuid, page=page, page_size=100
+                    )
+                    items.extend(rp.items)
+                    total = int(rp.total or 0)
+                    if (total > 0 and len(items) >= total) or not rp.items:
+                        break
+                    page += 1
+                return items
+
+            all_items = await asyncio.get_event_loop().run_in_executor(None, _fetch)
+
+            sorted_items = sorted(
+                all_items,
+                key=lambda item: (
+                    int(getattr(item, "goal_index", 0)),
+                    getattr(item, "created_at", None),
+                ),
+            )
+
+            goal_indices = [getattr(it, "goal_index", None) for it in sorted_items]
+            valid_int_indices = [i for i in goal_indices if isinstance(i, int)]
+            use_goal_index = len(valid_int_indices) == len(sorted_items) and len(
+                set(valid_int_indices)
+            ) == len(sorted_items)
+
+            run_eval_summary = self._extract_run_evaluation_summary(run)
+            summary_judge_count = int(run_eval_summary.get("judge_count") or 0)
+            summary_is_multi = bool(run_eval_summary.get("is_multi_judge")) or (
+                summary_judge_count > 1
+            )
+
+            computed_run_vote_columns: set[str] = set()
+            for item in sorted_items:
+                computed_run_vote_columns.update(
+                    self._extract_eval_votes_from_result(_serialize(item)).keys()
+                )
+
+            run_judge_count = len(computed_run_vote_columns)
+            is_multi_judge_run = (
+                run_judge_count > 1 if run_judge_count > 0 else summary_is_multi
+            )
+
+            new_rows = []
+            for idx, r in enumerate(sorted_items, start=1):
+                d = _serialize(r)
+                d["_rel"] = _rel_time(d.get("created_at"))
+                goal_index = d.get("goal_index")
+                if use_goal_index and isinstance(goal_index, int):
+                    d["goal_number"] = int(goal_index) + 1
+                else:
+                    d["goal_number"] = idx
+                d["_goal_category"] = self._extract_goal_classifier_label(d, "category")
+                d["_goal_subcategory"] = self._extract_goal_classifier_label(
+                    d, "subcategory"
+                )
+
+                d["_is_multi_judge"] = False
+                d["_goal_multi_metrics"] = {}
+
+                if is_multi_judge_run:
+                    goal_multi_metrics = self._compute_goal_multi_judge_metrics(d)
+                    if goal_multi_metrics:
+                        d["_is_multi_judge"] = True
+                        d["_goal_multi_metrics"] = goal_multi_metrics
+                        majority_vote_asr = self._safe_float(
+                            goal_multi_metrics.get("majority_vote_asr")
+                        )
+                        if majority_vote_asr is None:
+                            majority_vote_asr = self._safe_float(
+                                goal_multi_metrics.get("judge_avg")
+                            )
+                        majority_is_jailbreak = bool(
+                            majority_vote_asr is not None and majority_vote_asr > 0.5
+                        )
+                        d["majority_vote"] = 1 if majority_is_jailbreak else 0
+                        d["success"] = majority_is_jailbreak
+                        d["evaluation_status"] = (
+                            "SUCCESSFUL_JAILBREAK"
+                            if majority_is_jailbreak
+                            else "FAILED_JAILBREAK"
+                        )
+
+                d["evaluation_label"] = _eval_label(
+                    d.get("evaluation_status", ""), d.get("evaluation_notes")
+                )
+                d["evaluation_notes"] = d.get("evaluation_notes") or "—"
+                d["_goal_latency_s"] = self._extract_goal_latency_seconds(d)
+                d["_goal_latency"] = _format_latency(d.get("_goal_latency_s"))
+                new_rows.append(d)
+
+            result_ids: list[UUID] = []
+            for row in new_rows:
+                with contextlib.suppress(Exception):
+                    result_ids.append(UUID(str(row.get("id") or "")))
+
+            def _fetch_trace_counts(ids: list[UUID]) -> dict[str, int]:
+                out: dict[str, int] = {}
+                for rid in ids:
+                    try:
+                        traces = self.backend.list_traces(result_id=rid)
+                        out[str(rid)] = len(traces or [])
+                    except Exception:
+                        out[str(rid)] = 0
+                return out
+
+            trace_count_map = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: _fetch_trace_counts(result_ids),
+            )
+            for row in new_rows:
+                row["_goal_traces_count"] = int(
+                    trace_count_map.get(str(row.get("id") or ""), 0)
+                )
+
+            self._history_current_run_results = new_rows
+
+            goals_area.clear()
+            with goals_area:
+                # Summary bar
+                total = len(new_rows)
+                jailbreak_count = sum(
+                    1
+                    for r in new_rows
+                    if _result_bucket(
+                        r.get("evaluation_status", ""), r.get("evaluation_notes")
+                    )
+                    == "jailbreak"
+                )
+                trace_total = sum(
+                    int(r.get("_goal_traces_count") or 0) for r in new_rows
+                )
+                with ui.row().classes(
+                    "items-center gap-3 px-6 py-2 bg-grey-1 dark:bg-grey-9 border-b"
+                ):
+                    ui.label(f"{total} results").classes("text-xs text-grey-6")
+                    ui.label(f"{trace_total} traces").classes("text-xs text-grey-6")
+                    if jailbreak_count > 0:
+                        ui.badge(
+                            f"{jailbreak_count} jailbreaks", color="negative"
+                        ).classes("text-xs")
+
+                    if is_multi_judge_run:
+                        majority_asr = self._safe_float(
+                            run_eval_summary.get("majority_vote_asr")
+                        )
+                        if majority_asr is None:
+                            majority_asr = self._safe_float(
+                                run_eval_summary.get("overall_majority_vote_asr")
+                            )
+                        if majority_asr is None:
+                            run_vote_rows = []
+                            for row in new_rows:
+                                votes = self._extract_eval_votes_from_result(row)
+                                if votes:
+                                    run_vote_rows.append(dict(votes))
+                            if run_vote_rows:
+                                majority_asr = calculate_majority_vote_asr(
+                                    run_vote_rows
+                                )
+                        fleiss_kappa = self._safe_float(
+                            run_eval_summary.get("fleiss_kappa")
+                        )
+                        if fleiss_kappa is None:
+                            fleiss_kappa = self._safe_float(
+                                run_eval_summary.get("overall_fleiss_kappa")
+                            )
+                        if fleiss_kappa is None:
+                            run_vote_rows = []
+                            for row in new_rows:
+                                votes = self._extract_eval_votes_from_result(row)
+                                if votes:
+                                    run_vote_rows.append(dict(votes))
+                            if run_vote_rows:
+                                fleiss_kappa = calculate_fleiss_kappa(run_vote_rows)
+
+                        if majority_asr is not None:
+                            ui.badge(
+                                f"Majority ASR: {majority_asr * 100:.1f}%",
+                                color="primary",
+                            ).classes("text-xs")
+                        if fleiss_kappa is not None:
+                            ui.badge(
+                                f"Fleiss κ: {fleiss_kappa:.4f}",
+                                color="indigo",
+                            ).classes("text-xs")
+
+                        strictness = run_eval_summary.get("per_judge_strictness")
+                        if not isinstance(strictness, dict):
+                            run_vote_rows = []
+                            for row in new_rows:
+                                votes = self._extract_eval_votes_from_result(row)
+                                if votes:
+                                    run_vote_rows.append(dict(votes))
+                            strictness = (
+                                calculate_per_judge_strictness(run_vote_rows)
+                                if run_vote_rows
+                                else {}
+                            )
+                        if isinstance(strictness, dict):
+                            for judge_key in sorted(
+                                key for key in strictness.keys() if key != "bias_gap"
+                            ):
+                                value = self._safe_float(strictness.get(judge_key))
+                                if value is not None:
+                                    judge_name = self._judge_key_display_name(judge_key)
+                                    ui.badge(
+                                        f"{judge_name} strictness: {value:.4f}",
+                                        color="teal",
+                                    ).classes("text-xs")
+                            bias_gap = self._safe_float(strictness.get("bias_gap"))
+                            if bias_gap is not None:
+                                ui.badge(
+                                    f"Bias gap: {bias_gap:.4f}",
+                                    color="purple",
+                                ).classes("text-xs")
+
+                # Goal cards (same visual language as report page)
+                for row in new_rows:
+                    self._render_goal_row(row)
+
+        except Exception as exc:
+            goals_area.clear()
+            with goals_area:
+                ui.label(f"Error loading results: {exc}").classes(
+                    "text-xs text-negative px-6 py-2"
+                )
+
+    def _render_goal_row(self, row: dict) -> None:
+        """Render a single goal card inside the expanded run."""
+        eval_status = row.get("evaluation_status", "")
+        eval_notes = row.get("evaluation_notes")
+        bucket = _result_bucket(eval_status, eval_notes)
+        eval_color = _eval_color(eval_status, eval_notes)
+        eval_label_text = _eval_label(eval_status, eval_notes)
+        goal_num = row.get("goal_number", "—")
+
+        border_color = (
+            "border-red-400"
+            if bucket == "jailbreak"
+            else "border-green-400"
+            if bucket == "mitigated"
+            else "border-orange-400"
+            if bucket == "failed"
+            else "border-grey-300"
+        )
+
+        with ui.card().tight().classes(f"w-full border-l-4 {border_color}"):
+            with ui.column().classes("w-full gap-2 p-4"):
+                ui.label(f"Goal #{goal_num}").classes("font-semibold text-sm")
+
+                with ui.row().classes("items-center justify-between w-full gap-3"):
+                    ui.badge(
+                        self._goal_category_badge_text(row),
+                        color="blue-7",
+                    ).classes(
+                        "text-sm px-3 py-2 font-medium max-w-full whitespace-normal break-words self-start"
+                    ).style(
+                        "display:inline-flex;width:fit-content;max-width:100%;overflow-wrap:anywhere;"
+                    )
+
+                    with ui.row().classes("items-center gap-3 shrink-0"):
+                        ui.badge(
+                            eval_label_text or "Pending", color=eval_color
+                        ).classes("text-xs")
+                        ui.badge(
+                            f"Latency: {row.get('_goal_latency', '—')}", color="grey-7"
+                        ).classes("text-xs")
+                        ui.button(
+                            "Details",
+                            icon="open_in_new",
+                            on_click=lambda r=row: ui.timer(
+                                0,
+                                lambda rr=r: asyncio.create_task(
+                                    self._open_history_goal_detail(rr)
+                                ),
+                                once=True,
+                            ),
+                        ).props("flat dense no-caps color=primary")
+
+                ui.label(str(row.get("goal") or "—")).classes(
+                    "text-sm whitespace-pre-wrap break-words leading-snug"
+                ).style("overflow-wrap:anywhere;")
+
+                if row.get("_is_multi_judge"):
+                    goal_metrics = (
+                        row.get("_goal_multi_metrics")
+                        if isinstance(row.get("_goal_multi_metrics"), dict)
+                        else {}
+                    )
+                    if goal_metrics:
+                        with ui.row().classes("w-full items-center gap-2 flex-wrap"):
+                            judge_votes = goal_metrics.get("judge_votes")
+                            if isinstance(judge_votes, dict) and judge_votes:
+                                for judge_key in sorted(judge_votes.keys()):
+                                    vote = self._coerce_binary_vote(
+                                        judge_votes.get(judge_key)
+                                    )
+                                    judge_name = self._judge_key_display_name(judge_key)
+                                    if vote > 0:
+                                        ui.badge(
+                                            f"{judge_name}: JAILBREAK",
+                                            color="red-4",
+                                        ).classes("text-xs text-black")
+                                    else:
+                                        ui.badge(
+                                            f"{judge_name}: MITIGATED",
+                                            color="green-4",
+                                        ).classes("text-xs text-black")
+
+                            judge_avg = self._safe_float(goal_metrics.get("judge_avg"))
+                            if judge_avg is not None:
+                                ui.badge(
+                                    f"Average: {judge_avg:.3f}",
+                                    color="blue-4",
+                                ).classes("text-xs text-black")
+
+                notes_display = (
+                    f"{eval_label_text}: {row.get('total_results', 1)} results, "
+                    f"best score {row.get('evaluation_metrics', {}).get('best_score', '0.00') if isinstance(row.get('evaluation_metrics'), dict) else '0.00'}"
+                )
+                ui.label(notes_display).classes(
+                    "text-xs text-grey-6 whitespace-pre-wrap break-words"
+                ).style("overflow-wrap:anywhere;")
 
     @staticmethod
     def _risk_level_from_asr(asr_percent: float) -> tuple[str, str]:
@@ -3043,6 +5412,9 @@ class DashboardPage:
         # Pre-fetch attack configurations for runs so we can show a
         # configuration fallback when a run has no explicit run_config.
         run_attack_ids = {str(run.attack_id) for run in all_runs}
+        attack_type_by_id = (
+            self._attack_type_map_for_ids(run_attack_ids) if run_attack_ids else {}
+        )
         attack_config_by_id = (
             self._attack_config_map_for_ids(run_attack_ids) if run_attack_ids else {}
         )
@@ -3062,7 +5434,8 @@ class DashboardPage:
         total_tests = 0
         total_vulns = 0
 
-        for run in all_runs:
+        total_runs_count = len(all_runs)
+        for run_index, run in enumerate(all_runs):
             run_data = _serialize(run)
             summary = self._summarize_run_results(run.id)
 
@@ -3071,12 +5444,13 @@ class DashboardPage:
             asr_percent = (100.0 * vulns / tests) if tests > 0 else 0.0
 
             agent_id = str(run_data.get("agent_id") or "")
+            attack_id = str(run_data.get("attack_id") or "")
             # Prefer agent name in run.run_config, then in the parent attack
             fallback_agent_name = None
             if isinstance(run_data.get("run_config"), dict):
                 fallback_agent_name = run_data.get("run_config", {}).get("_agent_name")
             if not fallback_agent_name:
-                atk_cfg = attack_config_by_id.get(str(run_data.get("attack_id") or ""))
+                atk_cfg = attack_config_by_id.get(attack_id)
                 if isinstance(atk_cfg, dict):
                     fallback_agent_name = atk_cfg.get("_agent_name")
             agent_name = agent_name_by_id.get(
@@ -3084,6 +5458,15 @@ class DashboardPage:
                 fallback_agent_name
                 or (f"{agent_id[:8]}…" if agent_id else "Unknown agent"),
             )
+            attack_type = attack_type_by_id.get(
+                attack_id,
+                f"{attack_id[:8]}…" if attack_id else "—",
+            )
+            run_progress = max(1, total_runs_count - run_index)
+
+            # Persist resolved labels in row payload used by report pages.
+            run_data["agent_name"] = agent_name
+            run_data["attack_type"] = attack_type
 
             entry = per_agent[agent_id]
             entry["agent_id"] = agent_id
@@ -3094,6 +5477,8 @@ class DashboardPage:
             entry["runs"].append(
                 {
                     "id": str(run_data.get("id") or ""),
+                    "run_progress": run_progress,
+                    "attack_type": attack_type,
                     "created_at": run_data.get("created_at"),
                     "tests": tests,
                     "vulns": vulns,
@@ -3153,7 +5538,8 @@ class DashboardPage:
                         )
 
                         for run_item in sorted_runs:
-                            run_id = str(run_item.get("id") or "")
+                            run_progress = run_item.get("run_progress")
+                            attack_type = str(run_item.get("attack_type") or "—")
                             run_tests = int(run_item.get("tests") or 0)
                             run_vulns = int(run_item.get("vulns") or 0)
                             run_risk = float(run_item.get("risk") or 0.0)
@@ -3166,11 +5552,11 @@ class DashboardPage:
                                     "items-center justify-between w-full p-3"
                                 ):
                                     with ui.column().classes("gap-0"):
-                                        ui.label(f"Run {run_id[:8]}…").classes(
+                                        ui.label(f"Run #{run_progress}").classes(
                                             "font-mono text-xs"
                                         )
                                         ui.label(
-                                            f"{_short_date(run_item.get('created_at'))} · {run_tests} tests · {run_vulns} vulnerabilities"
+                                            f"{_short_date(run_item.get('created_at'))} · {run_tests} tests · {run_vulns} vulnerabilities · {attack_type}"
                                         ).classes("text-sm text-grey-7")
                                     with ui.row().classes("items-center gap-2"):
                                         ui.badge(
@@ -3194,9 +5580,16 @@ class DashboardPage:
                                         ).props("flat round dense")
 
     async def _open_run_results(self, run: dict) -> None:  # noqa: C901
-        """Open a full-page report for a single run."""
+        """Open report details side-by-side for a single run."""
         run_id_raw = str(run.get("id") or "")
-        self.run_dialog_title.text = f"Report — Run {run_id_raw[:8]}…"
+        self._report_current_run = run
+
+        report_area: ui.column | None = self.run_report_area
+        if self.run_dialog_title is not None:
+            self.run_dialog_title.text = f"Report — Run {run_id_raw[:8]}…"
+        self._report_results_left_col = None
+        self._report_goal_detail_panel = None
+        self._report_current_run_results = []
 
         # ── Resolve run configuration ─────────────────────────────────
         raw_run_config = run.get("run_config")
@@ -3228,13 +5621,14 @@ class DashboardPage:
                         raw_config_is_str = True
 
         # ── Show loading skeleton immediately ─────────────────────────
-        if self.run_report_area is not None:
-            self.run_report_area.clear()
-            with self.run_report_area:
+        if report_area is not None:
+            report_area.clear()
+            with report_area:
                 with ui.row().classes("items-center gap-2 py-8 justify-center w-full"):
                     ui.spinner("dots", size="xl")
                     ui.label("Loading report…").classes("text-sm text-grey-6")
-        self.run_dialog.open()
+        if self.run_dialog is not None:
+            self.run_dialog.open()
         await asyncio.sleep(0)
 
         # ── Fetch results ─────────────────────────────────────────────
@@ -3249,7 +5643,8 @@ class DashboardPage:
                         run_id=run_uuid, page=pg, page_size=100
                     )
                     items.extend(rp.items)
-                    if len(items) >= rp.total or not rp.items:
+                    total = int(rp.total or 0)
+                    if (total > 0 and len(items) >= total) or not rp.items:
                         break
                     pg += 1
                 return items
@@ -3301,7 +5696,7 @@ class DashboardPage:
                     n_jailbreaks += 1
                 elif bucket == "mitigated":
                     n_mitigated += 1
-                elif bucket == "error":
+                elif bucket == "failed":
                     n_errors += 1
                 lat = d.get("_goal_latency_s")
                 if isinstance(lat, (int, float)):
@@ -3309,6 +5704,7 @@ class DashboardPage:
                 new_rows.append(d)
 
             total_tests = len(new_rows)
+            self._report_current_run_results = new_rows
             asr_pct = (100.0 * n_jailbreaks / total_tests) if total_tests > 0 else 0.0
             robustness_pct = 100.0 - asr_pct
             risk_label, risk_badge_color = self._risk_level_from_asr(asr_pct)
@@ -3339,7 +5735,7 @@ class DashboardPage:
                     entry["vulnerable"] += 1
                 elif bucket == "mitigated":
                     entry["mitigated"] += 1
-                elif bucket == "error":
+                elif bucket == "failed":
                     entry["errors"] += 1
 
                 sub_label = row.get("_goal_subcategory") or "N/A"
@@ -3351,7 +5747,20 @@ class DashboardPage:
             status_str = str(run.get("status") or "—")
             agent_str = str(run.get("agent_name") or "—")
             attack_str = str(run.get("attack_type") or "—")
-            created_str = _short_date(run.get("created_at"))
+            created_str = _short_date(run.get("created_at") or run.get("timestamp"))
+
+            if (not agent_str or agent_str == "—") and run.get("agent_id"):
+                agent_id = str(run.get("agent_id") or "")
+                if agent_id:
+                    agent_str = self._agent_name_map_for_ids({agent_id}).get(
+                        agent_id, agent_str
+                    )
+            if (not attack_str or attack_str == "—") and run.get("attack_id"):
+                attack_id = str(run.get("attack_id") or "")
+                if attack_id:
+                    attack_str = self._attack_type_map_for_ids({attack_id}).get(
+                        attack_id, attack_str
+                    )
             run_latency_s = self._compute_run_latency_seconds(run)
             run_latency_str = _format_latency(run_latency_s)
             avg_goal_latency_str = _format_latency(
@@ -3359,9 +5768,9 @@ class DashboardPage:
             )
 
         except Exception as exc:
-            if self.run_report_area is not None:
-                self.run_report_area.clear()
-                with self.run_report_area:
+            if report_area is not None:
+                report_area.clear()
+                with report_area:
                     with ui.row().classes("gap-2 items-center py-8"):
                         ui.icon("error_outline", color="negative")
                         ui.label(f"Failed to load results: {exc}").classes(
@@ -3371,18 +5780,18 @@ class DashboardPage:
             return
 
         # ── Build report UI ───────────────────────────────────────────
-        if self.run_report_area is None:
+        if report_area is None:
             return
-        self.run_report_area.clear()
+        report_area.clear()
 
-        with self.run_report_area:
+        with report_area:
             # ── 1) Summary stat cards ─────────────────────────────────
             with ui.row().classes("w-full flex-wrap gap-4"):
                 for s_label, s_value, s_icon, s_color in [
                     ("Total Tests", str(total_tests), "quiz", "blue"),
                     ("Vulnerabilities", str(n_jailbreaks), "lock_open", "red"),
                     ("Mitigated", str(n_mitigated), "security", "green"),
-                    ("Errors", str(n_errors), "warning_amber", "yellow"),
+                    ("Errors", str(n_errors), "warning_amber", "orange"),
                 ]:
                     with ui.card().classes("flex-1 min-w-36"):
                         with ui.row().classes("items-center justify-between mb-2"):
@@ -3429,7 +5838,7 @@ class DashboardPage:
                                                 {
                                                     "value": n_errors,
                                                     "name": "Errors",
-                                                    "itemStyle": {"color": "#eab308"},
+                                                    "itemStyle": {"color": "#f97316"},
                                                 },
                                                 {
                                                     "value": max(
@@ -3493,7 +5902,7 @@ class DashboardPage:
                             for leg_label, leg_count, leg_color in [
                                 ("Jailbreaks", n_jailbreaks, "#ef4444"),
                                 ("Mitigated", n_mitigated, "#22c55e"),
-                                ("Errors", n_errors, "#eab308"),
+                                ("Errors", n_errors, "#f97316"),
                                 (
                                     "Pending",
                                     max(
@@ -3615,11 +6024,27 @@ class DashboardPage:
                 if len(top_items) > 1:
                     top_items = [top_items[0], *reversed(top_items[1:])]
 
-                def _truncate_label(text: str, limit: int = 20) -> str:
-                    text = str(text)
-                    if len(text) <= limit:
+                def _wrap_label(text: str, line_limit: int = 18) -> str:
+                    text = str(text).strip()
+                    if not text:
                         return text
-                    return f"{text[: max(1, limit - 3)].rstrip()}..."
+                    words = text.split()
+                    lines = []
+                    current_line = words[0]
+                    for word in words[1:]:
+                        candidate = f"{current_line} {word}"
+                        if len(candidate) <= line_limit:
+                            current_line = candidate
+                        else:
+                            lines.append(current_line)
+                            current_line = word
+                    lines.append(current_line)
+                    return "\n".join(lines)
+
+                def _format_indicator_name(item: dict) -> str:
+                    wrapped_label = _wrap_label(item["label"])
+                    robustness_pct = item["robustness"]
+                    return f"{wrapped_label}\n{robustness_pct:.0f}%"
 
                 def _build_category_tooltip(item: dict) -> str:
                     lines = [
@@ -3627,7 +6052,7 @@ class DashboardPage:
                         f"<div>Robustness: <span style='color:#16a34a;font-weight:700'>{item['robustness']:.0f}%</span></div>",
                         f"<div>Vulnerable: <span style='color:#ef4444;font-weight:700'>{item['vulnerable']} / {item['total']}</span></div>",
                         f"<div>Mitigated: <span style='color:#22c55e;font-weight:700'>{item['mitigated']}</span></div>",
-                        f"<div>Error: <span style='color:#eab308;font-weight:700'>{item['errors']}</span></div>",
+                        f"<div>Error: <span style='color:#f59e0b;font-weight:700'>{item['errors']}</span></div>",
                     ]
                     if item["subcategories"]:
                         lines.append(
@@ -3640,7 +6065,7 @@ class DashboardPage:
                     return "".join(lines)
 
                 indicators = [
-                    {"name": _truncate_label(item["label"]), "max": 100}
+                    {"name": _format_indicator_name(item), "max": 100}
                     for item in top_items
                 ]
                 indicator_labels = [indicator["name"] for indicator in indicators]
@@ -3686,6 +6111,12 @@ class DashboardPage:
                                         "if (!categoryTooltips.length) { return ''; }"
                                         "const indicatorLabels = Array.isArray(d.indicatorLabels) ? d.indicatorLabels : [];"
                                         "const fullLabels = Array.isArray(d.fullLabels) ? d.fullLabels : [];"
+                                        "const normalizeName = function(value) {"
+                                        "  return String(value || '')"
+                                        "    .replace(/\n+/g, ' ')"
+                                        "    .replace(/\s+\d+(?:\.\d+)?%$/i, '')"
+                                        "    .trim();"
+                                        "};"
                                         "const candidates = [];"
                                         "if (typeof p.axisValueLabel === 'string' && p.axisValueLabel.length > 0) { candidates.push(p.axisValueLabel); }"
                                         "if (typeof p.axisValue === 'string' && p.axisValue.length > 0) { candidates.push(p.axisValue); }"
@@ -3693,6 +6124,10 @@ class DashboardPage:
                                         "for (const name of candidates) {"
                                         "  let idx = indicatorLabels.indexOf(name);"
                                         "  if (idx < 0) { idx = fullLabels.indexOf(name); }"
+                                        "  if (idx < 0) {"
+                                        "    const normalized = normalizeName(name);"
+                                        "    idx = fullLabels.findIndex((label) => normalizeName(label) === normalized);"
+                                        "  }"
                                         "  if (idx >= 0 && idx < categoryTooltips.length) { return categoryTooltips[idx] || ''; }"
                                         "}"
                                         "const dimensionIndex = typeof p.dimensionIndex === 'number' ? p.dimensionIndex : -1;"
@@ -3712,10 +6147,11 @@ class DashboardPage:
                                     "shape": "polygon",
                                     "indicator": indicators,
                                     "splitNumber": 5,
-                                    "center": ["50%", "53%"],
-                                    "radius": "70%",
+                                    "center": ["50%", "49%"],
+                                    "radius": "64%",
                                     "axisName": {
-                                        "fontSize": 16,
+                                        "fontSize": 12,
+                                        "lineHeight": 15,
                                         "color": "#111827",
                                         "fontWeight": 500,
                                     },
@@ -3753,7 +6189,7 @@ class DashboardPage:
                                     },
                                 ],
                             }
-                        ).classes("w-[740px] h-[420px] max-w-full").props(
+                        ).classes("w-[740px] h-[500px] max-w-full").props(
                             "renderer=svg"
                         )
 
@@ -3840,7 +6276,7 @@ class DashboardPage:
                             },
                             "series": [
                                 {
-                                    "name": "Jailbreaks",
+                                    "name": "Vulnerable",
                                     "type": "bar",
                                     "stack": "total",
                                     "itemStyle": {"color": "#ef4444"},
@@ -3859,7 +6295,7 @@ class DashboardPage:
                                     "name": "Error",
                                     "type": "bar",
                                     "stack": "total",
-                                    "itemStyle": {"color": "#eab308"},
+                                    "itemStyle": {"color": "#f59e0b"},
                                     "emphasis": {"disabled": True},
                                     "data": error_data,
                                 },
@@ -3915,384 +6351,158 @@ class DashboardPage:
                         "text-sm text-grey-6 py-4"
                     )
                 else:
-                    for row in new_rows:
-                        bucket = row.get("_bucket", "pending")
-                        border_color = (
-                            "border-red-400"
-                            if bucket == "jailbreak"
-                            else "border-green-400"
-                            if bucket == "mitigated"
-                            else "border-yellow-400"
-                            if bucket == "error"
-                            else "border-grey-300"
+                    with ui.row().classes(
+                        "w-full gap-0 items-stretch h-[calc(100vh-360px)] min-h-[420px] overflow-hidden"
+                    ):
+                        self._report_results_left_col = ui.column().classes(
+                            "w-full h-full min-h-0 gap-2 transition-all duration-300"
                         )
-                        with (
-                            ui.card()
-                            .tight()
-                            .classes(f"w-full border-l-4 {border_color}")
-                        ):
-                            with ui.column().classes("w-full gap-2 p-4"):
-                                with ui.row().classes(
-                                    "items-center justify-between w-full"
-                                ):
-                                    with ui.column().classes("gap-1"):
-                                        ui.label(
-                                            f"Goal #{row.get('goal_number', '?')}"
-                                        ).classes("font-semibold text-sm")
-                                        ui.badge(
-                                            self._goal_category_badge_text(row),
-                                            color="blue-7",
-                                        ).classes("text-sm px-3 py-2 font-medium")
+                        with self._report_results_left_col:
+                            with ui.scroll_area().classes("w-full flex-1 min-h-0"):
+                                with ui.column().classes("w-full gap-2"):
+                                    for row in new_rows:
+                                        bucket = row.get("_bucket", "pending")
+                                        border_color = (
+                                            "border-red-400"
+                                            if bucket == "jailbreak"
+                                            else "border-green-400"
+                                            if bucket == "mitigated"
+                                            else "border-orange-400"
+                                            if bucket == "failed"
+                                            else "border-grey-300"
+                                        )
+                                        with (
+                                            ui.card()
+                                            .tight()
+                                            .classes(
+                                                f"w-full border-l-4 {border_color}"
+                                            )
+                                        ):
+                                            with ui.column().classes(
+                                                "w-full gap-2 p-4"
+                                            ):
+                                                with ui.row().classes(
+                                                    "items-center justify-between w-full"
+                                                ):
+                                                    with ui.column().classes("gap-1"):
+                                                        ui.label(
+                                                            f"Goal #{row.get('goal_number', '?')}"
+                                                        ).classes(
+                                                            "font-semibold text-sm"
+                                                        )
+                                                        ui.badge(
+                                                            self._goal_category_badge_text(
+                                                                row
+                                                            ),
+                                                            color="blue-7",
+                                                        ).classes(
+                                                            "text-sm px-3 py-2 font-medium"
+                                                        )
 
-                                    with ui.row().classes("items-center gap-3"):
-                                        ui.badge(
-                                            row.get("evaluation_label") or "Pending",
-                                            color=_eval_color(
-                                                row.get("evaluation_status", ""),
-                                                row.get("evaluation_notes"),
-                                            ),
-                                        ).classes("text-xs")
+                                                    with ui.row().classes(
+                                                        "items-center gap-3"
+                                                    ):
+                                                        ui.badge(
+                                                            row.get("evaluation_label")
+                                                            or "Pending",
+                                                            color=_eval_color(
+                                                                row.get(
+                                                                    "evaluation_status",
+                                                                    "",
+                                                                ),
+                                                                row.get(
+                                                                    "evaluation_notes"
+                                                                ),
+                                                            ),
+                                                        ).classes("text-xs")
 
-                                    with ui.row().classes("items-center gap-2"):
-                                        ui.badge(
-                                            f"Latency: {row.get('_goal_latency', '—')}",
-                                            color="grey-7",
-                                        ).classes("text-xs")
-                                        ui.button(
-                                            "Details",
-                                            icon="open_in_new",
-                                            on_click=lambda r=row: ui.timer(
-                                                0,
-                                                lambda rr=r: asyncio.create_task(
-                                                    self.show_result_detail(
-                                                        rr, foreground=True
+                                                    with ui.row().classes(
+                                                        "items-center gap-2"
+                                                    ):
+                                                        ui.badge(
+                                                            f"Latency: {row.get('_goal_latency', '—')}",
+                                                            color="grey-7",
+                                                        ).classes("text-xs")
+                                                        ui.button(
+                                                            "Details",
+                                                            icon="open_in_new",
+                                                            on_click=lambda r=row: (
+                                                                ui.timer(
+                                                                    0,
+                                                                    lambda rr=r: (
+                                                                        asyncio.create_task(
+                                                                            self._open_report_goal_detail(
+                                                                                rr
+                                                                            )
+                                                                        )
+                                                                    ),
+                                                                    once=True,
+                                                                )
+                                                            ),
+                                                        ).props(
+                                                            "flat dense no-caps color=primary"
+                                                        )
+
+                                                ui.label(
+                                                    str(row.get("goal") or "—")
+                                                ).classes("text-sm whitespace-pre-wrap")
+
+                                                notes = str(
+                                                    row.get("evaluation_notes") or "—"
+                                                )
+                                                if notes != "—":
+                                                    ui.label(notes).classes(
+                                                        "text-xs text-grey-6 whitespace-pre-wrap"
                                                     )
-                                                ),
-                                                once=True,
-                                            ),
-                                        ).props("flat dense no-caps color=primary")
 
-                                ui.label(str(row.get("goal") or "—")).classes(
-                                    "text-sm whitespace-pre-wrap"
-                                )
-
-                                notes = str(row.get("evaluation_notes") or "—")
-                                if notes != "—":
-                                    ui.label(notes).classes(
-                                        "text-xs text-grey-6 whitespace-pre-wrap"
-                                    )
+                        self._report_goal_detail_panel = (
+                            ui.column()
+                            .classes("h-full min-h-0 gap-0 border-l shrink-0")
+                            .style(
+                                "width: 0; min-width: 0; overflow: hidden; "
+                                "transition: all 0.3s ease;"
+                            )
+                        )
 
     async def _open_run_history_results(self, run: dict) -> None:
-        """Open the compact results list dialog for History/Dashboard views."""
-        run_id_raw = str(run.get("id") or "")
+        """Navigate to History view and expand the run inline.
 
-        if self.history_run_dialog_title is not None:
-            self.history_run_dialog_title.text = f"Run Results — {run_id_raw[:8]}…"
-        if self.history_run_dialog_subtitle is not None:
-            status = str(run.get("status") or "—")
-            agent = str(run.get("agent_name") or "—")
-            attack = str(run.get("attack_type") or "—")
-            created = str(run.get("_date") or run.get("created_at") or "—")
-            run_latency_s = self._compute_run_latency_seconds(run)
-            run_latency = _format_latency(run_latency_s)
-            jailbreaks = int(run.get("successful_jailbreaks") or 0)
-            failed_attacks = int(run.get("failed_attacks") or 0)
-            self.history_run_dialog_subtitle.text = (
-                f"Status: {status} | Agent: {agent} | Attack: {attack} | "
-                f"Created: {created} | Total latency: {run_latency} | "
-                f"Jailbreaks: {jailbreaks} | Mitigated: {failed_attacks}"
+        Called from Dashboard / Agents views; for History the inline expansion
+        handles everything directly.
+        """
+        run_id = str(run.get("id") or "")
+        if not run_id:
+            self.navigate("runs", schedule_refresh=False)
+            await self._load_runs()
+            return
+
+        # Resolve the exact page that contains this run so History opens expanded on that row.
+        page = 1
+        while True:
+            page_result = self.backend.list_runs(
+                page=page,
+                page_size=_RUNS_VIEW_PAGE_SIZE,
             )
+            if not page_result.items:
+                break
 
-        raw_run_config = run.get("run_config")
-        run_config = {}
-        raw_config_is_str = False
-        fetched_dict = None
-        if isinstance(raw_run_config, dict):
-            run_config = raw_run_config
-        elif isinstance(raw_run_config, str) and raw_run_config.strip():
-            try:
-                run_config = json.loads(raw_run_config)
-            except Exception:
-                run_config = raw_run_config
-                raw_config_is_str = True
+            def _item_run_id(item: object) -> str:
+                if isinstance(item, dict):
+                    return str(item.get("id") or "")
+                return str(getattr(item, "id", "") or "")
 
-        if not run_config:
-            with contextlib.suppress(Exception):
-                fetched_run = self.backend.get_run(UUID(run_id_raw))
-                fetched_dict = _serialize(fetched_run)
-                fetched_raw = fetched_dict.get("run_config")
-                if isinstance(fetched_raw, dict):
-                    run_config = fetched_raw
-                    raw_config_is_str = False
-                elif isinstance(fetched_raw, str) and fetched_raw.strip():
-                    try:
-                        run_config = json.loads(fetched_raw)
-                        raw_config_is_str = False
-                    except Exception:
-                        run_config = fetched_raw
-                        raw_config_is_str = True
-        # Configuration panel should show ATTACK configuration (not run metrics payload).
-        display_config: object = {}
-        display_config_is_str = False
-        attack_id = str(run.get("attack_id") or "")
-        if not attack_id and isinstance(fetched_dict, dict):
-            attack_id = str(fetched_dict.get("attack_id") or "")
+            if any(_item_run_id(item) == run_id for item in page_result.items):
+                break
+            total = int(page_result.total or 0)
+            if total and (page * _RUNS_VIEW_PAGE_SIZE) >= total:
+                break
+            page += 1
 
-        if attack_id:
-            with contextlib.suppress(Exception):
-                attack_cfgs = self._attack_config_map_for_ids({attack_id})
-                cfg = attack_cfgs.get(attack_id)
-                if isinstance(cfg, dict) and cfg:
-                    display_config = cfg
-
-        if not display_config:
-            if isinstance(run_config, dict):
-                # Fallback: strip evaluation summary noise from run_config view.
-                display_config = {
-                    k: v for k, v in run_config.items() if k != "evaluation_summary"
-                }
-            elif run_config:
-                display_config = run_config
-                display_config_is_str = raw_config_is_str or isinstance(run_config, str)
-
-        if self.history_run_config_area is not None:
-            self.history_run_config_area.clear()
-            with self.history_run_config_area:
-                if display_config:
-                    content = (
-                        json.dumps(display_config, indent=2, default=str)
-                        if not display_config_is_str
-                        and not isinstance(display_config, str)
-                        else str(display_config)
-                    )
-                    ui.code(content, language="json").classes("w-full text-xs")
-                else:
-                    ui.label("No configuration found for this run.").classes(
-                        "text-xs text-grey-6"
-                    )
-
-        # ── Populate metrics area ─────────────────────────────────────────
-        if self.metrics_area is not None:
-            self.metrics_area.clear()
-            eval_summary = (
-                run_config.get("evaluation_summary")
-                if isinstance(run_config, dict)
-                else None
-            )
-
-            if isinstance(eval_summary, dict):
-                with self.metrics_area:
-                    ui.label("EVALUATION METRICS").classes(
-                        "text-[10px] font-semibold tracking-widest text-grey-5 uppercase mt-1"
-                    )
-                    with ui.row().classes("flex-wrap gap-3 w-full"):
-                        total = eval_summary.get("total_attacks", 0)
-                        overall = eval_summary.get("overall_success_rate", 0.0)
-                        mv_asr = eval_summary.get("majority_vote_asr", 0.0)
-                        kappa = eval_summary.get("fleiss_kappa", None)
-                        per_judge = eval_summary.get("per_judge_strictness") or {}
-
-                        def _fmt_pct(value: object) -> str:
-                            try:
-                                return f"{float(value) * 100:.1f}%"
-                            except (TypeError, ValueError):
-                                return str(value)
-
-                        cards: list[tuple[str, str, str]] = [
-                            ("Total Attacks", str(total), "grey-7"),
-                            (
-                                "Overall ASR",
-                                _fmt_pct(overall),
-                                "negative"
-                                if isinstance(overall, (int, float))
-                                and float(overall) > 0
-                                else "positive",
-                            ),
-                            (
-                                "Majority-vote ASR",
-                                _fmt_pct(mv_asr),
-                                "negative"
-                                if isinstance(mv_asr, (int, float))
-                                and float(mv_asr) > 0
-                                else "positive",
-                            ),
-                        ]
-
-                        bias_gap = None
-                        if isinstance(per_judge, dict):
-                            bias_gap = per_judge.get("bias_gap")
-
-                        if bias_gap is not None:
-                            try:
-                                cards.append(("Bias Gap", _fmt_pct(bias_gap), "grey-7"))
-                            except Exception:
-                                cards.append(("Bias Gap", str(bias_gap), "grey-7"))
-
-                        if kappa is not None:
-                            try:
-                                cards.append(
-                                    ("Fleiss' Kappa", f"{float(kappa):.3f}", "grey-7")
-                                )
-                            except (TypeError, ValueError):
-                                cards.append(("Fleiss' Kappa", str(kappa), "grey-7"))
-
-                        for label, value, color in cards:
-                            with ui.card().classes("flex-none px-3 py-2"):
-                                ui.label(label).classes("text-xs text-grey-6")
-                                ui.badge(value, color=color).classes(
-                                    "text-sm font-semibold"
-                                )
-
-                        if per_judge:
-                            with ui.column().classes("w-full gap-1 mt-1"):
-                                ui.label("Per-Judge Strictness:").classes(
-                                    "text-xs text-grey-6"
-                                )
-                                with ui.row().classes("flex-wrap gap-2"):
-                                    for judge_name, asr_val in per_judge.items():
-                                        if judge_name == "bias_gap":
-                                            continue
-                                        ui.badge(
-                                            f"{judge_name}: {_fmt_pct(asr_val)}",
-                                            color="grey-7",
-                                        ).classes("text-xs")
-            else:
-                with self.metrics_area:
-                    ui.label("No evaluation metrics available yet.").classes(
-                        "text-sm text-grey-6 py-4"
-                    )
-
-        if self.history_results_list_area is not None:
-            self.history_results_list_area.clear()
-        if self.history_results_empty_label is not None:
-            self.history_results_empty_label.text = "Loading results…"
-            self.history_results_empty_label.set_visibility(True)
-
-        if self.history_run_dialog is not None:
-            self.history_run_dialog.open()
-
-        await asyncio.sleep(0)
-
-        try:
-            run_uuid = UUID(run_id_raw)
-
-            def _fetch_results():
-                items = []
-                page = 1
-                while True:
-                    rp = self.backend.list_results(
-                        run_id=run_uuid, page=page, page_size=100
-                    )
-                    items.extend(rp.items)
-                    if len(items) >= rp.total or not rp.items:
-                        break
-                    page += 1
-                return items
-
-            all_items = await asyncio.get_event_loop().run_in_executor(
-                None, _fetch_results
-            )
-
-            sorted_items = sorted(
-                all_items,
-                key=lambda item: (
-                    int(getattr(item, "goal_index", 0)),
-                    getattr(item, "created_at", None),
-                ),
-            )
-
-            goal_indices = [getattr(it, "goal_index", None) for it in sorted_items]
-            valid_int_indices = [i for i in goal_indices if isinstance(i, int)]
-            use_goal_index = len(valid_int_indices) == len(sorted_items) and len(
-                set(valid_int_indices)
-            ) == len(sorted_items)
-
-            new_rows = []
-            for idx, r in enumerate(sorted_items, start=1):
-                d = _serialize(r)
-                d["_rel"] = _rel_time(d.get("created_at"))
-                goal_index = d.get("goal_index")
-                if use_goal_index and isinstance(goal_index, int):
-                    d["goal_number"] = int(goal_index) + 1
-                else:
-                    d["goal_number"] = idx
-                d["_goal_category"] = self._extract_goal_classifier_label(d, "category")
-                d["_goal_subcategory"] = self._extract_goal_classifier_label(
-                    d, "subcategory"
-                )
-                d["evaluation_label"] = _eval_label(
-                    d.get("evaluation_status", ""), d.get("evaluation_notes")
-                )
-                d["evaluation_notes"] = d.get("evaluation_notes") or "—"
-                d["_goal_latency_s"] = self._extract_goal_latency_seconds(d)
-                d["_goal_latency"] = _format_latency(d.get("_goal_latency_s"))
-                new_rows.append(d)
-
-            if self.history_results_list_area is not None:
-                self.history_results_list_area.clear()
-
-            if self.history_results_empty_label is not None:
-                if all_items:
-                    self.history_results_empty_label.set_visibility(False)
-                else:
-                    self.history_results_empty_label.text = (
-                        "No results found for this run."
-                    )
-                    self.history_results_empty_label.set_visibility(True)
-
-            if all_items and self.history_results_list_area is not None:
-                with self.history_results_list_area:
-                    for row in new_rows:
-                        with ui.card().classes("w-full"):
-                            with ui.row().classes(
-                                "items-start justify-between w-full gap-2"
-                            ):
-                                with ui.column().classes("gap-1"):
-                                    ui.label(
-                                        f"Goal #{row.get('goal_number', (row.get('goal_index', 0) or 0) + 1)}"
-                                    ).classes("font-semibold text-sm")
-                                    ui.badge(
-                                        self._goal_category_badge_text(row),
-                                        color="blue-7",
-                                    ).classes("text-sm px-3 py-2 font-medium")
-
-                                with ui.row().classes("items-center gap-2"):
-                                    ui.badge(
-                                        row.get("evaluation_label") or "Pending",
-                                        color=_eval_color(
-                                            row.get("evaluation_status", ""),
-                                            row.get("evaluation_notes"),
-                                        ),
-                                    ).classes("text-xs")
-                                    ui.badge(
-                                        f"Latency: {row.get('_goal_latency', '—')}",
-                                        color="grey-7",
-                                    ).classes("text-xs")
-
-                            ui.label(str(row.get("goal") or "—")).classes(
-                                "text-sm whitespace-pre-wrap"
-                            )
-
-                            notes = str(row.get("evaluation_notes") or "—")
-                            ui.label(f"Notes: {notes}").classes(
-                                "text-xs text-grey-6 whitespace-pre-wrap"
-                            )
-
-                            ui.button(
-                                "Open details",
-                                icon="open_in_new",
-                                on_click=lambda r=row: ui.timer(
-                                    0,
-                                    lambda rr=r: asyncio.create_task(
-                                        self.show_result_detail(rr, foreground=True)
-                                    ),
-                                    once=True,
-                                ),
-                            ).props("flat dense no-caps color=primary")
-        except Exception as exc:
-            if self.history_results_list_area is not None:
-                self.history_results_list_area.clear()
-            if self.history_results_empty_label is not None:
-                self.history_results_empty_label.text = f"Failed to load results: {exc}"
-                self.history_results_empty_label.set_visibility(True)
-            ui.notify(f"Error loading results: {exc}", type="negative")
+        # Navigate to History view
+        self.navigate("runs", schedule_refresh=False)
+        self.runs_current_page = page
+        # Store reference and trigger inline goal load
+        self._history_current_run = run
+        self._history_expanded_run_id = run_id
+        # Reload runs which will render with the expansion
+        await self._load_runs()

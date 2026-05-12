@@ -67,7 +67,7 @@ class AutoDANTurboConfig(ConfigBase):
     attack_type: str = "autodan_turbo"
     autodan_turbo_params: AutoDANTurboParams = Field(default_factory=AutoDANTurboParams)
     scorer: AttackerConfig = Field(
-        default_factory=lambda: AttackerConfig(identifier="hackagent-scorer")
+        default_factory=lambda: AttackerConfig(identifier="gemma3:4b")
     )
     summarizer: AttackerConfig = Field(
         default_factory=lambda: AttackerConfig(identifier="hackagent-summarizer")
@@ -129,7 +129,7 @@ DEFAULT_AUTODAN_TURBO_CONFIG: Dict[str, Any] = {
         "warm_up_only": False,
     },
     # Scorer LLM configuration (evaluates jailbreak success 1-10)
-    "scorer": _default_role_config("hackagent-scorer"),
+    "scorer": _default_role_config("gemma3:4b"),
     # Summarizer LLM configuration (extracts strategies from prompt pairs)
     "summarizer": _default_role_config("hackagent-summarizer"),
     # Embedder role used by strategy retrieval.

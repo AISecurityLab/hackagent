@@ -18,13 +18,12 @@ a high-level interface for:
 - Executing automated security tests against the configured agents.
 - Retrieving and handling test results.
 
-It encapsulates complexities such as API authentication, agent registration
-with the backend (via `AgentRouter`), and the dynamic dispatch of various
+It encapsulates complexities such as agent registration
+with the local backend (via `AgentRouter`), and the dynamic dispatch of various
 attack methodologies.
 
 **Attributes**:
 
-- `client` - An `AuthenticatedClient` instance for API communication.
 - `router` - An `AgentRouter` instance managing the agent&#x27;s representation
   in the HackAgent backend.
 - `attack_strategies` - A dictionary mapping strategy names to their
@@ -36,17 +35,16 @@ attack methodologies.
 def __init__(endpoint: str,
              name: Optional[str] = None,
              agent_type: Union[AgentTypeEnum, str] = AgentTypeEnum.UNKNOWN,
-             base_url: Optional[str] = None,
-             api_key: Optional[str] = None,
              raise_on_unexpected_status: bool = False,
              timeout: Optional[float] = None,
              metadata: Optional[Dict[str, Any]] = None,
+             target_config: Optional[Dict[str, Any]] = None,
              adapter_operational_config: Optional[Dict[str, Any]] = None)
 ```
 
 Initializes the HackAgent client and prepares it for interaction.
 
-This constructor sets up the authenticated API client, loads default
+This constructor sets up the local storage backend, loads default
 prompts, resolves the agent type, and initializes the agent router
 to ensure the agent is known to the backend. It also prepares available
 attack strategies.
@@ -65,18 +63,18 @@ attack strategies.
   String values are automatically converted to the corresponding
   `AgentTypeEnum` member. Defaults to `AgentTypeEnum.UNKNOWN` if
   not specified or if an invalid string is provided.
-- `base_url` - The base URL for the HackAgent API service.
-- `api_key` - The API key for authenticating with the HackAgent API.
-  If omitted, the client will attempt to retrieve it from the
-  config file (~/.config/hackagent/config.json).
-- `raise_on_unexpected_status` - If set to `name`0, the API client will
+- `raise_on_unexpected_status` - If set to `True`, the API client will
   raise an exception for any HTTP status codes that are not typically
-  expected for a successful operation. Defaults to `name`1.
-- `name`2 - The timeout duration in seconds for API requests made by the
-  authenticated client. Defaults to `name`3 (which might mean a
+  expected for a successful operation. Defaults to `False`.
+- `name`0 - The timeout duration in seconds for API requests made by the
+  authenticated client. Defaults to `name`1 (which might mean a
   default timeout from the underlying HTTP library is used).
-- `name`4 - Optional dictionary containing agent-specific metadata.
-- `name`5 - Optional configuration for the agent adapter.
+- `name`2 - Optional dictionary containing agent-specific metadata.
+- `name`3 - Optional default request settings for the configured
+  victim model. This is the preferred place to define target-side
+  generation defaults such as `name`4, `name`5,
+  and `name`0.
+- `name`7 - Optional configuration for the agent adapter.
 
 #### attack\_strategies
 
@@ -129,6 +127,6 @@ delegates the execution to the chosen strategy.
 - `ValueError` - If the &#x27;attack_type&#x27; is missing from `attack_config` or
   if the specified &#x27;attack_type&#x27; is not a supported/registered
   strategy.
-- `self.router`0 - For issues during API interaction, problems with backend
+- `self.router`0 - For issues during backend
   agent operations, or other unexpected errors during the attack process.
 

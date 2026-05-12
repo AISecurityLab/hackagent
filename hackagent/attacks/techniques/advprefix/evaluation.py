@@ -129,17 +129,6 @@ class EvaluationPipeline(BaseEvaluationStep):
 
         self._statistics["input_count"] = len(input_data)
 
-        # Detect and mark error rows before judge evaluation so they are
-        # not sent to judges (which would score them as "mitigated" instead
-        # of surfacing the underlying adapter/execution error).
-        error_indices = self._detect_error_indices(input_data)
-        if error_indices:
-            self.logger.info(
-                f"Detected {len(error_indices)}/{len(input_data)} error rows — "
-                "these will be excluded from judge evaluation"
-            )
-            self._mark_error_rows(input_data, error_indices)
-
         # Judge Evaluation (via inherited multi-judge pipeline)
         self.logger.info(
             f"Judge Evaluation: Starting evaluation for {len(input_data)} completions"
@@ -262,23 +251,6 @@ class EvaluationPipeline(BaseEvaluationStep):
             if result_id:
                 result["result_id"] = result_id
 
-            # Propagate error state: if every item in the group is an error,
-            # the aggregated row must also be marked as an error so that
-            # finalize_all_goals correctly identifies failed goals.
-            n_errors = sum(1 for item in group_items if item.get("is_error"))
-            if n_errors == len(group_items):
-                result["is_error"] = True
-                result["error"] = (
-                    group_items[0].get("error")
-                    or group_items[0].get("error_message")
-                    or "All completions failed"
-                )
-                result["success"] = False
-                result["best_score"] = 0.0
-                result["evaluation_notes"] = (
-                    f"All {n_errors} completion(s) failed with execution/adapter errors"
-                )
-
             # Find the best-scoring completion (the one that led to jailbreak)
             # so it can be displayed in the evaluation details.
             best_item = None
@@ -322,13 +294,7 @@ class EvaluationPipeline(BaseEvaluationStep):
         return aggregated_results
 
     def _filter_by_nll(self, data: List[Dict], max_ce_threshold: float) -> List[Dict]:
-        """Filter data by cross-entropy threshold.
-
-        Error rows (``is_error=True``) are always preserved so they can
-        propagate through aggregation/selection to ``finalize_all_goals``,
-        which uses them to set ``ERROR_AGENT_RESPONSE`` instead of
-        ``FAILED_JAILBREAK``.
-        """
+        """Filter data by cross-entropy threshold."""
         if not any("prefix_nll" in item for item in data):
             self.logger.warning("prefix_nll key not found, skipping NLL filtering")
             return data
@@ -337,8 +303,7 @@ class EvaluationPipeline(BaseEvaluationStep):
             filtered = [
                 item
                 for item in data
-                if item.get("is_error")
-                or item.get("prefix_nll", float("inf")) < max_ce_threshold
+                if item.get("prefix_nll", float("inf")) < max_ce_threshold
             ]
             self.logger.info(f"NLL filtering: {len(data)} -> {len(filtered)} items")
             return filtered
@@ -405,13 +370,6 @@ class EvaluationPipeline(BaseEvaluationStep):
 
         selected_prefixes = []
         for goal, group in groups.items():
-            # If every item in this goal group is an error, include one
-            # representative error row so finalize_all_goals can detect
-            # the error status instead of marking the goal "mitigated".
-            if all(item.get("is_error") for item in group):
-                selected_prefixes.append(group[0])
-                continue
-
             if not group or all(item.get("pasr") is None for item in group):
                 self.logger.warning(
                     f"Skipping goal '{goal[:50]}...' due to invalid scores"

@@ -6,34 +6,10 @@ sidebar_position: 8
 
 h4rm3l is a **composable prompt-decoration attack** that chains multiple text transformations — encoding, obfuscation, roleplaying, persuasion — to bypass LLM safety filters. Users define a "program" of chained decorators that transform each harmful goal before sending it to the target model.
 
-<details>
-<summary><strong>📚 Quick Navigation (click to expand)</strong></summary>
-
-- [Overview](#overview)
-- [How h4rm3l Works](#how-h4rm3l-works)
-- [Decorator Families](#decorator-families)
-- [Program Syntax](#program-syntax)
-- [Preset Programs](#preset-programs)
-- [Program Logic (Paper-Inspired)](#program-logic-paper-inspired)
-- [Basic Usage](#basic-usage)
-- [Advanced Configuration](#advanced-configuration)
-- [Decorator Reference (Parameters + I/O Examples)](#decorator-reference-parameters--io-examples)
-- [Notes](#notes)
-
-</details>
 
 ## Overview
 
 h4rm3l operates by applying a **decorator chain** (called a "program") to each goal prompt. Each decorator in the chain transforms the text in a specific way — from simple encodings (Base64, character corruption) to sophisticated LLM-assisted rewrites (translation, persuasion, persona injection). The key insight is that **composing** multiple weak transformations produces much stronger jailbreaks than any single technique.
-
-### Key Features
-
-- **Composable**: Chain any combination of 30+ decorators using a simple program syntax
-- **Parallelisable**: Each goal is independently decorated and queried — fully concurrent
-- **No Iterative Loop**: Single-pass decoration + query, no multi-step search
-- **LLM-Assisted Decorators**: Some decorators use an auxiliary LLM for translation, persuasion, etc.
-- **Preset Programs**: Curated decorator chains from the paper for common attack patterns
-- **Research-Backed**: Based on peer-reviewed academic work
 
 ### Research Foundation
 

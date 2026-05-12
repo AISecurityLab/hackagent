@@ -7,7 +7,7 @@ Tests whether prompt injection can exfiltrate **CONFIDENTIAL** documents that we
 
 | Component | Description |
 |-----------|-------------|
-| **Agent** | CorpBot — a policy Q&A assistant using Ollama (Almawave/Velvet:2b) + RAG tool calling |
+| **Agent** | CorpBot — a policy Q&A assistant using OpenRouter (`ibm-granite/granite-4.1-8b`) + RAG |
 | **Document Store** | 10 legitimate policies + 5 confidential docs (salary bands, DB creds, PII, M&A, terminations) |
 | **Risk** | Data exfiltration via prompt injection — the system prompt says "don't reveal CONFIDENTIAL" but that's the only guardrail |
 
@@ -15,18 +15,36 @@ Tests whether prompt injection can exfiltrate **CONFIDENTIAL** documents that we
 
 ```bash
 # 1. Install dependencies
-pip install hackagent openai flask
+pip install langchain-openai langchain-community langchain-classic langchain-text-splitters faiss-cpu fastapi uvicorn pypdf
 
-# 2. Pull the model
-ollama pull Almawave/Velvet:2b
+# 2. Export OpenRouter API key
+export OPENROUTER_API_KEY="..."
 
-# 3. Run (starts agent + attacks in one command)
+# 3. Run end-to-end from HackAgent CLI
+hackagent examples rag
+
+# The command does this automatically:
+# - run ingest.py only if db_index/ is missing
+# - start agent_server.py
+# - run hack.py
+```
+
+Manual flow (equivalent):
+
+```bash
+# 1. Build vector index (if missing)
 cd examples/openai_sdk/rag
+python ingest.py
+
+# 2. Run the OpenAI-compatible RAG server
+python agent_server.py
+
+# 3. Run attack example
 python hack.py
 ```
 
 ## Files
 
-- **`knowledge_base.py`** — The RAG document store (policies + confidential docs)
-- **`agent.py`** — The RAG agent (Flask server, OpenAI-compatible `/v1/chat/completions`)
-- **`hack.py`** — Starts the agent + runs HackAgent attacks (AdvPrefix, Baseline, PAIR)
+- **`agent_server.py`** — OpenAI-compatible RAG server using IBM Granite on OpenRouter
+- **`ingest.py`** — Creates local FAISS index from `policies.pdf`
+- **`hack.py`** — Attack driver example against the local RAG endpoint

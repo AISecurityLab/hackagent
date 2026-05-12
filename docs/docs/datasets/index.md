@@ -43,7 +43,9 @@ graph LR
 ## Installation
 
 ```bash
-pip install hackagent
+python3 -m venv .venv
+source .venv/bin/activate
+pip install git+https://github.com/AISecurityLab/HackAgent.git
 ```
 
 ## Quick Start
@@ -174,3 +176,4 @@ When both `shuffle` and `offset` are used, shuffling happens **first**, then off
 - 🤗 [**HuggingFace Provider**](./huggingface.md) — Load any HuggingFace dataset
 - 📁 [**File Provider**](./file.md) — Load from local JSON, CSV, or TXT files
 - 🔧 [**Custom Providers**](./custom-providers.md) — Create your own data sources
+- 🩺 [**Troubleshooting**](./troubleshooting.md) — Resolve common dataset loading issues

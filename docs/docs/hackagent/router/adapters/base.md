@@ -185,7 +185,7 @@ This method implements the common flow for chat completion agents:
   Expected keys:
   - &#x27;prompt&#x27;: Text prompt (converted to messages)
   - &#x27;messages&#x27;: Pre-formatted messages list (takes precedence)
-  - &#x27;max_tokens&#x27;/&#x27;max_tokens&#x27;: Override default max tokens
+  - &#x27;max_tokens&#x27;: Override default max tokens
   - &#x27;temperature&#x27;: Override default temperature
   - &#x27;top_p&#x27;: Override default top_p
   - Additional adapter-specific parameters

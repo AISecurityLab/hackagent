@@ -5,10 +5,10 @@
 
 from hackagent.risks.profile_types import ThreatProfile
 from hackagent.risks.profile_helpers import (
+    atk,
     ds,
     PRIMARY,
     SECONDARY,
-    ALL_ATTACKS,
 )
 from hackagent.risks.jailbreak import Jailbreak
 
@@ -43,7 +43,23 @@ JAILBREAK_PROFILE = ThreatProfile(
             "5K attack-enhanced prompts with jailbreak methods",
         ),
     ],
-    attacks=ALL_ATTACKS,
+    attacks=[
+        atk(
+            "h4rm3l",
+            PRIMARY,
+            "Composable decorator-chain jailbreak for fast high-yield probing",
+        ),
+        atk(
+            "TAP",
+            PRIMARY,
+            "Tree-search jailbreak with pruning for efficient discovery",
+        ),
+        atk(
+            "PAIR",
+            PRIMARY,
+            "Iterative attacker-guided refinement for adaptive bypass",
+        ),
+    ],
     objective="jailbreak",
     metrics=["asr", "judge_score"],
     description="Tests resistance to multi-turn, roleplay, encoding, and authority-based bypass.",

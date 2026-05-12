@@ -105,7 +105,7 @@ class PromptDecorator:
     def prompt_model(
         self, prompt: str, maxtokens: int = 256, temperature: float = 1.0
     ) -> str:
-        """Forward to the global prompting interface with detailed logging."""
+        """Forward to the global prompting interface with metadata-only logging."""
         self._last_llm_prompt = prompt
         prompting_fn = get_prompting_interface()
         llm_identifier = getattr(prompting_fn, "_llm_identifier", "unknown")
@@ -123,10 +123,9 @@ class PromptDecorator:
             llm_endpoint,
         )
         runtime_logger.info(
-            "[h4rm3l][Decorator LLM] decorator=%s prompt (len=%d):\n%s",
+            "[h4rm3l][Decorator LLM] decorator=%s prompt_len=%d",
             decorator_name,
             len(prompt),
-            prompt,
         )
 
         response = prompting_fn(prompt, maxtokens=maxtokens, temperature=temperature)
@@ -138,10 +137,9 @@ class PromptDecorator:
         self._last_llm_response = response
 
         runtime_logger.info(
-            "[h4rm3l][Decorator LLM] decorator=%s response (len=%d):\n%s",
+            "[h4rm3l][Decorator LLM] decorator=%s response_len=%d",
             decorator_name,
             len(response),
-            response,
         )
         return response
 

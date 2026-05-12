@@ -32,7 +32,7 @@ from hackagent.attacks.shared.prompt_parser import extract_prompt_and_improvemen
 from hackagent.attacks.shared.response_utils import extract_response_content
 from hackagent.attacks.shared.router_factory import create_router
 from hackagent.server.client import AuthenticatedClient
-from hackagent.server.api.models import StepTypeEnum
+from hackagent.server.storage.enums import StepTypeEnum
 from hackagent.router.router import AgentRouter
 from hackagent.router.tracking import Context, Tracker
 
@@ -91,19 +91,25 @@ def _resolve_on_topic_judges_config(
     Returns:
         List with one on-topic judge config, or None when disabled.
     """
-    using_fallback = False
     if isinstance(on_topic, dict):
         on_topic_config = dict(on_topic)
     elif isinstance(fallback_judges, list) and fallback_judges:
-        using_fallback = True
         on_topic_config = dict(fallback_judges[0])
     else:
         return None
 
-    if using_fallback:
-        on_topic_config["type"] = "on_topic"
-    elif not on_topic_config.get("type") and not on_topic_config.get("evaluator_type"):
-        on_topic_config["type"] = "on_topic"
+    # TAP on-topic pruning expects eval_on_topic/explanation_on_topic columns.
+    # Always force evaluator type to on_topic, regardless of provided type.
+    existing_type = on_topic_config.get("type") or on_topic_config.get("evaluator_type")
+    if existing_type and str(existing_type).lower() != "on_topic":
+        logger = logging.getLogger("hackagent.attacks")
+        logger.warning(
+            "TAP on_topic_judge type '%s' overridden to 'on_topic' for correct pruning semantics",
+            existing_type,
+        )
+
+    on_topic_config["type"] = "on_topic"
+    on_topic_config.pop("evaluator_type", None)
 
     return [on_topic_config]
 
@@ -282,7 +288,7 @@ class TapExecutor:
 
     def _query_attacker(
         self, messages: List[Dict[str, str]]
-    ) -> Tuple[Optional[Dict[str, str]], Optional[str]]:
+    ) -> Optional[Dict[str, str]]:
         """
         Ask the attacker model for a refined prompt in JSON form.
 
@@ -290,40 +296,29 @@ class TapExecutor:
             messages: Chat messages to send to the attacker LLM.
 
         Returns:
-            Tuple of (parsed_dict, error_message). ``parsed_dict`` is the
-            attacker's prompt/improvement on success; ``error_message`` is
-            set when the adapter raised or returned an error response so
-            callers can distinguish parse failures from infra failures.
+            Dict with keys like "prompt" and "improvement", or None on failure.
         """
         attacker_config = self.config.get("attacker", {})
         max_tokens = attacker_config.get("max_tokens", 400)
         temperature = attacker_config.get("temperature", 1.0)
         top_p = attacker_config.get("top_p", 0.9)
 
-        try:
-            response = self.attacker_router.route_request(
-                registration_key=self.attacker_key,
-                request_data={
-                    "messages": messages,
-                    "max_tokens": max_tokens,
-                    "temperature": temperature,
-                    "top_p": top_p,
-                },
-            )
-        except Exception as exc:
-            self.logger.error(f"Error querying attacker: {exc}")
-            return None, str(exc)
-
-        error_message: Optional[str] = None
-        if isinstance(response, dict):
-            error_message = response.get("error_message") or response.get("error")
+        response = self.attacker_router.route_request(
+            registration_key=self.attacker_key,
+            request_data={
+                "messages": messages,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+                "top_p": top_p,
+            },
+        )
 
         content = extract_response_content(response, self.logger)
         if not content:
-            return None, error_message
-        return extract_prompt_and_improvement(content), None
+            return None
+        return extract_prompt_and_improvement(content)
 
-    def _query_target(self, prompt: str) -> Tuple[Optional[str], Optional[str]]:
+    def _query_target(self, prompt: str) -> Optional[str]:
         """
         Query the victim model with a candidate prompt.
 
@@ -331,11 +326,7 @@ class TapExecutor:
             prompt: Candidate adversarial prompt.
 
         Returns:
-            Tuple of (response_text, error_message). ``response_text`` is
-            ``None`` when the adapter failed; ``error_message`` is set when
-            an infrastructure-level error (timeout, connection failure,
-            adapter error) occurred so callers can distinguish empty
-            responses from failures.
+            The victim model response text, or None on failure.
         """
         request_data = {
             "messages": [{"role": "user", "content": prompt}],
@@ -343,23 +334,11 @@ class TapExecutor:
             "temperature": self.config.get("temperature", 0.7),
             "top_p": self.config.get("top_p", 1.0),
         }
-        try:
-            response = self.agent_router.route_request(
-                registration_key=list(self.agent_router._agent_registry.keys())[0],
-                request_data=request_data,
-            )
-        except Exception as exc:
-            self.logger.error(f"Error querying target: {exc}")
-            return None, str(exc)
-
-        error_message: Optional[str] = None
-        if isinstance(response, dict):
-            error_message = response.get("error_message") or response.get("error")
-
-        content = extract_response_content(response, self.logger)
-        if content:
-            return content, None
-        return None, error_message
+        response = self.agent_router.route_request(
+            registration_key=list(self.agent_router._agent_registry.keys())[0],
+            request_data=request_data,
+        )
+        return extract_response_content(response, self.logger)
 
     def _expand_one_branch(
         self,
@@ -385,32 +364,21 @@ class TapExecutor:
 
         Returns:
             Dict with keys ``attack_dict``, ``conv_copy``, ``branch_index``,
-            ``stream_index``, ``error`` on success or partial failure.
-            ``attack_dict`` is ``None`` when all attempts failed; ``error``
-            holds the last adapter error message (if any).
+            ``stream_index`` on success; ``None`` when all attempts fail.
         """
         conv_copy = copy.deepcopy(conv)
         conv_copy["parent_id"] = conv.get("self_id")
         conv_copy["self_id"] = _random_id()
         conv_copy["messages"].append({"role": "user", "content": user_message})
 
-        attack_dict: Optional[Dict[str, str]] = None
-        last_error: Optional[str] = None
+        attack_dict = None
         for _ in range(max_attempts):
-            attack_dict, err = self._query_attacker(conv_copy["messages"])
-            if err:
-                last_error = err
+            attack_dict = self._query_attacker(conv_copy["messages"])
             if attack_dict is not None:
                 break
 
         if attack_dict is None:
-            return {
-                "attack_dict": None,
-                "conv_copy": conv_copy,
-                "branch_index": branch_index,
-                "stream_index": stream_index,
-                "error": last_error,
-            }
+            return None
 
         conv_copy["messages"].append(
             {
@@ -423,7 +391,6 @@ class TapExecutor:
             "conv_copy": conv_copy,
             "branch_index": branch_index,
             "stream_index": stream_index,
-            "error": None,
         }
 
     def run_single_goal(
@@ -486,9 +453,6 @@ class TapExecutor:
         best_response = ""
         best_score = 0
         iterations_completed = 0
-        target_errors = 0
-        attacker_errors = 0
-        last_error_message = ""
 
         for iteration in range(1, depth + 1):
             iterations_completed = iteration
@@ -527,14 +491,8 @@ class TapExecutor:
             _exp_results: List[Dict[str, Any]] = []
             for _f in _exp_futures:
                 _res = _f.result()
-                if _res is None:
-                    continue
-                if _res.get("attack_dict") is None:
-                    attacker_errors += 1
-                    if _res.get("error"):
-                        last_error_message = _res["error"]
-                    continue
-                _exp_results.append(_res)
+                if _res is not None:
+                    _exp_results.append(_res)
             # Restore deterministic (branch_index, stream_index) ordering
             _exp_results.sort(key=lambda r: (r["branch_index"], r["stream_index"]))
 
@@ -618,7 +576,9 @@ class TapExecutor:
                     if raw_on_topic_response is None or raw_on_topic_response == "":
                         raw_on_topic_response = judged_row.get("explanation_on_topic")
                     if raw_on_topic_response is None or raw_on_topic_response == "":
-                        raw_on_topic_response = "<no response>"
+                        raw_on_topic_response = (
+                            "<missing on-topic judge output: check judge type/errors>"
+                        )
 
                     _log_colored(
                         self.logger,
@@ -678,26 +638,14 @@ class TapExecutor:
                 with ThreadPoolExecutor(max_workers=_vn) as _vpool:
                     for _j, _p in enumerate(adv_prompt_list):
                         _vfutures[_vpool.submit(self._query_target, _p)] = _j
-                _vmap: Dict[int, Tuple[Optional[str], Optional[str]]] = {}
+                _vmap: Dict[int, str] = {}
                 for _vf in _vfutures:
-                    _vmap[_vfutures[_vf]] = _vf.result()
-                _target_pairs: List[Tuple[Optional[str], Optional[str]]] = [
-                    _vmap[_j] for _j in range(_vn)
-                ]
-            elif _vn:
-                _target_pairs = [self._query_target(adv_prompt_list[0])]
+                    _vmap[_vfutures[_vf]] = _vf.result() or ""
+                target_response_list: List[str] = [_vmap[_j] for _j in range(_vn)]
             else:
-                _target_pairs = []
-
-            target_response_list: List[str] = []
-            for _content, _err in _target_pairs:
-                if _content:
-                    target_response_list.append(_content)
-                else:
-                    target_response_list.append("")
-                    if _err:
-                        target_errors += 1
-                        last_error_message = _err
+                target_response_list = (
+                    [self._query_target(adv_prompt_list[0]) or ""] if _vn else []
+                )
 
             judge_scores = self.evaluator.score_candidates(
                 goal,
@@ -884,7 +832,6 @@ class TapExecutor:
             for conv in convs_list:
                 conv["messages"] = conv["messages"][-2 * keep_last_n :]
 
-        had_infra_error = (target_errors + attacker_errors) > 0
         return {
             "goal": goal,
             "goal_index": goal_index,
@@ -894,17 +841,6 @@ class TapExecutor:
             "is_success": best_score >= success_threshold,
             "iterations_completed": iterations_completed,
             "depth": depth,
-            **(
-                {
-                    "is_error": True,
-                    "error": last_error_message
-                    or "All attacker/target queries failed (adapter/execution errors)",
-                    "error_message": last_error_message
-                    or "All attacker/target queries failed (adapter/execution errors)",
-                }
-                if not best_response and had_infra_error
-                else {}
-            ),
         }
 
 

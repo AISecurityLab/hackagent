@@ -10,17 +10,14 @@ const config: Config = {
   favicon: 'img/favicon.ico',
 
   // Set the production url of your site here
-  url: 'https://docs.hackagent.dev',
+  url: 'https://animated-guide-g46k62k.pages.github.io',
   // Set the /<baseUrl>/ pathname under which your site is served
-  // For local development, use '/' to serve at root
-  // For production, you can change this to '/docs/' if needed
   baseUrl: '/',
   trailingSlash: false,
 
   // GitHub pages deployment config.
-  // If you aren't using GitHub pages, you don't need these.
   organizationName: 'AISecurityLab', // Usually your GitHub org/user name.
-  projectName: 'hackagent', // Usually your repo name.
+  projectName: 'HackAgent', // Must match the GitHub repo name exactly (case-sensitive).
 
   onBrokenLinks: 'throw',
 
@@ -83,6 +80,15 @@ const config: Config = {
     // Mermaid theme configuration
     mermaid: {
       theme: {light: 'neutral', dark: 'dark'},
+      options: {
+        flowchart: {
+          useMaxWidth: false,
+          htmlLabels: false,
+        },
+        sequence: {
+          useMaxWidth: false,
+        },
+      },
     },
     announcementBar: {
       id: 'github_star', // Any unique ID for this banner
@@ -99,8 +105,7 @@ const config: Config = {
       logo: {
         alt: 'HackAgent Logo',
         src: 'img/logo.png',
-        href: 'https://hackagent.dev',
-        target: '_blank',
+        href: '/',
       },
       items: [
         {
@@ -108,11 +113,6 @@ const config: Config = {
           sidebarId: 'tutorialSidebar',
           position: 'left',
           label: 'Docs',
-        },
-        {
-          href: 'https://app.hackagent.dev',
-          label: 'App',
-          position: 'right',
         },
         {
           href: 'https://github.com/AISecurityLab/hackagent',

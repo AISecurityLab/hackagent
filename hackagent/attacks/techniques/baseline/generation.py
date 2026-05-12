@@ -235,39 +235,20 @@ def execute_prompts(
                     registration_key=list(agent_router._agent_registry.keys())[0],
                     request_data=request_data,
                 )
-
-                # Detect adapter-level errors (e.g. timeout, connection refused)
-                # returned as dicts rather than raised as exceptions.
-                adapter_error = (
-                    response.get("error_message")
-                    if isinstance(response, dict)
-                    else None
-                )
-
-                if adapter_error:
-                    logger.warning(f"Adapter error for prompt {idx}: {adapter_error}")
-                    with _lock:
-                        if goal_tracker and goal_ctx:
-                            goal_tracker.add_custom_trace(
-                                ctx=goal_ctx,
-                                step_name="Adapter Error",
-                                content={
-                                    "error": adapter_error,
-                                    "template_category": row.get("template_category"),
-                                    "attack_prompt": row.get("attack_prompt", "")[:200],
-                                },
-                            )
-                    row_completions.append(
-                        {
-                            **row,
-                            "completion": "",
-                            "response_length": 0,
-                            "error": adapter_error,
-                        }
-                    )
-                    continue
-
                 completion = extract_response_content(response, logger) or ""
+                adapter_error = None
+                if isinstance(response, dict):
+                    adapter_error = response.get("error_message") or response.get(
+                        "error"
+                    )
+                row_payload = {
+                    **row,
+                    "completion": completion,
+                    "response_length": len(completion),
+                }
+                if adapter_error and not completion:
+                    row_payload["error"] = str(adapter_error)
+
                 with _lock:
                     if goal_tracker and goal_ctx:
                         goal_tracker.add_interaction_trace(
@@ -281,13 +262,7 @@ def execute_prompts(
                                 "response_length": len(completion),
                             },
                         )
-                row_completions.append(
-                    {
-                        **row,
-                        "completion": completion,
-                        "response_length": len(completion),
-                    }
-                )
+                row_completions.append(row_payload)
         except Exception as e:
             logger.warning(f"Error executing prompt {idx}: {e}")
             with _lock:

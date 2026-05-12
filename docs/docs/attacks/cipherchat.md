@@ -43,7 +43,6 @@ agent = HackAgent(
     name="target_agent",
     endpoint="https://openrouter.ai/api/v1",
     agent_type=AgentTypeEnum.OPENAI_SDK,
-    api_key="${HACKAGENT_API_KEY}",
     adapter_operational_config={
         "name": "google/gemma-3n-e4b-it",
         "api_key": "${OPENROUTER_API_KEY}",

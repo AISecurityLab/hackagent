@@ -250,11 +250,9 @@ def query_target(agent_router, victim_key, prompt, config, logger, role_label="t
         role_label: Log label for target role.
 
     Returns:
-        Tuple ``(target_response, error_message)``. ``target_response`` is the
-        extracted text (empty string when extraction fails); ``error_message``
-        is set when the adapter returned/raised an infrastructure error
-        (timeout, connection failure, etc.) so callers can distinguish empty
-        responses from failures.
+        Tuple ``(target_response, error_message)`` where ``error_message`` is
+        ``None`` on success and a best-effort adapter/runtime error string when
+        the target response is empty due to upstream failures.
     """
     logger.info(
         format_phase_message(
@@ -278,30 +276,21 @@ def query_target(agent_router, victim_key, prompt, config, logger, role_label="t
             )
         )
 
-    error_message = None
-    try:
-        resp = agent_router.route_request(
-            registration_key=victim_key,
-            request_data=request_data,
-        )
-    except Exception as exc:
-        logger.error(
-            format_phase_message(
-                "target",
-                f"[Role:{role_label}] adapter exception: {exc}",
-            )
-        )
-        return "", str(exc)
-
+    resp = agent_router.route_request(
+        registration_key=victim_key,
+        request_data=request_data,
+    )
     target_response = extract_response_content(resp, logger) or ""
+    target_error = None
     if not target_response:
         if isinstance(resp, dict):
-            error_message = resp.get("error_message") or resp.get("error")
+            error_message = resp.get("error_message")
             status_code = resp.get("status_code") or resp.get("raw_response_status")
             agent_data = resp.get("agent_specific_data") or {}
             finish_reason = agent_data.get("finish_reason")
             model_name = agent_data.get("model_name")
             if error_message:
+                target_error = str(error_message)
                 logger.warning(
                     format_phase_message(
                         "target",
@@ -321,7 +310,7 @@ def query_target(agent_router, victim_key, prompt, config, logger, role_label="t
             f"[Role:{role_label}] response='{_truncate_for_log(target_response)}'",
         )
     )
-    return target_response, error_message
+    return target_response, target_error
 
 
 def score_response(

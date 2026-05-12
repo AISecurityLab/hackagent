@@ -1,15 +1,13 @@
 <div align="center">
-
 <p align="center">
   <img src="https://docs.hackagent.dev/img/banner.svg" alt="HackAgent - AI Agent Security Testing Toolkit" width="800">
 </p>
 
-  <strong>AI Security Red-Team Toolkit</strong> 
+  <strong>AI Security Red-Team Toolkit</strong>
 
 <br>
 
 [App](https://app.hackagent.dev/) -- [Docs](https://docs.hackagent.dev/) -- [API](https://api.hackagent.dev/schema/redoc)
-
 
 <br>
 
@@ -20,93 +18,206 @@
 ![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)
 ![Test Coverage](https://img.shields.io/codecov/c/github/AISecurityLab/hackagent)
 ![CI Status](https://img.shields.io/github/actions/workflow/status/AISecurityLab/hackagent/ci.yml)
-
-
-<br>
-
 </div>
 
+## Top Links
 
-## Overview
+- [Introduction](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/introduction.mdx)
 
-HackAgent is an open-source toolkit designed to help security researchers, developers and AI safety practitioners evaluate the security of AI agents. 
-It provides a structured approach to discover potential vulnerabilities, including prompt injection, jailbreaking techniques, and other attack vectors.
+<details>
+<summary><strong>Getting Started</strong></summary>
 
-## 🔥 Features
+- [Section Source](https://github.com/AISecurityLab/hackagent/tree/main/docs/docs/getting-started)
+- [Installation](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/getting-started/installation.mdx)
+- [Quick Start](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/getting-started/quick-start.mdx)
+- [Dashboard](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/getting-started/dashboard.mdx)
+- [Quick Security Scan](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/getting-started/quick-security-scan.mdx)
+- [Attack Tutorial](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/getting-started/attack-tutorial.mdx)
+- [Datasets Tutorial](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/getting-started/datasets-tutorial.mdx)
 
-- **Comprehensive Attack Library**: Pre-built techniques for prompt injections, jailbreaks, and goal hijacking
-- **Modular Framework**: Easily extend with custom attack vectors and testing methodologies
-- **Safety Focused**: Responsible disclosure guidelines and ethical usage recommendations
+</details>
 
-### 🔌 AI Agent Frameworks Supported
+<details>
+<summary><strong>AI Risks</strong></summary>
 
-[![LiteLLM](https://img.shields.io/badge/LiteLLM-blue?style=flat&logo=github)](https://github.com/BerriAI/litellm)
-[![ADK](https://img.shields.io/badge/Google-ADK-green?style=flat&logo=openai)](https://google.github.io/adk-docs/)
-[![OpenAI](https://img.shields.io/badge/OpenAI-SDK-412991?style=flat&logo=openai)](https://platform.openai.com/docs)
+- [Section Source](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/risks/index.mdx)
+- [Jailbreak](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/risks/vulnerabilities.md)
 
-## 🚀 Installation
+</details>
+
+<details>
+<summary><strong>Attacks</strong></summary>
+
+- [Section Source](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/attacks/index.mdx)
+- [AdvPrefix](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/attacks/advprefix.md)
+- [AutoDAN-Turbo](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/attacks/autodan_turbo.md)
+- [PAIR](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/attacks/pair.md)
+- [TAP](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/attacks/tap.md)
+- [FlipAttack](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/attacks/flipattack.md)
+- [BoN](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/attacks/bon.md)
+- [h4rm3l](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/attacks/h4rm3l.md)
+- [CipherChat](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/attacks/cipherchat.md)
+- [PAP](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/attacks/pap.md)
+- [Baseline](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/attacks/baseline.md)
+
+</details>
+
+<details>
+<summary><strong>Datasets</strong></summary>
+
+- [Section Source](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/datasets/index.md)
+- [Presets](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/datasets/presets.md)
+- [Hugging Face](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/datasets/huggingface.md)
+- [File Provider](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/datasets/file.md)
+- [Custom Providers](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/datasets/custom-providers.md)
+- [Troubleshooting](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/datasets/troubleshooting.md)
+
+</details>
+
+<details>
+<summary><strong>Agents</strong></summary>
+
+- [Section Source](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/agents/index.mdx)
+- [Ollama](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/agents/ollama.mdx)
+- [OpenAI SDK](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/agents/openai-sdk.mdx)
+- [Google ADK](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/agents/google-adk.mdx)
+
+</details>
+
+<details>
+<summary><strong>CLI Reference</strong></summary>
+
+- [Section Source](https://github.com/AISecurityLab/hackagent/tree/main/docs/docs/cli)
+- [Overview](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/cli/overview.md)
+- [Initialization](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/cli/initialization.md)
+- [Configuration](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/cli/config.md)
+- [Attack](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/cli/attack.mdx)
+- [Results](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/cli/results.md)
+
+</details>
+
+<details>
+<summary><strong>SDK Reference</strong></summary>
+
+- [Section Source](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/api-index.md)
+- [Agent](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/hackagent/agent.md)
+- [Errors](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/hackagent/errors.md)
+- [Logger](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/hackagent/logger.md)
+- [Utils](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/hackagent/utils.md)
+- [Router](https://github.com/AISecurityLab/hackagent/tree/main/docs/docs/hackagent/router)
+- [Attacks](https://github.com/AISecurityLab/hackagent/tree/main/docs/docs/hackagent/attacks)
+- [Datasets](https://github.com/AISecurityLab/hackagent/tree/main/docs/docs/hackagent/datasets)
+- [Risks](https://github.com/AISecurityLab/hackagent/tree/main/docs/docs/hackagent/risks)
+- [Server](https://github.com/AISecurityLab/hackagent/tree/main/docs/docs/hackagent/server)
+
+</details>
+
+<details>
+<summary><strong>Security & Ethics</strong></summary>
+
+- [Section Source](https://github.com/AISecurityLab/hackagent/tree/main/docs/docs/security)
+- [Responsible Disclosure](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/security/responsible-disclosure.md)
+- [Ethical Guidelines](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/security/ethical-guidelines.md)
+
+</details>
+
+## What is HackAgent?
+
+HackAgent is a comprehensive Python SDK and CLI designed to help security researchers, developers, and AI safety practitioners evaluate and strengthen the security of AI agents.
 
 
-### Installation from PyPI
 
-HackAgent can be installed directly from PyPI:
+As AI agents become more powerful and autonomous, they face security challenges that traditional testing tools cannot address:
+
+| Threat | Description |
+|--------|-------------|
+| **Prompt Injection** | Malicious inputs that hijack agent behavior |
+| **Jailbreaking** | Bypassing safety guardrails and content filters |
+| **Goal Hijacking** | Manipulating agents to pursue unintended objectives |
+| **Tool Misuse** | Exploiting agent capabilities for unauthorized actions |
+
+HackAgent automates testing for these vulnerabilities using research-backed attack techniques, helping you identify and fix security issues before they are exploited.
+
+<div align="center">
+  <img src="docs/static/gifs/terminal.gif" alt="HackAgent CLI Demo" width="100%" />
+  <p><em>Interactive TUI with real-time attack progress and visual reporting.</em></p>
+</div>
+
+## Get Started Now
+
+### Quick Install
 
 ```bash
-# With uv (recommended)
-uv add hackagent
-
-# Or with pip
-pip install hackagent
+python3 -m venv .venv
+source .venv/bin/activate
+pip install git+https://github.com/AISecurityLab/HackAgent.git
 ```
 
-## 📚 Quick Start
+No API key required: HackAgent works locally out of the box.
 
-Run the interactive CLI to start testing your AI agents:
+
+Questions? Join [community discussions](https://github.com/AISecurityLab/hackagent/discussions) or email ais@ai4i.it.
+
+## Architecture
+
+HackAgent uses a modular pipeline to test agent robustness end-to-end.
+
+| Component | Description |
+|-----------|-------------|
+| **Attack Engine** | Orchestrates attacks using AdvPrefix, AutoDAN-Turbo, PAIR, TAP, FlipAttack, BoN, h4rm3l, CipherChat, PAP, and Baseline |
+| **Generator** | LLM role that creates adversarial prompts to test the target agent |
+| **Judge** | LLM role that evaluates whether attacks bypass safety measures |
+| **Target Agent** | Your AI agent under test across supported frameworks |
+| **Datasets** | Pre-built benchmark presets plus custom HuggingFace/file datasets |
+
+## Supported Frameworks
+
+[![Google ADK](https://img.shields.io/badge/Google-ADK-green?style=for-the-badge&logo=google)](https://google.github.io/adk-docs/)
+[![OpenAI SDK](https://img.shields.io/badge/OpenAI-SDK-412991?style=for-the-badge&logo=openai)](https://platform.openai.com/docs)
+[![LiteLLM](https://img.shields.io/badge/LiteLLM-blue?style=for-the-badge&logo=github)](https://github.com/BerriAI/litellm)
+[![LangChain](https://img.shields.io/badge/LangChain-1C3C3C?style=for-the-badge)](https://python.langchain.com)
+
+## Reporting
+
+HackAgent supports both local and remote reporting.
+
+- Local mode stores test results in SQLite and includes a built-in dashboard.
+- Cloud mode syncs runs to the HackAgent remote platform when an API key is configured.
 
 ```bash
-hackagent
+hackagent web
 ```
 
-Or use the SDK:
+Access cloud reporting at [https://app.hackagent.dev](https://app.hackagent.dev).
 
-```python
-from hackagent import HackAgent, AgentTypeEnum
+## Responsible Use
 
-agent = HackAgent(
-    name="my_agent",
-    endpoint="http://localhost:8000",
-    agent_type=AgentTypeEnum.GOOGLE_ADK
-)
+HackAgent is designed for authorized security testing only. Always obtain explicit permission before testing any AI system.
 
-results = agent.hack(attack_config={
-    "attack_type": "advprefix",
-    "goals": ["Test goal"],
-    # ... generator and judges config
-})
-```
+### Do
 
-Obtain your credentials at [https://app.hackagent.dev](https://app.hackagent.dev)
+- Test your own agents
+- Conduct authorized pentesting
+- Follow coordinated disclosure
+- Share security knowledge responsibly
 
-For detailed examples and advanced usage, visit our [documentation](https://docs.hackagent.dev).
+### Don't
 
-## 📊 Reporting
+- Test systems without permission
+- Exploit vulnerabilities maliciously
+- Violate terms of service
+- Share harmful exploit instructions irresponsibly
 
-HackAgent automatically sends test results to the dashboard for analysis and visualization. 
+Read the full guidelines: [Responsible Disclosure](docs/docs/security/responsible-disclosure.md)
 
-Access your dashboard at [https://app.hackagent.dev](https://app.hackagent.dev)
+## Contributing
 
-## 🤝 Contributing
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for guidelines.
+## License
 
-## 📜 License
+Licensed under Apache-2.0. See [LICENSE](LICENSE).
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+## Disclaimer
 
-## ⚠️ Disclaimer
-
-HackAgent is a tool designed for security research and improving AI safety. Always obtain proper authorization before testing any AI systems. The authors are not responsible for any misuse of this software.
-
----
-
-*This project is for educational and research purposes. Always use responsibly and ethically.*
+HackAgent is intended for security research and AI safety improvement. The authors are not responsible for misuse.

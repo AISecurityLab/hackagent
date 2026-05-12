@@ -98,8 +98,8 @@ class AgentsTab(BaseTab):
     """
 
     BINDINGS = [
-        Binding("n", "new_agent", "New Agent"),
-        Binding("d", "delete_agent", "Delete Agent"),
+        Binding("n", "new_agent", "New Target Agent"),
+        Binding("d", "delete_agent", "Delete Target Agent"),
         Binding("enter", "view_agent", "View Details"),
         Binding("f5", "refresh", "Refresh"),
     ]
@@ -121,12 +121,13 @@ class AgentsTab(BaseTab):
 
         # Title section
         yield Static(
-            "🤖 [bold cyan]Agent Management[/bold cyan]", classes="section-header"
+            "🎯 [bold cyan]Target Agent Management[/bold cyan]",
+            classes="section-header",
         )
 
         # Statistics bar
         yield Static(
-            "📊 [cyan]Total Agents:[/cyan] [yellow]0[/yellow] | "
+            "📊 [cyan]Total Target Agents:[/cyan] [yellow]0[/yellow] | "
             "🟢 [green]Active:[/green] [yellow]0[/yellow] | "
             "⚡ [magenta]Last Updated:[/magenta] [dim]Never[/dim]",
             id="agents-stats",
@@ -158,11 +159,11 @@ class AgentsTab(BaseTab):
         # Show loading message immediately
         try:
             details_widget = self.query_one("#agent-details", Static)
-            details_widget.update("⏳ [cyan]Loading agents from API...[/cyan]")
+            details_widget.update("⏳ [cyan]Loading target agents from API...[/cyan]")
 
             stats_widget = self.query_one("#agents-stats", Static)
             stats_widget.update(
-                "📊 [cyan]Total Agents:[/cyan] [yellow]...[/yellow] | "
+                "📊 [cyan]Total Target Agents:[/cyan] [yellow]...[/yellow] | "
                 "🟢 [green]Active:[/green] [yellow]...[/yellow] | "
                 "⚡ [magenta]Status:[/magenta] [cyan]Loading...[/cyan]"
             )
@@ -180,21 +181,21 @@ class AgentsTab(BaseTab):
         if event.button.id == "refresh-agents":
             self.action_refresh()
         elif event.button.id == "new-agent":
-            self._show_info_message("➕ Create new agent feature coming soon!")
+            self._show_info_message("➕ Create new target agent feature coming soon!")
         elif event.button.id == "delete-agent":
             if self.selected_agent:
                 self._show_info_message(
-                    f"🗑️  Delete agent '{self.selected_agent.name}' - feature coming soon!"
+                    f"🗑️  Delete target agent '{self.selected_agent.name}' - feature coming soon!"
                 )
             else:
-                self._show_info_message("⚠️ Please select an agent to delete")
+                self._show_info_message("⚠️ Please select a target agent to delete")
 
     def action_refresh(self) -> None:
         """Action to manually refresh agents data."""
         try:
             stats_widget = self.query_one("#agents-stats", Static)
             stats_widget.update(
-                "📊 [cyan]Total Agents:[/cyan] [yellow]...[/yellow] | "
+                "📊 [cyan]Total Target Agents:[/cyan] [yellow]...[/yellow] | "
                 "🟢 [green]Active:[/green] [yellow]...[/yellow] | "
                 "⚡ [magenta]Status:[/magenta] [cyan]Refreshing...[/cyan]"
             )
@@ -213,7 +214,7 @@ class AgentsTab(BaseTab):
             self._show_agent_details()
 
     def refresh_data(self) -> None:
-        """Refresh agents data from backend (local or remote)."""
+        """Refresh agents data from the local backend."""
         try:
             backend = self.create_backend()
             result = backend.list_agents(page=1, page_size=200)
@@ -226,18 +227,18 @@ class AgentsTab(BaseTab):
 
                 stats_widget = self.query_one("#agents-stats", Static)
                 stats_widget.update(
-                    "📊 [cyan]Total Agents:[/cyan] [yellow]0[/yellow] | "
+                    "📊 [cyan]Total Target Agents:[/cyan] [yellow]0[/yellow] | "
                     "🟢 [green]Active:[/green] [yellow]0[/yellow] | "
                     "⚡ [magenta]Status:[/magenta] [green]Loaded[/green]"
                 )
 
                 details_widget = self.query_one("#agent-details", Static)
                 details_widget.update(
-                    "📭 [bold cyan]No Agents Found[/bold cyan]\n\n"
-                    "[yellow]Get started by creating your first agent:[/yellow]\n\n"
+                    "📭 [bold cyan]No Target Agents Found[/bold cyan]\n\n"
+                    "[yellow]Get started by creating your first target agent:[/yellow]\n\n"
                     "• Click [bold]➕ New Agent[/bold] button above\n"
                     "• Or use the CLI: [bold]hackagent agent create[/bold]\n\n"
-                    "[dim]Agents are AI systems that you can test for security vulnerabilities[/dim]"
+                    "[dim]Target agents are AI systems that you can test for security vulnerabilities[/dim]"
                 )
                 return
 
@@ -246,7 +247,7 @@ class AgentsTab(BaseTab):
             self._update_table()
 
         except Exception as e:
-            error_msg = self.handle_api_error(e, "Loading agents")
+            error_msg = self.handle_api_error(e, "Loading target agents")
             self._show_empty_state(error_msg)
 
     def _show_empty_state(self, message: str) -> None:
@@ -262,7 +263,7 @@ class AgentsTab(BaseTab):
         try:
             stats_widget = self.query_one("#agents-stats", Static)
             stats_widget.update(
-                "📊 [cyan]Total Agents:[/cyan] [red]0[/red] | "
+                "📊 [cyan]Total Target Agents:[/cyan] [red]0[/red] | "
                 "🟢 [green]Active:[/green] [red]0[/red] | "
                 "⚡ [magenta]Status:[/magenta] [red]Error[/red]"
             )
@@ -353,7 +354,7 @@ class AgentsTab(BaseTab):
 
             stats_widget = self.query_one("#agents-stats", Static)
             stats_widget.update(
-                f"📊 [cyan]Total Agents:[/cyan] [green]{rows_added}[/green] | "
+                f"📊 [cyan]Total Target Agents:[/cyan] [green]{rows_added}[/green] | "
                 f"🟢 [green]Active:[/green] [green]{active_count}[/green] | "
                 f"⚡ [magenta]Last Updated:[/magenta] [yellow]{current_time}[/yellow]"
             )
@@ -361,12 +362,12 @@ class AgentsTab(BaseTab):
             # Show success message
             inactive_count = rows_added - active_count
             details_widget.update(
-                f"✅ [bold green]Successfully loaded {rows_added} agent(s)[/bold green]\n\n"
-                f"[cyan]Agent Summary:[/cyan]\n"
+                f"✅ [bold green]Successfully loaded {rows_added} target agent(s)[/bold green]\n\n"
+                f"[cyan]Target Agent Summary:[/cyan]\n"
                 f"• Total: [yellow]{rows_added}[/yellow]\n"
                 f"• Active (with endpoint): [green]{active_count}[/green]\n"
                 f"• Inactive: [yellow]{inactive_count}[/yellow]\n\n"
-                f"[dim italic]💡 Click on any agent in the table to view detailed information[/dim]"
+                f"[dim italic]💡 Click on any target agent in the table to view detailed information[/dim]"
             )
 
         except Exception as e:
@@ -429,7 +430,7 @@ class AgentsTab(BaseTab):
             else "[dim]No description provided[/dim]"
         )
 
-        details = f"""╭─ [bold cyan]🤖 Agent Details[/bold cyan] ─────────────────────────────────────╮
+        details = f"""╭─ [bold cyan]🎯 Target Agent Details[/bold cyan] ──────────────────────────────╮
 
 {status_icon} [bold yellow]Status:[/bold yellow] {status_text}
 

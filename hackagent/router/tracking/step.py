@@ -17,7 +17,7 @@ or per-datapoint tracking, use the Tracker class from tracker.py instead.
 from contextlib import contextmanager
 from typing import Any, Dict, Optional
 
-from hackagent.server.api.models import (
+from hackagent.server.storage.enums import (
     EvaluationStatusEnum,
     StatusEnum,
     StepTypeEnum,

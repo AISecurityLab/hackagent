@@ -22,12 +22,12 @@ EVAL_COLOR_JS = (
 )
 
 EVAL_LABEL_JS = (
-    "(props.row.evaluation_notes || '').toLowerCase().includes('failed with exception') ? 'Error'"
+    "(props.row.evaluation_notes || '').toLowerCase().includes('failed with exception') ? 'Failed'"
     " : props.row.evaluation_status?.toUpperCase().includes('SUCCESSFUL_JAILBREAK') ? 'Jailbreak'"
     " : props.row.evaluation_status?.toUpperCase().includes('PASSED_CRITERIA') ? 'Mitigated'"
     " : props.row.evaluation_status?.toUpperCase().includes('FAILED_JAILBREAK') ? 'Mitigated'"
     " : (props.row.evaluation_status?.toUpperCase().includes('FAILED_CRITERIA') ||"
-    "    props.row.evaluation_status?.toUpperCase().includes('ERROR')) ? 'Error'"
+    "    props.row.evaluation_status?.toUpperCase().includes('ERROR')) ? 'Failed'"
     " : 'Pending'"
 )
 
@@ -39,6 +39,7 @@ def make_run_table(
     include_progressive_run: bool = False,
     include_results: bool = True,
     include_goal_latency_avg: bool = False,
+    include_asr: bool = False,
     selection: str | None = None,
     on_select=None,
 ) -> ui.table:
@@ -85,7 +86,7 @@ def make_run_table(
             },
             {
                 "name": "latency",
-                "label": "Latency",
+                "label": "Total Latency",
                 "field": "_latency_s",
                 "align": "left",
                 "sortable": True,
@@ -120,6 +121,16 @@ def make_run_table(
                 "align": "left",
                 "sortable": True,
             },
+        )
+    if include_asr:
+        columns.append(
+            {
+                "name": "asr",
+                "label": "ASR",
+                "field": "overall_asr",
+                "align": "left",
+                "sortable": True,
+            }
         )
 
     tbl = ui.table(
@@ -210,19 +221,15 @@ def make_run_table(
                     </q-badge>
                     <q-badge v-if="(props.row.failed_attacks ?? 0) > 0"
                                      color="positive" class="ml-2">
-                        mitigated: {{ props.row.failed_attacks }}
+                        failed attacks: {{ props.row.failed_attacks }}
           </q-badge>
-                    <q-badge v-if="(props.row.errors ?? 0) > 0"
-                             color="warning" class="ml-2">
-                        errors: {{ props.row.errors }}
-                    </q-badge>
                     <q-badge
                         v-if="((props.row.successful_jailbreaks ?? 0) + (props.row.failed_attacks ?? 0)) > 0"
                         color="info"
                         class="ml-2"
                     >
                         ASR:
-                        {{ (((props.row.successful_jailbreaks ?? 0) * 100) / ((props.row.successful_jailbreaks ?? 0) + (props.row.failed_attacks ?? 0))).toFixed(1) }}%
+                        {{ props.row.overall_asr ?? ((((props.row.successful_jailbreaks ?? 0) * 100) / ((props.row.successful_jailbreaks ?? 0) + (props.row.failed_attacks ?? 0))).toFixed(1) + '%') }}
                     </q-badge>
         </q-td>
         """,
@@ -230,9 +237,12 @@ def make_run_table(
     tbl.add_slot(
         "body-cell-asr",
         r"""
-        <q-td :props="props">
+                <q-td :props="props" class="cursor-pointer"
+                            @click="$emit('rowClick', props.row)">
           <span class="tabular-nums font-medium">
-            {{ props.row.overall_asr ?? '—' }}
+                        {{ props.row.overall_asr ?? (((props.row.successful_jailbreaks ?? 0) + (props.row.failed_attacks ?? 0)) > 0
+                            ? ((((props.row.successful_jailbreaks ?? 0) * 100) / ((props.row.successful_jailbreaks ?? 0) + (props.row.failed_attacks ?? 0))).toFixed(1) + '%')
+                            : '—') }}
           </span>
         </q-td>
         """,

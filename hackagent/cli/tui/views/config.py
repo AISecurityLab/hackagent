@@ -12,7 +12,7 @@ import importlib.metadata
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.widgets import Button, Input, Label, Static
+from textual.widgets import Button, Static
 
 from hackagent.cli.config import CLIConfig
 
@@ -45,25 +45,6 @@ class ConfigTab(VerticalScroll):
         )
 
         with Vertical(classes="config-section"):
-            yield Static("[bold]API Configuration[/bold]")
-
-            with Vertical(classes="form-group"):
-                yield Label("API Key:")
-                yield Input(
-                    placeholder="Your HackAgent API key",
-                    id="api-key",
-                    password=True,
-                )
-
-            with Vertical(classes="form-group"):
-                yield Label("Base URL:")
-                yield Input(
-                    id="base_url",
-                    placeholder="https://api.hackagent.dev",
-                    classes="config-input",
-                )
-
-        with Vertical(classes="config-section"):
             yield Static("[bold]Configuration File[/bold]")
 
             yield Static(
@@ -79,14 +60,13 @@ class ConfigTab(VerticalScroll):
             )
 
             yield Static(
-                "[dim]Mode: Detecting...[/dim]",
+                "[green]🗄️ Mode:[/green] [bold]Local[/bold] — results stored in local SQLite database",
                 classes="status-indicator",
                 id="mode-indicator",
             )
 
         with Horizontal(classes="button-group"):
             yield Button("Save Configuration", id="save-config", variant="primary")
-            yield Button("Test Connection", id="test-connection", variant="default")
             yield Button("Reset to Defaults", id="reset-config", variant="error")
             yield Button("Validate Config", id="validate-config", variant="success")
 
@@ -120,13 +100,8 @@ class ConfigTab(VerticalScroll):
             self._validate_config()
 
     def _load_config(self) -> None:
-        """Load current configuration into form fields."""
-        # Set API key (masked)
-        if self.cli_config.api_key:
-            self.query_one("#api-key", Input).value = self.cli_config.api_key
-
-        # Set base URL
-        self.query_one("#base_url", Input).value = self.cli_config.base_url
+        """Load current configuration."""
+        pass
 
     def _update_status(self) -> None:
         """Update configuration status display."""
@@ -140,95 +115,31 @@ class ConfigTab(VerticalScroll):
             )
 
     def _update_mode_indicator(self) -> None:
-        """Show whether running in local or remote mode."""
+        """Show storage mode — always local."""
         try:
             mode_widget = self.query_one("#mode-indicator", Static)
-            if self.cli_config.api_key:
-                mode_widget.update(
-                    "[green]🌐 Mode:[/green] [bold]Remote[/bold] — results synced to HackAgent platform"
-                )
-            else:
-                from pathlib import Path
+            from pathlib import Path
 
-                db_path = Path("~/.local/share/hackagent/hackagent.db").expanduser()
-                db_exists = (
-                    "[green]✓ exists[/green]"
-                    if db_path.exists()
-                    else "[yellow]not yet created[/yellow]"
-                )
-                mode_widget.update(
-                    f"[cyan]💾 Mode:[/cyan] [bold]Local[/bold] — SQLite at {db_path} ({db_exists})"
-                )
+            db_path = Path("~/.local/share/hackagent/hackagent.db").expanduser()
+            db_exists = (
+                "[green]✓ exists[/green]"
+                if db_path.exists()
+                else "[yellow]not yet created[/yellow]"
+            )
+            mode_widget.update(
+                f"[cyan]💾 Mode:[/cyan] [bold]Local[/bold] — SQLite at {db_path} ({db_exists})"
+            )
         except Exception:
             pass
 
     def _save_config(self) -> None:
         """Save configuration to file."""
         try:
-            # Get values from form
-            api_key = self.query_one("#api-key", Input).value
-            base_url = self.query_one("#base_url", Input).value
-
-            # Update config
-            if api_key:
-                self.cli_config.api_key = api_key
-            if base_url:
-                self.cli_config.base_url = base_url
-
-            # Save to file
             self.cli_config.save()
-
             self._update_status()
             self._update_mode_indicator()
-
         except Exception:
             pass
-
-    def _test_connection(self) -> None:
-        """Test API connection (remote) or local SQLite DB (local mode)."""
-        try:
-            if not self.cli_config.api_key:
-                # Local mode: verify SQLite DB is accessible
-                from pathlib import Path
-                import sqlite3
-
-                db_path = Path("~/.local/share/hackagent/hackagent.db").expanduser()
-                if not db_path.exists():
-                    self.app.notify(
-                        "💾 Local mode — DB not yet created (will be created on first run)",
-                        severity="information",
-                        timeout=5,
-                    )
-                    return
-                conn = sqlite3.connect(str(db_path))
-                run_count = conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0]
-                agent_count = conn.execute("SELECT COUNT(*) FROM agents").fetchone()[0]
-                conn.close()
-                self.app.notify(
-                    f"💾 Local mode — {run_count} run(s), {agent_count} agent(s) in DB",
-                    severity="information",
-                    timeout=5,
-                )
-                return
-
-            # Remote mode: test API key against the platform
-            from hackagent.server.api.key import key_list
-            from hackagent.server.client import AuthenticatedClient
-
-            client = AuthenticatedClient(
-                base_url=self.cli_config.base_url,
-                token=self.cli_config.api_key,
-                prefix="Bearer",
-            )
-            key_list.sync_detailed(client=client)
-            self.app.notify(
-                "✅ Connected to HackAgent platform", severity="information", timeout=4
-            )
-
-        except Exception as e:
-            self.app.notify(
-                f"❌ Connection test failed: {e}", severity="error", timeout=6
-            )
 
     def _validate_config(self) -> None:
         """Validate current configuration."""
@@ -242,10 +153,6 @@ class ConfigTab(VerticalScroll):
         try:
             if self.cli_config.default_config_path.exists():
                 self.cli_config.default_config_path.unlink()
-
-            # Reset to defaults
-            self.cli_config.base_url = "https://api.hackagent.dev"
-            self.cli_config.api_key = None
 
             self._load_config()
             self._update_status()
@@ -264,7 +171,7 @@ class ConfigTab(VerticalScroll):
         import re
         from importlib.metadata import requires
 
-        # Map pypi package names to import names
+        # Map package distribution names to import names
         package_to_import = {
             "pyyaml": "yaml",
             "python-dateutil": "dateutil",

@@ -10,6 +10,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 from hackagent.server.dashboard._api import register_api
+from hackagent.server.dashboard._helpers import _result_bucket
 from hackagent.server.storage.base import PaginatedResult, ResultRecord, RunRecord
 
 
@@ -47,6 +48,30 @@ class _FakeBackend:
         start = (page - 1) * page_size
         end = start + page_size
         return PaginatedResult(items=items[start:end], total=len(items))
+
+    def count_result_buckets(self):
+        buckets = {
+            "total": 0,
+            "jailbreaks": 0,
+            "mitigated": 0,
+            "failed": 0,
+            "pending": 0,
+        }
+        for run_results in self._results_by_run.values():
+            for result in run_results:
+                buckets["total"] += 1
+                bucket = _result_bucket(
+                    result.evaluation_status, result.evaluation_notes
+                )
+                if bucket == "jailbreak":
+                    buckets["jailbreaks"] += 1
+                elif bucket == "mitigated":
+                    buckets["mitigated"] += 1
+                elif bucket == "failed":
+                    buckets["failed"] += 1
+                elif bucket == "pending":
+                    buckets["pending"] += 1
+        return buckets
 
 
 class TestDashboardApiRoutes(unittest.TestCase):
@@ -90,6 +115,26 @@ class TestDashboardApiRoutes(unittest.TestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(payload["mode"], "local")
         self.assertEqual(payload["db_path"], "/tmp/hackagent-test.db")
+
+    def test_status_route_reports_remote_mode(self):
+        run = RunRecord(
+            id=uuid4(),
+            attack_id=uuid4(),
+            agent_id=uuid4(),
+            run_config={},
+            status="PENDING",
+            run_notes=None,
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+        backend = _FakeBackend(runs=[run], results_by_run={}, api_key="k")
+        routes = self._register(backend)
+
+        payload = asyncio.run(routes["/api/status"]())
+
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["mode"], "remote")
+        self.assertIsNone(payload["db_path"])
 
     def test_stats_and_runs_routes_use_bucket_classification(self):
         run = RunRecord(
@@ -146,7 +191,7 @@ class TestDashboardApiRoutes(unittest.TestCase):
         self.assertEqual(runs_payload["total"], 1)
         self.assertEqual(runs_payload["items"][0]["total_results"], 2)
         self.assertEqual(runs_payload["items"][0]["successful_jailbreaks"], 1)
-        self.assertEqual(runs_payload["items"][0]["status"], "COMPLETED")
+        self.assertEqual(runs_payload["items"][0]["status"], "FAILED")
 
 
 if __name__ == "__main__":

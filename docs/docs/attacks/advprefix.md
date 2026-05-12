@@ -10,13 +10,6 @@ AdvPrefix is HackAgent's most sophisticated attack technique, implementing a mul
 
 AdvPrefix attacks work by automatically generating and optimizing attack prefixes that are specifically tailored to the target model. Unlike simple prompt injection, AdvPrefix uses a sophisticated evaluation system to create prefixes that maximize attack success rates.
 
-### Key Features
-
-- **Automated Prefix Generation**: Uses uncensored models to create attack prefixes
-- **Multi-Step Evaluation**: Comprehensive pipeline with generation, evaluation, and selection
-- **Model-Specific Optimization**: Tailors attacks to specific target models
-- **Research-Backed**: Based on academic research in adversarial ML
-
 ## Attack Pipeline
 
 AdvPrefix implements a 9-step attack pipeline:
@@ -417,7 +410,7 @@ AdvPrefix attacks may exhibit these patterns:
 ## Next Steps
 
 - **[Google ADK Integration](../agents/google-adk.mdx)** - Framework-specific testing
-- **[Attack Tutorial](../getting-started/attack-tutorial.mdx)** - Getting started with attacks
+- **[Evaluation Tutorial](../getting-started/attack-tutorial.mdx)** - Getting started with attacks
 - **[Security Guidelines](../security/responsible-disclosure.md)** - Responsible testing practices
 
 ---

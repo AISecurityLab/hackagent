@@ -34,12 +34,15 @@ from uuid import UUID
 import httpx
 
 from hackagent.errors import HackAgentError
-from hackagent.server.api.models import StatusEnum
+from hackagent.server.storage.enums import StatusEnum
 
 if TYPE_CHECKING:
     from hackagent.agent import HackAgent
 
 logger = get_logger(__name__)
+if not logger.handlers:
+    logger.addHandler(logging.NullHandler())
+logger.propagate = False
 
 
 class _BatchContextFilter(logging.Filter):
@@ -80,7 +83,7 @@ class AttackOrchestrator:
             attack_impl_class = AdvPrefixAttack
 
     Attributes:
-        hack_agent: HackAgent instance providing context
+        hackagent_agent: HackAgent instance providing context
         client: Authenticated client for API communication
         attack_type: Attack identifier (must be set by subclass)
         attack_impl_class: Implementation class (must be set by subclass)
@@ -89,19 +92,21 @@ class AttackOrchestrator:
     attack_type: str = None  # Must be overridden by subclass
     attack_impl_class: type = None  # Must be overridden by subclass
 
-    def __init__(self, hack_agent: "HackAgent"):
+    def __init__(self, hackagent_agent: "HackAgent"):
         """
         Initialize orchestrator with HackAgent instance.
 
         Args:
-            hack_agent: HackAgent instance providing client and configuration
+            hackagent_agent: HackAgent instance providing client and configuration
 
         Raises:
             ValueError: If attack_type or attack_impl_class not defined
         """
-        self.hack_agent = hack_agent
+        self.hackagent_agent = hackagent_agent
+        # Backward-compatible alias used by older tests/integrations.
+        self.hack_agent = hackagent_agent
         # keep self.client as legacy attr for subclasses that may reference it directly
-        self.client = getattr(hack_agent, "client", None)
+        self.client = getattr(hackagent_agent, "client", None)
 
         if not self.attack_type:
             raise ValueError(f"{self.__class__.__name__} must define attack_type")
@@ -118,7 +123,7 @@ class AttackOrchestrator:
         """Create Attack record via the storage backend."""
         logger.info(f"Creating {attack_type} Attack record")
         try:
-            record = self.hack_agent.backend.create_attack(
+            record = self.hackagent_agent.backend.create_attack(
                 attack_type=attack_type,
                 agent_id=victim_agent_id,
                 organization=organization_id,
@@ -151,7 +156,7 @@ class AttackOrchestrator:
                     logger.warning(f"Invalid UUID '{val}', generating fallback UUID")
                     return uuid4()
 
-            record = self.hack_agent.backend.create_run(
+            record = self.hackagent_agent.backend.create_run(
                 attack_id=safe_uuid(attack_id),
                 agent_id=safe_uuid(victim_agent_id),
                 run_config=run_config_override or {},
@@ -267,20 +272,45 @@ class AttackOrchestrator:
         Returns:
             Kwargs for attack_impl_class constructor
         """
-        target_config = getattr(self.hack_agent, "target_config", {}) or {}
+        target_config = getattr(self.hackagent_agent, "target_config", {}) or {}
+        agent_router = getattr(self.hack_agent, "router", None) or getattr(
+            self.hack_agent, "agent_router", None
+        )
+        backend = getattr(self.hack_agent, "backend", None)
+        run_config_for_attack = dict(run_config_override or {})
+        # Run-level dashboard metadata must not leak into strict attack configs.
+        run_config_for_attack.pop("expected_total_goals", None)
 
         return {
             "config": {
                 **target_config,
                 **attack_config,  ## Spread full attack config
-                **(run_config_override or {}),
+                **run_config_for_attack,
                 "_run_id": run_id,
-                "_client": self.hack_agent.backend,  # backend expected by evaluator/router factory
-                "_backend": self.hack_agent.backend,  # StorageBackend for result tracking
+                "_client": backend,  # backend expected by evaluator/router factory
+                "_backend": backend,  # StorageBackend for result tracking
             },
-            "client": self.hack_agent.backend,  # pass backend as 'client' for BaseAttack compat
-            "agent_router": self.hack_agent.router,
+            "client": backend,  # pass backend as 'client' for BaseAttack compat
+            "agent_router": agent_router,
         }
+
+    @staticmethod
+    def _normalize_attack_results(results: Any) -> List[Dict[str, Any]]:
+        """Normalize heterogeneous attack outputs into a list of row dicts."""
+        if results is None:
+            return []
+        if isinstance(results, list):
+            return results
+        if isinstance(results, dict):
+            evaluated = results.get("evaluated")
+            if isinstance(evaluated, list):
+                return evaluated
+            for key in ("rows", "results", "data", "items"):
+                value = results.get(key)
+                if isinstance(value, list):
+                    return value
+            return []
+        return []
 
     def _execute_local_attack(
         self,
@@ -323,8 +353,8 @@ class AttackOrchestrator:
         previous_default_max_tokens = None
         if requested_max_tokens is not None:
             try:
-                adapter_instance = self.hack_agent.router.get_agent_instance(
-                    str(self.hack_agent.router.backend_agent.id)
+                adapter_instance = self.hackagent_agent.router.get_agent_instance(
+                    str(self.hackagent_agent.router.backend_agent.id)
                 )
                 if adapter_instance is not None and hasattr(
                     adapter_instance, "default_max_tokens"
@@ -533,9 +563,23 @@ class AttackOrchestrator:
         # 1. Validate parameters
         attack_params = self._prepare_attack_params(attack_config)
 
+        # Enrich run config with expected goal cardinality so downstream views
+        # can keep RUNNING until all expected goals are fully tracked.
+        effective_run_config = dict(run_config_override or {})
+        expected_goals = attack_params.get("goals")
+        if isinstance(expected_goals, list):
+            effective_run_config.setdefault("expected_total_goals", len(expected_goals))
+
         # 2. Create Attack record
-        victim_agent_id = self.hack_agent.router.backend_agent.id
-        organization_id = self.hack_agent.router.organization_id
+        router_obj = getattr(self.hackagent_agent, "router", None)
+        backend_agent = getattr(router_obj, "backend_agent", None)
+        victim_agent_id = getattr(backend_agent, "id", None) or getattr(
+            self.hack_agent, "agent_id", None
+        )
+
+        organization_id = getattr(router_obj, "organization_id", None) or getattr(
+            self.hack_agent, "organization_id", None
+        )
 
         attack_id = self._create_server_attack_record(
             attack_type=self.attack_type,
@@ -548,13 +592,13 @@ class AttackOrchestrator:
         run_id = self._create_server_run_record(
             attack_id=attack_id,
             victim_agent_id=str(victim_agent_id),
-            run_config_override=run_config_override,
+            run_config_override=effective_run_config,
         )
 
         # 4. Update run status to RUNNING
         try:
             logger.info(f"Updating run {run_id} status to RUNNING")
-            self.hack_agent.backend.update_run(
+            self.hackagent_agent.backend.update_run(
                 UUID(run_id),
                 status=StatusEnum.RUNNING.value,
             )
@@ -570,41 +614,61 @@ class AttackOrchestrator:
                 run_id=run_id,
                 attack_params=attack_params,
                 attack_config=attack_config,
-                run_config_override=run_config_override,
+                run_config_override=effective_run_config,
             )
-
-            # Normalize results: some techniques (e.g. baseline) return a dict
-            # with an "evaluated" key; the evaluation pipeline expects a flat list.
-            results = self._normalize_attack_results(results)
+            normalized_results = self._normalize_attack_results(results)
 
             # =========================
             # RUN EVALUATION PIPELINE
             # =========================
             try:
-                from hackagent.attacks.evaluator.evaluation_step import (
-                    BaseEvaluationStep,
-                )
+                base_eval_config = {
+                    **attack_config,
+                    **effective_run_config,
+                    "_run_id": run_id,
+                    "_backend": self.hackagent_agent.backend,
+                }
 
-                logger.info("Starting evaluation pipeline")
+                if (self.attack_type or "").lower() == "pair":
+                    from hackagent.attacks.techniques.pair.evaluation import (
+                        PAIREvaluation,
+                    )
 
-                evaluator = BaseEvaluationStep(
-                    config={
-                        **attack_config,
-                        **(run_config_override or {}),
-                        "_run_id": run_id,
-                        "_backend": self.hack_agent.backend,
-                    },
-                    logger=logger,
-                    client=self.hack_agent.backend,
-                )
+                    logger.info(
+                        "Starting PAIR scorer-only evaluation pipeline (no judge fallback)"
+                    )
 
-                # Run evaluation pipeline
-                final_results = evaluator.run_full_evaluation(results)
+                    evaluator = PAIREvaluation(
+                        config=base_eval_config,
+                        logger=logger,
+                        client=self.hackagent_agent.backend,
+                    )
 
-                # Sync metrics to backend
-                evaluator.prepare_and_sync(final_results, run_id)
+                    final_results = evaluator.execute(results)
+                    final_results = self._normalize_attack_results(final_results)
+                    evaluator.prepare_and_sync(final_results, run_id)
+                    logger.info("PAIR scorer-only evaluation pipeline completed")
+                else:
+                    from hackagent.attacks.evaluator.evaluation_step import (
+                        BaseEvaluationStep,
+                    )
 
-                logger.info("Evaluation pipeline completed")
+                    logger.info("Starting evaluation pipeline")
+
+                    evaluator = BaseEvaluationStep(
+                        config=base_eval_config,
+                        logger=logger,
+                        client=self.hackagent_agent.backend,
+                    )
+
+                    # Run evaluation pipeline
+                    final_results = evaluator.run_full_evaluation(normalized_results)
+                    final_results = self._normalize_attack_results(final_results)
+
+                    # Sync metrics to backend
+                    evaluator.prepare_and_sync(final_results, run_id)
+
+                    logger.info("Evaluation pipeline completed")
 
             except Exception as e:
                 logger.warning(f"Evaluation failed: {e}", exc_info=True)
@@ -617,7 +681,7 @@ class AttackOrchestrator:
             # ✅ Update run status to COMPLETED
             try:
                 logger.info(f"Updating run {run_id} status to COMPLETED")
-                self.hack_agent.backend.update_run(
+                self.hackagent_agent.backend.update_run(
                     UUID(run_id),
                     status=StatusEnum.COMPLETED.value,
                 )
@@ -630,7 +694,7 @@ class AttackOrchestrator:
             # ❌ FAILED case (this part is already correct)
             try:
                 logger.error(f"Attack execution failed: {e}")
-                self.hack_agent.backend.update_run(
+                self.hackagent_agent.backend.update_run(
                     UUID(run_id),
                     status=StatusEnum.FAILED.value,
                     run_notes=f"Execution failed: {str(e)}",
@@ -638,34 +702,6 @@ class AttackOrchestrator:
             except Exception as update_error:
                 logger.warning(f"Failed to update run status to FAILED: {update_error}")
             raise
-
-    # ========================================================================
-    # Result Normalization
-    # ========================================================================
-
-    @staticmethod
-    def _normalize_attack_results(results: Any) -> List[Dict[str, Any]]:
-        """Normalise the return value of an attack ``run()`` into a flat list.
-
-        Some techniques (e.g. baseline) return a ``dict`` like
-        ``{"evaluated": [...], "summary": [...]}``.  The evaluation
-        pipeline expects ``List[Dict]``.  Iterating a dict directly
-        yields its *keys* as strings, which is the root cause of the
-        ``"Evaluation row N is str, coercing to dict"`` warnings.
-        """
-        if results is None:
-            return []
-        if isinstance(results, list):
-            return results
-        if isinstance(results, dict):
-            # Prefer the "evaluated" key (baseline convention).
-            if "evaluated" in results and isinstance(results["evaluated"], list):
-                return results["evaluated"]
-            # Fallback: if every value is a list, concatenate them.
-            lists = [v for v in results.values() if isinstance(v, list)]
-            if lists:
-                return lists[0]
-        return []
 
     # ========================================================================
     # HTTP Response Helpers

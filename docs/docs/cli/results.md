@@ -133,9 +133,7 @@ hackagent results delete --id res_abc123 --confirm
 
 ## Dashboard
 
-Results are automatically synced to the HackAgent dashboard:
-
-**[app.hackagent.dev](https://app.hackagent.dev)**
+Results are automatically synced to your configured dashboard (if any).
 
 The dashboard provides:
 
@@ -161,5 +159,5 @@ Results are also saved locally in `./logs/runs/` for offline access:
 
 ## See Also
 
-- [Attack](./attack.md) — Run security attacks
+- [Attack](./attack.mdx) — Run security attacks
 - [Config](./config.md) — Configure HackAgent settings

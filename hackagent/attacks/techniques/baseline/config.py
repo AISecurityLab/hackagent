@@ -37,7 +37,7 @@ DEFAULT_TEMPLATE_CONFIG: Dict[str, Any] = {
     "n_samples_per_template": 1,  # Completions per template-goal combo
     # --- Evaluation Settings ---
     "objective": "jailbreak",  # Default objective: jailbreak, harmful_behavior, policy_violation
-    "evaluator_type": "pattern",  # pattern, keyword, or llm_judge
+    "evaluator_type": "llm_judge",  # pattern, keyword, or llm_judge
     "judge_config": None,  # For LLM judge evaluation
     # --- Filtering ---
     "min_response_length": 10,
@@ -70,7 +70,7 @@ class TemplateAttackConfig(ConfigBase):
 
     # Evaluation
     objective: str = "jailbreak"
-    evaluator_type: str = "pattern"
+    evaluator_type: str = "llm_judge"
     judge_config: Optional[Dict[str, Any]] = None
 
     # Filtering

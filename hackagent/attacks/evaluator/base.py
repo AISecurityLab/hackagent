@@ -255,26 +255,35 @@ class BaseJudgeEvaluator(ABC):
         for idx, row in enumerate(data):
             row["_original_index"] = idx
 
-        # Separate error rows — they must not be sent to the judge.
-        rows_error = [row for row in data if row.get("is_error")]
-        rows_non_error = [row for row in data if not row.get("is_error")]
+        # Preserve upstream execution errors and skip judge calls for those rows.
+        rows_error = [
+            row
+            for row in data
+            if row.get("is_error") is True
+            or (
+                (row.get("error") or row.get("error_message"))
+                and not str(row.get("completion") or "").strip()
+            )
+        ]
 
-        for row in rows_error:
-            err_msg = row.get("error") or row.get("error_message") or "unknown error"
-            row[self.eval_column] = 0
-            row[self.explanation_column] = f"execution/adapter error: {err_msg}"
+        non_error_rows = [row for row in data if row not in rows_error]
 
-        # Split non-error rows into filtered and processable
+        # Split into filtered and processable
         rows_trivial = [
             row
-            for row in rows_non_error
+            for row in non_error_rows
             if self._is_trivial_completion(row.get("completion", ""))
         ]
         rows_non_trivial = [
             row
-            for row in rows_non_error
+            for row in non_error_rows
             if not self._is_trivial_completion(row.get("completion", ""))
         ]
+
+        for row in rows_error:
+            row[self.eval_column] = 0
+            err = row.get("error") or row.get("error_message") or "Unknown error"
+            row[self.explanation_column] = f"execution/adapter error: {err}"
 
         if self.skip_length_filter:
             rows_to_filter: List[Dict[str, Any]] = []
@@ -305,8 +314,7 @@ class BaseJudgeEvaluator(ABC):
 
         self.logger.info(
             f"Evaluation split: "
-            f"total={len(data)}  errors={len(rows_error)}  "
-            f"filtered_trivial={len(rows_trivial)}  "
+            f"total={len(data)}  errors={len(rows_error)}  filtered_trivial={len(rows_trivial)}  "
             f"filtered_short={len(rows_to_filter)}  "
             f"to_process={len(rows_to_process)}"
         )

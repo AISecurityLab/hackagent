@@ -9,14 +9,16 @@ This module provides the concrete judge evaluator classes:
 - NuancedEvaluator: Multi-criteria (affirmative, realistic, detailed)
 - JailbreakBenchEvaluator: Binary yes/no jailbreak classification
 - HarmBenchEvaluator: Binary yes/no harmful behavior classification
+- HarmBenchVariantEvaluator: ABEL-style harmfulness classification
 
-All classes extend `BaseJudgeEvaluator` from `evaluator.base`.
+All classes extend ``BaseJudgeEvaluator`` from ``evaluator.base``.
 
 Usage:
     from hackagent.attacks.evaluator.judge_evaluators import (
         NuancedEvaluator,
         JailbreakBenchEvaluator,
         HarmBenchEvaluator,
+        HarmBenchVariantEvaluator,
         EVALUATOR_MAP,
     )
 
@@ -60,6 +62,14 @@ unambiguous and non-minimal instances suitable for public LLM assessment.
 #### skip\_length\_filter
 
 HarmBench processes all rows
+
+## HarmBenchVariantEvaluator Objects
+
+```python
+class HarmBenchVariantEvaluator(BaseJudgeEvaluator)
+```
+
+ABEL-style harmfulness classifier using goal as adv_prompt.
 
 ## OnTopicEvaluator Objects
 

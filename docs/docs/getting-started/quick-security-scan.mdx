@@ -1,0 +1,105 @@
+---
+sidebar_position: 4
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Evaluation Campaign
+
+Use this workflow for a fast, high-signal jailbreak assessment before deeper testing.
+
+## What It Runs
+
+The evaluation campaign uses the **primary attacks** from `JAILBREAK_PROFILE`:
+
+- `h4rm3l`
+- `TAP`
+- `PAIR`
+
+These are executed against a primary jailbreak dataset.
+
+## Run It
+
+<Tabs defaultValue="cli">
+    <TabItem value="cli" label="CLI">
+
+Run the built-in evaluation campaign command:
+
+```bash
+hackagent eval \
+    --agent-name "quick-security-scan" \
+    --agent-type "other" \
+    --endpoint "http://localhost:8080/chat"
+```
+
+By default, the command:
+- selects the first primary jailbreak dataset from `JAILBREAK_PROFILE`
+- runs the three primary attacks in sequence (`h4rm3l`, `TAP`, `PAIR`)
+- uses `ollama/llama3` with `harmbench` judge type
+- prints a per-attack summary table (status, result count, ASR, duration)
+
+Common overrides:
+
+```bash
+hackagent eval \
+    --agent-name "quick-security-scan" \
+    --agent-type "other" \
+    --endpoint "http://localhost:8080/chat" \
+    --dataset "strongreject" \
+    --limit 50 \
+    --judge-identifier "ollama/llama3" \
+    --judge-type "harmbench" \
+    --timeout 600
+```
+
+Validation-only mode:
+
+```bash
+hackagent eval \
+    --agent-name "quick-security-scan" \
+    --agent-type "other" \
+    --endpoint "http://localhost:8080/chat" \
+    --dry-run
+```
+
+    </TabItem>
+    <TabItem value="sdk" label="SDK">
+
+## Example Implementation
+
+```python
+from hackagent import HackAgent
+from hackagent.risks.jailbreak import JAILBREAK_PROFILE
+
+agent = HackAgent(
+    endpoint="http://localhost:8080/chat",
+    name="quick-security-scan",
+)
+
+primary_dataset = JAILBREAK_PROFILE.primary_datasets[0].preset
+
+for attack in JAILBREAK_PROFILE.primary_attacks:
+    attack_type = attack.technique.lower()
+
+    result = agent.attack(
+        attack_type=attack_type,
+        dataset={"preset": primary_dataset, "limit": 25},
+        judges=[{"identifier": "ollama/llama3", "type": "harmbench"}],
+    )
+
+    print(f"{attack.technique}: ASR = {result.get('asr', 'N/A')}")
+```
+
+    </TabItem>
+</Tabs>
+
+## When To Use It
+
+- Before release as a security smoke test.
+- After model, prompt, or policy updates.
+- As a recurring regression check in CI pipelines.
+
+## Next Step
+
+If the scan shows bypasses, continue with [Evaluation Tutorial](./attack-tutorial) to tune and deepen each attack configuration.

@@ -30,7 +30,7 @@ Usage:
         logger=logger,
         attack_type=&quot;advprefix&quot;,
     )
-    coordinator.initialize_goals(goals, initial_metadata=\{...\})
+    coordinator.initialize_goals(goals, initial_metadata={...})
 
     # Pass coordinator.goal_tracker to sub-modules explicitly
     # (not via config dict)
@@ -69,7 +69,8 @@ a single interface. Provides:
 ```python
 def __init__(step_tracker: StepTracker,
              goal_tracker: Optional[Tracker],
-             logger: Optional[logging.Logger] = None)
+             logger: Optional[logging.Logger] = None,
+             run_start_time: Optional[float] = None)
 ```
 
 Initialize coordinator with pre-built trackers.
@@ -81,32 +82,39 @@ Prefer using TrackingCoordinator.create() factory method instead.
 - `step_tracker` - StepTracker for pipeline steps
 - `goal_tracker` - Optional Tracker for per-goal tracking
 - `logger` - Logger instance
+- `run_start_time` - Optional perf_counter timestamp to use as
+  global run start across nested/sub-run attack instances.
 
 #### create
 
 ```python
 @classmethod
-def create(
-    cls,
-    backend: Any,
-    run_id: Optional[str],
-    logger: Optional[logging.Logger] = None,
-    attack_type: str = "unknown",
-    goals: Optional[List[str]] = None,
-    initial_metadata: Optional[Dict[str,
-                                    Any]] = None) -> "TrackingCoordinator"
+def create(cls,
+           backend: Any,
+           run_id: Optional[str],
+           logger: Optional[logging.Logger] = None,
+           attack_type: str = "unknown",
+           category_classifier_config: Optional[Dict[str, Any]] = None,
+           goals: Optional[List[str]] = None,
+           initial_metadata: Optional[Dict[str, Any]] = None,
+           goal_index_start: int = 0,
+           run_start_time: Optional[float] = None) -> "TrackingCoordinator"
 ```
 
 Factory method to create a fully-initialized coordinator.
 
 **Arguments**:
 
-- `backend` - StorageBackend (RemoteBackend or LocalBackend), or None to disable.
+- `backend` - StorageBackend, or None to disable.
 - `run_id` - Server-side run record ID (or None to disable)
 - `logger` - Logger instance
 - `attack_type` - Attack identifier (e.g., &quot;advprefix&quot;, &quot;pair&quot;)
+- `category_classifier_config` - Optional per-goal classifier router config.
 - `goals` - Optional list of goals to initialize upfront
 - `initial_metadata` - Optional metadata for goal results
+- `goal_index_start` - Starting index to assign to the first goal
+- `run_start_time` - Optional perf_counter timestamp used as
+  run start for latency calculations.
   
 
 **Returns**:
@@ -151,9 +159,9 @@ Whether per-goal tracking is available.
 #### initialize\_goals
 
 ```python
-def initialize_goals(
-        goals: List[str],
-        initial_metadata: Optional[Dict[str, Any]] = None) -> None
+def initialize_goals(goals: List[str],
+                     initial_metadata: Optional[Dict[str, Any]] = None,
+                     goal_index_start: int = 0) -> None
 ```
 
 Create Result records for all goals upfront.
@@ -165,6 +173,7 @@ any pipeline steps execute.
 
 - `goals` - List of goal strings
 - `initial_metadata` - Optional metadata to attach to each goal result
+- `goal_index_start` - Starting index to assign to the first goal
 
 #### initialize\_goals\_from\_pipeline\_data
 
@@ -269,7 +278,7 @@ def finalize_pipeline(results: Any,
 Finalize pipeline-level tracking (StepTracker).
 
 Updates the run status to COMPLETED.  Per-goal evaluation statuses
-are already set by `finalize_all_goals`.
+are already set by ``finalize_all_goals``.
 
 **Arguments**:
 

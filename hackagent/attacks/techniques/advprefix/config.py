@@ -49,8 +49,8 @@ DEFAULT_PREFIX_GENERATION_CONFIG: Dict[str, Any] = {
     "output_dir": DEFAULT_OUTPUT_DIR,
     # --- Model Configurations ---
     "generator": {
-        "identifier": "hackagent-generator",
-        "endpoint": "https://api.hackagent.dev/v1",
+        "identifier": "gemma3:4b",
+        "endpoint": "http://localhost:11434",
         "system_prompt": DEFAULT_ADVPREFIX_GENERATOR_SYSTEM_PROMPT,
         "max_tokens": 50,
         "guided_topk": 50,
@@ -58,8 +58,8 @@ DEFAULT_PREFIX_GENERATION_CONFIG: Dict[str, Any] = {
     },
     "judges": [
         {
-            "identifier": "hackagent-judge",
-            "endpoint": "https://api.hackagent.dev/v1",
+            "identifier": "gemma3:4b",
+            "endpoint": "http://localhost:11434",
             "type": "harmbench",
         }
     ],
@@ -230,7 +230,7 @@ class EvaluatorConfig(BaseModel):
     """
 
     agent_name: str
-    agent_type: Any  # AgentTypeEnum from hackagent.server.api.models
+    agent_type: Any  # AgentTypeEnum from hackagent.router.types
     model_id: str
     agent_endpoint: Optional[str] = None
     organization_id: Optional[int] = None

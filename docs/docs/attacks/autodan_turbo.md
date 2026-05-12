@@ -17,14 +17,6 @@ AutoDAN-Turbo combines three core LLM roles plus a configurable retrieval embedd
 
 It uses these roles to build a strategy library, then reuses that library across iterations to improve success rates.
 An attack attempt is considered jailbroken as soon as the scorer reports a value greater than or equal to `break_score`.
-
-### Key Features
-
-- **Strategy Library**: stores reusable jailbreak strategies
-- **Warm-up + Lifelong Phases**: discovery first, reuse second
-- **Multi-Role LLMs**: attacker, scorer, summarizer, embedder
-- **Research-Backed**: based on AutoDAN-Turbo (lifelong red teaming)
-
 ---
 
 ## How AutoDAN-Turbo Works

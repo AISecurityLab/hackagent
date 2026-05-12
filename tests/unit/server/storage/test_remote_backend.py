@@ -273,6 +273,19 @@ class TestRemoteBackendRun(unittest.TestCase):
         self.backend = RemoteBackend(self.client)
         self.backend._context = OrganizationContext(org_id=_uid(), user_id="1")
 
+    def _mock_run_model(self, idx: int) -> MagicMock:
+        run_m = MagicMock()
+        run_m.id = _uid()
+        run_m.attack = _uid()
+        run_m.agent = _uid()
+        run_m.run_config = {"idx": idx}
+        run_m.status = MagicMock()
+        run_m.status.value = "COMPLETED"
+        run_m.run_notes = None
+        run_m.created_at = _dt()
+        run_m.updated_at = _dt()
+        return run_m
+
     def test_create_run_success(self):
         run_id = str(_uid())
         resp = _mock_response(201, content=f'{{"id": "{run_id}"}}'.encode())
@@ -426,6 +439,45 @@ class TestRemoteBackendRun(unittest.TestCase):
         self.assertEqual(len(result.items), 2)
         self.assertEqual(mock_list.sync_detailed.call_count, 2)
 
+    def test_list_runs_logical_page_has_no_overlap(self):
+        runs = [self._mock_run_model(i) for i in range(5)]
+
+        parsed_1 = MagicMock()
+        parsed_1.results = runs[0:2]
+        parsed_1.count = 5
+        parsed_1.next = "https://api.hackagent.dev/run?page=2"
+
+        parsed_2 = MagicMock()
+        parsed_2.results = runs[2:4]
+        parsed_2.count = 5
+        parsed_2.next = "https://api.hackagent.dev/run?page=3"
+
+        parsed_3 = MagicMock()
+        parsed_3.results = runs[4:5]
+        parsed_3.count = 5
+        parsed_3.next = None
+
+        with patch("hackagent.server.storage.remote.run_list") as mock_list:
+            mock_list.sync_detailed.side_effect = [
+                _mock_response(200, parsed=parsed_1),
+                _mock_response(200, parsed=parsed_2),
+                _mock_response(200, parsed=parsed_1),
+                _mock_response(200, parsed=parsed_2),
+                _mock_response(200, parsed=parsed_3),
+            ]
+
+            page_1 = self.backend.list_runs(page=1, page_size=3)
+            page_2 = self.backend.list_runs(page=2, page_size=3)
+
+        ids_1 = {r.id for r in page_1.items}
+        ids_2 = {r.id for r in page_2.items}
+
+        self.assertEqual(page_1.total, 5)
+        self.assertEqual(page_2.total, 5)
+        self.assertEqual(len(page_1.items), 3)
+        self.assertEqual(len(page_2.items), 2)
+        self.assertTrue(ids_1.isdisjoint(ids_2))
+
     def test_get_run_success(self):
         run_id = _uid()
         run_m = MagicMock()
@@ -455,6 +507,22 @@ class TestRemoteBackendResult(unittest.TestCase):
         self.client = _mock_client()
         self.backend = RemoteBackend(self.client)
         self.backend._context = OrganizationContext(org_id=_uid(), user_id="1")
+
+    def _mock_result_model(self, run_id: UUID, goal_index: int) -> MagicMock:
+        result_m = MagicMock()
+        result_m.id = _uid()
+        result_m.run = run_id
+        result_m.agent_specific_data = {
+            "goal": f"g{goal_index + 1}",
+            "goal_index": goal_index,
+        }
+        result_m.evaluation_status = MagicMock()
+        result_m.evaluation_status.value = "NOT_EVALUATED"
+        result_m.evaluation_notes = None
+        result_m.evaluation_metrics = {}
+        result_m.created_at = _dt()
+        result_m.updated_at = _dt()
+        return result_m
 
     def test_create_result_success(self):
         result_id = _uid()
@@ -615,6 +683,67 @@ class TestRemoteBackendResult(unittest.TestCase):
         self.assertEqual(result.items[0].run_id, run_id)
         self.assertEqual(result.items[0].goal, "fallback-goal")
         self.assertEqual(result.items[0].goal_index, 7)
+
+    def test_list_results_logical_page_has_no_overlap(self):
+        run_id = _uid()
+        results = [self._mock_result_model(run_id, i) for i in range(5)]
+
+        parsed_1 = MagicMock()
+        parsed_1.results = results[0:2]
+        parsed_1.count = 5
+        parsed_1.next = "https://api.hackagent.dev/result?page=2"
+
+        parsed_2 = MagicMock()
+        parsed_2.results = results[2:4]
+        parsed_2.count = 5
+        parsed_2.next = "https://api.hackagent.dev/result?page=3"
+
+        parsed_3 = MagicMock()
+        parsed_3.results = results[4:5]
+        parsed_3.count = 5
+        parsed_3.next = None
+
+        with patch("hackagent.server.storage.remote.result_list") as mock_list:
+            mock_list.sync_detailed.side_effect = [
+                _mock_response(200, parsed=parsed_1),
+                _mock_response(200, parsed=parsed_2),
+                _mock_response(200, parsed=parsed_1),
+                _mock_response(200, parsed=parsed_2),
+                _mock_response(200, parsed=parsed_3),
+            ]
+
+            page_1 = self.backend.list_results(run_id=run_id, page=1, page_size=3)
+            page_2 = self.backend.list_results(run_id=run_id, page=2, page_size=3)
+
+        ids_1 = {r.id for r in page_1.items}
+        ids_2 = {r.id for r in page_2.items}
+
+        self.assertEqual(page_1.total, 5)
+        self.assertEqual(page_2.total, 5)
+        self.assertEqual(len(page_1.items), 3)
+        self.assertEqual(len(page_2.items), 2)
+        self.assertTrue(ids_1.isdisjoint(ids_2))
+
+    def test_list_results_does_not_fallback_on_page_gt_1(self):
+        run_id = _uid()
+
+        empty_page = MagicMock()
+        empty_page.results = []
+        empty_page.count = 0
+        empty_page.next = None
+
+        with (
+            patch("hackagent.server.storage.remote.result_list") as mock_list,
+            patch("hackagent.server.storage.remote.run_retrieve") as mock_run_retrieve,
+        ):
+            mock_list.sync_detailed.return_value = _mock_response(
+                200, parsed=empty_page
+            )
+            result = self.backend.list_results(run_id=run_id, page=2, page_size=100)
+
+        self.assertEqual(result.total, 0)
+        self.assertEqual(result.items, [])
+        mock_run_retrieve.sync_detailed.assert_not_called()
 
     def test_count_result_buckets_aggregates_filtered_counts(self):
         counts = [12, 4, 2, 1, 3, 2, 1, 5]

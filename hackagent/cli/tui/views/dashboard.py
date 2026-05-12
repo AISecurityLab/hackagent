@@ -70,7 +70,10 @@ class DashboardTab(BaseTab):
 
         with Horizontal():
             with Vertical():
-                yield Static("🤖 [bold]Agents[/bold]\n[cyan]0[/cyan]", id="stat-agents")
+                yield Static(
+                    "🎯 [bold]Target Agents[/bold]\n[cyan]0[/cyan]",
+                    id="stat-agents",
+                )
                 yield Static(
                     "⚔️  [bold]Attacks[/bold]\n[green]0[/green]", id="stat-attacks"
                 )
@@ -102,63 +105,29 @@ class DashboardTab(BaseTab):
         self.enable_auto_refresh(interval=5.0)
 
     def refresh_data(self) -> None:
-        """Refresh dashboard data from API."""
+        """Refresh dashboard data from local backend."""
         try:
-            from hackagent.server.api.agent import agent_list
-            from hackagent.server.api.result import result_list
+            from hackagent.server.storage.local import LocalBackend
 
-            # Validate configuration
-            if not self.cli_config.api_key:
-                activity_log = self.query_one("#activity-log", Static)
-                activity_log.update(
-                    "[red]API key not configured[/red]\n\n"
-                    "[yellow]Run 'hackagent init' to set up your API key[/yellow]\n\n"
-                    "[dim]You need to configure your HackAgent API key before you can use the TUI.[/dim]"
-                )
-                return
-
-            # Create API client using base class method
-            client = self.create_api_client()
+            backend = LocalBackend()
 
             agents_data = []
             results_data = []
 
             # Fetch agents count
-            agents_response = agent_list.sync_detailed(client=client)
-            if agents_response.status_code == 200 and agents_response.parsed:
-                agents_data = (
-                    agents_response.parsed.results
-                    if agents_response.parsed.results
-                    else []
-                )
-                self.stats["agents"] = len(agents_data)
-            elif agents_response.status_code == 401:
-                activity_log = self.query_one("#activity-log", Static)
-                activity_log.update(
-                    "[red]Authentication failed[/red]\n\n"
-                    "[yellow]Your API key is invalid or expired[/yellow]\n\n"
-                    "[dim]Run 'hackagent config set --api-key YOUR_KEY' to update[/dim]"
-                )
-                return
-            elif agents_response.status_code == 403:
-                activity_log = self.query_one("#activity-log", Static)
-                activity_log.update(
-                    "[red]Access forbidden[/red]\n\n"
-                    "[yellow]Your API key doesn't have permission to access this resource[/yellow]"
-                )
-                return
+            try:
+                agents_page = backend.list_agents(page=1, page_size=100)
+                agents_data = agents_page.items
+                self.stats["agents"] = agents_page.total
+            except Exception:
+                pass
 
             # Fetch results count
-            results_response = result_list.sync_detailed(client=client)
-            if results_response.status_code == 200 and results_response.parsed:
-                results_data = (
-                    results_response.parsed.results
-                    if results_response.parsed.results
-                    else []
-                )
-                self.stats["results"] = len(results_data)
+            try:
+                results_page = backend.list_results(page=1, page_size=100)
+                results_data = results_page.items
+                self.stats["results"] = results_page.total
 
-                # Calculate success rate
                 if results_data:
                     completed = sum(
                         1
@@ -176,6 +145,8 @@ class DashboardTab(BaseTab):
                         if len(results_data) > 0
                         else 0
                     )
+            except Exception:
+                pass
 
             # Update stat cards
             self._update_stat_cards()
@@ -187,9 +158,9 @@ class DashboardTab(BaseTab):
                 activity_log = self.query_one("#activity-log", Static)
                 activity_log.update(
                     "[yellow]No data found[/yellow]\n\n"
-                    "[dim]Create agents and run attacks to see activity here.[/dim]\n\n"
+                    "[dim]Create target agents and run attacks to see activity here.[/dim]\n\n"
                     "[cyan]Quick Start:[/cyan]\n"
-                    "1. Go to Agents tab to create an agent\n"
+                    "1. Go to Target Agents tab to create a target agent\n"
                     "2. Go to Attacks tab to run security tests\n"
                     "3. Check Results tab to see outcomes"
                 )
@@ -197,42 +168,15 @@ class DashboardTab(BaseTab):
                 self._update_activity_log(agents_data, results_data)
 
         except Exception as e:
-            # Display error in activity log with helpful context
             self.query_one("#activity-tree", Tree).display = False
             self.query_one("#activity-scroll").display = True
             activity_log = self.query_one("#activity-log", Static)
-
-            error_type = type(e).__name__
             error_msg = str(e)
-
-            # Provide context-specific help
-            if "timeout" in error_msg.lower() or "TimeoutException" in error_type:
-                activity_log.update(
-                    f"[red]⚠️ Connection Timeout[/red]\n\n"
-                    f"[yellow]Cannot reach HackAgent API:[/yellow]\n{self.cli_config.base_url}\n\n"
-                    f"[cyan]Possible causes:[/cyan]\n"
-                    f"• API server is down or unreachable\n"
-                    f"• Network connection issues\n"
-                    f"• Firewall blocking the connection\n\n"
-                    f"[dim]Press F5 to retry when connection is restored[/dim]\n\n"
-                    f"[bold]Offline Mode:[/bold]\n"
-                    f"You can still use the Attacks tab with local agents\n"
-                    f"(results won't be synced to the platform)"
-                )
-            elif "401" in error_msg or "authentication" in error_msg.lower():
-                activity_log.update(
-                    "[red]Authentication Failed[/red]\n\n"
-                    "[yellow]Your API key is invalid or expired[/yellow]\n\n"
-                    "[cyan]To fix:[/cyan]\n"
-                    "Run: hackagent config set --api-key YOUR_KEY\n\n"
-                    "[dim]Press F5 to retry after updating[/dim]"
-                )
-            else:
-                activity_log.update(
-                    f"[red]Error loading data:[/red]\n{error_type}\n\n"
-                    f"[yellow]Details:[/yellow]\n{error_msg}\n\n"
-                    f"[dim]Press F5 to retry[/dim]"
-                )
+            activity_log.update(
+                f"[red]Error loading data:[/red]\n\n"
+                f"[yellow]Details:[/yellow]\n{error_msg}\n\n"
+                f"[dim]Press F5 to retry[/dim]"
+            )
 
     def _update_stat_cards(self) -> None:
         """Update the statistics cards with current data."""
@@ -245,7 +189,9 @@ class DashboardTab(BaseTab):
 
             # Update each stat widget by ID with icons and formatting
             stat_agents = self.query_one("#stat-agents", Static)
-            stat_agents.update(f"🤖 [bold]Agents[/bold]\n[cyan]{agents_val}[/cyan]")
+            stat_agents.update(
+                f"🎯 [bold]Target Agents[/bold]\n[cyan]{agents_val}[/cyan]"
+            )
 
             stat_attacks = self.query_one("#stat-attacks", Static)
             stat_attacks.update(
@@ -291,7 +237,7 @@ class DashboardTab(BaseTab):
             # Add recent agents
             if agents:
                 agents_node = tree.root.add(
-                    "[bold cyan]🤖 Recent Agents[/bold cyan]", expand=True
+                    "[bold cyan]🎯 Recent Target Agents[/bold cyan]", expand=True
                 )
                 for i, agent in enumerate(agents[:3], 1):
                     agent_type = (

@@ -5,10 +5,10 @@ This directory contains the documentation generation tools for HackAgent.
 ## Quick Start
 
 ```bash
-# Generate docs for latest PyPI version (default)
+# Generate docs for current local project version (default)
 poetry run python docs/scripts/generate_docs.py
 
-# Generate docs for specific version
+# Generate docs with a custom version label
 poetry run python docs/scripts/generate_docs.py --version 0.2.4
 
 # Generate docs for current local version
@@ -26,7 +26,7 @@ npm run start
 
 ## View Documentation
 
-After generation, the API reference will be available directly in `docs/docs/` and integrated into the main documentation site.
+After generation, the SDK reference will be available directly in `docs/docs/` and integrated into the main documentation site.
 
 ```bash
 # View documentation locally
@@ -37,13 +37,12 @@ cd docs && npm start
 
 - Poetry: `curl -sSL https://install.python-poetry.org | python3 -`
 - Node.js 18+ and npm
-- Internet connection (for fetching PyPI versions)
 
 ## What the Script Does
 
 The script automatically handles:
 - Installing documentation dependencies via Poetry
-- Fetching version information from PyPI
+- Reading the project version from local `pyproject.toml` (or a custom `--version` label)
 - Generating Markdown files from Python docstrings using pydoc-markdown
 - Creating proper Docusaurus-compatible output
 - Copying generated files to the correct locations for the documentation site

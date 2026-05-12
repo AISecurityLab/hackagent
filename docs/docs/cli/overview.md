@@ -5,7 +5,7 @@ sidebar_position: 1
 # Overview
 
 
-The **HackAgent CLI** provides a powerful command-line interface for AI agent security testing. With beautiful ASCII branding, rich terminal output, and comprehensive functionality, it's the fastest way to run attacks.
+The **HackAgent CLI** provides a powerful command-line interface for AI agent security testing. With beautiful ASCII branding, rich terminal output, and comprehensive functionality, it's the fastest way to run security evaluations.
 
 For installation instructions, see the [Installation Guide](../getting-started/installation.mdx).
 
@@ -16,8 +16,11 @@ For installation instructions, see the [Installation Guide](../getting-started/i
 | `hackagent` | Launch TUI interface | [Quick Start](../getting-started/quick-start.mdx) |
 | `hackagent init` | Interactive setup wizard | [Initialization](./initialization.md) |
 | `hackagent config` | Manage configuration | [Config](./config.md) |
-| `hackagent attack` | Execute security attacks | [Attack](./attack.md) |
+| `hackagent eval` | Run quick 3-attack security scan | [Evaluation Campaign](../getting-started/quick-security-scan.mdx) |
+| `hackagent eval <attack_name>` | Execute one specific attack strategy | [Eval](./attack.mdx) |
+| `hackagent examples ollama` | Run built-in Ollama demo | [Quick Start (TUI tab)](../getting-started/quick-start.mdx) |
 | `hackagent results` | View and manage results | [Results](./results.md) |
+| `hackagent web` | Launch local dashboard | [Dashboard](../getting-started/dashboard.mdx) |
 | `hackagent version` | Show version info | - |
 
 ## Quick Examples
@@ -31,11 +34,20 @@ hackagent init
 ### Run an Attack
 
 ```bash
-hackagent attack advprefix \
+hackagent eval advprefix \
   --agent-name "my-agent" \
   --agent-type "google-adk" \
   --endpoint "http://localhost:8000" \
   --goals "Test security vulnerability"
+```
+
+### Run Evaluation Campaign
+
+```bash
+hackagent eval \
+  --agent-name "my-agent" \
+  --agent-type "google-adk" \
+  --endpoint "http://localhost:8000/chat"
 ```
 
 ### View Results
@@ -61,6 +73,6 @@ These options work with all commands:
 hackagent --help
 
 # Command-specific help
-hackagent attack --help
+hackagent eval --help
 hackagent config --help
 ```

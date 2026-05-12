@@ -28,7 +28,7 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from hackagent.server.storage.base import StorageBackend
-from hackagent.server.api.models import EvaluationStatusEnum, StepTypeEnum
+from hackagent.server.storage.enums import EvaluationStatusEnum, StepTypeEnum
 
 from .category_classifier import (
     GoalCategoryClassifier,
@@ -424,7 +424,7 @@ class Tracker:
         success: bool,
         evaluation_notes: Optional[str] = None,
         final_metadata: Optional[Dict[str, Any]] = None,
-        evaluation_status: Optional["EvaluationStatusEnum"] = None,
+        evaluation_status: Optional[Any] = None,
     ) -> bool:
         """
         Finalize a goal's result with evaluation status.
@@ -434,9 +434,6 @@ class Tracker:
             success: Whether the attack was successful
             evaluation_notes: Optional evaluation notes
             final_metadata: Optional final metadata to merge
-            evaluation_status: Explicit status override (e.g.
-                ``EvaluationStatusEnum.ERROR_AGENT_RESPONSE``).  When
-                *None*, the status is derived from *success*.
 
         Returns:
             True if update was successful, False otherwise
@@ -445,14 +442,42 @@ class Tracker:
             self.logger.warning(f"Goal {ctx.goal_index} already finalized")
             return False
 
+        requested_success = bool(success)
+        final_success = requested_success
+        preserved_prior_success = False
+
+        # Some attacks (e.g. AdvPrefix) may sync per-goal evaluation status during
+        # execution. Preserve an already successful backend status to avoid
+        # downgrading the final state at run completion.
+        if not requested_success and self.is_enabled and ctx.result_id:
+            try:
+                existing = self.backend.get_result(UUID(ctx.result_id))
+                existing_status = str(
+                    getattr(existing, "evaluation_status", "") or ""
+                ).upper()
+                if EvaluationStatusEnum.SUCCESSFUL_JAILBREAK.value in existing_status:
+                    final_success = True
+                    preserved_prior_success = True
+                    self.logger.info(
+                        "Preserving SUCCESSFUL_JAILBREAK for goal "
+                        f"{ctx.goal_index} ({ctx.result_id}) during finalization"
+                    )
+            except Exception as e:
+                self.logger.debug(
+                    "Could not check existing evaluation status for goal "
+                    f"{ctx.goal_index}: {e}"
+                )
+
         ctx.is_finalized = True
-        ctx.final_success = bool(success)
+        ctx.final_success = bool(final_success)
         ctx._end_time = time.perf_counter()
 
         # Update local metadata
         if final_metadata:
             ctx.metadata.update(final_metadata)
-        ctx.metadata["success"] = bool(success)
+        ctx.metadata["success"] = bool(final_success)
+        if preserved_prior_success:
+            ctx.metadata["preserved_prior_success"] = True
         ctx.metadata["total_traces"] = len(ctx.traces)
         ctx.metadata["elapsed_s"] = round(ctx.elapsed_s, 3)
 
@@ -462,28 +487,35 @@ class Tracker:
         try:
             result_uuid = UUID(ctx.result_id)
 
-            # Map success to evaluation status string
+            # Map success to evaluation status string, allowing explicit override.
             if evaluation_status is not None:
-                eval_status = evaluation_status
-            elif success:
-                eval_status = EvaluationStatusEnum.SUCCESSFUL_JAILBREAK
+                if hasattr(evaluation_status, "value"):
+                    eval_status_value = str(evaluation_status.value)
+                else:
+                    eval_status_value = str(evaluation_status)
+            elif final_success:
+                eval_status_value = EvaluationStatusEnum.SUCCESSFUL_JAILBREAK.value
             else:
-                eval_status = EvaluationStatusEnum.FAILED_JAILBREAK
+                eval_status_value = EvaluationStatusEnum.FAILED_JAILBREAK.value
 
             # Backend requires non-null evaluation_notes
-            notes = (
-                evaluation_notes
-                if evaluation_notes
-                else (
-                    "Goal completed successfully"
-                    if success
-                    else "Goal evaluation failed"
+            if preserved_prior_success:
+                base_note = evaluation_notes or "Goal previously marked as successful"
+                notes = f"Success preserved from prior evaluation sync. {base_note}"
+            else:
+                notes = (
+                    evaluation_notes
+                    if evaluation_notes
+                    else (
+                        "Goal completed successfully"
+                        if final_success
+                        else "Goal evaluation failed"
+                    )
                 )
-            )
 
             self.backend.update_result(
                 result_uuid,
-                evaluation_status=eval_status.value,
+                evaluation_status=eval_status_value,
                 evaluation_notes=notes,
                 agent_specific_data={
                     **ctx.metadata,
@@ -494,7 +526,7 @@ class Tracker:
             )
             self.logger.info(
                 f"Finalized goal {ctx.goal_index} (result {ctx.result_id}): "
-                f"{eval_status.value}"
+                f"{'SUCCESS' if final_success else 'FAILED'}"
             )
             return True
 

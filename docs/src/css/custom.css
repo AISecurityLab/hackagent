@@ -209,7 +209,7 @@ table th {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%237f1d1d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='4 17 10 11 4 5'/%3E%3Cline x1='12' x2='20' y1='19' y2='19'/%3E%3C/svg%3E");
 }
 
-/* Code — API Reference */
+/* Code — SDK Reference */
 .sidebar-icon-code > .menu__list-item-collapsible > .menu__link::before {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%237f1d1d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='16 18 22 12 16 6'/%3E%3Cpolyline points='8 6 2 12 8 18'/%3E%3C/svg%3E");
 }
@@ -227,4 +227,158 @@ table th {
 /* Dark mode: make icons lighter and more vibrant for better visibility */
 [data-theme='dark'] .sidebar-icon > .menu__list-item-collapsible > .menu__link::before {
   filter: brightness(1.4) saturate(1.2);
+}
+
+/* Mermaid diagrams: prevent SVG from being clipped/truncated */
+.docusaurus-mermaid-container {
+  overflow-x: auto;
+  text-align: center;
+}
+
+.docusaurus-mermaid-container svg {
+  display: block;
+  margin: 0 auto;
+}
+
+/* Fix htmlLabels foreignObject text clipping (font measurement mismatch) */
+.docusaurus-mermaid-container svg foreignObject {
+  overflow: visible !important;
+}
+
+.docusaurus-mermaid-container svg foreignObject > div,
+.docusaurus-mermaid-container svg foreignObject > div > p {
+  overflow: visible !important;
+  white-space: nowrap !important;
+}
+
+/* Architecture hover reveal blocks in introduction */
+.architecture-hover-section {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+}
+
+.architecture-hover-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.22rem 0.6rem;
+  border-radius: 999px;
+  border: 1px dashed var(--ifm-color-primary-light);
+  background: var(--ifm-color-emphasis-100);
+  color: var(--ifm-color-primary-dark);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+.architecture-hover-trigger::after {
+  content: '↓';
+  display: inline-block;
+  font-weight: 800;
+  transform: rotate(0deg);
+  transition: transform 0.2s ease;
+}
+
+.architecture-hover-trigger-title {
+  width: 100%;
+  justify-content: center;
+  font-size: 1.1rem;
+  margin-bottom: 0.15rem;
+}
+
+.architecture-hover-content {
+  width: 100%;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: max-height 0.28s ease, opacity 0.2s ease, transform 0.2s ease;
+}
+
+.architecture-hover-section:hover .architecture-hover-content,
+.architecture-hover-section:focus-within .architecture-hover-content {
+  max-height: 460px;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.architecture-hover-section:hover .architecture-hover-trigger,
+.architecture-hover-section:focus-within .architecture-hover-trigger {
+  background: var(--ifm-color-primary);
+  border-color: var(--ifm-color-primary);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(127, 29, 29, 0.24);
+}
+
+.architecture-hover-section:hover .architecture-hover-trigger::after,
+.architecture-hover-section:focus-within .architecture-hover-trigger::after {
+  transform: rotate(180deg);
+}
+
+.architecture-hover-trigger:focus-visible {
+  outline: 2px solid var(--ifm-color-primary-light);
+  outline-offset: 2px;
+}
+
+.architecture-middle-row {
+  display: flex;
+  gap: 1rem;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  justify-content: center;
+  width: 100%;
+}
+
+.architecture-core-box {
+  width: min(620px, 62vw);
+  min-width: 280px;
+  max-width: 760px;
+}
+
+.architecture-agent-box {
+  width: 220px;
+  min-width: 200px;
+  flex-shrink: 0;
+}
+
+@media (hover: none), (max-width: 996px) {
+  .architecture-hover-trigger {
+    cursor: default;
+  }
+
+  .architecture-hover-trigger::after {
+    content: '';
+  }
+
+  .architecture-hover-content {
+    max-height: none;
+    opacity: 1;
+    overflow: visible;
+    transform: none;
+    pointer-events: auto;
+    margin-top: 0.35rem;
+  }
+
+  .architecture-middle-row {
+    flex-wrap: wrap;
+  }
+
+  .architecture-core-box {
+    width: 100%;
+    min-width: 260px;
+  }
+
+  .architecture-agent-box {
+    width: 100%;
+    max-width: 320px;
+  }
 }

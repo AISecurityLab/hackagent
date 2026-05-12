@@ -218,34 +218,6 @@ def execute(
     tracker = config.get("_tracker")
 
     for idx, item in enumerate(input_data):
-        # Stamp error rows so finalize_all_goals routes them to
-        # ERROR_AGENT_RESPONSE instead of FAILED_JAILBREAK.
-        if item.get("is_error") or (
-            item.get("error") and not item.get("best_response")
-        ):
-            err_msg = item.get("error") or item.get("error_message") or "unknown"
-            item["is_error"] = True
-            item.setdefault("best_score", 0)
-            item.setdefault("is_success", False)
-            item.setdefault(
-                "evaluation_notes",
-                f"Execution/adapter error: {err_msg}",
-            )
-            if tracker:
-                goal_ctx = tracker.get_goal_context(idx)
-                if goal_ctx:
-                    tracker.add_evaluation_trace(
-                        ctx=goal_ctx,
-                        evaluation_result={
-                            "is_error": True,
-                            "error": err_msg,
-                        },
-                        score=0,
-                        explanation=f"TAP error: {err_msg}",
-                        evaluator_name="tap_judge",
-                    )
-            continue
-
         best_prompt = item.get("best_prompt")
         best_response = item.get("best_response")
         best_score = item.get("best_score")

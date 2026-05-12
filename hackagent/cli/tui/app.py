@@ -161,7 +161,7 @@ class HackAgentTUI(App):
 
     BINDINGS = [
         Binding("q", "quit", "Quit", priority=True),
-        Binding("a", "switch_tab('agents')", "Agents", show=False),
+        Binding("a", "switch_tab('agents')", "Target Agents", show=False),
         Binding("k", "switch_tab('attacks')", "Attacks", show=False),
         Binding("r", "switch_tab('results')", "Results", show=False),
         Binding("c", "switch_tab('config')", "Config", show=False),
@@ -190,7 +190,7 @@ class HackAgentTUI(App):
     def compose(self) -> ComposeResult:
         """Compose the UI layout."""
         with TabbedContent(initial=self.initial_tab):
-            with TabPane("Agents", id="agents"):
+            with TabPane("Target Agents", id="agents"):
                 yield AgentsTab(self.cli_config)
 
             with TabPane("Attacks", id="attacks"):

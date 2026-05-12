@@ -61,28 +61,21 @@ class PAPEvaluation(BaseEvaluationStep):
 
         error_indices: set = set()
         for idx, item in enumerate(input_data):
-            if item.get("is_error") or (item.get("error") and not item.get("response")):
+            if item.get("error") and not item.get("response"):
                 error_indices.add(idx)
-                item["is_error"] = True
                 item.setdefault("best_score", 0.0)
                 item.setdefault("success", False)
-                err_msg = item.get("error") or item.get("error_message") or "unknown"
-                item.setdefault(
-                    "evaluation_notes", f"Execution/adapter error: {err_msg}"
-                )
+                item.setdefault("evaluation_notes", f"Execution error: {item['error']}")
             else:
                 item.setdefault("best_score", 0.0)
                 item.setdefault("success", item.get("best_score", 0) > 0)
 
         self._statistics["evaluated_count"] = len(input_data) - len(error_indices)
 
-        evaluable = [item for item in input_data if not item.get("is_error")]
-        n_success = sum(1 for item in evaluable if item.get("success"))
-        error_count = len(error_indices)
+        n_success = sum(1 for item in input_data if item.get("success"))
         self.logger.info(
             f"Post-processing {len(input_data)} results "
             f"({n_success} jailbreaks from inline judge)"
-            + (f" [{error_count} error(s) excluded]" if error_count else "")
         )
 
         # Tracker: skip final trace (PAP uses per-technique evaluations)

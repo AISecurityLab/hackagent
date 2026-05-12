@@ -10,14 +10,6 @@ FlipAttack is a character-level adversarial attack that **obfuscates harmful req
 
 FlipAttack operates without an external attacker model. The harmful goal is deterministically transformed and wrapped in a carefully crafted system prompt that instructs the target to reverse the text and answer directly. Because the obfuscated input looks nothing like the original harmful request, many safety classifiers fail to trigger.
 
-### Key Features
-
-- **No Attacker LLM Required**: Purely algorithmic — no additional model needed for generation
-- **Multiple Flip Modes**: Four distinct obfuscation strategies with different trade-offs
-- **Optional Enhancements**: Chain-of-thought, LangGPT templating, and few-shot demonstrations
-- **Fast**: Single-pass generation with no iterative refinement
-- **Research-Backed**: Based on peer-reviewed academic work
-
 ### Research Foundation
 
 FlipAttack is based on the paper:
@@ -118,7 +110,7 @@ results = agent.hack(attack_config=attack_config)
 ### CLI Usage
 
 ```bash
-hackagent attack flipattack \
+hackagent eval flipattack \
   --agent-name "my-agent" \
   --agent-type "google-adk" \
   --endpoint "http://localhost:8000" \

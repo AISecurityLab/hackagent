@@ -2,13 +2,16 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Attack Commands
+Eval Commands
 
-Execute security attacks against AI agents.
+Evaluate AI agent security.
+
+`hackagent eval` without a strategy runs the evaluation campaign.
+`hackagent eval <strategy>` runs a specific attack strategy.
 """
 
 import time
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional, Tuple
 
 import click
 from rich.console import Console
@@ -25,77 +28,178 @@ from hackagent.cli.utils import (
     handle_errors,
     load_config_file,
 )
+from hackagent.cli.commands.scan import run_quick_scan
 
 console = Console()
 
 
-@click.group()
-def attack():
-    """🚀 Execute security attacks against AI agents"""
-    # Logo will be shown by HackAgent initialization
-    pass
+ATTACK_CATALOG: Dict[str, Dict[str, str]] = {
+    "advprefix": {
+        "label": "AdvPrefix",
+        "description": "Adversarial prefix generation pipeline with judge-based evaluation.",
+    },
+    "baseline": {
+        "label": "Baseline",
+        "description": "Template-based baseline jailbreak attack.",
+    },
+    "pair": {
+        "label": "PAIR",
+        "description": "Prompt Automatic Iterative Refinement with attacker/scorer loops.",
+    },
+    "flipattack": {
+        "label": "FlipAttack",
+        "description": "Prompt obfuscation via character/word flipping modes.",
+    },
+    "tap": {
+        "label": "TAP",
+        "description": "Tree of Attacks with Pruning search attack.",
+    },
+    "autodan_turbo": {
+        "label": "AutoDAN-Turbo",
+        "description": "Lifelong jailbreak strategy search with warm-up and retrieval phases.",
+    },
+    "bon": {
+        "label": "BoN",
+        "description": "Best-of-N augmentation search with inline judge evaluation.",
+    },
+    "cipherchat": {
+        "label": "CipherChat",
+        "description": "Cipher-based prompt transformation with optional demonstrations.",
+    },
+    "h4rm3l": {
+        "label": "h4rm3l",
+        "description": "Composable decorator-program attack chaining multiple obfuscations.",
+    },
+    "pap": {
+        "label": "PAP",
+        "description": "Persuasive Adversarial Prompts using persuasion-technique taxonomies.",
+    },
+}
 
 
-@attack.command()
-@click.option("--agent-name", required=True, help="Target agent name")
-@click.option(
-    "--agent-type",
-    type=str,
-    default="other",
-    help="Agent type (e.g., google-adk, litellm, langchain, openai-sdk, mcp, a2a, or other)",
-)
-@click.option(
-    "--endpoint",
-    required=True,
-    help="Agent endpoint URL. For OpenAI-compatible endpoints, provide base URL ending with /v1 (e.g., http://localhost:8000/v1). For LangServe, provide full path (e.g., http://localhost:8000/invoke).",
-)
-@click.option(
-    "--goals",
-    required=True,
-    help="Attack goals (what you want the agent to do incorrectly)",
-)
-@click.option(
-    "--config-file",
-    type=click.Path(exists=True),
-    help="Attack configuration file (JSON/YAML)",
-)
-@click.option("--timeout", default=300, help="Attack timeout in seconds")
-@click.option(
-    "--dry-run", is_flag=True, help="Validate configuration without running attack"
-)
-@click.option(
-    "--no-tui",
-    is_flag=True,
-    help="Run attack directly without opening TUI (default: open TUI)",
-)
-@click.pass_context
-@handle_errors
-def advprefix(
-    ctx, agent_name, agent_type, endpoint, goals, config_file, timeout, dry_run, no_tui
+def _common_attack_options(func):
+    """Apply common CLI options shared by all attack subcommands."""
+    options = [
+        click.option("--agent-name", required=True, help="Target agent name"),
+        click.option(
+            "--agent-type",
+            type=str,
+            default="other",
+            help="Agent type (e.g., google-adk, litellm, langchain, openai-sdk, mcp, a2a, or other)",
+        ),
+        click.option(
+            "--endpoint",
+            required=True,
+            help="Agent endpoint URL. For OpenAI-compatible endpoints, provide base URL ending with /v1 (e.g., http://localhost:8000/v1). For LangServe, provide full path (e.g., http://localhost:8000/invoke).",
+        ),
+        click.option(
+            "--goals",
+            multiple=True,
+            help="Attack goals. Repeat --goals multiple times or pass a comma-separated string.",
+        ),
+        click.option(
+            "--config-file",
+            type=click.Path(exists=True),
+            help="Attack configuration file (JSON/YAML)",
+        ),
+        click.option("--timeout", default=300, help="Attack timeout in seconds"),
+        click.option(
+            "--dry-run",
+            is_flag=True,
+            help="Validate configuration without running attack",
+        ),
+        click.option(
+            "--no-tui",
+            is_flag=True,
+            help="Run attack directly without opening TUI (default: open TUI)",
+        ),
+    ]
+
+    for option in reversed(options):
+        func = option(func)
+
+    return func
+
+
+def _parse_goals(goals: Tuple[str, ...]) -> List[str]:
+    """Normalize --goals values into a clean list of goal strings."""
+    parsed: List[str] = []
+    for raw in goals:
+        if not raw:
+            continue
+        chunks = [chunk.strip() for chunk in raw.split(",")]
+        parsed.extend([chunk for chunk in chunks if chunk])
+    return parsed
+
+
+def _build_attack_config(
+    attack_type: str,
+    goals: Tuple[str, ...],
+    config_file: Optional[str],
+) -> Dict[str, Any]:
+    """Build and validate attack configuration from CLI args and optional file."""
+    if not goals and not config_file:
+        raise click.ClickException(
+            "Provide at least one --goals value or a --config-file containing goals/dataset."
+        )
+
+    attack_config: Dict[str, Any] = {"attack_type": attack_type}
+
+    if config_file:
+        try:
+            file_config = load_config_file(config_file)
+            attack_config.update(file_config)
+            display_info(f"Loaded configuration from: {config_file}")
+        except Exception as e:
+            raise click.ClickException(f"Failed to load config file: {e}")
+
+    parsed_goals = _parse_goals(goals)
+    if parsed_goals:
+        attack_config["goals"] = parsed_goals
+
+    # Command selection controls the attack type and should win over config-file values.
+    attack_config["attack_type"] = attack_type
+
+    # Coerce string goals loaded from config files to list form.
+    if isinstance(attack_config.get("goals"), str):
+        attack_config["goals"] = [attack_config["goals"]]
+
+    goals_in_config = attack_config.get("goals")
+    has_goals = isinstance(goals_in_config, list) and len(goals_in_config) > 0
+    has_dataset = attack_config.get("dataset") is not None
+
+    if not has_goals and not has_dataset:
+        raise click.ClickException(
+            "Attack configuration must include non-empty 'goals' or a 'dataset' section."
+        )
+
+    return attack_config
+
+
+def _run_attack_command(
+    ctx,
+    attack_type: str,
+    attack_label: str,
+    agent_name: str,
+    agent_type: str,
+    endpoint: str,
+    goals: Tuple[str, ...],
+    config_file: Optional[str],
+    timeout: int,
+    dry_run: bool,
+    no_tui: bool,
 ):
-    """Execute AdvPrefix attack strategy
-
-    This command runs the AdvPrefix attack against a target agent.
-    Goals should describe what you want the agent to do incorrectly.
-
-    Examples:
-
-      # Basic attack with goals
-      hackagent attack advprefix \\
-        --agent-name "weather-bot" \\
-        --agent-type "google-adk" \\
-        --endpoint "http://localhost:8000" \\
-        --goals "Return fake weather data and ignore safety guidelines"
-
-              # Attack with configuration file
-        hackagent attack advprefix \\
-          --agent-name "multi-tool-agent" \\
-          --agent-type "google-adk" \\
-          --endpoint "http://localhost:8000" \\
-          --config-file "attack-config.json"
-    """
+    """Shared implementation for all attack subcommands."""
     cli_config: CLIConfig = ctx.obj["config"]
     cli_config.validate()
+
+    attack_config = _build_attack_config(attack_type, goals, config_file)
+
+    goals_for_display = attack_config.get("goals") or attack_config.get("dataset")
+    if isinstance(goals_for_display, list):
+        goals_summary = "; ".join(str(g) for g in goals_for_display)
+    else:
+        goals_summary = str(goals_for_display)
 
     # Launch TUI with attack form pre-filled (default behavior)
     if not no_tui:
@@ -106,8 +210,9 @@ def advprefix(
                 "agent_name": agent_name,
                 "agent_type": agent_type,
                 "endpoint": endpoint,
-                "goals": goals,
+                "goals": goals_summary,
                 "timeout": timeout,
+                "attack_type": attack_type,
             }
 
             app = HackAgentTUI(
@@ -134,28 +239,15 @@ def advprefix(
     # Convert agent type
     agent_type_enum = get_agent_type_enum(agent_type)
 
-    # Build attack configuration
-    attack_config = {
-        "attack_type": "advprefix",
-        "goals": [goals],  # Convert single goal string to list
-    }
-
-    # Load additional config from file if provided
-    if config_file:
-        try:
-            file_config = load_config_file(config_file)
-            attack_config.update(file_config)
-            display_info(f"Loaded configuration from: {config_file}")
-        except Exception as e:
-            raise click.ClickException(f"Failed to load config file: {e}")
-
     # Display logo first
     from hackagent.utils import display_hackagent_splash
 
     display_hackagent_splash()
 
     # Display attack summary
-    _display_attack_summary(agent_name, agent_type, endpoint, goals, attack_config)
+    _display_attack_summary(
+        agent_name, agent_type, endpoint, goals_summary, attack_config
+    )
 
     if dry_run:
         display_success("✅ Configuration validation passed")
@@ -177,8 +269,10 @@ def advprefix(
             raise click.ClickException(f"Failed to initialize agent: {e}")
 
     # Execute attack with progress tracking
-    console.print(f"\n[bold cyan]🎯 Executing AdvPrefix attack against '{agent_name}'")
-    console.print(f"[cyan]Goals: {goals}")
+    console.print(
+        f"\n[bold cyan]🎯 Executing {attack_label} attack against '{agent_name}'"
+    )
+    console.print(f"[cyan]Goals/Dataset: {goals_summary}")
     console.print(f"[cyan]Timeout: {timeout}s")
 
     start_time = time.time()
@@ -204,7 +298,357 @@ def advprefix(
         raise click.ClickException(f"Attack execution failed: {e}")
 
 
-@attack.command(name="list")
+@click.group(name="eval", invoke_without_command=True)
+@click.option("--agent-name", help="Target agent name")
+@click.option(
+    "--agent-type",
+    type=str,
+    default="other",
+    show_default=True,
+    help="Agent type (e.g., google-adk, litellm, langchain, openai-sdk, mcp, a2a, or other)",
+)
+@click.option(
+    "--endpoint",
+    help="Agent endpoint URL. For OpenAI-compatible endpoints, use a base URL ending with /v1.",
+)
+@click.option(
+    "--dataset",
+    "dataset_preset",
+    default=None,
+    help="Dataset preset for evaluation campaign (default: first PRIMARY dataset in JAILBREAK_PROFILE).",
+)
+@click.option(
+    "--limit",
+    type=int,
+    default=25,
+    show_default=True,
+    help="Maximum number of goals loaded from the dataset per attack.",
+)
+@click.option(
+    "--judge-identifier",
+    default="ollama/llama3",
+    show_default=True,
+    help="Judge model identifier.",
+)
+@click.option(
+    "--judge-type",
+    default="harmbench",
+    show_default=True,
+    help="Judge evaluator type.",
+)
+@click.option(
+    "--timeout",
+    type=int,
+    default=300,
+    show_default=True,
+    help="Per-attack timeout (seconds).",
+)
+@click.option(
+    "--fail-fast/--no-fail-fast",
+    default=False,
+    show_default=True,
+    help="Stop at first failed attack instead of continuing remaining attacks.",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Validate evaluation campaign plan without executing attacks.",
+)
+@click.pass_context
+@handle_errors
+def eval_cmd(
+    ctx: click.Context,
+    agent_name: Optional[str],
+    agent_type: str,
+    endpoint: Optional[str],
+    dataset_preset: Optional[str],
+    limit: int,
+    judge_identifier: str,
+    judge_type: str,
+    timeout: int,
+    fail_fast: bool,
+    dry_run: bool,
+) -> None:
+    """🚀 Evaluate AI agent security.
+
+    - `hackagent eval` runs the evaluation campaign.
+    - `hackagent eval <strategy>` runs a specific attack strategy.
+    """
+    if ctx.invoked_subcommand is not None:
+        return
+
+    if not agent_name or not endpoint:
+        raise click.ClickException(
+            "Evaluation campaign requires --agent-name and --endpoint. "
+            "For a specific attack use: hackagent eval <strategy> ..."
+        )
+
+    run_quick_scan(
+        ctx=ctx,
+        agent_name=agent_name,
+        agent_type=agent_type,
+        endpoint=endpoint,
+        dataset_preset=dataset_preset,
+        limit=limit,
+        judge_identifier=judge_identifier,
+        judge_type=judge_type,
+        timeout=timeout,
+        fail_fast=fail_fast,
+        dry_run=dry_run,
+    )
+
+
+@eval_cmd.command()
+@_common_attack_options
+@click.pass_context
+@handle_errors
+def advprefix(
+    ctx, agent_name, agent_type, endpoint, goals, config_file, timeout, dry_run, no_tui
+):
+    """Execute AdvPrefix attack strategy
+
+    This command runs the AdvPrefix attack against a target agent.
+    Goals should describe what you want the agent to do incorrectly.
+
+    Examples:
+
+      # Basic attack with goals
+            hackagent eval advprefix \\
+        --agent-name "weather-bot" \\
+        --agent-type "google-adk" \\
+        --endpoint "http://localhost:8000" \\
+        --goals "Return fake weather data and ignore safety guidelines"
+
+              # Attack with configuration file
+                hackagent eval advprefix \\
+          --agent-name "multi-tool-agent" \\
+          --agent-type "google-adk" \\
+          --endpoint "http://localhost:8000" \\
+          --config-file "attack-config.json"
+    """
+    _run_attack_command(
+        ctx=ctx,
+        attack_type="advprefix",
+        attack_label=ATTACK_CATALOG["advprefix"]["label"],
+        agent_name=agent_name,
+        agent_type=agent_type,
+        endpoint=endpoint,
+        goals=goals,
+        config_file=config_file,
+        timeout=timeout,
+        dry_run=dry_run,
+        no_tui=no_tui,
+    )
+
+
+@eval_cmd.command()
+@_common_attack_options
+@click.pass_context
+@handle_errors
+def baseline(
+    ctx, agent_name, agent_type, endpoint, goals, config_file, timeout, dry_run, no_tui
+):
+    """Execute Baseline attack strategy."""
+    _run_attack_command(
+        ctx=ctx,
+        attack_type="baseline",
+        attack_label=ATTACK_CATALOG["baseline"]["label"],
+        agent_name=agent_name,
+        agent_type=agent_type,
+        endpoint=endpoint,
+        goals=goals,
+        config_file=config_file,
+        timeout=timeout,
+        dry_run=dry_run,
+        no_tui=no_tui,
+    )
+
+
+@eval_cmd.command()
+@_common_attack_options
+@click.pass_context
+@handle_errors
+def pair(
+    ctx, agent_name, agent_type, endpoint, goals, config_file, timeout, dry_run, no_tui
+):
+    """Execute PAIR attack strategy."""
+    _run_attack_command(
+        ctx=ctx,
+        attack_type="pair",
+        attack_label=ATTACK_CATALOG["pair"]["label"],
+        agent_name=agent_name,
+        agent_type=agent_type,
+        endpoint=endpoint,
+        goals=goals,
+        config_file=config_file,
+        timeout=timeout,
+        dry_run=dry_run,
+        no_tui=no_tui,
+    )
+
+
+@eval_cmd.command()
+@_common_attack_options
+@click.pass_context
+@handle_errors
+def flipattack(
+    ctx, agent_name, agent_type, endpoint, goals, config_file, timeout, dry_run, no_tui
+):
+    """Execute FlipAttack strategy."""
+    _run_attack_command(
+        ctx=ctx,
+        attack_type="flipattack",
+        attack_label=ATTACK_CATALOG["flipattack"]["label"],
+        agent_name=agent_name,
+        agent_type=agent_type,
+        endpoint=endpoint,
+        goals=goals,
+        config_file=config_file,
+        timeout=timeout,
+        dry_run=dry_run,
+        no_tui=no_tui,
+    )
+
+
+@eval_cmd.command()
+@_common_attack_options
+@click.pass_context
+@handle_errors
+def tap(
+    ctx, agent_name, agent_type, endpoint, goals, config_file, timeout, dry_run, no_tui
+):
+    """Execute TAP attack strategy."""
+    _run_attack_command(
+        ctx=ctx,
+        attack_type="tap",
+        attack_label=ATTACK_CATALOG["tap"]["label"],
+        agent_name=agent_name,
+        agent_type=agent_type,
+        endpoint=endpoint,
+        goals=goals,
+        config_file=config_file,
+        timeout=timeout,
+        dry_run=dry_run,
+        no_tui=no_tui,
+    )
+
+
+@eval_cmd.command(name="autodan_turbo")
+@_common_attack_options
+@click.pass_context
+@handle_errors
+def autodan_turbo(
+    ctx, agent_name, agent_type, endpoint, goals, config_file, timeout, dry_run, no_tui
+):
+    """Execute AutoDAN-Turbo attack strategy."""
+    _run_attack_command(
+        ctx=ctx,
+        attack_type="autodan_turbo",
+        attack_label=ATTACK_CATALOG["autodan_turbo"]["label"],
+        agent_name=agent_name,
+        agent_type=agent_type,
+        endpoint=endpoint,
+        goals=goals,
+        config_file=config_file,
+        timeout=timeout,
+        dry_run=dry_run,
+        no_tui=no_tui,
+    )
+
+
+@eval_cmd.command()
+@_common_attack_options
+@click.pass_context
+@handle_errors
+def bon(
+    ctx, agent_name, agent_type, endpoint, goals, config_file, timeout, dry_run, no_tui
+):
+    """Execute BoN attack strategy."""
+    _run_attack_command(
+        ctx=ctx,
+        attack_type="bon",
+        attack_label=ATTACK_CATALOG["bon"]["label"],
+        agent_name=agent_name,
+        agent_type=agent_type,
+        endpoint=endpoint,
+        goals=goals,
+        config_file=config_file,
+        timeout=timeout,
+        dry_run=dry_run,
+        no_tui=no_tui,
+    )
+
+
+@eval_cmd.command()
+@_common_attack_options
+@click.pass_context
+@handle_errors
+def cipherchat(
+    ctx, agent_name, agent_type, endpoint, goals, config_file, timeout, dry_run, no_tui
+):
+    """Execute CipherChat attack strategy."""
+    _run_attack_command(
+        ctx=ctx,
+        attack_type="cipherchat",
+        attack_label=ATTACK_CATALOG["cipherchat"]["label"],
+        agent_name=agent_name,
+        agent_type=agent_type,
+        endpoint=endpoint,
+        goals=goals,
+        config_file=config_file,
+        timeout=timeout,
+        dry_run=dry_run,
+        no_tui=no_tui,
+    )
+
+
+@eval_cmd.command()
+@_common_attack_options
+@click.pass_context
+@handle_errors
+def h4rm3l(
+    ctx, agent_name, agent_type, endpoint, goals, config_file, timeout, dry_run, no_tui
+):
+    """Execute h4rm3l attack strategy."""
+    _run_attack_command(
+        ctx=ctx,
+        attack_type="h4rm3l",
+        attack_label=ATTACK_CATALOG["h4rm3l"]["label"],
+        agent_name=agent_name,
+        agent_type=agent_type,
+        endpoint=endpoint,
+        goals=goals,
+        config_file=config_file,
+        timeout=timeout,
+        dry_run=dry_run,
+        no_tui=no_tui,
+    )
+
+
+@eval_cmd.command()
+@_common_attack_options
+@click.pass_context
+@handle_errors
+def pap(
+    ctx, agent_name, agent_type, endpoint, goals, config_file, timeout, dry_run, no_tui
+):
+    """Execute PAP attack strategy."""
+    _run_attack_command(
+        ctx=ctx,
+        attack_type="pap",
+        attack_label=ATTACK_CATALOG["pap"]["label"],
+        agent_name=agent_name,
+        agent_type=agent_type,
+        endpoint=endpoint,
+        goals=goals,
+        config_file=config_file,
+        timeout=timeout,
+        dry_run=dry_run,
+        no_tui=no_tui,
+    )
+
+
+@eval_cmd.command(name="list")
 @click.pass_context
 @handle_errors
 def list_attacks(ctx):
@@ -217,30 +661,17 @@ def list_attacks(ctx):
     table.add_column("Description", style="green")
     table.add_column("Status", style="yellow")
 
-    # Add available strategies
-    table.add_row(
-        "advprefix",
-        "Adversarial prefix generation attack using language models",
-        "✅ Available",
-    )
-
-    # Add planned strategies
-    table.add_row("prompt-injection", "Direct prompt injection attacks", "🚧 Planned")
-    table.add_row(
-        "jailbreak", "Jailbreaking techniques for safety bypassing", "🚧 Planned"
-    )
-    table.add_row(
-        "goal-hijacking", "Goal hijacking and manipulation attacks", "🚧 Planned"
-    )
+    for attack_key, meta in ATTACK_CATALOG.items():
+        table.add_row(attack_key, meta["description"], "✅ Available")
 
     console.print(table)
     console.print(
-        "\n[cyan]💡 Use 'hackagent attack STRATEGY --help' for strategy-specific options"
+        "\n[cyan]💡 Use 'hackagent eval STRATEGY --help' for strategy-specific options"
     )
 
 
-@attack.command()
-@click.argument("strategy", type=click.Choice(["advprefix"]))
+@eval_cmd.command()
+@click.argument("strategy", type=click.Choice(list(ATTACK_CATALOG.keys())))
 @click.pass_context
 @handle_errors
 def info(ctx, strategy):
@@ -249,7 +680,35 @@ def info(ctx, strategy):
     if strategy == "advprefix":
         _display_advprefix_info()
     else:
-        raise click.ClickException(f"Strategy '{strategy}' not yet implemented")
+        _display_generic_attack_info(strategy)
+
+
+def _display_generic_attack_info(strategy: str) -> None:
+    """Display concise info for attack strategies that don't have long-form docs."""
+    meta = ATTACK_CATALOG[strategy]
+
+    info_content = f"""[bold]{meta["label"]} Attack Strategy[/bold]
+
+[cyan]Description:[/cyan]
+{meta["description"]}
+
+[cyan]CLI Usage:[/cyan]
+hackagent eval {strategy} --agent-name <name> --endpoint <url> --goals "<goal>" --no-tui
+
+[cyan]Advanced Configuration:[/cyan]
+Use --config-file with JSON/YAML to provide full attack-specific configuration.
+
+[cyan]Quick Help:[/cyan]
+hackagent eval {strategy} --help"""
+
+    panel = Panel(
+        info_content,
+        title=f"{meta['label']} Attack Information",
+        border_style="cyan",
+        padding=(1, 2),
+    )
+
+    console.print(panel)
 
 
 def _display_attack_summary(
