@@ -2820,7 +2820,16 @@ class DashboardPage:
         )
         with ui.card().tight().classes("w-full"):
             with ui.column().classes("p-3 gap-1"):
-                ui.label(title).classes("text-xs text-grey-6")
+                with ui.row().classes("w-full items-center justify-between"):
+                    ui.label(title).classes("text-xs text-grey-6")
+                    ui.button(
+                        icon="content_copy",
+                    ).props("flat dense size=xs color=grey-6").tooltip(
+                        "Copy to clipboard"
+                    ).on(
+                        "click",
+                        js_handler=f"() => navigator.clipboard.writeText({json.dumps(text)})",
+                    )
                 ui.label(text).classes("text-sm whitespace-pre-wrap")
 
     def _render_autodan_role_section(
@@ -3972,7 +3981,16 @@ class DashboardPage:
                     ui.card().tight().classes("w-full border border-red-200 bg-red-50")
                 ):
                     with ui.column().classes("p-3 gap-1"):
-                        ui.label("Target Goal").classes("text-xs text-grey-6")
+                        with ui.row().classes("w-full items-center justify-between"):
+                            ui.label("Target Goal").classes("text-xs text-grey-6")
+                            ui.button(
+                                icon="content_copy",
+                            ).props("flat dense size=xs color=grey-6").tooltip(
+                                "Copy to clipboard"
+                            ).on(
+                                "click",
+                                js_handler=f"() => navigator.clipboard.writeText({json.dumps(goal)})",
+                            )
                         ui.label(goal).classes("text-sm font-medium")
 
             # -----------------------------------------------------------------
@@ -4101,7 +4119,16 @@ class DashboardPage:
                 )
                 with ui.card().tight().classes("w-full"):
                     with ui.column().classes("p-3 gap-1"):
-                        ui.label(title).classes("text-xs text-grey-6")
+                        with ui.row().classes("w-full items-center justify-between"):
+                            ui.label(title).classes("text-xs text-grey-6")
+                            ui.button(
+                                icon="content_copy",
+                            ).props("flat dense size=xs color=grey-6").tooltip(
+                                "Copy to clipboard"
+                            ).on(
+                                "click",
+                                js_handler=f"() => navigator.clipboard.writeText({json.dumps(text)})",
+                            )
                         ui.label(text).classes("text-sm whitespace-pre-wrap")
 
             if isinstance(metadata, dict) and metadata:

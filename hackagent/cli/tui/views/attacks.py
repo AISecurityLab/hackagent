@@ -188,6 +188,7 @@ class AttacksTab(Container):
         self._reduced_tui_logs = bool(self.initial_data.get("reduced_tui_logs", False))
         self._show_advanced = False
         self._advanced_hover_preview = False
+        self._advanced_focus_preview = False
         self._current_spec: Optional[AttackConfigSpec] = None
 
     def compose(self) -> ComposeResult:
@@ -289,7 +290,7 @@ class AttacksTab(Container):
                     classes="advanced-toggle",
                 )
                 yield Static(
-                    "[dim]Hover this option to preview all advanced settings. "
+                    "[dim]Hover or focus this option to preview all advanced settings. "
                     "Check it to keep them always visible.[/dim]"
                 )
                 yield Static("")
@@ -422,6 +423,22 @@ class AttacksTab(Container):
         self._advanced_hover_preview = False
         self._sync_advanced_visibility()
 
+    def on_focus(self, _: events.Focus) -> None:
+        """Preview advanced settings when keyboard focus reaches advanced-toggle."""
+        focused = self.app.focused
+        self._advanced_focus_preview = bool(
+            focused is not None and getattr(focused, "id", None) == "advanced-toggle"
+        )
+        self._sync_advanced_visibility()
+
+    def on_blur(self, _: events.Blur) -> None:
+        """Hide focus-based preview once advanced-toggle is no longer focused."""
+        focused = self.app.focused
+        self._advanced_focus_preview = bool(
+            focused is not None and getattr(focused, "id", None) == "advanced-toggle"
+        )
+        self._sync_advanced_visibility()
+
     def _sync_advanced_visibility(self) -> None:
         """Recompute advanced visibility from toggle state and hover preview state."""
         try:
@@ -429,7 +446,9 @@ class AttacksTab(Container):
         except Exception:
             pinned = self._show_advanced
 
-        should_show = pinned or self._advanced_hover_preview
+        should_show = (
+            pinned or self._advanced_hover_preview or self._advanced_focus_preview
+        )
         if self._show_advanced == should_show:
             return
 
@@ -450,7 +469,9 @@ class AttacksTab(Container):
         # Keep internal state aligned with the current checkbox value.
         try:
             pinned = bool(self.query_one("#advanced-toggle", Checkbox).value)
-            self._show_advanced = pinned or self._advanced_hover_preview
+            self._show_advanced = (
+                pinned or self._advanced_hover_preview or self._advanced_focus_preview
+            )
         except Exception:
             pass
 

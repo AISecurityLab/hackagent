@@ -20,7 +20,6 @@ const sidebars: SidebarsConfig = {
       items: [
         'getting-started/installation',
         'getting-started/quick-start',
-        'getting-started/dashboard',
         'getting-started/quick-security-scan',
         'getting-started/attack-tutorial',
         'getting-started/datasets-tutorial',
