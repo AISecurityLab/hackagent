@@ -1,3 +1,134 @@
+## v0.7.0 (2026-05-14)
+
+### ✨ Features
+
+- metrics results saving in json
+- judge metrics visualization on local dashboard, strictness is now 1-avg(ASR)
+- **evaluator**: metrics added on local dashbaord
+- general bug fixing and improvement for all the attacks and the local dashboard
+- Local dashboard now works both in remote and in local mode.
+- Adding local dashboard features
+- Automatic Ollama setup with 'hackagent examples ollama'
+- Added Ollama demo
+- Added CipherCheat attack
+- Added CipherCheat attack
+- Added CipherChat attack
+- Added PAP attack
+- Updated attack list in TUI
+- H4RM3L attack added
+
+### 🐛🚑️ Fixes
+
+- **evaluator**: reformated file
+- **evaluator**: safely handle non-dict rows and update orchestrator test
+- fixed bugs on all the attacks, local dashboard improved, retry mechanism implemented in openai requests
+- Fixed documentation
+- Fixed documentation
+- Bug fixing for PAIR and baseline
+- Fixed remote fetching for local dashboard
+- Fixed TAP test
+- Fixed TAP test
+- Unit tests fixed
+- Fixed API key init error
+- Allow for empty API key
+- Added CipherChat attack to TUI
+- Fixed tests that made pytest loop
+- Fixed result ordering, date and fetching. Added "Attack" column with the type of the attack
+- Fixed result ordering, date and fetching. Added "Attack" column with the type of the attack
+- Fixed startup error for local web app
+- **docs**: fixing tests
+- **docs**: can we please fix the docs
+- **docs**: compilation of documentation
+- **docs**: fixing docs error
+- **docs**: building docs
+
+### ♻️ Refactorings
+
+- **standardize-attack-config**: standardization for each attack configuration
+
+### bump
+
+- **deps**: bump datasets from 4.8.3 to 4.8.4
+- **deps-dev**: bump ruff from 0.15.7 to 0.15.8
+- **deps**: bump litellm from 1.82.6 to 1.83.0
+- **deps**: bump textual from 8.1.1 to 8.2.1
+- **deps-dev**: bump pytest-cov from 7.0.0 to 7.1.0
+- **deps-dev**: bump anyio from 4.12.1 to 4.13.0
+- **deps-dev**: bump google-adk from 1.27.1 to 1.27.3
+- **deps**: bump litellm from 1.82.4 to 1.82.6
+- **deps**: bump nicegui from 3.8.0 to 3.9.0
+- **deps-dev**: bump ruff from 0.15.6 to 0.15.7
+- **deps**: bump datasets from 4.8.2 to 4.8.3
+- **deps**: bump openai from 2.28.0 to 2.29.0
+- **deps-dev**: bump google-adk from 1.27.0 to 1.27.1
+- **deps**: bump datasets from 4.7.0 to 4.8.2
+- **deps**: bump litellm from 1.82.1 to 1.82.3
+- **deps**: bump pypdf from 6.7.5 to 6.9.1
+
+### ci
+
+- split tests into focused jobs and merge coverage
+- scope test-matrix and test-quick to tests/unit/ only
+
+### fix
+
+- **ci**: use find instead of glob to locate .coverage files
+- **ci**: include hidden .coverage files in upload artifacts
+- **ci**: correct coverage artifact glob path
+- use isinstance(next_page, (str, AnyUrl)) to avoid infinite pagination loop
+- correct AnyUrl pagination check in RemoteBackend list methods
+- **tests**: update test_update_result_status_function to use backend kwarg
+- use backend.update_result() in baseline legacy evaluation sync path
+- **e2e**: skip auth test when HACKAGENT_API_BASE_URL not explicitly set
+- update attack techniques to use _backend config key and Tracker(backend=...)
+- **tests**: pass backend=RemoteBackend(client) to AgentRouter in integration tests
+- **remote**: use .next instead of .next_ on PaginatedAgentList
+- **docs**: set markdown format:detect so .md files skip MDX parsing
+- **docs**: use HTML entities instead of backslash escapes for MDX v3 compatibility
+- **ci**: ruff format, F821 undefined name, F841 unused variable
+
+### refactor
+
+- standardize attack config naming
+
+### style
+
+- ruff format remote.py
+- remove unused patch import from test_evaluation_updates
+- fix ruff formatting in bon/generation.py and pap/generation.py
+- **tests**: apply ruff formatting to integration adapter tests
+
+### ✅🤡🧪 Tests
+
+- Fixed test_tap.py
+- **docs**: fixing docs tests
+
+### 🎨🏗️ Style & Architecture
+
+- reformatting
+- formatting
+- Fixed tests and linting
+- **local-api**: local version of the storage that does not require api connection
+- **local-api**: local version of the storage that does not require api connection
+
+### 💚👷 CI & Build
+
+- Fixed integration tests
+
+### 📝💡 Documentation
+
+- **build**: fixing build error
+
+### 🔥⚰️ Clean up
+
+- Removed e2e PAIR test
+- Removed unnecessary tests
+- Removed original codebase of PAP
+
+### 🫥 fixup
+
+- Fixed merge
+
 ## v0.6.0 (2026-03-14)
 
 ### ✨ Features
