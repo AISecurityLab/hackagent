@@ -223,6 +223,10 @@ def execute(
             )
             encoded_response = response.get("generated_text")
             error_message = response.get("error_message")
+            _guardrail_blocked = response.get("guardrail_blocked", False)
+            if _guardrail_blocked:
+                error_message = None
+                encoded_response = None
         except Exception as e:  # pragma: no cover - network adapter level failure
             logger.info("[%s] No response (error=%s)", _label, e)
             with lock:
@@ -287,10 +291,14 @@ def execute(
                 tracker.add_interaction_trace(
                     ctx=goal_ctx,
                     request=request_data,
-                    response={
-                        "generated_text": encoded_response,
-                        "error_message": error_message,
-                    },
+                    response=(
+                        response
+                        if response.get("guardrail_blocked")
+                        else {
+                            "generated_text": encoded_response,
+                            "error_message": error_message,
+                        }
+                    ),
                     step_name=f"CipherChat Generation ({encode_method})",
                     metadata={
                         "encode_method": encode_method,
