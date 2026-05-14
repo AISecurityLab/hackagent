@@ -1,3 +1,61 @@
+## v0.8.0 (2026-05-14)
+
+### ✨ Features
+
+- Improved attacks, updated documentation and dashboard
+- add attack configuration flow to TUI
+- add attack configuration flow to TUI
+
+### 🐛🚑️ Fixes
+
+- correct api configuration for all roles in all attacks in tui
+
+### build
+
+- **deps**: bump authlib from 1.6.6 to 1.6.9
+- **deps**: bump authlib from 1.6.6 to 1.6.9
+
+### bump
+
+- **deps-dev**: bump transformers from 4.57.6 to 5.5.4
+- **deps**: bump litellm from 1.83.0 to 1.83.10
+- **deps**: bump textual from 8.2.1 to 8.2.4
+- **deps-dev**: bump pytest from 9.0.2 to 9.0.3
+- **deps-dev**: bump google-adk from 1.28.0 to 1.31.0
+- **deps**: bump rich from 14.3.3 to 15.0.0
+- **deps-dev**: bump commitizen from 4.13.9 to 4.13.10
+- **deps**: bump click from 8.3.1 to 8.3.2
+- **deps-dev**: bump mcp from 1.26.0 to 1.27.0
+- **deps-dev**: bump requests from 2.32.5 to 2.33.1
+- **deps-dev**: bump ruff from 0.15.8 to 0.15.9
+- **deps**: bump openai from 2.29.0 to 2.30.0
+- **deps-dev**: bump google-adk from 1.27.3 to 1.28.0
+
+### feat
+
+- propagate adapter/execution errors in AutoDAN-Turbo results
+- propagate adapter/execution errors in TAP attack results
+- propagate adapter/execution errors in PAP attack results
+- propagate adapter/execution errors in PAIR attack results
+
+### fix
+
+- propagate adapter/execution errors to dashboard instead of masking as failed attacks
+- **advprefix**: propagate errors to results instead of marking as mitigated  Error rows (e.g. timeouts) were silently lost through the evaluation pipeline and finalized as FAILED_JAILBREAK ("Mitigated") instead of ERROR_AGENT_RESPONSE.  Root causes fixed: - completions.py: propagate the normalized 'error' key so   _detect_error_indices can identify error rows downstream - evaluation.py: detect/mark error rows before judge evaluation;   preserve error rows through NLL filtering, aggregation, and   selection so they reach finalize_all_goals with is_error=True - sync.py: skip is_error rows in sync_evaluation_to_server so the   coordinator's ERROR_AGENT_RESPONSE is not overwritten by   FAILED_JAILBREAK
+- propagate BoN adapter errors as ERROR_AGENT_RESPONSE in dashboard
+- propagate adapter/execution errors instead of masking them as failed attacks
+- prevent orchestrator re-evaluation from zeroing jailbreak counts
+
+### refactor
+
+- unify dashboard labels, colors, and error reporting
+
+### 📝💡 Documentation
+
+- fixed documentation
+- fixed documentation
+- documentation update
+
 ## v0.7.0 (2026-05-14)
 
 ### ✨ Features
