@@ -319,6 +319,37 @@ class TrackingCoordinator:
                 if ctx and gen_elapsed > 0:
                     ctx._start_time -= gen_elapsed
 
+    def backdate_goal_start_times(self, pipeline_data: List[Dict[str, Any]]) -> None:
+        """Shift each goal's _start_time back by its generation elapsed_s.
+
+        Call this after generation when goals were already initialized upfront
+        (via initialize_goals) so that the tracked latency covers the full
+        lifecycle including generation time.
+
+        Args:
+            pipeline_data: Output from the Generation step (list of dicts
+                with "goal" and optional "elapsed_s" keys).
+        """
+        if not self.has_goal_tracking or not pipeline_data:
+            return
+
+        goal_gen_elapsed: Dict[str, float] = {}
+        for row in pipeline_data:
+            goal = row.get("goal", "")
+            elapsed = row.get("elapsed_s")
+            if goal and elapsed is not None:
+                try:
+                    goal_gen_elapsed[goal] = max(
+                        goal_gen_elapsed.get(goal, 0.0), float(elapsed)
+                    )
+                except (TypeError, ValueError):
+                    pass
+
+        for goal, gen_elapsed in goal_gen_elapsed.items():
+            ctx = self.goal_tracker.get_goal_context_by_goal(goal)
+            if ctx and gen_elapsed > 0:
+                ctx._start_time -= gen_elapsed
+
     def get_goal_context(self, goal_index: int) -> Optional[Context]:
         """Get tracking context for a specific goal by index."""
         if not self.has_goal_tracking:

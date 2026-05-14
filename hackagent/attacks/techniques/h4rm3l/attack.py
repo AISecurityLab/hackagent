@@ -178,6 +178,21 @@ class H4rm3lAttack(BaseAttack):
         pipeline_steps = self._get_pipeline_steps()
         start_step = self.config.get("start_step", 1) - 1
 
+        # Initialize goal results and tracker BEFORE generation so that
+        # generation.execute() can record per-goal interaction traces.
+        h4rm3l_params = self.config.get("h4rm3l_params", {})
+        goal_metadata = {
+            "attack_type": "h4rm3l",
+            "program": h4rm3l_params.get("program", ""),
+            "syntax_version": h4rm3l_params.get("syntax_version", 2),
+        }
+        coordinator.initialize_goals(goals, initial_metadata=goal_metadata)
+        if coordinator.goal_tracker:
+            self.config["_tracker"] = coordinator.goal_tracker
+
+        if coordinator.has_goal_tracking:
+            self.logger.info("Using TrackingCoordinator for per-goal tracking")
+
         try:
             # Phase 1: Generation
             generation_output = self._execute_pipeline(
@@ -189,23 +204,8 @@ class H4rm3lAttack(BaseAttack):
                 coordinator.finalize_pipeline([], lambda _: False)
                 return []
 
-            # Phase 2: Create goal results for surviving goals
-            h4rm3l_params = self.config.get("h4rm3l_params", {})
-            goal_metadata = {
-                "attack_type": "h4rm3l",
-                "program": h4rm3l_params.get("program", ""),
-                "syntax_version": h4rm3l_params.get("syntax_version", 2),
-            }
-            coordinator.initialize_goals_from_pipeline_data(
-                pipeline_data=generation_output,
-                initial_metadata=goal_metadata,
-            )
-
-            if coordinator.has_goal_tracking:
-                self.logger.info("Using TrackingCoordinator for per-goal tracking")
-
-            if coordinator.goal_tracker:
-                self.config["_tracker"] = coordinator.goal_tracker
+            # Backdate goal start times to include generation latency.
+            coordinator.backdate_goal_start_times(generation_output)
 
             # Phase 3: Evaluation
             results = self._execute_pipeline(
