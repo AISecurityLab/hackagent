@@ -457,13 +457,24 @@ def _attack_single_goal(
                 },
             )
             response_text = target_response.get("generated_text")
-            target_error = target_response.get("error_message")
+            _guardrail_blocked = target_response.get("guardrail_blocked", False)
+            target_guardrail_event = (
+                target_response.get("guardrail_event") if _guardrail_blocked else None
+            )
+            target_error = (
+                None if _guardrail_blocked else target_response.get("error_message")
+            )
         except Exception as e:
             response_text = None
             target_error = str(e)
+            target_guardrail_event = None
             logger.warning(f"[{_label}] Target request failed — {e}")
 
-        if response_text:
+        if target_guardrail_event:
+            logger.info(
+                f"[{_label}] Blocked by {target_guardrail_event.get('side', 'unknown')} guardrail"
+            )
+        elif response_text:
             _preview = (
                 f"{response_text[:120]}..."
                 if len(response_text) > 120
@@ -507,6 +518,7 @@ def _attack_single_goal(
                     judge_score,
                     is_jailbreak,
                     judge_cols,
+                    guardrail_event=target_guardrail_event,
                 )
 
         # Update best result
@@ -555,6 +567,7 @@ def _persist_technique_trace(
     judge_score: float,
     is_jailbreak: bool,
     judge_cols: Dict[str, Any],
+    guardrail_event: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Persist PAP technique trace for dashboard display.
 
@@ -568,10 +581,11 @@ def _persist_technique_trace(
     tracker.add_interaction_trace(
         ctx=goal_ctx,
         request={"prompt": persuasive_prompt},
-        response={
-            "generated_text": response_text,
-            "error_message": error,
-        },
+        response=(
+            {"guardrail_blocked": True, "guardrail_event": guardrail_event}
+            if guardrail_event
+            else {"generated_text": response_text, "error_message": error}
+        ),
         step_name=step_name,
         metadata={
             "display_type": "pap_candidate",

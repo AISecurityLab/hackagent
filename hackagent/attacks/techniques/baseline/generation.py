@@ -247,14 +247,16 @@ def execute_prompts(
                     "completion": completion,
                     "response_length": len(completion),
                 }
-                if adapter_error and not completion:
+                if isinstance(response, dict) and response.get("guardrail_blocked"):
+                    row_payload["guardrail_blocked"] = True
+                elif adapter_error and not completion:
                     row_payload["error"] = str(adapter_error)
 
                 with _lock:
                     if goal_tracker and goal_ctx:
                         goal_tracker.add_interaction_trace(
                             ctx=goal_ctx,
-                            request=request_data,
+                            request={"prompt": row["attack_prompt"]},
                             response=response,
                             step_name=f"Template: {row.get('template_category', 'unknown')}",
                             metadata={

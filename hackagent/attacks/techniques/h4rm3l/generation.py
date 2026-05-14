@@ -322,14 +322,12 @@ def execute(
                 tracker.add_interaction_trace(
                     ctx=goal_ctx,
                     request=request_data,
-                    response={
-                        "generated_text": generated_text,
-                        "error_message": error_message,
-                    },
+                    response=response,
                     step_name="h4rm3l Generation",
                     metadata={
                         "program": resolved_program,
                         "original_goal": goal_text,
+                        "decoration_steps": decoration_traces,
                         "elapsed_s": _elapsed,
                     },
                 )

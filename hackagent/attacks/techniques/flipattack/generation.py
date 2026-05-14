@@ -149,9 +149,14 @@ def execute(
         )
 
         generated_text = response.get("generated_text")
-        error_message = response.get("error_message")
+        _guardrail_blocked = response.get("guardrail_blocked", False)
+        error_message = None if _guardrail_blocked else response.get("error_message")
 
-        if generated_text:
+        if _guardrail_blocked:
+            logger.info(
+                f"[Goal {idx + 1}/{len(goals)}] Blocked by {response.get('guardrail_event', {}).get('side', 'unknown')} guardrail"
+            )
+        elif generated_text:
             logger.info(
                 f"[Goal {idx + 1}/{len(goals)}] Target response:\n{generated_text}"
             )
@@ -172,10 +177,14 @@ def execute(
                     tracker.add_interaction_trace(
                         ctx=goal_ctx,
                         request=request_data,
-                        response={
-                            "generated_text": generated_text,
-                            "error_message": error_message,
-                        },
+                        response=(
+                            response
+                            if _guardrail_blocked
+                            else {
+                                "generated_text": generated_text,
+                                "error_message": error_message,
+                            }
+                        ),
                         step_name=f"FlipAttack Generation ({flip_mode})",
                         metadata={
                             "flip_mode": flip_mode,

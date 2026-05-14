@@ -211,6 +211,7 @@ def _get_completion_via_router(
         "adapter_specific_events": None,
         "agent_specific_data": None,
         "error_message": None,
+        "guardrail_event": None,
         "log_message": None,  # For per-prefix logging by the main loop
     }
 
@@ -237,6 +238,16 @@ def _get_completion_via_router(
 
         # Log agent actions for visibility
         _log_agent_actions(logger, agent_specific, original_index)
+
+    # Propagate guardrail_event so the dashboard can render it correctly.
+    if response.get("guardrail_blocked") and response.get("guardrail_event"):
+        result_dict["guardrail_event"] = response["guardrail_event"]
+        result_dict["log_message"] = (
+            f"Guardrail blocked request for prefix at original index {original_index}: "
+            f"{response['guardrail_event'].get('side')} guardrail — "
+            f"{response['guardrail_event'].get('explanation')}"
+        )
+        return result_dict
 
     error_msg = response.get("error_message")
     completion_text = response.get("generated_text")
@@ -402,11 +413,19 @@ def execute(
                 goal_ctx = tracker.get_goal_context_by_goal(goal)
                 if goal_ctx:
                     completion_text = result.get("completion")
-                    response_payload = {
-                        "generated_text": completion_text,
-                        "raw_response_body": result.get("raw_response_body"),
-                        "raw_response_status": result.get("raw_response_status"),
-                    }
+                    response_payload = (
+                        {
+                            "guardrail_blocked": True,
+                            "guardrail_event": result["guardrail_event"],
+                            "error_message": result.get("error_message"),
+                        }
+                        if result.get("guardrail_event")
+                        else {
+                            "generated_text": completion_text,
+                            "raw_response_body": result.get("raw_response_body"),
+                            "raw_response_status": result.get("raw_response_status"),
+                        }
+                    )
                     tracker.add_interaction_trace(
                         ctx=goal_ctx,
                         request=result.get("raw_request_payload") or {},
@@ -415,7 +434,9 @@ def execute(
                         metadata={
                             "prefix": prefix_text,
                             "surrogate_attack_prompt": actual_surrogate_prompt_str,
-                            "error_message": result.get("error_message"),
+                            "error_message": result.get("error_message")
+                            if not result.get("guardrail_event")
+                            else None,
                             "adapter_specific_events": result.get(
                                 "adapter_specific_events"
                             ),
