@@ -20,107 +20,6 @@
 ![CI Status](https://img.shields.io/github/actions/workflow/status/AISecurityLab/hackagent/ci.yml)
 </div>
 
-## Top Links
-
-- [Introduction](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/introduction.mdx)
-
-<details>
-<summary><strong>Getting Started</strong></summary>
-
-- [Section Source](https://github.com/AISecurityLab/hackagent/tree/main/docs/docs/getting-started)
-- [Installation](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/getting-started/installation.mdx)
-- [Quick Start](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/getting-started/quick-start.mdx)
-- [Dashboard](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/getting-started/dashboard.mdx)
-- [Quick Security Scan](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/getting-started/quick-security-scan.mdx)
-- [Attack Tutorial](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/getting-started/attack-tutorial.mdx)
-- [Datasets Tutorial](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/getting-started/datasets-tutorial.mdx)
-
-</details>
-
-<details>
-<summary><strong>AI Risks</strong></summary>
-
-- [Section Source](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/risks/index.mdx)
-- [Jailbreak](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/risks/vulnerabilities.md)
-
-</details>
-
-<details>
-<summary><strong>Attacks</strong></summary>
-
-- [Section Source](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/attacks/index.mdx)
-- [AdvPrefix](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/attacks/advprefix.md)
-- [AutoDAN-Turbo](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/attacks/autodan_turbo.md)
-- [PAIR](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/attacks/pair.md)
-- [TAP](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/attacks/tap.md)
-- [FlipAttack](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/attacks/flipattack.md)
-- [BoN](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/attacks/bon.md)
-- [h4rm3l](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/attacks/h4rm3l.md)
-- [CipherChat](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/attacks/cipherchat.md)
-- [PAP](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/attacks/pap.md)
-- [Baseline](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/attacks/baseline.md)
-
-</details>
-
-<details>
-<summary><strong>Datasets</strong></summary>
-
-- [Section Source](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/datasets/index.md)
-- [Presets](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/datasets/presets.md)
-- [Hugging Face](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/datasets/huggingface.md)
-- [File Provider](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/datasets/file.md)
-- [Custom Providers](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/datasets/custom-providers.md)
-- [Troubleshooting](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/datasets/troubleshooting.md)
-
-</details>
-
-<details>
-<summary><strong>Agents</strong></summary>
-
-- [Section Source](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/agents/index.mdx)
-- [Ollama](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/agents/ollama.mdx)
-- [OpenAI SDK](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/agents/openai-sdk.mdx)
-- [Google ADK](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/agents/google-adk.mdx)
-
-</details>
-
-<details>
-<summary><strong>CLI Reference</strong></summary>
-
-- [Section Source](https://github.com/AISecurityLab/hackagent/tree/main/docs/docs/cli)
-- [Overview](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/cli/overview.md)
-- [Initialization](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/cli/initialization.md)
-- [Configuration](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/cli/config.md)
-- [Attack](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/cli/attack.mdx)
-- [Results](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/cli/results.md)
-
-</details>
-
-<details>
-<summary><strong>SDK Reference</strong></summary>
-
-- [Section Source](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/api-index.md)
-- [Agent](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/hackagent/agent.md)
-- [Errors](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/hackagent/errors.md)
-- [Logger](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/hackagent/logger.md)
-- [Utils](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/hackagent/utils.md)
-- [Router](https://github.com/AISecurityLab/hackagent/tree/main/docs/docs/hackagent/router)
-- [Attacks](https://github.com/AISecurityLab/hackagent/tree/main/docs/docs/hackagent/attacks)
-- [Datasets](https://github.com/AISecurityLab/hackagent/tree/main/docs/docs/hackagent/datasets)
-- [Risks](https://github.com/AISecurityLab/hackagent/tree/main/docs/docs/hackagent/risks)
-- [Server](https://github.com/AISecurityLab/hackagent/tree/main/docs/docs/hackagent/server)
-
-</details>
-
-<details>
-<summary><strong>Security & Ethics</strong></summary>
-
-- [Section Source](https://github.com/AISecurityLab/hackagent/tree/main/docs/docs/security)
-- [Responsible Disclosure](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/security/responsible-disclosure.md)
-- [Ethical Guidelines](https://github.com/AISecurityLab/hackagent/blob/main/docs/docs/security/ethical-guidelines.md)
-
-</details>
-
 ## What is HackAgent?
 
 HackAgent is a comprehensive Python SDK and CLI designed to help security researchers, developers, and AI safety practitioners evaluate and strengthen the security of AI agents.
@@ -150,7 +49,7 @@ HackAgent automates testing for these vulnerabilities using research-backed atta
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install git+https://github.com/AISecurityLab/HackAgent.git
+pip install hackagent
 ```
 
 No API key required: HackAgent works locally out of the box.
