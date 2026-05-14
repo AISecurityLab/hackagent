@@ -2,12 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Re-export hackagent errors for server/api relative imports.
+Compatibility re-export of canonical HackAgent errors.
 
-The auto-generated server/api/ code uses ``from ... import errors`` which
-resolves to this module (hackagent.server.errors) when the api/ tree lives
-under server/.  All symbols are forwarded from the canonical errors module so
-callers that reference e.g. ``errors.UnexpectedStatus`` continue to work.
+All symbols are forwarded from ``hackagent.errors`` so imports that resolve
+through ``hackagent.server.errors`` continue to work.
 """
 
 from hackagent.errors import (  # noqa: F401

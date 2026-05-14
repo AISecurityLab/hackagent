@@ -247,18 +247,16 @@ def execute(
                     llm_identifier or "n/a",
                 )
                 logger.info(
-                    "[%s][Decoration Step %d] input (len=%d):\n%s",
+                    "[%s][Decoration Step %d] input_len=%d",
                     _label,
                     step_idx,
                     len(input_prompt),
-                    input_prompt,
                 )
                 logger.info(
-                    "[%s][Decoration Step %d] output (len=%d):\n%s",
+                    "[%s][Decoration Step %d] output_len=%d",
                     _label,
                     step_idx,
                     output_len,
-                    output_prompt,
                 )
 
                 current_prompt = output_prompt
@@ -276,12 +274,11 @@ def execute(
             }
             return
 
-        # Log the decorated prompt (full)
+        # Log metadata only (avoid printing full prompt content)
         logger.info(
-            "[%s] Full prompt (len=%d):\n%s",
+            "[%s] Decorated prompt length=%d",
             _label,
             len(decorated_prompt),
-            decorated_prompt,
         )
 
         # Step 2: Send to target model
@@ -306,13 +303,12 @@ def execute(
         generated_text = response.get("generated_text")
         error_message = response.get("error_message")
 
-        # Log the response (full)
+        # Log metadata only (avoid printing full response content)
         if generated_text:
             logger.info(
-                "[%s] Full response (len=%d):\n%s",
+                "[%s] Response length=%d",
                 _label,
                 len(generated_text),
-                generated_text,
             )
         else:
             logger.info(f"[{_label}] No response (error={error_message})")

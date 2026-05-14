@@ -47,6 +47,6 @@ architecture separation between orchestration and attack algorithms.
 **Example**:
 
   &gt;&gt;&gt; MyOrchestrator = create_orchestrator(&quot;MyAttack&quot;, MyAttackClass)
-  &gt;&gt;&gt; orchestrator = MyOrchestrator(hack_agent)
+  &gt;&gt;&gt; orchestrator = MyOrchestrator(hackagent_agent)
   &gt;&gt;&gt; results = orchestrator.execute(attack_config)
 

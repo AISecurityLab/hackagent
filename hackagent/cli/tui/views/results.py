@@ -936,7 +936,7 @@ def _format_result_full_details(
 ) -> str:
     """Format full details for a single result with 3 sections: Result, Traces, Config.
 
-    Mirrors the remote dashboard layout with tabbed sections.
+    Mirrors the dashboard layout with tabbed sections.
 
     Args:
         result: Result object
@@ -1270,7 +1270,7 @@ class ResultsTab(BaseTab):
         self._total_count: int = (
             0  # Total number of runs from API (for correct numbering)
         )
-        # Local-mode enrichment caches (populated in refresh_data)
+        # Enrichment caches (populated in refresh_data)
         self._agent_map: dict[str, str] = {}  # agent_id str -> agent name
         self._attack_map: dict[str, str] = {}  # attack_id str -> attack type
         self._result_counts: dict[
@@ -1469,7 +1469,7 @@ class ResultsTab(BaseTab):
                 except (ValueError, TypeError):
                     limit = 25
 
-            # Validate configuration — works in local mode too
+            # Validate configuration
             pass
 
             backend = self.create_backend()
@@ -1478,7 +1478,7 @@ class ResultsTab(BaseTab):
             runs_result = backend.list_runs(page=1, page_size=limit)
             all_runs = runs_result.items
 
-            # Build agent name cache (for local RunRecord which only has agent_id)
+            # Build agent name cache (RunRecord only has agent_id)
             self._agent_map.clear()
             try:
                 agents_result = backend.list_agents(page=1, page_size=500)
@@ -1555,21 +1555,7 @@ class ResultsTab(BaseTab):
             error_type = type(e).__name__
             error_msg = str(e)
 
-            # Provide helpful error messages
-            if "timeout" in error_msg.lower() or "TimeoutException" in error_type:
-                self._show_empty_state(
-                    f"⚠️ Connection Timeout\n\n"
-                    f"Cannot reach API: {self.cli_config.base_url}\n"
-                    f"Check your network connection and retry."
-                )
-            elif "401" in error_msg or "authentication" in error_msg.lower():
-                self._show_empty_state(
-                    "🔒 Authentication Failed\n\nYour API key is invalid.\nRun: hackagent config set --api-key YOUR_KEY"
-                )
-            else:
-                self._show_empty_state(
-                    f"Error loading results: {error_type}\n{error_msg}"
-                )
+            self._show_empty_state(f"Error loading results: {error_type}\n{error_msg}")
 
     def _show_empty_state(self, message: str) -> None:
         """Show an empty state message when no data is available.
@@ -1635,7 +1621,7 @@ class ResultsTab(BaseTab):
                     else:
                         status_display = "[dim]❓[/dim]"
 
-                # Get agent name — remote Run has agent_name, local RunRecord only has agent_id
+                # Get agent name — prefer explicit name, otherwise resolve agent_id
                 if hasattr(run, "agent_name") and run.agent_name:
                     agent_name = run.agent_name
                 elif hasattr(run, "agent_id"):
@@ -1664,7 +1650,7 @@ class ResultsTab(BaseTab):
                 if len(attack_name) > 16:
                     attack_name = attack_name[:13] + "..."
 
-                # Get created time — remote uses timestamp, local uses created_at
+                # Get created time from timestamp/created_at
                 created_time = "N/A"
                 ts = getattr(run, "timestamp", None) or getattr(run, "created_at", None)
                 if ts:
@@ -1721,7 +1707,7 @@ class ResultsTab(BaseTab):
                     key=run_id_str,
                 )
 
-            # Calculate overall statistics — use cached counts for local RunRecords
+            # Calculate overall statistics — use cached counts when results are not embedded
             total_success = 0
             total_failed = 0
             total_pending = 0
@@ -1904,7 +1890,7 @@ class ResultsTab(BaseTab):
             )
             return
 
-        # Format creation date — remote uses timestamp, local uses created_at
+        # Format creation date from timestamp/created_at
         created = "Unknown"
         ts = getattr(run, "timestamp", None) or getattr(run, "created_at", None)
         if ts:
@@ -1912,7 +1898,7 @@ class ResultsTab(BaseTab):
                 ts, fmt="%Y-%m-%d %H:%M:%S", fallback=str(ts)
             )
 
-        # Resolve agent name — remote has agent_name, local has agent_id
+        # Resolve agent name
         if hasattr(run, "agent_name") and run.agent_name:
             agent_display = run.agent_name
         elif hasattr(run, "agent_id"):
@@ -1922,10 +1908,10 @@ class ResultsTab(BaseTab):
         else:
             agent_display = "Unknown"
 
-        # Resolve organisation name — local mode is always "Local"
+        # Resolve organisation name
         org_display = getattr(run, "organization_name", None) or "Local"
 
-        # Fetch results for this run when they are not embedded (local RunRecord)
+        # Fetch results for this run when they are not embedded
         run_results: list[Any] = []
         if hasattr(run, "results") and run.results:
             run_results = list(run.results)
@@ -2005,7 +1991,7 @@ class ResultsTab(BaseTab):
 [bold cyan]╚{"═" * 50}╝[/bold cyan]
 
 """
-        # ── Summary Stats Bar (like remote dashboard) ──────────────────
+        # ── Summary Stats Bar ───────────────────────────────────────────
         vuln_count = eval_summary["SUCCESSFUL_JAILBREAK"]
         mitigated_count = eval_summary["FAILED_JAILBREAK"]
         error_count = eval_summary["ERROR"]
@@ -2172,7 +2158,7 @@ class ResultsTab(BaseTab):
                 )
             )
 
-            # Pre-fetch traces for all results from the backend (local mode)
+            # Pre-fetch traces for all results from the backend
             _backend_for_traces = self.create_backend()
             _traces_by_result: dict[str, list] = {}
             for _r in run_results:
@@ -2208,10 +2194,10 @@ class ResultsTab(BaseTab):
                 else:
                     css_class += " -pending"
 
-                # Resolve traces — embedded (remote) or pre-fetched (local)
+                # Resolve traces — embedded or pre-fetched
                 result_traces = _traces_by_result.get(str(result.id)) or []
 
-                # Create the title (matches remote: "Test #N ... Status")
+                # Create the title
                 eval_status_short = ""
                 if (
                     "SUCCESSFUL" in eval_status.upper()

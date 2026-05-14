@@ -23,25 +23,18 @@ Resolves the agent type from a string or AgentTypeEnum member.
 #### resolve\_api\_token
 
 ```python
-def resolve_api_token(direct_api_key_param: Optional[str],
+def resolve_api_token(direct_api_key_param: Optional[str] = None,
                       config_file_path: Optional[str] = None) -> Optional[str]
 ```
 
-Resolves the API token with standardized priority order.
+Resolves the API token with this priority:
 
-Priority order:
-1. Direct api_key parameter (highest priority)
-2. HACKAGENT_API_KEY environment variable
-3. Config file (~/.config/hackagent/config.json or specified path)
-4. Returns None → local mode, no remote tracking
-
-**Arguments**:
-
-- `direct_api_key_param` - API key provided directly as parameter
-- `config_file_path` - Optional path to config file (defaults to ~/.config/hackagent/config.json)
-  
+1. direct `api_key` parameter
+2. `HACKAGENT_API_KEY` environment variable
+3. config file (`~/.config/hackagent/config.json`)
+4. `None` (local mode fallback)
 
 **Returns**:
 
-- `Optional[str]` - The resolved API token, or None (local mode)
+- `Optional[str]` - resolved API token when available, otherwise `None` for local mode.
 

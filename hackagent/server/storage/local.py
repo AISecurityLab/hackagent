@@ -5,8 +5,8 @@
 LocalBackend — StorageBackend implementation backed by SQLite.
 
 Selected automatically by HackAgent when no API key is available.  All data
-is persisted in ~/.local/share/hackagent/hackagent.db with the same schema
-as the remote Django models, enabling identical TUI/SDK behaviour offline.
+is persisted in ~/.local/share/hackagent/hackagent.db with a stable schema
+for TUI/SDK access.
 
 Thread safety: a per-instance lock ensures safe concurrent writes from the
 goal-batch parallel execution workers.
@@ -130,8 +130,7 @@ class LocalBackend:
     SQLite-backed StorageBackend.
 
     All tracking data (agents, attacks, runs, results, traces) is stored in a
-    single SQLite database.  The schema mirrors the remote Django models so that
-    TUI views and the SDK work identically in both online and offline modes.
+    single SQLite database so TUI views and the SDK can access the same data.
     """
 
     def __init__(self, db_path: Optional[str] = None) -> None:
@@ -524,7 +523,7 @@ class LocalBackend:
                 buckets["jailbreaks"] += 1
             elif b == "mitigated":
                 buckets["mitigated"] += 1
-            elif b == "error":
+            elif b in {"failed", "error"}:
                 buckets["error"] += 1
             elif b == "pending":
                 buckets["pending"] += 1

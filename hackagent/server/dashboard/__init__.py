@@ -4,8 +4,8 @@
 """
 HackAgent Dashboard
 
-A lightweight, self-hosted web dashboard that reads directly from the local
-SQLite storage (or a remote backend when an API key is configured).
+A lightweight, self-hosted web dashboard that can read from local SQLite
+storage or a remote backend.
 
 Usage:
     from hackagent.server.dashboard import create_app

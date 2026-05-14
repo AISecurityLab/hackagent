@@ -7,9 +7,13 @@ Examples Commands
 Launch ready-to-run example scenarios from the CLI.
 """
 
-import importlib.util
+import importlib
+import os
+import socket
 import shutil
 import subprocess
+import sys
+import time
 from pathlib import Path
 from types import ModuleType
 from urllib.error import URLError
@@ -23,6 +27,108 @@ from hackagent.cli.config import CLIConfig
 from hackagent.cli.utils import handle_errors
 
 console = Console()
+
+
+def _get_repo_root() -> Path:
+    """Return repository root directory from this module location."""
+    return Path(__file__).resolve().parents[3]
+
+
+def _resolve_example_dir(relative_path: str) -> Path:
+    """Resolve an example directory across editable and installed layouts."""
+    relative = Path(relative_path)
+    candidates = [
+        _get_repo_root() / "examples" / relative,
+        Path(__file__).resolve().parents[2] / "examples" / relative,
+    ]
+
+    for candidate in candidates:
+        if candidate.exists() and candidate.is_dir():
+            return candidate
+
+    searched = "\n".join(f" - {candidate}" for candidate in candidates)
+    raise click.ClickException(
+        f"Example directory '{relative_path}' not found. Checked:\n{searched}"
+    )
+
+
+def _run_python_script(script_path: Path, env: dict[str, str] | None = None) -> None:
+    """Run a Python script and stream output to the current terminal."""
+    if not script_path.exists() or not script_path.is_file():
+        raise click.ClickException(f"Script not found: {script_path}")
+
+    result = subprocess.run(
+        [sys.executable, script_path.name],
+        cwd=str(script_path.parent),
+        env=env,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise click.ClickException(
+            f"Script failed ({script_path.name}) with exit code {result.returncode}"
+        )
+
+
+def _start_background_python(
+    script_path: Path,
+    process_name: str,
+    env: dict[str, str] | None = None,
+) -> subprocess.Popen:
+    """Start a Python script as background process inheriting terminal I/O."""
+    if not script_path.exists() or not script_path.is_file():
+        raise click.ClickException(f"Script not found: {script_path}")
+
+    console.print(f"[cyan]▶️ Starting {process_name}...[/cyan]")
+    try:
+        return subprocess.Popen(
+            [sys.executable, script_path.name],
+            cwd=str(script_path.parent),
+            env=env,
+        )
+    except OSError as exc:
+        raise click.ClickException(f"Failed to start {process_name}: {exc}") from exc
+
+
+def _wait_for_tcp_port(
+    host: str,
+    port: int,
+    timeout_seconds: float,
+    process: subprocess.Popen | None = None,
+    process_name: str = "service",
+) -> None:
+    """Wait until a TCP port is reachable or fail with a clear error."""
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        if process is not None and process.poll() is not None:
+            raise click.ClickException(
+                f"{process_name} exited before becoming ready (exit code {process.returncode})"
+            )
+
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(1.0)
+            try:
+                sock.connect((host, port))
+                return
+            except OSError:
+                time.sleep(0.5)
+
+    raise click.ClickException(
+        f"{process_name} did not become ready at {host}:{port} within {timeout_seconds:.0f}s"
+    )
+
+
+def _stop_background_process(process: subprocess.Popen, process_name: str) -> None:
+    """Terminate a background process gracefully, then force kill if needed."""
+    if process.poll() is not None:
+        return
+
+    console.print(f"[cyan]⏹️ Stopping {process_name}...[/cyan]")
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=5)
 
 
 def _extract_ollama_models_from_demo_cfg(demo_cfg: dict) -> dict[str, str]:
@@ -41,8 +147,18 @@ def _extract_ollama_models_from_demo_cfg(demo_cfg: dict) -> dict[str, str]:
     if attacker_model:
         models["attacker"] = str(attacker_model)
 
+    judge_model = None
     judge_cfg = attack_cfg.get("judge", {})
-    judge_model = judge_cfg.get("identifier")
+    if isinstance(judge_cfg, dict):
+        judge_model = judge_cfg.get("identifier")
+
+    if not judge_model:
+        judges_cfg = attack_cfg.get("judges")
+        if isinstance(judges_cfg, list) and judges_cfg:
+            first_judge = judges_cfg[0]
+            if isinstance(first_judge, dict):
+                judge_model = first_judge.get("identifier")
+
     if judge_model:
         models["judge"] = str(judge_model)
 
@@ -190,9 +306,8 @@ def _patch_textual_terminal_queries() -> None:
 
 
 def _load_ollama_demo_module() -> ModuleType:
-    """Load examples/ollama/demo.py as a module."""
-    repo_root = Path(__file__).resolve().parents[3]
-    demo_path = repo_root / "examples" / "ollama" / "demo.py"
+    """Load hackagent/examples/ollama/demo.py as a module."""
+    demo_path = _resolve_example_dir("ollama") / "demo.py"
 
     spec = importlib.util.spec_from_file_location("hackagent_ollama_demo", demo_path)
     if spec is None or spec.loader is None:
@@ -227,7 +342,7 @@ def ollama(ctx):
     demo_module = _load_ollama_demo_module()
     if not hasattr(demo_module, "build_ollama_demo_config"):
         raise click.ClickException(
-            "examples/ollama/demo.py must define build_ollama_demo_config()"
+            "hackagent/examples/ollama/demo.py must define build_ollama_demo_config()"
         )
 
     demo_cfg = demo_module.build_ollama_demo_config()
@@ -274,3 +389,82 @@ def ollama(ctx):
     except Exception as e:
         console.print(f"[bold red]❌ TUI failed to start: {e}[/bold red]")
         ctx.exit(1)
+
+
+@examples.command(name="quick-evaluation")
+@handle_errors
+def quick_evaluation():
+    """Run the OpenRouter quick evaluation example (h4rm3l)."""
+    example_dir = _resolve_example_dir("openai_sdk/quick_evaluation")
+    script_path = example_dir / "run_h4rm3l.py"
+
+    console.print("[bold cyan]🚀 Running quick evaluation (h4rm3l)...[/bold cyan]")
+    _run_python_script(script_path)
+    console.print("[bold green]✅ quick-evaluation completed[/bold green]")
+
+
+@examples.command(name="pc-tool")
+@handle_errors
+def pc_tool():
+    """Run the PC Tool sandbox example: start agent, then launch attack."""
+    example_dir = _resolve_example_dir("openai_sdk/pc_tool_sandbox")
+    agent_script = example_dir / "agent.py"
+    attack_script = example_dir / "hack.py"
+
+    port = int(os.environ.get("PORT", "5001"))
+    agent_process = _start_background_python(agent_script, "PC Tool agent")
+
+    try:
+        _wait_for_tcp_port(
+            host="127.0.0.1",
+            port=port,
+            timeout_seconds=30,
+            process=agent_process,
+            process_name="PC Tool agent",
+        )
+        console.print(
+            f"[green]✅ PC Tool agent ready at:[/green] http://127.0.0.1:{port}/v1/chat/completions"
+        )
+
+        attack_env = os.environ.copy()
+        attack_env["HACKAGENT_PC_TOOL_EXTERNAL_AGENT"] = "1"
+        _run_python_script(attack_script, env=attack_env)
+        console.print("[bold green]✅ pc-tool completed[/bold green]")
+    finally:
+        _stop_background_process(agent_process, "PC Tool agent")
+
+
+@examples.command(name="rag")
+@handle_errors
+def rag_example():
+    """Run the RAG example: ingest if needed, start server, then run attack."""
+    example_dir = _resolve_example_dir("openai_sdk/rag")
+    ingest_script = example_dir / "ingest.py"
+    server_script = example_dir / "agent_server.py"
+    attack_script = example_dir / "hack.py"
+
+    db_index_dir = example_dir / "db_index"
+    if not db_index_dir.exists() or not db_index_dir.is_dir():
+        console.print("[yellow]📦 db_index not found. Running ingest.py...[/yellow]")
+        _run_python_script(ingest_script)
+    else:
+        console.print(
+            f"[green]✅ Found existing vector index:[/green] {db_index_dir.name}"
+        )
+
+    server_process = _start_background_python(server_script, "RAG agent server")
+
+    try:
+        _wait_for_tcp_port(
+            host="127.0.0.1",
+            port=8000,
+            timeout_seconds=45,
+            process=server_process,
+            process_name="RAG agent server",
+        )
+        console.print("[green]✅ RAG server ready at:[/green] http://127.0.0.1:8000/v1")
+
+        _run_python_script(attack_script)
+        console.print("[bold green]✅ rag example completed[/bold green]")
+    finally:
+        _stop_background_process(server_process, "RAG agent server")

@@ -50,7 +50,7 @@ Concrete orchestrators only need to specify:
 
 **Attributes**:
 
-- `hack_agent` - HackAgent instance providing context
+- `hackagent_agent` - HackAgent instance providing context
 - `client` - Authenticated client for API communication
 - `attack_type` - Attack identifier (must be set by subclass)
 - `attack_impl_class` - Implementation class (must be set by subclass)
@@ -66,14 +66,14 @@ Must be overridden by subclass
 #### \_\_init\_\_
 
 ```python
-def __init__(hack_agent: "HackAgent")
+def __init__(hackagent_agent: "HackAgent")
 ```
 
 Initialize orchestrator with HackAgent instance.
 
 **Arguments**:
 
-- `hack_agent` - HackAgent instance providing client and configuration
+- `hackagent_agent` - HackAgent instance providing client and configuration
   
 
 **Raises**:

@@ -2,7 +2,7 @@
 sidebar_position: 1
 ---
 
-# Python SDK API Reference
+# Python SDK Reference
 
 This section provides detailed documentation for all classes, methods, and functions
 in the HackAgent Python SDK, auto-generated from source-code docstrings.

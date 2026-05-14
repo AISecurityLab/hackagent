@@ -134,3 +134,4 @@ dmypy.json
 
 
 .copilotignore
+tests/e2e/attacks/

@@ -279,7 +279,7 @@ graph TD
     E --> F[Response]
     F --> G[Evaluation/Judges]
     G --> H[Results]
-    H --> I[Dashboard Sync]
+    H --> I[Local Storage]
     
     style B fill:#e1f5fe
     style G fill:#fff3e0
@@ -292,7 +292,7 @@ graph TD
 2. **Attack Implementation**: Contains the specific attack logic (AdvPrefix, PAIR, Baseline)
 3. **Agent Router**: Handles communication with target agents across different frameworks
 4. **Judges**: Evaluate attack success using various criteria (HarmBench, custom objectives)
-5. **Dashboard Sync**: Automatically uploads results to the HackAgent platform
+5. **Local Storage**: Saves results to the local SQLite database for review via TUI and CLI results commands
 
 ---
 

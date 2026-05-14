@@ -57,7 +57,7 @@ def create_orchestrator(
 
     Example:
         >>> MyOrchestrator = create_orchestrator("MyAttack", MyAttackClass)
-        >>> orchestrator = MyOrchestrator(hack_agent)
+        >>> orchestrator = MyOrchestrator(hackagent_agent)
         >>> results = orchestrator.execute(attack_config)
     """
     class_attrs = {

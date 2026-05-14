@@ -6,6 +6,7 @@ title: " "
 hide_title: true
 ---
 
+
 <div style={{textAlign: 'center', marginBottom: '2rem'}}>
   <img 
     src="/img/banner.svg" 
@@ -73,8 +74,8 @@ HackAgent automates testing for these vulnerabilities using **research-backed at
 
 <div style={{minWidth: '300px', maxWidth: '600px', width: '100%', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '1px solid var(--ifm-color-emphasis-300)', textAlign: 'center'}}>
   <div style={{fontSize: '1.1rem', marginBottom: '0.75rem'}}><strong>Quick Install</strong></div>
-  <code style={{padding: '0.5rem 1rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.9rem'}}>pip install hackagent</code>
-  <div style={{marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--ifm-color-emphasis-600)'}}>No API key required — works locally out of the box</div>
+  <pre style={{padding: '0.5rem 1rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.9rem', margin: 0, overflowX: 'auto'}}><code>{`python3 -m venv .venv\nsource .venv/bin/activate\npip install git+https://github.com/AISecurityLab/HackAgent.git`}</code></pre>
+  <div style={{marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--ifm-color-emphasis-600)'}}>Works locally out of the box, with optional cloud sync via HACKAGENT_API_KEY</div>
 </div>
 
 <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center'}}>
@@ -111,52 +112,92 @@ HackAgent is built with a modular architecture that makes it easy to test any AI
 <div style={{minWidth: '300px', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '1px solid var(--ifm-color-emphasis-300)'}}>
   <div style={{fontSize: '1.1rem', marginBottom: '0.75rem', textAlign: 'center'}}><strong>Inputs</strong></div>
   <div style={{marginBottom: '0.5rem'}}>
-    <div style={{fontSize: '0.75rem', marginBottom: '0.3rem'}}>Goals</div>
-    <div style={{display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'center'}}>
-      <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem'}}>Custom Goals</span>
+    <div className="architecture-hover-section">
+      <div className="architecture-hover-trigger" tabIndex={0}>Goals</div>
+      <div className="architecture-hover-content">
+        <div style={{display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'center'}}>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem'}}>Custom Goals</span>
+        </div>
+      </div>
     </div>
   </div>
   <div>
-    <div style={{fontSize: '0.75rem', marginBottom: '0.3rem'}}>Datasets</div>
-    <div style={{display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'center'}}>
-      <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem'}}>AgentHarm</span>
-      <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem'}}>HarmBench</span>
-      <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem'}}>StrongREJECT</span>
+    <div className="architecture-hover-section">
+      <div className="architecture-hover-trigger" tabIndex={0}>Datasets</div>
+      <div className="architecture-hover-content">
+        <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.4rem', maxWidth: '980px', margin: '0 auto'}}>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>AgentHarm</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>JailbreakBench</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>HarmBench</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>AdvBench</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>StrongREJECT</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>BeaverTails</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>SALAD-Bench</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>WMDP (Bio/Cyber/Chem)</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>AIR-Bench</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>ToxicChat</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>HuggingFace Custom</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>File (JSON/CSV/JSONL/TXT)</span>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
 <div style={{fontSize: '1.2rem'}}>↓</div>
 
-<div style={{display: 'flex', gap: '1rem', alignItems: 'stretch', flexWrap: 'wrap', justifyContent: 'center'}}>
-  <div style={{minWidth: '280px', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '1px solid var(--ifm-color-emphasis-300)'}}>
+<div className="architecture-middle-row">
+  <div className="architecture-core-box" style={{padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '1px solid var(--ifm-color-emphasis-300)'}}>
     <div style={{fontSize: '1.1rem', marginBottom: '0.75rem', textAlign: 'center'}}><strong>HackAgent</strong></div>
     <div style={{marginBottom: '0.5rem'}}>
-      <div style={{fontSize: '0.75rem', marginBottom: '0.3rem'}}>Attack Engine</div>
-      <div style={{display: 'flex', gap: '0.4rem', flexWrap: 'wrap'}}>
-        <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem'}}>AdvPrefix</span>
-        <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem'}}>PAIR</span>
-        <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem'}}>Baseline</span>
+      <div className="architecture-hover-section">
+        <div className="architecture-hover-trigger" tabIndex={0}>Attack Engine</div>
+        <div className="architecture-hover-content">
+          <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.4rem'}}>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>AdvPrefix</span>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>AutoDAN-Turbo</span>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>PAIR</span>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>TAP</span>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>FlipAttack</span>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>BoN</span>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>h4rm3l</span>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>CipherChat</span>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>PAP</span>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>Baseline</span>
+          </div>
+        </div>
       </div>
     </div>
     <div>
-      <div style={{fontSize: '0.75rem', marginBottom: '0.3rem'}}>LLM Models</div>
-      <div style={{display: 'flex', gap: '0.4rem', flexWrap: 'wrap'}}>
-        <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem'}}>Generator</span>
-        <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem'}}>Judge</span>
+      <div className="architecture-hover-section">
+        <div className="architecture-hover-trigger" tabIndex={0}>LLM Models</div>
+        <div className="architecture-hover-content">
+          <div style={{display: 'flex', gap: '0.4rem', flexWrap: 'wrap'}}>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem'}}>Attacker/Generator/Decorator</span>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem'}}>Summarizer (AutoDAN-Turbo only)</span>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem'}}>Judge/Scorer</span>
+            <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem'}}>Category classifier</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
   
   <div style={{display: 'flex', alignItems: 'center', fontSize: '1.2rem'}}>⇄</div>
   
-  <div style={{minWidth: '200px', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '1px solid var(--ifm-color-emphasis-300)'}}>
-    <div style={{fontSize: '1.1rem', marginBottom: '0.75rem', textAlign: 'center'}}><strong>Your Agent</strong></div>
-    <div style={{display: 'flex', flexDirection: 'column', gap: '0.4rem'}}>
-      <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>Google ADK</span>
-      <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>OpenAI SDK</span>
-      <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>LiteLLM</span>
-      <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>LangChain</span>
+  <div className="architecture-agent-box" style={{padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '1px solid var(--ifm-color-emphasis-300)'}}>
+    <div className="architecture-hover-section architecture-hover-title-section">
+      <div className="architecture-hover-trigger architecture-hover-trigger-title" tabIndex={0}><strong>Your Agent</strong></div>
+      <div className="architecture-hover-content">
+        <div style={{display: 'flex', flexDirection: 'column', gap: '0.4rem'}}>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>Google ADK</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>OpenAI SDK</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>LiteLLM</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>LangChain</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>Ollama</span>
+          <span style={{padding: '0.25rem 0.5rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center'}}>vLLM</span>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -164,11 +205,15 @@ HackAgent is built with a modular architecture that makes it easy to test any AI
 <div style={{fontSize: '1.2rem'}}>↓</div>
 
 <div style={{minWidth: '300px', padding: '1rem', borderRadius: '8px', background: 'var(--ifm-background-surface-color)', border: '1px solid var(--ifm-color-emphasis-300)'}}>
-  <div style={{fontSize: '1.1rem', marginBottom: '0.75rem', textAlign: 'center'}}><strong>Output</strong></div>
-  <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center'}}>
-    <span style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem'}}>Results</span>
-    <span style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem'}}>Reports</span>
-    <span style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem'}}>Dashboard</span>
+  <div className="architecture-hover-section architecture-hover-title-section">
+    <div className="architecture-hover-trigger architecture-hover-trigger-title" tabIndex={0}><strong>Output</strong></div>
+    <div className="architecture-hover-content">
+      <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center'}}>
+        <span style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem'}}>Results</span>
+        <span style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem'}}>Reports</span>
+        <span style={{padding: '0.3rem 0.6rem', background: 'var(--ifm-color-emphasis-100)', borderRadius: '4px', fontSize: '0.8rem'}}>Dashboard</span>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -176,11 +221,11 @@ HackAgent is built with a modular architecture that makes it easy to test any AI
 
 | Component | Description |
 |-----------|-------------|
-| **Attack Engine** | Orchestrates attacks using techniques like AdvPrefix, PAIR, and Baseline |
+| **Attack Engine** | Orchestrates attacks using AdvPrefix, AutoDAN-Turbo, PAIR, TAP, FlipAttack, BoN, h4rm3l, CipherChat, PAP, and Baseline |
 | **Generator** | LLM that creates adversarial prompts to test the target agent |
 | **Judge** | LLM that evaluates whether attacks successfully bypassed safety measures |
 | **Target Agent** | Your AI agent being tested (supports multiple frameworks) |
-| **Datasets** | Pre-built goal sets from AI safety benchmarks |
+| **Datasets** | Pre-built benchmark presets plus custom HuggingFace/file datasets |
 
 
 ---

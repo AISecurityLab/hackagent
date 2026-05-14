@@ -95,7 +95,7 @@ Calculate Per-Judge Strictness (Bias Gap) from attack judges only.
 
 **Returns**:
 
-  Dict with each judge&#x27;s strictness (average of votes)
+  Dict with each judge&#x27;s strictness (safe-rate = 1 - average jailbreak vote)
   + overall bias gap. Judge keys are only the eval_* columns present
   in results, plus &quot;bias_gap&quot;.
 

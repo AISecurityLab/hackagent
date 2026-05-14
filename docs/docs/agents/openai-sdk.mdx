@@ -30,7 +30,9 @@ OpenAI SDK is the official Python library for interacting with OpenAI's API, inc
 
 4. **Install HackAgent** (includes OpenAI SDK):
    ```bash
-   pip install hackagent
+    python3 -m venv .venv
+    source .venv/bin/activate
+    pip install git+https://github.com/AISecurityLab/HackAgent.git
    ```
 
 5. **(Optional) For Azure OpenAI**, set custom endpoint:
@@ -190,7 +192,9 @@ export OPENAI_API_KEY_PROD="sk-prod-..."
 ```bash
 pip install openai
 # or
-pip install hackagent  # OpenAI SDK is included
+python3 -m venv .venv
+source .venv/bin/activate
+pip install git+https://github.com/AISecurityLab/HackAgent.git  # OpenAI SDK is included
 ```
 
 ### Authentication Errors
@@ -219,12 +223,12 @@ except Exception as e:
 
 - [OpenAI API Documentation](https://platform.openai.com/docs)
 - [OpenAI SDK GitHub](https://github.com/openai/openai-python)
-- [HackAgent Attack Tutorial](../getting-started/attack-tutorial.mdx)
+- [HackAgent Evaluation Tutorial](../getting-started/attack-tutorial.mdx)
 - [Function Calling Guide](https://platform.openai.com/docs/guides/function-calling)
 
 ## Next Steps
 
-1. Review results on your [HackAgent Dashboard](https://app.hackagent.dev)
+1. Review results on your configured dashboard (if any)
 2. Try different models and configurations
 3. Test with custom attack goals specific to your use case
 4. Implement fixes and re-test

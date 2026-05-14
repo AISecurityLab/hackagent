@@ -8,7 +8,6 @@ from hackagent import utils
 from hackagent.errors import HackAgentError
 from hackagent.router import AgentRouter
 from hackagent.router.types import AgentTypeEnum
-from hackagent.server.storage.base import StorageBackend
 
 # Lazy import for attack orchestrators to avoid ~0.5s startup delay
 if TYPE_CHECKING:
@@ -44,12 +43,11 @@ class HackAgent:
     - Executing automated security tests against the configured agents.
     - Retrieving and handling test results.
 
-    It encapsulates complexities such as API authentication, agent registration
-    with the backend (via `AgentRouter`), and the dynamic dispatch of various
+    It encapsulates complexities such as agent registration
+    with the local backend (via `AgentRouter`), and the dynamic dispatch of various
     attack methodologies.
 
     Attributes:
-        client: An `AuthenticatedClient` instance for API communication.
         router: An `AgentRouter` instance managing the agent's representation
             in the HackAgent backend.
         attack_strategies: A dictionary mapping strategy names to their
@@ -72,7 +70,7 @@ class HackAgent:
         """
         Initializes the HackAgent client and prepares it for interaction.
 
-        This constructor sets up the authenticated API client, loads default
+        This constructor sets up the local storage backend, loads default
         prompts, resolves the agent type, and initializes the agent router
         to ensure the agent is known to the backend. It also prepares available
         attack strategies.
@@ -90,10 +88,6 @@ class HackAgent:
                 String values are automatically converted to the corresponding
                 `AgentTypeEnum` member. Defaults to `AgentTypeEnum.UNKNOWN` if
                 not specified or if an invalid string is provided.
-            base_url: The base URL for the HackAgent API service.
-            api_key: The API key for authenticating with the HackAgent API.
-                If omitted, the client will attempt to retrieve it from the
-                config file (~/.config/hackagent/config.json).
             raise_on_unexpected_status: If set to `True`, the API client will
                 raise an exception for any HTTP status codes that are not typically
                 expected for a successful operation. Defaults to `False`.
@@ -122,7 +116,7 @@ class HackAgent:
                 raise_on_unexpected_status=raise_on_unexpected_status,
                 timeout=timeout,
             )
-            self.backend: StorageBackend = RemoteBackend(_client)
+            self.backend = RemoteBackend(_client)
             logger.info("HackAgent using remote backend → %s", _base_url)
         else:
             from hackagent.server.storage.local import LocalBackend
@@ -132,8 +126,7 @@ class HackAgent:
                 "HackAgent using local backend → ~/.local/share/hackagent/hackagent.db"
             )
 
-        # Keep self.client as the raw HTTP client for backward compat
-        # (adapters that need it can access it via backend.get_api_key())
+        # Backward compatible raw HTTP client reference.
         self.client = getattr(self.backend, "_client", None)
 
         processed_agent_type = utils.resolve_agent_type(agent_type)
@@ -189,16 +182,16 @@ class HackAgent:
             )
 
             self._attack_strategies = {
-                "advprefix": AdvPrefixOrchestrator(hack_agent=self),
-                "autodan_turbo": AutoDANTurboOrchestrator(hack_agent=self),
-                "baseline": BaselineOrchestrator(hack_agent=self),
-                "bon": BoNOrchestrator(hack_agent=self),
-                "cipherchat": CipherChatOrchestrator(hack_agent=self),
-                "pair": PAIROrchestrator(hack_agent=self),
-                "flipattack": FlipAttackOrchestrator(hack_agent=self),
-                "tap": TAPOrchestrator(hack_agent=self),
-                "h4rm3l": H4rm3lOrchestrator(hack_agent=self),
-                "pap": PAPOrchestrator(hack_agent=self),
+                "advprefix": AdvPrefixOrchestrator(hackagent_agent=self),
+                "autodan_turbo": AutoDANTurboOrchestrator(hackagent_agent=self),
+                "baseline": BaselineOrchestrator(hackagent_agent=self),
+                "bon": BoNOrchestrator(hackagent_agent=self),
+                "cipherchat": CipherChatOrchestrator(hackagent_agent=self),
+                "pair": PAIROrchestrator(hackagent_agent=self),
+                "flipattack": FlipAttackOrchestrator(hackagent_agent=self),
+                "tap": TAPOrchestrator(hackagent_agent=self),
+                "h4rm3l": H4rm3lOrchestrator(hackagent_agent=self),
+                "pap": PAPOrchestrator(hackagent_agent=self),
             }
         return self._attack_strategies
 
@@ -238,7 +231,7 @@ class HackAgent:
             ValueError: If the 'attack_type' is missing from `attack_config` or
                 if the specified 'attack_type' is not a supported/registered
                 strategy.
-            HackAgentError: For issues during API interaction, problems with backend
+            HackAgentError: For issues during backend
                 agent operations, or other unexpected errors during the attack process.
         """
         try:

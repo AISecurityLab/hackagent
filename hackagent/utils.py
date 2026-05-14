@@ -3,7 +3,6 @@
 
 import json
 import os
-from hackagent.logger import get_logger
 from pathlib import Path
 from typing import Optional, Union
 
@@ -11,12 +10,13 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
+from hackagent.logger import get_logger
 from hackagent.router.types import AgentTypeEnum
 
 logger = get_logger(__name__)
 
 
-HACKAGENT = """
+HACKAGENT_BANNER = """
 ██╗  ██╗ █████╗  ██████╗██╗  ██╗ █████╗  ██████╗ ███████╗███╗   ██╗████████╗
 ██║  ██║██╔══██╗██╔════╝██║ ██╔╝██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝
 ███████║███████║██║     █████╔╝ ███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║
@@ -25,13 +25,14 @@ HACKAGENT = """
 ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝
 """
 
+# Backward compatible alias used by older CLI/help code.
+HACKAGENT = HACKAGENT_BANNER
 
-def display_hackagent_splash():
-    """Displays the HackAgent splash screen using the pre-defined ASCII art."""
+
+def display_hackagent_splash() -> None:
+    """Display the HackAgent splash screen using the pre-defined ASCII art."""
     console = Console()
-
-    # Create a Text object from the HACKAGENT string
-    title_content = Text(HACKAGENT, style="bold dark_red")
+    title_content = Text(HACKAGENT_BANNER, style="bold dark_red")
 
     splash_panel = Panel(
         title_content,
@@ -45,10 +46,9 @@ def display_hackagent_splash():
 
 
 def resolve_agent_type(agent_type_input: Union[AgentTypeEnum, str]) -> AgentTypeEnum:
-    """Resolves the agent type from a string or AgentTypeEnum member."""
+    """Resolve the agent type from a string or AgentTypeEnum member."""
     if isinstance(agent_type_input, str):
         try:
-            # Convert to uppercase and replace hyphens with underscores for enum matching
             return AgentTypeEnum[agent_type_input.upper().replace("-", "_")]
         except KeyError:
             logger.warning(
@@ -56,55 +56,44 @@ def resolve_agent_type(agent_type_input: Union[AgentTypeEnum, str]) -> AgentType
                 f"Valid types are: {[member.name for member in AgentTypeEnum]}"
             )
             return AgentTypeEnum.UNKNOWN
-    elif isinstance(agent_type_input, AgentTypeEnum):
+
+    if isinstance(agent_type_input, AgentTypeEnum):
         return agent_type_input
-    else:
-        logger.warning(
-            f"Invalid agent_type type: {type(agent_type_input)}. Falling back to UNKNOWN."
-        )
-        return AgentTypeEnum.UNKNOWN
+
+    logger.warning(
+        f"Invalid agent_type type: {type(agent_type_input)}. Falling back to UNKNOWN."
+    )
+    return AgentTypeEnum.UNKNOWN
 
 
 def resolve_api_token(
-    direct_api_key_param: Optional[str],
+    direct_api_key_param: Optional[str] = None,
     config_file_path: Optional[str] = None,
 ) -> Optional[str]:
-    """
-    Resolves the API token with standardized priority order.
+    """Resolve API token with standardized priority order.
 
-    Priority order:
-    1. Direct api_key parameter (highest priority)
+    Priority:
+    1. direct api_key parameter
     2. HACKAGENT_API_KEY environment variable
-    3. Config file (~/.config/hackagent/config.json or specified path)
-    4. Returns None → local mode, no remote tracking
-
-    Args:
-        direct_api_key_param: API key provided directly as parameter
-        config_file_path: Optional path to config file (defaults to ~/.config/hackagent/config.json)
-
-    Returns:
-        Optional[str]: The resolved API token, or None (local mode)
+    3. config file (~/.config/hackagent/config.json or specified path)
+    4. None => local mode
     """
-    # Priority 1: Direct parameter
     if direct_api_key_param is not None:
         logger.debug("Using API token provided directly via 'api_key' parameter.")
         return direct_api_key_param
 
-    # Priority 2: Environment variable
     api_token_from_env = os.environ.get("HACKAGENT_API_KEY")
     if api_token_from_env:
         logger.debug("Using API token from HACKAGENT_API_KEY environment variable.")
         return api_token_from_env
 
-    # Priority 3: Config file
     api_token_from_config = _load_api_key_from_config(config_file_path)
     if api_token_from_config:
         logger.debug("Using API token from config file.")
         return api_token_from_config
 
-    # Priority 4: No token found — run in local mode
     logger.info(
-        "No API key found. HackAgent running in local mode — "
+        "No API key found. HackAgent running in local mode; "
         "results will be stored in ~/.local/share/hackagent/hackagent.db. "
         "Set HACKAGENT_API_KEY or pass api_key= to enable remote tracking."
     )
@@ -141,10 +130,9 @@ def _load_api_key_from_config(config_file_path: Optional[str] = None) -> Optiona
         if api_key:
             logger.debug(f"Found API key in config file: {config_path}")
             return api_key
-        else:
-            logger.debug(f"No api_key found in config file: {config_path}")
-            return None
 
+        logger.debug(f"No api_key found in config file: {config_path}")
+        return None
     except Exception as e:
         logger.warning(f"Error loading config file: {e}")
         return None

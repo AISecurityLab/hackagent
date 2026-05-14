@@ -59,6 +59,7 @@
                 {
                   "items": [
                     "reference/hackagent/attacks/techniques/autodan_turbo/attack",
+                    "reference/hackagent/attacks/techniques/autodan_turbo/config",
                     "reference/hackagent/attacks/techniques/autodan_turbo/core",
                     "reference/hackagent/attacks/techniques/autodan_turbo/dashboard_tracing",
                     "reference/hackagent/attacks/techniques/autodan_turbo/evaluation",
@@ -93,29 +94,22 @@
                 },
                 {
                   "items": [
+                    "reference/hackagent/attacks/techniques/cipherchat/attack",
+                    "reference/hackagent/attacks/techniques/cipherchat/config",
+                    "reference/hackagent/attacks/techniques/cipherchat/evaluation",
+                    "reference/hackagent/attacks/techniques/cipherchat/generation"
+                  ],
+                  "label": "hackagent.attacks.techniques.cipherchat",
+                  "type": "category"
+                },
+                {
+                  "items": [
                     "reference/hackagent/attacks/techniques/flipattack/attack",
                     "reference/hackagent/attacks/techniques/flipattack/config",
                     "reference/hackagent/attacks/techniques/flipattack/evaluation",
                     "reference/hackagent/attacks/techniques/flipattack/generation"
                   ],
                   "label": "hackagent.attacks.techniques.flipattack",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "reference/hackagent/attacks/techniques/pair/attack"
-                  ],
-                  "label": "hackagent.attacks.techniques.pair",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "reference/hackagent/attacks/techniques/tap/attack",
-                    "reference/hackagent/attacks/techniques/tap/config",
-                    "reference/hackagent/attacks/techniques/tap/evaluation",
-                    "reference/hackagent/attacks/techniques/tap/generation"
-                  ],
-                  "label": "hackagent.attacks.techniques.tap",
                   "type": "category"
                 },
                 {
@@ -131,13 +125,11 @@
                 },
                 {
                   "items": [
-                    "reference/hackagent/attacks/techniques/cipherchat/attack",
-                    "reference/hackagent/attacks/techniques/cipherchat/config",
-                    "reference/hackagent/attacks/techniques/cipherchat/evaluation",
-                    "reference/hackagent/attacks/techniques/cipherchat/generation",
-                    "reference/hackagent/attacks/techniques/cipherchat/encode_experts"
+                    "reference/hackagent/attacks/techniques/pair/attack",
+                    "reference/hackagent/attacks/techniques/pair/config",
+                    "reference/hackagent/attacks/techniques/pair/evaluation"
                   ],
-                  "label": "hackagent.attacks.techniques.cipherchat",
+                  "label": "hackagent.attacks.techniques.pair",
                   "type": "category"
                 },
                 {
@@ -151,7 +143,18 @@
                   "label": "hackagent.attacks.techniques.pap",
                   "type": "category"
                 },
-                "reference/hackagent/attacks/techniques/base"
+                {
+                  "items": [
+                    "reference/hackagent/attacks/techniques/tap/attack",
+                    "reference/hackagent/attacks/techniques/tap/config",
+                    "reference/hackagent/attacks/techniques/tap/evaluation",
+                    "reference/hackagent/attacks/techniques/tap/generation"
+                  ],
+                  "label": "hackagent.attacks.techniques.tap",
+                  "type": "category"
+                },
+                "reference/hackagent/attacks/techniques/base",
+                "reference/hackagent/attacks/techniques/config"
               ],
               "label": "hackagent.attacks.techniques",
               "type": "category"
@@ -312,6 +315,7 @@
             },
             {
               "items": [
+                "reference/hackagent/router/tracking/category_classifier",
                 "reference/hackagent/router/tracking/context",
                 "reference/hackagent/router/tracking/coordinator",
                 "reference/hackagent/router/tracking/decorators",
@@ -332,144 +336,23 @@
           "items": [
             {
               "items": [
-                {
-                  "items": [
-                    "reference/hackagent/server/api/agent/agent_create",
-                    "reference/hackagent/server/api/agent/agent_destroy",
-                    "reference/hackagent/server/api/agent/agent_list",
-                    "reference/hackagent/server/api/agent/agent_partial_update",
-                    "reference/hackagent/server/api/agent/agent_retrieve",
-                    "reference/hackagent/server/api/agent/agent_update"
-                  ],
-                  "label": "hackagent.server.api.agent",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "reference/hackagent/server/api/apilogs/apilogs_list",
-                    "reference/hackagent/server/api/apilogs/apilogs_retrieve",
-                    "reference/hackagent/server/api/apilogs/apilogs_summary_retrieve"
-                  ],
-                  "label": "hackagent.server.api.apilogs",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "reference/hackagent/server/api/attack/attack_create",
-                    "reference/hackagent/server/api/attack/attack_destroy",
-                    "reference/hackagent/server/api/attack/attack_list",
-                    "reference/hackagent/server/api/attack/attack_partial_update",
-                    "reference/hackagent/server/api/attack/attack_retrieve",
-                    "reference/hackagent/server/api/attack/attack_update"
-                  ],
-                  "label": "hackagent.server.api.attack",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "reference/hackagent/server/api/checkout/checkout_create"
-                  ],
-                  "label": "hackagent.server.api.checkout",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "reference/hackagent/server/api/generate/v1_chat_completions_create"
-                  ],
-                  "label": "hackagent.server.api.generate",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "reference/hackagent/server/api/judge/judge_create"
-                  ],
-                  "label": "hackagent.server.api.judge",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "reference/hackagent/server/api/key/key_context_retrieve",
-                    "reference/hackagent/server/api/key/key_create",
-                    "reference/hackagent/server/api/key/key_destroy",
-                    "reference/hackagent/server/api/key/key_list",
-                    "reference/hackagent/server/api/key/key_retrieve"
-                  ],
-                  "label": "hackagent.server.api.key",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "reference/hackagent/server/api/organization/organization_create",
-                    "reference/hackagent/server/api/organization/organization_destroy",
-                    "reference/hackagent/server/api/organization/organization_list",
-                    "reference/hackagent/server/api/organization/organization_me_retrieve",
-                    "reference/hackagent/server/api/organization/organization_partial_update",
-                    "reference/hackagent/server/api/organization/organization_retrieve",
-                    "reference/hackagent/server/api/organization/organization_update"
-                  ],
-                  "label": "hackagent.server.api.organization",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "reference/hackagent/server/api/result/result_create",
-                    "reference/hackagent/server/api/result/result_destroy",
-                    "reference/hackagent/server/api/result/result_list",
-                    "reference/hackagent/server/api/result/result_partial_update",
-                    "reference/hackagent/server/api/result/result_retrieve",
-                    "reference/hackagent/server/api/result/result_trace_create",
-                    "reference/hackagent/server/api/result/result_update"
-                  ],
-                  "label": "hackagent.server.api.result",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "reference/hackagent/server/api/run/run_create",
-                    "reference/hackagent/server/api/run/run_destroy",
-                    "reference/hackagent/server/api/run/run_list",
-                    "reference/hackagent/server/api/run/run_partial_update",
-                    "reference/hackagent/server/api/run/run_result_create",
-                    "reference/hackagent/server/api/run/run_retrieve",
-                    "reference/hackagent/server/api/run/run_run_tests_create",
-                    "reference/hackagent/server/api/run/run_update"
-                  ],
-                  "label": "hackagent.server.api.run",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "reference/hackagent/server/api/scripts/generate"
-                  ],
-                  "label": "hackagent.server.api.scripts",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "reference/hackagent/server/api/user/user_create",
-                    "reference/hackagent/server/api/user/user_destroy",
-                    "reference/hackagent/server/api/user/user_list",
-                    "reference/hackagent/server/api/user/user_me_retrieve",
-                    "reference/hackagent/server/api/user/user_me_update",
-                    "reference/hackagent/server/api/user/user_partial_update",
-                    "reference/hackagent/server/api/user/user_retrieve",
-                    "reference/hackagent/server/api/user/user_update"
-                  ],
-                  "label": "hackagent.server.api.user",
-                  "type": "category"
-                },
-                "reference/hackagent/server/api/models"
-              ],
-              "label": "hackagent.server.api",
-              "type": "category"
-            },
-            {
-              "items": [
                 "reference/hackagent/server/storage/base",
                 "reference/hackagent/server/storage/local",
                 "reference/hackagent/server/storage/remote"
               ],
               "label": "hackagent.server.storage",
+              "type": "category"
+            },
+            {
+              "items": [
+                "reference/hackagent/server/api/models",
+                "reference/hackagent/server/api/key/key_context_retrieve",
+                "reference/hackagent/server/api/key/key_create",
+                "reference/hackagent/server/api/key/key_list",
+                "reference/hackagent/server/api/key/key_retrieve",
+                "reference/hackagent/server/api/key/key_destroy"
+              ],
+              "label": "hackagent.server.api",
               "type": "category"
             },
             "reference/hackagent/server/client",
@@ -487,6 +370,6 @@
       "type": "category"
     }
   ],
-  "label": "\ud83d\udd17 API Reference",
+  "label": "\ud83d\udd17 SDK Reference",
   "type": "category"
 }

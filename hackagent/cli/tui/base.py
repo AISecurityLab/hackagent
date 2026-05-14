@@ -14,7 +14,6 @@ from textual.containers import Container
 from textual.widgets import Static
 
 from hackagent.cli.config import CLIConfig
-from hackagent.server.client import AuthenticatedClient
 from hackagent.server.storage.base import StorageBackend
 
 
@@ -37,10 +36,10 @@ class HackAgentHeader(Container):
     """
 
     def compose(self) -> ComposeResult:
-        from hackagent.utils import HACKAGENT
+        from hackagent.utils import HACKAGENT_BANNER
 
         # Display the ASCII logo as-is (now side-by-side format)
-        logo_text = Text(HACKAGENT, style="bold red")
+        logo_text = Text(HACKAGENT_BANNER, style="bold red")
         yield Static(logo_text)
 
 
@@ -72,50 +71,14 @@ class BaseTab(Container):
         self._did_initial_refresh = False
 
     def create_backend(self) -> StorageBackend:
-        """Return a StorageBackend (Remote or Local) based on available credentials.
-
-        Uses RemoteBackend when an api_key is configured; otherwise falls back
-        to LocalBackend so the TUI works completely offline.
+        """Return a LocalBackend for local storage.
 
         Returns:
             StorageBackend instance ready for use.
         """
-        api_key = self.cli_config.api_key
-        if api_key:
-            from hackagent.server.storage.remote import RemoteBackend
+        from hackagent.server.storage.local import LocalBackend
 
-            client = AuthenticatedClient(
-                base_url=self.cli_config.base_url,
-                token=api_key,
-                prefix="Bearer",
-                timeout=httpx.Timeout(self.API_TIMEOUT, connect=self.API_TIMEOUT),
-            )
-            return RemoteBackend(client)
-        else:
-            from hackagent.server.storage.local import LocalBackend
-
-            return LocalBackend()
-
-    def create_api_client(self, timeout: float | None = None) -> AuthenticatedClient:
-        """Create an authenticated API client with timeout.
-
-        Deprecated: prefer create_backend() which works in both local and remote modes.
-
-        Args:
-            timeout: Optional timeout override (uses API_TIMEOUT by default)
-
-        Returns:
-            Configured AuthenticatedClient instance
-        """
-        if timeout is None:
-            timeout = self.API_TIMEOUT
-
-        return AuthenticatedClient(
-            base_url=self.cli_config.base_url,
-            token=self.cli_config.api_key,
-            prefix="Bearer",
-            timeout=httpx.Timeout(timeout, connect=timeout),
-        )
+        return LocalBackend()
 
     def handle_api_error(self, error: Exception, context: str = "API call") -> str:
         """Format API error messages for display.

@@ -48,21 +48,16 @@ class CLIConfig:
         verbose=_UNSET,
     ):
         """Initialize with explicit tracking of what was passed via CLI"""
-        # Store defaults
         self._defaults = {
             "api_key": None,
             "base_url": "https://api.hackagent.dev",
-            "verbose": VERBOSITY_WARNING,  # Default to WARNING level
+            "verbose": VERBOSITY_WARNING,
         }
 
-        # Track what was explicitly passed using sentinel values
         self._cli_overrides = set()
 
-        # Set attributes and track overrides
-        # Only mark as CLI override if explicitly provided AND not None
         if api_key is not _UNSET:
             self.api_key = api_key
-            # Only treat as CLI override if actually provided (not None from missing env var)
             if api_key is not None:
                 self._cli_overrides.add("api_key")
         else:
@@ -70,7 +65,6 @@ class CLIConfig:
 
         if base_url is not _UNSET:
             self.base_url = base_url
-            # Only treat as CLI override if actually provided (not None from missing env var)
             if base_url is not None:
                 self._cli_overrides.add("base_url")
         else:
@@ -78,26 +72,16 @@ class CLIConfig:
 
         if config_file is not _UNSET:
             self.config_file = config_file
-            # config_file doesn't need to be tracked as an override
         else:
             self.config_file = None
 
         if verbose is not _UNSET:
             self.verbose = verbose
-            # Only treat as CLI override if actually provided and > 0
-            # (Click's count option returns 0 when not specified, so 0 means not set)
             if verbose is not None and verbose > 0:
                 self._cli_overrides.add("verbose")
         else:
             self.verbose = self._defaults["verbose"]
 
-        # STANDARDIZED PRIORITY ORDER:
-        # 1. CLI arguments (tracked in _cli_overrides)
-        # 2. Config file
-        # 3. Environment variables
-        # 4. Defaults (already set)
-
-        # Initialize config overrides tracking
         self._config_overrides = set()
 
         if self.config_file:
@@ -105,15 +89,11 @@ class CLIConfig:
         else:
             self._load_default_config()
 
-        # Load from environment AFTER config file (lower priority)
         self._load_from_env()
 
     def _load_from_env(self):
-        """Load from environment variables (only if not already set by CLI or config)"""
-        # Only load from env if not explicitly set via CLI args
-        # AND (not set by config file OR config file has None value)
+        """Load from environment variables (only if not already set by CLI or config)."""
         if "api_key" not in self._cli_overrides:
-            # Use env if no config override, or if config set None
             if (
                 "api_key" not in self._config_overrides
                 or getattr(self, "api_key", None) is None
@@ -122,7 +102,6 @@ class CLIConfig:
                 if env_api_key:
                     self.api_key = env_api_key
 
-        # Only load base_url from env if not set by CLI or config
         if "base_url" not in self._cli_overrides:
             if (
                 "base_url" not in self._config_overrides
@@ -133,7 +112,7 @@ class CLIConfig:
                     self.base_url = env_base_url
 
     def _load_from_file(self, config_path: str):
-        """Load from configuration file (JSON or YAML)"""
+        """Load from configuration file (JSON or YAML)."""
         path = Path(config_path)
         if not path.exists():
             return
@@ -152,29 +131,23 @@ class CLIConfig:
                 else:
                     config_data = json.load(f)
 
-                # STANDARDIZED PRIORITY: CLI args > Config file > Env vars > Defaults
-                # Never override CLI arguments, but override defaults and environment will be loaded later
                 for key, value in config_data.items():
-                    # Never override CLI arguments
                     if key in self._cli_overrides:
                         continue
-
-                    # Set config file values (env will be loaded later for None values)
                     if hasattr(self, key):
                         setattr(self, key, value)
-                        # Track that this was set by config file (even if None)
                         self._config_overrides.add(key)
         except Exception as e:
             raise ValueError(f"Failed to load config file {config_path}: {e}")
 
     def _load_default_config(self):
-        """Load from default config file"""
+        """Load from default config file."""
         default_config = Path.home() / ".config" / "hackagent" / "config.json"
         if default_config.exists():
             self._load_from_file(str(default_config))
 
     def save(self, path: Optional[str] = None):
-        """Save configuration to file"""
+        """Save configuration to file."""
         if not path:
             config_dir = Path.home() / ".config" / "hackagent"
             config_dir.mkdir(parents=True, exist_ok=True)
@@ -185,11 +158,9 @@ class CLIConfig:
             config_dict = {}
             for attr in ["api_key", "base_url", "verbose"]:
                 value = getattr(self, attr, None)
-                # Never persist empty API keys.
                 if attr == "api_key" and isinstance(value, str) and not value.strip():
                     continue
                 if value is not None:
-                    # Only persist base_url if it differs from the default
                     if attr == "base_url" and value == self._defaults["base_url"]:
                         continue
                     config_dict[attr] = value
@@ -199,7 +170,6 @@ class CLIConfig:
         """Validate configuration — warns if no api_key but does NOT raise (local mode)."""
         if not self.base_url:
             raise ValueError("Base URL is required")
-        # api_key is optional: missing means local mode (SQLite backend)
 
     def require_remote(self):
         """Raise an error if no api_key is set (for commands that need cloud access)."""
@@ -211,22 +181,17 @@ class CLIConfig:
             )
 
     def should_show_info(self) -> bool:
-        """Check if INFO level messages should be displayed"""
         return self.verbose >= VERBOSITY_INFO
 
     def should_show_warning(self) -> bool:
-        """Check if WARNING level messages should be displayed"""
         return self.verbose >= VERBOSITY_WARNING
 
     def should_show_debug(self) -> bool:
-        """Check if DEBUG level messages should be displayed"""
         return self.verbose >= VERBOSITY_DEBUG
 
     def get_verbosity_name(self) -> str:
-        """Get the name of the current verbosity level"""
         return VERBOSITY_NAMES.get(self.verbose, "UNKNOWN")
 
     @property
     def default_config_path(self) -> Path:
-        """Get the default configuration file path"""
         return Path.home() / ".config" / "hackagent" / "config.json"

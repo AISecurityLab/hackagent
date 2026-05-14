@@ -88,7 +88,7 @@ This method handles both &#x27;prompt&#x27; (for /api/generate) and &#x27;messag
 
 - `request_data` - The data for the agent to process. Expected keys:
   - &#x27;prompt&#x27; or &#x27;messages&#x27;: The input for generation
-  - &#x27;max_tokens&#x27; or &#x27;max_tokens&#x27; (optional): Override default max tokens
+  - &#x27;max_tokens&#x27; (optional): Override default max tokens
   - &#x27;temperature&#x27; (optional): Override default temperature
   - &#x27;top_p&#x27; (optional): Override default top_p
   - &#x27;top_k&#x27; (optional): Override default top_k

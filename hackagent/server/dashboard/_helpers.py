@@ -78,7 +78,7 @@ def _result_bucket(status: str | None, notes: str | None = None) -> str:
     s = (status or "").upper()
     n = (notes or "").lower()
 
-    # Operational failures must be treated as errors even if the model outcome
+    # Operational failures must be treated as error even if the model outcome
     # would otherwise be considered mitigated.
     if "failed with exception" in n:
         return "error"
@@ -94,12 +94,15 @@ def _result_bucket(status: str | None, notes: str | None = None) -> str:
 
 
 def _eval_label(status: str | None, notes: str | None = None) -> str:
+    s = (status or "").upper()
     bucket = _result_bucket(status, notes)
     if bucket == "jailbreak":
         return "Jailbreak"
     if bucket == "mitigated":
         return "Mitigated"
     if bucket == "error":
+        return "Error"
+    if "ERROR_AGENT" in s:
         return "Error"
     if bucket == "pending":
         return "Pending"

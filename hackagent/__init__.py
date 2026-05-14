@@ -1,7 +1,7 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""A client library for accessing HackAgent API"""
+"""A client library for HackAgent — AI Agent Security Testing"""
 
 from .agent import HackAgent
 from .server.client import AuthenticatedClient, Client

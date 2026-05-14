@@ -55,7 +55,6 @@ def set(ctx, api_key, base_url, verbose):
     if verbose is not None:
         from hackagent.cli.config import VERBOSITY_LEVELS, VERBOSITY_NAMES
 
-        # Try to parse as integer first, then as name
         try:
             verbose_int = int(verbose)
             if 0 <= verbose_int <= 3:
@@ -68,7 +67,6 @@ def set(ctx, api_key, base_url, verbose):
             else:
                 display_info("Verbosity level must be between 0 and 3")
         except ValueError:
-            # Try as name
             verbose_lower = verbose.lower()
             if verbose_lower in VERBOSITY_LEVELS:
                 verbose_int = VERBOSITY_LEVELS[verbose_lower]
@@ -105,7 +103,6 @@ def show(ctx):
     table.add_column("Value", style="green")
     table.add_column("Source", style="dim")
 
-    # Determine sources
     api_key_source = "Not set"
     if cli_config.api_key:
         if ctx.params.get("api_key"):
@@ -124,7 +121,6 @@ def show(ctx):
         else:
             base_url_source = "Environment/Default config"
 
-    # Add rows
     api_key_display = (
         cli_config.api_key[:8] + "..." if cli_config.api_key else "Not set"
     )
@@ -142,7 +138,6 @@ def show(ctx):
 
     console.print(table)
 
-    # Show config file status only in info mode or higher
     if cli_config.should_show_info():
         if cli_config.default_config_path.exists():
             display_info(f"Configuration file: {cli_config.default_config_path}")
@@ -168,7 +163,6 @@ def reset(ctx, confirm):
             display_info("Configuration reset cancelled")
             return
 
-    # Remove config file if it exists
     if cli_config.default_config_path.exists():
         cli_config.default_config_path.unlink()
         display_success("✅ Configuration reset to defaults")
@@ -191,7 +185,6 @@ def validate(ctx):
     try:
         cli_config.validate()
 
-        # Test API connection
         if cli_config.should_show_info():
             with console.status("[bold green]Testing API connection..."):
                 from hackagent.server.client import AuthenticatedClient
@@ -202,7 +195,6 @@ def validate(ctx):
                     prefix="Bearer",
                 )
 
-                # Try to make a simple API call to test connection
                 from hackagent.server.api.key import key_list
 
                 response = key_list.sync_detailed(client=client)
@@ -252,7 +244,6 @@ def import_config(ctx, config_file):
 
         cli_config: CLIConfig = ctx.obj["config"]
 
-        # Update configuration
         updated_fields = []
         if "api_key" in config_data:
             cli_config.api_key = config_data["api_key"]
@@ -261,6 +252,10 @@ def import_config(ctx, config_file):
         if "base_url" in config_data:
             cli_config.base_url = config_data["base_url"]
             updated_fields.append("Base URL")
+
+        if "verbose" in config_data:
+            cli_config.verbose = config_data["verbose"]
+            updated_fields.append("Verbosity")
 
         if updated_fields:
             cli_config.save()

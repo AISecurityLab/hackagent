@@ -185,17 +185,10 @@ def _create_attacker_router(
     """Create an AgentRouter for the attacker LLM."""
     metadata: Dict[str, Any] = {
         "name": attacker_config.get("identifier"),
-        "role": "attacker",
     }
     api_key = attacker_config.get("api_key")
     if api_key:
         metadata["api_key"] = api_key
-
-    # Forward operational keys so the adapter picks them up at init time.
-    for key in ("timeout", "max_tokens", "temperature", "top_p", "top_k", "num_ctx"):
-        val = attacker_config.get(key)
-        if val is not None:
-            metadata[key] = val
 
     return AgentRouter(
         backend=backend,
@@ -396,9 +389,6 @@ def _attack_single_goal(
         "best_score": 0.0,
         "success": False,
     }
-    attacker_errors = 0
-    target_errors = 0
-    last_error_message = ""
 
     for tech_idx, technique in enumerate(techniques):
         _label = f"Goal {goal_idx + 1}, Technique {tech_idx + 1}/{len(techniques)} ({technique[:30]})"
@@ -425,7 +415,6 @@ def _attack_single_goal(
             attacker_error = str(e)
 
         if not attacker_text:
-            attacker_errors += 1
             logger.warning(f"[{_label}] No attacker response (error={attacker_error})")
             # Persist trace even on failure
             if tracker:
@@ -482,9 +471,6 @@ def _attack_single_goal(
             )
             logger.info(f"[{_label}] Response (len={len(response_text)}): {_preview}")
         else:
-            if target_error:
-                target_errors += 1
-                last_error_message = target_error
             logger.info(f"[{_label}] No response (error={target_error})")
 
         # 5. Judge evaluation
@@ -553,19 +539,6 @@ def _attack_single_goal(
         if is_jailbreak:
             logger.info(f"[{_label}] 🎯 Jailbreak confirmed — early stopping")
             break
-
-    # Mark as error when all techniques failed due to infrastructure issues
-    total_infra_errors = attacker_errors + target_errors
-    if (
-        not best_result.get("response")
-        and total_infra_errors > 0
-        and total_infra_errors == len(techniques)
-    ):
-        if not last_error_message:
-            last_error_message = "All techniques failed (attacker/target errors)"
-        best_result["error"] = last_error_message
-        best_result["error_message"] = last_error_message
-        best_result["is_error"] = True
 
     return best_result
 

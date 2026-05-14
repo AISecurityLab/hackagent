@@ -20,7 +20,7 @@ based on the `agent_type`.
 
 **Attributes**:
 
-- `backend` - The StorageBackend (RemoteBackend or LocalBackend).
+- `backend` - The StorageBackend.
 - `organization_id` - The UUID of the organization associated with the backend.
 - `user_id_str` - The string user ID associated with the backend context.
 - `backend_agent` - The `AgentRecord` representing this agent in storage.
@@ -42,7 +42,7 @@ Initializes the AgentRouter and configures a single agent.
 
 **Arguments**:
 
-- `backend` - StorageBackend (RemoteBackend or LocalBackend).
+- `backend` - StorageBackend.
 - `name` - Name for the agent in storage.
 - `agent_type` - The type of agent (e.g., AgentTypeEnum.LITELLM).
 - `endpoint` - API endpoint URL for the agent service.

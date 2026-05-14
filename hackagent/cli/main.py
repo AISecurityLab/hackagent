@@ -57,7 +57,7 @@ def _render_rich_help(ctx: click.Context) -> None:
     from rich.table import Table
     from rich.text import Text
 
-    from hackagent.utils import HACKAGENT
+    from hackagent.utils import HACKAGENT_BANNER
 
     c = Console()
     version = importlib.metadata.version("hackagent")
@@ -65,7 +65,7 @@ def _render_rich_help(ctx: click.Context) -> None:
     # ── Logo ──────────────────────────────────────────────────────────────────
     c.print(
         Panel(
-            Text(HACKAGENT, style="bold dark_red"),
+            Text(HACKAGENT_BANNER, style="bold dark_red"),
             border_style="red",
             padding=(0, 2),
             expand=False,
@@ -85,7 +85,7 @@ def _render_rich_help(ctx: click.Context) -> None:
         'hackagent agent create --name "my-bot" --type google-adk \\\n'
         "    --endpoint http://localhost:8000\n\n"
         "# 3. Run an adversarial attack\n"
-        'hackagent attack advprefix --agent-name "my-bot" \\\n'
+        'hackagent eval advprefix --agent-name "my-bot" \\\n'
         '    --goals "Ignore safety rules"\n\n'
         "# 4. Review findings\n"
         "hackagent results summary"
@@ -268,39 +268,6 @@ def init(ctx):
         # Reload config from file to get the latest saved values
         cli_config._load_default_config()
 
-    # API Key setup
-    console.print("[cyan]📋 API Key Configuration[/cyan]")
-    console.print(
-        "Get your API key from: [link=https://app.hackagent.dev]https://app.hackagent.dev[/link]"
-    )
-
-    current_key = cli_config.api_key
-    if current_key:
-        console.print(f"Current API key: {current_key[:8]}...")
-        if click.confirm("Keep current API key?"):
-            api_key = current_key
-        else:
-            api_key = (
-                click.prompt(
-                    "Enter your API key (press Enter to skip)",
-                    default="",
-                    show_default=False,
-                ).strip()
-                or None
-            )
-    else:
-        api_key = (
-            click.prompt(
-                "Enter your API key (press Enter to skip)",
-                default="",
-                show_default=False,
-            ).strip()
-            or None
-        )
-
-    # Base URL is always the official endpoint
-    base_url = "https://api.hackagent.dev"
-
     # Verbosity level setup
     console.print("\n[cyan]🔊 Verbosity Level Configuration[/cyan]")
     console.print("0 = ERROR (only errors)")
@@ -317,65 +284,20 @@ def init(ctx):
         verbose_level = 1
 
     # Save configuration
-    cli_config.api_key = api_key
-    cli_config.base_url = base_url
     cli_config.verbose = verbose_level
 
     try:
         cli_config.save()
         console.print("\n[bold green]✅ Configuration saved[/bold green]")
 
-        # Test the configuration
-        if cli_config.should_show_info():
-            console.print("\n[cyan]🔍 Testing configuration...[/cyan]")
-        cli_config.validate()
-
-        # API key is optional: if absent, keep local mode and skip remote check.
-        if not cli_config.api_key:
-            console.print(
-                "[bold green]✅ Setup complete![/bold green] "
-                "[dim](No API key set: local mode enabled)[/dim]"
-            )
-            if cli_config.should_show_info():
-                console.print("\n[bold cyan]💡 Next steps:[/bold cyan]")
-                console.print("  [green]hackagent attack advprefix --help[/green]")
-                console.print("  [green]hackagent agent list[/green]")
-            return
-
-        # Test API connection when a key is configured.
-        from hackagent.server.api.agent import agent_list
-        from hackagent.server.client import AuthenticatedClient
-
-        client = AuthenticatedClient(
-            base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
+        console.print(
+            "[bold green]✅ Setup complete![/bold green] "
+            "[dim](Local mode: results stored in ~/.local/share/hackagent/hackagent.db)[/dim]"
         )
-
         if cli_config.should_show_info():
-            with console.status("[bold green]Testing API connection..."):
-                response = agent_list.sync_detailed(client=client)
-        else:
-            response = agent_list.sync_detailed(client=client)
-
-        if response.status_code == 200:
-            console.print(
-                "[bold green]✅ Setup complete! API connection verified.[/bold green]"
-            )
-            if response.parsed and cli_config.should_show_info():
-                agent_count = (
-                    len(response.parsed.results) if response.parsed.results else 0
-                )
-                console.print(
-                    f"[dim]Found {agent_count} agent(s) in your organization[/dim]"
-                )
-            if cli_config.should_show_info():
-                console.print("\n[bold cyan]💡 Next steps:[/bold cyan]")
-                console.print("  [green]hackagent attack advprefix --help[/green]")
-                console.print("  [green]hackagent agent list[/green]")
-        else:
-            console.print(
-                f"[yellow]⚠️ API connection issue (Status: {response.status_code})[/yellow]"
-            )
-            console.print("Configuration saved, but you may need to check your API key")
+            console.print("\n[bold cyan]💡 Next steps:[/bold cyan]")
+            console.print("  [green]hackagent eval advprefix --help[/green]")
+            console.print("  [green]hackagent agent list[/green]")
 
     except Exception as e:
         console.print(f"[bold red]❌ Setup failed: {e}[/bold red]")
@@ -404,22 +326,10 @@ def version(ctx):
     # Show configuration status
     cli_config: CLIConfig = ctx.obj["config"]
 
-    config_status = (
-        "[green]✅ Configured[/green]"
-        if cli_config.api_key
-        else "[red]❌ Not configured[/red]"
-    )
-    console.print(f"[cyan]Configuration:[/cyan] {config_status}")
     console.print(f"[cyan]Config file:[/cyan] {cli_config.default_config_path}")
-    console.print(f"[cyan]API Base URL:[/cyan] {cli_config.base_url}")
-
-    if cli_config.api_key:
-        console.print(f"[cyan]API Key:[/cyan] {cli_config.api_key[:8]}...")
 
     console.print()
-    console.print(
-        "[dim]For more information: [link=https://docs.hackagent.dev]https://docs.hackagent.dev[/link]"
-    )
+    console.print("[dim]For more information, run: hackagent --help")
 
 
 @cli.command()
@@ -453,7 +363,7 @@ def tui(ctx):
     except ValueError as e:
         console.print(f"[bold red]❌ Configuration Error: {e}[/bold red]")
         console.print("\n[cyan]💡 Quick fix:[/cyan]")
-        console.print("  Run '[green]hackagent init[/green]' to set up your API key")
+        console.print("  Run '[green]hackagent init[/green]' to set up configuration")
         ctx.exit(1)
 
     try:
@@ -496,52 +406,22 @@ def doctor(ctx):
         console.print("   💡 Run 'hackagent init' to create one")
         issues_found += 1
 
-    # Check 2: API Key
-    console.print("\n[cyan]🔑 API Key")
+    # Check 2: Storage
+    console.print("\n[cyan]💾 Local Storage")
+    from pathlib import Path
+
+    db_path = Path.home() / ".local" / "share" / "hackagent" / "hackagent.db"
+    if db_path.exists():
+        console.print("[green]✅ Local database exists")
+    else:
+        console.print("[yellow]⚠️ No local database yet (will be created on first run)")
+
+    # Check 3: API key
+    console.print("\n[cyan]🔐 API Key")
     if cli_config.api_key:
         console.print("[green]✅ API key is set")
-
-        # Test API key format
-        if len(cli_config.api_key) > 20:
-            console.print("[green]✅ API key format looks valid")
-        else:
-            console.print("[yellow]⚠️ API key seems too short")
-            issues_found += 1
     else:
-        console.print("[red]❌ API key not set")
-        console.print("   💡 Set with: hackagent config set --api-key YOUR_KEY")
-        console.print("   💡 Or set HACKAGENT_API_KEY environment variable")
-        issues_found += 1
-
-    # Check 3: API Connection
-    console.print("\n[cyan]🌐 API Connection")
-    if cli_config.api_key:
-        try:
-            from hackagent.server.api.agent import agent_list
-            from hackagent.server.client import AuthenticatedClient
-
-            client = AuthenticatedClient(
-                base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
-            )
-
-            with console.status("Testing API connection..."):
-                response = agent_list.sync_detailed(client=client)
-
-            if response.status_code == 200:
-                console.print("[green]✅ API connection successful")
-            else:
-                console.print(
-                    f"[red]❌ API connection failed (Status: {response.status_code})"
-                )
-                console.print("   💡 Check your API key and network connection")
-                issues_found += 1
-
-        except Exception as e:
-            console.print(f"[red]❌ API connection error: {e}")
-            console.print("   💡 Check your API key and network connection")
-            issues_found += 1
-    else:
-        console.print("[dim]⏭️ Skipped (no API key)")
+        console.print("[yellow]⚠️ API key not set")
 
     # Check 4: Dependencies
     console.print("\n[cyan]📦 Dependencies")
@@ -585,9 +465,7 @@ def _launch_tui_default(ctx):
         cli_config.validate()
     except ValueError:
         # If validation fails, show welcome message instead
-        console.print(
-            "[yellow]⚠️ Configuration not complete. Please set up your API key first.[/yellow]"
-        )
+        console.print("[yellow]⚠️ Configuration not complete.[/yellow]")
         console.print()
         _display_welcome()
         console.print()
@@ -631,14 +509,14 @@ def _display_welcome():
 [green]A powerful toolkit for testing AI agent security through automated attacks.[/green]
 
 [bold yellow]🚀 Getting Started:[/bold yellow]
-  1. Set up your API key:     [cyan]hackagent init[/cyan]
-  2. Launch full-screen TUI:  [cyan]hackagent[/cyan] (default) or [cyan]hackagent tui[/cyan]
-  3. List available agents:   [cyan]hackagent agent list[/cyan]
-  4. Run security tests:      [cyan]hackagent attack advprefix --help[/cyan]
-  5. View results:            [cyan]hackagent results list[/cyan]
+  1. Configure preferences:    [cyan]hackagent init[/cyan]
+  2. Launch full-screen TUI:   [cyan]hackagent[/cyan] (default) or [cyan]hackagent tui[/cyan]
+  3. List available agents:    [cyan]hackagent agent list[/cyan]
+    4. Run security tests:       [cyan]hackagent eval advprefix --help[/cyan]
+  5. View results:             [cyan]hackagent results list[/cyan]
+  6. Open web dashboard:       [cyan]hackagent web[/cyan]
 
-[bold blue]💡 Need help?[/bold blue] Use '[cyan]hackagent --help[/cyan]' or '[cyan]hackagent COMMAND --help[/cyan]'
-[bold blue]🌐 Get your API key at:[/bold blue] [link=https://app.hackagent.dev]https://app.hackagent.dev[/link]"""
+[bold blue]💡 Need help?[/bold blue] Use '[cyan]hackagent --help[/cyan]' or '[cyan]hackagent COMMAND --help[/cyan]'"""
 
     panel = Panel(
         welcome_text, title="🔍 HackAgent CLI", border_style="red", padding=(1, 2)
@@ -649,7 +527,7 @@ def _display_welcome():
 # Add command groups
 cli.add_command(config.config)
 cli.add_command(agent.agent)
-cli.add_command(attack.attack)
+cli.add_command(attack.eval_cmd)
 cli.add_command(examples.examples)
 cli.add_command(results.results)
 cli.add_command(web_cmd.web)

@@ -14,6 +14,30 @@ Use the HuggingFace provider when you want to:
 - Customize dataset configurations
 :::
 
+## Initial Setup (Authentication)
+
+Public datasets usually work without authentication.
+For **private** or **gated** datasets, you should set a Hugging Face token first.
+
+1. Create a token on Hugging Face:
+    - Go to https://huggingface.co/settings/tokens
+    - Create a token with at least `read` permission
+2. Export it in your shell as `HF_TOKEN`:
+
+```bash
+export HF_TOKEN="hf_xxx_your_token_here"
+```
+
+3. (Optional) Persist it in your shell profile (`~/.zshrc`, `~/.bashrc`) so it is available in new sessions.
+
+Quick check:
+
+```bash
+python -c "from datasets import load_dataset; ds = load_dataset('ag_news', split='train[:1]'); print(len(ds))"
+```
+
+If this succeeds, your Hugging Face access is correctly configured.
+
 ## Configuration Options
 
 | Option | Type | Required | Default | Description |
@@ -28,6 +52,9 @@ Use the HuggingFace provider when you want to:
 | `limit` | int | No | — | Maximum number of goals |
 | `shuffle` | bool | No | `false` | Randomize goal selection |
 | `seed` | int | No | — | Random seed for reproducibility |
+
+Authentication is handled by the Hugging Face ecosystem (`datasets` / `huggingface_hub`).
+This provider does not define a dedicated `token` field in the config, so use `HF_TOKEN` in the environment when required.
 
 ---
 
@@ -134,8 +161,7 @@ held_out_results = agent.hack(attack_config={
 ### Example 2: Loading Private Datasets
 
 ```python
-# First, authenticate with HuggingFace
-# huggingface-cli login
+# Ensure HF_TOKEN is set in the environment before running this
 
 attack_config = {
     "attack_type": "advprefix",

@@ -27,7 +27,7 @@ DEFAULT_PAIR_CONFIG: Dict[str, Any] = {
     # Objective
     "objective": "jailbreak",
     # Dedicated scorer role (AutoDAN-style scorer+wrapper)
-    "scorer": _default_role_config("hackagent-scorer"),
+    "scorer": _default_role_config("gemma3:4b"),
     # Iteration settings
     "n_iterations": 5,  # Number of refinement iterations
     "n_streams": 5,  # Number of parallel refinement streams
@@ -51,9 +51,7 @@ class PairConfig(ConfigBase):
     attack_type: str = "pair"
     objective: str = "jailbreak"
     scorer: Dict[str, Any] = Field(
-        default_factory=lambda: AttackerConfig(
-            identifier="hackagent-scorer"
-        ).model_dump()
+        default_factory=lambda: AttackerConfig(identifier="gemma3:4b").model_dump()
     )
     n_iterations: int = Field(default=5, ge=1)
     n_streams: int = Field(default=5, ge=1)

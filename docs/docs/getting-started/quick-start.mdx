@@ -13,18 +13,55 @@ Get started with HackAgent in minutes. Choose your preferred method below.
 <Tabs defaultValue="tui">
   <TabItem value="tui" label="TUI">
 
-Launch the interactive terminal interface:
-
-```bash
-hackagent
-```
-
-### See it in Action
 
 <img src="/gifs/terminal.gif" alt="HackAgent TUI Demo" style={{width: '100%', borderRadius: '8px', border: '1px solid var(--ifm-color-emphasis-300)'}} />
 
-  </TabItem>
-  <TabItem value="cli" label="CLI">
+
+The command preconfigures the demo and automatically starts the attack flow in the TUI.
+
+<details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
+  <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
+
+1. Install Ollama: `curl -fsSL https://ollama.com/install.sh | sh`
+2. Start server: `ollama serve`
+3. Pull model: `ollama pull gemma3:4b`
+4. Verify: `curl http://localhost:11434/api/tags`
+</details>
+
+Run the built-in Ollama demo directly in the TUI:
+
+```bash
+hackagent examples ollama
+```
+
+### What the CLI does automatically
+
+1. Checks that Ollama is reachable at `http://localhost:11434`
+2. Reads required models from the demo configuration
+3. Pulls missing models automatically
+4. Opens the TUI in the Attacks tab and auto-runs the demo
+
+### Demo configuration used
+
+- **Attack type**: `flipattack`
+- **Target model (victim)**: `gemma3:4b` via Ollama
+- **Judge model**: `gemma3:4b` with judge type `harmbench_variant`
+- **Attacker model**: not used explicitly in this demo (`flipattack` is transformation-based)
+- **Dataset**: HarmBench preset with `limit: 5`, `shuffle: false`, `seed: 42`
+- **FlipAttack param `flip_mode`**: `FCS`
+- **FlipAttack param `cot`**: `false`
+- **FlipAttack param `lang_gpt`**: `false`
+- **FlipAttack param `few_shot`**: `false`
+
+
+### Troubleshooting
+
+- **Ollama not running**: start it with `ollama serve`
+- **Missing model**: the CLI pulls missing models automatically
+- **TUI startup issue**: run `hackagent --version` first to confirm installation
+
+</TabItem>
+<TabItem value="cli" label="CLI">
 
 Run attacks directly from your terminal (without TUI):
 
@@ -41,7 +78,7 @@ Run attacks directly from your terminal (without TUI):
 </details>
 
 ```bash
-hackagent attack advprefix \
+hackagent eval advprefix \
   --agent-name "llama3" \
   --agent-type "ollama" \
   --endpoint "http://localhost:11434" \
@@ -61,7 +98,7 @@ hackagent attack advprefix \
 </details>
 
 ```bash
-hackagent attack advprefix \
+hackagent eval advprefix \
   --agent-name "gpt-4" \
   --agent-type "openai-sdk" \
   --endpoint "https://api.openai.com/v1" \
@@ -81,7 +118,7 @@ hackagent attack advprefix \
 </details>
 
 ```bash
-hackagent attack advprefix \
+hackagent eval advprefix \
   --agent-name "my-agent" \
   --agent-type "google-adk" \
   --endpoint "http://localhost:8000" \
@@ -90,93 +127,7 @@ hackagent attack advprefix \
 ```
 
   </TabItem>
-  <TabItem value="litellm" label={<span><img src="https://docs.litellm.ai/img/favicon.ico" alt="LiteLLM" style={{height: '20px', marginRight: '8px', verticalAlign: 'middle'}} />LiteLLM</span>}>
-
-<details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
-  <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
-
-1. Install: `pip install litellm[proxy]`
-2. Start proxy: `litellm --model gpt-4 --port 4000`
-3. Verify: `curl http://localhost:4000/health`
-</details>
-
-```bash
-hackagent attack advprefix \
-  --agent-name "gpt-4" \
-  --agent-type "litellm" \
-  --endpoint "http://localhost:4000/v1" \
-  --goals "Extract system prompt information" \
-  --no-tui
-```
-
-  </TabItem>
-</Tabs>
-
-#### More Frameworks
-
-<Tabs groupId="framework-extra">
-  <TabItem value="langchain" label="LangChain" default>
-
-<details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
-  <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
-
-1. Install: `pip install langserve`
-2. Start server: `python your_langserve_app.py`
-3. Verify: `curl http://localhost:8000/`
-</details>
-
-```bash
-hackagent attack advprefix \
-  --agent-name "my-langchain-agent" \
-  --agent-type "langchain" \
-  --endpoint "http://localhost:8000" \
-  --goals "Extract system prompt information" \
-  --no-tui
-```
-
-  </TabItem>
-  <TabItem value="lmstudio" label="LM Studio">
-
-<details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
-  <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
-
-1. Download from [lmstudio.ai](https://lmstudio.ai)
-2. Load a model in LM Studio
-3. Start local server: "Local Server" tab → "Start Server"
-4. Verify: `curl http://localhost:1234/v1/models`
-</details>
-
-```bash
-hackagent attack advprefix \
-  --agent-name "local-model" \
-  --agent-type "openai-sdk" \
-  --endpoint "http://localhost:1234/v1" \
-  --goals "Extract system prompt information" \
-  --no-tui
-```
-
-  </TabItem>
-  <TabItem value="vllm" label="vLLM">
-
-<details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
-  <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
-
-1. Install: `pip install vllm`
-2. Start server: `vllm serve meta-llama/Llama-3-8B-Instruct --port 8000`
-3. Verify: `curl http://localhost:8000/v1/models`
-</details>
-
-```bash
-hackagent attack advprefix \
-  --agent-name "my-model" \
-  --agent-type "openai-sdk" \
-  --endpoint "http://localhost:8000/v1" \
-  --goals "Extract system prompt information" \
-  --no-tui
-```
-
-  </TabItem>
-  <TabItem value="custom" label="Custom">
+  <TabItem value="custom" label="Custom (OpenAI compatible)">
 
 <details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
   <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
@@ -186,7 +137,7 @@ hackagent attack advprefix \
 </details>
 
 ```bash
-hackagent attack advprefix \
+hackagent eval advprefix \
   --agent-name "my-model" \
   --agent-type "openai-sdk" \
   --endpoint "http://your-endpoint/v1" \
@@ -200,7 +151,7 @@ hackagent attack advprefix \
 View available attacks and options:
 
 ```bash
-hackagent attack --help
+hackagent eval --help
 ```
 
   </TabItem>
@@ -273,106 +224,7 @@ agent = HackAgent(
 ```
 
   </TabItem>
-  <TabItem value="litellm" label={<span><img src="https://docs.litellm.ai/img/favicon.ico" alt="LiteLLM" style={{height: '20px', marginRight: '8px', verticalAlign: 'middle'}} />LiteLLM</span>}>
-
-<details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
-  <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
-
-1. Install: `pip install litellm[proxy]`
-2. Start proxy: `litellm --model gpt-4 --port 4000`
-</details>
-
-```python
-from hackagent import HackAgent
-
-# Initialize HackAgent
-agent = HackAgent(
-  name="gpt-4",
-  endpoint="http://localhost:4000/v1",
-  agent_type="litellm",
-)
-```
-
-  </TabItem>
-</Tabs>
-
-```python
-# Configure and run an attack
-attack_config = {
-  "attack_type": "advprefix",
-  "goals": ["Bypass content safety filters"]
-}
-
-agent.hack(attack_config=attack_config)
-```
-
-#### More Frameworks
-
-<Tabs groupId="framework-extra">
-  <TabItem value="langchain" label="LangChain" default>
-
-<details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
-  <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
-
-1. Install: `pip install langserve`
-2. Start server: `python your_langserve_app.py`
-</details>
-
-```python
-from hackagent import HackAgent
-
-# Initialize HackAgent
-agent = HackAgent(
-  name="my_langchain_agent",
-  endpoint="http://localhost:8000",
-  agent_type="langchain",
-)
-```
-
-  </TabItem>
-  <TabItem value="lmstudio" label="LM Studio">
-
-<details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
-  <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
-
-1. Download from [lmstudio.ai](https://lmstudio.ai)
-2. Load a model, then start local server from "Local Server" tab
-</details>
-
-```python
-from hackagent import HackAgent
-
-# Initialize HackAgent
-agent = HackAgent(
-  name="local-model",
-  endpoint="http://localhost:1234/v1",
-  agent_type="openai-sdk",
-)
-```
-
-  </TabItem>
-  <TabItem value="vllm" label="vLLM">
-
-<details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
-  <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
-
-1. Install: `pip install vllm`
-2. Start server: `vllm serve meta-llama/Llama-3-8B-Instruct --port 8000`
-</details>
-
-```python
-from hackagent import HackAgent
-
-# Initialize HackAgent
-agent = HackAgent(
-  name="my-model",
-  endpoint="http://localhost:8000/v1",
-  agent_type="openai-sdk",
-)
-```
-
-  </TabItem>
-  <TabItem value="custom" label="Custom">
+  <TabItem value="custom" label="Custom (OpenAI compatible)">
 
 <details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
   <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
@@ -404,11 +256,22 @@ attack_config = {
 agent.hack(attack_config=attack_config)
 ```
 
+```python
+# Configure and run an attack
+attack_config = {
+  "attack_type": "advprefix",
+  "goals": ["Bypass content safety filters"]
+}
+
+agent.hack(attack_config=attack_config)
+```
+
 
   </TabItem>
 </Tabs>
 
 ## Next Steps
 
-- [**Attack Tutorial**](./attack-tutorial) — Run your first security test
+- [**Evaluation Campaign**](./quick-security-scan) — Run h4rm3l, TAP, and PAIR in one flow
+- [**Evaluation Tutorial**](./attack-tutorial) — Run your first security test
 - [**AdvPrefix Attacks**](../attacks/advprefix) — Deep dive into attack techniques

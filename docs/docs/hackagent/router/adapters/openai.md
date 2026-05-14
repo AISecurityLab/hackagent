@@ -49,6 +49,7 @@ Initializes the OpenAIAgent.
   or the API key itself. Defaults to OPENAI_API_KEY env var.
   - &#x27;max_tokens&#x27; (optional): Default max tokens for generation.
   - &#x27;temperature&#x27; (optional): Default temperature (defaults to 1.0).
+  - &#x27;timeout&#x27; (optional): Default request timeout.
   - &#x27;tools&#x27; (optional): List of tool/function definitions for function calling.
   - &#x27;tool_choice&#x27; (optional): Controls which tools the model can call.
 

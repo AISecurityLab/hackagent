@@ -81,8 +81,8 @@ a complete attack attempt on a single goal/datapoint.
   ...         response = query_target(prompt)
   ...         tracker.add_interaction_trace(
   ...             goal_ctx,
-  ...             request=\{&quot;prompt&quot;: prompt\},
-  ...             response=\{&quot;content&quot;: response\},
+  ...             request={&quot;prompt&quot;: prompt},
+  ...             response={&quot;content&quot;: response},
   ...             step_name=&quot;Attack Attempt&quot;
   ...         )
   ...
@@ -99,7 +99,8 @@ a complete attack attempt on a single goal/datapoint.
 def __init__(backend: StorageBackend,
              run_id: str,
              logger: Optional[logging.Logger] = None,
-             attack_type: Optional[str] = None)
+             attack_type: Optional[str] = None,
+             category_classifier_config: Optional[Dict[str, Any]] = None)
 ```
 
 Initialize tracker.

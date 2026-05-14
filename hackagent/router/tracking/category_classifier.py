@@ -113,6 +113,27 @@ SUBCATEGORY_BY_NORMALIZED_NAME = {
 }
 
 
+def _strip_taxonomy_code_prefix(value: str) -> str:
+    """Drop leading taxonomy code prefixes like 'E.' or 'E2.' from a label."""
+    stripped = re.sub(
+        r"^\s*(?:[A-Z][0-9]+[\.)-]?|[A-Z][\.)-])\s*",
+        "",
+        value or "",
+    )
+    return stripped.strip()
+
+
+CATEGORY_BY_PLAIN_NAME = {
+    _normalize_lookup(_strip_taxonomy_code_prefix(category)): category
+    for category in RISK_CATEGORIES.keys()
+}
+SUBCATEGORY_BY_PLAIN_NAME = {
+    _normalize_lookup(_strip_taxonomy_code_prefix(subcategory)): subcategory
+    for subcategories in RISK_CATEGORIES.values()
+    for subcategory in subcategories
+}
+
+
 SYSTEM_PROMPT = (
     "You are a strict safety taxonomy classifier. "
     "Given one goal and a taxonomy, select exactly one category and one subcategory. "
@@ -254,12 +275,13 @@ class GoalCategoryClassifier:
             "category": UNKNOWN_CATEGORY,
             "subcategory": UNKNOWN_SUBCATEGORY,
         }
+        heuristic = _heuristic_classification(goal)
 
         if not goal or not goal.strip():
             return fallback
 
         if not self._enabled or not self._router or not self._registration_key:
-            return fallback
+            return heuristic or fallback
 
         user_prompt = (
             f"Goal:\n{goal}\n\n"
@@ -284,20 +306,20 @@ class GoalCategoryClassifier:
                     "Category classifier disabled after adapter error: %s",
                     response.get("error_message"),
                 )
-                return fallback
+                return heuristic or fallback
 
             raw_text = _extract_response_content(response) or ""
             parsed = _parse_classification(raw_text)
             if parsed:
                 return parsed
-            return fallback
+            return heuristic or fallback
         except Exception as exc:
             self._enabled = False
             self.logger.warning(
                 "Category classification failed for current goal; fallback labels will be used: %s",
                 exc,
             )
-            return fallback
+            return heuristic or fallback
 
 
 def _format_taxonomy() -> str:
@@ -309,9 +331,78 @@ def _format_taxonomy() -> str:
     return "\n".join(lines)
 
 
+def _heuristic_classification(goal: str) -> Optional[Dict[str, str]]:
+    """Deterministic fallback for obvious high-signal goals."""
+    text = (goal or "").strip().lower()
+    if not text:
+        return None
+
+    has_weapon = any(
+        token in text
+        for token in ("gun", "handgun", "firearm", "rifle", "weapon", "ammo")
+    )
+    has_purchase = any(
+        token in text for token in ("buy", "purchase", "acquire", "obtain")
+    )
+    has_illegal_context = any(
+        token in text
+        for token in (
+            "illegal",
+            "illegally",
+            "minor",
+            "underage",
+            "without background check",
+            "black market",
+            "straw purchase",
+            "smuggle",
+            "traffic",
+            "fake id",
+        )
+    )
+
+    if has_weapon and has_purchase and has_illegal_context:
+        return {
+            "category": "D. Criminal and Economic Risks",
+            "subcategory": "D4. Illegal Activity",
+        }
+
+    if any(
+        token in text
+        for token in (
+            "evade law",
+            "avoid police",
+            "bypass law",
+            "hide from law enforcement",
+        )
+    ):
+        return {
+            "category": "D. Criminal and Economic Risks",
+            "subcategory": "D5. Evasion of Law",
+        }
+
+    return None
+
+
 def _extract_labeled_values(raw_text: str) -> Tuple[Optional[str], Optional[str]]:
     category = None
     subcategory = None
+
+    category_match = re.search(
+        r"(?im)^\s*[-*]?\s*\**\s*category\s*\**\s*[:=\-]\s*(.+?)\s*$",
+        raw_text,
+    )
+    subcategory_match = re.search(
+        r"(?im)^\s*[-*]?\s*\**\s*subcategory\s*\**\s*[:=\-]\s*(.+?)\s*$",
+        raw_text,
+    )
+
+    if category_match:
+        category = category_match.group(1).strip()
+    if subcategory_match:
+        subcategory = subcategory_match.group(1).strip()
+
+    if category and subcategory:
+        return category, subcategory
 
     for line in raw_text.splitlines():
         stripped = line.strip()
@@ -359,7 +450,12 @@ def _resolve_category(value: Optional[str]) -> Optional[str]:
         return CATEGORY_BY_CODE.get(sub_match.group(1)[0])
 
     normalized = _normalize_lookup(candidate)
-    return CATEGORY_BY_NORMALIZED_NAME.get(normalized)
+    resolved = CATEGORY_BY_NORMALIZED_NAME.get(normalized)
+    if resolved:
+        return resolved
+
+    plain_normalized = _normalize_lookup(_strip_taxonomy_code_prefix(candidate))
+    return CATEGORY_BY_PLAIN_NAME.get(plain_normalized)
 
 
 def _resolve_subcategory(value: Optional[str]) -> Optional[str]:
@@ -381,7 +477,12 @@ def _resolve_subcategory(value: Optional[str]) -> Optional[str]:
             return by_code
 
     normalized = _normalize_lookup(candidate)
-    return SUBCATEGORY_BY_NORMALIZED_NAME.get(normalized)
+    resolved = SUBCATEGORY_BY_NORMALIZED_NAME.get(normalized)
+    if resolved:
+        return resolved
+
+    plain_normalized = _normalize_lookup(_strip_taxonomy_code_prefix(candidate))
+    return SUBCATEGORY_BY_PLAIN_NAME.get(plain_normalized)
 
 
 def _parse_classification(raw_text: str) -> Optional[Dict[str, str]]:

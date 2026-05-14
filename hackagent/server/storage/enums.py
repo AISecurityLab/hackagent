@@ -1,0 +1,34 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+"""Shared local enums for run/result/trace status values."""
+
+from enum import Enum
+
+
+class EvaluationStatusEnum(str, Enum):
+    NOT_EVALUATED = "NOT_EVALUATED"
+    SUCCESSFUL_JAILBREAK = "SUCCESSFUL_JAILBREAK"
+    FAILED_JAILBREAK = "FAILED_JAILBREAK"
+    ERROR_AGENT_RESPONSE = "ERROR_AGENT_RESPONSE"
+    ERROR_TEST_FRAMEWORK = "ERROR_TEST_FRAMEWORK"
+    PASSED_CRITERIA = "PASSED_CRITERIA"
+    FAILED_CRITERIA = "FAILED_CRITERIA"
+
+
+class StatusEnum(str, Enum):
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+
+
+class StepTypeEnum(str, Enum):
+    TOOL_CALL = "TOOL_CALL"
+    TOOL_RESPONSE = "TOOL_RESPONSE"
+    AGENT_THOUGHT = "AGENT_THOUGHT"
+    AGENT_RESPONSE_CHUNK = "AGENT_RESPONSE_CHUNK"
+    OTHER = "OTHER"
+    MCP_STEP = "MCP_STEP"
+    A2_A_COMM = "A2A_COMM"

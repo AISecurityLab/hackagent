@@ -448,14 +448,18 @@ class RemoteBackend:
     ) -> PaginatedResult[RunRecord]:
         items: List[RunRecord] = []
         total = 0
-        current_page = max(1, int(page))
-        remaining = max(1, int(page_size))
+        logical_page = max(1, int(page))
+        logical_page_size = max(1, int(page_size))
+        start_index = (logical_page - 1) * logical_page_size
+        end_index = start_index + logical_page_size
 
-        while remaining > 0:
+        scanned = 0
+        api_page = 1
+
+        while True:
             run_kwargs: Dict[str, Any] = {
                 "client": self._client,
-                "page": current_page,
-                "page_size": remaining,
+                "page": api_page,
             }
             if attack_id is not None:
                 run_kwargs["attack"] = attack_id
@@ -466,33 +470,44 @@ class RemoteBackend:
 
             page_results = resp.parsed.results or []
             total = resp.parsed.count or total
+            if not page_results:
+                break
 
-            for r in page_results:
-                rc = r.run_config if isinstance(r.run_config, dict) else {}
-                # Inject agent_name from API response for dashboard display
-                agent_name = getattr(r, "agent_name", None)
-                if agent_name:
-                    rc = {**rc, "_agent_name": agent_name}
-                items.append(
-                    RunRecord(
-                        id=r.id,
-                        attack_id=r.attack
-                        if isinstance(r.attack, UUID)
-                        else UUID(str(r.attack)),
-                        agent_id=r.agent
-                        if isinstance(r.agent, UUID)
-                        else UUID(str(r.agent)),
-                        run_config=rc,
-                        status=r.status.value
-                        if hasattr(r.status, "value")
-                        else str(r.status),
-                        run_notes=getattr(r, "run_notes", None),
-                        created_at=_pick_dt(r, "timestamp", "created_at"),
-                        updated_at=_pick_dt(r, "updated_at", "timestamp"),
+            page_start = scanned
+            page_end = scanned + len(page_results)
+
+            if page_end > start_index and page_start < end_index:
+                local_start = max(0, start_index - page_start)
+                local_end = min(len(page_results), end_index - page_start)
+                for r in page_results[local_start:local_end]:
+                    rc = r.run_config if isinstance(r.run_config, dict) else {}
+                    # Inject agent_name from API response for dashboard display
+                    agent_name = getattr(r, "agent_name", None)
+                    if agent_name:
+                        rc = {**rc, "_agent_name": agent_name}
+                    items.append(
+                        RunRecord(
+                            id=r.id,
+                            attack_id=r.attack
+                            if isinstance(r.attack, UUID)
+                            else UUID(str(r.attack)),
+                            agent_id=r.agent
+                            if isinstance(r.agent, UUID)
+                            else UUID(str(r.agent)),
+                            run_config=rc,
+                            status=r.status.value
+                            if hasattr(r.status, "value")
+                            else str(r.status),
+                            run_notes=getattr(r, "run_notes", None),
+                            created_at=_pick_dt(r, "timestamp", "created_at"),
+                            updated_at=_pick_dt(r, "updated_at", "timestamp"),
+                        )
                     )
-                )
 
-            remaining -= len(page_results)
+            scanned = page_end
+            if scanned >= end_index:
+                break
+
             # `next` is AnyUrl | None — isinstance guards against truthy MagicMocks
             next_page = getattr(resp.parsed, "next", None)
             if not isinstance(next_page, (str, AnyUrl)) or not str(next_page).strip():
@@ -500,9 +515,9 @@ class RemoteBackend:
             has_next = isinstance(next_page, (str, AnyUrl)) and bool(
                 str(next_page).strip()
             )
-            if remaining <= 0 or not has_next or not page_results:
+            if not has_next:
                 break
-            current_page += 1
+            api_page += 1
 
         return PaginatedResult(items=items, total=total or len(items))
 
@@ -607,13 +622,18 @@ class RemoteBackend:
     ) -> PaginatedResult[ResultRecord]:
         items: List[ResultRecord] = []
         total = 0
-        current_page = max(1, int(page))
-        remaining = max(1, int(page_size))
+        logical_page = max(1, int(page))
+        logical_page_size = max(1, int(page_size))
+        start_index = (logical_page - 1) * logical_page_size
+        end_index = start_index + logical_page_size
 
-        while remaining > 0:
+        scanned = 0
+        api_page = 1
+
+        while True:
             result_kwargs: Dict[str, Any] = {
                 "client": self._client,
-                "page": current_page,
+                "page": api_page,
             }
             if run_id is not None:
                 result_kwargs["run"] = run_id
@@ -624,33 +644,47 @@ class RemoteBackend:
 
             page_results = resp.parsed.results or []
             total = resp.parsed.count or total
+            if not page_results:
+                break
 
-            for r in page_results:
-                goal = ""
-                goal_index = 0
-                if isinstance(r.agent_specific_data, dict):
-                    goal = r.agent_specific_data.get("goal", "")
-                    goal_index = r.agent_specific_data.get("goal_index", 0)
-                items.append(
-                    ResultRecord(
-                        id=r.id,
-                        run_id=r.run if isinstance(r.run, UUID) else UUID(str(r.run)),
-                        goal=goal,
-                        goal_index=goal_index,
-                        evaluation_status=r.evaluation_status.value
-                        if hasattr(r.evaluation_status, "value")
-                        else str(r.evaluation_status),
-                        evaluation_notes=getattr(r, "evaluation_notes", None),
-                        evaluation_metrics=getattr(r, "evaluation_metrics", {}) or {},
-                        metadata=r.agent_specific_data
-                        if isinstance(r.agent_specific_data, dict)
-                        else {},
-                        created_at=_pick_dt(r, "timestamp", "created_at"),
-                        updated_at=_pick_dt(r, "updated_at", "timestamp"),
+            page_start = scanned
+            page_end = scanned + len(page_results)
+
+            if page_end > start_index and page_start < end_index:
+                local_start = max(0, start_index - page_start)
+                local_end = min(len(page_results), end_index - page_start)
+                for r in page_results[local_start:local_end]:
+                    goal = ""
+                    goal_index = 0
+                    if isinstance(r.agent_specific_data, dict):
+                        goal = r.agent_specific_data.get("goal", "")
+                        goal_index = r.agent_specific_data.get("goal_index", 0)
+                    items.append(
+                        ResultRecord(
+                            id=r.id,
+                            run_id=r.run
+                            if isinstance(r.run, UUID)
+                            else UUID(str(r.run)),
+                            goal=goal,
+                            goal_index=goal_index,
+                            evaluation_status=r.evaluation_status.value
+                            if hasattr(r.evaluation_status, "value")
+                            else str(r.evaluation_status),
+                            evaluation_notes=getattr(r, "evaluation_notes", None),
+                            evaluation_metrics=getattr(r, "evaluation_metrics", {})
+                            or {},
+                            metadata=r.agent_specific_data
+                            if isinstance(r.agent_specific_data, dict)
+                            else {},
+                            created_at=_pick_dt(r, "timestamp", "created_at"),
+                            updated_at=_pick_dt(r, "updated_at", "timestamp"),
+                        )
                     )
-                )
 
-            remaining -= len(page_results)
+            scanned = page_end
+            if scanned >= end_index:
+                break
+
             # `next` is AnyUrl | None — isinstance guards against truthy MagicMocks
             next_page = getattr(resp.parsed, "next", None)
             if not isinstance(next_page, (str, AnyUrl)) or not str(next_page).strip():
@@ -658,13 +692,14 @@ class RemoteBackend:
             has_next = isinstance(next_page, (str, AnyUrl)) and bool(
                 str(next_page).strip()
             )
-            if remaining <= 0 or not has_next or not page_results:
+            if not has_next:
                 break
-            current_page += 1
 
-        # Fallback: if result_list returned nothing for a specific run,
+            api_page += 1
+
+        # Fallback: if first page is empty for a specific run,
         # try run_retrieve which embeds results directly on the Run object.
-        if not items and run_id is not None:
+        if not items and run_id is not None and logical_page == 1:
             try:
                 rr = run_retrieve.sync_detailed(id=run_id, client=self._client)
                 if rr.status_code == 200 and rr.parsed:
