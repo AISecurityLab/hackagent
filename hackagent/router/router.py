@@ -460,16 +460,17 @@ class AgentRouter:
                         "raw_response_status": 200,
                         "raw_response_headers": None,
                         "raw_response_body": None,
-                        "agent_specific_data": None,
+                        "agent_specific_data": {
+                            "guardrail": "before_guardrail_blocked",
+                            "side": "before",
+                            "message": "Request blocked: flagged as unsafe by guardrail.",
+                            "categories": getattr(_gr, "categories", []),
+                            "reasoning": _gr.explanation,
+                        },
                         "error_message": None,
                         "error_category": None,
                         "agent_id": registration_key,
-                        "adapter_type": "AgentRouter",
-                        "guardrail_blocked": True,
-                        "guardrail_event": {
-                            "side": "before",
-                            "explanation": _gr.explanation,
-                        },
+                        "adapter_type": "guardrail",
                     }
 
         try:
@@ -537,17 +538,17 @@ class AgentRouter:
                         "raw_response_status": 200,
                         "raw_response_headers": None,
                         "raw_response_body": None,
-                        "agent_specific_data": None,
+                        "agent_specific_data": {
+                            "guardrail": "after_guardrail_censored",
+                            "side": "after",
+                            "message": "Response censored: flagged as unsafe by guardrail.",
+                            "categories": getattr(_gr, "categories", []),
+                            "reasoning": _gr.explanation,
+                        },
                         "error_message": None,
                         "error_category": None,
                         "agent_id": registration_key,
-                        "adapter_type": "AgentRouter",
-                        "guardrail_blocked": True,
-                        "guardrail_event": {
-                            "side": "after",
-                            "explanation": _gr.explanation,
-                            "target_response": _response_text,
-                        },
+                        "adapter_type": "guardrail",
                     }
 
         return response

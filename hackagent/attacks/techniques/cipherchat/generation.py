@@ -10,6 +10,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+from hackagent.attacks.shared.response_utils import is_guardrail_response
 from hackagent.router.router import AgentRouter
 
 from .encode_experts import encode_expert_dict
@@ -223,7 +224,7 @@ def execute(
             )
             encoded_response = response.get("generated_text")
             error_message = response.get("error_message")
-            _guardrail_blocked = response.get("guardrail_blocked", False)
+            _guardrail_blocked = is_guardrail_response(response)
             if _guardrail_blocked:
                 error_message = None
                 encoded_response = None
@@ -293,7 +294,7 @@ def execute(
                     request=request_data,
                     response=(
                         response
-                        if response.get("guardrail_blocked")
+                        if is_guardrail_response(response)
                         else {
                             "generated_text": encoded_response,
                             "error_message": error_message,

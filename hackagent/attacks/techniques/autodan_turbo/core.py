@@ -5,7 +5,11 @@
 import re
 
 from hackagent.attacks.techniques.config import DEFAULT_MAX_OUTPUT_TOKENS
-from hackagent.attacks.shared.response_utils import extract_response_content
+from hackagent.attacks.shared.response_utils import (
+    extract_response_content,
+    get_guardrail_info,
+    is_guardrail_response,
+)
 from hackagent.attacks.shared.router_factory import create_router
 
 from .config import (
@@ -280,6 +284,18 @@ def query_target(agent_router, victim_key, prompt, config, logger, role_label="t
         registration_key=victim_key,
         request_data=request_data,
     )
+
+    # Check if a before/after guardrail blocked the request
+    if isinstance(resp, dict) and is_guardrail_response(resp):
+        _info = get_guardrail_info(resp)
+        logger.info(
+            format_phase_message(
+                "target",
+                f"[Role:{role_label}] blocked by {_info.get('side', 'unknown')} guardrail",
+            )
+        )
+        return "", None
+
     target_response = extract_response_content(resp, logger) or ""
     target_error = None
     if not target_response:

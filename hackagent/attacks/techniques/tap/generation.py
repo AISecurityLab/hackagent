@@ -29,7 +29,11 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from hackagent.attacks.shared.progress import create_progress_bar
 from hackagent.attacks.shared.prompt_parser import extract_prompt_and_improvement
-from hackagent.attacks.shared.response_utils import extract_response_content
+from hackagent.attacks.shared.response_utils import (
+    extract_response_content,
+    get_guardrail_info,
+    is_guardrail_response,
+)
 from hackagent.attacks.shared.router_factory import create_router
 from hackagent.server.client import AuthenticatedClient
 from hackagent.server.storage.enums import StepTypeEnum
@@ -338,6 +342,16 @@ class TapExecutor:
             registration_key=list(self.agent_router._agent_registry.keys())[0],
             request_data=request_data,
         )
+
+        # Check if a before/after guardrail blocked the request
+        if isinstance(response, dict) and is_guardrail_response(response):
+            _info = get_guardrail_info(response)
+            self.logger.info(
+                "Target query blocked by %s guardrail",
+                _info.get("side", "unknown"),
+            )
+            return None
+
         return extract_response_content(response, self.logger)
 
     def _expand_one_branch(
