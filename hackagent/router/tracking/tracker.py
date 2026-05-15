@@ -803,33 +803,30 @@ class Tracker:
 
         # Dictionary response
         if isinstance(response, dict):
-            # Guardrail-blocked (full router response): preserve the event dict so
-            # the dashboard can render it as a dedicated visual block.
-            if response.get("guardrail_blocked"):
-                return response.get("guardrail_event") or {
+            # Guardrail-blocked response: adapter_type == "guardrail".
+            # Preserve the agent_specific_data dict so the dashboard can
+            # render it as a dedicated visual block.
+            if response.get("adapter_type") == "guardrail":
+                return response.get("agent_specific_data") or {
                     "side": "unknown",
-                    "explanation": response.get(
-                        "error_message", "Blocked by guardrail"
-                    ),
+                    "message": "Blocked by guardrail",
                 }
 
             # Guardrail-event dict passed directly (e.g. AdvPrefix passes the event
             # dict as the response payload rather than the full router response).
-            if (
-                response.get("side") in ("before", "after", "unknown")
-                and "explanation" in response
+            if response.get("side") in ("before", "after", "unknown") and (
+                "explanation" in response or "message" in response
             ):
                 return response
 
-            # Guardrail block detected from error_message when guardrail_blocked flag
-            # was not propagated — attacks that extract only generated_text/error_message
-            # before calling add_interaction_trace (BoN, FlipAttack, CipherChat, PAP …).
+            # Guardrail block detected from error_message — attacks that extract
+            # only generated_text/error_message before calling add_interaction_trace.
             _err = str(response.get("error_message") or "")
             if _err:
-                if "before_guardrail" in _err:
-                    return {"side": "before", "explanation": _err}
-                if "after_guardrail" in _err:
-                    return {"side": "after", "explanation": _err}
+                if "before_guardrail" in _err or "before guardrail" in _err.lower():
+                    return {"side": "before", "message": _err}
+                if "after_guardrail" in _err or "after guardrail" in _err.lower():
+                    return {"side": "after", "message": _err}
 
             return (
                 response.get("generated_text")

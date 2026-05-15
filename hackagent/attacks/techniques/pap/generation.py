@@ -23,6 +23,10 @@ import time
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from hackagent.attacks.evaluator.judge_evaluators import EVALUATOR_MAP
+from hackagent.attacks.shared.response_utils import (
+    get_guardrail_info,
+    is_guardrail_response,
+)
 from hackagent.attacks.shared.router_factory import extract_passthrough_request_config
 from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
 from hackagent.attacks.techniques.config import DEFAULT_MAX_OUTPUT_TOKENS
@@ -457,9 +461,9 @@ def _attack_single_goal(
                 },
             )
             response_text = target_response.get("generated_text")
-            _guardrail_blocked = target_response.get("guardrail_blocked", False)
-            target_guardrail_event = (
-                target_response.get("guardrail_event") if _guardrail_blocked else None
+            _guardrail_blocked = is_guardrail_response(target_response)
+            target_guardrail_info = (
+                get_guardrail_info(target_response) if _guardrail_blocked else None
             )
             target_error = (
                 None if _guardrail_blocked else target_response.get("error_message")
@@ -467,12 +471,12 @@ def _attack_single_goal(
         except Exception as e:
             response_text = None
             target_error = str(e)
-            target_guardrail_event = None
+            target_guardrail_info = None
             logger.warning(f"[{_label}] Target request failed — {e}")
 
-        if target_guardrail_event:
+        if target_guardrail_info:
             logger.info(
-                f"[{_label}] Blocked by {target_guardrail_event.get('side', 'unknown')} guardrail"
+                f"[{_label}] Blocked by {target_guardrail_info.get('side', 'unknown')} guardrail"
             )
         elif response_text:
             _preview = (
@@ -518,7 +522,7 @@ def _attack_single_goal(
                     judge_score,
                     is_jailbreak,
                     judge_cols,
-                    guardrail_event=target_guardrail_event,
+                    guardrail_info=target_guardrail_info,
                 )
 
         # Update best result
@@ -567,7 +571,7 @@ def _persist_technique_trace(
     judge_score: float,
     is_jailbreak: bool,
     judge_cols: Dict[str, Any],
-    guardrail_event: Optional[Dict[str, Any]] = None,
+    guardrail_info: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Persist PAP technique trace for dashboard display.
 
@@ -582,8 +586,8 @@ def _persist_technique_trace(
         ctx=goal_ctx,
         request={"prompt": persuasive_prompt},
         response=(
-            {"guardrail_blocked": True, "guardrail_event": guardrail_event}
-            if guardrail_event
+            {"adapter_type": "guardrail", "agent_specific_data": guardrail_info}
+            if guardrail_info
             else {"generated_text": response_text, "error_message": error}
         ),
         step_name=step_name,

@@ -17,7 +17,10 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional
 
-from hackagent.attacks.shared.response_utils import extract_response_content
+from hackagent.attacks.shared.response_utils import (
+    extract_response_content,
+    is_guardrail_response,
+)
 from hackagent.attacks.generator import AttackTemplates
 from hackagent.attacks.shared.progress import create_progress_bar
 from hackagent.router.router import AgentRouter
@@ -247,7 +250,7 @@ def execute_prompts(
                     "completion": completion,
                     "response_length": len(completion),
                 }
-                if isinstance(response, dict) and response.get("guardrail_blocked"):
+                if isinstance(response, dict) and is_guardrail_response(response):
                     row_payload["guardrail_blocked"] = True
                 elif adapter_error and not completion:
                     row_payload["error"] = str(adapter_error)
