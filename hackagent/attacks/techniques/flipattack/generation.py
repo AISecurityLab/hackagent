@@ -30,6 +30,10 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+from hackagent.attacks.shared.response_utils import (
+    get_guardrail_info,
+    is_guardrail_response,
+)
 from hackagent.router.router import AgentRouter
 
 if TYPE_CHECKING:
@@ -149,12 +153,13 @@ def execute(
         )
 
         generated_text = response.get("generated_text")
-        _guardrail_blocked = response.get("guardrail_blocked", False)
+        _guardrail_blocked = is_guardrail_response(response)
         error_message = None if _guardrail_blocked else response.get("error_message")
 
         if _guardrail_blocked:
+            _info = get_guardrail_info(response)
             logger.info(
-                f"[Goal {idx + 1}/{len(goals)}] Blocked by {response.get('guardrail_event', {}).get('side', 'unknown')} guardrail"
+                f"[Goal {idx + 1}/{len(goals)}] Blocked by {_info.get('side', 'unknown')} guardrail"
             )
         elif generated_text:
             logger.info(

@@ -27,7 +27,11 @@ from hackagent.attacks.techniques.autodan_turbo.core import score_response
 from hackagent.attacks.objectives import OBJECTIVES
 from hackagent.attacks.shared.progress import create_progress_bar
 from hackagent.attacks.shared.prompt_parser import extract_prompt
-from hackagent.attacks.shared.response_utils import extract_response_content
+from hackagent.attacks.shared.response_utils import (
+    extract_response_content,
+    get_guardrail_info,
+    is_guardrail_response,
+)
 from hackagent.attacks.shared.router_factory import create_router
 from hackagent.attacks.shared.tui import with_tui_logging
 from hackagent.server.client import AuthenticatedClient
@@ -487,6 +491,16 @@ SCORE: {score}"""
                 registration_key=list(self.agent_router._agent_registry.keys())[0],
                 request_data=request_data,
             )
+
+            # Check if a before/after guardrail blocked the request
+            if isinstance(response, dict) and is_guardrail_response(response):
+                _info = get_guardrail_info(response)
+                self.logger.info(
+                    "Target query blocked by %s guardrail",
+                    _info.get("side", "unknown"),
+                )
+                metadata["guardrail_info"] = _info
+                return (None, metadata) if include_meta else None
 
             if isinstance(response, dict):
                 agent_specific_data = response.get("agent_specific_data") or {}
