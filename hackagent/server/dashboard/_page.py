@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 from collections import defaultdict
 import contextlib
+import html
 import json
 import math
 import re
@@ -112,28 +113,23 @@ class DashboardPage:
         self.run_dialog_title: ui.label | None = None
         self.run_report_area: ui.column | None = None
 
-        # History inline run expansion + side detail panel
-        self.history_run_dialog: ui.dialog | None = None  # kept for compat
+        # History run dialog (two-panel popup)
+        self.history_run_dialog: ui.dialog | None = None
         self.history_run_dialog_title: ui.label | None = None
         self.history_run_dialog_subtitle: ui.label | None = None
         self.history_run_config_area: ui.column | None = None
         self.history_results_list_area: ui.column | None = None
         self.history_results_empty_label: ui.label | None = None
         self.metrics_area: ui.column | None = None
+        self.history_detail_area: ui.column | None = None
+        self._history_dialog_attack_str: str = ""
 
         # New side-by-side History layout
         self._history_runs_area: ui.column | None = None
-        self._history_detail_panel: ui.column | None = None
-        self._history_detail_title: ui.label | None = None
-        self._history_detail_result_tab: ui.scroll_area | None = None
-        self._history_detail_traces_tab: ui.scroll_area | None = None
-        self._history_detail_config_tab: ui.scroll_area | None = None
         self._history_expanded_run_id: str | None = None
         self._history_expanded_goals_area: ui.column | None = None
         self._history_current_run: dict | None = None
         self._history_current_run_results: list[dict] = []
-        self._history_left_col: ui.column | None = None
-        self._history_detail_visible: bool = False
         self._history_visible_run_ids: list[str] = []
 
         # Attack detail dialog
@@ -161,6 +157,7 @@ class DashboardPage:
         self._build_header(sidebar)
         self._build_panels()
         self._build_run_dialog()
+        self._build_history_run_dialog()
         self._build_attack_dialog()
 
         self._highlight_nav("dashboard")
@@ -632,57 +629,40 @@ class DashboardPage:
             with ui.card().classes(
                 "w-full h-[calc(100vh-220px)] min-h-[540px] overflow-hidden"
             ):
-                with ui.row().classes(
-                    "w-full h-full gap-0 items-stretch overflow-hidden"
-                ):
-                    # ── Left column: run list + expanded goals ──
-                    self._history_left_col = ui.column().classes(
-                        "w-full h-full min-h-0 gap-2 transition-all duration-300"
-                    )
-                    with self._history_left_col:
-                        with ui.row().classes("items-center justify-between mb-1 px-2"):
-                            self.runs_count_label = ui.label("").classes(
+                with ui.column().classes("w-full h-full min-h-0 gap-2"):
+                    with ui.row().classes("items-center justify-between mb-1 px-2"):
+                        self.runs_count_label = ui.label("").classes(
+                            "text-sm text-grey-6"
+                        )
+                        with ui.row().classes("items-center gap-2"):
+                            self._runs_delete_btn = (
+                                ui.button(
+                                    "Delete selected",
+                                    icon="delete",
+                                    on_click=lambda: ui.timer(
+                                        0,
+                                        self._delete_selected_runs,
+                                        once=True,
+                                    ),
+                                )
+                                .props("flat dense no-caps color=negative")
+                                .classes("hidden")
+                            )
+                            ui.button(
+                                "← Prev",
+                                on_click=lambda: self._change_runs_page(-1),
+                            ).props("flat dense no-caps")
+                            self.runs_page_label = ui.label("Page 1 / 1").classes(
                                 "text-sm text-grey-6"
                             )
-                            with ui.row().classes("items-center gap-2"):
-                                self._runs_delete_btn = (
-                                    ui.button(
-                                        "Delete selected",
-                                        icon="delete",
-                                        on_click=lambda: ui.timer(
-                                            0,
-                                            self._delete_selected_runs,
-                                            once=True,
-                                        ),
-                                    )
-                                    .props("flat dense no-caps color=negative")
-                                    .classes("hidden")
-                                )
-                                ui.button(
-                                    "← Prev",
-                                    on_click=lambda: self._change_runs_page(-1),
-                                ).props("flat dense no-caps")
-                                self.runs_page_label = ui.label("Page 1 / 1").classes(
-                                    "text-sm text-grey-6"
-                                )
-                                ui.button(
-                                    "Next →",
-                                    on_click=lambda: self._change_runs_page(1),
-                                ).props("flat dense no-caps")
-                        with ui.scroll_area().classes("w-full flex-1 min-h-0"):
-                            self._history_runs_area = ui.column().classes(
-                                "w-full gap-0 overflow-x-auto"
-                            )
-
-                    # ── Right column: goal detail panel ──
-                    self._history_detail_panel = (
-                        ui.column()
-                        .classes("h-full min-h-0 gap-0 border-l shrink-0")
-                        .style(
-                            "width: 0; min-width: 0; overflow: hidden; "
-                            "transition: all 0.3s ease;"
+                            ui.button(
+                                "Next →",
+                                on_click=lambda: self._change_runs_page(1),
+                            ).props("flat dense no-caps")
+                    with ui.scroll_area().classes("w-full flex-1 min-h-0"):
+                        self._history_runs_area = ui.column().classes(
+                            "w-full gap-0 overflow-x-auto"
                         )
-                    )
 
     def _build_reports_panel(self, panel: ui.column) -> None:
         with panel:
@@ -749,20 +729,49 @@ class DashboardPage:
         self.run_dialog = dialog
 
     def _build_history_run_dialog(self) -> None:
-        """No-op: history runs now render inline instead of in a dialog."""
-        pass
-
-    # ── History: close detail panel ──────────────────────────────────────────
-
-    def _close_history_detail(self) -> None:
-        """Close the right detail panel and restore full-width run list."""
-        self._history_detail_visible = False
-        if self._history_detail_panel is not None:
-            self._history_detail_panel.style(
-                "width: 0; min-width: 0; overflow: hidden; height: 100%;"
-            )
-        if self._history_left_col is not None:
-            self._history_left_col.classes(remove="w-1/2", add="w-full")
+        """Build a two-panel dialog for History run results."""
+        with ui.dialog() as dialog:
+            with ui.card().classes("w-full max-w-[96vw] h-[90vh] flex flex-col gap-0"):
+                with ui.row().classes(
+                    "items-center justify-between w-full shrink-0 px-5 py-3 border-b"
+                ):
+                    self.history_run_dialog_title = ui.label("Run Results").classes(
+                        "font-semibold text-lg"
+                    )
+                    ui.button(icon="close", on_click=dialog.close).props(
+                        "flat round dense"
+                    )
+                # Two-panel body
+                with ui.row().classes("w-full flex-1 gap-0 overflow-hidden"):
+                    # Left: config/metrics + compact card list
+                    with (
+                        ui.scroll_area()
+                        .classes("h-full border-r")
+                        .style("flex:none;width:680px")
+                    ):
+                        with ui.column().classes("w-full gap-3 p-4"):
+                            self.history_run_config_area = ui.column().classes(
+                                "w-full gap-2"
+                            )
+                            ui.separator()
+                            self.metrics_area = ui.column().classes("w-full gap-2")
+                            ui.separator()
+                            self.history_results_empty_label = ui.label(
+                                "Loading results..."
+                            ).classes("text-sm text-grey-8 py-2")
+                            self.history_results_list_area = ui.column().classes(
+                                "w-full gap-1"
+                            )
+                    # Right: detail view
+                    with ui.scroll_area().classes("h-full flex-1"):
+                        self.history_detail_area = ui.column().classes(
+                            "w-full gap-3 p-6"
+                        )
+                        with self.history_detail_area:
+                            ui.label("← Select a goal to view details").classes(
+                                "text-grey-4 text-sm italic mt-16 w-full text-center"
+                            )
+        self.history_run_dialog = dialog
 
     def _close_reports_detail(self) -> None:
         """Close the right detail panel and restore full-width report list."""
@@ -872,102 +881,18 @@ class DashboardPage:
                                     row, run=self._report_current_run
                                 )
 
-        await self._load_goal_traces(row, traces_container)
-
-    # ── History: open detail panel for a goal ────────────────────────────────
-
-    async def _open_history_goal_detail(self, row: dict) -> None:
-        """Show Result / Traces / Config tabs in the right panel for a goal."""
-        if self._history_detail_panel is None:
-            return
-
-        self._history_detail_visible = True
-        # Shrink left, expand right
-        if self._history_left_col is not None:
-            self._history_left_col.classes(remove="w-full", add="w-1/2")
-        self._history_detail_panel.style(
-            "width: 50%; min-width: 50%; height: 100%; overflow: hidden;"
+        _report_attack_str = str(
+            (self._report_current_run or {}).get("attack_type") or "—"
         )
-
-        self._history_detail_panel.clear()
-        with self._history_detail_panel:
-            with ui.scroll_area().classes("w-full h-full"):
-                with ui.column().classes("w-full h-full gap-0"):
-                    # Header
-                    result_num = row.get("goal_number") or (
-                        (row.get("goal_index", 0) or 0) + 1
-                    )
-                    with ui.row().classes(
-                        "items-center justify-between w-full px-4 py-2 border-b shrink-0"
-                    ):
-                        with ui.row().classes("items-center gap-2"):
-                            eval_status = row.get("evaluation_status", "")
-                            eval_notes = row.get("evaluation_notes")
-                            bucket = _result_bucket(eval_status, eval_notes)
-                            if bucket == "jailbreak":
-                                ui.badge("Jailbreak", color="negative").classes(
-                                    "text-xs"
-                                )
-                            elif bucket == "mitigated":
-                                ui.badge("Mitigated", color="positive").classes(
-                                    "text-xs"
-                                )
-                            elif bucket == "failed":
-                                ui.badge("Error", color="warning").classes("text-xs")
-                            else:
-                                ui.badge("Pending", color="grey-6").classes("text-xs")
-
-                            goal_text = str(row.get("goal") or "—")
-                            if len(goal_text) > 80:
-                                goal_text = goal_text[:80] + "…"
-                            ui.label(
-                                f"Result {result_num} of {len(self._history_current_run_results)}"
-                            ).classes("font-semibold text-sm")
-                            ui.label(goal_text).classes(
-                                "text-xs text-grey-6 truncate max-w-md"
-                            )
-
-                        ui.button(
-                            icon="close", on_click=self._close_history_detail
-                        ).props("flat round dense")
-
-                    # Tabs: Result, Traces, Config
-                    with (
-                        ui.tabs()
-                        .props("dense no-caps align=left")
-                        .classes("w-full shrink-0") as detail_tabs
-                    ):
-                        ui.tab(name="result-tab", label="Result")
-                        ui.tab(name="traces-tab", label="Traces")
-                        ui.tab(name="config-tab", label="Config")
-
-                    with ui.tab_panels(detail_tabs, value="result-tab").classes(
-                        "w-full"
-                    ):
-                        # ── Result tab ──
-                        with ui.tab_panel("result-tab").classes("w-full p-0"):
-                            with ui.column().classes("w-full gap-4 p-4"):
-                                self._render_result_tab(row)
-
-                        # ── Traces tab ──
-                        with ui.tab_panel("traces-tab").classes("w-full p-0"):
-                            traces_container = ui.column().classes("w-full gap-4 p-4")
-                            with traces_container:
-                                with ui.row().classes(
-                                    "items-center gap-2 py-4 justify-center"
-                                ):
-                                    ui.spinner("dots")
-                                    ui.label("Loading traces…").classes(
-                                        "text-sm text-grey-6"
-                                    )
-
-                        # ── Config tab ──
-                        with ui.tab_panel("config-tab").classes("w-full p-0"):
-                            with ui.column().classes("w-full gap-4 p-4"):
-                                self._render_config_tab(row)
-
-        # Load traces asynchronously
-        await self._load_goal_traces(row, traces_container)
+        if _report_attack_str == "—":
+            _atk_id = str((self._report_current_run or {}).get("attack_id") or "")
+            if _atk_id:
+                _report_attack_str = self._attack_type_map_for_ids({_atk_id}).get(
+                    _atk_id, "—"
+                )
+        await self._load_attack_specific_traces(
+            row, traces_container, _report_attack_str
+        )
 
     # ── History: render Result tab ───────────────────────────────────────────
 
@@ -2730,6 +2655,2335 @@ class DashboardPage:
 
         return serialized_traces
 
+    # ── Attack-specific goal card helpers ─────────────────────────────────────
+
+    @staticmethod
+    def _border_color_for_bucket(bucket: str) -> str:
+        if bucket == "jailbreak":
+            return "border-red-400"
+        if bucket == "mitigated":
+            return "border-green-400"
+        if bucket == "failed":
+            return "border-orange-400"
+        return "border-grey-300"
+
+    def _render_compact_card(self, row: dict, on_click) -> None:
+        """Render a compact clickable goal card for the left-panel list view."""
+        goal_text = str(row.get("goal") or "—")
+        goal_number = row.get("goal_number", "?")
+        bucket = row.get("_bucket", "pending")
+        border_color = self._border_color_for_bucket(bucket)
+        with (
+            ui.card()
+            .tight()
+            .classes(
+                f"w-full border-l-4 {border_color} cursor-pointer"
+                " hover:shadow-sm transition-shadow"
+            )
+            .on("click", on_click)
+        ):
+            with ui.row().classes("items-start gap-2 px-3 py-2 w-full"):
+                ui.label(f"#{goal_number}").classes(
+                    "font-bold text-xs text-grey-5 shrink-0 w-6 pt-0.5 text-right"
+                )
+                ui.label(goal_text).classes(
+                    "text-xs text-grey-8 flex-1 leading-snug whitespace-pre-wrap"
+                )
+
+    @contextlib.contextmanager
+    def _goal_card_shell(self, row: dict, detail_mode: bool = False):
+        goal_text = str(row.get("goal") or "—")
+        goal_number = row.get("goal_number", "?")
+        bucket = row.get("_bucket", "pending")
+        border_color = self._border_color_for_bucket(bucket)
+        if detail_mode:
+            _cat = row.get("_goal_category") or ""
+            _subcat = row.get("_goal_subcategory") or ""
+            with ui.column().classes("w-full gap-2"):
+                with ui.row().classes("items-center gap-2 flex-wrap"):
+                    ui.label(f"Goal #{goal_number}").classes(
+                        "font-bold text-base shrink-0"
+                    )
+                    if bucket == "jailbreak":
+                        ui.badge("Jailbreak", color="negative").classes("text-xs")
+                    elif bucket == "mitigated":
+                        ui.badge("Mitigated", color="positive").classes("text-xs")
+                    elif bucket == "failed":
+                        ui.badge("Error", color="warning").classes("text-xs")
+                    lat = row.get("_goal_latency")
+                    if lat and lat != "—":
+                        ui.badge(f"Latency: {lat}", color="grey-7").classes("text-xs")
+                if _cat:
+                    _cat_str = _cat
+                    if _subcat and _subcat not in ("", "N/A"):
+                        _cat_str += f" › {_subcat}"
+                    ui.label(_cat_str).classes("text-xs text-grey-5 tracking-wide")
+                ui.label(goal_text).classes(
+                    "text-sm text-grey-8 whitespace-pre-wrap leading-relaxed"
+                )
+            ui.separator().classes("my-2")
+            yield
+        else:
+            with ui.card().tight().classes(f"w-full border-l-4 {border_color}"):
+                with ui.column().classes("w-full gap-2 p-3") as col:
+                    ui.label(f"Goal #{goal_number}").classes(
+                        "font-bold text-sm shrink-0"
+                    )
+                    ui.label(goal_text).classes(
+                        "text-sm text-grey-8 whitespace-pre-wrap"
+                    )
+                    yield col
+
+    @staticmethod
+    def _wire_expand_toggle(body_col) -> None:
+        toggle_btn = (
+            ui.button("Expand", icon="expand_more")
+            .props("flat no-caps size=sm color=grey-7")
+            .classes("w-full")
+        )
+        _state: dict = {"open": False}
+
+        def _toggle(_b=body_col, _btn=toggle_btn, _s=_state) -> None:
+            _s["open"] = not _s["open"]
+            _b.set_visibility(_s["open"])
+            _btn.props(
+                f"label={'Collapse' if _s['open'] else 'Expand'} icon={'expand_less' if _s['open'] else 'expand_more'} flat no-caps size=sm color=grey-7"
+            )
+
+        toggle_btn.on_click(_toggle)
+
+    # ── Baseline ──────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _parse_baseline_traces(traces: list[dict], goal: str = "") -> list[dict]:
+        """Parse Baseline attack traces into per-template rows.
+
+        Each row dict:
+          num           – 1-based row number
+          template      – attack_prompt with goal text replaced by {goal}
+          prompt        – raw attack prompt sent to target
+          response      – target model response
+          result        – "Jailbreak" | "Mitigated" | "Error"
+          _bucket       – "jailbreak" | "mitigated" | "error"
+        """
+        from collections import deque  # noqa: PLC0415
+
+        sorted_traces = sorted(traces, key=lambda x: x.get("sequence", 0))
+
+        # Baseline writes one "Template:…" interaction trace per template and
+        # one evaluation trace from the baseline_pattern_evaluator.
+        interaction_traces: list[tuple[str, dict]] = []
+        eval_trace_result: dict = {}
+
+        for td in sorted_traces:
+            content = td.get("content") or {}
+            step_name = str(content.get("step_name") or td.get("step_name") or "")
+            if step_name.startswith("Template:"):
+                interaction_traces.append((step_name, content))
+            elif content.get("evaluator") == "baseline_pattern_evaluator":
+                eval_trace_result = content.get("result") or {}
+
+        # Stable sort: by step_name then first message content
+        interaction_traces.sort(
+            key=lambda x: (
+                x[0],
+                (x[1].get("request") or {}).get("messages", [{}])[0].get("content", "")
+                if (x[1].get("request") or {}).get("messages")
+                else "",
+            )
+        )
+
+        # Build lookup: (template_category, response_length) → deque of eval entries
+        eval_by_key: dict[tuple, deque] = {}
+        for ev in eval_trace_result.get("evaluations") or []:
+            key = (
+                ev.get("template_category") or "",
+                int(ev.get("response_length") or 0),
+            )
+            if key not in eval_by_key:
+                eval_by_key[key] = deque()
+            eval_by_key[key].append(ev)
+
+        rows: list[dict] = []
+        for idx, (_, content) in enumerate(interaction_traces, start=1):
+            request = content.get("request") or {}
+            messages = request.get("messages") or []
+            attack_prompt = messages[0].get("content", "") if messages else ""
+            if not attack_prompt:
+                attack_prompt = str(request.get("prompt") or "")
+
+            _raw_resp = content.get("response")
+            _actual_resp, _g_side, _g_expl = (
+                DashboardPage._extract_guardrail_from_response(_raw_resp)
+            )
+            response_text = str(_actual_resp or "")
+
+            metadata = content.get("metadata") or {}
+            template_category = str(metadata.get("template_category") or "")
+            response_length = int(metadata.get("response_length") or len(response_text))
+
+            # Replace goal text in prompt with {goal} placeholder for display
+            if goal and goal in attack_prompt:
+                template_display = attack_prompt.replace(goal, "{goal}", 1)
+            else:
+                template_display = attack_prompt
+
+            # Match against the evaluator result
+            key = (template_category, response_length)
+            success: bool | None = None
+            q = eval_by_key.get(key)
+            if q:
+                ev = q.popleft()
+                success = bool(ev.get("success", False))
+
+            if _g_side:
+                bucket = "mitigated"
+            elif success is True:
+                bucket = "jailbreak"
+            elif success is False:
+                bucket = "mitigated"
+            else:
+                bucket = "error"
+
+            rows.append(
+                {
+                    "num": idx,
+                    "template": template_display,
+                    "template_category": template_category,
+                    "prompt": attack_prompt,
+                    "response": response_text,
+                    "result": (
+                        "Jailbreak"
+                        if bucket == "jailbreak"
+                        else "Error"
+                        if bucket == "error"
+                        else "Mitigated"
+                    ),
+                    "_bucket": bucket,
+                    "_guardrail_side": _g_side,
+                    "_guardrail_explanation": _g_expl,
+                }
+            )
+
+        return rows
+
+    def _render_baseline_goal_card(
+        self, row: dict, template_rows: list[dict], detail_mode: bool = False
+    ) -> None:
+        """Render a Baseline goal card grouped by template category."""
+
+        def _fmt_cat(cat: str) -> str:
+            return cat.replace("_", " ").title() if cat else "Uncategorised"
+
+        # Build category groups preserving insertion order
+        groups: dict[str, list[dict]] = {}
+        for tr in template_rows:
+            cat = tr.get("template_category") or ""
+            groups.setdefault(cat, []).append(tr)
+
+        n_jailbreaks = sum(1 for r in template_rows if r["_bucket"] == "jailbreak")
+        n_mitigated = sum(1 for r in template_rows if r["_bucket"] == "mitigated")
+        n_errors = sum(1 for r in template_rows if r["_bucket"] == "error")
+
+        bl_cols = [
+            {
+                "name": "template_short",
+                "label": "Template",
+                "field": "template_short",
+                "align": "left",
+            },
+            {
+                "name": "result",
+                "label": "Result",
+                "field": "result",
+                "align": "center",
+                "style": "width:100px",
+            },
+        ]
+
+        with self._goal_card_shell(row, detail_mode):
+            if not template_rows:
+                ui.label("No Baseline template data recorded.").classes(
+                    "text-sm text-grey-6"
+                )
+                return
+
+            with ui.column().classes("w-full gap-2 mt-1") as body_col:
+                if not detail_mode:
+                    body_col.set_visibility(False)
+
+                for cat, rows_in_cat in groups.items():
+                    cat_label = _fmt_cat(cat)
+                    cat_n_jailbreaks = sum(
+                        1 for r in rows_in_cat if r["_bucket"] == "jailbreak"
+                    )
+
+                    with ui.row().classes("items-center gap-2 mt-3 mb-0.5 px-1"):
+                        ui.label(cat_label).classes(
+                            "text-xs font-semibold text-grey-6 uppercase tracking-wide"
+                        )
+                        ui.badge(
+                            f"{len(rows_in_cat)} prompt{'s' if len(rows_in_cat) != 1 else ''}",
+                            color="grey-5",
+                        ).classes("text-xs")
+                        if cat_n_jailbreaks:
+                            ui.badge(
+                                f"{cat_n_jailbreaks} jailbreak{'s' if cat_n_jailbreaks != 1 else ''}",
+                                color="negative",
+                            ).classes("text-xs")
+
+                    tbl_rows = [
+                        {
+                            "_num": tr["num"],
+                            "template_short": (
+                                (
+                                    tr["template"].replace("{goal}", "", 1)[:80]
+                                    + "\u2026"
+                                )
+                                if len(tr["template"].replace("{goal}", "", 1)) > 80
+                                else tr["template"].replace("{goal}", "", 1)
+                            )
+                            or "—",
+                            "result": tr["result"],
+                            "_bucket": tr["_bucket"],
+                            "_full_prompt": tr.get("prompt") or "",
+                            "_response": tr.get("response") or "",
+                            "_guardrail_side": tr.get("_guardrail_side") or "",
+                            "_guardrail_explanation": tr.get("_guardrail_explanation")
+                            or "",
+                        }
+                        for tr in rows_in_cat
+                    ]
+
+                    tbl = (
+                        ui.table(
+                            columns=bl_cols,
+                            rows=tbl_rows,
+                            row_key="_num",
+                        )
+                        .classes("w-full text-xs")
+                        .props("dense flat")
+                    )
+                    if detail_mode:
+                        tbl.props(
+                            f":expanded-rows='{json.dumps([r['_num'] for r in tbl_rows])}'"
+                        )
+
+                    tbl.add_slot(
+                        "body",
+                        r"""
+<q-tr :props="props" @click="props.expand = !props.expand" style="cursor:pointer">
+  <q-td key="template_short" :props="props"
+        style="white-space:pre-wrap;word-break:break-word;max-width:360px">
+    {{ props.row.template_short }}
+  </q-td>
+  <q-td key="result" :props="props">
+    <q-badge v-if="props.row._bucket === 'jailbreak'" color="negative" class="text-xs">Jailbreak</q-badge>
+    <q-badge v-else-if="props.row._bucket === 'mitigated'" color="positive" class="text-xs">Mitigated</q-badge>
+    <q-badge v-else color="warning" class="text-xs">Error</q-badge>
+  </q-td>
+</q-tr>
+<q-tr v-show="props.expand" :props="props" @click="props.expand = false" style="cursor:pointer">
+  <q-td colspan="100%" class="bg-grey-1">
+    <div class="q-pa-sm">
+      <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">PROMPT SENT TO TARGET</div>
+      <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
+                  border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._full_prompt || '\u2014' }}</pre>
+      <template v-if="props.row._guardrail_side !== 'before'">
+        <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">TARGET RESPONSE</div>
+        <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
+                    border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._response || 'No response recorded.' }}</pre>
+      </template>
+      <div v-if="props.row._guardrail_side === 'before'"
+           style="border:2px solid #f97316;background:#fff7ed;border-radius:4px;padding:10px">
+        <div style="font-size:11px;font-weight:700;color:#c2410c;text-transform:uppercase;margin-bottom:4px">⚠ Prompt blocked by before guardrail</div>
+        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      </div>
+      <div v-else-if="props.row._guardrail_side === 'after'"
+           style="border:2px solid #ef4444;background:#fef2f2;border-radius:4px;padding:10px">
+        <div style="font-size:11px;font-weight:700;color:#dc2626;text-transform:uppercase;margin-bottom:4px">🚫 Response censored by after guardrail</div>
+        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      </div>
+      <div v-else-if="props.row._guardrail_side"
+           style="border:2px solid #9e9e9e;background:#f5f5f5;border-radius:4px;padding:10px">
+        <div style="font-size:11px;font-weight:700;color:#616161;text-transform:uppercase;margin-bottom:4px">🛡 Blocked by guardrail</div>
+        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      </div>
+    </div>
+  </q-td>
+</q-tr>
+""",
+                    )
+
+                # ── Summary row ───────────────────────────────────────
+                ui.separator().classes("mt-2")
+                with ui.row().classes("items-center gap-2 mt-2 flex-wrap"):
+                    ui.label("Summary:").classes("text-xs font-semibold text-grey-6")
+                    if n_jailbreaks:
+                        ui.badge(
+                            f"{n_jailbreaks} Jailbreak{'s' if n_jailbreaks != 1 else ''}",
+                            color="negative",
+                        ).classes("text-xs")
+                    ui.badge(f"{n_mitigated} Mitigated", color="positive").classes(
+                        "text-xs"
+                    )
+                    if n_errors:
+                        ui.badge(
+                            f"{n_errors} Error{'s' if n_errors != 1 else ''}",
+                            color="warning",
+                        ).classes("text-xs")
+
+            if not detail_mode:
+                self._wire_expand_toggle(body_col)
+
+    # ── Best-of-N (BoN) ───────────────────────────────────────────────────────
+
+    @staticmethod
+    def _parse_bon_traces(traces: list[dict]) -> list[dict]:
+        """Parse BoN traces into per-step groups.
+
+        Returns a list of step dicts, each containing:
+          step          – 0-based step index
+          step_label    – human label "Step N / M"
+          is_jailbreak  – True if the judge confirmed jailbreak for this step
+          candidates    – list of candidate dicts:
+              k                – 1-based candidate index
+              augmented_prompt – text sent to target
+              response         – target model response
+              response_length  – char length of response
+              is_best          – True if selected as best in the step
+              error            – error string or None
+              _guardrail_side  – "" | "before" | "after" | "unknown"
+              _guardrail_explanation – explanation string
+        """
+        candidate_traces: list[dict] = []
+        eval_traces: list[dict] = []
+
+        for td in sorted(traces, key=lambda x: x.get("sequence", 0)):
+            content = td.get("content") or {}
+            meta = content.get("metadata") or {}
+            dtype = str(meta.get("display_type") or "").lower()
+            if dtype == "bon_candidate":
+                candidate_traces.append(td)
+            elif dtype == "bon_evaluation":
+                eval_traces.append(td)
+
+        # Build lookup: step index → is_jailbreak (from evaluation traces only)
+        step_jailbreak: dict[int, bool] = {}
+        for td in eval_traces:
+            content = td.get("content") or {}
+            meta = content.get("metadata") or {}
+            s = meta.get("step")
+            if s is not None:
+                step_jailbreak[int(s)] = bool(meta.get("is_jailbreak", False))
+
+        # Group candidate traces by step
+        by_step: dict[int, list[dict]] = {}
+        for td in candidate_traces:
+            content = td.get("content") or {}
+            meta = content.get("metadata") or {}
+            s = int(meta.get("step", 0))
+            by_step.setdefault(s, []).append(td)
+
+        if not by_step:
+            return []
+
+        n_steps_seen = 1
+        for td in candidate_traces:
+            content = td.get("content") or {}
+            meta = content.get("metadata") or {}
+            n_steps_seen = max(n_steps_seen, int(meta.get("n_steps", 1)))
+
+        steps: list[dict] = []
+        for s in sorted(by_step.keys()):
+            cands = []
+            for td in sorted(
+                by_step[s],
+                key=lambda x: int(
+                    (x.get("content") or {})
+                    .get("metadata", {})
+                    .get("candidate_index", 0)
+                ),
+            ):
+                content = td.get("content") or {}
+                meta = content.get("metadata") or {}
+                request = content.get("request") or {}
+                response_obj = content.get("response")
+
+                augmented_prompt = (
+                    request.get("prompt")
+                    or (request.get("messages") or [{}])[0].get("content", "")
+                    if isinstance(request, dict)
+                    else ""
+                )
+
+                response_obj, _g_side, _g_expl = (
+                    DashboardPage._extract_guardrail_from_response(response_obj)
+                )
+
+                if isinstance(response_obj, dict):
+                    response_text = (
+                        response_obj.get("generated_text")
+                        or response_obj.get("completion")
+                        or ""
+                    )
+                    error_text = response_obj.get("error_message")
+                elif response_obj is not None:
+                    response_text = str(response_obj)
+                    error_text = None
+                else:
+                    response_text = ""
+                    error_text = None
+
+                resp_len = int(meta.get("response_length", len(response_text or "")))
+                cands.append(
+                    {
+                        "k": int(meta.get("candidate_index", 0)),
+                        "augmented_prompt": augmented_prompt,
+                        "response": response_text,
+                        "response_length": resp_len,
+                        "is_best": bool(meta.get("is_best", False)),
+                        "error": error_text,
+                        "_guardrail_side": _g_side,
+                        "_guardrail_explanation": _g_expl,
+                    }
+                )
+
+            steps.append(
+                {
+                    "step": s,
+                    "step_label": f"Step {s + 1} / {n_steps_seen}",
+                    "is_jailbreak": step_jailbreak.get(s, False),
+                    "candidates": cands,
+                }
+            )
+
+        return steps
+
+    def _render_bon_goal_card(
+        self, row: dict, step_groups: list[dict], detail_mode: bool = False
+    ) -> None:
+        """Render a BoN goal card with per-step candidate tables."""
+        with self._goal_card_shell(row, detail_mode):
+            if not step_groups:
+                ui.label("No BoN step results recorded.").classes("text-sm text-grey-6")
+                return
+
+            with ui.column().classes("w-full gap-2 mt-1") as body_col:
+                if not detail_mode:
+                    body_col.set_visibility(False)
+
+                for sg in step_groups:
+                    step_label = sg["step_label"]
+                    is_jailbreak_step = sg["is_jailbreak"]
+                    candidates = sg["candidates"]
+
+                    with ui.row().classes("items-center gap-2 mt-3 mb-0.5 px-1"):
+                        ui.label(step_label).classes(
+                            "text-xs font-semibold text-grey-6 uppercase tracking-wide"
+                        )
+                        if is_jailbreak_step:
+                            ui.badge("Jailbreak", color="negative").classes("text-xs")
+
+                    columns = [
+                        {
+                            "name": "k",
+                            "label": "K",
+                            "field": "k",
+                            "align": "center",
+                            "style": "width:48px",
+                        },
+                        {
+                            "name": "augmented_prompt",
+                            "label": "Augmented prompt",
+                            "field": "augmented_prompt",
+                            "align": "left",
+                        },
+                        {
+                            "name": "response_length",
+                            "label": "Response length",
+                            "field": "response_length",
+                            "align": "center",
+                            "style": "width:140px",
+                        },
+                        {
+                            "name": "result",
+                            "label": "Result",
+                            "field": "result",
+                            "align": "center",
+                            "style": "width:100px",
+                        },
+                    ]
+
+                    rows_data = []
+                    for c in candidates:
+                        if c.get("_guardrail_side"):
+                            result_label = "Mitigated"
+                        elif c["error"]:
+                            result_label = "Error"
+                        elif c["is_best"] and is_jailbreak_step:
+                            result_label = "Jailbreak"
+                        elif c["is_best"] and not is_jailbreak_step:
+                            result_label = "Mitigated"
+                        else:
+                            result_label = "—"
+                        aug = c.get("augmented_prompt") or ""
+                        rows_data.append(
+                            {
+                                "k": c["k"],
+                                "augmented_prompt": (aug[:80] + "…")
+                                if len(aug) > 80
+                                else aug or "—",
+                                "response_length": c["response_length"],
+                                "result": result_label,
+                                "_is_best": c["is_best"],
+                                "_full_prompt": aug,
+                                "_response": c.get("response") or "",
+                                "_guardrail_side": c.get("_guardrail_side") or "",
+                                "_guardrail_explanation": c.get(
+                                    "_guardrail_explanation"
+                                )
+                                or "",
+                            }
+                        )
+
+                    tbl = (
+                        ui.table(columns=columns, rows=rows_data, row_key="k")
+                        .classes("w-full text-xs")
+                        .props("dense flat")
+                    )
+                    if detail_mode:
+                        tbl.props(
+                            f":expanded-rows='{json.dumps([r['k'] for r in rows_data])}'"
+                        )
+
+                    tbl.add_slot(
+                        "body",
+                        r"""
+<q-tr :props="props" @click="props.expand = !props.expand"
+      :class="props.row._is_best ? 'bg-grey-2' : ''"
+      style="cursor:pointer">
+  <q-td key="k" :props="props">{{ props.row.k }}</q-td>
+  <q-td key="augmented_prompt" :props="props"
+        style="white-space:pre-wrap;word-break:break-word;max-width:320px">
+    {{ props.row.augmented_prompt }}
+  </q-td>
+  <q-td key="response_length" :props="props">{{ props.row.response_length }}</q-td>
+  <q-td key="result" :props="props">
+    <q-badge v-if="props.row.result === 'Jailbreak'" color="negative" class="text-xs">Jailbreak</q-badge>
+    <q-badge v-else-if="props.row.result === 'Mitigated'" color="positive" class="text-xs">Mitigated</q-badge>
+    <q-badge v-else-if="props.row.result === 'Error'" color="warning" class="text-xs">Error</q-badge>
+    <span v-else class="text-grey-5">&#8212;</span>
+  </q-td>
+</q-tr>
+<q-tr v-show="props.expand" :props="props" @click="props.expand = false" style="cursor:pointer">
+  <q-td colspan="100%" class="bg-grey-1">
+    <div class="q-pa-sm">
+      <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">PROMPT SENT TO TARGET</div>
+      <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
+                  border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._full_prompt || '\u2014' }}</pre>
+      <template v-if="props.row._guardrail_side !== 'before'">
+        <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">TARGET RESPONSE</div>
+        <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
+                    border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._response || 'No response recorded.' }}</pre>
+      </template>
+      <div v-if="props.row._guardrail_side === 'before'"
+           style="border:2px solid #f97316;background:#fff7ed;border-radius:4px;padding:10px">
+        <div style="font-size:11px;font-weight:700;color:#c2410c;text-transform:uppercase;margin-bottom:4px">⚠ Prompt blocked by before guardrail</div>
+        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      </div>
+      <div v-else-if="props.row._guardrail_side === 'after'"
+           style="border:2px solid #ef4444;background:#fef2f2;border-radius:4px;padding:10px">
+        <div style="font-size:11px;font-weight:700;color:#dc2626;text-transform:uppercase;margin-bottom:4px">🚫 Response censored by after guardrail</div>
+        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      </div>
+      <div v-else-if="props.row._guardrail_side"
+           style="border:2px solid #9e9e9e;background:#f5f5f5;border-radius:4px;padding:10px">
+        <div style="font-size:11px;font-weight:700;color:#616161;text-transform:uppercase;margin-bottom:4px">🛡 Blocked by guardrail</div>
+        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      </div>
+    </div>
+  </q-td>
+</q-tr>
+""",
+                    )
+
+            if not detail_mode:
+                self._wire_expand_toggle(body_col)
+
+    # ── H4rm3l formatting ─────────────────────────────────────────────────────
+
+    @staticmethod
+    def _format_h4rm3l_program(program: str) -> str:
+        """Convert an h4rm3l program string to a human-readable arrow chain."""
+        if not program or not isinstance(program, str):
+            return program or ""
+        p = program.strip()
+        # If it looks like a Python/h4rm3l call chain, simplify
+        import re as _re  # noqa: PLC0415
+
+        # Match Apply(transform1, Apply(transform2, ...)) style
+        names = _re.findall(r"\b([A-Za-z][A-Za-z0-9_]*)(?:\s*\()", p)
+        if names:
+            # Skip generic wrappers
+            skip = {"Apply", "Compose", "Pipeline"}
+            filtered = [n for n in names if n not in skip]
+            if filtered:
+                return " → ".join(
+                    " ".join(
+                        w.capitalize() for w in _re.sub(r"([A-Z])", r" \1", n).split()
+                    )
+                    for n in filtered
+                )
+        # Fallback: title-case snake_case names
+        if "_" in p and " " not in p:
+            return p.replace("_", " ").title()
+        return p
+
+    @staticmethod
+    def _extract_guardrail_from_response(response_value) -> tuple:
+        """Detect a guardrail event embedded in a response value.
+
+        Returns (actual_response, guardrail_side, guardrail_explanation) where:
+        - actual_response: real response string/value, or None if before-guardrail
+        - guardrail_side: "before" | "after" | "unknown" | ""
+        - guardrail_explanation: human-readable reason string
+        """
+        if isinstance(response_value, dict) and response_value.get("side") in (
+            "before",
+            "after",
+            "unknown",
+        ):
+            side = response_value.get("side", "unknown")
+            explanation = str(
+                response_value.get("explanation") or "Blocked by guardrail"
+            )
+            if side == "after":
+                actual = response_value.get("target_response") or None
+            else:
+                actual = None  # before-guardrail: request was never sent
+            return actual, side, explanation
+        return response_value, "", ""
+
+    # ── PAIR ──────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _parse_pair_traces(traces: list[dict]) -> list[dict]:
+        """Parse PAIR traces into per-iteration rows.
+
+        Each row:
+          iteration  – 1-based iteration number
+          prompt     – prompt sent to target
+          response   – target response
+          score      – judge score (int or None)
+          is_best    – True if this had the highest score
+        """
+        sorted_traces = sorted(traces, key=lambda x: x.get("sequence", 0))
+        rows: list[dict] = []
+
+        for td in sorted_traces:
+            content = td.get("content")
+            if not isinstance(content, dict):
+                continue
+            step_name = str(content.get("step_name") or "")
+            if "Iteration" not in step_name and "iteration" not in step_name:
+                continue
+            metadata = content.get("metadata") or {}
+            iteration = int(metadata.get("iteration") or len(rows) + 1)
+            req = content.get("request") or {}
+            prompt = req.get("prompt") or "" if isinstance(req, dict) else str(req)
+            if isinstance(prompt, list):
+                user_msgs = [
+                    m.get("content", "") for m in prompt if m.get("role") == "user"
+                ]
+                prompt = user_msgs[-1] if user_msgs else ""
+            resp = content.get("response")
+            resp, _pair_g_side, _pair_g_expl = (
+                DashboardPage._extract_guardrail_from_response(resp)
+            )
+            if isinstance(resp, dict):
+                response = (
+                    resp.get("generated_text") or resp.get("completion") or str(resp)
+                )
+            elif resp is not None:
+                response = str(resp)
+            else:
+                response = ""
+            score_raw = metadata.get("judge_score") or content.get("score")
+            try:
+                score = int(float(score_raw)) if score_raw is not None else None
+            except (TypeError, ValueError):
+                score = None
+            rows.append(
+                {
+                    "iteration": iteration,
+                    "prompt": str(prompt),
+                    "response": response,
+                    "score": score,
+                    "is_best": False,
+                    "_guardrail_side": _pair_g_side,
+                    "_guardrail_explanation": _pair_g_expl,
+                }
+            )
+
+        # Mark best score
+        if rows:
+            scored = [r for r in rows if r["score"] is not None]
+            if scored:
+                best = max(scored, key=lambda r: r["score"])  # type: ignore[arg-type]
+                best["is_best"] = True
+
+        return rows
+
+    def _render_pair_goal_card(
+        self, row: dict, steps: list[dict], detail_mode: bool = False
+    ) -> None:
+        """Render a PAIR goal card as a conversation with per-iteration steps."""
+        with self._goal_card_shell(row, detail_mode):
+            if not steps:
+                ui.label("No PAIR iteration data recorded.").classes(
+                    "text-sm text-grey-6"
+                )
+            else:
+                with ui.column().classes("w-full gap-0 mt-1") as body_col:
+                    if not detail_mode:
+                        body_col.set_visibility(False)
+
+                    for step in steps:
+                        iteration = step["iteration"]
+                        score = step["score"]
+                        is_best = step["is_best"]
+                        prompt = step["prompt"]
+                        response = step["response"]
+                        _guardrail_side = step.get("_guardrail_side") or ""
+                        _guardrail_explanation = (
+                            step.get("_guardrail_explanation") or ""
+                        )
+
+                        with ui.row().classes("items-center gap-2 mt-3 mb-1 px-1"):
+                            _iter_label = f"Iteration {iteration}"
+                            if score is not None:
+                                _iter_label += f" — {score}/10"
+                            ui.label(_iter_label).classes(
+                                "text-xs font-semibold text-grey-6 uppercase tracking-wide"
+                            )
+                            if is_best:
+                                ui.badge("Best", color="positive").classes("text-xs")
+
+                        ui.label("PROMPT SENT TO TARGET").classes(
+                            "text-[10px] text-grey-6 font-semibold uppercase tracking-wide px-1"
+                        )
+                        ui.html(
+                            '<pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;'
+                            'border-radius:4px;margin-bottom:6px;white-space:pre-wrap;word-break:break-word">'
+                            + html.escape(prompt or "—")
+                            + "</pre>"
+                        )
+
+                        if _guardrail_side == "before":
+                            self._render_guardrail_event_block(
+                                {
+                                    "side": "before",
+                                    "explanation": _guardrail_explanation,
+                                }
+                            )
+                        else:
+                            ui.label("TARGET RESPONSE").classes(
+                                "text-[10px] text-grey-6 font-semibold uppercase tracking-wide px-1"
+                            )
+                            ui.html(
+                                '<pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;'
+                                'border-radius:4px;white-space:pre-wrap;word-break:break-word">'
+                                + html.escape(response or "No response recorded.")
+                                + "</pre>"
+                            )
+                            if _guardrail_side:
+                                self._render_guardrail_event_block(
+                                    {
+                                        "side": _guardrail_side,
+                                        "explanation": _guardrail_explanation,
+                                    }
+                                )
+
+                        if iteration < steps[-1]["iteration"]:
+                            ui.separator().classes("mt-2 mb-0")
+
+                if not detail_mode:
+                    self._wire_expand_toggle(body_col)
+
+    # ── AutoDAN-Turbo ─────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _parse_autodan_traces(traces: list[dict]) -> list[dict]:
+        """Parse AutoDAN-Turbo traces into per-epoch step rows."""
+        sorted_traces = sorted(traces, key=lambda x: x.get("sequence", 0))
+
+        steps: dict[tuple, dict] = {}
+        warmup_summary: dict | None = None
+
+        for td in sorted_traces:
+            content = td.get("content")
+            if not isinstance(content, dict):
+                continue
+            step_name = str(content.get("step_name") or "")
+            metadata = content.get("metadata") or {}
+
+            if step_name == "Warmup Summary":
+                warmup_summary = {
+                    "phase": "WARMUP_SUMMARY",
+                    "epoch": -1,
+                    "stream": -1,
+                    "strategy": content.get("strategy") or metadata.get("strategy"),
+                    "score": None,
+                    "is_best": False,
+                    "generated_prompt": None,
+                    "target_response": None,
+                    "assessment": None,
+                    "score_delta": None,
+                }
+                continue
+
+            phase = "WARMUP" if "warmup" in step_name.lower() else "LIFELONG"
+            epoch = int(metadata.get("epoch") or metadata.get("iteration") or 0)
+            stream = int(metadata.get("stream") or 0)
+            key = (phase, epoch, stream)
+
+            if key not in steps:
+                steps[key] = {
+                    "phase": phase,
+                    "epoch": epoch,
+                    "stream": stream,
+                    "score": None,
+                    "is_best": False,
+                    "generated_prompt": None,
+                    "target_response": None,
+                    "assessment": None,
+                    "strategy": None,
+                    "score_delta": None,
+                    "_guardrail_side": "",
+                    "_guardrail_explanation": "",
+                }
+
+            step = steps[key]
+
+            req = content.get("request") or {}
+            if isinstance(req, dict) and req.get("prompt"):
+                step["generated_prompt"] = req["prompt"]
+
+            resp = content.get("response")
+            if resp:
+                resp, _adan_g_side, _adan_g_expl = (
+                    DashboardPage._extract_guardrail_from_response(resp)
+                )
+                if _adan_g_side:
+                    step["_guardrail_side"] = _adan_g_side
+                    step["_guardrail_explanation"] = _adan_g_expl
+                if resp is not None:
+                    if isinstance(resp, dict):
+                        step["target_response"] = (
+                            resp.get("generated_text")
+                            or resp.get("completion")
+                            or str(resp)
+                        )
+                    else:
+                        step["target_response"] = str(resp)
+
+            score_raw = metadata.get("judge_score") or content.get("score")
+            if score_raw is not None:
+                try:
+                    step["score"] = float(score_raw)
+                except (TypeError, ValueError):
+                    pass
+
+            if content.get("assessment"):
+                step["assessment"] = str(content["assessment"])
+            if content.get("strategy"):
+                step["strategy"] = content["strategy"]
+            if metadata.get("score_delta") is not None:
+                try:
+                    step["score_delta"] = float(metadata["score_delta"])
+                except (TypeError, ValueError):
+                    pass
+
+        _phase_order = {"WARMUP": 0, "LIFELONG": 1}
+        result = [
+            steps[k]
+            for k in sorted(
+                steps,
+                key=lambda t: (_phase_order.get(t[0], 9), t[1], t[2]),
+            )
+        ]
+        for phase_label in ("WARMUP", "LIFELONG"):
+            phase_steps = [s for s in result if s["phase"] == phase_label]
+            scored = [s for s in phase_steps if s["score"] is not None]
+            if scored:
+                best = max(scored, key=lambda s: s["score"])  # type: ignore[arg-type]
+                best["is_best"] = True
+
+        if warmup_summary:
+            last_warmup_idx = -1
+            for i, s in enumerate(result):
+                if s["phase"] == "WARMUP":
+                    last_warmup_idx = i
+            result.insert(last_warmup_idx + 1, warmup_summary)
+
+        return result
+
+    def _render_autodan_goal_card(
+        self, row: dict, steps: list[dict], detail_mode: bool = False
+    ) -> None:
+        """Render AutoDAN-Turbo goal card as a phase-divided conversation."""
+        with self._goal_card_shell(row, detail_mode):
+            if not steps:
+                ui.label("No AutoDAN-Turbo trace data recorded.").classes(
+                    "text-sm text-grey-6"
+                )
+                return
+
+            with ui.column().classes("w-full gap-3 mt-2") as body_col:
+                if not detail_mode:
+                    body_col.set_visibility(False)
+
+                phase_groups: list[tuple[str, list[dict]]] = []
+                for step in steps:
+                    phase = step["phase"]
+                    display_phase = (
+                        "WARMUP"
+                        if phase in ("WARMUP", "WARMUP_SUMMARY")
+                        else "LIFELONG"
+                    )
+                    if not phase_groups or phase_groups[-1][0] != display_phase:
+                        phase_groups.append((display_phase, []))
+                    phase_groups[-1][1].append(step)
+
+                for display_phase, phase_steps in phase_groups:
+                    _is_warmup = display_phase == "WARMUP"
+                    _phase_border = (
+                        "border-blue-grey-3" if _is_warmup else "border-teal-3"
+                    )
+                    _phase_header_bg = (
+                        "background:#eceff1" if _is_warmup else "background:#e0f2f1"
+                    )
+                    _phase_label_text = "Warm-Up" if _is_warmup else "Lifelong"
+                    _phase_icon = "explore" if _is_warmup else "loop"
+
+                    with ui.card().tight().classes(f"w-full border {_phase_border}"):
+                        with (
+                            ui.row()
+                            .classes("items-center gap-2 px-3 py-2 w-full")
+                            .style(_phase_header_bg)
+                        ):
+                            ui.icon(_phase_icon, size="xs").classes("text-grey-7")
+                            ui.label(_phase_label_text).classes(
+                                "text-xs font-bold text-grey-8 uppercase tracking-widest"
+                            )
+
+                        with ui.column().classes("w-full gap-2 p-2"):
+                            _phase_epoch_counter = 0
+
+                            for step in phase_steps:
+                                phase = step["phase"]
+
+                                if phase == "WARMUP_SUMMARY":
+                                    strategy = step.get("strategy") or {}
+                                    s_name = (
+                                        strategy.get("Strategy")
+                                        if isinstance(strategy, dict)
+                                        else None
+                                    )
+                                    s_defn = (
+                                        strategy.get("Definition")
+                                        if isinstance(strategy, dict)
+                                        else None
+                                    )
+                                    if s_name or s_defn:
+                                        with (
+                                            ui.card()
+                                            .tight()
+                                            .classes("w-full border border-indigo-2")
+                                        ):
+                                            with (
+                                                ui.row()
+                                                .classes("items-center gap-2 px-3 py-2")
+                                                .style("background:#e8eaf6")
+                                            ):
+                                                ui.icon("summarize", size="xs").classes(
+                                                    "text-indigo-6"
+                                                )
+                                                ui.label(
+                                                    "Summarizer — Strategy Extracted"
+                                                ).classes(
+                                                    "text-xs font-bold text-indigo-8 uppercase tracking-widest"
+                                                )
+                                            with ui.column().classes("p-3 gap-1"):
+                                                _strat_text = ""
+                                                if s_name:
+                                                    _strat_text += (
+                                                        f"Strategy: {s_name}\n"
+                                                    )
+                                                if s_defn:
+                                                    _strat_text += (
+                                                        f"Definition: {s_defn}"
+                                                    )
+                                                ui.html(
+                                                    '<pre style="font-size:11px;padding:8px;background:white;'
+                                                    "border:1px solid #c5cae9;border-radius:4px;margin:0;"
+                                                    'white-space:pre-wrap;word-break:break-word">'
+                                                    + html.escape(_strat_text.strip())
+                                                    + "</pre>"
+                                                )
+                                    continue
+
+                                score = step["score"]
+                                is_best = step["is_best"]
+                                generated_prompt = step["generated_prompt"]
+                                target_response = step["target_response"]
+                                assessment = step.get("assessment") or ""
+                                strategy = step.get("strategy")
+                                score_delta = step.get("score_delta")
+                                _adan_g_side = step.get("_guardrail_side") or ""
+                                _adan_g_expl = step.get("_guardrail_explanation") or ""
+                                _global_epoch_num = _phase_epoch_counter + 1
+                                _phase_epoch_counter += 1
+                                _epoch_border = (
+                                    "border-positive" if is_best else "border-grey-3"
+                                )
+
+                                with (
+                                    ui.card()
+                                    .tight()
+                                    .classes(f"w-full border {_epoch_border}")
+                                ):
+                                    with (
+                                        ui.row()
+                                        .classes(
+                                            "items-center gap-2 px-3 py-1.5 w-full"
+                                        )
+                                        .style("background:#f5f5f5")
+                                    ):
+                                        _score_str = (
+                                            f" - score {score:.1f} / 10"
+                                            if score is not None
+                                            else ""
+                                        )
+                                        ui.label(
+                                            f"Epoch {_global_epoch_num}{_score_str}"
+                                        ).classes(
+                                            "text-xs font-semibold text-grey-7 uppercase tracking-wide"
+                                        )
+                                        if is_best:
+                                            ui.badge("Best", color="positive").classes(
+                                                "text-xs"
+                                            )
+                                        ui.space()
+
+                                    with ui.column().classes("p-3 gap-2"):
+                                        ui.label("Attacker").classes(
+                                            "text-[10px] font-semibold text-grey-5 uppercase tracking-wide"
+                                        )
+                                        ui.html(
+                                            '<pre style="font-size:11px;padding:8px;background:white;'
+                                            "border:1px solid #e0e0e0;border-radius:4px;margin:0;"
+                                            'white-space:pre-wrap;word-break:break-word">'
+                                            + html.escape(generated_prompt or "—")
+                                            + "</pre>"
+                                        )
+
+                                        if _adan_g_side == "before":
+                                            self._render_guardrail_event_block(
+                                                {
+                                                    "side": "before",
+                                                    "explanation": _adan_g_expl,
+                                                }
+                                            )
+                                        else:
+                                            ui.label("Target response").classes(
+                                                "text-[10px] font-semibold text-grey-5 uppercase tracking-wide"
+                                            )
+                                            ui.html(
+                                                '<pre style="font-size:11px;padding:8px;background:white;'
+                                                "border:1px solid #e0e0e0;border-radius:4px;margin:0;"
+                                                'white-space:pre-wrap;word-break:break-word">'
+                                                + html.escape(
+                                                    target_response
+                                                    or "No response recorded."
+                                                )
+                                                + "</pre>"
+                                            )
+                                            if _adan_g_side:
+                                                self._render_guardrail_event_block(
+                                                    {
+                                                        "side": _adan_g_side,
+                                                        "explanation": _adan_g_expl,
+                                                    }
+                                                )
+
+                                        if assessment:
+                                            ui.label("Scorer assessment").classes(
+                                                "text-[10px] font-semibold text-grey-5 uppercase tracking-wide"
+                                            )
+                                            ui.html(
+                                                '<pre style="font-size:11px;padding:8px;background:#fff8e1;'
+                                                "border:1px solid #ffe082;border-radius:4px;margin:0;"
+                                                'white-space:pre-wrap;word-break:break-word">'
+                                                + html.escape(assessment)
+                                                + "</pre>"
+                                            )
+
+                                        if strategy is not None and isinstance(
+                                            strategy, dict
+                                        ):
+                                            s_name = strategy.get("Strategy")
+                                            s_defn = strategy.get("Definition")
+                                            if s_name or s_defn:
+                                                _delta_str = (
+                                                    f" (+{score_delta:.1f})"
+                                                    if score_delta
+                                                    else ""
+                                                )
+                                                ui.label(
+                                                    f"New strategy{_delta_str}"
+                                                ).classes(
+                                                    "text-[10px] font-semibold text-indigo-6 uppercase tracking-wide"
+                                                )
+                                                _strat_text = ""
+                                                if s_name:
+                                                    _strat_text += (
+                                                        f"Strategy: {s_name}\n"
+                                                    )
+                                                if s_defn:
+                                                    _strat_text += (
+                                                        f"Definition: {s_defn}"
+                                                    )
+                                                ui.html(
+                                                    '<pre style="font-size:11px;padding:8px;background:#f3f4fd;'
+                                                    "border:1px solid #c5cae9;border-radius:4px;margin:0;"
+                                                    'white-space:pre-wrap;word-break:break-word">'
+                                                    + html.escape(_strat_text.strip())
+                                                    + "</pre>"
+                                                )
+
+            if not detail_mode:
+                self._wire_expand_toggle(body_col)
+
+    # ── AdvPrefix ─────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _parse_advprefix_traces(
+        traces: list[dict],
+    ) -> tuple[list[dict], dict]:
+        """Parse AdvPrefix traces into per-prefix rows grouped by meta_prefix."""
+        sorted_traces = sorted(traces, key=lambda x: x.get("sequence", 0))
+
+        gen_stats: dict = {
+            "raw_generated": 0,
+            "after_phase1": 0,
+            "after_phase2": 0,
+        }
+
+        candidates: dict[str, dict] = {}
+
+        for td in sorted_traces:
+            content = td.get("content")
+            if not isinstance(content, dict):
+                continue
+            if "candidates" not in content and "raw_generated" not in content:
+                continue
+            gen_stats["raw_generated"] += int(content.get("raw_generated") or 0)
+            gen_stats["after_phase1"] += int(content.get("after_phase1_filtering") or 0)
+            gen_stats["after_phase2"] += int(content.get("after_phase2_filtering") or 0)
+            for cand in content.get("candidates") or []:
+                if not isinstance(cand, dict):
+                    continue
+                prefix_text = str(cand.get("prefix") or "")
+                if not prefix_text:
+                    continue
+                if prefix_text not in candidates:
+                    _raw_mp = str(cand.get("meta_prefix") or "")
+                    _mp_parts = [p.strip() for p in _raw_mp.split(",") if p.strip()]
+                    _seen: set[str] = set()
+                    _mp_dedup: list[str] = []
+                    for _p in _mp_parts:
+                        if _p not in _seen:
+                            _seen.add(_p)
+                            _mp_dedup.append(_p)
+                    _meta_prefix_str = ", ".join(_mp_dedup)
+                    candidates[prefix_text] = {
+                        "prefix": prefix_text,
+                        "_meta_prefix": _meta_prefix_str,
+                        "_nll": cand.get("prefix_nll"),
+                        "completion": "",
+                        "_bucket": "pending",
+                        "result": "Pending",
+                        "_filtered": "Pending",
+                        "_error": "",
+                    }
+
+        completion_by_prefix: dict[str, dict] = {}
+
+        for td in sorted_traces:
+            content = td.get("content")
+            if not isinstance(content, dict):
+                continue
+            if str(content.get("step_name") or "") != "Target Completion":
+                continue
+
+            metadata = content.get("metadata") or {}
+            full_prefix = str(metadata.get("prefix") or "")
+            lookup_key = full_prefix[:300]
+            error_msg = metadata.get("error_message")
+            surrogate = str(metadata.get("surrogate_attack_prompt") or "")
+
+            response = content.get("response")
+            response, _adv_g_side, _adv_g_expl = (
+                DashboardPage._extract_guardrail_from_response(response)
+            )
+            if isinstance(response, dict):
+                completion = (
+                    response.get("generated_text") or response.get("completion") or ""
+                )
+            elif isinstance(response, str):
+                completion = response
+            elif response is None:
+                completion = ""
+            else:
+                completion = str(response)
+
+            # error_message may carry the guardrail block description when the
+            # guardrail info was not embedded in the response object itself
+            # (e.g. for runs recorded before guardrail_event propagation was added).
+            if not _adv_g_side and error_msg:
+                _emsg_lower = str(error_msg).lower()
+                if (
+                    "before_guardrail" in _emsg_lower
+                    or "before guardrail" in _emsg_lower
+                ):
+                    _adv_g_side = "before"
+                    _adv_g_expl = str(error_msg)
+                    error_msg = None
+                elif (
+                    "after_guardrail" in _emsg_lower or "after guardrail" in _emsg_lower
+                ):
+                    _adv_g_side = "after"
+                    _adv_g_expl = str(error_msg)
+                    error_msg = None
+
+            if _adv_g_side:
+                bucket = "mitigated"
+                result_label = "Mitigated"
+                error_msg = None  # guardrail takes precedence over any error_msg
+            elif error_msg:
+                bucket = "error"
+                result_label = "Error"
+            elif completion:
+                bucket = "mitigated"
+                result_label = "Mitigated"
+            else:
+                bucket = "error"
+                result_label = "Error"
+
+            comp_data = {
+                "prefix": full_prefix,
+                "completion": completion,
+                "_bucket": bucket,
+                "result": result_label,
+                "_filtered": "No",
+                "_error": str(error_msg) if error_msg else "",
+                "_meta_prefix": "",
+                "_surrogate": surrogate,
+                "_guardrail_side": _adv_g_side,
+                "_guardrail_explanation": _adv_g_expl,
+            }
+            completion_by_prefix[lookup_key] = comp_data
+
+            if lookup_key not in candidates:
+                candidates[lookup_key] = {
+                    "prefix": full_prefix,
+                    "_meta_prefix": "",
+                    "_nll": None,
+                    "completion": "",
+                    "_bucket": "pending",
+                    "result": "Pending",
+                    "_filtered": "Pending",
+                    "_error": "",
+                    "_surrogate": surrogate,
+                }
+
+        rows: list[dict] = []
+        for key, cand in candidates.items():
+            comp = completion_by_prefix.get(key)
+            if comp:
+                cand["prefix"] = comp["prefix"]
+                cand["completion"] = comp["completion"]
+                cand["_bucket"] = comp["_bucket"]
+                cand["result"] = comp["result"]
+                cand["_filtered"] = comp["_filtered"]
+                cand["_error"] = comp["_error"]
+                cand["_surrogate"] = comp.get("_surrogate", "")
+                if not cand.get("_meta_prefix") and comp["_meta_prefix"]:
+                    cand["_meta_prefix"] = comp["_meta_prefix"]
+                cand["_guardrail_side"] = comp.get("_guardrail_side") or ""
+                cand["_guardrail_explanation"] = (
+                    comp.get("_guardrail_explanation") or ""
+                )
+            _surrogate = cand.get("_surrogate") or ""
+            _prefix = cand["prefix"]
+            if _surrogate:
+                if "{prefix}" in _surrogate:
+                    cand["_sent_prompt"] = _surrogate.format(prefix=_prefix)
+                else:
+                    cand["_sent_prompt"] = _prefix + " " + _surrogate
+            else:
+                cand["_sent_prompt"] = _prefix
+            rows.append(cand)
+
+        rows.sort(key=lambda r: (r["_meta_prefix"], r["prefix"][:40]))
+        for i, r in enumerate(rows):
+            r["num"] = i + 1
+
+        unmatched_jailbreaks = 0
+        for td in sorted_traces:
+            content = td.get("content")
+            if not isinstance(content, dict):
+                continue
+            if str(content.get("step_name") or "") != "Evaluation":
+                continue
+            _result_val = content.get("result")
+            is_success = (
+                content.get("success") is True
+                or content.get("is_success") is True
+                or (
+                    isinstance(_result_val, dict) and _result_val.get("success") is True
+                )
+                or (content.get("score") or 0) > 0
+            )
+            if not is_success:
+                continue
+            meta = content.get("metadata") or {}
+            eval_prefix = str(meta.get("prefix") or "")
+            if eval_prefix:
+                eval_key = eval_prefix[:300]
+                matched = False
+                for r in rows:
+                    if r["prefix"][:300] == eval_key:
+                        r["_bucket"] = "jailbreak"
+                        r["result"] = "Jailbreak"
+                        matched = True
+                if not matched:
+                    unmatched_jailbreaks += 1
+            else:
+                unmatched_jailbreaks += 1
+
+        if unmatched_jailbreaks:
+            marked = 0
+            for r in rows:
+                if marked >= unmatched_jailbreaks:
+                    break
+                if r["_bucket"] in ("mitigated", "error") and not r.get(
+                    "_guardrail_side"
+                ):
+                    r["_bucket"] = "jailbreak"
+                    r["result"] = "Jailbreak"
+                    marked += 1
+
+        return rows, gen_stats
+
+    def _render_advprefix_goal_card(
+        self,
+        row: dict,
+        prefix_rows: list[dict],
+        gen_stats: dict,
+        detail_mode: bool = False,
+    ) -> None:
+        """Render an AdvPrefix goal card as a single flat table."""
+        n_jailbreaks = sum(1 for r in prefix_rows if r["_bucket"] == "jailbreak")
+        n_mitigated = sum(1 for r in prefix_rows if r["_bucket"] == "mitigated")
+        n_errors = sum(1 for r in prefix_rows if r["_bucket"] == "error")
+        n_pending = sum(1 for r in prefix_rows if r["_bucket"] == "pending")
+
+        with self._goal_card_shell(row, detail_mode):
+            if not prefix_rows:
+                ui.label("No AdvPrefix completion data recorded.").classes(
+                    "text-sm text-grey-6"
+                )
+            else:
+                with ui.column().classes("w-full gap-2 mt-1") as body_col:
+                    if not detail_mode:
+                        body_col.set_visibility(False)
+
+                    _raw = gen_stats.get("raw_generated", 0)
+                    _p1 = gen_stats.get("after_phase1", 0)
+                    _p2 = gen_stats.get("after_phase2", 0)
+                    if _raw > 0:
+                        with ui.row().classes(
+                            "items-center gap-1 text-[10px] text-grey-5 mb-1"
+                        ):
+                            ui.label(f"{_raw} generated").classes("font-mono")
+                            ui.label("→").classes("text-grey-4")
+                            ui.label(f"{_p1} after pattern filter").classes("font-mono")
+                            ui.label("→").classes("text-grey-4")
+                            ui.label(f"{_p2} after CE + top-k").classes(
+                                "font-mono font-semibold text-grey-7"
+                            )
+
+                    columns = [
+                        {
+                            "name": "num",
+                            "label": "#",
+                            "field": "num",
+                            "align": "center",
+                            "style": "width:36px",
+                        },
+                        {
+                            "name": "meta_prefix",
+                            "label": "Meta Prefix",
+                            "field": "meta_prefix",
+                            "align": "left",
+                        },
+                        {
+                            "name": "result",
+                            "label": "Result",
+                            "field": "result",
+                            "align": "center",
+                            "style": "width:100px",
+                        },
+                    ]
+
+                    tbl_rows = [
+                        {
+                            "num": r["num"],
+                            "meta_prefix": r.get("_meta_prefix") or "—",
+                            "result": r["result"],
+                            "_bucket": r["_bucket"],
+                            "_full_sent_prompt": r.get("_sent_prompt") or r["prefix"],
+                            "_full_prefix": r["prefix"],
+                            "_completion": r.get("completion") or "",
+                            "_error": r.get("_error") or "",
+                            "_guardrail_side": r.get("_guardrail_side") or "",
+                            "_guardrail_explanation": r.get("_guardrail_explanation")
+                            or "",
+                        }
+                        for r in prefix_rows
+                    ]
+
+                    tbl = (
+                        ui.table(columns=columns, rows=tbl_rows, row_key="num")
+                        .classes("w-full text-xs")
+                        .props("dense flat")
+                    )
+                    if detail_mode:
+                        tbl.props(
+                            f":expanded-rows='{json.dumps([r['num'] for r in tbl_rows])}'"
+                        )
+
+                    tbl.add_slot(
+                        "body",
+                        r"""
+<q-tr :props="props" @click="props.expand = !props.expand" style="cursor:pointer">
+  <q-td key="num" :props="props" style="font-size:10px;color:#9e9e9e">{{ props.row.num }}</q-td>
+  <q-td key="meta_prefix" :props="props"
+        style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px">
+    {{ props.row.meta_prefix }}
+  </q-td>
+  <q-td key="result" :props="props">
+    <q-badge v-if="props.row._bucket === 'jailbreak'" color="negative" class="text-xs">Jailbreak</q-badge>
+    <q-badge v-else-if="props.row._bucket === 'mitigated'" color="positive" class="text-xs">Mitigated</q-badge>
+    <q-badge v-else-if="props.row._bucket === 'pending'" color="grey" class="text-xs">Pending</q-badge>
+    <q-badge v-else color="warning" class="text-xs">Error</q-badge>
+  </q-td>
+</q-tr>
+<q-tr v-show="props.expand" :props="props" @click="props.expand = false" style="cursor:pointer">
+  <q-td colspan="100%" class="bg-grey-1">
+    <div class="q-pa-sm">
+      <template v-if="props.row._full_prefix !== props.row._full_sent_prompt">
+        <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">RAW ADVERSARIAL PREFIX</div>
+        <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
+                    border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._full_prefix || '—' }}</pre>
+        <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">PROMPT SENT TO TARGET</div>
+        <pre style="font-size:11px;padding:8px;background:#fff8e1;border:1px solid #ffe082;
+                    border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._full_sent_prompt }}</pre>
+      </template>
+      <template v-else>
+        <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">PROMPT SENT TO TARGET</div>
+        <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
+                    border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._full_sent_prompt || '—' }}</pre>
+      </template>
+      <template v-if="props.row._bucket !== 'pending' && props.row._guardrail_side !== 'before'">
+        <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">TARGET COMPLETION</div>
+        <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
+                    border-radius:4px;white-space:pre-wrap;word-break:break-word">{{ props.row._completion || 'No completion recorded.' }}</pre>
+        <div v-if="props.row._error" class="text-caption text-negative text-italic q-mt-xs">
+          Error: {{ props.row._error }}
+        </div>
+      </template>
+      <div v-else-if="props.row._bucket === 'pending'" class="text-caption text-grey-6 text-italic q-mt-xs">
+        This candidate was not executed against the target model.
+      </div>
+      <div v-if="props.row._guardrail_side === 'before'"
+           style="border:2px solid #f97316;background:#fff7ed;border-radius:4px;padding:10px;margin-top:4px">
+        <div style="font-size:11px;font-weight:700;color:#c2410c;text-transform:uppercase;margin-bottom:4px">⚠ Prompt blocked by before guardrail</div>
+        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      </div>
+      <div v-else-if="props.row._guardrail_side === 'after'"
+           style="border:2px solid #ef4444;background:#fef2f2;border-radius:4px;padding:10px;margin-top:4px">
+        <div style="font-size:11px;font-weight:700;color:#dc2626;text-transform:uppercase;margin-bottom:4px">🚫 Response censored by after guardrail</div>
+        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      </div>
+      <div v-else-if="props.row._guardrail_side"
+           style="border:2px solid #9e9e9e;background:#f5f5f5;border-radius:4px;padding:10px;margin-top:4px">
+        <div style="font-size:11px;font-weight:700;color:#616161;text-transform:uppercase;margin-bottom:4px">🛡 Blocked by guardrail</div>
+        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      </div>
+    </div>
+  </q-td>
+</q-tr>
+""",
+                    )
+
+                    ui.separator().classes("mt-2")
+                    with ui.row().classes("items-center gap-2 mt-2 flex-wrap"):
+                        ui.label("Summary:").classes(
+                            "text-xs font-semibold text-grey-6"
+                        )
+                        ui.label(
+                            f"{len(prefix_rows)} prefix{'es' if len(prefix_rows) != 1 else ''}"
+                        ).classes("text-xs text-grey-6")
+                        if n_jailbreaks:
+                            ui.badge(
+                                f"{n_jailbreaks} Jailbreak{'s' if n_jailbreaks != 1 else ''}",
+                                color="negative",
+                            ).classes("text-xs")
+                        if n_mitigated:
+                            ui.badge(
+                                f"{n_mitigated} Mitigated", color="positive"
+                            ).classes("text-xs")
+                        if n_errors:
+                            ui.badge(
+                                f"{n_errors} Error{'s' if n_errors != 1 else ''}",
+                                color="warning",
+                            ).classes("text-xs")
+                        if n_pending:
+                            ui.badge(f"{n_pending} Pending", color="grey").classes(
+                                "text-xs"
+                            )
+
+                if not detail_mode:
+                    self._wire_expand_toggle(body_col)
+
+    # ── PAP ───────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _parse_pap_traces(traces: list[dict]) -> list[dict]:
+        """Parse PAP traces into per-technique rows for the result table."""
+        candidates: dict[int, dict] = {}
+        evaluations: dict[int, dict] = {}
+
+        for td in sorted(traces, key=lambda x: x.get("sequence", 0)):
+            content = td.get("content")
+            if not isinstance(content, dict):
+                continue
+            meta = content.get("metadata") or {}
+            display_type = meta.get("display_type") or ""
+            tech_idx = meta.get("technique_index")
+            if tech_idx is None:
+                continue
+            if display_type == "pap_candidate":
+                req = content.get("request") or {}
+                prompt = req.get("prompt") or "" if isinstance(req, dict) else ""
+                _cand_resp = content.get("response")
+                _, _cand_g_side, _cand_g_expl = (
+                    DashboardPage._extract_guardrail_from_response(_cand_resp)
+                )
+                candidates[tech_idx] = {
+                    "technique": meta.get("technique") or "",
+                    "prompt": prompt,
+                    "_guardrail_side": _cand_g_side,
+                    "_guardrail_explanation": _cand_g_expl,
+                }
+            elif display_type == "pap_evaluation":
+                _pap_raw_resp = content.get("response")
+                _pap_raw_resp, _pap_g_side, _pap_g_expl = (
+                    DashboardPage._extract_guardrail_from_response(_pap_raw_resp)
+                )
+                _pap_response = (
+                    _pap_raw_resp.get("target_response")
+                    if isinstance(_pap_raw_resp, dict)
+                    else None
+                )
+                evaluations[tech_idx] = {
+                    "is_jailbreak": bool(meta.get("is_jailbreak")),
+                    "judge_score": meta.get("judge_score"),
+                    "response": _pap_response or "",
+                    "_guardrail_side": _pap_g_side,
+                    "_guardrail_explanation": _pap_g_expl,
+                }
+
+        rows = []
+        for idx in sorted(candidates):
+            cand = candidates[idx]
+            ev = evaluations.get(idx, {})
+            technique = cand["technique"]
+            prompt = cand["prompt"]
+            is_jailbreak = ev.get("is_jailbreak", False)
+            response = ev.get("response") or ""
+            _guardrail_side = (
+                ev.get("_guardrail_side") or cand.get("_guardrail_side") or ""
+            )
+            _guardrail_explanation = (
+                ev.get("_guardrail_explanation")
+                or cand.get("_guardrail_explanation")
+                or ""
+            )
+            if _guardrail_side:
+                bucket = "mitigated"
+            elif is_jailbreak:
+                bucket = "jailbreak"
+            elif ev:
+                bucket = "mitigated"
+            else:
+                bucket = "error"
+            rows.append(
+                {
+                    "num": idx + 1,
+                    "technique": technique,
+                    "prompt_short": (prompt[:80] + "\u2026")
+                    if len(prompt) > 80
+                    else prompt,
+                    "result": "Jailbreak"
+                    if bucket == "jailbreak"
+                    else "Mitigated"
+                    if bucket == "mitigated"
+                    else "Error",
+                    "_bucket": bucket,
+                    "_full_prompt": prompt,
+                    "_response": response,
+                    "_guardrail_side": _guardrail_side,
+                    "_guardrail_explanation": _guardrail_explanation,
+                }
+            )
+        return rows
+
+    def _render_pap_goal_card(
+        self, row: dict, technique_rows: list[dict], detail_mode: bool = False
+    ) -> None:
+        """Render a per-goal PAP result card with a per-technique table."""
+        with self._goal_card_shell(row, detail_mode):
+            if not technique_rows:
+                ui.label("No PAP technique results recorded.").classes(
+                    "text-sm text-grey-6"
+                )
+            else:
+                with ui.column().classes("w-full gap-2 mt-1") as body_col:
+                    if not detail_mode:
+                        body_col.set_visibility(False)
+
+                    pap_cols = [
+                        {
+                            "name": "technique",
+                            "label": "Technique",
+                            "field": "technique",
+                            "align": "left",
+                        },
+                        {
+                            "name": "result",
+                            "label": "Result",
+                            "field": "result",
+                            "align": "center",
+                            "style": "width:100px",
+                        },
+                    ]
+
+                    pap_tbl = (
+                        ui.table(columns=pap_cols, rows=technique_rows, row_key="num")
+                        .classes("w-full text-xs")
+                        .props("dense flat")
+                    )
+                    if detail_mode:
+                        pap_tbl.props(
+                            f":expanded-rows='{json.dumps([r['num'] for r in technique_rows])}'"
+                        )
+
+                    pap_tbl.add_slot(
+                        "body",
+                        r"""
+<q-tr :props="props" @click="props.expand = !props.expand" style="cursor:pointer">
+  <q-td key="technique" :props="props"
+        style="white-space:pre-wrap;word-break:break-word;max-width:360px">
+    {{ props.row.technique }}
+  </q-td>
+  <q-td key="result" :props="props">
+    <q-badge v-if="props.row._bucket === 'jailbreak'" color="negative" class="text-xs">Jailbreak</q-badge>
+    <q-badge v-else-if="props.row._bucket === 'mitigated'" color="positive" class="text-xs">Mitigated</q-badge>
+    <q-badge v-else color="warning" class="text-xs">Error</q-badge>
+  </q-td>
+</q-tr>
+<q-tr v-show="props.expand" :props="props" @click="props.expand = false" style="cursor:pointer">
+  <q-td colspan="100%" class="bg-grey-1">
+    <div class="q-pa-sm">
+      <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">PROMPT SENT TO TARGET</div>
+      <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
+                  border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._full_prompt || '—' }}</pre>
+      <template v-if="props.row._guardrail_side !== 'before'">
+        <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">TARGET RESPONSE</div>
+        <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
+                    border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._response || 'No response recorded.' }}</pre>
+      </template>
+      <div v-if="props.row._guardrail_side === 'before'"
+           style="border:2px solid #f97316;background:#fff7ed;border-radius:4px;padding:10px">
+        <div style="font-size:11px;font-weight:700;color:#c2410c;text-transform:uppercase;margin-bottom:4px">⚠ Prompt blocked by before guardrail</div>
+        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      </div>
+      <div v-else-if="props.row._guardrail_side === 'after'"
+           style="border:2px solid #ef4444;background:#fef2f2;border-radius:4px;padding:10px">
+        <div style="font-size:11px;font-weight:700;color:#dc2626;text-transform:uppercase;margin-bottom:4px">🚫 Response censored by after guardrail</div>
+        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      </div>
+      <div v-else-if="props.row._guardrail_side"
+           style="border:2px solid #9e9e9e;background:#f5f5f5;border-radius:4px;padding:10px">
+        <div style="font-size:11px;font-weight:700;color:#616161;text-transform:uppercase;margin-bottom:4px">🛡 Blocked by guardrail</div>
+        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      </div>
+    </div>
+  </q-td>
+</q-tr>
+""",
+                    )
+
+                if not detail_mode:
+                    self._wire_expand_toggle(body_col)
+
+    # ── TAP ───────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _parse_tap_traces(traces: list[dict]) -> tuple[list[dict], dict[int, dict]]:
+        """Parse TAP traces into a list of candidate node dicts."""
+        nodes: list[dict] = []
+        seen_ids: set[str] = set()
+        _interaction_counts: dict[int, int] = {}
+        _summary_counts: dict[int, int] = {}
+
+        def _add(node: dict) -> None:
+            sid = node.get("self_id") or ""
+            if sid and sid in seen_ids:
+                return
+            if sid:
+                seen_ids.add(sid)
+            nodes.append(node)
+
+        for td in sorted(traces, key=lambda x: x.get("sequence", 0)):
+            content = td.get("content")
+            if not isinstance(content, dict):
+                continue
+
+            step_name = str(content.get("step_name") or "")
+
+            if "Depth" in step_name and "Candidate" in step_name:
+                meta = content.get("metadata") or {}
+                req = content.get("request") or {}
+                prompt = req.get("prompt", "") if isinstance(req, dict) else ""
+                resp = content.get("response")
+                resp, _tap_g_side, _tap_g_expl = (
+                    DashboardPage._extract_guardrail_from_response(resp)
+                )
+                response = str(resp) if resp not in (None, "") else ""
+                depth_level = int(meta.get("iteration") or 0)
+                _interaction_counts[depth_level] = (
+                    _interaction_counts.get(depth_level, 0) + 1
+                )
+                _add(
+                    {
+                        "depth": depth_level,
+                        "branch_index": meta.get("branch_index"),
+                        "stream_index": meta.get("stream_index"),
+                        "self_id": meta.get("self_id", ""),
+                        "parent_id": meta.get("parent_id"),
+                        "prompt": prompt,
+                        "response": response,
+                        "judge_score": meta.get("judge_score"),
+                        "on_topic": meta.get("on_topic_score"),
+                        "improvement": str(meta.get("improvement") or ""),
+                        "_guardrail_side": _tap_g_side,
+                        "_guardrail_explanation": _tap_g_expl,
+                    }
+                )
+                continue
+
+            if "Depth" in step_name and "Summary" in step_name:
+                depth_level = int(content.get("depth") or 0)
+                branches = [
+                    b for b in (content.get("branches") or []) if isinstance(b, dict)
+                ]
+                _summary_counts[depth_level] = len(branches)
+                for branch in branches:
+                    _b_resp = branch.get("response")
+                    _b_resp, _b_g_side, _b_g_expl = (
+                        DashboardPage._extract_guardrail_from_response(_b_resp)
+                    )
+                    _add(
+                        {
+                            "depth": depth_level,
+                            "branch_index": branch.get("branch_index"),
+                            "stream_index": branch.get("stream_index"),
+                            "self_id": branch.get("self_id", ""),
+                            "parent_id": branch.get("parent_id"),
+                            "prompt": str(branch.get("prompt") or ""),
+                            "response": str(_b_resp or ""),
+                            "judge_score": branch.get("judge_score"),
+                            "on_topic": branch.get("on_topic_score"),
+                            "improvement": str(branch.get("improvement") or ""),
+                            "_guardrail_side": _b_g_side,
+                            "_guardrail_explanation": _b_g_expl,
+                        }
+                    )
+                continue
+
+            if not step_name and "depth" in content and "branches" in content:
+                depth_level = int(content.get("depth") or 0)
+                branches = [
+                    b for b in (content.get("branches") or []) if isinstance(b, dict)
+                ]
+                _summary_counts[depth_level] = len(branches)
+                for branch in branches:
+                    _b_resp2 = branch.get("response")
+                    _b_resp2, _b2_g_side, _b2_g_expl = (
+                        DashboardPage._extract_guardrail_from_response(_b_resp2)
+                    )
+                    _add(
+                        {
+                            "depth": depth_level,
+                            "branch_index": branch.get("branch_index"),
+                            "stream_index": branch.get("stream_index"),
+                            "self_id": branch.get("self_id", ""),
+                            "parent_id": branch.get("parent_id"),
+                            "prompt": str(branch.get("prompt") or ""),
+                            "response": str(_b_resp2 or ""),
+                            "judge_score": branch.get("judge_score"),
+                            "on_topic": branch.get("on_topic_score"),
+                            "improvement": str(branch.get("improvement") or ""),
+                            "_guardrail_side": _b2_g_side,
+                            "_guardrail_explanation": _b2_g_expl,
+                        }
+                    )
+                continue
+
+        if not nodes:
+            eval_idx = 0
+            for td in sorted(traces, key=lambda x: x.get("sequence", 0)):
+                content = td.get("content")
+                if not isinstance(content, dict):
+                    continue
+                if content.get("step_name") != "Evaluation":
+                    continue
+                evaluator = str(content.get("evaluator") or "")
+                if evaluator == "tracking_coordinator":
+                    continue
+                meta = content.get("metadata") or {}
+                prompt = str(meta.get("completion") or meta.get("prefix") or "")
+                if not prompt:
+                    continue
+                score_raw = content.get("score")
+                try:
+                    score_val = int(float(score_raw)) if score_raw is not None else None
+                except (TypeError, ValueError):
+                    score_val = None
+                eval_idx += 1
+                nodes.append(
+                    {
+                        "depth": 1,
+                        "branch_index": eval_idx - 1,
+                        "stream_index": 0,
+                        "self_id": "",
+                        "parent_id": None,
+                        "prompt": prompt,
+                        "response": "",
+                        "judge_score": score_val,
+                        "on_topic": None,
+                        "improvement": "",
+                        "_guardrail_side": "",
+                        "_guardrail_explanation": "",
+                    }
+                )
+
+        depth_stats: dict[int, dict] = {}
+        all_depths = set(_interaction_counts) | set(_summary_counts)
+        for _d in all_depths:
+            _gen = _interaction_counts.get(_d)
+            _surv = _summary_counts.get(_d)
+            depth_stats[_d] = {
+                "generated": _gen,
+                "survived": _surv,
+                "pruned": (_gen - _surv)
+                if (_gen is not None and _surv is not None)
+                else None,
+            }
+
+        return nodes, depth_stats
+
+    def _render_tap_goal_card(
+        self,
+        row: dict,
+        nodes: list[dict],
+        depth_stats: dict[int, dict] | None = None,
+        detail_mode: bool = False,
+    ) -> None:
+        """Render a TAP goal card: one table per depth."""
+        with self._goal_card_shell(row, detail_mode):
+            if not nodes:
+                ui.label("No TAP candidate data recorded.").classes(
+                    "text-sm text-grey-6"
+                )
+            else:
+                by_depth: dict[int, list[dict]] = defaultdict(list)
+                for n in nodes:
+                    by_depth[n.get("depth") or 0].append(n)
+
+                _global_num = 0
+                _id_to_num: dict[str, int] = {}
+                for depth_level in sorted(by_depth.keys()):
+                    depth_nodes = by_depth[depth_level]
+                    depth_nodes.sort(
+                        key=lambda x: (
+                            x.get("stream_index") or 0,
+                            x.get("branch_index") or 0,
+                        )
+                    )
+                    for n in depth_nodes:
+                        _global_num += 1
+                        n["_global_num"] = _global_num
+                        sid = n.get("self_id") or ""
+                        if sid:
+                            _id_to_num[sid] = _global_num
+                for n in nodes:
+                    pid = n.get("parent_id") or ""
+                    n["_parent_num"] = _id_to_num.get(pid)
+
+                with ui.column().classes("w-full gap-2 mt-1") as body_col:
+                    if not detail_mode:
+                        body_col.set_visibility(False)
+
+                    for depth_level in sorted(by_depth.keys()):
+                        depth_nodes = by_depth[depth_level]
+                        _ds = (depth_stats or {}).get(depth_level, {})
+                        _n_cands = len(depth_nodes)
+                        _cand_label = f"{_n_cands} candidate{'s' if _n_cands != 1 else ''} after pruning"
+                        with ui.row().classes("items-center gap-2 mt-3 mb-0.5 px-1"):
+                            ui.label(f"Depth {depth_level}").classes(
+                                "text-xs font-semibold text-grey-6 uppercase tracking-wide"
+                            )
+                            ui.badge(_cand_label, color="grey-5").classes("text-xs")
+
+                        rows_data = []
+                        for idx, n in enumerate(depth_nodes):
+                            score = n.get("judge_score")
+                            on_topic = n.get("on_topic")
+                            prompt_text = n.get("prompt") or ""
+                            parent_num = n.get("_parent_num")
+                            _s_str = (
+                                str(int(float(score))) if score is not None else "—"
+                            )
+                            rows_data.append(
+                                {
+                                    "_num": n["_global_num"],
+                                    "parent_str": str(parent_num)
+                                    if parent_num is not None
+                                    else "—",
+                                    "prompt_short": (prompt_text[:80] + "…")
+                                    if len(prompt_text) > 80
+                                    else prompt_text or "—",
+                                    "score_val": float(score)
+                                    if score is not None
+                                    else -1,
+                                    "score_str": _s_str,
+                                    "on_topic_str": (
+                                        "yes"
+                                        if on_topic is not None
+                                        and int(float(on_topic)) >= 1
+                                        else "no"
+                                        if on_topic is not None
+                                        else "—"
+                                    ),
+                                    "_on_topic": on_topic,
+                                    "_full_prompt": prompt_text,
+                                    "_response": n.get("response") or "",
+                                    "_guardrail_side": n.get("_guardrail_side") or "",
+                                    "_guardrail_explanation": n.get(
+                                        "_guardrail_explanation"
+                                    )
+                                    or "",
+                                }
+                            )
+
+                        columns = [
+                            {
+                                "name": "_num",
+                                "label": "#",
+                                "field": "_num",
+                                "align": "center",
+                                "style": "width:40px",
+                            },
+                            {
+                                "name": "parent_str",
+                                "label": "Parent",
+                                "field": "parent_str",
+                                "align": "center",
+                                "style": "width:55px",
+                            },
+                            {
+                                "name": "prompt_short",
+                                "label": "Prompt",
+                                "field": "prompt_short",
+                                "align": "left",
+                            },
+                            {
+                                "name": "on_topic_str",
+                                "label": "On-topic",
+                                "field": "on_topic_str",
+                                "align": "center",
+                                "style": "width:80px",
+                            },
+                            {
+                                "name": "score_str",
+                                "label": "Score",
+                                "field": "score_str",
+                                "align": "center",
+                                "style": "width:80px",
+                            },
+                        ]
+
+                        tbl = (
+                            ui.table(columns=columns, rows=rows_data, row_key="_num")
+                            .classes("w-full text-xs")
+                            .props("dense flat")
+                        )
+                        if detail_mode:
+                            tbl.props(
+                                f":expanded-rows='{json.dumps([r['_num'] for r in rows_data])}'"
+                            )
+
+                        tbl.add_slot(
+                            "body",
+                            r"""
+<q-tr :props="props" @click="props.expand = !props.expand" style="cursor:pointer">
+  <q-td key="_num" :props="props" class="text-center text-grey-6">{{ props.row._num }}</q-td>
+  <q-td key="parent_str" :props="props" class="text-center text-grey-5">{{ props.row.parent_str }}</q-td>
+  <q-td key="prompt_short" :props="props"
+        style="white-space:pre-wrap;word-break:break-word;max-width:360px">
+    {{ props.row.prompt_short }}
+  </q-td>
+  <q-td key="on_topic_str" :props="props" class="text-center">
+    <span class="text-grey-7">{{ props.row.on_topic_str }}</span>
+  </q-td>
+  <q-td key="score_str" :props="props" class="text-center">
+    <q-badge
+      :color="props.row.score_val >= 8 ? 'positive'
+              : props.row.score_val >= 4 ? 'warning'
+              : props.row.score_val >= 1 ? 'blue-grey-4'
+              : 'grey-5'"
+      class="text-xs">
+      {{ props.row.score_str }}
+    </q-badge>
+  </q-td>
+</q-tr>
+<q-tr v-show="props.expand" :props="props" @click="props.expand = false" style="cursor:pointer">
+  <q-td colspan="100%" class="bg-grey-1">
+    <div class="q-pa-sm">
+      <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">PROMPT SENT TO TARGET</div>
+      <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
+                  border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._full_prompt || '\u2014' }}</pre>
+      <template v-if="props.row._guardrail_side !== 'before'">
+        <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">TARGET RESPONSE</div>
+        <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
+                    border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._response || 'No response recorded.' }}</pre>
+      </template>
+      <div v-if="props.row._guardrail_side === 'before'"
+           style="border:2px solid #f97316;background:#fff7ed;border-radius:4px;padding:10px">
+        <div style="font-size:11px;font-weight:700;color:#c2410c;text-transform:uppercase;margin-bottom:4px">⚠ Prompt blocked by before guardrail</div>
+        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      </div>
+      <div v-else-if="props.row._guardrail_side === 'after'"
+           style="border:2px solid #ef4444;background:#fef2f2;border-radius:4px;padding:10px">
+        <div style="font-size:11px;font-weight:700;color:#dc2626;text-transform:uppercase;margin-bottom:4px">🚫 Response censored by after guardrail</div>
+        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      </div>
+      <div v-else-if="props.row._guardrail_side"
+           style="border:2px solid #9e9e9e;background:#f5f5f5;border-radius:4px;padding:10px">
+        <div style="font-size:11px;font-weight:700;color:#616161;text-transform:uppercase;margin-bottom:4px">🛡 Blocked by guardrail</div>
+        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      </div>
+    </div>
+  </q-td>
+</q-tr>
+""",
+                        )
+
+                if not detail_mode:
+                    self._wire_expand_toggle(body_col)
+
+    # ── Generic / fallback ────────────────────────────────────────────────────
+
+    @staticmethod
+    def _extract_prompt_response_from_traces(
+        traces: list[dict],
+    ) -> tuple[str, str]:
+        """Extract the best (prompt, response) pair from generic attack traces."""
+        best_req = ""
+        best_resp = ""
+        fallback_req = ""
+        for td in sorted(traces, key=lambda x: x.get("sequence", 0)):
+            content = td.get("content")
+            if not isinstance(content, dict):
+                continue
+            req, resp = DashboardPage._extract_request_response_candidates(content)
+            req_str = (
+                json.dumps(req, indent=2)
+                if isinstance(req, (dict, list))
+                else str(req)
+                if req not in (None, "")
+                else ""
+            )
+            resp_str = (
+                json.dumps(resp, indent=2)
+                if isinstance(resp, (dict, list))
+                else str(resp)
+                if resp not in (None, "")
+                else ""
+            )
+            if req_str and resp_str:
+                best_req = req_str
+                best_resp = resp_str
+            elif req_str:
+                fallback_req = req_str
+        if best_req:
+            return best_req, best_resp
+        if fallback_req:
+            return fallback_req, "(no response recorded)"
+        return "(not available)", "(not available)"
+
+    def _render_generic_goal_card(
+        self,
+        row: dict,
+        request_text: str,
+        response_text: str,
+        detail_mode: bool = False,
+        guardrail_event: dict | None = None,
+    ) -> None:
+        """Render a per-goal result card for non-specific attacks."""
+        with self._goal_card_shell(row, detail_mode):
+            with ui.column().classes("w-full gap-2 mt-1") as body_col:
+                if not detail_mode:
+                    body_col.set_visibility(False)
+
+                ui.label("PROMPT SENT TO TARGET").classes(
+                    "text-[10px] text-grey-6 font-semibold uppercase tracking-wide"
+                )
+                ui.html(
+                    '<pre style="font-size:11px;padding:8px;background:white;'
+                    "border:1px solid #e0e0e0;border-radius:4px;margin-bottom:8px;"
+                    'white-space:pre-wrap;word-break:break-word">'
+                    + html.escape(request_text or "\u2014")
+                    + "</pre>"
+                )
+
+                _g_side = (guardrail_event or {}).get("side") or ""
+                if _g_side == "before":
+                    self._render_guardrail_event_block(guardrail_event)  # type: ignore[arg-type]
+                else:
+                    ui.label("TARGET RESPONSE").classes(
+                        "text-[10px] text-grey-6 font-semibold uppercase tracking-wide"
+                    )
+                    ui.html(
+                        '<pre style="font-size:11px;padding:8px;background:white;'
+                        "border:1px solid #e0e0e0;border-radius:4px;"
+                        'white-space:pre-wrap;word-break:break-word">'
+                        + html.escape(response_text or "No response recorded.")
+                        + "</pre>"
+                    )
+                    if _g_side:
+                        self._render_guardrail_event_block(guardrail_event)  # type: ignore[arg-type]
+
+            if not detail_mode:
+                self._wire_expand_toggle(body_col)
+
+    async def _load_attack_specific_traces(
+        self, row: dict, container: ui.column, attack_str: str
+    ) -> None:
+        """Load traces and render attack-specific goal card in detail_mode=True."""
+        try:
+            result_id = row.get("id")
+            if not result_id:
+                container.clear()
+                with container:
+                    ui.label("No result ID available.").classes("text-sm text-grey-6")
+                return
+
+            traces_raw = self.backend.list_traces(result_id=UUID(result_id))
+            serialized_traces = [_serialize(t) for t in traces_raw]
+
+            container.clear()
+            atk = attack_str.lower()
+
+            with container:
+                if atk == "baseline":
+                    detail_data = self._parse_baseline_traces(
+                        serialized_traces, str(row.get("goal") or "")
+                    )
+                    self._render_baseline_goal_card(row, detail_data, detail_mode=True)
+                elif atk == "bon":
+                    detail_data = self._parse_bon_traces(serialized_traces)
+                    self._render_bon_goal_card(row, detail_data, detail_mode=True)
+                elif atk == "pap":
+                    detail_data = self._parse_pap_traces(serialized_traces)
+                    self._render_pap_goal_card(row, detail_data, detail_mode=True)
+                elif atk == "pair":
+                    detail_data = self._parse_pair_traces(serialized_traces)
+                    self._render_pair_goal_card(row, detail_data, detail_mode=True)
+                elif atk == "tap":
+                    nodes, depth_stats = self._parse_tap_traces(serialized_traces)
+                    self._render_tap_goal_card(
+                        row, nodes, depth_stats, detail_mode=True
+                    )
+                elif atk == "advprefix":
+                    prefix_rows, gen_stats = self._parse_advprefix_traces(
+                        serialized_traces
+                    )
+                    self._render_advprefix_goal_card(
+                        row, prefix_rows, gen_stats, detail_mode=True
+                    )
+                elif atk == "autodanturbo":
+                    detail_data = self._parse_autodan_traces(serialized_traces)
+                    self._render_autodan_goal_card(row, detail_data, detail_mode=True)
+                else:
+                    req_text, resp_text = self._extract_prompt_response_from_traces(
+                        serialized_traces
+                    )
+                    # Detect guardrail event for the generic case
+                    _generic_guardrail: dict | None = None
+                    for _td in serialized_traces:
+                        _r = (_td.get("content") or {}).get("response")
+                        if isinstance(_r, dict) and _r.get("side") in (
+                            "before",
+                            "after",
+                            "unknown",
+                        ):
+                            _generic_guardrail = _r
+                            break
+                    self._render_generic_goal_card(
+                        row,
+                        req_text,
+                        resp_text,
+                        detail_mode=True,
+                        guardrail_event=_generic_guardrail,
+                    )
+
+        except Exception as exc:
+            container.clear()
+            with container:
+                with ui.row().classes("gap-2 items-center py-4"):
+                    ui.icon("error_outline", color="negative")
+                    ui.label(f"Error loading traces: {exc}").classes(
+                        "text-sm text-negative"
+                    )
+
     def _render_trace_tabs_section(
         self,
         title: str,
@@ -3981,16 +6235,7 @@ class DashboardPage:
                     ui.card().tight().classes("w-full border border-red-200 bg-red-50")
                 ):
                     with ui.column().classes("p-3 gap-1"):
-                        with ui.row().classes("w-full items-center justify-between"):
-                            ui.label("Target Goal").classes("text-xs text-grey-6")
-                            ui.button(
-                                icon="content_copy",
-                            ).props("flat dense size=xs color=grey-6").tooltip(
-                                "Copy to clipboard"
-                            ).on(
-                                "click",
-                                js_handler=f"() => navigator.clipboard.writeText({json.dumps(goal)})",
-                            )
+                        ui.label("Target Goal").classes("text-xs text-grey-6")
                         ui.label(goal).classes("text-sm font-medium")
 
             # -----------------------------------------------------------------
@@ -4087,6 +6332,24 @@ class DashboardPage:
                 or metadata.get("scorer_explanation")
             )
 
+            # ------------------------------------------------------------------
+            # Guardrail event: detect and strip from the blocks list so we can
+            # render dedicated visual boxes instead of a generic "Response" card.
+            # ------------------------------------------------------------------
+            _guardrail_event: dict | None = None
+            if isinstance(response_value, dict) and response_value.get("side") in (
+                "before",
+                "after",
+                "unknown",
+            ):
+                _guardrail_event = response_value
+                if response_value.get("side") == "after":
+                    # Show the original target response, then the censor box below.
+                    response_value = response_value.get("target_response") or ""
+                else:
+                    # Before-guardrail: request was never sent — no response to show.
+                    response_value = None
+
             blocks = [
                 ("Explanation", content.get("explanation")),
                 ("Scorer Explanation", scorer_explanation),
@@ -4119,16 +6382,7 @@ class DashboardPage:
                 )
                 with ui.card().tight().classes("w-full"):
                     with ui.column().classes("p-3 gap-1"):
-                        with ui.row().classes("w-full items-center justify-between"):
-                            ui.label(title).classes("text-xs text-grey-6")
-                            ui.button(
-                                icon="content_copy",
-                            ).props("flat dense size=xs color=grey-6").tooltip(
-                                "Copy to clipboard"
-                            ).on(
-                                "click",
-                                js_handler=f"() => navigator.clipboard.writeText({json.dumps(text)})",
-                            )
+                        ui.label(title).classes("text-xs text-grey-6")
                         ui.label(text).classes("text-sm whitespace-pre-wrap")
 
             if isinstance(metadata, dict) and metadata:
@@ -4182,6 +6436,11 @@ class DashboardPage:
                 ui.code(json.dumps(content, indent=2), language="json").classes(
                     "w-full text-xs max-h-72 overflow-auto"
                 )
+
+            # Guardrail event boxes rendered after all other content.
+            if _guardrail_event is not None:
+                self._render_guardrail_event_block(_guardrail_event)
+
             return
 
         if isinstance(content, list):
@@ -4193,6 +6452,69 @@ class DashboardPage:
             return
 
         ui.label(str(content)).classes("text-sm whitespace-pre-wrap")
+
+    @staticmethod
+    def _render_guardrail_event_block(event: dict) -> None:
+        """Render a visual banner for a guardrail-blocked trace step.
+
+        * ``side="before"`` — prompt was blocked before reaching the target model:
+          shows an orange warning box.  No target response is displayed because
+          the request was never sent.
+        * ``side="after"`` — model response was censored after it was received:
+          shows a red box below the (visible) target response.
+        """
+        side = event.get("side", "unknown")
+        explanation = str(event.get("explanation") or "Blocked by guardrail")
+
+        if side == "before":
+            with (
+                ui.card()
+                .tight()
+                .classes(
+                    "w-full border-2 border-orange-400 "
+                    "bg-orange-50 dark:border-orange-600 dark:bg-orange-900/30"
+                )
+            ):
+                with ui.row().classes("gap-3 items-start p-3"):
+                    ui.icon("block", color="warning").classes("text-xl shrink-0 mt-0.5")
+                    with ui.column().classes("gap-1"):
+                        ui.label("Prompt blocked by before guardrail").classes(
+                            "font-semibold text-warning text-sm"
+                        )
+                        ui.label(explanation).classes(
+                            "text-xs text-grey-7 dark:text-grey-4"
+                        )
+        elif side == "after":
+            with (
+                ui.card()
+                .tight()
+                .classes(
+                    "w-full border-2 border-red-400 "
+                    "bg-red-50 dark:border-red-700 dark:bg-red-900/30"
+                )
+            ):
+                with ui.row().classes("gap-3 items-start p-3"):
+                    ui.icon("visibility_off", color="negative").classes(
+                        "text-xl shrink-0 mt-0.5"
+                    )
+                    with ui.column().classes("gap-1"):
+                        ui.label("Response censored by after guardrail").classes(
+                            "font-semibold text-negative text-sm"
+                        )
+                        ui.label(explanation).classes(
+                            "text-xs text-grey-7 dark:text-grey-4"
+                        )
+        else:
+            with (
+                ui.card().tight().classes("w-full border-2 border-grey-400 bg-grey-50")
+            ):
+                with ui.row().classes("gap-3 items-center p-3"):
+                    ui.icon("shield", color="grey-6").classes("text-xl")
+                    with ui.column().classes("gap-1"):
+                        ui.label("Blocked by guardrail").classes(
+                            "font-semibold text-grey-7 text-sm"
+                        )
+                        ui.label(explanation).classes("text-xs text-grey-6")
 
     async def refresh_view(self) -> None:
         _v = self.current_view["value"]
@@ -4960,7 +7282,7 @@ class DashboardPage:
                     "flex-1 flex-nowrap items-center gap-0 cursor-pointer"
                 )
                 with run_header:
-                    chevron = ui.icon("expand_more", size="sm").classes(
+                    ui.icon("expand_more", size="sm").classes(
                         "w-8 text-grey-6 transition-transform"
                     )
                     ui.label(str(run.get("run_progress", "—"))).classes(
@@ -4999,51 +7321,27 @@ class DashboardPage:
                         )
                     ui.label(asr_value).classes("w-16 text-sm")
 
-            # Goals area (initially hidden)
-            goals_area = ui.column().classes("w-full gap-0").style("display:none")
+            # Goals area (kept for structural compatibility but unused)
+            ui.column().classes("w-full gap-0").style("display:none")
 
-            def _toggle_expand(ga=goals_area, ch=chevron, r=run, rid=run_id):
-                if self._history_expanded_run_id == rid:
-                    # Collapse
-                    ga.style("display:none")
-                    ch.style("transform: rotate(0deg)")
-                    self._history_expanded_run_id = None
-                    self._history_expanded_goals_area = None
-                    # Also close detail panel if open
-                    self._close_history_detail()
-                else:
-                    # Collapse previous if any
-                    if (
-                        self._history_expanded_goals_area is not None
-                        and self._history_expanded_goals_area != ga
-                    ):
-                        self._history_expanded_goals_area.style("display:none")
-                    # Close detail panel from previous run
-                    self._close_history_detail()
-                    self._history_expanded_run_id = rid
-                    self._history_expanded_goals_area = ga
-                    self._history_current_run = r
-                    ga.style("display:block")
-                    ch.style("transform: rotate(180deg)")
-                    # Load goals
-                    ui.timer(
-                        0,
-                        lambda: asyncio.create_task(self._load_run_goals_inline(r, ga)),
-                        once=True,
-                    )
-
-            run_header.on("click", lambda e, t=_toggle_expand: t())
-
-            # Auto-expand when navigation requested from Dashboard -> Recent Runs.
-            if self._history_expanded_run_id == run_id:
-                self._history_expanded_goals_area = goals_area
-                self._history_current_run = run
-                goals_area.style("display:block")
-                chevron.style("transform: rotate(180deg)")
+            def _open_dialog(r=run):
                 ui.timer(
                     0,
-                    lambda: asyncio.create_task(
-                        self._load_run_goals_inline(run, goals_area)
+                    lambda rr=r: asyncio.create_task(
+                        self._open_run_history_results(rr)
+                    ),
+                    once=True,
+                )
+
+            run_header.on("click", lambda e, fn=_open_dialog: fn())
+
+            # Auto-open dialog when navigation requested from Dashboard -> Recent Runs.
+            if self._history_expanded_run_id == run_id:
+                self._history_expanded_run_id = None
+                ui.timer(
+                    0,
+                    lambda r=run: asyncio.create_task(
+                        self._open_run_history_results(r)
                     ),
                     once=True,
                 )
@@ -6140,8 +8438,8 @@ class DashboardPage:
                                         "const fullLabels = Array.isArray(d.fullLabels) ? d.fullLabels : [];"
                                         "const normalizeName = function(value) {"
                                         "  return String(value || '')"
-                                        "    .replace(/\n+/g, ' ')"
-                                        "    .replace(/\s+\d+(?:\.\d+)?%$/i, '')"
+                                        "    .replace(/\\n+/g, ' ')"
+                                        "    .replace(/\\s+\\d+(?:\\.\\d+)?%$/i, '')"
                                         "    .trim();"
                                         "};"
                                         "const candidates = [];"
@@ -6492,44 +8790,856 @@ class DashboardPage:
                         )
 
     async def _open_run_history_results(self, run: dict) -> None:
-        """Navigate to History view and expand the run inline.
+        """Open the compact results list dialog for History/Dashboard views."""
+        run_id_raw = str(run.get("id") or "")
 
-        Called from Dashboard / Agents views; for History the inline expansion
-        handles everything directly.
-        """
-        run_id = str(run.get("id") or "")
-        if not run_id:
-            self.navigate("runs", schedule_refresh=False)
-            await self._load_runs()
-            return
+        if self.history_run_dialog_title is not None:
+            self.history_run_dialog_title.text = f"Run Results — {run_id_raw[:8]}…"
 
-        # Resolve the exact page that contains this run so History opens expanded on that row.
-        page = 1
-        while True:
-            page_result = self.backend.list_runs(
-                page=page,
-                page_size=_RUNS_VIEW_PAGE_SIZE,
+        agent = str(run.get("agent_name") or "—")
+        _hr_jailbreaks = int(run.get("successful_jailbreaks") or 0)
+        _hr_errors = int(run.get("errors") or 0)
+        _hr_run_latency_str = _format_latency(self._compute_run_latency_seconds(run))
+
+        raw_run_config = run.get("run_config")
+        run_config = {}
+        fetched_dict = None
+        if isinstance(raw_run_config, dict):
+            run_config = raw_run_config
+        elif isinstance(raw_run_config, str) and raw_run_config.strip():
+            try:
+                run_config = json.loads(raw_run_config)
+            except Exception:
+                run_config = raw_run_config
+
+        if not run_config:
+            with contextlib.suppress(Exception):
+                fetched_run = self.backend.get_run(UUID(run_id_raw))
+                fetched_dict = _serialize(fetched_run)
+                fetched_raw = fetched_dict.get("run_config")
+                if isinstance(fetched_raw, dict):
+                    run_config = fetched_raw
+                elif isinstance(fetched_raw, str) and fetched_raw.strip():
+                    try:
+                        run_config = json.loads(fetched_raw)
+                    except Exception:
+                        run_config = fetched_raw
+        # Configuration panel should show ATTACK configuration (not run metrics payload).
+        display_config: object = {}
+        attack_id = str(run.get("attack_id") or "")
+        if not attack_id and isinstance(fetched_dict, dict):
+            attack_id = str(fetched_dict.get("attack_id") or "")
+
+        if attack_id:
+            with contextlib.suppress(Exception):
+                attack_cfgs = self._attack_config_map_for_ids({attack_id})
+                cfg = attack_cfgs.get(attack_id)
+                if isinstance(cfg, dict) and cfg:
+                    display_config = cfg
+
+        if not display_config:
+            if isinstance(run_config, dict):
+                # Fallback: strip evaluation summary noise from run_config view.
+                display_config = {
+                    k: v for k, v in run_config.items() if k != "evaluation_summary"
+                }
+            elif run_config:
+                display_config = run_config
+
+        # Resolve attack type early (needed by the interpretation panel below).
+        attack_type_str = str(run.get("attack_type") or "—")
+        if attack_type_str == "—":
+            _attack_id_hr = str(run.get("attack_id") or "")
+            if _attack_id_hr:
+                _atm_hr = self._attack_type_map_for_ids({_attack_id_hr})
+                attack_type_str = _atm_hr.get(_attack_id_hr, "—")
+
+        if self.history_run_config_area is not None:
+            self.history_run_config_area.clear()
+            with self.history_run_config_area:
+                _hcfg = display_config if isinstance(display_config, dict) else {}
+                _hrc = run_config if isinstance(run_config, dict) else {}
+                _h_evaluator_type = (
+                    _hcfg.get("evaluator_type")
+                    or _hrc.get("evaluator_type")
+                    or "pattern"
+                )
+                _h_judge_cfg = (
+                    _hcfg.get("judge_config") or _hrc.get("judge_config") or {}
+                )
+                _h_judge_model = (
+                    (_h_judge_cfg.get("model_id") or _h_judge_cfg.get("model") or "")
+                    if isinstance(_h_judge_cfg, dict)
+                    else ""
+                )
+                _h_attack_str = (
+                    attack_type_str
+                    if attack_type_str and attack_type_str != "—"
+                    else agent
+                )
+                _h_attack_display: dict[str, str] = {
+                    "baseline": "Baseline",
+                    "pair": "PAIR",
+                    "tap": "TAP",
+                    "bon": "Best-of-N",
+                    "advprefix": "AdvPrefix",
+                    "autodanturbo": "AutoDAN-Turbo",
+                    "cipherchat": "CipherChat",
+                    "flipattack": "FlipAttack",
+                    "pap": "PAP",
+                    "h4rm3l": "H4rm3l",
+                }
+
+                def _h_resolve_eval_label(
+                    attack: str,
+                    cfg: dict,
+                    ev_type: str,
+                    jmodel: str,
+                ) -> str:
+                    if attack.lower() == "baseline":
+                        if ev_type == "llm_judge":
+                            return f"LLM judge{f' · {jmodel}' if jmodel else ''}"
+                        if ev_type == "keyword":
+                            return "Keyword matching"
+                        return "Pattern matching"
+                    judges = cfg.get("judges") or []
+                    if isinstance(judges, list) and judges:
+                        names = []
+                        for j in judges:
+                            if isinstance(j, dict):
+                                n = (
+                                    j.get("model_id")
+                                    or j.get("identifier")
+                                    or j.get("model")
+                                    or ""
+                                )
+                                if n and n not in names:
+                                    names.append(n)
+                        if names:
+                            if len(names) == 1:
+                                return f"LLM judge · {names[0]}"
+                            return f"LLM judges ({len(names)}): {', '.join(names)}"
+                        return (
+                            f"LLM judge{'s' if len(judges) > 1 else ''} × {len(judges)}"
+                        )
+                    if jmodel:
+                        return f"LLM judge · {jmodel}"
+                    return "LLM judge"
+
+                ui.label("CONFIGURATION").classes(
+                    "text-[10px] font-semibold tracking-widest text-grey-5 uppercase mb-1"
+                )
+
+                def _chip(_ic, _il, _iv):
+                    with ui.row().classes(
+                        "items-center gap-1 bg-grey-1 rounded px-2 py-1"
+                    ):
+                        ui.icon(_ic, size="xs").classes("text-grey-6")
+                        ui.label(_il).classes(
+                            "text-[10px] text-grey-5 font-semibold uppercase tracking-wide"
+                        )
+                        ui.label(_iv).classes("text-xs font-medium text-grey-9")
+
+                # ── Line 1: Attack + attack-specific params ───────────
+                _atk_lower = _h_attack_str.lower()
+                with ui.row().classes("flex-wrap gap-2 items-center"):
+                    _chip(
+                        "flash_on",
+                        "Attack",
+                        _h_attack_display.get(
+                            _h_attack_str.lower(), _h_attack_str.capitalize()
+                        ),
+                    )
+                    if _atk_lower == "flipattack":
+                        _fa_params = _hcfg.get("flipattack_params") or {}
+                        _flip_mode = (
+                            _fa_params.get("flip_mode", "FCS")
+                            if isinstance(_fa_params, dict)
+                            else "FCS"
+                        )
+                        _flip_mode_labels = {
+                            "FWO": "Flip Word Order",
+                            "FCW": "Flip Chars in Word",
+                            "FCS": "Flip Chars in Sentence",
+                            "FMM": "Fool Model Mode",
+                        }
+                        _chip(
+                            "flip",
+                            "Mode",
+                            _flip_mode_labels.get(
+                                str(_flip_mode).upper(), str(_flip_mode)
+                            ),
+                        )
+                    elif _atk_lower == "h4rm3l":
+                        _h4_params = _hcfg.get("h4rm3l_params") or {}
+                        _h4_program = (
+                            _h4_params.get("program", "")
+                            if isinstance(_h4_params, dict)
+                            else ""
+                        )
+                        if _h4_program:
+                            _chip(
+                                "layers",
+                                "Decorators",
+                                self._format_h4rm3l_program(_h4_program),
+                            )
+                    elif _atk_lower == "cipherchat":
+                        _cc_params = _hcfg.get("cipherchat_params") or {}
+                        _cc_cipher = (
+                            _cc_params.get("encode_method", "—")
+                            if isinstance(_cc_params, dict)
+                            else "—"
+                        )
+                        _chip("lock", "Cipher", str(_cc_cipher))
+                    elif _atk_lower == "bon":
+                        _bon_params = _hcfg.get("bon_params") or {}
+                        if isinstance(_bon_params, dict):
+                            _chip(
+                                "auto_awesome",
+                                "Steps",
+                                str(_bon_params.get("n_steps", 4)),
+                            )
+                            _chip(
+                                "auto_awesome",
+                                "Candidates/step",
+                                str(_bon_params.get("num_concurrent_k", 5)),
+                            )
+                    elif _atk_lower == "tap":
+                        _tap_p = _hcfg.get("tap_params") or {}
+                        if isinstance(_tap_p, dict):
+                            _chip("account_tree", "Depth", str(_tap_p.get("depth", 3)))
+                            _chip("width", "Width", str(_tap_p.get("width", 4)))
+                            _chip(
+                                "call_split",
+                                "Branching",
+                                str(_tap_p.get("branching_factor", 3)),
+                            )
+
+                # ── Line 2: Dataset ───────────────────────────────────
+                _h_dataset_raw = _hcfg.get("dataset") or _hrc.get("dataset")
+                if _h_dataset_raw is not None:
+                    if isinstance(_h_dataset_raw, dict):
+                        _h_ds_preset = _h_dataset_raw.get("preset") or ""
+                        if _h_ds_preset:
+                            _h_dataset_str = _h_ds_preset.replace("_", " ").title()
+                        else:
+                            _h_ds_desc = _h_dataset_raw.get("description") or ""
+                            if _h_ds_desc:
+                                _h_dataset_str = _h_ds_desc.split(" - ")[0].strip()
+                            else:
+                                _h_ds_path = _h_dataset_raw.get("path") or ""
+                                _h_dataset_str = (
+                                    _h_ds_path.rsplit("/", 1)[-1]
+                                    if "/" in _h_ds_path
+                                    else _h_ds_path or "Custom"
+                                )
+                    else:
+                        _h_dataset_str = str(_h_dataset_raw)
+                    if _h_dataset_str:
+                        _h_ds_limit = (
+                            _h_dataset_raw.get("limit")
+                            if isinstance(_h_dataset_raw, dict)
+                            else None
+                        )
+                        _h_ds_shuffle = (
+                            _h_dataset_raw.get("shuffle")
+                            if isinstance(_h_dataset_raw, dict)
+                            else None
+                        )
+                        with ui.row().classes("flex-wrap gap-2 items-center mt-1"):
+                            _chip("dataset", "Dataset", _h_dataset_str)
+                            if _h_ds_limit is not None:
+                                _chip("filter_list", "Limit", str(_h_ds_limit))
+                            if _h_ds_shuffle is not None:
+                                _chip("shuffle", "Shuffle", str(_h_ds_shuffle))
+
+                # ── Line 3: Roles (Target, Judge/Scorer, Attacker, Generator, Decorator, …) ──
+                with ui.row().classes("flex-wrap gap-2 items-center mt-1"):
+                    _chip("smart_toy", "Target", agent)
+                    _h_atk_lower_r = _h_attack_str.lower()
+                    # PAIR / AutoDAN: scorer IS the judge — show Scorer, not Judge
+                    if _h_atk_lower_r in ("pair", "autodanturbo"):
+                        _h_scorer_cfg = _hcfg.get("scorer") or {}
+                        if isinstance(_h_scorer_cfg, dict):
+                            _h_scorer_id = (
+                                _h_scorer_cfg.get("identifier")
+                                or _h_scorer_cfg.get("model_id")
+                                or ""
+                            )
+                            if _h_scorer_id:
+                                _chip("analytics", "Scorer", str(_h_scorer_id))
+                    else:
+                        _chip(
+                            "gavel",
+                            "Judge",
+                            _h_resolve_eval_label(
+                                _h_attack_str, _hcfg, _h_evaluator_type, _h_judge_model
+                            ),
+                        )
+                    # TAP: optional separate on-topic judge
+                    if _h_atk_lower_r == "tap":
+                        _h_ot_judge_cfg = _hcfg.get("on_topic_judge")
+                        if isinstance(_h_ot_judge_cfg, dict):
+                            _h_ot_id = (
+                                _h_ot_judge_cfg.get("identifier")
+                                or _h_ot_judge_cfg.get("model_id")
+                                or ""
+                            )
+                            if _h_ot_id:
+                                _chip("fact_check", "On-Topic Judge", str(_h_ot_id))
+                    # Attacker LLM
+                    _h_attacker_cfg = _hcfg.get("attacker") or {}
+                    if isinstance(_h_attacker_cfg, dict):
+                        _h_attacker_id = (
+                            _h_attacker_cfg.get("identifier")
+                            or _h_attacker_cfg.get("model_id")
+                            or ""
+                        )
+                        if _h_attacker_id:
+                            _chip("psychology", "Attacker", str(_h_attacker_id))
+                    # AdvPrefix: generator role
+                    if _h_atk_lower_r == "advprefix":
+                        _h_gen_cfg = _hcfg.get("generator") or {}
+                        if isinstance(_h_gen_cfg, dict):
+                            _h_gen_id = (
+                                _h_gen_cfg.get("identifier")
+                                or _h_gen_cfg.get("model_id")
+                                or ""
+                            )
+                            if _h_gen_id:
+                                _chip("build", "Generator", str(_h_gen_id))
+                    # AutoDAN: Summarizer + Embedder
+                    if _h_atk_lower_r == "autodanturbo":
+                        _h_summarizer_cfg = _hcfg.get("summarizer") or {}
+                        if isinstance(_h_summarizer_cfg, dict):
+                            _h_summarizer_id = (
+                                _h_summarizer_cfg.get("identifier")
+                                or _h_summarizer_cfg.get("model_id")
+                                or ""
+                            )
+                            if _h_summarizer_id:
+                                _chip("summarize", "Summarizer", str(_h_summarizer_id))
+                        _h_embedder_cfg = _hcfg.get("embedder") or {}
+                        if isinstance(_h_embedder_cfg, dict):
+                            _h_embedder_id = (
+                                _h_embedder_cfg.get("identifier")
+                                or _h_embedder_cfg.get("model_id")
+                                or ""
+                            )
+                            if _h_embedder_id:
+                                _chip("hub", "Embedder", str(_h_embedder_id))
+                    # h4rm3l: decorator LLM
+                    if _h_atk_lower_r == "h4rm3l":
+                        _h4_p = _hcfg.get("h4rm3l_params") or {}
+                        _h_dec_llm_cfg = (
+                            _h4_p.get("decorator_llm")
+                            if isinstance(_h4_p, dict)
+                            else None
+                        ) or _hcfg.get("decorator_llm")
+                        if isinstance(_h_dec_llm_cfg, dict):
+                            _h_dec_id = (
+                                _h_dec_llm_cfg.get("identifier")
+                                or _h_dec_llm_cfg.get("model_id")
+                                or ""
+                            )
+                            if _h_dec_id:
+                                _chip("layers", "Decorator LLM", str(_h_dec_id))
+
+        # ── Populate metrics area ─────────────────────────────────────────
+        if self.metrics_area is not None:
+            self.metrics_area.clear()
+            eval_summary = (
+                run_config.get("evaluation_summary")
+                if isinstance(run_config, dict)
+                else None
             )
-            if not page_result.items:
-                break
 
-            def _item_run_id(item: object) -> str:
-                if isinstance(item, dict):
-                    return str(item.get("id") or "")
-                return str(getattr(item, "id", "") or "")
+            if isinstance(eval_summary, dict):
+                with self.metrics_area:
+                    total = eval_summary.get("total_attacks", 0)
+                    overall = eval_summary.get("overall_success_rate", 0.0)
+                    mv_asr = eval_summary.get("majority_vote_asr", 0.0)
+                    kappa = eval_summary.get("fleiss_kappa", None)
+                    per_judge = eval_summary.get("per_judge_strictness") or {}
+                    _hr_n_judges = len(
+                        [
+                            k
+                            for k in per_judge
+                            if k != "bias_gap" and not k.endswith("_mean")
+                        ]
+                    )
+                    # Use run-level goal counts for the summary cards so they
+                    # match _hr_jailbreaks/_hr_errors (which are also goal-level).
+                    _hr_total_goals = int(run.get("total_results") or 0) or int(total)
+                    _hr_mitigated = max(
+                        0, _hr_total_goals - _hr_jailbreaks - _hr_errors
+                    )
 
-            if any(_item_run_id(item) == run_id for item in page_result.items):
-                break
-            total = int(page_result.total or 0)
-            if total and (page * _RUNS_VIEW_PAGE_SIZE) >= total:
-                break
-            page += 1
+                    def _fmt_pct(value: object) -> str:
+                        try:
+                            return f"{float(value) * 100:.1f}%"
+                        except (TypeError, ValueError):
+                            return str(value)
 
-        # Navigate to History view
-        self.navigate("runs", schedule_refresh=False)
-        self.runs_current_page = page
-        # Store reference and trigger inline goal load
-        self._history_current_run = run
-        self._history_expanded_run_id = run_id
-        # Reload runs which will render with the expansion
-        await self._load_runs()
+                    def _is_risky(v: object) -> bool:
+                        return isinstance(v, (int, float)) and float(v) > 0
+
+                    # ── Results Summary ───────────────────────────────
+                    ui.label("RESULTS SUMMARY").classes(
+                        "text-[10px] font-semibold tracking-widest text-grey-5 uppercase mb-2"
+                    )
+                    with ui.row().classes("flex-wrap gap-2 items-start"):
+                        for _ml, _mv, _mc, _mi in [
+                            ("Total Attacks", str(_hr_total_goals), "grey-8", "quiz"),
+                            (
+                                "Jailbreaks",
+                                str(_hr_jailbreaks),
+                                "negative",
+                                "lock_open",
+                            ),
+                            (
+                                "Mitigated",
+                                str(_hr_mitigated),
+                                "positive" if _hr_mitigated > 0 else "grey-7",
+                                "security",
+                            ),
+                            (
+                                "Errors",
+                                str(_hr_errors),
+                                "warning" if _hr_errors > 0 else "grey-7",
+                                "warning_amber",
+                            ),
+                            ("Duration", _hr_run_latency_str, "grey-7", "timer"),
+                        ]:
+                            with ui.card().classes("flex-none min-w-[110px] px-3 py-2"):
+                                with ui.row().classes("items-center gap-1 mb-1"):
+                                    ui.icon(_mi, color=_mc, size="xs")
+                                    ui.label(_ml).classes(
+                                        "text-[10px] text-grey-6 font-semibold uppercase tracking-wide"
+                                    )
+                                ui.label(_mv).classes("text-xl font-bold")
+
+                    ui.separator().classes("my-2")
+
+                    # ── Evaluation Metrics ────────────────────────────
+                    ui.label("EVALUATION METRICS").classes(
+                        "text-[10px] font-semibold tracking-widest text-grey-5 uppercase mb-2"
+                    )
+                    with ui.row().classes("flex-wrap gap-2 items-start"):
+                        for _ml, _mv, _mc, _mi in (
+                            [
+                                (
+                                    "Attack Success Rate",
+                                    _fmt_pct(overall),
+                                    "negative" if _is_risky(overall) else "positive",
+                                    "lock_open" if _is_risky(overall) else "security",
+                                ),
+                            ]
+                            + (
+                                [
+                                    (
+                                        "Majority-vote ASR",
+                                        _fmt_pct(mv_asr),
+                                        "negative" if _is_risky(mv_asr) else "positive",
+                                        "how_to_vote",
+                                    ),
+                                ]
+                                if _hr_n_judges > 1
+                                else []
+                            )
+                            + (
+                                [
+                                    (
+                                        "Fleiss' Kappa",
+                                        f"{float(kappa):.3f}",
+                                        "grey-7",
+                                        "balance",
+                                    )
+                                ]
+                                if kappa is not None and _hr_n_judges > 1
+                                else []
+                            )
+                            + (
+                                [
+                                    (
+                                        "Bias Gap",
+                                        _fmt_pct(per_judge.get("bias_gap")),
+                                        "grey-7",
+                                        "compare_arrows",
+                                    )
+                                ]
+                                if isinstance(per_judge, dict)
+                                and per_judge.get("bias_gap") is not None
+                                and _hr_n_judges > 1
+                                else []
+                            )
+                        ):
+                            with ui.card().classes("flex-none min-w-[110px] px-3 py-2"):
+                                with ui.row().classes("items-center gap-1 mb-1"):
+                                    ui.icon(_mi, color=_mc, size="xs")
+                                    ui.label(_ml).classes(
+                                        "text-[10px] text-grey-6 font-semibold uppercase tracking-wide"
+                                    )
+                                ui.label(_mv).classes("text-xl font-bold")
+
+                        if (
+                            _hr_n_judges > 1
+                            and isinstance(per_judge, dict)
+                            and any(k != "bias_gap" for k in per_judge)
+                        ):
+                            with ui.card().classes("flex-none px-3 py-2"):
+                                ui.label("PER-JUDGE ASR").classes(
+                                    "text-[10px] text-grey-6 font-semibold uppercase tracking-wide mb-1"
+                                )
+                                with ui.column().classes("gap-1"):
+                                    for judge_name, asr_val in per_judge.items():
+                                        if judge_name == "bias_gap":
+                                            continue
+                                        with ui.row().classes("items-center gap-2"):
+                                            ui.label(judge_name).classes(
+                                                "text-xs text-grey-7 font-mono"
+                                            )
+                                            ui.badge(
+                                                _fmt_pct(asr_val),
+                                                color="grey-6",
+                                            ).classes("text-xs font-mono")
+            else:
+                # No evaluation_summary in run_config (e.g. BoN) — show
+                # a basic results summary from the run-level counters.
+                _hr_total = int(run.get("total_results") or 0)
+                _hr_mitigated_fb = int(run.get("mitigations") or 0)
+                with self.metrics_area:
+                    if _hr_total > 0:
+                        ui.label("RESULTS SUMMARY").classes(
+                            "text-[10px] font-semibold tracking-widest "
+                            "text-grey-5 uppercase mb-2"
+                        )
+                        with ui.row().classes("flex-wrap gap-2 items-start"):
+                            for _ml, _mv, _mc, _mi in [
+                                ("Total Tests", str(_hr_total), "grey-8", "quiz"),
+                                (
+                                    "Vulnerabilities",
+                                    str(_hr_jailbreaks),
+                                    "negative" if _hr_jailbreaks else "grey-7",
+                                    "lock_open",
+                                ),
+                                (
+                                    "Mitigated",
+                                    str(_hr_mitigated_fb),
+                                    "positive" if _hr_mitigated_fb else "grey-7",
+                                    "security",
+                                ),
+                                (
+                                    "Errors",
+                                    str(_hr_errors),
+                                    "warning" if _hr_errors else "grey-7",
+                                    "warning_amber",
+                                ),
+                                ("Duration", _hr_run_latency_str, "grey-7", "timer"),
+                            ]:
+                                with ui.card().classes(
+                                    "flex-none min-w-[110px] px-3 py-2"
+                                ):
+                                    with ui.row().classes("items-center gap-1 mb-1"):
+                                        ui.icon(_mi, color=_mc, size="xs")
+                                        ui.label(_ml).classes(
+                                            "text-[10px] text-grey-6 font-semibold "
+                                            "uppercase tracking-wide"
+                                        )
+                                    ui.label(_mv).classes("text-xl font-bold")
+                    else:
+                        ui.label("No results available yet.").classes(
+                            "text-sm text-grey-6 py-4"
+                        )
+
+        if self.history_results_list_area is not None:
+            self.history_results_list_area.clear()
+        if self.history_results_empty_label is not None:
+            self.history_results_empty_label.text = "Loading results…"
+            self.history_results_empty_label.set_visibility(True)
+
+        if self.history_run_dialog is not None:
+            self.history_run_dialog.open()
+
+        await asyncio.sleep(0)
+
+        try:
+            run_uuid = UUID(run_id_raw)
+
+            def _fetch_results():
+                items = []
+                page = 1
+                while True:
+                    rp = self.backend.list_results(
+                        run_id=run_uuid, page=page, page_size=100
+                    )
+                    items.extend(rp.items)
+                    if len(items) >= rp.total or not rp.items:
+                        break
+                    page += 1
+                return items
+
+            all_items = await asyncio.get_event_loop().run_in_executor(
+                None, _fetch_results
+            )
+
+            sorted_items = sorted(
+                all_items,
+                key=lambda item: (
+                    int(getattr(item, "goal_index", 0)),
+                    getattr(item, "created_at", None),
+                ),
+            )
+
+            new_rows = []
+            for idx, r in enumerate(sorted_items, start=1):
+                d = _serialize(r)
+                d["_rel"] = _rel_time(d.get("created_at"))
+                d["goal_number"] = idx
+                d["_goal_category"] = self._extract_goal_classifier_label(d, "category")
+                d["_goal_subcategory"] = self._extract_goal_classifier_label(
+                    d, "subcategory"
+                )
+                d["evaluation_label"] = _eval_label(
+                    d.get("evaluation_status", ""), d.get("evaluation_notes")
+                )
+                d["evaluation_notes"] = d.get("evaluation_notes") or "—"
+                d["_goal_latency_s"] = self._extract_goal_latency_seconds(d)
+                d["_goal_latency"] = _format_latency(d.get("_goal_latency_s"))
+                bucket = _result_bucket(
+                    d.get("evaluation_status", ""), d.get("evaluation_notes")
+                )
+                d["_bucket"] = bucket
+                new_rows.append(d)
+
+            # Pre-fetch traces for Baseline / BoN views
+            baseline_traces_map_hr: dict[str, list[dict]] = {}
+            if attack_type_str.lower() == "baseline" and new_rows:
+                _hr_ids = [str(r.get("id") or "") for r in new_rows if r.get("id")]
+
+                def _load_hr_traces() -> dict[str, list[dict]]:
+                    _res: dict[str, list[dict]] = {}
+                    for _rid in _hr_ids:
+                        try:
+                            _ts = self.backend.list_traces(result_id=UUID(_rid))
+                            _res[_rid] = [_serialize(t) for t in _ts]
+                        except Exception:
+                            _res[_rid] = []
+                    return _res
+
+                baseline_traces_map_hr = await asyncio.get_event_loop().run_in_executor(
+                    None, _load_hr_traces
+                )
+
+            bon_traces_map_hr: dict[str, list[dict]] = {}
+            if attack_type_str.lower() == "bon" and new_rows:
+                _bon_hr_ids = [str(r.get("id") or "") for r in new_rows if r.get("id")]
+
+                def _load_bon_hr_traces() -> dict[str, list[dict]]:
+                    _res: dict[str, list[dict]] = {}
+                    for _rid in _bon_hr_ids:
+                        try:
+                            _ts = self.backend.list_traces(result_id=UUID(_rid))
+                            _res[_rid] = [_serialize(t) for t in _ts]
+                        except Exception:
+                            _res[_rid] = []
+                    return _res
+
+                bon_traces_map_hr = await asyncio.get_event_loop().run_in_executor(
+                    None, _load_bon_hr_traces
+                )
+
+            generic_traces_map_hr: dict[str, list[dict]] = {}
+            if attack_type_str.lower() not in ("baseline", "bon") and new_rows:
+                _gen_hr_ids = [str(r.get("id") or "") for r in new_rows if r.get("id")]
+
+                def _load_gen_hr_traces() -> dict[str, list[dict]]:
+                    _res: dict[str, list[dict]] = {}
+                    for _rid in _gen_hr_ids:
+                        try:
+                            _ts = self.backend.list_traces(result_id=UUID(_rid))
+                            _res[_rid] = [_serialize(t) for t in _ts]
+                        except Exception:
+                            _res[_rid] = []
+                    return _res
+
+                generic_traces_map_hr = await asyncio.get_event_loop().run_in_executor(
+                    None, _load_gen_hr_traces
+                )
+
+            if self.history_results_list_area is not None:
+                self.history_results_list_area.clear()
+
+            if self.history_detail_area is not None:
+                self.history_detail_area.clear()
+                with self.history_detail_area:
+                    ui.label("← Select a goal to view details").classes(
+                        "text-grey-4 text-sm italic mt-16 w-full text-center"
+                    )
+
+            if self.history_results_empty_label is not None:
+                if all_items:
+                    self.history_results_empty_label.set_visibility(False)
+                else:
+                    self.history_results_empty_label.text = (
+                        "No results found for this run."
+                    )
+                    self.history_results_empty_label.set_visibility(True)
+
+            if all_items and self.history_results_list_area is not None:
+                with self.history_results_list_area:
+                    # ── Pre-parse detail data for all rows ─────────────
+                    _h_atk = attack_type_str.lower()
+                    _h_detail_data: dict[str, object] = {}
+                    for _row in new_rows:
+                        _rid = str(_row.get("id") or "")
+                        if _h_atk == "baseline":
+                            _t = baseline_traces_map_hr.get(_rid, [])
+                            _h_detail_data[_rid] = self._parse_baseline_traces(
+                                _t, str(_row.get("goal") or "")
+                            )
+                        elif _h_atk == "bon":
+                            _t = bon_traces_map_hr.get(_rid, [])
+                            _h_detail_data[_rid] = self._parse_bon_traces(_t)
+                        elif _h_atk == "pap":
+                            _t = generic_traces_map_hr.get(_rid, [])
+                            _h_detail_data[_rid] = self._parse_pap_traces(_t)
+                        elif _h_atk == "pair":
+                            _t = generic_traces_map_hr.get(_rid, [])
+                            _h_detail_data[_rid] = self._parse_pair_traces(_t)
+                        elif _h_atk == "tap":
+                            _t = generic_traces_map_hr.get(_rid, [])
+                            _h_detail_data[_rid] = self._parse_tap_traces(_t)
+                        elif _h_atk == "advprefix":
+                            _t = generic_traces_map_hr.get(_rid, [])
+                            _h_detail_data[_rid] = self._parse_advprefix_traces(_t)
+                        elif _h_atk == "autodanturbo":
+                            _t = generic_traces_map_hr.get(_rid, [])
+                            _h_detail_data[_rid] = self._parse_autodan_traces(_t)
+                        else:
+                            _t = generic_traces_map_hr.get(_rid, [])
+                            _h_detail_data[_rid] = (
+                                self._extract_prompt_response_from_traces(_t)
+                            )
+
+                    # ── Group rows by category ─────────────────────────
+                    _h_cat_groups: dict[str, list[dict]] = {}
+                    for _row in new_rows:
+                        _cat = _row.get("_goal_category") or "Uncategorised"
+                        _h_cat_groups.setdefault(str(_cat), []).append(_row)
+
+                    _h_left_num = 0
+                    for _cat_label in sorted(_h_cat_groups.keys()):
+                        _rows_in_cat = _h_cat_groups[_cat_label]
+                        with ui.row().classes("items-center gap-2 mt-3 mb-1 px-1"):
+                            ui.label(_cat_label).classes(
+                                "text-xs font-semibold text-grey-6 uppercase "
+                                "tracking-wide"
+                            )
+
+                        # ── Group by subcategory within category ──────
+                        _h_subcat_groups: dict[str, list[dict]] = {}
+                        for _row in _rows_in_cat:
+                            _sub = str(_row.get("_goal_subcategory") or "")
+                            if _sub == "N/A":
+                                _sub = ""
+                            _h_subcat_groups.setdefault(_sub, []).append(_row)
+
+                        for _h_sub_label in sorted(_h_subcat_groups.keys()):
+                            _h_rows_in_sub = sorted(
+                                _h_subcat_groups[_h_sub_label],
+                                key=lambda r: str(r.get("goal") or "").lower(),
+                            )
+                            if _h_sub_label:
+                                with ui.row().classes(
+                                    "items-center gap-2 mt-2 mb-0.5 px-3"
+                                ):
+                                    ui.label(_h_sub_label).classes(
+                                        "text-[10px] font-semibold text-grey-5 "
+                                        "uppercase tracking-wide"
+                                    )
+
+                            for _row in _h_rows_in_sub:
+                                _h_left_num += 1
+                                _row["goal_number"] = _h_left_num
+                                _rid = str(_row.get("id") or "")
+                                _data = _h_detail_data.get(_rid)
+
+                                def _make_h_click(
+                                    _r: dict = _row,
+                                    _d: object = _data,
+                                    _atk_str: str = attack_type_str,
+                                ) -> None:
+                                    if self.history_detail_area is None:
+                                        return
+                                    self.history_detail_area.clear()
+                                    with self.history_detail_area:
+                                        _ha = _atk_str.lower()
+                                        if _ha == "baseline":
+                                            self._render_baseline_goal_card(
+                                                _r,
+                                                _d,
+                                                detail_mode=True,  # type: ignore[arg-type]
+                                            )
+                                        elif _ha == "bon":
+                                            self._render_bon_goal_card(
+                                                _r,
+                                                _d,
+                                                detail_mode=True,  # type: ignore[arg-type]
+                                            )
+                                        elif _ha == "pap":
+                                            self._render_pap_goal_card(
+                                                _r,
+                                                _d,
+                                                detail_mode=True,  # type: ignore[arg-type]
+                                            )
+                                        elif _ha == "pair":
+                                            self._render_pair_goal_card(
+                                                _r,
+                                                _d,
+                                                detail_mode=True,  # type: ignore[arg-type]
+                                            )
+                                        elif _ha == "tap":
+                                            _nodes, _ds = _d  # type: ignore[misc]
+                                            self._render_tap_goal_card(
+                                                _r, _nodes, _ds, detail_mode=True
+                                            )
+                                        elif _ha == "advprefix":
+                                            _pr, _gs = _d  # type: ignore[misc]
+                                            self._render_advprefix_goal_card(
+                                                _r, _pr, _gs, detail_mode=True
+                                            )
+                                        elif _ha == "autodanturbo":
+                                            self._render_autodan_goal_card(
+                                                _r,
+                                                _d,
+                                                detail_mode=True,  # type: ignore[arg-type]
+                                            )
+                                        else:
+                                            _req, _resp = _d  # type: ignore[misc]
+                                            self._render_generic_goal_card(
+                                                _r, _req, _resp, detail_mode=True
+                                            )
+
+                                self._render_compact_card(_row, _make_h_click)
+        except Exception as exc:
+            if self.history_results_list_area is not None:
+                self.history_results_list_area.clear()
+            if self.history_results_empty_label is not None:
+                self.history_results_empty_label.text = f"Failed to load results: {exc}"
+                self.history_results_empty_label.set_visibility(True)
+            ui.notify(f"Error loading results: {exc}", type="negative")
+
+    async def _open_history_goal_detail(self, row: dict) -> None:
+        """Populate the right panel of the history dialog with attack traces."""
+        if self.history_detail_area is None:
+            return
+        self.history_detail_area.clear()
+        with self.history_detail_area:
+            with ui.row().classes("items-center gap-2 py-8 justify-center w-full"):
+                ui.spinner("dots")
+                ui.label("Loading…").classes("text-sm text-grey-6")
+        await asyncio.sleep(0)
+        await self._load_attack_specific_traces(
+            row, self.history_detail_area, self._history_dialog_attack_str
+        )
