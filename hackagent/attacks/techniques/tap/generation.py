@@ -350,7 +350,9 @@ class TapExecutor:
                 "Target query blocked by %s guardrail",
                 _info.get("side", "unknown"),
             )
-            return None
+            # Return a structured marker so traces can distinguish guardrail
+            # blocks from empty responses.
+            return f"[GUARDRAIL:{_info.get('side', 'unknown')}] {_info.get('reasoning') or _info.get('message') or 'Blocked by guardrail'}"
 
         return extract_response_content(response, self.logger)
 
