@@ -343,16 +343,15 @@ class TapExecutor:
             request_data=request_data,
         )
 
-        # Check if a before/after guardrail blocked the request
+        # Return the raw guardrail response dict so the tracker's
+        # _extract_response_content stores agent_specific_data and the
+        # dashboard's _extract_guardrail_from_response renders it properly.
         if isinstance(response, dict) and is_guardrail_response(response):
-            _info = get_guardrail_info(response)
             self.logger.info(
                 "Target query blocked by %s guardrail",
-                _info.get("side", "unknown"),
+                get_guardrail_info(response).get("side", "unknown"),
             )
-            # Return a structured marker so traces can distinguish guardrail
-            # blocks from empty responses.
-            return f"[GUARDRAIL:{_info.get('side', 'unknown')}] {_info.get('reasoning') or _info.get('message') or 'Blocked by guardrail'}"
+            return response
 
         return extract_response_content(response, self.logger)
 
@@ -664,10 +663,15 @@ class TapExecutor:
                     [self._query_target(adv_prompt_list[0]) or ""] if _vn else []
                 )
 
+            # Judges expect plain strings; pass "" for guardrail-blocked
+            # responses (dicts) so they score 0 (not jailbroken).
+            _judge_responses = [
+                r if isinstance(r, str) else "" for r in target_response_list
+            ]
             judge_scores = self.evaluator.score_candidates(
                 goal,
                 adv_prompt_list,
-                target_response_list,
+                _judge_responses,
                 self.judges_config,
                 default=0,
             )
@@ -725,7 +729,7 @@ class TapExecutor:
                     goal_tracker.add_interaction_trace(
                         ctx=goal_ctx,
                         request={"prompt": prompt[:500]},
-                        response=response_text[:500],
+                        response=response_text,
                         step_name=f"Depth {iteration} Candidate",
                         step_type=StepTypeEnum.OTHER,
                         metadata={
@@ -752,7 +756,7 @@ class TapExecutor:
                     depth_summary.append(
                         {
                             "prompt": prompt[:500],
-                            "response": response_text[:500],
+                            "response": response_text,
                             "improvement": improv[:500],
                             "on_topic_score": on_score,
                             "judge_score": judge_score,
