@@ -719,8 +719,29 @@ class AttackOrchestrator:
         if isinstance(expected_goals, list):
             effective_run_config.setdefault("expected_total_goals", len(expected_goals))
 
-        # 2. Create Attack record
+        # Persist guardrail configuration so the dashboard can display it.
         router_obj = getattr(self.hackagent_agent, "router", None)
+        if router_obj:
+            before_gr = getattr(router_obj, "before_guardrail", None)
+            after_gr = getattr(router_obj, "after_guardrail", None)
+            if before_gr is not None:
+                cfg = getattr(before_gr, "_config", None)
+                if isinstance(cfg, dict):
+                    effective_run_config["before_guardrail"] = {
+                        k: str(v)
+                        for k, v in cfg.items()
+                        if k in ("identifier", "endpoint", "agent_type")
+                    }
+            if after_gr is not None:
+                cfg = getattr(after_gr, "_config", None)
+                if isinstance(cfg, dict):
+                    effective_run_config["after_guardrail"] = {
+                        k: str(v)
+                        for k, v in cfg.items()
+                        if k in ("identifier", "endpoint", "agent_type")
+                    }
+
+        # 2. Create Attack record
         backend_agent = getattr(router_obj, "backend_agent", None)
         victim_agent_id = getattr(backend_agent, "id", None) or getattr(
             self.hack_agent, "agent_id", None
