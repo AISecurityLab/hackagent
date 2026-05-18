@@ -157,7 +157,12 @@ class DashboardPage:
         self._selected_run_ids: list[str] = []
         self._selected_attack_ids: list[str] = []
         self._runs_delete_btn: ui.button | None = None
+        self._runs_compare_btn: ui.button | None = None
         self._attacks_delete_btn: ui.button | None = None
+
+        # Comparison dialog
+        self._compare_dialog: ui.dialog | None = None
+        self._compare_dialog_body: ui.column | None = None
 
     # ── Public entry point ────────────────────────────────────────────────────
 
@@ -695,19 +700,33 @@ class DashboardPage:
                         self.runs_count_label = ui.label("").classes(
                             "text-sm text-grey-6"
                         )
-                        self._runs_delete_btn = (
-                            ui.button(
-                                "Delete selected",
-                                icon="delete",
-                                on_click=lambda: ui.timer(
-                                    0,
-                                    self._delete_selected_runs,
-                                    once=True,
-                                ),
+                        with ui.row().classes("items-center gap-2"):
+                            self._runs_compare_btn = (
+                                ui.button(
+                                    "Compare",
+                                    icon="compare_arrows",
+                                    on_click=lambda: ui.timer(
+                                        0,
+                                        self._compare_selected_runs,
+                                        once=True,
+                                    ),
+                                )
+                                .props("flat dense no-caps color=primary")
+                                .classes("hidden")
                             )
-                            .props("flat dense no-caps color=negative")
-                            .classes("hidden")
-                        )
+                            self._runs_delete_btn = (
+                                ui.button(
+                                    "Delete selected",
+                                    icon="delete",
+                                    on_click=lambda: ui.timer(
+                                        0,
+                                        self._delete_selected_runs,
+                                        once=True,
+                                    ),
+                                )
+                                .props("flat dense no-caps color=negative")
+                                .classes("hidden")
+                            )
                     # ── Scrollable run list ────────────────────────────────────
                     with ui.scroll_area().classes("w-full flex-1 min-h-0"):
                         self._history_runs_area = ui.column().classes(
@@ -1015,8 +1034,10 @@ class DashboardPage:
         elif ha == "autodanturbo":
             self._render_autodan_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
         else:
-            _req, _resp = data  # type: ignore[misc]
-            self._render_generic_goal_card(row, _req, _resp, detail_mode=True)
+            _req, _resp, _gr_evt = data  # type: ignore[misc]
+            self._render_generic_goal_card(
+                row, _req, _resp, detail_mode=True, guardrail_event=_gr_evt
+            )
 
     def _close_reports_detail(self) -> None:
         """Close the right detail panel and restore full-width report list."""
@@ -1435,6 +1456,47 @@ class DashboardPage:
                 else:
                     ui.label(str(models_info)).classes("text-sm")
 
+        # Guardrails section
+        run_cfg = (
+            run.get("run_config") if isinstance(run.get("run_config"), dict) else {}
+        )
+        before_gr = display_config.get("before_guardrail") or run_cfg.get(
+            "before_guardrail"
+        )
+        after_gr = display_config.get("after_guardrail") or run_cfg.get(
+            "after_guardrail"
+        )
+        if before_gr or after_gr:
+            with ui.column().classes("w-full gap-1"):
+                ui.label("GUARDRAILS").classes(
+                    "text-[10px] font-semibold tracking-widest text-grey-5 uppercase"
+                )
+                with ui.row().classes("flex-wrap gap-3"):
+                    if before_gr:
+                        gr_label = (
+                            before_gr.get("identifier", "—")
+                            if isinstance(before_gr, dict)
+                            else str(before_gr)
+                        )
+                        with ui.card().tight().classes("min-w-24"):
+                            with ui.column().classes("px-3 py-2 gap-0"):
+                                ui.label("BEFORE MODEL").classes(
+                                    "text-[10px] font-semibold text-grey-5"
+                                )
+                                ui.label(gr_label).classes("text-sm font-medium")
+                    if after_gr:
+                        gr_label = (
+                            after_gr.get("identifier", "—")
+                            if isinstance(after_gr, dict)
+                            else str(after_gr)
+                        )
+                        with ui.card().tight().classes("min-w-24"):
+                            with ui.column().classes("px-3 py-2 gap-0"):
+                                ui.label("AFTER MODEL").classes(
+                                    "text-[10px] font-semibold text-grey-5"
+                                )
+                                ui.label(gr_label).classes("text-sm font-medium")
+
         # IDs
         with ui.column().classes("w-full gap-1 pt-2"):
             for id_label, id_val in [
@@ -1746,6 +1808,11 @@ class DashboardPage:
                 self._runs_delete_btn.classes(remove="hidden")
             else:
                 self._runs_delete_btn.classes(add="hidden")
+        if self._runs_compare_btn is not None:
+            if len(self._selected_run_ids) >= 2:
+                self._runs_compare_btn.classes(remove="hidden")
+            else:
+                self._runs_compare_btn.classes(add="hidden")
 
     async def _delete_selected_runs(self) -> None:
         ids = list(self._selected_run_ids)
@@ -1764,6 +1831,628 @@ class DashboardPage:
             self._runs_delete_btn.classes(add="hidden")
         await self._load_runs()
         await self._load_history_reports()
+
+    async def _compare_selected_runs(self) -> None:
+        """Open a comparison dialog for 2-4 selected runs."""
+        ids = list(self._selected_run_ids)
+        if len(ids) < 2:
+            ui.notify("Select at least 2 runs to compare", type="warning")
+            return
+        if len(ids) > 4:
+            ui.notify("Select at most 4 runs to compare", type="warning")
+            return
+
+        # Gather run rows
+        runs: list[dict] = []
+        for rid in ids:
+            row = next(
+                (r for r in self._runs_all_rows if str(r.get("id")) == rid), None
+            )
+            if row:
+                runs.append(row)
+        if len(runs) < 2:
+            return
+
+        # Fetch per-category breakdown for each run
+        per_run_cats: list[dict[str, dict[str, int]]] = []
+        all_categories: set[str] = set()
+        for run in runs:
+            run_id = UUID(str(run["id"]))
+            cat_stats: dict[str, dict[str, int]] = defaultdict(
+                lambda: {"total": 0, "vulnerable": 0, "mitigated": 0, "errors": 0}
+            )
+            page = 1
+            while True:
+                rp = self.backend.list_results(run_id=run_id, page=page, page_size=100)
+                if not rp.items:
+                    break
+                for result in rp.items:
+                    rd = _serialize(result)
+                    cat = self._extract_goal_classifier_label(rd, "category")
+                    if not cat or cat == "N/A":
+                        cat = "Uncategorised"
+                    es = str(rd.get("evaluation_status") or "")
+                    en = rd.get("evaluation_notes")
+                    bucket = _result_bucket(status=es, notes=en)
+                    entry = cat_stats[cat]
+                    entry["total"] += 1
+                    if bucket == "jailbreak":
+                        entry["vulnerable"] += 1
+                    elif bucket == "mitigated":
+                        entry["mitigated"] += 1
+                    elif bucket == "error":
+                        entry["errors"] += 1
+                if int(rp.total or 0) <= page * 100:
+                    break
+                page += 1
+            per_run_cats.append(dict(cat_stats))
+            all_categories.update(cat_stats.keys())
+
+        sorted_cats = sorted(all_categories)
+
+        # Create or reuse dialog
+        if self._compare_dialog is not None:
+            self._compare_dialog.delete()
+        with ui.dialog().props("maximized") as self._compare_dialog:
+            with (
+                ui.card()
+                .classes("w-full h-full overflow-auto")
+                .style("max-width: 96vw; max-height: 90vh")
+            ):
+                # ── Categorical palette for run identity ──────────
+                # Avoids red/green/orange reserved for status semantics
+                colors = ["#6366f1", "#06b6d4", "#8b5cf6", "#ec4899"]
+
+                # ── Build short + full labels ─────────────────────
+                short_labels = [f"#{r.get('run_progress', '?')}" for r in runs]
+
+                # ── Detect comparison context ─────────────────────
+                agents = {str(r.get("agent_name") or "—") for r in runs}
+                attacks = {str(r.get("attack_type") or "—") for r in runs}
+                if len(agents) == 1 and len(attacks) > 1:
+                    context_line = (
+                        f"Same target: {next(iter(agents))} — "
+                        f"Comparing attacks: {', '.join(sorted(attacks))}"
+                    )
+                elif len(attacks) == 1 and len(agents) > 1:
+                    context_line = (
+                        f"Same attack: {next(iter(attacks))} — "
+                        f"Comparing targets: {', '.join(sorted(agents))}"
+                    )
+                elif len(agents) == 1 and len(attacks) == 1:
+                    context_line = (
+                        f"Same target & attack: "
+                        f"{next(iter(agents))} · {next(iter(attacks))}"
+                    )
+                else:
+                    context_line = (
+                        f"Targets: {', '.join(sorted(agents))} · "
+                        f"Attacks: {', '.join(sorted(attacks))}"
+                    )
+
+                # ── Header ────────────────────────────────────────
+                with ui.row().classes("items-center justify-between w-full mb-1"):
+                    with ui.column().classes("gap-0"):
+                        ui.label(f"Comparing {len(runs)} Runs").classes(
+                            "text-lg font-semibold"
+                        )
+                        ui.label(context_line).classes("text-xs text-grey-7")
+                    ui.button(icon="close", on_click=self._compare_dialog.close).props(
+                        "flat round dense"
+                    )
+
+                # ── Build config chips per run & detect differences ──
+                _attack_display_map: dict[str, str] = {
+                    "baseline": "Baseline",
+                    "pair": "PAIR",
+                    "tap": "TAP",
+                    "bon": "Best-of-N",
+                    "advprefix": "AdvPrefix",
+                    "autodanturbo": "AutoDAN-Turbo",
+                    "cipherchat": "CipherChat",
+                    "flipattack": "FlipAttack",
+                    "pap": "PAP",
+                    "h4rm3l": "H4rm3l",
+                }
+
+                def _compare_chips_for_run(run: dict) -> list[tuple[str, str, str]]:
+                    """Return (icon, label, value) tuples for a run."""
+                    chips: list[tuple[str, str, str]] = []
+                    rc = (
+                        run.get("run_config")
+                        if isinstance(run.get("run_config"), dict)
+                        else {}
+                    )
+                    # Get attack config from run_config or attack lookup
+                    cfg: dict = {}
+                    _atk_id = str(run.get("attack_id") or "")
+                    if _atk_id:
+                        with contextlib.suppress(Exception):
+                            _acm = self._attack_config_map_for_ids({_atk_id})
+                            _ac = _acm.get(_atk_id)
+                            if isinstance(_ac, dict) and _ac:
+                                cfg = _ac
+                    if not cfg and isinstance(rc, dict):
+                        cfg = {k: v for k, v in rc.items() if k != "evaluation_summary"}
+
+                    atk_str = str(run.get("attack_type") or "—")
+                    atk_lower = atk_str.lower()
+
+                    # Attack type
+                    chips.append(
+                        (
+                            "flash_on",
+                            "Attack",
+                            _attack_display_map.get(atk_lower, atk_str.capitalize()),
+                        )
+                    )
+
+                    # Attack-specific params
+                    if atk_lower == "flipattack":
+                        _fa = cfg.get("flipattack_params") or {}
+                        if isinstance(_fa, dict):
+                            chips.append(
+                                ("flip", "Mode", str(_fa.get("flip_mode", "FCS")))
+                            )
+                    elif atk_lower == "h4rm3l":
+                        _h4 = cfg.get("h4rm3l_params") or {}
+                        _prog = _h4.get("program", "") if isinstance(_h4, dict) else ""
+                        if _prog:
+                            chips.append(
+                                (
+                                    "layers",
+                                    "Decorators",
+                                    self._format_h4rm3l_program(_prog),
+                                )
+                            )
+                    elif atk_lower == "cipherchat":
+                        _cc = cfg.get("cipherchat_params") or {}
+                        if isinstance(_cc, dict):
+                            chips.append(
+                                ("lock", "Cipher", str(_cc.get("encode_method", "—")))
+                            )
+                    elif atk_lower == "bon":
+                        _bn = cfg.get("bon_params") or {}
+                        if isinstance(_bn, dict):
+                            chips.append(
+                                ("auto_awesome", "Steps", str(_bn.get("n_steps", 4)))
+                            )
+                    elif atk_lower == "tap":
+                        _tp = cfg.get("tap_params") or {}
+                        if isinstance(_tp, dict):
+                            chips.append(
+                                ("account_tree", "Depth", str(_tp.get("depth", 3)))
+                            )
+                            chips.append(("width", "Width", str(_tp.get("width", 4))))
+
+                    # Dataset
+                    _ds_raw = cfg.get("dataset") or rc.get("dataset")
+                    if isinstance(_ds_raw, dict):
+                        _ds_p = _ds_raw.get("preset") or ""
+                        _ds_label = (
+                            _ds_p.replace("_", " ").title() if _ds_p else "Custom"
+                        )
+                        chips.append(("dataset", "Dataset", _ds_label))
+                        _ds_lim = _ds_raw.get("limit")
+                        if _ds_lim is not None:
+                            chips.append(("filter_list", "Limit", str(_ds_lim)))
+                    elif _ds_raw:
+                        chips.append(("dataset", "Dataset", str(_ds_raw)))
+
+                    # Target
+                    _agent = str(run.get("agent_name") or "—")
+                    chips.append(("smart_toy", "Target", _agent))
+
+                    # Judge / Scorer
+                    if atk_lower in ("pair", "autodanturbo"):
+                        _sc = cfg.get("scorer") or {}
+                        if isinstance(_sc, dict):
+                            _sc_id = _sc.get("identifier") or _sc.get("model_id") or ""
+                            if _sc_id:
+                                chips.append(("analytics", "Scorer", str(_sc_id)))
+                    else:
+                        _judges = cfg.get("judges")
+                        if isinstance(_judges, list) and _judges:
+                            _j0 = _judges[0] if isinstance(_judges[0], dict) else {}
+                            _jm = _j0.get("identifier") or _j0.get("model_id") or ""
+                            _jt = _j0.get("type") or ""
+                            _jlabel = (
+                                f"{_jt}" + (f" · {_jm}" if _jm else "")
+                                if _jt
+                                else (_jm or "pattern")
+                            )
+                            chips.append(("gavel", "Judge", _jlabel))
+
+                    # Attacker
+                    _att = cfg.get("attacker") or {}
+                    if isinstance(_att, dict):
+                        _att_id = _att.get("identifier") or _att.get("model_id") or ""
+                        if _att_id:
+                            chips.append(("psychology", "Attacker", str(_att_id)))
+
+                    # Generator (AdvPrefix)
+                    if atk_lower == "advprefix":
+                        _gen = cfg.get("generator") or {}
+                        if isinstance(_gen, dict):
+                            _gen_id = (
+                                _gen.get("identifier") or _gen.get("model_id") or ""
+                            )
+                            if _gen_id:
+                                chips.append(("build", "Generator", str(_gen_id)))
+
+                    # Guardrails
+                    _bg = rc.get("before_guardrail")
+                    _ag = rc.get("after_guardrail")
+                    if isinstance(_bg, dict):
+                        chips.append(
+                            ("shield", "Before Guardrail", _bg.get("identifier", "—"))
+                        )
+                    if isinstance(_ag, dict):
+                        chips.append(
+                            ("shield", "After Guardrail", _ag.get("identifier", "—"))
+                        )
+
+                    return chips
+
+                # Collect chips per run and determine which labels differ
+                _all_run_chips: list[list[tuple[str, str, str]]] = [
+                    _compare_chips_for_run(r) for r in runs
+                ]
+                # Build label→set(values) to detect differences
+                _label_values: dict[str, set[str]] = defaultdict(set)
+                for _chips_list in _all_run_chips:
+                    _seen_labels: set[str] = set()
+                    for _, lbl, val in _chips_list:
+                        _label_values[lbl].add(val)
+                        _seen_labels.add(lbl)
+                    # Labels absent from a run count as different
+                    for other_lbl in _label_values:
+                        if other_lbl not in _seen_labels:
+                            _label_values[other_lbl].add("")
+                _diff_labels: set[str] = {
+                    lbl for lbl, vals in _label_values.items() if len(vals) > 1
+                }
+
+                # ── Run identity cards (compact) ──────────────────
+                with ui.row().classes("w-full gap-2 flex-wrap mb-3"):
+                    for i, run in enumerate(runs):
+                        color = colors[i % len(colors)]
+                        with (
+                            ui.card()
+                            .classes("flex-1 min-w-[160px] py-2 px-3")
+                            .style(f"border-left: 4px solid {color}; box-shadow: none")
+                        ):
+                            with ui.row().classes("items-center gap-2 no-wrap"):
+                                ui.label(short_labels[i]).classes(
+                                    "text-base font-bold"
+                                ).style(f"color: {color}")
+                                with ui.column().classes("gap-0"):
+                                    ui.label(
+                                        str(run.get("attack_type") or "—")
+                                    ).classes("text-xs font-medium")
+                                    ui.label(str(run.get("agent_name") or "—")).classes(
+                                        "text-xs text-grey-6"
+                                    )
+                            with ui.row().classes("items-center gap-3 mt-1"):
+                                ui.label(f"ASR {run.get('overall_asr', '—')}").classes(
+                                    "text-sm font-bold"
+                                )
+                                ui.label(
+                                    f"{run.get('total_results', 0)} goals"
+                                ).classes("text-xs text-grey-6")
+                                ui.label(run.get("_latency") or "—").classes(
+                                    "text-xs text-grey-6"
+                                )
+                            # Configuration chips (differences highlighted)
+                            _run_chips = _all_run_chips[i]
+                            if _run_chips:
+                                with ui.row().classes(
+                                    "items-center gap-1 mt-1 flex-wrap"
+                                ):
+                                    for _cic, _clbl, _cval in _run_chips:
+                                        _is_diff = _clbl in _diff_labels
+                                        _bg_cls = (
+                                            "bg-amber-1 ring-1 ring-amber-3"
+                                            if _is_diff
+                                            else "bg-grey-1"
+                                        )
+                                        with ui.row().classes(
+                                            f"items-center gap-1 rounded px-1.5 py-0.5 {_bg_cls}"
+                                        ):
+                                            ui.icon(_cic, size="10px").classes(
+                                                "text-amber-8"
+                                                if _is_diff
+                                                else "text-grey-5"
+                                            )
+                                            ui.label(_clbl).classes(
+                                                "text-[9px] font-semibold uppercase tracking-wide "
+                                                + (
+                                                    "text-amber-8"
+                                                    if _is_diff
+                                                    else "text-grey-5"
+                                                )
+                                            )
+                                            ui.label(_cval).classes(
+                                                "text-[10px] font-medium "
+                                                + (
+                                                    "text-amber-9"
+                                                    if _is_diff
+                                                    else "text-grey-8"
+                                                )
+                                            )
+
+                # ── Risk Distribution donuts (side by side) ───────
+                with ui.card().classes("w-full"):
+                    ui.label("Risk Distribution").classes("font-semibold text-sm mb-1")
+                    with ui.row().classes("w-full gap-1 justify-around flex-wrap"):
+                        for i, run in enumerate(runs):
+                            jb = int(run.get("successful_jailbreaks") or 0)
+                            mit = int(run.get("mitigations") or 0)
+                            err = int(run.get("errors") or 0)
+                            total = int(run.get("total_results") or 0)
+                            pending = max(0, total - jb - mit - err)
+                            color = colors[i % len(colors)]
+                            asr_val = run.get("overall_asr", "—")
+                            with ui.column().classes(
+                                "items-center flex-1 min-w-[140px] max-w-[220px]"
+                            ):
+                                ui.label(short_labels[i]).classes(
+                                    "text-xs font-bold"
+                                ).style(f"color: {color}")
+                                ui.echart(
+                                    {
+                                        "tooltip": {
+                                            "trigger": "item",
+                                            "formatter": "{b}: {c} ({d}%)",
+                                        },
+                                        "series": [
+                                            {
+                                                "type": "pie",
+                                                "radius": ["44%", "74%"],
+                                                "center": ["50%", "50%"],
+                                                "label": {
+                                                    "show": True,
+                                                    "position": "inside",
+                                                    "formatter": "{c}",
+                                                    "fontSize": 9,
+                                                    "color": "#fff",
+                                                    "fontWeight": "bold",
+                                                },
+                                                "labelLine": {
+                                                    "show": False,
+                                                },
+                                                "data": [
+                                                    d
+                                                    for d in [
+                                                        {
+                                                            "value": jb,
+                                                            "name": "Jailbreak",
+                                                            "itemStyle": {
+                                                                "color": "#ef4444"
+                                                            },
+                                                        },
+                                                        {
+                                                            "value": mit,
+                                                            "name": "Mitigated",
+                                                            "itemStyle": {
+                                                                "color": "#22c55e"
+                                                            },
+                                                        },
+                                                        {
+                                                            "value": err,
+                                                            "name": "Errors",
+                                                            "itemStyle": {
+                                                                "color": "#f97316"
+                                                            },
+                                                        },
+                                                        {
+                                                            "value": pending,
+                                                            "name": "Pending",
+                                                            "itemStyle": {
+                                                                "color": "#d1d5db"
+                                                            },
+                                                        },
+                                                    ]
+                                                    if d["value"] > 0
+                                                ],
+                                            }
+                                        ],
+                                        "graphic": [
+                                            {
+                                                "type": "text",
+                                                "left": "center",
+                                                "top": "45%",
+                                                "style": {
+                                                    "text": str(asr_val),
+                                                    "fontSize": 15,
+                                                    "fontWeight": "bold",
+                                                    "fill": "#374151",
+                                                    "textAlign": "center",
+                                                },
+                                            },
+                                            {
+                                                "type": "text",
+                                                "left": "center",
+                                                "top": "57%",
+                                                "style": {
+                                                    "text": "ASR",
+                                                    "fontSize": 9,
+                                                    "fill": "#9ca3af",
+                                                    "textAlign": "center",
+                                                },
+                                            },
+                                        ],
+                                    }
+                                ).classes("w-full h-44")
+                    # Shared legend below all donuts
+                    with ui.row().classes("w-full justify-center gap-4 mt-1"):
+                        for lbl, clr in [
+                            ("Jailbreak", "#ef4444"),
+                            ("Mitigated", "#22c55e"),
+                            ("Errors", "#f97316"),
+                            ("Pending", "#d1d5db"),
+                        ]:
+                            with ui.row().classes("items-center gap-1"):
+                                ui.element("div").classes("w-2 h-2 rounded-full").style(
+                                    f"background: {clr}"
+                                )
+                                ui.label(lbl).classes("text-xs text-grey-7")
+
+                # ── Vulnerabilities per Category (grouped bar) ───
+                if sorted_cats:
+                    with ui.card().classes("w-full mt-3"):
+                        ui.label("Vulnerabilities per Category").classes(
+                            "font-semibold text-sm mb-2"
+                        )
+
+                        # Categories on Y-axis, one bar per run
+                        bar_cats = sorted(sorted_cats, reverse=True)
+
+                        # Pre-compute absolute counts per run
+                        vuln_data: list[list[int]] = []
+                        for _i, cat_data in enumerate(per_run_cats):
+                            vuln_vals: list[int] = []
+                            for cat in bar_cats:
+                                entry = cat_data.get(cat)
+                                vuln_vals.append(entry["vulnerable"] if entry else 0)
+                            vuln_data.append(vuln_vals)
+
+                        def _build_cat_series() -> list[dict]:
+                            series = []
+                            for idx, run in enumerate(runs):
+                                series.append(
+                                    {
+                                        "name": short_labels[idx],
+                                        "type": "bar",
+                                        "data": vuln_data[idx],
+                                        "itemStyle": {
+                                            "color": colors[idx % len(colors)]
+                                        },
+                                        "barMaxWidth": 18,
+                                    }
+                                )
+                            return series
+
+                        chart_height = max(260, len(bar_cats) * 38)
+
+                        (
+                            ui.echart(
+                                {
+                                    "tooltip": {
+                                        "trigger": "axis",
+                                        "axisPointer": {"type": "shadow"},
+                                    },
+                                    "legend": {
+                                        "bottom": 0,
+                                        "textStyle": {"fontSize": 11},
+                                    },
+                                    "grid": {
+                                        "left": "3%",
+                                        "right": "4%",
+                                        "top": "3%",
+                                        "bottom": "10%",
+                                        "containLabel": True,
+                                    },
+                                    "xAxis": {
+                                        "type": "value",
+                                        "minInterval": 1,
+                                    },
+                                    "yAxis": {
+                                        "type": "category",
+                                        "data": bar_cats,
+                                        "axisLabel": {
+                                            "width": 120,
+                                            "overflow": "truncate",
+                                            "fontSize": 11,
+                                        },
+                                    },
+                                    "series": _build_cat_series(),
+                                }
+                            )
+                            .classes("w-full")
+                            .style(f"height: {chart_height}px")
+                        )
+
+                # ── Robustness radar (overlaid) ───────────────────
+                if len(sorted_cats) >= 3:
+                    with ui.card().classes("w-full mt-3"):
+                        ui.label("Robustness by Category").classes(
+                            "font-semibold text-sm mb-1"
+                        )
+                        ui.label(
+                            "Higher = more robust (100% means no successful jailbreaks)"
+                        ).classes("text-xs text-grey-6 mb-2")
+                        radar_cats = sorted_cats[:9]
+                        if len(radar_cats) > 1:
+                            radar_cats = [
+                                radar_cats[0],
+                                *reversed(radar_cats[1:]),
+                            ]
+
+                        indicators = [{"name": c, "max": 100} for c in radar_cats]
+                        series_data = []
+                        legend_names = []
+                        for i, (run, cat_data) in enumerate(zip(runs, per_run_cats)):
+                            legend_names.append(short_labels[i])
+                            values = []
+                            for cat in radar_cats:
+                                entry = cat_data.get(cat)
+                                if entry and entry["total"] > 0:
+                                    robustness = round(
+                                        100
+                                        * (entry["total"] - entry["vulnerable"])
+                                        / entry["total"],
+                                        1,
+                                    )
+                                else:
+                                    robustness = 100.0
+                                values.append(robustness)
+                            series_data.append(
+                                {
+                                    "value": values,
+                                    "name": short_labels[i],
+                                    "lineStyle": {"width": 2},
+                                    "areaStyle": {"opacity": 0.08},
+                                    "itemStyle": {"color": colors[i % len(colors)]},
+                                }
+                            )
+
+                        ui.echart(
+                            {
+                                "tooltip": {
+                                    "trigger": "item",
+                                    "confine": True,
+                                },
+                                "legend": {
+                                    "data": legend_names,
+                                    "bottom": 0,
+                                    "textStyle": {"fontSize": 11},
+                                },
+                                "radar": {
+                                    "shape": "polygon",
+                                    "indicator": indicators,
+                                    "splitNumber": 5,
+                                    "center": ["50%", "48%"],
+                                    "radius": "62%",
+                                    "axisName": {
+                                        "fontSize": 11,
+                                        "color": "#374151",
+                                    },
+                                    "splitLine": {"lineStyle": {"color": "#e5e7eb"}},
+                                    "splitArea": {"areaStyle": {"color": ["#ffffff"]}},
+                                },
+                                "series": [
+                                    {
+                                        "type": "radar",
+                                        "symbol": "circle",
+                                        "symbolSize": 7,
+                                        "data": series_data,
+                                    }
+                                ],
+                            }
+                        ).classes("w-full h-80")
+
+        self._compare_dialog.open()
 
     async def _delete_selected_attacks(self) -> None:
         ids = list(self._selected_attack_ids)
@@ -3558,22 +4247,24 @@ class DashboardPage:
         if not program or not isinstance(program, str):
             return program or ""
         p = program.strip()
-        # If it looks like a Python/h4rm3l call chain, simplify
         import re as _re  # noqa: PLC0415
 
-        # Match Apply(transform1, Apply(transform2, ...)) style
+        # Match function/class calls in the chain
         names = _re.findall(r"\b([A-Za-z][A-Za-z0-9_]*)(?:\s*\()", p)
         if names:
-            # Skip generic wrappers
-            skip = {"Apply", "Compose", "Pipeline"}
+            # Skip generic wrappers and chain methods
+            skip = {"Apply", "Compose", "Pipeline", "then"}
             filtered = [n for n in names if n not in skip]
             if filtered:
-                return " → ".join(
-                    " ".join(
-                        w.capitalize() for w in _re.sub(r"([A-Z])", r" \1", n).split()
-                    )
-                    for n in filtered
-                )
+
+                def _camel_to_words(n: str) -> str:
+                    # Handle acronyms followed by words: DANDecorator → DAN Decorator
+                    s = _re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", n)
+                    # Handle lowercase/digit followed by uppercase: refusalSuppression → refusal Suppression
+                    s = _re.sub(r"([a-z\d])([A-Z])", r"\1 \2", s)
+                    return s
+
+                return " → ".join(_camel_to_words(n) for n in filtered)
         # Fallback: title-case snake_case names
         if "_" in p and " " not in p:
             return p.replace("_", " ").title()
@@ -5238,16 +5929,25 @@ class DashboardPage:
     @staticmethod
     def _extract_prompt_response_from_traces(
         traces: list[dict],
-    ) -> tuple[str, str]:
-        """Extract the best (prompt, response) pair from generic attack traces."""
+    ) -> tuple[str, str, "dict | None"]:
+        """Extract the best (prompt, response, guardrail_event) from generic attack traces."""
         best_req = ""
         best_resp = ""
         fallback_req = ""
+        guardrail_event: dict | None = None
         for td in sorted(traces, key=lambda x: x.get("sequence", 0)):
             content = td.get("content")
             if not isinstance(content, dict):
                 continue
             req, resp = DashboardPage._extract_request_response_candidates(content)
+            # Detect guardrail event dict before stringifying
+            if isinstance(resp, dict) and resp.get("side") in (
+                "before",
+                "after",
+                "unknown",
+            ):
+                guardrail_event = resp
+                resp = None  # Don't treat guardrail dict as normal response text
             req_str = (
                 json.dumps(req, indent=2)
                 if isinstance(req, (dict, list))
@@ -5268,10 +5968,10 @@ class DashboardPage:
             elif req_str:
                 fallback_req = req_str
         if best_req:
-            return best_req, best_resp
+            return best_req, best_resp, guardrail_event
         if fallback_req:
-            return fallback_req, "(no response recorded)"
-        return "(not available)", "(not available)"
+            return fallback_req, "(no response recorded)", guardrail_event
+        return "(not available)", "(not available)", guardrail_event
 
     def _render_generic_goal_card(
         self,
@@ -5367,20 +6067,9 @@ class DashboardPage:
                     detail_data = self._parse_autodan_traces(serialized_traces)
                     self._render_autodan_goal_card(row, detail_data, detail_mode=True)
                 else:
-                    req_text, resp_text = self._extract_prompt_response_from_traces(
-                        serialized_traces
+                    req_text, resp_text, _generic_guardrail = (
+                        self._extract_prompt_response_from_traces(serialized_traces)
                     )
-                    # Detect guardrail event for the generic case
-                    _generic_guardrail: dict | None = None
-                    for _td in serialized_traces:
-                        _r = (_td.get("content") or {}).get("response")
-                        if isinstance(_r, dict) and _r.get("side") in (
-                            "before",
-                            "after",
-                            "unknown",
-                        ):
-                            _generic_guardrail = _r
-                            break
                     self._render_generic_goal_card(
                         row,
                         req_text,
@@ -6909,7 +7598,12 @@ class DashboardPage:
           shows a red box below the (visible) target response.
         """
         side = event.get("side", "unknown")
-        explanation = str(event.get("explanation") or "Blocked by guardrail")
+        explanation = str(
+            event.get("explanation")
+            or event.get("reasoning")
+            or event.get("message")
+            or "Blocked by guardrail"
+        )
         categories = event.get("categories", [])
 
         cat_html = ""
@@ -9672,6 +10366,26 @@ class DashboardPage:
                             if _h_dec_id:
                                 _chip("layers", "Decorator LLM", str(_h_dec_id))
 
+                # ── Line 4: Guardrails (if present) ───────────────────
+                _h_bg = _hrc.get("before_guardrail")
+                _h_ag = _hrc.get("after_guardrail")
+                if _h_bg or _h_ag:
+                    with ui.row().classes("flex-wrap gap-2 items-center mt-1"):
+                        if _h_bg:
+                            _h_bg_id = (
+                                _h_bg.get("identifier", "—")
+                                if isinstance(_h_bg, dict)
+                                else str(_h_bg)
+                            )
+                            _chip("shield", "Before Guardrail", _h_bg_id)
+                        if _h_ag:
+                            _h_ag_id = (
+                                _h_ag.get("identifier", "—")
+                                if isinstance(_h_ag, dict)
+                                else str(_h_ag)
+                            )
+                            _chip("shield", "After Guardrail", _h_ag_id)
+
         if self.history_results_list_area is not None:
             self.history_results_list_area.clear()
         if self.history_results_empty_label is not None:
@@ -10221,7 +10935,7 @@ class DashboardPage:
                         _t = generic_traces_map_hr.get(_rid, [])
                         _h_detail_data[_rid] = (
                             self._extract_prompt_response_from_traces(_t)
-                        )
+                        )  # returns (req, resp, guardrail_event)
 
                 # Store for filter re-rendering
                 self._history_goal_rows = new_rows
