@@ -2813,7 +2813,7 @@ class DashboardPage:
                 attack_prompt = str(request.get("prompt") or "")
 
             _raw_resp = content.get("response")
-            _actual_resp, _g_side, _g_expl = (
+            _actual_resp, _g_side, _g_expl, _g_cats = (
                 DashboardPage._extract_guardrail_from_response(_raw_resp)
             )
             response_text = str(_actual_resp or "")
@@ -2842,6 +2842,9 @@ class DashboardPage:
                 bucket = "jailbreak"
             elif success is False:
                 bucket = "mitigated"
+            elif response_text:
+                # Have a response but no evaluator match — treat as pending
+                bucket = "mitigated"
             else:
                 bucket = "error"
 
@@ -2862,6 +2865,7 @@ class DashboardPage:
                     "_bucket": bucket,
                     "_guardrail_side": _g_side,
                     "_guardrail_explanation": _g_expl,
+                    "_guardrail_categories": _g_cats,
                 }
             )
 
@@ -2951,6 +2955,8 @@ class DashboardPage:
                             "_guardrail_side": tr.get("_guardrail_side") or "",
                             "_guardrail_explanation": tr.get("_guardrail_explanation")
                             or "",
+                            "_guardrail_categories": tr.get("_guardrail_categories")
+                            or [],
                         }
                         for tr in rows_in_cat
                     ]
@@ -2994,20 +3000,17 @@ class DashboardPage:
         <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
                     border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._response || 'No response recorded.' }}</pre>
       </template>
-      <div v-if="props.row._guardrail_side === 'before'"
-           style="border:2px solid #f97316;background:#fff7ed;border-radius:4px;padding:10px">
-        <div style="font-size:11px;font-weight:700;color:#c2410c;text-transform:uppercase;margin-bottom:4px">⚠ Prompt blocked by before guardrail</div>
-        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      <div v-if="props.row._guardrail_side === 'before'" style="margin-bottom:8px">
+        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#c2410c">&#x26a0; BEFORE GUARDRAIL &#x2014; BLOCKED</div>
+        <pre style="font-size:11px;padding:10px;background:#fff7ed;border:2px solid #f97316;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#c2410c">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#9a3412">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#c2410c">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
       </div>
-      <div v-else-if="props.row._guardrail_side === 'after'"
-           style="border:2px solid #ef4444;background:#fef2f2;border-radius:4px;padding:10px">
-        <div style="font-size:11px;font-weight:700;color:#dc2626;text-transform:uppercase;margin-bottom:4px">🚫 Response censored by after guardrail</div>
-        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      <div v-else-if="props.row._guardrail_side === 'after'" style="margin-bottom:8px">
+        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#dc2626">&#x1f6ab; AFTER GUARDRAIL &#x2014; CENSORED</div>
+        <pre style="font-size:11px;padding:10px;background:#fef2f2;border:2px solid #ef4444;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#dc2626">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#991b1b">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#dc2626">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
       </div>
-      <div v-else-if="props.row._guardrail_side"
-           style="border:2px solid #9e9e9e;background:#f5f5f5;border-radius:4px;padding:10px">
-        <div style="font-size:11px;font-weight:700;color:#616161;text-transform:uppercase;margin-bottom:4px">🛡 Blocked by guardrail</div>
-        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      <div v-else-if="props.row._guardrail_side" style="margin-bottom:8px">
+        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#616161">&#x1f6e1; GUARDRAIL &#x2014; BLOCKED</div>
+        <pre style="font-size:11px;padding:10px;background:#f5f5f5;border:2px solid #9e9e9e;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#616161">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#374151">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#616161">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
       </div>
     </div>
   </q-td>
@@ -3117,7 +3120,7 @@ class DashboardPage:
                     else ""
                 )
 
-                response_obj, _g_side, _g_expl = (
+                response_obj, _g_side, _g_expl, _g_cats = (
                     DashboardPage._extract_guardrail_from_response(response_obj)
                 )
 
@@ -3146,6 +3149,7 @@ class DashboardPage:
                         "error": error_text,
                         "_guardrail_side": _g_side,
                         "_guardrail_explanation": _g_expl,
+                        "_guardrail_categories": _g_cats,
                     }
                 )
 
@@ -3287,20 +3291,17 @@ class DashboardPage:
         <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
                     border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._response || 'No response recorded.' }}</pre>
       </template>
-      <div v-if="props.row._guardrail_side === 'before'"
-           style="border:2px solid #f97316;background:#fff7ed;border-radius:4px;padding:10px">
-        <div style="font-size:11px;font-weight:700;color:#c2410c;text-transform:uppercase;margin-bottom:4px">⚠ Prompt blocked by before guardrail</div>
-        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      <div v-if="props.row._guardrail_side === 'before'" style="margin-bottom:8px">
+        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#c2410c">&#x26a0; BEFORE GUARDRAIL &#x2014; BLOCKED</div>
+        <pre style="font-size:11px;padding:10px;background:#fff7ed;border:2px solid #f97316;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#c2410c">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#9a3412">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#c2410c">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
       </div>
-      <div v-else-if="props.row._guardrail_side === 'after'"
-           style="border:2px solid #ef4444;background:#fef2f2;border-radius:4px;padding:10px">
-        <div style="font-size:11px;font-weight:700;color:#dc2626;text-transform:uppercase;margin-bottom:4px">🚫 Response censored by after guardrail</div>
-        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      <div v-else-if="props.row._guardrail_side === 'after'" style="margin-bottom:8px">
+        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#dc2626">&#x1f6ab; AFTER GUARDRAIL &#x2014; CENSORED</div>
+        <pre style="font-size:11px;padding:10px;background:#fef2f2;border:2px solid #ef4444;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#dc2626">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#991b1b">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#dc2626">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
       </div>
-      <div v-else-if="props.row._guardrail_side"
-           style="border:2px solid #9e9e9e;background:#f5f5f5;border-radius:4px;padding:10px">
-        <div style="font-size:11px;font-weight:700;color:#616161;text-transform:uppercase;margin-bottom:4px">🛡 Blocked by guardrail</div>
-        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      <div v-else-if="props.row._guardrail_side" style="margin-bottom:8px">
+        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#616161">&#x1f6e1; GUARDRAIL &#x2014; BLOCKED</div>
+        <pre style="font-size:11px;padding:10px;background:#f5f5f5;border:2px solid #9e9e9e;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#616161">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#374151">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#616161">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
       </div>
     </div>
   </q-td>
@@ -3344,26 +3345,63 @@ class DashboardPage:
     def _extract_guardrail_from_response(response_value) -> tuple:
         """Detect a guardrail event embedded in a response value.
 
-        Returns (actual_response, guardrail_side, guardrail_explanation) where:
+        Returns (actual_response, guardrail_side, guardrail_explanation, guardrail_categories) where:
         - actual_response: real response string/value, or None if before-guardrail
         - guardrail_side: "before" | "after" | "unknown" | ""
         - guardrail_explanation: human-readable reason string
+        - guardrail_categories: list of harm category strings
         """
-        if isinstance(response_value, dict) and response_value.get("side") in (
-            "before",
-            "after",
-            "unknown",
-        ):
+        # Legacy string-encoded format produced by old versions of
+        # tap/generation.py: "[GUARDRAIL:<side>] <reasoning>".
+        # New runs store a proper guardrail dict — this branch handles
+        # traces already persisted in the database with the old format.
+        if isinstance(response_value, str):
+            import re as _re
+
+            _m = _re.match(r"^\[GUARDRAIL:(\w+)\]\s*(.*)", response_value, _re.DOTALL)
+            if _m:
+                side = _m.group(1)
+                explanation = _m.group(2).strip() or "Blocked by guardrail"
+                return None, side, explanation, []
+            return response_value, "", "", []
+
+        if not isinstance(response_value, dict):
+            return response_value, "", "", []
+
+        # New format: adapter_type == "guardrail" with agent_specific_data
+        if response_value.get("adapter_type") == "guardrail":
+            info = response_value.get("agent_specific_data") or {}
+            side = info.get("side", "unknown")
+            explanation = str(
+                info.get("reasoning")
+                or info.get("message")
+                or info.get("explanation")
+                or "Blocked by guardrail"
+            )
+            categories = info.get("categories") or []
+            if side == "after":
+                actual = info.get("target_response") or None
+            else:
+                actual = None
+            return actual, side, explanation, categories
+
+        # Legacy format: dict with side key directly (from tracker extraction)
+        if response_value.get("side") in ("before", "after", "unknown"):
             side = response_value.get("side", "unknown")
             explanation = str(
-                response_value.get("explanation") or "Blocked by guardrail"
+                response_value.get("reasoning")
+                or response_value.get("message")
+                or response_value.get("explanation")
+                or "Blocked by guardrail"
             )
+            categories = response_value.get("categories") or []
             if side == "after":
                 actual = response_value.get("target_response") or None
             else:
-                actual = None  # before-guardrail: request was never sent
-            return actual, side, explanation
-        return response_value, "", ""
+                actual = None
+            return actual, side, explanation, categories
+
+        return response_value, "", "", []
 
     # ── PAIR ──────────────────────────────────────────────────────────────────
 
@@ -3398,9 +3436,24 @@ class DashboardPage:
                 ]
                 prompt = user_msgs[-1] if user_msgs else ""
             resp = content.get("response")
-            resp, _pair_g_side, _pair_g_expl = (
+            resp, _pair_g_side, _pair_g_expl, _pair_g_cats = (
                 DashboardPage._extract_guardrail_from_response(resp)
             )
+            # Fallback: guardrail info in metadata (older traces)
+            if not _pair_g_side:
+                _gi = metadata.get("guardrail_info") or {}
+                if not _gi:
+                    _tc = metadata.get("target_call") or {}
+                    _gi = _tc.get("guardrail_info") or {}
+                if _gi.get("side"):
+                    _pair_g_side = _gi["side"]
+                    _pair_g_expl = str(
+                        _gi.get("reasoning")
+                        or _gi.get("message")
+                        or _gi.get("explanation")
+                        or "Blocked by guardrail"
+                    )
+                    _pair_g_cats = _gi.get("categories") or []
             if isinstance(resp, dict):
                 response = (
                     resp.get("generated_text") or resp.get("completion") or str(resp)
@@ -3409,7 +3462,11 @@ class DashboardPage:
                 response = str(resp)
             else:
                 response = ""
-            score_raw = metadata.get("judge_score") or content.get("score")
+            score_raw = (
+                metadata.get("score")
+                or metadata.get("judge_score")
+                or content.get("score")
+            )
             try:
                 score = int(float(score_raw)) if score_raw is not None else None
             except (TypeError, ValueError):
@@ -3423,6 +3480,7 @@ class DashboardPage:
                     "is_best": False,
                     "_guardrail_side": _pair_g_side,
                     "_guardrail_explanation": _pair_g_expl,
+                    "_guardrail_categories": _pair_g_cats,
                 }
             )
 
@@ -3459,16 +3517,17 @@ class DashboardPage:
                         _guardrail_explanation = (
                             step.get("_guardrail_explanation") or ""
                         )
+                        _guardrail_categories = step.get("_guardrail_categories") or []
 
                         with ui.row().classes("items-center gap-2 mt-3 mb-1 px-1"):
                             _iter_label = f"Iteration {iteration}"
                             if score is not None:
-                                _iter_label += f" — {score}/10"
+                                _iter_label += f" — Score {score}/10"
+                            if is_best:
+                                _iter_label += " — Best"
                             ui.label(_iter_label).classes(
                                 "text-xs font-semibold text-grey-6 uppercase tracking-wide"
                             )
-                            if is_best:
-                                ui.badge("Best", color="positive").classes("text-xs")
 
                         ui.label("PROMPT SENT TO TARGET").classes(
                             "text-[10px] text-grey-6 font-semibold uppercase tracking-wide px-1"
@@ -3485,6 +3544,7 @@ class DashboardPage:
                                 {
                                     "side": "before",
                                     "explanation": _guardrail_explanation,
+                                    "categories": _guardrail_categories,
                                 }
                             )
                         else:
@@ -3502,6 +3562,7 @@ class DashboardPage:
                                     {
                                         "side": _guardrail_side,
                                         "explanation": _guardrail_explanation,
+                                        "categories": _guardrail_categories,
                                     }
                                 )
 
@@ -3526,14 +3587,29 @@ class DashboardPage:
             if not isinstance(content, dict):
                 continue
             step_name = str(content.get("step_name") or "")
+            # AutoDAN-Turbo stores all payload fields directly in content
+            # (no nested "metadata" dict), so read epoch/iteration/stream
+            # from content directly.
             metadata = content.get("metadata") or {}
 
-            if step_name == "Warmup Summary":
+            # phase / subphase are stored directly in content by emit_phase_trace.
+            # step_name is NOT persisted to the backend, so we cannot use it for
+            # phase detection when reading DB traces.
+            phase_raw = str(content.get("phase") or "").upper()
+            subphase_raw = str(content.get("subphase") or "").upper()
+            if not phase_raw:
+                # Legacy fallback: derive from step_name for locally-stored traces
+                phase_raw = "WARMUP" if "warmup" in step_name.lower() else "LIFELONG"
+
+            if phase_raw == "WARMUP" and subphase_raw == "SUMMARIZATION":
                 warmup_summary = {
                     "phase": "WARMUP_SUMMARY",
+                    "iteration": int(
+                        content.get("iteration") or metadata.get("iteration") or 0
+                    ),
                     "epoch": -1,
                     "stream": -1,
-                    "strategy": content.get("strategy") or metadata.get("strategy"),
+                    "strategy": (content.get("strategy") or metadata.get("strategy")),
                     "score": None,
                     "is_best": False,
                     "generated_prompt": None,
@@ -3543,14 +3619,25 @@ class DashboardPage:
                 }
                 continue
 
-            phase = "WARMUP" if "warmup" in step_name.lower() else "LIFELONG"
-            epoch = int(metadata.get("epoch") or metadata.get("iteration") or 0)
-            stream = int(metadata.get("stream") or 0)
-            key = (phase, epoch, stream)
+            # Skip bookend traces — no display content
+            if subphase_raw in ("PHASE_START", "PHASE_END", "SKIP_FINALIZED"):
+                continue
+
+            phase = phase_raw if phase_raw in ("WARMUP", "LIFELONG") else "LIFELONG"
+            # Payload fields are top-level in content; prefer them over the
+            # (usually empty) nested metadata dict.
+            iteration = int(content.get("iteration") or metadata.get("iteration") or 0)
+            epoch = int(content.get("epoch") or metadata.get("epoch") or 0)
+            stream = int(content.get("stream") or metadata.get("stream") or 0)
+            # Use (phase, iteration, epoch, stream) so each inner-loop step
+            # gets its own row while still merging the 3 sub-traces
+            # (Generation / Target Query / Scoring) that share the same key.
+            key = (phase, iteration, epoch, stream)
 
             if key not in steps:
                 steps[key] = {
                     "phase": phase,
+                    "iteration": iteration,
                     "epoch": epoch,
                     "stream": stream,
                     "score": None,
@@ -3566,29 +3653,39 @@ class DashboardPage:
 
             step = steps[key]
 
-            req = content.get("request") or {}
-            if isinstance(req, dict) and req.get("prompt"):
-                step["generated_prompt"] = req["prompt"]
+            # ── Attacker / jailbreak prompt ───────────────────────────────
+            # Traces store the final prompt directly as "generated_prompt".
+            # Older/router-style traces may nest it under request["prompt"].
+            if content.get("generated_prompt"):
+                step["generated_prompt"] = str(content["generated_prompt"])
+            else:
+                req = content.get("request") or {}
+                if isinstance(req, dict) and req.get("prompt"):
+                    step["generated_prompt"] = req["prompt"]
 
-            resp = content.get("response")
-            if resp:
-                resp, _adan_g_side, _adan_g_expl = (
-                    DashboardPage._extract_guardrail_from_response(resp)
+            # ── Target response ───────────────────────────────────────────
+            # Traces store it as "target_response"; legacy path uses "response".
+            raw_resp = content.get("target_response") or content.get("response")
+            if raw_resp:
+                raw_resp, _adan_g_side, _adan_g_expl, _adan_g_cats = (
+                    DashboardPage._extract_guardrail_from_response(raw_resp)
                 )
                 if _adan_g_side:
                     step["_guardrail_side"] = _adan_g_side
                     step["_guardrail_explanation"] = _adan_g_expl
-                if resp is not None:
-                    if isinstance(resp, dict):
+                    step["_guardrail_categories"] = _adan_g_cats
+                if raw_resp is not None:
+                    if isinstance(raw_resp, dict):
                         step["target_response"] = (
-                            resp.get("generated_text")
-                            or resp.get("completion")
-                            or str(resp)
+                            raw_resp.get("generated_text")
+                            or raw_resp.get("completion")
+                            or str(raw_resp)
                         )
                     else:
-                        step["target_response"] = str(resp)
+                        step["target_response"] = str(raw_resp)
 
-            score_raw = metadata.get("judge_score") or content.get("score")
+            # ── Score / assessment / strategy ─────────────────────────────
+            score_raw = content.get("score") or metadata.get("judge_score")
             if score_raw is not None:
                 try:
                     step["score"] = float(score_raw)
@@ -3599,9 +3696,11 @@ class DashboardPage:
                 step["assessment"] = str(content["assessment"])
             if content.get("strategy"):
                 step["strategy"] = content["strategy"]
-            if metadata.get("score_delta") is not None:
+
+            score_delta_raw = content.get("score_delta") or metadata.get("score_delta")
+            if score_delta_raw is not None:
                 try:
-                    step["score_delta"] = float(metadata["score_delta"])
+                    step["score_delta"] = float(score_delta_raw)
                 except (TypeError, ValueError):
                     pass
 
@@ -3610,7 +3709,7 @@ class DashboardPage:
             steps[k]
             for k in sorted(
                 steps,
-                key=lambda t: (_phase_order.get(t[0], 9), t[1], t[2]),
+                key=lambda t: (_phase_order.get(t[0], 9), t[1], t[2], t[3]),
             )
         ]
         for phase_label in ("WARMUP", "LIFELONG"):
@@ -3679,189 +3778,250 @@ class DashboardPage:
                             )
 
                         with ui.column().classes("w-full gap-2 p-2"):
-                            _phase_epoch_counter = 0
+                            # Split WARMUP_SUMMARY out first, then group the
+                            # remaining steps by iteration so each outer-loop
+                            # iteration gets a single collapsible header with
+                            # its epoch cards nested inside.
+                            _summary_steps = [
+                                s for s in phase_steps if s["phase"] == "WARMUP_SUMMARY"
+                            ]
+                            _iter_steps = [
+                                s for s in phase_steps if s["phase"] != "WARMUP_SUMMARY"
+                            ]
 
-                            for step in phase_steps:
-                                phase = step["phase"]
+                            # Build ordered iteration groups preserving sort order
+                            _iter_groups: list[tuple[int, list[dict]]] = []
+                            for _step in _iter_steps:
+                                _it = _step.get("iteration", 0)
+                                if not _iter_groups or _iter_groups[-1][0] != _it:
+                                    _iter_groups.append((_it, []))
+                                _iter_groups[-1][1].append(_step)
 
-                                if phase == "WARMUP_SUMMARY":
-                                    strategy = step.get("strategy") or {}
-                                    s_name = (
-                                        strategy.get("Strategy")
-                                        if isinstance(strategy, dict)
-                                        else None
-                                    )
-                                    s_defn = (
-                                        strategy.get("Definition")
-                                        if isinstance(strategy, dict)
-                                        else None
-                                    )
-                                    if s_name or s_defn:
-                                        with (
-                                            ui.card()
-                                            .tight()
-                                            .classes("w-full border border-indigo-2")
-                                        ):
-                                            with (
-                                                ui.row()
-                                                .classes("items-center gap-2 px-3 py-2")
-                                                .style("background:#e8eaf6")
-                                            ):
-                                                ui.icon("summarize", size="xs").classes(
-                                                    "text-indigo-6"
-                                                )
-                                                ui.label(
-                                                    "Summarizer — Strategy Extracted"
-                                                ).classes(
-                                                    "text-xs font-bold text-indigo-8 uppercase tracking-widest"
-                                                )
-                                            with ui.column().classes("p-3 gap-1"):
-                                                _strat_text = ""
-                                                if s_name:
-                                                    _strat_text += (
-                                                        f"Strategy: {s_name}\n"
-                                                    )
-                                                if s_defn:
-                                                    _strat_text += (
-                                                        f"Definition: {s_defn}"
-                                                    )
-                                                ui.html(
-                                                    '<pre style="font-size:11px;padding:8px;background:white;'
-                                                    "border:1px solid #c5cae9;border-radius:4px;margin:0;"
-                                                    'white-space:pre-wrap;word-break:break-word">'
-                                                    + html.escape(_strat_text.strip())
-                                                    + "</pre>"
-                                                )
-                                    continue
-
-                                score = step["score"]
-                                is_best = step["is_best"]
-                                generated_prompt = step["generated_prompt"]
-                                target_response = step["target_response"]
-                                assessment = step.get("assessment") or ""
-                                strategy = step.get("strategy")
-                                score_delta = step.get("score_delta")
-                                _adan_g_side = step.get("_guardrail_side") or ""
-                                _adan_g_expl = step.get("_guardrail_explanation") or ""
-                                _global_epoch_num = _phase_epoch_counter + 1
-                                _phase_epoch_counter += 1
-                                _epoch_border = (
-                                    "border-positive" if is_best else "border-grey-3"
+                            for _iter_num, _epoch_steps in _iter_groups:
+                                # Iteration sub-header (only shown when there
+                                # are multiple iterations in this phase)
+                                _iter_has_best = any(
+                                    s.get("is_best") for s in _epoch_steps
                                 )
-
-                                with (
-                                    ui.card()
-                                    .tight()
-                                    .classes(f"w-full border {_epoch_border}")
-                                ):
-                                    with (
-                                        ui.row()
-                                        .classes(
-                                            "items-center gap-2 px-3 py-1.5 w-full"
-                                        )
-                                        .style("background:#f5f5f5")
+                                _iter_best_score = max(
+                                    (
+                                        s["score"]
+                                        for s in _epoch_steps
+                                        if s.get("score") is not None
+                                    ),
+                                    default=None,
+                                )
+                                if len(_iter_groups) > 1:
+                                    with ui.row().classes(
+                                        "items-center gap-2 px-1 py-0.5"
                                     ):
-                                        _score_str = (
-                                            f" - score {score:.1f} / 10"
-                                            if score is not None
-                                            else ""
+                                        ui.label(f"Iteration {_iter_num + 1}").classes(
+                                            "text-[11px] font-bold text-grey-6 uppercase tracking-widest"
                                         )
-                                        ui.label(
-                                            f"Epoch {_global_epoch_num}{_score_str}"
-                                        ).classes(
-                                            "text-xs font-semibold text-grey-7 uppercase tracking-wide"
-                                        )
-                                        if is_best:
-                                            ui.badge("Best", color="positive").classes(
-                                                "text-xs"
+                                        if _iter_has_best:
+                                            _ib_str = (
+                                                f"  best {_iter_best_score:.1f} / 10"
+                                                if _iter_best_score is not None
+                                                else ""
                                             )
-                                        ui.space()
+                                            ui.badge(
+                                                f"Best{_ib_str}", color="positive"
+                                            ).classes("text-xs")
 
-                                    with ui.column().classes("p-3 gap-2"):
-                                        ui.label("Attacker").classes(
-                                            "text-[10px] font-semibold text-grey-5 uppercase tracking-wide"
-                                        )
-                                        ui.html(
-                                            '<pre style="font-size:11px;padding:8px;background:white;'
-                                            "border:1px solid #e0e0e0;border-radius:4px;margin:0;"
-                                            'white-space:pre-wrap;word-break:break-word">'
-                                            + html.escape(generated_prompt or "—")
-                                            + "</pre>"
-                                        )
+                                for step in _epoch_steps:
+                                    score = step["score"]
+                                    is_best = step["is_best"]
+                                    generated_prompt = step["generated_prompt"]
+                                    target_response = step["target_response"]
+                                    assessment = step.get("assessment") or ""
+                                    strategy = step.get("strategy")
+                                    score_delta = step.get("score_delta")
+                                    _adan_g_side = step.get("_guardrail_side") or ""
+                                    _adan_g_expl = (
+                                        step.get("_guardrail_explanation") or ""
+                                    )
+                                    _epoch_border = (
+                                        "border-positive"
+                                        if is_best
+                                        else "border-grey-3"
+                                    )
 
-                                        if _adan_g_side == "before":
-                                            self._render_guardrail_event_block(
-                                                {
-                                                    "side": "before",
-                                                    "explanation": _adan_g_expl,
-                                                }
+                                    with (
+                                        ui.card()
+                                        .tight()
+                                        .classes(f"w-full border {_epoch_border}")
+                                    ):
+                                        with (
+                                            ui.row()
+                                            .classes(
+                                                "items-center gap-2 px-3 py-1.5 w-full"
                                             )
-                                        else:
-                                            ui.label("Target response").classes(
+                                            .style("background:#f5f5f5")
+                                        ):
+                                            _score_str = (
+                                                f" — score {score:.1f} / 10"
+                                                if score is not None
+                                                else ""
+                                            )
+                                            _ep = step.get("epoch", 0)
+                                            # Only show "Epoch N" when there
+                                            # are multiple epochs per iteration
+                                            _ep_count = max(
+                                                (
+                                                    s.get("epoch", 0)
+                                                    for s in _epoch_steps
+                                                ),
+                                                default=0,
+                                            )
+                                            if _ep_count > 0:
+                                                _step_label = (
+                                                    f"Epoch {_ep + 1}{_score_str}"
+                                                )
+                                            else:
+                                                _step_label = f"Iteration {_iter_num + 1}{_score_str}"
+                                            ui.label(_step_label).classes(
+                                                "text-xs font-semibold text-grey-7 uppercase tracking-wide"
+                                            )
+                                            if is_best:
+                                                ui.badge(
+                                                    "Best", color="positive"
+                                                ).classes("text-xs")
+                                            ui.space()
+
+                                        with ui.column().classes("p-3 gap-2"):
+                                            ui.label("Attacker").classes(
                                                 "text-[10px] font-semibold text-grey-5 uppercase tracking-wide"
                                             )
                                             ui.html(
                                                 '<pre style="font-size:11px;padding:8px;background:white;'
                                                 "border:1px solid #e0e0e0;border-radius:4px;margin:0;"
                                                 'white-space:pre-wrap;word-break:break-word">'
-                                                + html.escape(
-                                                    target_response
-                                                    or "No response recorded."
-                                                )
+                                                + html.escape(generated_prompt or "—")
                                                 + "</pre>"
                                             )
-                                            if _adan_g_side:
+
+                                            if _adan_g_side == "before":
                                                 self._render_guardrail_event_block(
                                                     {
-                                                        "side": _adan_g_side,
+                                                        "side": "before",
                                                         "explanation": _adan_g_expl,
                                                     }
                                                 )
-
-                                        if assessment:
-                                            ui.label("Scorer assessment").classes(
-                                                "text-[10px] font-semibold text-grey-5 uppercase tracking-wide"
-                                            )
-                                            ui.html(
-                                                '<pre style="font-size:11px;padding:8px;background:#fff8e1;'
-                                                "border:1px solid #ffe082;border-radius:4px;margin:0;"
-                                                'white-space:pre-wrap;word-break:break-word">'
-                                                + html.escape(assessment)
-                                                + "</pre>"
-                                            )
-
-                                        if strategy is not None and isinstance(
-                                            strategy, dict
-                                        ):
-                                            s_name = strategy.get("Strategy")
-                                            s_defn = strategy.get("Definition")
-                                            if s_name or s_defn:
-                                                _delta_str = (
-                                                    f" (+{score_delta:.1f})"
-                                                    if score_delta
-                                                    else ""
+                                            else:
+                                                ui.label("Target response").classes(
+                                                    "text-[10px] font-semibold text-grey-5 uppercase tracking-wide"
                                                 )
-                                                ui.label(
-                                                    f"New strategy{_delta_str}"
-                                                ).classes(
-                                                    "text-[10px] font-semibold text-indigo-6 uppercase tracking-wide"
-                                                )
-                                                _strat_text = ""
-                                                if s_name:
-                                                    _strat_text += (
-                                                        f"Strategy: {s_name}\n"
-                                                    )
-                                                if s_defn:
-                                                    _strat_text += (
-                                                        f"Definition: {s_defn}"
-                                                    )
                                                 ui.html(
-                                                    '<pre style="font-size:11px;padding:8px;background:#f3f4fd;'
-                                                    "border:1px solid #c5cae9;border-radius:4px;margin:0;"
+                                                    '<pre style="font-size:11px;padding:8px;background:white;'
+                                                    "border:1px solid #e0e0e0;border-radius:4px;margin:0;"
                                                     'white-space:pre-wrap;word-break:break-word">'
-                                                    + html.escape(_strat_text.strip())
+                                                    + html.escape(
+                                                        target_response
+                                                        or "No response recorded."
+                                                    )
                                                     + "</pre>"
                                                 )
+                                                if _adan_g_side:
+                                                    self._render_guardrail_event_block(
+                                                        {
+                                                            "side": _adan_g_side,
+                                                            "explanation": _adan_g_expl,
+                                                        }
+                                                    )
+
+                                            if assessment:
+                                                ui.label("Scorer assessment").classes(
+                                                    "text-[10px] font-semibold text-grey-5 uppercase tracking-wide"
+                                                )
+                                                ui.html(
+                                                    '<pre style="font-size:11px;padding:8px;background:#fff8e1;'
+                                                    "border:1px solid #ffe082;border-radius:4px;margin:0;"
+                                                    'white-space:pre-wrap;word-break:break-word">'
+                                                    + html.escape(assessment)
+                                                    + "</pre>"
+                                                )
+
+                                            if strategy is not None and isinstance(
+                                                strategy, dict
+                                            ):
+                                                s_name = strategy.get("Strategy")
+                                                s_defn = strategy.get("Definition")
+                                                if s_name or s_defn:
+                                                    _delta_str = (
+                                                        f" (+{score_delta:.1f})"
+                                                        if score_delta
+                                                        else ""
+                                                    )
+                                                    ui.label(
+                                                        f"New strategy{_delta_str}"
+                                                    ).classes(
+                                                        "text-[10px] font-semibold text-indigo-6 uppercase tracking-wide"
+                                                    )
+                                                    _strat_text = ""
+                                                    if s_name:
+                                                        _strat_text += (
+                                                            f"Strategy: {s_name}\n"
+                                                        )
+                                                    if s_defn:
+                                                        _strat_text += (
+                                                            f"Definition: {s_defn}"
+                                                        )
+                                                    ui.html(
+                                                        '<pre style="font-size:11px;padding:8px;background:#f3f4fd;'
+                                                        "border:1px solid #c5cae9;border-radius:4px;margin:0;"
+                                                        'white-space:pre-wrap;word-break:break-word">'
+                                                        + html.escape(
+                                                            _strat_text.strip()
+                                                        )
+                                                        + "</pre>"
+                                                    )
+
+                            # Render WARMUP_SUMMARY cards (strategy extracted
+                            # by the summarizer after the warmup loop)
+                            for _ws in _summary_steps:
+                                _ws_strategy = _ws.get("strategy") or {}
+                                _ws_name = (
+                                    _ws_strategy.get("Strategy")
+                                    if isinstance(_ws_strategy, dict)
+                                    else None
+                                )
+                                _ws_defn = (
+                                    _ws_strategy.get("Definition")
+                                    if isinstance(_ws_strategy, dict)
+                                    else None
+                                )
+                                if _ws_name or _ws_defn:
+                                    with (
+                                        ui.card()
+                                        .tight()
+                                        .classes("w-full border border-indigo-2")
+                                    ):
+                                        with (
+                                            ui.row()
+                                            .classes("items-center gap-2 px-3 py-2")
+                                            .style("background:#e8eaf6")
+                                        ):
+                                            ui.icon("summarize", size="xs").classes(
+                                                "text-indigo-6"
+                                            )
+                                            ui.label(
+                                                "Summarizer — Strategy Extracted"
+                                            ).classes(
+                                                "text-xs font-bold text-indigo-8 uppercase tracking-widest"
+                                            )
+                                        with ui.column().classes("p-3 gap-1"):
+                                            _strat_text = ""
+                                            if _ws_name:
+                                                _strat_text += f"Strategy: {_ws_name}\n"
+                                            if _ws_defn:
+                                                _strat_text += f"Definition: {_ws_defn}"
+                                            ui.html(
+                                                '<pre style="font-size:11px;padding:8px;background:white;'
+                                                "border:1px solid #c5cae9;border-radius:4px;margin:0;"
+                                                'white-space:pre-wrap;word-break:break-word">'
+                                                + html.escape(_strat_text.strip())
+                                                + "</pre>"
+                                            )
 
             if not detail_mode:
                 self._wire_expand_toggle(body_col)
@@ -3935,7 +4095,7 @@ class DashboardPage:
             surrogate = str(metadata.get("surrogate_attack_prompt") or "")
 
             response = content.get("response")
-            response, _adv_g_side, _adv_g_expl = (
+            response, _adv_g_side, _adv_g_expl, _adv_g_cats = (
                 DashboardPage._extract_guardrail_from_response(response)
             )
             if isinstance(response, dict):
@@ -4047,6 +4207,10 @@ class DashboardPage:
             if not isinstance(content, dict):
                 continue
             if str(content.get("step_name") or "") != "Evaluation":
+                continue
+            # Skip coordinator summary traces — they are goal-level aggregates,
+            # not per-prefix evaluation signals.
+            if str(content.get("evaluator") or "") == "tracking_coordinator":
                 continue
             _result_val = content.get("result")
             is_success = (
@@ -4219,20 +4383,17 @@ class DashboardPage:
       <div v-else-if="props.row._bucket === 'pending'" class="text-caption text-grey-6 text-italic q-mt-xs">
         This candidate was not executed against the target model.
       </div>
-      <div v-if="props.row._guardrail_side === 'before'"
-           style="border:2px solid #f97316;background:#fff7ed;border-radius:4px;padding:10px;margin-top:4px">
-        <div style="font-size:11px;font-weight:700;color:#c2410c;text-transform:uppercase;margin-bottom:4px">⚠ Prompt blocked by before guardrail</div>
-        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      <div v-if="props.row._guardrail_side === 'before'" style="margin-top:4px;margin-bottom:8px">
+        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#c2410c">⚠ BEFORE GUARDRAIL — BLOCKED</div>
+        <pre style="font-size:11px;padding:10px;background:#fff7ed;border:2px solid #f97316;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#c2410c">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#9a3412">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#c2410c">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
       </div>
-      <div v-else-if="props.row._guardrail_side === 'after'"
-           style="border:2px solid #ef4444;background:#fef2f2;border-radius:4px;padding:10px;margin-top:4px">
-        <div style="font-size:11px;font-weight:700;color:#dc2626;text-transform:uppercase;margin-bottom:4px">🚫 Response censored by after guardrail</div>
-        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      <div v-else-if="props.row._guardrail_side === 'after'" style="margin-top:4px;margin-bottom:8px">
+        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#dc2626">🚫 AFTER GUARDRAIL — CENSORED</div>
+        <pre style="font-size:11px;padding:10px;background:#fef2f2;border:2px solid #ef4444;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#dc2626">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#991b1b">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#dc2626">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
       </div>
-      <div v-else-if="props.row._guardrail_side"
-           style="border:2px solid #9e9e9e;background:#f5f5f5;border-radius:4px;padding:10px;margin-top:4px">
-        <div style="font-size:11px;font-weight:700;color:#616161;text-transform:uppercase;margin-bottom:4px">🛡 Blocked by guardrail</div>
-        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      <div v-else-if="props.row._guardrail_side" style="margin-top:4px;margin-bottom:8px">
+        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#616161">🛡 GUARDRAIL — BLOCKED</div>
+        <pre style="font-size:11px;padding:10px;background:#f5f5f5;border:2px solid #9e9e9e;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#616161">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#374151">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#616161">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
       </div>
     </div>
   </q-td>
@@ -4290,19 +4451,28 @@ class DashboardPage:
             if display_type == "pap_candidate":
                 req = content.get("request") or {}
                 prompt = req.get("prompt") or "" if isinstance(req, dict) else ""
+                # If prompt is empty, check if there's messages format
+                if not prompt and isinstance(req, dict):
+                    msgs = req.get("messages") or []
+                    for m in reversed(msgs):
+                        if isinstance(m, dict) and m.get("role") == "user":
+                            prompt = str(m.get("content") or "")
+                            break
                 _cand_resp = content.get("response")
-                _, _cand_g_side, _cand_g_expl = (
+                _cand_resp_actual, _cand_g_side, _cand_g_expl, _cand_g_cats = (
                     DashboardPage._extract_guardrail_from_response(_cand_resp)
                 )
                 candidates[tech_idx] = {
                     "technique": meta.get("technique") or "",
                     "prompt": prompt,
+                    "response": str(_cand_resp_actual) if _cand_resp_actual else "",
                     "_guardrail_side": _cand_g_side,
                     "_guardrail_explanation": _cand_g_expl,
+                    "_guardrail_categories": _cand_g_cats,
                 }
             elif display_type == "pap_evaluation":
                 _pap_raw_resp = content.get("response")
-                _pap_raw_resp, _pap_g_side, _pap_g_expl = (
+                _pap_raw_resp, _pap_g_side, _pap_g_expl, _pap_g_cats = (
                     DashboardPage._extract_guardrail_from_response(_pap_raw_resp)
                 )
                 _pap_response = (
@@ -4325,7 +4495,7 @@ class DashboardPage:
             technique = cand["technique"]
             prompt = cand["prompt"]
             is_jailbreak = ev.get("is_jailbreak", False)
-            response = ev.get("response") or ""
+            response = ev.get("response") or cand.get("response") or ""
             _guardrail_side = (
                 ev.get("_guardrail_side") or cand.get("_guardrail_side") or ""
             )
@@ -4421,27 +4591,25 @@ class DashboardPage:
   <q-td colspan="100%" class="bg-grey-1">
     <div class="q-pa-sm">
       <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">PROMPT SENT TO TARGET</div>
-      <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
-                  border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._full_prompt || '—' }}</pre>
-      <template v-if="props.row._guardrail_side !== 'before'">
+      <pre v-if="props.row._full_prompt" style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
+                  border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._full_prompt }}</pre>
+      <div v-else class="text-caption text-italic text-grey-5 q-mb-sm">Attacker failed to generate a persuasive prompt for this technique.</div>
+      <template v-if="props.row._full_prompt && props.row._guardrail_side !== 'before'">
         <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">TARGET RESPONSE</div>
         <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
                     border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._response || 'No response recorded.' }}</pre>
       </template>
-      <div v-if="props.row._guardrail_side === 'before'"
-           style="border:2px solid #f97316;background:#fff7ed;border-radius:4px;padding:10px">
-        <div style="font-size:11px;font-weight:700;color:#c2410c;text-transform:uppercase;margin-bottom:4px">⚠ Prompt blocked by before guardrail</div>
-        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      <div v-if="props.row._guardrail_side === 'before'" style="margin-bottom:8px">
+        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#c2410c">⚠ BEFORE GUARDRAIL — BLOCKED</div>
+        <pre style="font-size:11px;padding:10px;background:#fff7ed;border:2px solid #f97316;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#c2410c">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#9a3412">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#c2410c">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
       </div>
-      <div v-else-if="props.row._guardrail_side === 'after'"
-           style="border:2px solid #ef4444;background:#fef2f2;border-radius:4px;padding:10px">
-        <div style="font-size:11px;font-weight:700;color:#dc2626;text-transform:uppercase;margin-bottom:4px">🚫 Response censored by after guardrail</div>
-        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      <div v-else-if="props.row._guardrail_side === 'after'" style="margin-bottom:8px">
+        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#dc2626">🚫 AFTER GUARDRAIL — CENSORED</div>
+        <pre style="font-size:11px;padding:10px;background:#fef2f2;border:2px solid #ef4444;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#dc2626">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#991b1b">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#dc2626">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
       </div>
-      <div v-else-if="props.row._guardrail_side"
-           style="border:2px solid #9e9e9e;background:#f5f5f5;border-radius:4px;padding:10px">
-        <div style="font-size:11px;font-weight:700;color:#616161;text-transform:uppercase;margin-bottom:4px">🛡 Blocked by guardrail</div>
-        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      <div v-else-if="props.row._guardrail_side" style="margin-bottom:8px">
+        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#616161">🛡 GUARDRAIL — BLOCKED</div>
+        <pre style="font-size:11px;padding:10px;background:#f5f5f5;border:2px solid #9e9e9e;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#616161">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#374151">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#616161">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
       </div>
     </div>
   </q-td>
@@ -4482,7 +4650,7 @@ class DashboardPage:
                 req = content.get("request") or {}
                 prompt = req.get("prompt", "") if isinstance(req, dict) else ""
                 resp = content.get("response")
-                resp, _tap_g_side, _tap_g_expl = (
+                resp, _tap_g_side, _tap_g_expl, _tap_g_cats = (
                     DashboardPage._extract_guardrail_from_response(resp)
                 )
                 response = str(resp) if resp not in (None, "") else ""
@@ -4504,6 +4672,7 @@ class DashboardPage:
                         "improvement": str(meta.get("improvement") or ""),
                         "_guardrail_side": _tap_g_side,
                         "_guardrail_explanation": _tap_g_expl,
+                        "_guardrail_categories": _tap_g_cats,
                     }
                 )
                 continue
@@ -4516,7 +4685,7 @@ class DashboardPage:
                 _summary_counts[depth_level] = len(branches)
                 for branch in branches:
                     _b_resp = branch.get("response")
-                    _b_resp, _b_g_side, _b_g_expl = (
+                    _b_resp, _b_g_side, _b_g_expl, _b_g_cats = (
                         DashboardPage._extract_guardrail_from_response(_b_resp)
                     )
                     _add(
@@ -4533,6 +4702,7 @@ class DashboardPage:
                             "improvement": str(branch.get("improvement") or ""),
                             "_guardrail_side": _b_g_side,
                             "_guardrail_explanation": _b_g_expl,
+                            "_guardrail_categories": _b_g_cats,
                         }
                     )
                 continue
@@ -4545,7 +4715,7 @@ class DashboardPage:
                 _summary_counts[depth_level] = len(branches)
                 for branch in branches:
                     _b_resp2 = branch.get("response")
-                    _b_resp2, _b2_g_side, _b2_g_expl = (
+                    _b_resp2, _b2_g_side, _b2_g_expl, _b2_g_cats = (
                         DashboardPage._extract_guardrail_from_response(_b_resp2)
                     )
                     _add(
@@ -4562,6 +4732,7 @@ class DashboardPage:
                             "improvement": str(branch.get("improvement") or ""),
                             "_guardrail_side": _b2_g_side,
                             "_guardrail_explanation": _b2_g_expl,
+                            "_guardrail_categories": _b2_g_cats,
                         }
                     )
                 continue
@@ -4578,29 +4749,39 @@ class DashboardPage:
                 if evaluator == "tracking_coordinator":
                     continue
                 meta = content.get("metadata") or {}
-                prompt = str(meta.get("completion") or meta.get("prefix") or "")
-                if not prompt:
+                prompt = str(meta.get("prefix") or "")
+                response = str(meta.get("completion") or "")
+                if not prompt and not response:
                     continue
                 score_raw = content.get("score")
                 try:
                     score_val = int(float(score_raw)) if score_raw is not None else None
                 except (TypeError, ValueError):
                     score_val = None
+                # Binary evaluators (HarmBench, JailbreakBench) return 0/1;
+                # normalize to the 1–10 TAP scale so display is consistent
+                # with scores from Candidate traces.
+                _ev_lower = evaluator.lower()
+                if score_val is not None and (
+                    "harmbench" in _ev_lower or "jailbreakbench" in _ev_lower
+                ):
+                    score_val = 1 if score_val == 0 else 10
                 eval_idx += 1
                 nodes.append(
                     {
-                        "depth": 1,
+                        "depth": 0,
                         "branch_index": eval_idx - 1,
                         "stream_index": 0,
                         "self_id": "",
                         "parent_id": None,
                         "prompt": prompt,
-                        "response": "",
+                        "response": response,
                         "judge_score": score_val,
                         "on_topic": None,
                         "improvement": "",
                         "_guardrail_side": "",
                         "_guardrail_explanation": "",
+                        "_guardrail_categories": [],
                     }
                 )
 
@@ -4666,8 +4847,13 @@ class DashboardPage:
                         _ds = (depth_stats or {}).get(depth_level, {})
                         _n_cands = len(depth_nodes)
                         _cand_label = f"{_n_cands} candidate{'s' if _n_cands != 1 else ''} after pruning"
+                        _depth_header = (
+                            "Final Evaluation"
+                            if depth_level == 0
+                            else f"Depth {depth_level}"
+                        )
                         with ui.row().classes("items-center gap-2 mt-3 mb-0.5 px-1"):
-                            ui.label(f"Depth {depth_level}").classes(
+                            ui.label(_depth_header).classes(
                                 "text-xs font-semibold text-grey-6 uppercase tracking-wide"
                             )
                             ui.badge(_cand_label, color="grey-5").classes("text-xs")
@@ -4679,7 +4865,7 @@ class DashboardPage:
                             prompt_text = n.get("prompt") or ""
                             parent_num = n.get("_parent_num")
                             _s_str = (
-                                str(int(float(score))) if score is not None else "—"
+                                f"{int(float(score))}/10" if score is not None else "—"
                             )
                             rows_data.append(
                                 {
@@ -4774,14 +4960,7 @@ class DashboardPage:
     <span class="text-grey-7">{{ props.row.on_topic_str }}</span>
   </q-td>
   <q-td key="score_str" :props="props" class="text-center">
-    <q-badge
-      :color="props.row.score_val >= 8 ? 'positive'
-              : props.row.score_val >= 4 ? 'warning'
-              : props.row.score_val >= 1 ? 'blue-grey-4'
-              : 'grey-5'"
-      class="text-xs">
-      {{ props.row.score_str }}
-    </q-badge>
+    <span class="text-grey-7">{{ props.row.score_str }}</span>
   </q-td>
 </q-tr>
 <q-tr v-show="props.expand" :props="props" @click="props.expand = false" style="cursor:pointer">
@@ -4795,20 +4974,17 @@ class DashboardPage:
         <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
                     border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._response || 'No response recorded.' }}</pre>
       </template>
-      <div v-if="props.row._guardrail_side === 'before'"
-           style="border:2px solid #f97316;background:#fff7ed;border-radius:4px;padding:10px">
-        <div style="font-size:11px;font-weight:700;color:#c2410c;text-transform:uppercase;margin-bottom:4px">⚠ Prompt blocked by before guardrail</div>
-        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      <div v-if="props.row._guardrail_side === 'before'" style="margin-bottom:8px">
+        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#c2410c">⚠ BEFORE GUARDRAIL — BLOCKED</div>
+        <pre style="font-size:11px;padding:10px;background:#fff7ed;border:2px solid #f97316;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#c2410c">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#9a3412">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#c2410c">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
       </div>
-      <div v-else-if="props.row._guardrail_side === 'after'"
-           style="border:2px solid #ef4444;background:#fef2f2;border-radius:4px;padding:10px">
-        <div style="font-size:11px;font-weight:700;color:#dc2626;text-transform:uppercase;margin-bottom:4px">🚫 Response censored by after guardrail</div>
-        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      <div v-else-if="props.row._guardrail_side === 'after'" style="margin-bottom:8px">
+        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#dc2626">🚫 AFTER GUARDRAIL — CENSORED</div>
+        <pre style="font-size:11px;padding:10px;background:#fef2f2;border:2px solid #ef4444;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#dc2626">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#991b1b">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#dc2626">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
       </div>
-      <div v-else-if="props.row._guardrail_side"
-           style="border:2px solid #9e9e9e;background:#f5f5f5;border-radius:4px;padding:10px">
-        <div style="font-size:11px;font-weight:700;color:#616161;text-transform:uppercase;margin-bottom:4px">🛡 Blocked by guardrail</div>
-        <div style="font-size:11px;color:#6b7280">{{ props.row._guardrail_explanation }}</div>
+      <div v-else-if="props.row._guardrail_side" style="margin-bottom:8px">
+        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#616161">🛡 GUARDRAIL — BLOCKED</div>
+        <pre style="font-size:11px;padding:10px;background:#f5f5f5;border:2px solid #9e9e9e;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#616161">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#374151">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#616161">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
       </div>
     </div>
   </q-td>
@@ -5483,8 +5659,22 @@ class DashboardPage:
             prompt = _clean_text(prompt_value)
 
             response_value = raw.get("response")
-            response_text = _clean_text(response_value)
-            target_present = "response" in raw
+            # Detect guardrail-blocked responses before converting to text
+            _node_g_side = ""
+            _node_g_expl = ""
+            _node_g_cats: list = []
+            if isinstance(response_value, dict) and (
+                response_value.get("adapter_type") == "guardrail"
+                or response_value.get("side") in ("before", "after", "unknown")
+            ):
+                _, _node_g_side, _node_g_expl, _node_g_cats = (
+                    DashboardPage._extract_guardrail_from_response(response_value)
+                )
+                response_text = ""
+                target_present = True
+            else:
+                response_text = _clean_text(response_value)
+                target_present = "response" in raw
 
             judge_score = raw.get("judge_score")
             has_judge_signal = (
@@ -5508,6 +5698,9 @@ class DashboardPage:
                     "has_judge_signal": has_judge_signal,
                     "pruned_on_topic": False,
                     "synthetic_pruned": False,
+                    "_guardrail_side": _node_g_side,
+                    "_guardrail_explanation": _node_g_expl,
+                    "_guardrail_categories": _node_g_cats,
                     "children": [],
                     "trace_data": trace_data,
                 }
@@ -5535,6 +5728,10 @@ class DashboardPage:
             if not node.get("target_present") and target_present:
                 node["target_present"] = True
                 node["target_response"] = response_text
+                if _node_g_side:
+                    node["_guardrail_side"] = _node_g_side
+                    node["_guardrail_explanation"] = _node_g_expl
+                    node["_guardrail_categories"] = _node_g_cats
             elif not _has_value(node.get("target_response")) and response_text:
                 node["target_response"] = response_text
             if not node.get("has_judge_signal") and has_judge_signal:
@@ -5916,7 +6113,17 @@ class DashboardPage:
             else:
                 with ui.expansion("Target", icon="ads_click").classes("w-full"):
                     with ui.column().classes("w-full gap-2 p-2"):
-                        if node.get("target_present"):
+                        _g_side = node.get("_guardrail_side") or ""
+                        if _g_side:
+                            _g_expl = (
+                                node.get("_guardrail_explanation")
+                                or "Blocked by guardrail"
+                            )
+                            _g_cats = node.get("_guardrail_categories") or []
+                            self._render_guardrail_event_block(
+                                _g_side, _g_expl, _g_cats
+                            )
+                        elif node.get("target_present"):
                             response = str(node.get("target_response") or "")
                             if response:
                                 ui.label(response).classes(
@@ -6465,56 +6672,54 @@ class DashboardPage:
         """
         side = event.get("side", "unknown")
         explanation = str(event.get("explanation") or "Blocked by guardrail")
+        categories = event.get("categories", [])
+
+        cat_html = ""
+        if categories:
+            cat_str = ", ".join(str(c) for c in categories)
+            if side == "before":
+                cat_html = f'<span style="font-weight:700;color:#c2410c">Categories: </span><span style="color:#9a3412">{cat_str}</span><br><br>'
+            elif side == "after":
+                cat_html = f'<span style="font-weight:700;color:#dc2626">Categories: </span><span style="color:#991b1b">{cat_str}</span><br><br>'
+            else:
+                cat_html = f'<span style="font-weight:700;color:#616161">Categories: </span><span style="color:#374151">{cat_str}</span><br><br>'
 
         if side == "before":
-            with (
-                ui.card()
-                .tight()
-                .classes(
-                    "w-full border-2 border-orange-400 "
-                    "bg-orange-50 dark:border-orange-600 dark:bg-orange-900/30"
-                )
-            ):
-                with ui.row().classes("gap-3 items-start p-3"):
-                    ui.icon("block", color="warning").classes("text-xl shrink-0 mt-0.5")
-                    with ui.column().classes("gap-1"):
-                        ui.label("Prompt blocked by before guardrail").classes(
-                            "font-semibold text-warning text-sm"
-                        )
-                        ui.label(explanation).classes(
-                            "text-xs text-grey-7 dark:text-grey-4"
-                        )
+            heading = "⚠ BEFORE GUARDRAIL — BLOCKED"
+            border_color = "#f97316"
+            bg_color = "#fff7ed"
+            heading_color = "#c2410c"
+            expl_label = (
+                '<span style="font-weight:700;color:#c2410c">Explanation: </span>'
+            )
         elif side == "after":
-            with (
-                ui.card()
-                .tight()
-                .classes(
-                    "w-full border-2 border-red-400 "
-                    "bg-red-50 dark:border-red-700 dark:bg-red-900/30"
-                )
-            ):
-                with ui.row().classes("gap-3 items-start p-3"):
-                    ui.icon("visibility_off", color="negative").classes(
-                        "text-xl shrink-0 mt-0.5"
-                    )
-                    with ui.column().classes("gap-1"):
-                        ui.label("Response censored by after guardrail").classes(
-                            "font-semibold text-negative text-sm"
-                        )
-                        ui.label(explanation).classes(
-                            "text-xs text-grey-7 dark:text-grey-4"
-                        )
+            heading = "🚫 AFTER GUARDRAIL — CENSORED"
+            border_color = "#ef4444"
+            bg_color = "#fef2f2"
+            heading_color = "#dc2626"
+            expl_label = (
+                '<span style="font-weight:700;color:#dc2626">Explanation: </span>'
+            )
         else:
-            with (
-                ui.card().tight().classes("w-full border-2 border-grey-400 bg-grey-50")
-            ):
-                with ui.row().classes("gap-3 items-center p-3"):
-                    ui.icon("shield", color="grey-6").classes("text-xl")
-                    with ui.column().classes("gap-1"):
-                        ui.label("Blocked by guardrail").classes(
-                            "font-semibold text-grey-7 text-sm"
-                        )
-                        ui.label(explanation).classes("text-xs text-grey-6")
+            heading = "🛡 GUARDRAIL — BLOCKED"
+            border_color = "#9e9e9e"
+            bg_color = "#f5f5f5"
+            heading_color = "#616161"
+            expl_label = (
+                '<span style="font-weight:700;color:#616161">Explanation: </span>'
+            )
+
+        from html import escape
+
+        ui.html(
+            f'<div style="margin-bottom:8px">'
+            f'<div style="font-size:11px;font-weight:700;text-transform:uppercase;margin-bottom:4px;color:{heading_color}">{heading}</div>'
+            f'<pre style="font-size:11px;padding:10px;background:{bg_color};border:2px solid {border_color};border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0">'
+            f"{cat_html}"
+            f"{expl_label}"
+            f'<span style="color:#6b7280">{escape(explanation)}</span>'
+            f"</pre></div>"
+        )
 
     async def refresh_view(self) -> None:
         _v = self.current_view["value"]
