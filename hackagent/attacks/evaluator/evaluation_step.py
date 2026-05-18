@@ -1251,12 +1251,14 @@ class BaseEvaluationStep:
 
             explanation = " | ".join(notes_parts) if notes_parts else ""
 
+            _prefix = item.get("prefix", "") or ""
             self._tracker.add_evaluation_trace(
                 ctx=goal_ctx,
                 evaluation_result=eval_result,
                 score=item.get("best_score", 0.0),
                 explanation=explanation,
                 evaluator_name=f"{evaluator_prefix}_{'_'.join(judges_used)}",
+                metadata={"prefix": _prefix} if _prefix else None,
             )
 
     # Keys whose presence signals that results were already evaluated
