@@ -91,9 +91,18 @@ class DashboardPage:
         self.agents_table: ui.table | None = None
         self.runs_table: ui.table | None = None
         self.runs_count_label: ui.label | None = None
-        self.runs_page_label: ui.label | None = None
         self.runs_current_page: int = 1
         self.runs_total_pages: int = 1
+        self._runs_all_rows: list[dict] = []
+        self._runs_total_available: int = 0
+        self._runs_filter_agent: str = ""
+        self._runs_filter_attack: str = ""
+        self._runs_filter_status: str = ""
+        self._runs_filter_search: str = ""
+        self._runs_load_more_btn: ui.button | None = None
+        self._runs_agent_select: ui.select | None = None
+        self._runs_attack_select: ui.select | None = None
+        self._runs_status_select: ui.select | None = None
         self.history_reports_list_area: ui.column | None = None
         self.history_reports_summary_labels: dict[str, ui.label] = {}
         self.history_reports_count_label: ui.label | None = None
@@ -118,11 +127,17 @@ class DashboardPage:
         self.history_run_dialog_title: ui.label | None = None
         self.history_run_dialog_subtitle: ui.label | None = None
         self.history_run_config_area: ui.column | None = None
+        self.history_charts_area: ui.column | None = None
         self.history_results_list_area: ui.column | None = None
         self.history_results_empty_label: ui.label | None = None
-        self.metrics_area: ui.column | None = None
         self.history_detail_area: ui.column | None = None
         self._history_dialog_attack_str: str = ""
+        self._history_goal_filter: str = ""  # "" | "jailbreak" | "mitigated" | "error"
+        self._history_goal_filter_category: str = ""  # "" or category label
+        self._history_goal_filter_search: str = ""
+        self._history_goal_rows: list[dict] = []
+        self._history_goal_detail_data: dict[str, object] = {}
+        self._history_goal_filter_area: ui.row | None = None
 
         # New side-by-side History layout
         self._history_runs_area: ui.column | None = None
@@ -630,38 +645,84 @@ class DashboardPage:
                 "w-full h-[calc(100vh-220px)] min-h-[540px] overflow-hidden"
             ):
                 with ui.column().classes("w-full h-full min-h-0 gap-2"):
-                    with ui.row().classes("items-center justify-between mb-1 px-2"):
+                    # ── Filter bar ────────────────────────────────────────────
+                    with ui.row().classes("items-center w-full gap-2 px-2 flex-wrap"):
+                        ui.input(
+                            placeholder="Search runs…",
+                        ).props("dense outlined clearable").classes(
+                            "min-w-[180px] flex-1"
+                        ).on(
+                            "update:model-value",
+                            lambda e: self._on_runs_search_change(
+                                e.args if isinstance(e.args, str) else (e.args or "")
+                            ),
+                        )
+                        self._runs_agent_select = (
+                            ui.select(
+                                options={"": "All agents"},
+                                value="",
+                                on_change=lambda e: self._on_runs_filter_change(
+                                    "agent", e.value
+                                ),
+                            )
+                            .props("dense outlined")
+                            .classes("min-w-[140px]")
+                        )
+                        self._runs_attack_select = (
+                            ui.select(
+                                options={"": "All attacks"},
+                                value="",
+                                on_change=lambda e: self._on_runs_filter_change(
+                                    "attack", e.value
+                                ),
+                            )
+                            .props("dense outlined")
+                            .classes("min-w-[140px]")
+                        )
+                        self._runs_status_select = (
+                            ui.select(
+                                options={"": "All statuses"},
+                                value="",
+                                on_change=lambda e: self._on_runs_filter_change(
+                                    "status", e.value
+                                ),
+                            )
+                            .props("dense outlined")
+                            .classes("min-w-[140px]")
+                        )
+                    # ── Count + delete row ─────────────────────────────────────
+                    with ui.row().classes("items-center justify-between px-2"):
                         self.runs_count_label = ui.label("").classes(
                             "text-sm text-grey-6"
                         )
-                        with ui.row().classes("items-center gap-2"):
-                            self._runs_delete_btn = (
-                                ui.button(
-                                    "Delete selected",
-                                    icon="delete",
-                                    on_click=lambda: ui.timer(
-                                        0,
-                                        self._delete_selected_runs,
-                                        once=True,
-                                    ),
-                                )
-                                .props("flat dense no-caps color=negative")
-                                .classes("hidden")
-                            )
+                        self._runs_delete_btn = (
                             ui.button(
-                                "← Prev",
-                                on_click=lambda: self._change_runs_page(-1),
-                            ).props("flat dense no-caps")
-                            self.runs_page_label = ui.label("Page 1 / 1").classes(
-                                "text-sm text-grey-6"
+                                "Delete selected",
+                                icon="delete",
+                                on_click=lambda: ui.timer(
+                                    0,
+                                    self._delete_selected_runs,
+                                    once=True,
+                                ),
                             )
-                            ui.button(
-                                "Next →",
-                                on_click=lambda: self._change_runs_page(1),
-                            ).props("flat dense no-caps")
+                            .props("flat dense no-caps color=negative")
+                            .classes("hidden")
+                        )
+                    # ── Scrollable run list ────────────────────────────────────
                     with ui.scroll_area().classes("w-full flex-1 min-h-0"):
                         self._history_runs_area = ui.column().classes(
                             "w-full gap-0 overflow-x-auto"
+                        )
+                        self._runs_load_more_btn = (
+                            ui.button(
+                                "Load more",
+                                icon="expand_more",
+                                on_click=lambda: ui.timer(
+                                    0, self._load_more_runs, once=True
+                                ),
+                            )
+                            .props("flat no-caps color=primary")
+                            .classes("self-center my-2 hidden")
                         )
 
     def _build_reports_panel(self, panel: ui.column) -> None:
@@ -729,9 +790,10 @@ class DashboardPage:
         self.run_dialog = dialog
 
     def _build_history_run_dialog(self) -> None:
-        """Build a two-panel dialog for History run results."""
+        """Build a full-window two-panel dialog for History run results."""
         with ui.dialog() as dialog:
-            with ui.card().classes("w-full max-w-[96vw] h-[90vh] flex flex-col gap-0"):
+            dialog.props("maximized")
+            with ui.card().classes("w-full h-full flex flex-col gap-0 rounded-none"):
                 with ui.row().classes(
                     "items-center justify-between w-full shrink-0 px-5 py-3 border-b"
                 ):
@@ -743,19 +805,27 @@ class DashboardPage:
                     )
                 # Two-panel body
                 with ui.row().classes("w-full flex-1 gap-0 overflow-hidden"):
-                    # Left: config/metrics + compact card list
+                    # Left: config/metrics + charts + compact card list
                     with (
                         ui.scroll_area()
                         .classes("h-full border-r")
-                        .style("flex:none;width:680px")
+                        .style("flex:1 1 50%;min-width:0")
                     ):
                         with ui.column().classes("w-full gap-3 p-4"):
                             self.history_run_config_area = ui.column().classes(
                                 "w-full gap-2"
                             )
                             ui.separator()
-                            self.metrics_area = ui.column().classes("w-full gap-2")
+                            self.history_charts_area = ui.column().classes(
+                                "w-full gap-3"
+                            )
                             ui.separator()
+                            # ── Goal filter bar ──────────────────────
+                            self._history_goal_filter_area = ui.row().classes(
+                                "items-center gap-2 px-1 w-full"
+                            )
+                            with self._history_goal_filter_area:
+                                self._build_goal_filter_bar()
                             self.history_results_empty_label = ui.label(
                                 "Loading results..."
                             ).classes("text-sm text-grey-8 py-2")
@@ -763,7 +833,11 @@ class DashboardPage:
                                 "w-full gap-1"
                             )
                     # Right: detail view
-                    with ui.scroll_area().classes("h-full flex-1"):
+                    with (
+                        ui.scroll_area()
+                        .classes("h-full")
+                        .style("flex:1 1 50%;min-width:0")
+                    ):
                         self.history_detail_area = ui.column().classes(
                             "w-full gap-3 p-6"
                         )
@@ -772,6 +846,177 @@ class DashboardPage:
                                 "text-grey-4 text-sm italic mt-16 w-full text-center"
                             )
         self.history_run_dialog = dialog
+
+    def _build_goal_filter_bar(self) -> None:
+        """Render the goal filter bar with search, status select, and category select."""
+        rows = self._history_goal_rows
+        # Status options
+        status_options: dict[str, str] = {"": "All statuses"}
+        n_jailbreak = sum(1 for r in rows if r.get("_bucket") == "jailbreak")
+        n_mitigated = sum(1 for r in rows if r.get("_bucket") == "mitigated")
+        n_error = sum(1 for r in rows if r.get("_bucket") == "error")
+        if n_jailbreak:
+            status_options["jailbreak"] = f"Jailbreaks ({n_jailbreak})"
+        if n_mitigated:
+            status_options["mitigated"] = f"Mitigated ({n_mitigated})"
+        if n_error:
+            status_options["error"] = f"Errors ({n_error})"
+
+        # Category options
+        cat_options: dict[str, str] = {"": "All categories"}
+        cats: set[str] = set()
+        for r in rows:
+            cat = r.get("_goal_category") or ""
+            if cat and cat != "N/A":
+                cats.add(str(cat))
+        for cat in sorted(cats):
+            cat_options[cat] = cat
+
+        ui.input(
+            placeholder="Search goals...",
+            value=self._history_goal_filter_search,
+            on_change=lambda e: self._on_goal_search_change(e.value),
+        ).props("dense outlined clearable").classes("flex-1 min-w-[120px]").style(
+            "max-width:220px"
+        )
+        ui.select(
+            options=status_options,
+            value=self._history_goal_filter,
+            on_change=lambda e: self._on_goal_status_change(e.value),
+        ).props("dense outlined").classes("min-w-[130px]")
+        ui.select(
+            options=cat_options,
+            value=self._history_goal_filter_category,
+            on_change=lambda e: self._on_goal_category_change(e.value),
+        ).props("dense outlined").classes("min-w-[140px]")
+
+    def _on_goal_search_change(self, value: str) -> None:
+        """Handle goal search input change."""
+        self._history_goal_filter_search = (value or "").strip()
+        self._render_filtered_history_goals()
+
+    def _on_goal_status_change(self, value: str) -> None:
+        """Handle goal status filter change."""
+        self._history_goal_filter = value or ""
+        self._render_filtered_history_goals()
+
+    def _on_goal_category_change(self, value: str) -> None:
+        """Handle goal category filter change."""
+        self._history_goal_filter_category = value or ""
+        self._render_filtered_history_goals()
+
+    def _render_filtered_history_goals(self) -> None:
+        """Re-render the goal list applying status, category, and search filters."""
+        if self.history_results_list_area is None:
+            return
+        rows = self._history_goal_rows
+        # Apply status filter
+        if self._history_goal_filter:
+            rows = [r for r in rows if r.get("_bucket") == self._history_goal_filter]
+        # Apply category filter
+        if self._history_goal_filter_category:
+            rows = [
+                r
+                for r in rows
+                if (r.get("_goal_category") or "") == self._history_goal_filter_category
+            ]
+        # Apply search filter
+        if self._history_goal_filter_search:
+            q = self._history_goal_filter_search.lower()
+            rows = [
+                r
+                for r in rows
+                if q in (r.get("goal") or "").lower()
+                or q in (r.get("_goal_category") or "").lower()
+                or q in (r.get("_goal_subcategory") or "").lower()
+            ]
+
+        self.history_results_list_area.clear()
+        if not rows:
+            with self.history_results_list_area:
+                ui.label("No matching goals").classes(
+                    "text-sm text-grey-5 italic py-4 w-full text-center"
+                )
+            return
+
+        attack_type_str = self._history_dialog_attack_str
+        detail_data = self._history_goal_detail_data
+
+        with self.history_results_list_area:
+            # Group by category
+            cat_groups: dict[str, list[dict]] = {}
+            for row in rows:
+                cat = row.get("_goal_category") or "Uncategorised"
+                cat_groups.setdefault(str(cat), []).append(row)
+
+            for cat_label in sorted(cat_groups.keys()):
+                rows_in_cat = cat_groups[cat_label]
+                with ui.row().classes("items-center gap-2 mt-3 mb-1 px-1"):
+                    ui.label(cat_label).classes(
+                        "text-xs font-semibold text-grey-6 uppercase tracking-wide"
+                    )
+
+                # Group by subcategory
+                subcat_groups: dict[str, list[dict]] = {}
+                for row in rows_in_cat:
+                    sub = str(row.get("_goal_subcategory") or "")
+                    if sub == "N/A":
+                        sub = ""
+                    subcat_groups.setdefault(sub, []).append(row)
+
+                for sub_label in sorted(subcat_groups.keys()):
+                    rows_in_sub = sorted(
+                        subcat_groups[sub_label],
+                        key=lambda r: str(r.get("goal") or "").lower(),
+                    )
+                    if sub_label:
+                        with ui.row().classes("items-center gap-2 mt-2 mb-0.5 px-3"):
+                            ui.label(sub_label).classes(
+                                "text-[10px] font-semibold text-grey-5 "
+                                "uppercase tracking-wide"
+                            )
+
+                    for _row in rows_in_sub:
+                        _rid = str(_row.get("id") or "")
+                        _data = detail_data.get(_rid)
+
+                        def _make_click(
+                            _r: dict = _row,
+                            _d: object = _data,
+                            _atk_str: str = attack_type_str,
+                        ) -> None:
+                            if self.history_detail_area is None:
+                                return
+                            self.history_detail_area.clear()
+                            with self.history_detail_area:
+                                self._render_history_goal_detail(_r, _d, _atk_str)
+
+                        self._render_compact_card(_row, _make_click)
+
+    def _render_history_goal_detail(
+        self, row: dict, data: object, attack_type_str: str
+    ) -> None:
+        """Render a single goal detail in the right panel."""
+        ha = attack_type_str.lower()
+        if ha == "baseline":
+            self._render_baseline_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
+        elif ha == "bon":
+            self._render_bon_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
+        elif ha == "pap":
+            self._render_pap_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
+        elif ha == "pair":
+            self._render_pair_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
+        elif ha == "tap":
+            _nodes, _ds = data  # type: ignore[misc]
+            self._render_tap_goal_card(row, _nodes, _ds, detail_mode=True)
+        elif ha == "advprefix":
+            _pr, _gs = data  # type: ignore[misc]
+            self._render_advprefix_goal_card(row, _pr, _gs, detail_mode=True)
+        elif ha == "autodanturbo":
+            self._render_autodan_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
+        else:
+            _req, _resp = data  # type: ignore[misc]
+            self._render_generic_goal_card(row, _req, _resp, detail_mode=True)
 
     def _close_reports_detail(self) -> None:
         """Close the right detail panel and restore full-width report list."""
@@ -1490,13 +1735,6 @@ class DashboardPage:
         self._highlight_nav(view)
         if schedule_refresh:
             asyncio.create_task(self.refresh_view())
-
-    def _change_runs_page(self, delta: int) -> None:
-        new_page = self.runs_current_page + delta
-        if new_page < 1 or new_page > self.runs_total_pages:
-            return
-        self.runs_current_page = new_page
-        ui.timer(0, self._load_runs, once=True)
 
     def _on_runs_select(self) -> None:
         if self.runs_table is not None:
@@ -7327,78 +7565,163 @@ class DashboardPage:
         self.attacks_table.update()
 
     async def _load_runs(self) -> None:
-        result = self.backend.list_runs(
-            page=self.runs_current_page,
-            page_size=_RUNS_VIEW_PAGE_SIZE,
-        )
-        self.runs_total_pages = max(
-            1,
-            (result.total + _RUNS_VIEW_PAGE_SIZE - 1) // _RUNS_VIEW_PAGE_SIZE,
-        )
-        if self.runs_current_page > self.runs_total_pages:
-            self.runs_current_page = self.runs_total_pages
-            result = self.backend.list_runs(
-                page=self.runs_current_page,
-                page_size=_RUNS_VIEW_PAGE_SIZE,
-            )
+        """Load all runs from backend."""
+        self.runs_current_page = 1
+        self._runs_all_rows.clear()
+        await self._fetch_all_runs()
+        self._update_runs_filter_options()
+        self._apply_runs_filters()
 
-        run_attack_ids = {str(run.attack_id) for run in result.items}
-        run_agent_ids = {str(run.agent_id) for run in result.items}
-        attack_type_by_id = self._attack_type_map_for_ids(run_attack_ids)
-        agent_name_by_id = self._agent_name_map_for_ids(run_agent_ids)
-        rows = []
-        for idx, run in enumerate(result.items):
-            d = _serialize(run)
-            summary = self._summarize_run_results(run.id, run_data=d)
-            d["status"] = str(summary["status"])
-            attack_id = str(d.get("attack_id") or "")
-            agent_id = str(d.get("agent_id") or "")
-            d["attack_type"] = attack_type_by_id.get(
-                attack_id,
-                f"{attack_id[:8]}…" if attack_id else "—",
-            )
-            d["agent_name"] = agent_name_by_id.get(
-                agent_id,
-                d.get("run_config", {}).get("_agent_name")
-                or (f"{agent_id[:8]}…" if agent_id else "—"),
-            )
-            d["run_progress"] = max(
-                1,
-                result.total
-                - ((self.runs_current_page - 1) * _RUNS_VIEW_PAGE_SIZE + idx),
-            )
-            d["total_results"] = int(summary["total_results"])
-            d["successful_jailbreaks"] = int(summary["successful_jailbreaks"])
-            d["failed_attacks"] = int(summary["failed_attacks"])
-            d["mitigations"] = int(summary["mitigations"])
-            d["evaluation_summary"] = summary.get("evaluation_summary") or {}
-            d["is_multi_judge"] = bool(summary.get("is_multi_judge"))
-            d["overall_asr"] = summary.get("overall_asr_display") or "—"
-            d["_goal_latency_avg_s"] = summary.get("avg_goal_latency_s")
-            d["_goal_latency_avg"] = _format_latency(d.get("_goal_latency_avg_s"))
-            d["_rel"] = _rel_time(d.get("created_at"))
-            d["_date"] = _short_date(d.get("created_at"))
-            d["_latency_s"] = self._compute_run_latency_seconds(d)
-            d["_latency"] = _format_latency(d.get("_latency_s"))
-            rows.append(d)
+    async def _load_more_runs(self) -> None:
+        """No-op — all data is loaded upfront."""
+        pass
 
-        # Render expandable run list in the runs area
+    def _has_active_filter(self) -> bool:
+        """Return True if any filter or search is active."""
+        return bool(
+            self._runs_filter_agent
+            or self._runs_filter_attack
+            or self._runs_filter_status
+            or self._runs_filter_search
+        )
+
+    async def _fetch_all_runs(self) -> None:
+        """Fetch all runs from backend."""
+        page = 1
+        while True:
+            result = self.backend.list_runs(page=page, page_size=100)
+            self._runs_total_available = result.total
+            if not result.items:
+                break
+            run_attack_ids = {str(run.attack_id) for run in result.items}
+            run_agent_ids = {str(run.agent_id) for run in result.items}
+            attack_type_by_id = self._attack_type_map_for_ids(run_attack_ids)
+            agent_name_by_id = self._agent_name_map_for_ids(run_agent_ids)
+            for idx, run in enumerate(result.items):
+                d = _serialize(run)
+                summary = self._summarize_run_results(run.id, run_data=d)
+                d["status"] = str(summary["status"])
+                attack_id = str(d.get("attack_id") or "")
+                agent_id = str(d.get("agent_id") or "")
+                d["attack_type"] = attack_type_by_id.get(
+                    attack_id,
+                    f"{attack_id[:8]}…" if attack_id else "—",
+                )
+                d["agent_name"] = agent_name_by_id.get(
+                    agent_id,
+                    d.get("run_config", {}).get("_agent_name")
+                    or (f"{agent_id[:8]}…" if agent_id else "—"),
+                )
+                d["run_progress"] = max(
+                    1,
+                    result.total - ((page - 1) * 100 + idx),
+                )
+                d["total_results"] = int(summary["total_results"])
+                d["successful_jailbreaks"] = int(summary["successful_jailbreaks"])
+                d["failed_attacks"] = int(summary["failed_attacks"])
+                d["mitigations"] = int(summary["mitigations"])
+                d["evaluation_summary"] = summary.get("evaluation_summary") or {}
+                d["is_multi_judge"] = bool(summary.get("is_multi_judge"))
+                d["overall_asr"] = summary.get("overall_asr_display") or "—"
+                d["_goal_latency_avg_s"] = summary.get("avg_goal_latency_s")
+                d["_goal_latency_avg"] = _format_latency(d.get("_goal_latency_avg_s"))
+                d["_rel"] = _rel_time(d.get("created_at"))
+                d["_date"] = _short_date(d.get("created_at"))
+                d["_latency_s"] = self._compute_run_latency_seconds(d)
+                d["_latency"] = _format_latency(d.get("_latency_s"))
+                self._runs_all_rows.append(d)
+            total_pages = max(1, math.ceil((result.total or 0) / 100))
+            if page >= total_pages:
+                break
+            page += 1
+
+    def _filter_runs_rows(self) -> list[dict]:
+        """Return subset of _runs_all_rows matching current filters."""
+        rows = self._runs_all_rows
+        if self._runs_filter_agent:
+            rows = [r for r in rows if r.get("agent_name") == self._runs_filter_agent]
+        if self._runs_filter_attack:
+            rows = [r for r in rows if r.get("attack_type") == self._runs_filter_attack]
+        if self._runs_filter_status:
+            rows = [r for r in rows if r.get("status") == self._runs_filter_status]
+        if self._runs_filter_search:
+            q = self._runs_filter_search.lower()
+            rows = [
+                r
+                for r in rows
+                if q in (r.get("agent_name") or "").lower()
+                or q in (r.get("attack_type") or "").lower()
+                or q in (r.get("status") or "").lower()
+                or q in (r.get("_date") or "").lower()
+                or q in str(r.get("id") or "").lower()
+            ]
+        return rows
+
+    def _apply_runs_filters(self) -> None:
+        """Re-render the run list with current filters applied."""
+        filtered = self._filter_runs_rows()
+
         if self._history_runs_area is not None:
             self._history_runs_area.clear()
             with self._history_runs_area:
-                self._render_runs_table(rows, result.total)
+                self._render_runs_table(filtered, len(filtered))
 
-        start = (
-            (self.runs_current_page - 1) * _RUNS_VIEW_PAGE_SIZE + 1
-            if result.total
-            else 0
+        shown = len(filtered)
+        total = len(self._runs_all_rows)
+        if self.runs_count_label is not None:
+            if self._has_active_filter():
+                self.runs_count_label.text = (
+                    f"Showing {shown} of {total} run"
+                    f"{'s' if total != 1 else ''} (filtered)"
+                )
+            else:
+                self.runs_count_label.text = f"{total} run{'s' if total != 1 else ''}"
+
+        if self._runs_load_more_btn is not None:
+            self._runs_load_more_btn.classes(add="hidden")
+
+    def _update_runs_filter_options(self) -> None:
+        """Populate filter dropdown options from loaded run data (targets with runs)."""
+        all_agent_names = sorted(
+            {r.get("agent_name") or "" for r in self._runs_all_rows} - {"", "—"}
         )
-        end = start + len(rows) - 1 if rows else 0
-        self.runs_count_label.text = f"Showing {start}-{end} of {result.total} run{'s' if result.total != 1 else ''}"
-        if self.runs_page_label is not None:
-            self.runs_page_label.text = (
-                f"Page {self.runs_current_page} / {self.runs_total_pages}"
-            )
+        all_attack_types = sorted(
+            {r.get("attack_type") or "" for r in self._runs_all_rows} - {"", "—"}
+        )
+        all_statuses = sorted(
+            {r.get("status") or "" for r in self._runs_all_rows} - {""}
+        )
+
+        if self._runs_agent_select is not None:
+            opts = {"": "All targets"}
+            opts.update({a: a for a in all_agent_names})
+            self._runs_agent_select.options = opts
+            self._runs_agent_select.update()
+        if self._runs_attack_select is not None:
+            opts = {"": "All attacks"}
+            opts.update({a: a for a in all_attack_types})
+            self._runs_attack_select.options = opts
+            self._runs_attack_select.update()
+        if self._runs_status_select is not None:
+            opts = {"": "All statuses"}
+            opts.update({s: s for s in all_statuses})
+            self._runs_status_select.options = opts
+            self._runs_status_select.update()
+
+    def _on_runs_filter_change(self, field: str, value: str) -> None:
+        """Handle filter dropdown change — re-renders with filter applied."""
+        if field == "agent":
+            self._runs_filter_agent = value or ""
+        elif field == "attack":
+            self._runs_filter_attack = value or ""
+        elif field == "status":
+            self._runs_filter_status = value or ""
+        self._apply_runs_filters()
+
+    def _on_runs_search_change(self, value) -> None:
+        """Handle search input change."""
+        self._runs_filter_search = str(value) if value else ""
+        self._apply_runs_filters()
 
     def _render_runs_table(self, rows: list[dict], total: int) -> None:
         """Render expandable run rows as a table-like layout."""
@@ -7416,7 +7739,7 @@ class DashboardPage:
                     rid for rid in self._selected_run_ids if rid not in page_ids
                 ]
             self._on_runs_select()
-            ui.timer(0, self._load_runs, once=True)
+            self._apply_runs_filters()
 
         all_checked = bool(self._history_visible_run_ids) and all(
             rid in self._selected_run_ids for rid in self._history_visible_run_ids
@@ -8545,12 +8868,8 @@ class DashboardPage:
                         }
                     )
 
-                category_items.sort(
-                    key=lambda item: (item["vuln_rate"], item["total"]),
-                    reverse=True,
-                )
+                category_items.sort(key=lambda item: item["label"])
                 top_items = category_items[:9]
-                top_items.sort(key=lambda item: item["label"])
                 if len(top_items) > 1:
                     top_items = [top_items[0], *reversed(top_items[1:])]
 
@@ -8735,7 +9054,9 @@ class DashboardPage:
                         "Stacked distribution of outcomes per harm category"
                     ).classes("text-xs text-grey-6 mb-3")
 
-                    bar_items = list(reversed(top_items))
+                    bar_items = sorted(
+                        top_items, key=lambda item: item["label"], reverse=True
+                    )
                     bar_y_labels = [item["label"] for item in bar_items]
                     vulnerable_data = []
                     mitigated_data = []
@@ -9058,6 +9379,7 @@ class DashboardPage:
             if _attack_id_hr:
                 _atm_hr = self._attack_type_map_for_ids({_attack_id_hr})
                 attack_type_str = _atm_hr.get(_attack_id_hr, "—")
+        self._history_dialog_attack_str = attack_type_str
 
         if self.history_run_config_area is not None:
             self.history_run_config_area.clear()
@@ -9350,213 +9672,6 @@ class DashboardPage:
                             if _h_dec_id:
                                 _chip("layers", "Decorator LLM", str(_h_dec_id))
 
-        # ── Populate metrics area ─────────────────────────────────────────
-        if self.metrics_area is not None:
-            self.metrics_area.clear()
-            eval_summary = (
-                run_config.get("evaluation_summary")
-                if isinstance(run_config, dict)
-                else None
-            )
-
-            if isinstance(eval_summary, dict):
-                with self.metrics_area:
-                    total = eval_summary.get("total_attacks", 0)
-                    overall = eval_summary.get("overall_success_rate", 0.0)
-                    mv_asr = eval_summary.get("majority_vote_asr", 0.0)
-                    kappa = eval_summary.get("fleiss_kappa", None)
-                    per_judge = eval_summary.get("per_judge_strictness") or {}
-                    _hr_n_judges = len(
-                        [
-                            k
-                            for k in per_judge
-                            if k != "bias_gap" and not k.endswith("_mean")
-                        ]
-                    )
-                    # Use run-level goal counts for the summary cards so they
-                    # match _hr_jailbreaks/_hr_errors (which are also goal-level).
-                    _hr_total_goals = int(run.get("total_results") or 0) or int(total)
-                    _hr_mitigated = max(
-                        0, _hr_total_goals - _hr_jailbreaks - _hr_errors
-                    )
-
-                    def _fmt_pct(value: object) -> str:
-                        try:
-                            return f"{float(value) * 100:.1f}%"
-                        except (TypeError, ValueError):
-                            return str(value)
-
-                    def _is_risky(v: object) -> bool:
-                        return isinstance(v, (int, float)) and float(v) > 0
-
-                    # ── Results Summary ───────────────────────────────
-                    ui.label("RESULTS SUMMARY").classes(
-                        "text-[10px] font-semibold tracking-widest text-grey-5 uppercase mb-2"
-                    )
-                    with ui.row().classes("flex-wrap gap-2 items-start"):
-                        for _ml, _mv, _mc, _mi in [
-                            ("Total Attacks", str(_hr_total_goals), "grey-8", "quiz"),
-                            (
-                                "Jailbreaks",
-                                str(_hr_jailbreaks),
-                                "negative",
-                                "lock_open",
-                            ),
-                            (
-                                "Mitigated",
-                                str(_hr_mitigated),
-                                "positive" if _hr_mitigated > 0 else "grey-7",
-                                "security",
-                            ),
-                            (
-                                "Errors",
-                                str(_hr_errors),
-                                "warning" if _hr_errors > 0 else "grey-7",
-                                "warning_amber",
-                            ),
-                            ("Duration", _hr_run_latency_str, "grey-7", "timer"),
-                        ]:
-                            with ui.card().classes("flex-none min-w-[110px] px-3 py-2"):
-                                with ui.row().classes("items-center gap-1 mb-1"):
-                                    ui.icon(_mi, color=_mc, size="xs")
-                                    ui.label(_ml).classes(
-                                        "text-[10px] text-grey-6 font-semibold uppercase tracking-wide"
-                                    )
-                                ui.label(_mv).classes("text-xl font-bold")
-
-                    ui.separator().classes("my-2")
-
-                    # ── Evaluation Metrics ────────────────────────────
-                    ui.label("EVALUATION METRICS").classes(
-                        "text-[10px] font-semibold tracking-widest text-grey-5 uppercase mb-2"
-                    )
-                    with ui.row().classes("flex-wrap gap-2 items-start"):
-                        for _ml, _mv, _mc, _mi in (
-                            [
-                                (
-                                    "Attack Success Rate",
-                                    _fmt_pct(overall),
-                                    "negative" if _is_risky(overall) else "positive",
-                                    "lock_open" if _is_risky(overall) else "security",
-                                ),
-                            ]
-                            + (
-                                [
-                                    (
-                                        "Majority-vote ASR",
-                                        _fmt_pct(mv_asr),
-                                        "negative" if _is_risky(mv_asr) else "positive",
-                                        "how_to_vote",
-                                    ),
-                                ]
-                                if _hr_n_judges > 1
-                                else []
-                            )
-                            + (
-                                [
-                                    (
-                                        "Fleiss' Kappa",
-                                        f"{float(kappa):.3f}",
-                                        "grey-7",
-                                        "balance",
-                                    )
-                                ]
-                                if kappa is not None and _hr_n_judges > 1
-                                else []
-                            )
-                            + (
-                                [
-                                    (
-                                        "Bias Gap",
-                                        _fmt_pct(per_judge.get("bias_gap")),
-                                        "grey-7",
-                                        "compare_arrows",
-                                    )
-                                ]
-                                if isinstance(per_judge, dict)
-                                and per_judge.get("bias_gap") is not None
-                                and _hr_n_judges > 1
-                                else []
-                            )
-                        ):
-                            with ui.card().classes("flex-none min-w-[110px] px-3 py-2"):
-                                with ui.row().classes("items-center gap-1 mb-1"):
-                                    ui.icon(_mi, color=_mc, size="xs")
-                                    ui.label(_ml).classes(
-                                        "text-[10px] text-grey-6 font-semibold uppercase tracking-wide"
-                                    )
-                                ui.label(_mv).classes("text-xl font-bold")
-
-                        if (
-                            _hr_n_judges > 1
-                            and isinstance(per_judge, dict)
-                            and any(k != "bias_gap" for k in per_judge)
-                        ):
-                            with ui.card().classes("flex-none px-3 py-2"):
-                                ui.label("PER-JUDGE ASR").classes(
-                                    "text-[10px] text-grey-6 font-semibold uppercase tracking-wide mb-1"
-                                )
-                                with ui.column().classes("gap-1"):
-                                    for judge_name, asr_val in per_judge.items():
-                                        if judge_name == "bias_gap":
-                                            continue
-                                        with ui.row().classes("items-center gap-2"):
-                                            ui.label(judge_name).classes(
-                                                "text-xs text-grey-7 font-mono"
-                                            )
-                                            ui.badge(
-                                                _fmt_pct(asr_val),
-                                                color="grey-6",
-                                            ).classes("text-xs font-mono")
-            else:
-                # No evaluation_summary in run_config (e.g. BoN) — show
-                # a basic results summary from the run-level counters.
-                _hr_total = int(run.get("total_results") or 0)
-                _hr_mitigated_fb = int(run.get("mitigations") or 0)
-                with self.metrics_area:
-                    if _hr_total > 0:
-                        ui.label("RESULTS SUMMARY").classes(
-                            "text-[10px] font-semibold tracking-widest "
-                            "text-grey-5 uppercase mb-2"
-                        )
-                        with ui.row().classes("flex-wrap gap-2 items-start"):
-                            for _ml, _mv, _mc, _mi in [
-                                ("Total Tests", str(_hr_total), "grey-8", "quiz"),
-                                (
-                                    "Vulnerabilities",
-                                    str(_hr_jailbreaks),
-                                    "negative" if _hr_jailbreaks else "grey-7",
-                                    "lock_open",
-                                ),
-                                (
-                                    "Mitigated",
-                                    str(_hr_mitigated_fb),
-                                    "positive" if _hr_mitigated_fb else "grey-7",
-                                    "security",
-                                ),
-                                (
-                                    "Errors",
-                                    str(_hr_errors),
-                                    "warning" if _hr_errors else "grey-7",
-                                    "warning_amber",
-                                ),
-                                ("Duration", _hr_run_latency_str, "grey-7", "timer"),
-                            ]:
-                                with ui.card().classes(
-                                    "flex-none min-w-[110px] px-3 py-2"
-                                ):
-                                    with ui.row().classes("items-center gap-1 mb-1"):
-                                        ui.icon(_mi, color=_mc, size="xs")
-                                        ui.label(_ml).classes(
-                                            "text-[10px] text-grey-6 font-semibold "
-                                            "uppercase tracking-wide"
-                                        )
-                                    ui.label(_mv).classes("text-xl font-bold")
-                    else:
-                        ui.label("No results available yet.").classes(
-                            "text-sm text-grey-6 py-4"
-                        )
-
         if self.history_results_list_area is not None:
             self.history_results_list_area.clear()
         if self.history_results_empty_label is not None:
@@ -9691,142 +9806,436 @@ class DashboardPage:
                     )
                     self.history_results_empty_label.set_visibility(True)
 
-            if all_items and self.history_results_list_area is not None:
-                with self.history_results_list_area:
-                    # ── Pre-parse detail data for all rows ─────────────
-                    _h_atk = attack_type_str.lower()
-                    _h_detail_data: dict[str, object] = {}
-                    for _row in new_rows:
-                        _rid = str(_row.get("id") or "")
-                        if _h_atk == "baseline":
-                            _t = baseline_traces_map_hr.get(_rid, [])
-                            _h_detail_data[_rid] = self._parse_baseline_traces(
-                                _t, str(_row.get("goal") or "")
-                            )
-                        elif _h_atk == "bon":
-                            _t = bon_traces_map_hr.get(_rid, [])
-                            _h_detail_data[_rid] = self._parse_bon_traces(_t)
-                        elif _h_atk == "pap":
-                            _t = generic_traces_map_hr.get(_rid, [])
-                            _h_detail_data[_rid] = self._parse_pap_traces(_t)
-                        elif _h_atk == "pair":
-                            _t = generic_traces_map_hr.get(_rid, [])
-                            _h_detail_data[_rid] = self._parse_pair_traces(_t)
-                        elif _h_atk == "tap":
-                            _t = generic_traces_map_hr.get(_rid, [])
-                            _h_detail_data[_rid] = self._parse_tap_traces(_t)
-                        elif _h_atk == "advprefix":
-                            _t = generic_traces_map_hr.get(_rid, [])
-                            _h_detail_data[_rid] = self._parse_advprefix_traces(_t)
-                        elif _h_atk == "autodanturbo":
-                            _t = generic_traces_map_hr.get(_rid, [])
-                            _h_detail_data[_rid] = self._parse_autodan_traces(_t)
-                        else:
-                            _t = generic_traces_map_hr.get(_rid, [])
-                            _h_detail_data[_rid] = (
-                                self._extract_prompt_response_from_traces(_t)
-                            )
+            # ── Populate charts area (before goals) ───────────────────
+            if self.history_charts_area is not None and new_rows:
+                self.history_charts_area.clear()
+                _n_jailbreaks = sum(
+                    1 for r in new_rows if r.get("_bucket") == "jailbreak"
+                )
+                _n_mitigated = sum(
+                    1 for r in new_rows if r.get("_bucket") == "mitigated"
+                )
+                _n_errors = sum(1 for r in new_rows if r.get("_bucket") == "failed")
+                _total = len(new_rows)
+                _asr = (100.0 * _n_jailbreaks / _total) if _total > 0 else 0.0
+                _robustness = 100.0 - _asr
+                _risk_hex = (
+                    "#ef4444"
+                    if _asr >= 70
+                    else "#f97316"
+                    if _asr >= 40
+                    else "#eab308"
+                    if _asr >= 10
+                    else "#22c55e"
+                )
+                _risk_label = (
+                    "Critical"
+                    if _asr >= 70
+                    else "High"
+                    if _asr >= 40
+                    else "Medium"
+                    if _asr >= 10
+                    else "Low"
+                )
+                _no_data = _total == 0
 
-                    # ── Group rows by category ─────────────────────────
-                    _h_cat_groups: dict[str, list[dict]] = {}
-                    for _row in new_rows:
-                        _cat = _row.get("_goal_category") or "Uncategorised"
-                        _h_cat_groups.setdefault(str(_cat), []).append(_row)
-
-                    _h_left_num = 0
-                    for _cat_label in sorted(_h_cat_groups.keys()):
-                        _rows_in_cat = _h_cat_groups[_cat_label]
-                        with ui.row().classes("items-center gap-2 mt-3 mb-1 px-1"):
-                            ui.label(_cat_label).classes(
-                                "text-xs font-semibold text-grey-6 uppercase "
-                                "tracking-wide"
+                with self.history_charts_area:
+                    # ── Risk donut + Robustness side by side ───────────
+                    with ui.row().classes("w-full flex-wrap gap-4 items-stretch"):
+                        # Risk donut
+                        with ui.card().classes("flex-1 min-w-64"):
+                            ui.label("Risk Score").classes("font-semibold text-sm mb-1")
+                            ui.label("Attack Success Rate across all tests").classes(
+                                "text-xs text-grey-6 mb-3"
                             )
+                            with ui.row().classes("items-center gap-6 flex-wrap"):
+                                ui.echart(
+                                    {
+                                        "series": [
+                                            {
+                                                "type": "pie",
+                                                "radius": ["58%", "80%"],
+                                                "data": (
+                                                    [
+                                                        {
+                                                            "value": 1,
+                                                            "name": "No data",
+                                                            "itemStyle": {
+                                                                "color": "#94a3b8"
+                                                            },
+                                                        }
+                                                    ]
+                                                    if _no_data
+                                                    else [
+                                                        {
+                                                            "value": _n_jailbreaks,
+                                                            "name": "Jailbreaks",
+                                                            "itemStyle": {
+                                                                "color": "#ef4444"
+                                                            },
+                                                        },
+                                                        {
+                                                            "value": _n_mitigated,
+                                                            "name": "Mitigated",
+                                                            "itemStyle": {
+                                                                "color": "#22c55e"
+                                                            },
+                                                        },
+                                                        {
+                                                            "value": _n_errors,
+                                                            "name": "Errors",
+                                                            "itemStyle": {
+                                                                "color": "#f97316"
+                                                            },
+                                                        },
+                                                        {
+                                                            "value": max(
+                                                                0,
+                                                                _total
+                                                                - _n_jailbreaks
+                                                                - _n_mitigated
+                                                                - _n_errors,
+                                                            ),
+                                                            "name": "Pending",
+                                                            "itemStyle": {
+                                                                "color": "#94a3b8"
+                                                            },
+                                                        },
+                                                    ]
+                                                ),
+                                                "label": {"show": False},
+                                                "emphasis": {"scale": False},
+                                            }
+                                        ],
+                                        "graphic": (
+                                            []
+                                            if _no_data
+                                            else [
+                                                {
+                                                    "type": "group",
+                                                    "left": "center",
+                                                    "top": "center",
+                                                    "children": [
+                                                        {
+                                                            "type": "text",
+                                                            "style": {
+                                                                "text": f"{_asr:.0f}%",
+                                                                "textAlign": "center",
+                                                                "fontSize": 22,
+                                                                "fontWeight": "bold",
+                                                                "fill": _risk_hex,
+                                                            },
+                                                            "top": -14,
+                                                        },
+                                                        {
+                                                            "type": "text",
+                                                            "style": {
+                                                                "text": _risk_label,
+                                                                "textAlign": "center",
+                                                                "fontSize": 11,
+                                                                "fill": _risk_hex,
+                                                            },
+                                                            "top": 12,
+                                                        },
+                                                    ],
+                                                }
+                                            ]
+                                        ),
+                                        "tooltip": {
+                                            "trigger": "item"
+                                            if not _no_data
+                                            else "none"
+                                        },
+                                    }
+                                ).classes("w-36 h-36 shrink-0")
 
-                        # ── Group by subcategory within category ──────
-                        _h_subcat_groups: dict[str, list[dict]] = {}
-                        for _row in _rows_in_cat:
-                            _sub = str(_row.get("_goal_subcategory") or "")
-                            if _sub == "N/A":
-                                _sub = ""
-                            _h_subcat_groups.setdefault(_sub, []).append(_row)
+                                # Legend
+                                with ui.column().classes("gap-1"):
+                                    for _leg_l, _leg_c, _leg_clr in [
+                                        ("Jailbreaks", _n_jailbreaks, "#ef4444"),
+                                        ("Mitigated", _n_mitigated, "#22c55e"),
+                                        ("Errors", _n_errors, "#f97316"),
+                                        (
+                                            "Pending",
+                                            max(
+                                                0,
+                                                _total
+                                                - _n_jailbreaks
+                                                - _n_mitigated
+                                                - _n_errors,
+                                            ),
+                                            "#94a3b8",
+                                        ),
+                                    ]:
+                                        if _leg_c > 0 or not _no_data:
+                                            with ui.row().classes("items-center gap-2"):
+                                                ui.element("div").classes(
+                                                    "w-2.5 h-2.5 rounded-full shrink-0"
+                                                ).style(f"background:{_leg_clr}")
+                                                ui.label(f"{_leg_l}: {_leg_c}").classes(
+                                                    "text-xs"
+                                                )
 
-                        for _h_sub_label in sorted(_h_subcat_groups.keys()):
-                            _h_rows_in_sub = sorted(
-                                _h_subcat_groups[_h_sub_label],
-                                key=lambda r: str(r.get("goal") or "").lower(),
+                        # Robustness bar
+                        with ui.card().classes("flex-1 min-w-64"):
+                            ui.label("Robustness").classes("font-semibold text-sm mb-1")
+                            ui.label("Percentage of tests the agent resisted").classes(
+                                "text-xs text-grey-6 mb-3"
                             )
-                            if _h_sub_label:
-                                with ui.row().classes(
-                                    "items-center gap-2 mt-2 mb-0.5 px-3"
-                                ):
-                                    ui.label(_h_sub_label).classes(
-                                        "text-[10px] font-semibold text-grey-5 "
-                                        "uppercase tracking-wide"
+                            with ui.column().classes("gap-3 w-full"):
+                                with ui.row().classes("items-end gap-2"):
+                                    ui.label(f"{_robustness:.0f}%").classes(
+                                        "text-4xl font-bold"
+                                    )
+                                    _rob_color = (
+                                        "positive"
+                                        if _robustness >= 80
+                                        else "warning"
+                                        if _robustness >= 50
+                                        else "negative"
+                                    )
+                                    _rob_word = (
+                                        "Strong"
+                                        if _robustness >= 80
+                                        else "Moderate"
+                                        if _robustness >= 50
+                                        else "Weak"
+                                    )
+                                    ui.badge(_rob_word, color=_rob_color).classes(
+                                        "text-xs mb-1"
+                                    )
+                                ui.linear_progress(
+                                    value=_robustness / 100.0,
+                                    show_value=False,
+                                    color=_rob_color,
+                                ).classes("w-full").props("rounded size=12px")
+                                with ui.row().classes("w-full justify-between"):
+                                    ui.label(f"{_n_mitigated} mitigated").classes(
+                                        "text-xs text-grey-6"
+                                    )
+                                    ui.label(f"{_n_jailbreaks} vulnerable").classes(
+                                        "text-xs text-grey-6"
                                     )
 
-                            for _row in _h_rows_in_sub:
-                                _h_left_num += 1
-                                _row["goal_number"] = _h_left_num
-                                _rid = str(_row.get("id") or "")
-                                _data = _h_detail_data.get(_rid)
+                    # ── Category radar (if categories exist) ──────────
+                    _hc_cat_stats: dict[str, dict[str, int]] = defaultdict(
+                        lambda: {
+                            "total": 0,
+                            "vulnerable": 0,
+                            "mitigated": 0,
+                            "errors": 0,
+                        }
+                    )
+                    for _row in new_rows:
+                        _cat = _row.get("_goal_category") or ""
+                        if not _cat or _cat == "N/A":
+                            continue
+                        _bkt = _row.get("_bucket", "pending")
+                        _entry = _hc_cat_stats[_cat]
+                        _entry["total"] += 1
+                        if _bkt == "jailbreak":
+                            _entry["vulnerable"] += 1
+                        elif _bkt == "mitigated":
+                            _entry["mitigated"] += 1
+                        elif _bkt == "failed":
+                            _entry["errors"] += 1
 
-                                def _make_h_click(
-                                    _r: dict = _row,
-                                    _d: object = _data,
-                                    _atk_str: str = attack_type_str,
-                                ) -> None:
-                                    if self.history_detail_area is None:
-                                        return
-                                    self.history_detail_area.clear()
-                                    with self.history_detail_area:
-                                        _ha = _atk_str.lower()
-                                        if _ha == "baseline":
-                                            self._render_baseline_goal_card(
-                                                _r,
-                                                _d,
-                                                detail_mode=True,  # type: ignore[arg-type]
-                                            )
-                                        elif _ha == "bon":
-                                            self._render_bon_goal_card(
-                                                _r,
-                                                _d,
-                                                detail_mode=True,  # type: ignore[arg-type]
-                                            )
-                                        elif _ha == "pap":
-                                            self._render_pap_goal_card(
-                                                _r,
-                                                _d,
-                                                detail_mode=True,  # type: ignore[arg-type]
-                                            )
-                                        elif _ha == "pair":
-                                            self._render_pair_goal_card(
-                                                _r,
-                                                _d,
-                                                detail_mode=True,  # type: ignore[arg-type]
-                                            )
-                                        elif _ha == "tap":
-                                            _nodes, _ds = _d  # type: ignore[misc]
-                                            self._render_tap_goal_card(
-                                                _r, _nodes, _ds, detail_mode=True
-                                            )
-                                        elif _ha == "advprefix":
-                                            _pr, _gs = _d  # type: ignore[misc]
-                                            self._render_advprefix_goal_card(
-                                                _r, _pr, _gs, detail_mode=True
-                                            )
-                                        elif _ha == "autodanturbo":
-                                            self._render_autodan_goal_card(
-                                                _r,
-                                                _d,
-                                                detail_mode=True,  # type: ignore[arg-type]
-                                            )
-                                        else:
-                                            _req, _resp = _d  # type: ignore[misc]
-                                            self._render_generic_goal_card(
-                                                _r, _req, _resp, detail_mode=True
-                                            )
+                    if _hc_cat_stats:
+                        _hc_items = []
+                        for _lbl, _sts in _hc_cat_stats.items():
+                            _t = int(_sts.get("total") or 0)
+                            _v = int(_sts.get("vulnerable") or 0)
+                            if _t <= 0:
+                                continue
+                            _hc_items.append(
+                                {
+                                    "label": _lbl,
+                                    "total": _t,
+                                    "vulnerable": _v,
+                                    "mitigated": int(_sts.get("mitigated") or 0),
+                                    "errors": int(_sts.get("errors") or 0),
+                                    "robustness": 100.0 * (_t - _v) / _t,
+                                }
+                            )
+                        _hc_items.sort(key=lambda x: x["label"], reverse=True)
+                        if _hc_items:
+                            with ui.column().classes("w-full gap-3"):
+                                with ui.card().classes("w-full"):
+                                    ui.label("Vulnerability by Category").classes(
+                                        "font-semibold text-sm mb-2"
+                                    )
+                                    # Always show bar chart for category breakdown
+                                    _hc_labels = [x["label"] for x in _hc_items]
+                                    _hc_vuln = [x["vulnerable"] for x in _hc_items]
+                                    _hc_mit = [x["mitigated"] for x in _hc_items]
+                                    _hc_err = [x["errors"] for x in _hc_items]
+                                    ui.echart(
+                                        {
+                                            "tooltip": {"trigger": "axis"},
+                                            "legend": {
+                                                "data": [
+                                                    "Vulnerable",
+                                                    "Mitigated",
+                                                    "Errors",
+                                                ],
+                                                "bottom": 0,
+                                            },
+                                            "grid": {
+                                                "left": "3%",
+                                                "right": "4%",
+                                                "top": "3%",
+                                                "bottom": "14%",
+                                                "containLabel": True,
+                                            },
+                                            "xAxis": {"type": "value"},
+                                            "yAxis": {
+                                                "type": "category",
+                                                "data": _hc_labels,
+                                                "axisLabel": {
+                                                    "width": 140,
+                                                    "overflow": "truncate",
+                                                },
+                                            },
+                                            "series": [
+                                                {
+                                                    "name": "Vulnerable",
+                                                    "type": "bar",
+                                                    "stack": "total",
+                                                    "data": _hc_vuln,
+                                                    "itemStyle": {"color": "#ef4444"},
+                                                },
+                                                {
+                                                    "name": "Mitigated",
+                                                    "type": "bar",
+                                                    "stack": "total",
+                                                    "data": _hc_mit,
+                                                    "itemStyle": {"color": "#22c55e"},
+                                                },
+                                                {
+                                                    "name": "Errors",
+                                                    "type": "bar",
+                                                    "stack": "total",
+                                                    "data": _hc_err,
+                                                    "itemStyle": {"color": "#f97316"},
+                                                },
+                                            ],
+                                        }
+                                    ).classes("w-full h-72")
 
-                                self._render_compact_card(_row, _make_h_click)
+                                # Radar chart (only when 3+ categories)
+                                if len(_hc_items) >= 3:
+                                    _hc_top = _hc_items[:9]
+                                    _hc_top.sort(key=lambda x: x["label"])
+                                    if len(_hc_top) > 1:
+                                        _hc_top = [_hc_top[0], *reversed(_hc_top[1:])]
+                                    _hc_indicators = [
+                                        {"name": x["label"], "max": 100}
+                                        for x in _hc_top
+                                    ]
+                                    _hc_values = [
+                                        round(x["robustness"], 1) for x in _hc_top
+                                    ]
+
+                                    with ui.card().classes("w-full"):
+                                        ui.label("Robustness by Category").classes(
+                                            "font-semibold text-sm mb-2"
+                                        )
+                                        with ui.row().classes("w-full justify-center"):
+                                            ui.echart(
+                                                {
+                                                    "radar": {
+                                                        "shape": "polygon",
+                                                        "indicator": _hc_indicators,
+                                                        "splitNumber": 5,
+                                                        "center": ["50%", "52%"],
+                                                        "radius": "64%",
+                                                        "axisName": {
+                                                            "fontSize": 11,
+                                                            "color": "#374151",
+                                                        },
+                                                        "splitLine": {
+                                                            "lineStyle": {
+                                                                "color": "#d1d5db"
+                                                            }
+                                                        },
+                                                        "splitArea": {
+                                                            "areaStyle": {
+                                                                "color": ["#ffffff"]
+                                                            }
+                                                        },
+                                                    },
+                                                    "series": [
+                                                        {
+                                                            "type": "radar",
+                                                            "symbol": "circle",
+                                                            "symbolSize": 8,
+                                                            "itemStyle": {
+                                                                "color": "#22c55e"
+                                                            },
+                                                            "lineStyle": {
+                                                                "color": "#22c55e",
+                                                                "width": 2,
+                                                            },
+                                                            "areaStyle": {
+                                                                "color": "rgba(34,197,94,0.15)"
+                                                            },
+                                                            "data": [
+                                                                {"value": _hc_values}
+                                                            ],
+                                                        }
+                                                    ],
+                                                    "tooltip": {"trigger": "item"},
+                                                }
+                                            ).classes("w-full h-72")
+
+            if all_items and self.history_results_list_area is not None:
+                # ── Pre-parse detail data for all rows ─────────────
+                _h_atk = attack_type_str.lower()
+                _h_detail_data: dict[str, object] = {}
+                for _row in new_rows:
+                    _rid = str(_row.get("id") or "")
+                    if _h_atk == "baseline":
+                        _t = baseline_traces_map_hr.get(_rid, [])
+                        _h_detail_data[_rid] = self._parse_baseline_traces(
+                            _t, str(_row.get("goal") or "")
+                        )
+                    elif _h_atk == "bon":
+                        _t = bon_traces_map_hr.get(_rid, [])
+                        _h_detail_data[_rid] = self._parse_bon_traces(_t)
+                    elif _h_atk == "pap":
+                        _t = generic_traces_map_hr.get(_rid, [])
+                        _h_detail_data[_rid] = self._parse_pap_traces(_t)
+                    elif _h_atk == "pair":
+                        _t = generic_traces_map_hr.get(_rid, [])
+                        _h_detail_data[_rid] = self._parse_pair_traces(_t)
+                    elif _h_atk == "tap":
+                        _t = generic_traces_map_hr.get(_rid, [])
+                        _h_detail_data[_rid] = self._parse_tap_traces(_t)
+                    elif _h_atk == "advprefix":
+                        _t = generic_traces_map_hr.get(_rid, [])
+                        _h_detail_data[_rid] = self._parse_advprefix_traces(_t)
+                    elif _h_atk == "autodanturbo":
+                        _t = generic_traces_map_hr.get(_rid, [])
+                        _h_detail_data[_rid] = self._parse_autodan_traces(_t)
+                    else:
+                        _t = generic_traces_map_hr.get(_rid, [])
+                        _h_detail_data[_rid] = (
+                            self._extract_prompt_response_from_traces(_t)
+                        )
+
+                # Store for filter re-rendering
+                self._history_goal_rows = new_rows
+                self._history_goal_detail_data = _h_detail_data
+                self._history_goal_filter = ""
+                self._history_goal_filter_category = ""
+                self._history_goal_filter_search = ""
+                # Update filter bar
+                if self._history_goal_filter_area is not None:
+                    self._history_goal_filter_area.clear()
+                    with self._history_goal_filter_area:
+                        self._build_goal_filter_bar()
+                # Render all goals
+                self._render_filtered_history_goals()
         except Exception as exc:
             if self.history_results_list_area is not None:
                 self.history_results_list_area.clear()
