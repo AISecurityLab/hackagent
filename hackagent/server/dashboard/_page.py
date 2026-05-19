@@ -158,6 +158,7 @@ class DashboardPage:
         self._selected_attack_ids: list[str] = []
         self._runs_delete_btn: ui.button | None = None
         self._runs_compare_btn: ui.button | None = None
+        self._runs_export_btn: ui.button | None = None
         self._attacks_delete_btn: ui.button | None = None
 
         # Comparison dialog
@@ -712,11 +713,24 @@ class DashboardPage:
                                     ),
                                 )
                                 .props("flat dense no-caps color=primary")
-                                .classes("hidden")
+                                .classes("opacity-30 pointer-events-none")
+                            )
+                            self._runs_export_btn = (
+                                ui.button(
+                                    "Export",
+                                    icon="download",
+                                    on_click=lambda: ui.timer(
+                                        0,
+                                        self._export_selected_runs,
+                                        once=True,
+                                    ),
+                                )
+                                .props("flat dense no-caps color=secondary")
+                                .classes("opacity-30 pointer-events-none")
                             )
                             self._runs_delete_btn = (
                                 ui.button(
-                                    "Delete selected",
+                                    "Delete",
                                     icon="delete",
                                     on_click=lambda: ui.timer(
                                         0,
@@ -725,13 +739,41 @@ class DashboardPage:
                                     ),
                                 )
                                 .props("flat dense no-caps color=negative")
-                                .classes("hidden")
+                                .classes("opacity-30 pointer-events-none")
                             )
                     # ── Scrollable run list ────────────────────────────────────
                     with ui.scroll_area().classes("w-full flex-1 min-h-0"):
-                        self._history_runs_area = ui.column().classes(
-                            "w-full gap-0 overflow-x-auto"
+                        self.runs_table = make_run_table(
+                            on_row_click=lambda run: ui.timer(
+                                0,
+                                lambda r=run: asyncio.create_task(
+                                    self._open_run_history_results(r)
+                                ),
+                                once=True,
+                            ),
+                            include_agent=True,
+                            include_progressive_run=True,
+                            include_results=False,
+                            include_goal_latency_avg=True,
+                            include_asr=True,
+                            pagination={"rowsPerPage": 15},
+                            selection="multiple",
+                            on_select=lambda e: self._on_runs_table_select(e),
                         )
+                        # Move pagination bar to top via flex order
+                        self.runs_table.classes("runs-table-top-pagination")
+                        ui.add_css("""
+                            .runs-table-top-pagination .q-table__container {
+                                display: flex;
+                                flex-direction: column;
+                            }
+                            .runs-table-top-pagination .q-table__bottom {
+                                order: -1;
+                                border-bottom: 1px solid #e0e0e0;
+                                border-top: none;
+                            }
+
+                        """)
                         self._runs_load_more_btn = (
                             ui.button(
                                 "Load more",
@@ -1798,6 +1840,10 @@ class DashboardPage:
         if schedule_refresh:
             asyncio.create_task(self.refresh_view())
 
+    def _on_runs_table_select(self, e) -> None:
+        """Handle selection event from the runs ui.table."""
+        self._on_runs_select()
+
     def _on_runs_select(self) -> None:
         if self.runs_table is not None:
             self._selected_run_ids = [
@@ -1805,14 +1851,37 @@ class DashboardPage:
             ]
         if self._runs_delete_btn is not None:
             if self._selected_run_ids:
-                self._runs_delete_btn.classes(remove="hidden")
+                self._runs_delete_btn.classes(
+                    remove="opacity-30 pointer-events-none",
+                    add="opacity-100",
+                )
             else:
-                self._runs_delete_btn.classes(add="hidden")
+                self._runs_delete_btn.classes(
+                    remove="opacity-100",
+                    add="opacity-30 pointer-events-none",
+                )
+        if self._runs_export_btn is not None:
+            if self._selected_run_ids:
+                self._runs_export_btn.classes(
+                    remove="opacity-30 pointer-events-none",
+                    add="opacity-100",
+                )
+            else:
+                self._runs_export_btn.classes(
+                    remove="opacity-100",
+                    add="opacity-30 pointer-events-none",
+                )
         if self._runs_compare_btn is not None:
             if len(self._selected_run_ids) >= 2:
-                self._runs_compare_btn.classes(remove="hidden")
+                self._runs_compare_btn.classes(
+                    remove="opacity-30 pointer-events-none",
+                    add="opacity-100",
+                )
             else:
-                self._runs_compare_btn.classes(add="hidden")
+                self._runs_compare_btn.classes(
+                    remove="opacity-100",
+                    add="opacity-30 pointer-events-none",
+                )
 
     async def _delete_selected_runs(self) -> None:
         ids = list(self._selected_run_ids)
@@ -1828,9 +1897,107 @@ class DashboardPage:
         if self.runs_table is not None:
             self.runs_table.selected.clear()
         if self._runs_delete_btn is not None:
-            self._runs_delete_btn.classes(add="hidden")
+            self._runs_delete_btn.classes(
+                remove="opacity-100",
+                add="opacity-30 pointer-events-none",
+            )
         await self._load_runs()
         await self._load_history_reports()
+
+    async def _export_selected_runs(self) -> None:
+        """Export selected runs as summary JSON download."""
+        ids = list(self._selected_run_ids)
+        if not ids:
+            ui.notify("No runs selected", type="warning")
+            return
+        try:
+            export_data = await self._build_export_data(ids)
+            short_ids = "_".join(rid[:8] for rid in ids)
+            filename = f"hackagent_export_{short_ids}.json"
+            content = json.dumps(export_data, indent=2, default=str)
+            ui.download(
+                content.encode("utf-8"),
+                filename=filename,
+                media_type="application/json",
+            )
+            ui.notify(f"Exported {len(ids)} run(s)", type="positive")
+        except Exception as exc:
+            ui.notify(f"Export failed: {exc}", type="negative")
+
+    async def _build_export_data(self, run_ids: list[str]) -> dict:
+        """Build export JSON payload for given run IDs."""
+        from datetime import datetime, timezone
+
+        export = {
+            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "runs": [],
+        }
+
+        for rid in run_ids:
+            run_row = next(
+                (r for r in self._runs_all_rows if str(r.get("id")) == rid), None
+            )
+            if not run_row:
+                continue
+
+            run_entry: dict = {
+                "id": rid,
+                "run_number": run_row.get("run_progress"),
+                "agent_name": run_row.get("agent_name"),
+                "attack_type": run_row.get("attack_type"),
+                "status": run_row.get("status"),
+                "created_at": run_row.get("created_at"),
+                "total_results": run_row.get("total_results"),
+                "successful_jailbreaks": run_row.get("successful_jailbreaks"),
+                "mitigations": run_row.get("mitigations"),
+                "errors": run_row.get("failed_attacks"),
+                "overall_asr": run_row.get("overall_asr"),
+                "latency_seconds": run_row.get("_latency_s"),
+                "avg_goal_latency_seconds": run_row.get("_goal_latency_avg_s"),
+                "run_config": run_row.get("run_config"),
+            }
+
+            # Per-category breakdown
+            run_uuid = UUID(rid)
+            cat_stats: dict[str, dict[str, int]] = defaultdict(
+                lambda: {
+                    "total": 0,
+                    "vulnerable": 0,
+                    "mitigated": 0,
+                    "errors": 0,
+                }
+            )
+            page = 1
+            while True:
+                rp = self.backend.list_results(
+                    run_id=run_uuid, page=page, page_size=100
+                )
+                if not rp.items:
+                    break
+                for result in rp.items:
+                    rd = _serialize(result)
+                    cat = self._extract_goal_classifier_label(rd, "category")
+                    if not cat or cat == "N/A":
+                        cat = "Uncategorised"
+                    es = str(rd.get("evaluation_status") or "")
+                    en = rd.get("evaluation_notes")
+                    bucket = _result_bucket(status=es, notes=en)
+                    entry = cat_stats[cat]
+                    entry["total"] += 1
+                    if bucket == "jailbreak":
+                        entry["vulnerable"] += 1
+                    elif bucket == "mitigated":
+                        entry["mitigated"] += 1
+                    elif bucket == "error":
+                        entry["errors"] += 1
+                if int(rp.total or 0) <= page * 100:
+                    break
+                page += 1
+            run_entry["categories"] = dict(cat_stats)
+
+            export["runs"].append(run_entry)
+
+        return export
 
     async def _compare_selected_runs(self) -> None:
         """Open a comparison dialog for 2-4 selected runs."""
@@ -1906,37 +2073,11 @@ class DashboardPage:
                 # ── Build short + full labels ─────────────────────
                 short_labels = [f"#{r.get('run_progress', '?')}" for r in runs]
 
-                # ── Detect comparison context ─────────────────────
-                agents = {str(r.get("agent_name") or "—") for r in runs}
-                attacks = {str(r.get("attack_type") or "—") for r in runs}
-                if len(agents) == 1 and len(attacks) > 1:
-                    context_line = (
-                        f"Same target: {next(iter(agents))} — "
-                        f"Comparing attacks: {', '.join(sorted(attacks))}"
-                    )
-                elif len(attacks) == 1 and len(agents) > 1:
-                    context_line = (
-                        f"Same attack: {next(iter(attacks))} — "
-                        f"Comparing targets: {', '.join(sorted(agents))}"
-                    )
-                elif len(agents) == 1 and len(attacks) == 1:
-                    context_line = (
-                        f"Same target & attack: "
-                        f"{next(iter(agents))} · {next(iter(attacks))}"
-                    )
-                else:
-                    context_line = (
-                        f"Targets: {', '.join(sorted(agents))} · "
-                        f"Attacks: {', '.join(sorted(attacks))}"
-                    )
-
                 # ── Header ────────────────────────────────────────
                 with ui.row().classes("items-center justify-between w-full mb-1"):
-                    with ui.column().classes("gap-0"):
-                        ui.label(f"Comparing {len(runs)} Runs").classes(
-                            "text-lg font-semibold"
-                        )
-                        ui.label(context_line).classes("text-xs text-grey-7")
+                    ui.label(f"Comparing {len(runs)} Runs").classes(
+                        "text-lg font-semibold"
+                    )
                     ui.button(icon="close", on_click=self._compare_dialog.close).props(
                         "flat round dense"
                     )
@@ -2100,18 +2241,48 @@ class DashboardPage:
                 ]
                 # Build label→set(values) to detect differences
                 _label_values: dict[str, set[str]] = defaultdict(set)
+                _all_labels: set[str] = set()
                 for _chips_list in _all_run_chips:
-                    _seen_labels: set[str] = set()
                     for _, lbl, val in _chips_list:
                         _label_values[lbl].add(val)
-                        _seen_labels.add(lbl)
-                    # Labels absent from a run count as different
-                    for other_lbl in _label_values:
-                        if other_lbl not in _seen_labels:
-                            _label_values[other_lbl].add("")
+                        _all_labels.add(lbl)
+                # Labels absent from a run count as a distinct value
+                for _chips_list in _all_run_chips:
+                    _run_labels = {lbl for _, lbl, _ in _chips_list}
+                    for lbl in _all_labels:
+                        if lbl not in _run_labels:
+                            _label_values[lbl].add("")
                 _diff_labels: set[str] = {
                     lbl for lbl, vals in _label_values.items() if len(vals) > 1
                 }
+
+                # ── Shared configuration (top) ────────────────────
+                # Show chips common to all runs (non-diff) once at top
+                _shared_labels = _all_labels - _diff_labels
+                if _shared_labels and _all_run_chips:
+                    # Take shared chips from the first run (values are identical)
+                    _shared_chips = [
+                        (ic, lbl, val)
+                        for ic, lbl, val in _all_run_chips[0]
+                        if lbl in _shared_labels
+                    ]
+                    if _shared_chips:
+                        with ui.row().classes("items-center gap-1 mb-3 flex-wrap px-1"):
+                            ui.icon("settings", size="14px").classes("text-grey-5")
+                            ui.label("Shared config").classes(
+                                "text-[10px] font-semibold uppercase text-grey-5 mr-1"
+                            )
+                            for _cic, _clbl, _cval in _shared_chips:
+                                with ui.row().classes(
+                                    "items-center gap-1 rounded px-1.5 py-0.5 bg-grey-1"
+                                ):
+                                    ui.icon(_cic, size="10px").classes("text-grey-5")
+                                    ui.label(_clbl).classes(
+                                        "text-[9px] font-semibold uppercase tracking-wide text-grey-5"
+                                    )
+                                    ui.label(_cval).classes(
+                                        "text-[10px] font-medium text-grey-8"
+                                    )
 
                 # ── Run identity cards (compact) ──────────────────
                 with ui.row().classes("w-full gap-2 flex-wrap mb-3"):
@@ -2143,42 +2314,31 @@ class DashboardPage:
                                 ui.label(run.get("_latency") or "—").classes(
                                     "text-xs text-grey-6"
                                 )
-                            # Configuration chips (differences highlighted)
+                            # Only show differing config chips per run
                             _run_chips = _all_run_chips[i]
-                            if _run_chips:
+                            _diff_chips = [
+                                (ic, lbl, val)
+                                for ic, lbl, val in _run_chips
+                                if lbl in _diff_labels
+                            ]
+                            if _diff_chips:
                                 with ui.row().classes(
                                     "items-center gap-1 mt-1 flex-wrap"
                                 ):
-                                    for _cic, _clbl, _cval in _run_chips:
-                                        _is_diff = _clbl in _diff_labels
-                                        _bg_cls = (
-                                            "bg-amber-1 ring-1 ring-amber-3"
-                                            if _is_diff
-                                            else "bg-grey-1"
-                                        )
+                                    for _cic, _clbl, _cval in _diff_chips:
                                         with ui.row().classes(
-                                            f"items-center gap-1 rounded px-1.5 py-0.5 {_bg_cls}"
+                                            "items-center gap-1 rounded px-1.5 py-0.5 "
+                                            "bg-amber-1 ring-1 ring-amber-3"
                                         ):
                                             ui.icon(_cic, size="10px").classes(
                                                 "text-amber-8"
-                                                if _is_diff
-                                                else "text-grey-5"
                                             )
                                             ui.label(_clbl).classes(
                                                 "text-[9px] font-semibold uppercase tracking-wide "
-                                                + (
-                                                    "text-amber-8"
-                                                    if _is_diff
-                                                    else "text-grey-5"
-                                                )
+                                                "text-amber-8"
                                             )
                                             ui.label(_cval).classes(
-                                                "text-[10px] font-medium "
-                                                + (
-                                                    "text-amber-9"
-                                                    if _is_diff
-                                                    else "text-grey-8"
-                                                )
+                                                "text-[10px] font-medium text-amber-9"
                                             )
 
                 # ── Risk Distribution donuts (side by side) ───────
@@ -2383,11 +2543,6 @@ class DashboardPage:
                             "Higher = more robust (100% means no successful jailbreaks)"
                         ).classes("text-xs text-grey-6 mb-2")
                         radar_cats = sorted_cats[:9]
-                        if len(radar_cats) > 1:
-                            radar_cats = [
-                                radar_cats[0],
-                                *reversed(radar_cats[1:]),
-                            ]
 
                         indicators = [{"name": c, "max": 100} for c in radar_cats]
                         series_data = []
@@ -8077,8 +8232,27 @@ class DashboardPage:
             d["_latency_s"] = self._compute_run_latency_seconds(d)
             d["_latency"] = _format_latency(d.get("_latency_s"))
             rows.append(d)
+        _DASH_FIELDS = (
+            "id",
+            "run_progress",
+            "agent_name",
+            "attack_type",
+            "status",
+            "_latency",
+            "_latency_s",
+            "_goal_latency_avg",
+            "_goal_latency_avg_s",
+            "_rel",
+            "_date",
+            "created_at",
+            "overall_asr",
+            "total_results",
+            "successful_jailbreaks",
+            "failed_attacks",
+        )
+        slim_rows = [{k: r.get(k) for k in _DASH_FIELDS} for r in rows]
         self.recent_runs_table.rows.clear()
-        self.recent_runs_table.rows.extend(rows)
+        self.recent_runs_table.rows.extend(slim_rows)
         self.recent_runs_table.update()
 
     def _count_result_buckets_for_agent(self, agent_id: UUID) -> dict[str, int]:
@@ -8355,10 +8529,30 @@ class DashboardPage:
         """Re-render the run list with current filters applied."""
         filtered = self._filter_runs_rows()
 
-        if self._history_runs_area is not None:
-            self._history_runs_area.clear()
-            with self._history_runs_area:
-                self._render_runs_table(filtered, len(filtered))
+        if self.runs_table is not None:
+            # Only send fields the table actually displays to avoid payload bloat
+            _TABLE_FIELDS = (
+                "id",
+                "run_progress",
+                "agent_name",
+                "attack_type",
+                "status",
+                "_latency",
+                "_latency_s",
+                "_goal_latency_avg",
+                "_goal_latency_avg_s",
+                "_rel",
+                "_date",
+                "created_at",
+                "overall_asr",
+                "total_results",
+                "successful_jailbreaks",
+                "failed_attacks",
+            )
+            slim_rows = [{k: r.get(k) for k in _TABLE_FIELDS} for r in filtered]
+            self.runs_table.rows.clear()
+            self.runs_table.rows.extend(slim_rows)
+            self.runs_table.update()
 
         shown = len(filtered)
         total = len(self._runs_all_rows)
@@ -8416,157 +8610,6 @@ class DashboardPage:
         """Handle search input change."""
         self._runs_filter_search = str(value) if value else ""
         self._apply_runs_filters()
-
-    def _render_runs_table(self, rows: list[dict], total: int) -> None:
-        """Render expandable run rows as a table-like layout."""
-        self._history_visible_run_ids = [str(r.get("id") or "") for r in rows]
-
-        def _toggle_all(e) -> None:
-            checked = bool(e.value)
-            page_ids = [rid for rid in self._history_visible_run_ids if rid]
-            if checked:
-                for rid in page_ids:
-                    if rid not in self._selected_run_ids:
-                        self._selected_run_ids.append(rid)
-            else:
-                self._selected_run_ids = [
-                    rid for rid in self._selected_run_ids if rid not in page_ids
-                ]
-            self._on_runs_select()
-            self._apply_runs_filters()
-
-        all_checked = bool(self._history_visible_run_ids) and all(
-            rid in self._selected_run_ids for rid in self._history_visible_run_ids
-        )
-
-        # Header row
-        with ui.row().classes(
-            "w-full min-w-[1220px] flex-nowrap items-center px-3 py-2 border-b "
-            "border-grey-3 text-xs font-semibold text-grey-6 gap-0"
-        ):
-            with ui.element("div").classes("w-10 flex items-center justify-center"):
-                ui.checkbox(value=all_checked, on_change=_toggle_all).props("dense")
-            ui.label("").classes("w-8")  # expand chevron
-            ui.label("Run #").classes("w-16")
-            ui.label("Agent").classes("flex-1 min-w-24")
-            ui.label("Attack").classes("w-32")
-            ui.label("Status").classes("w-28")
-            ui.label("Total Latency").classes("w-24")
-            ui.label("Per-Goal Latency (AVG)").classes("w-32")
-            ui.label("Timestamp").classes("w-28")
-            ui.label("ASR").classes("w-16")
-
-        for run_row in rows:
-            self._render_expandable_run_row(run_row)
-
-    def _render_expandable_run_row(self, run: dict) -> None:
-        """Render a single run row with inline expansion for goals."""
-        run_id = str(run.get("id") or "")
-        status = str(run.get("status") or "—")
-        status_color = (
-            "positive"
-            if status == "COMPLETED"
-            else "info"
-            if status == "RUNNING"
-            else "negative"
-            if status == "FAILED"
-            else "warning"
-        )
-
-        # Container for the run + its expanded goals
-        run_container = ui.column().classes("w-full gap-0")
-        with run_container:
-            row_shell = ui.row().classes(
-                "w-full min-w-[1220px] flex-nowrap items-center px-3 py-2 border-b "
-                "border-grey-2 gap-0 hover:bg-grey-1 dark:hover:bg-grey-9 transition-colors"
-            )
-
-            run_checked = run_id in self._selected_run_ids
-
-            def _toggle_selected(e, rid=run_id) -> None:
-                checked = bool(e.value)
-                if checked:
-                    if rid not in self._selected_run_ids:
-                        self._selected_run_ids.append(rid)
-                else:
-                    self._selected_run_ids = [
-                        x for x in self._selected_run_ids if x != rid
-                    ]
-                self._on_runs_select()
-
-            with row_shell:
-                with ui.element("div").classes("w-10 flex items-center justify-center"):
-                    ui.checkbox(value=run_checked, on_change=_toggle_selected).props(
-                        "dense"
-                    )
-
-                run_header = ui.row().classes(
-                    "flex-1 flex-nowrap items-center gap-0 cursor-pointer"
-                )
-                with run_header:
-                    ui.icon("expand_more", size="sm").classes(
-                        "w-8 text-grey-6 transition-transform"
-                    )
-                    ui.label(str(run.get("run_progress", "—"))).classes(
-                        "w-16 font-mono text-sm font-medium whitespace-nowrap"
-                    )
-                    ui.label(str(run.get("agent_name") or "—")).classes(
-                        "flex-1 min-w-24 text-sm truncate whitespace-nowrap"
-                    )
-                    with ui.element("div").classes("w-32"):
-                        ui.badge(
-                            str(run.get("attack_type") or "—"), color="orange"
-                        ).classes("text-xs")
-                    with ui.element("div").classes("w-28"):
-                        ui.badge(status, color=status_color).classes("text-xs")
-                        if status == "RUNNING":
-                            ui.spinner(color="info", size="xs").classes("ml-1")
-                    ui.label(str(run.get("_latency") or "—")).classes("w-24 text-sm")
-                    ui.label(str(run.get("_goal_latency_avg") or "—")).classes(
-                        "w-32 text-sm"
-                    )
-                    with ui.column().classes("w-28 gap-0"):
-                        ui.label(str(run.get("_rel") or "—")).classes("text-xs")
-                        ui.label(str(run.get("_date") or "—")).classes(
-                            "text-[10px] text-grey-6"
-                        )
-
-                    jb = int(run.get("successful_jailbreaks") or 0)
-                    failed_attacks = int(run.get("failed_attacks") or 0)
-                    denominator = jb + failed_attacks
-                    asr_value = str(run.get("overall_asr") or "").strip()
-                    if not asr_value:
-                        asr_value = (
-                            f"{(jb * 100.0 / denominator):.1f}%"
-                            if denominator > 0
-                            else "—"
-                        )
-                    ui.label(asr_value).classes("w-16 text-sm")
-
-            # Goals area (kept for structural compatibility but unused)
-            ui.column().classes("w-full gap-0").style("display:none")
-
-            def _open_dialog(r=run):
-                ui.timer(
-                    0,
-                    lambda rr=r: asyncio.create_task(
-                        self._open_run_history_results(rr)
-                    ),
-                    once=True,
-                )
-
-            run_header.on("click", lambda e, fn=_open_dialog: fn())
-
-            # Auto-open dialog when navigation requested from Dashboard -> Recent Runs.
-            if self._history_expanded_run_id == run_id:
-                self._history_expanded_run_id = None
-                ui.timer(
-                    0,
-                    lambda r=run: asyncio.create_task(
-                        self._open_run_history_results(r)
-                    ),
-                    once=True,
-                )
 
     async def _load_run_goals_inline(self, run: dict, goals_area: ui.column) -> None:
         """Load and render goals as a table inside the expanded run row."""
@@ -9564,8 +9607,6 @@ class DashboardPage:
 
                 category_items.sort(key=lambda item: item["label"])
                 top_items = category_items[:9]
-                if len(top_items) > 1:
-                    top_items = [top_items[0], *reversed(top_items[1:])]
 
                 def _wrap_label(text: str, line_limit: int = 18) -> str:
                     text = str(text).strip()
@@ -10392,6 +10433,8 @@ class DashboardPage:
             self.history_results_empty_label.text = "Loading results…"
             self.history_results_empty_label.set_visibility(True)
 
+        self._history_current_run = run
+
         if self.history_run_dialog is not None:
             self.history_run_dialog.open()
 
@@ -10840,8 +10883,6 @@ class DashboardPage:
                                 if len(_hc_items) >= 3:
                                     _hc_top = _hc_items[:9]
                                     _hc_top.sort(key=lambda x: x["label"])
-                                    if len(_hc_top) > 1:
-                                        _hc_top = [_hc_top[0], *reversed(_hc_top[1:])]
                                     _hc_indicators = [
                                         {"name": x["label"], "max": 100}
                                         for x in _hc_top
@@ -10894,7 +10935,10 @@ class DashboardPage:
                                                                 "color": "rgba(34,197,94,0.15)"
                                                             },
                                                             "data": [
-                                                                {"value": _hc_values}
+                                                                {
+                                                                    "value": _hc_values,
+                                                                    "name": "Robustness",
+                                                                }
                                                             ],
                                                         }
                                                     ],
