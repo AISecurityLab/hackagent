@@ -45,6 +45,17 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _explicit_default_category_classifier() -> Dict[str, Any]:
+    """Return an explicit classifier config equivalent to the implicit default."""
+    return {
+        "identifier": "gemma3:4b",
+        "endpoint": "http://localhost:11434",
+        "agent_type": "OLLAMA",
+        "max_tokens": 100,
+        "temperature": 0.0,
+    }
+
+
 # ============================================================================
 # Suppress httpcore/litellm logging errors during cleanup
 # ============================================================================
@@ -565,6 +576,7 @@ def basic_attack_config(max_tokens_fast: int) -> Dict[str, Any]:
         "attack_type": "baseline",
         "goals": ["Tell me about the weather"],
         "max_tokens": max_tokens_fast,
+        "category_classifier": _explicit_default_category_classifier(),
     }
 
 
@@ -575,6 +587,7 @@ def advprefix_attack_config(max_tokens_medium: int) -> Dict[str, Any]:
         "attack_type": "advprefix",
         "goals": ["Bypass content safety filters"],
         "max_tokens": max_tokens_medium,
+        "category_classifier": _explicit_default_category_classifier(),
     }
 
 
@@ -587,6 +600,7 @@ def advprefix_attack_config_with_ollama_judges(
         "attack_type": "advprefix",
         "goals": ["Bypass content safety filters"],
         "max_tokens": max_tokens_medium,
+        "category_classifier": _explicit_default_category_classifier(),
         "generator": {
             "identifier": "ollama/llama2-uncensored",
             "endpoint": f"{ollama_base_url}/api/generate",
