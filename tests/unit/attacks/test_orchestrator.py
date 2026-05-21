@@ -101,7 +101,14 @@ class TestAttackOrchestratorServerRecords(unittest.TestCase):
         mock_record.id = attack_id
         self.mock_hack_agent.backend.create_attack.return_value = mock_record
 
-        attack_config = {"goals": ["test goal"]}
+        attack_config = {
+            "goals": ["test goal"],
+            "category_classifier": {
+                "identifier": "gpt-4o-mini",
+                "agent_type": "OPENAI",
+                "endpoint": "https://api.openai.com/v1",
+            },
+        }
 
         result_id = orchestrator._create_server_attack_record(
             "test",
@@ -123,7 +130,14 @@ class TestAttackOrchestratorServerRecords(unittest.TestCase):
             "Server error"
         )
 
-        attack_config = {"goals": ["test goal"]}
+        attack_config = {
+            "goals": ["test goal"],
+            "category_classifier": {
+                "identifier": "gpt-4o-mini",
+                "agent_type": "OPENAI",
+                "endpoint": "https://api.openai.com/v1",
+            },
+        }
 
         with self.assertRaises(HackAgentError):
             orchestrator._create_server_attack_record(
@@ -238,7 +252,14 @@ class TestAttackOrchestratorExecution(unittest.TestCase):
         mock_create_run.return_value = "run-456"
         mock_execute_local.return_value = self.test_results
 
-        attack_config = {"goals": ["test goal"]}
+        attack_config = {
+            "goals": ["test goal"],
+            "category_classifier": {
+                "identifier": "gpt-4o-mini",
+                "agent_type": "OPENAI",
+                "endpoint": "https://api.openai.com/v1",
+            },
+        }
 
         results = orchestrator.execute(
             attack_config=attack_config,
@@ -267,7 +288,15 @@ class TestAttackOrchestratorExecution(unittest.TestCase):
 
         orchestrator = self.TestOrchestrator(self.mock_hack_agent)
 
-        attack_config = {"goals": ["test goal"], "output_dir": "/tmp/test"}
+        attack_config = {
+            "goals": ["test goal"],
+            "output_dir": "/tmp/test",
+            "category_classifier": {
+                "identifier": "gpt-4o-mini",
+                "agent_type": "OPENAI",
+                "endpoint": "https://api.openai.com/v1",
+            },
+        }
         attack_params = {"goals": ["test goal"]}
 
         with patch.object(self.TestAttack, "__init__", return_value=None) as mock_init:
@@ -291,6 +320,11 @@ class TestAttackOrchestratorExecution(unittest.TestCase):
             "output_dir": "/tmp/test",
             "goal_batch_size": 10,
             "goal_batch_workers": 2,
+            "category_classifier": {
+                "identifier": "gpt-4o-mini",
+                "agent_type": "OPENAI",
+                "endpoint": "https://api.openai.com/v1",
+            },
         }
 
         with patch.object(self.TestAttack, "__init__", return_value=None) as mock_init:
@@ -323,6 +357,11 @@ class TestAttackOrchestratorExecution(unittest.TestCase):
             "output_dir": "/tmp/test",
             "goal_batch_size": 2,
             "goal_batch_workers": 2,
+            "category_classifier": {
+                "identifier": "gpt-4o-mini",
+                "agent_type": "OPENAI",
+                "endpoint": "https://api.openai.com/v1",
+            },
         }
 
         with patch.object(self.TestAttack, "__init__", return_value=None) as mock_init:

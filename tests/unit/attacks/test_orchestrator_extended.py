@@ -55,7 +55,14 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
         """Test that execute updates run to RUNNING status."""
         orch, hack_agent, _ = _make_orchestrator()
 
-        attack_config = {"goals": ["test"]}
+        attack_config = {
+            "goals": ["test"],
+            "category_classifier": {
+                "identifier": "gpt-4o-mini",
+                "agent_type": "OPENAI",
+                "endpoint": "https://api.openai.com/v1",
+            },
+        }
         orch.execute(
             attack_config=attack_config,
             run_config_override=None,
@@ -79,7 +86,14 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
         """Test that execute updates run to COMPLETED on success."""
         orch, hack_agent, _ = _make_orchestrator()
 
-        attack_config = {"goals": ["test"]}
+        attack_config = {
+            "goals": ["test"],
+            "category_classifier": {
+                "identifier": "gpt-4o-mini",
+                "agent_type": "OPENAI",
+                "endpoint": "https://api.openai.com/v1",
+            },
+        }
         orch.execute(
             attack_config=attack_config,
             run_config_override=None,
@@ -104,7 +118,14 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
         """Test that execute updates run to FAILED on exception."""
         orch, hack_agent, _ = _make_orchestrator()
 
-        attack_config = {"goals": ["test"]}
+        attack_config = {
+            "goals": ["test"],
+            "category_classifier": {
+                "identifier": "gpt-4o-mini",
+                "agent_type": "OPENAI",
+                "endpoint": "https://api.openai.com/v1",
+            },
+        }
         with self.assertRaises(RuntimeError):
             orch.execute(
                 attack_config=attack_config,
@@ -129,13 +150,131 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
         orch, hack_agent, _ = _make_orchestrator()
         hack_agent.backend.update_run.side_effect = Exception("Update failed")
 
-        attack_config = {"goals": ["test"]}
+        attack_config = {
+            "goals": ["test"],
+            "category_classifier": {
+                "identifier": "gpt-4o-mini",
+                "agent_type": "OPENAI",
+                "endpoint": "https://api.openai.com/v1",
+            },
+        }
         # Should not raise even though update_run fails
         results = orch.execute(
             attack_config=attack_config,
             run_config_override=None,
             fail_on_run_error=False,
         )
+        self.assertIsNotNone(results)
+
+
+class TestDefaultCategoryClassifierPreflight(unittest.TestCase):
+    """Test abort behavior when default category classifier dependencies are missing."""
+
+    def test_aborts_if_default_classifier_and_ollama_not_installed(self):
+        """Default classifier should fail fast before creating DB records."""
+        orch, _, _ = _make_orchestrator()
+
+        attack_config = {
+            "goals": ["test"],
+            "output_dir": "/tmp/test",
+        }
+
+        with patch("hackagent.attacks.orchestrator.shutil.which", return_value=None):
+            with patch.object(
+                AttackOrchestrator,
+                "_create_server_attack_record",
+                return_value=_VALID_ATK_ID,
+            ) as mock_create_atk:
+                with patch.object(
+                    AttackOrchestrator,
+                    "_create_server_run_record",
+                    return_value=_VALID_RUN_ID,
+                ) as mock_create_run:
+                    with self.assertRaises(ValueError) as ctx:
+                        orch.execute(
+                            attack_config=attack_config,
+                            run_config_override=None,
+                            fail_on_run_error=False,
+                        )
+
+        self.assertIn("default category_classifier", str(ctx.exception))
+        self.assertIn("ollama", str(ctx.exception).lower())
+        mock_create_atk.assert_not_called()
+        mock_create_run.assert_not_called()
+
+    def test_aborts_if_default_classifier_and_model_missing(self):
+        """Default classifier should fail fast before run creation when model is missing."""
+        orch, _, _ = _make_orchestrator()
+
+        attack_config = {
+            "goals": ["test"],
+            "output_dir": "/tmp/test",
+        }
+
+        with patch(
+            "hackagent.attacks.orchestrator.shutil.which",
+            return_value="/usr/local/bin/ollama",
+        ):
+            with patch.object(
+                AttackOrchestrator,
+                "_get_installed_ollama_models",
+                return_value={"llama3:latest"},
+            ):
+                with patch.object(
+                    AttackOrchestrator,
+                    "_create_server_run_record",
+                    return_value=_VALID_RUN_ID,
+                ) as mock_create_run:
+                    with self.assertRaises(ValueError) as ctx:
+                        orch.execute(
+                            attack_config=attack_config,
+                            run_config_override=None,
+                            fail_on_run_error=False,
+                        )
+
+        self.assertIn("gemma3:4b", str(ctx.exception))
+        mock_create_run.assert_not_called()
+
+    def test_skips_preflight_if_classifier_is_explicitly_configured(self):
+        """Explicit category_classifier bypasses default-Ollama preflight in execute."""
+        orch, _, _ = _make_orchestrator()
+
+        attack_config = {
+            "goals": ["test"],
+            "output_dir": "/tmp/test",
+            "category_classifier": {
+                "identifier": "gpt-4o-mini",
+                "agent_type": "OPENAI",
+                "endpoint": "https://api.openai.com/v1",
+            },
+        }
+
+        with patch("hackagent.attacks.orchestrator.shutil.which", return_value=None):
+            with patch.object(
+                AttackOrchestrator, "_get_installed_ollama_models"
+            ) as mock_models:
+                with patch.object(
+                    AttackOrchestrator,
+                    "_create_server_attack_record",
+                    return_value=_VALID_ATK_ID,
+                ):
+                    with patch.object(
+                        AttackOrchestrator,
+                        "_create_server_run_record",
+                        return_value=_VALID_RUN_ID,
+                    ):
+                        with patch.object(
+                            AttackOrchestrator,
+                            "_execute_local_attack",
+                            return_value=["result"],
+                        ):
+                            results = orch.execute(
+                                attack_config=attack_config,
+                                run_config_override=None,
+                                fail_on_run_error=False,
+                            )
+
+        mock_models.assert_not_called()
         self.assertIsNotNone(results)
 
 

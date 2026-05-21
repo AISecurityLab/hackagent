@@ -24,6 +24,8 @@ Technique implementations remain pure algorithms, unaware of server integration.
 
 import json
 import logging
+import shutil
+import subprocess
 import time
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -34,6 +36,10 @@ from uuid import UUID
 import httpx
 
 from hackagent.errors import HackAgentError
+from hackagent.attacks.techniques.config import (
+    DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE,
+    DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
+)
 from hackagent.server.storage.enums import StatusEnum
 
 if TYPE_CHECKING:
@@ -212,6 +218,102 @@ class AttackOrchestrator:
 
         logger.info(f"Prepared {len(goals)} goals for {self.attack_type} attack")
         return {"goals": goals}
+
+    @staticmethod
+    def _uses_default_category_classifier(attack_config: Dict[str, Any]) -> bool:
+        """Return whether attack config leaves category classifier at defaults."""
+        if "category_classifier" not in attack_config:
+            return True
+
+        raw_config = attack_config.get("category_classifier")
+        if raw_config is None:
+            return True
+
+        if isinstance(raw_config, dict):
+            return not any(value is not None for value in raw_config.values())
+
+        return False
+
+    @staticmethod
+    def _normalize_ollama_model_aliases(model_name: str) -> set[str]:
+        """Return equivalent Ollama names accounting for implicit :latest tags."""
+        aliases = {model_name}
+        if ":" in model_name:
+            base, tag = model_name.rsplit(":", 1)
+            if tag == "latest":
+                aliases.add(base)
+        else:
+            aliases.add(f"{model_name}:latest")
+        return aliases
+
+    @classmethod
+    def _is_ollama_model_present(
+        cls, model_name: str, installed_models: set[str]
+    ) -> bool:
+        """Check if a model exists locally, including :latest aliases."""
+        aliases = cls._normalize_ollama_model_aliases(model_name)
+        return any(alias in installed_models for alias in aliases)
+
+    @staticmethod
+    def _get_installed_ollama_models() -> set[str]:
+        """Read locally available Ollama models via `ollama list`."""
+        result = subprocess.run(
+            ["ollama", "list"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        if result.returncode != 0:
+            stderr = result.stderr.strip() or "unknown error"
+            raise RuntimeError(f"Failed to read local Ollama models: {stderr}")
+
+        models: set[str] = set()
+        lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        for line in lines:
+            if line.upper().startswith("NAME"):
+                continue
+            model_name = line.split()[0]
+            if model_name:
+                models.add(model_name)
+        return models
+
+    def _validate_default_category_classifier_requirements(
+        self, attack_config: Dict[str, Any]
+    ) -> None:
+        """Abort attack early if implicit default classifier dependencies are missing."""
+        if not self._uses_default_category_classifier(attack_config):
+            return
+
+        if (DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE or "").upper() != "OLLAMA":
+            return
+
+        required_model = DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER
+
+        if shutil.which("ollama") is None:
+            raise ValueError(
+                "Attack aborted: default category_classifier requires local Ollama "
+                f"with model '{required_model}', but 'ollama' is not installed or "
+                "not in PATH. Provide `category_classifier` explicitly to bypass "
+                "this default."
+            )
+
+        try:
+            installed_models = self._get_installed_ollama_models()
+        except Exception as exc:
+            raise ValueError(
+                "Attack aborted: default category_classifier requires local Ollama "
+                f"model '{required_model}', but installed models could not be "
+                f"verified ({exc})."
+            ) from exc
+
+        if not self._is_ollama_model_present(required_model, installed_models):
+            raise ValueError(
+                "Attack aborted: default category_classifier requires local Ollama "
+                f"model '{required_model}', but it is not present. Run "
+                f"`ollama pull {required_model}` or provide `category_classifier` "
+                "explicitly in attack_config."
+            )
 
     def _load_goals_from_dataset(self, dataset_config: Dict[str, Any]) -> list:
         """
@@ -562,6 +664,9 @@ class AttackOrchestrator:
         """
         # 1. Validate parameters
         attack_params = self._prepare_attack_params(attack_config)
+
+        # Fail-fast preflight before creating Attack/Run DB records.
+        self._validate_default_category_classifier_requirements(attack_config)
 
         # Enrich run config with expected goal cardinality so downstream views
         # can keep RUNNING until all expected goals are fully tracked.
