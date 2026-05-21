@@ -251,6 +251,7 @@ class PAIRAttack(BaseAttack):
                 "identifier": attacker_config.get("identifier", "gemma3:4b"),
                 "endpoint": attacker_config.get("endpoint", "http://localhost:11434"),
                 "agent_type": attacker_config.get("agent_type", "OLLAMA"),
+                "thinking": attacker_config.get("thinking"),
                 "max_tokens": attacker_config.get("max_tokens", 500),
                 "temperature": attacker_config.get("temperature", 1.0),
                 "timeout": attacker_config.get(
@@ -299,6 +300,7 @@ class PAIRAttack(BaseAttack):
                 "identifier": scorer_config.get("identifier", "gemma3:4b"),
                 "endpoint": scorer_config.get("endpoint", "http://localhost:11434"),
                 "agent_type": scorer_config.get("agent_type", "OLLAMA"),
+                "thinking": scorer_config.get("thinking"),
                 "max_tokens": scorer_config.get("max_tokens", 4096),
                 "temperature": scorer_config.get("temperature", 0.7),
                 "timeout": scorer_config.get(

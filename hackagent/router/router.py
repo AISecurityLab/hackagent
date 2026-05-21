@@ -294,6 +294,7 @@ class AgentRouter:
                 "num_ctx",
                 "stream",
                 "timeout",
+                "thinking",
             ]
             if isinstance(self.backend_agent.metadata, dict):
                 for key in optional_ollama_keys:

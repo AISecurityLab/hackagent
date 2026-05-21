@@ -108,6 +108,15 @@ class TestOllamaAgentInit(unittest.TestCase):
         self.assertEqual(adapter.default_stream, False)
         self.assertEqual(adapter.timeout, 60)
 
+    def test_init_with_default_thinking(self):
+        """Test initialization stores default thinking behavior."""
+        adapter = OllamaAgent(
+            id="ollama_test_agent_thinking",
+            config={"name": "qwen3", "thinking": False},
+        )
+
+        self.assertFalse(adapter.default_thinking)
+
     def test_init_missing_name_raises_error(self):
         """Test that missing 'name' config raises error."""
         with self.assertRaisesRegex(
@@ -366,6 +375,51 @@ class TestOllamaAgentHandleRequest(unittest.TestCase):
         self.assertEqual(request_body["options"]["temperature"], 0.3)
         self.assertEqual(request_body["options"]["top_k"], 20)
         self.assertEqual(request_body["options"]["seed"], 42)
+
+    @patch("hackagent.router.adapters.ollama.requests.post")
+    def test_handle_request_forwards_thinking_override(self, mock_post):
+        """Per-request thinking is forwarded as Ollama `think`."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "model": "llama3",
+            "response": "Thinking disabled.",
+            "done": True,
+        }
+        mock_response.raise_for_status = MagicMock()
+        mock_post.return_value = mock_response
+
+        response = self.adapter.handle_request({"prompt": "Hello", "thinking": False})
+
+        self.assertEqual(response["status_code"], 200)
+        request_body = mock_post.call_args[1]["json"]
+        self.assertIn("think", request_body)
+        self.assertFalse(request_body["think"])
+
+    @patch("hackagent.router.adapters.ollama.requests.post")
+    def test_handle_request_uses_default_thinking_from_config(self, mock_post):
+        """Adapter-level thinking default is applied when request omits it."""
+        adapter = OllamaAgent(
+            id="ollama_default_think",
+            config={"name": "llama3", "thinking": False},
+        )
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "model": "llama3",
+            "response": "Default thinking applied.",
+            "done": True,
+        }
+        mock_response.raise_for_status = MagicMock()
+        mock_post.return_value = mock_response
+
+        response = adapter.handle_request({"prompt": "Hello"})
+
+        self.assertEqual(response["status_code"], 200)
+        request_body = mock_post.call_args[1]["json"]
+        self.assertIn("think", request_body)
+        self.assertFalse(request_body["think"])
 
 
 class TestOllamaAgentUtilityMethods(unittest.TestCase):
