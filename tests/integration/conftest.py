@@ -195,11 +195,11 @@ def ollama_available(ollama_base_url: str, ollama_model: str) -> bool:
         return False
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def ollama_config(
     ollama_base_url: str, ollama_model: str, max_tokens_fast: int
 ) -> Dict[str, Any]:
-    """Return configuration dictionary for Ollama adapter."""
+    """Return configuration dictionary for Ollama adapter (module-scoped for speed)."""
     return {
         "name": ollama_model,
         "endpoint": ollama_base_url,
@@ -277,14 +277,14 @@ def openai_available(openai_api_key: Optional[str]) -> bool:
     return openai_api_key is not None and len(openai_api_key) > 0
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def openai_config(
     openai_model: str,
     openai_api_key: Optional[str],
     openai_base_url: str,
     using_openrouter: bool,
 ) -> Dict[str, Any]:
-    """Return configuration dictionary for OpenAI adapter.
+    """Return configuration dictionary for OpenAI adapter (module-scoped for speed).
 
     Automatically configures for OpenRouter if OPENROUTER_API_KEY is set.
     """
@@ -469,9 +469,9 @@ def google_adk_available(google_adk_agent_url: Optional[str]) -> bool:
         return False
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def google_adk_config(google_adk_agent_url: Optional[str]) -> Dict[str, Any]:
-    """Return configuration dictionary for Google ADK adapter."""
+    """Return configuration dictionary for Google ADK adapter (module-scoped for speed)."""
     return {
         "name": "multi_tool_agent",
         "endpoint": google_adk_agent_url or "http://localhost:8000",
@@ -516,14 +516,14 @@ def litellm_available(
     return False
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def litellm_config(
     litellm_model: str,
     openai_api_key: Optional[str],
     using_openrouter: bool,
     max_tokens_fast: int,
 ) -> Dict[str, Any]:
-    """Return configuration dictionary for LiteLLM adapter."""
+    """Return configuration dictionary for LiteLLM adapter (module-scoped for speed)."""
     config = {
         "name": litellm_model,
         "max_tokens": max_tokens_fast,
@@ -570,7 +570,7 @@ def hackagent_client_factory(
 # --- Common Attack Configuration Fixtures ---
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def basic_attack_config(max_tokens_fast: int) -> Dict[str, Any]:
     """Return a basic attack configuration for testing."""
     return {
@@ -581,7 +581,7 @@ def basic_attack_config(max_tokens_fast: int) -> Dict[str, Any]:
     }
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def advprefix_attack_config(max_tokens_medium: int) -> Dict[str, Any]:
     """Return an advprefix attack configuration for testing."""
     return {
@@ -592,7 +592,7 @@ def advprefix_attack_config(max_tokens_medium: int) -> Dict[str, Any]:
     }
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def advprefix_attack_config_with_ollama_judges(
     ollama_base_url: str, max_tokens_medium: int
 ) -> Dict[str, Any]:

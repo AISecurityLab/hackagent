@@ -164,6 +164,9 @@ jobs:
           tests/integration/storage/
           tests/integration/tui/
           --run-integration
+          -n auto
+          --dist=loadfile
+          -m "not slow"
           -v --tb=short
           --cov --cov-fail-under=0
           --cov-report=xml:reports/coverage.xml
@@ -230,6 +233,9 @@ jobs:
           tests/integration/adapters/
           tests/integration/attacks/
           --run-integration
+          -n 2
+          --dist=loadfile
+          -m "not slow"
           -v --tb=short
           --cov --cov-fail-under=0
           --cov-report=xml:reports/coverage.xml
