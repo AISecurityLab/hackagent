@@ -355,8 +355,11 @@ class BaseEvaluationStep:
         """
         Resolve the judges list from ``_raw_config``.
 
-        If no top-level ``judges`` key is present, builds a single-judge
-        fallback from *technique_params* for backward compatibility.
+        Resolution order:
+        1. Top-level ``judges`` list in raw config.
+        2. Top-level ``judge`` dict in raw config (wrapped in a list).
+        3. ``technique_params["judge"]`` string (legacy fallback).
+        4. ``default_judge`` / ``default_type`` hardcoded defaults.
 
         Args:
             technique_params: Technique-specific params dict with legacy
@@ -370,6 +373,11 @@ class BaseEvaluationStep:
         judges = self._raw_config.get("judges")
         if isinstance(judges, list) and judges:
             return judges
+
+        # Use the top-level "judge" dict if present (e.g. from Ollama/local configs).
+        raw_judge = self._raw_config.get("judge")
+        if isinstance(raw_judge, dict) and raw_judge:
+            return [raw_judge]
 
         tp = technique_params or {}
         judge_model = tp.get("judge", default_judge)
