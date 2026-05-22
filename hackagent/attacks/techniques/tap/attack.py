@@ -262,6 +262,7 @@ class TAPAttack(BaseAttack):
         width = tap_params.get("width", 4)
         branching_factor = tap_params.get("branching_factor", 3)
         n_streams = tap_params.get("n_streams", 4)
+        success_threshold = tap_params.get("success_score_threshold", 10)
 
         coordinator = self._initialize_coordinator(
             attack_type="tap",
@@ -287,7 +288,7 @@ class TAPAttack(BaseAttack):
                 self._get_pipeline_steps(), goals, start_step
             )
 
-            coordinator.finalize_all_goals(results)
+            coordinator.finalize_all_goals(results, success_threshold=success_threshold)
             coordinator.log_summary()
             coordinator.finalize_pipeline(results)
 
