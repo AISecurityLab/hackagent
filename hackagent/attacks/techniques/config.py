@@ -79,6 +79,7 @@ class AttackerConfig(BaseModel):
     extra_body: Optional[Dict[str, Any]] = None
     response_format: Optional[Dict[str, Any]] = None
     logit_bias: Optional[Dict[str, int]] = None
+    thinking: Optional[bool] = None
 
 
 class CategoryClassifierConfig(BaseModel):
@@ -96,6 +97,7 @@ class CategoryClassifierConfig(BaseModel):
     api_key: Optional[str] = None
     max_tokens: int = DEFAULT_CATEGORY_CLASSIFIER_MAX_TOKENS
     temperature: float = 0.0
+    thinking: Optional[bool] = None
 
 
 class JudgeConfig(BaseModel):
@@ -120,6 +122,7 @@ class JudgeConfig(BaseModel):
     extra_body: Optional[Dict[str, Any]] = None
     response_format: Optional[Dict[str, Any]] = None
     logit_bias: Optional[Dict[str, int]] = None
+    thinking: Optional[bool] = None
 
 
 class JudgeEvalConfig(BaseModel):
@@ -152,6 +155,7 @@ class TargetConfig(BaseModel):
     response_format: Optional[Dict[str, Any]] = None
     logit_bias: Optional[Dict[str, int]] = None
     timeout: int = Field(default=120, ge=1)
+    thinking: Optional[bool] = None
 
 
 class GoalsDatasetConfig(BaseModel):

@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from hackagent.errors import HackAgentError
+from hackagent.router.types import AgentTypeEnum
 
 
 class TestHackAgentInitialization(unittest.TestCase):
@@ -115,6 +116,47 @@ class TestHackAgentInitialization(unittest.TestCase):
         self.assertEqual(call_kwargs["adapter_operational_config"]["temperature"], 0.4)
         self.assertEqual(call_kwargs["metadata"]["temperature"], 0.2)
         self.assertEqual(call_kwargs["metadata"]["label"], "demo")
+
+    @patch("hackagent.agent.AgentRouter")
+    @patch("hackagent.agent.utils.resolve_api_token", return_value="test-token")
+    @patch("hackagent.agent.utils.resolve_agent_type")
+    def test_constructor_thinking_is_forwarded_for_ollama(
+        self, mock_resolve_type, mock_resolve_token, mock_router
+    ):
+        """Constructor thinking is forwarded only when target type is OLLAMA."""
+        from hackagent.agent import HackAgent
+
+        mock_resolve_type.return_value = AgentTypeEnum.OLLAMA
+
+        HackAgent(
+            endpoint="http://localhost:11434",
+            api_key="test-key",
+            thinking=False,
+        )
+
+        call_kwargs = mock_router.call_args.kwargs
+        self.assertIn("thinking", call_kwargs["adapter_operational_config"])
+        self.assertFalse(call_kwargs["adapter_operational_config"]["thinking"])
+
+    @patch("hackagent.agent.AgentRouter")
+    @patch("hackagent.agent.utils.resolve_api_token", return_value="test-token")
+    @patch("hackagent.agent.utils.resolve_agent_type")
+    def test_constructor_thinking_is_ignored_for_non_ollama(
+        self, mock_resolve_type, mock_resolve_token, mock_router
+    ):
+        """Constructor thinking is stripped for non-OLLAMA target types."""
+        from hackagent.agent import HackAgent
+
+        mock_resolve_type.return_value = AgentTypeEnum.OPENAI_SDK
+
+        HackAgent(
+            endpoint="http://localhost:8000",
+            api_key="test-key",
+            thinking=False,
+        )
+
+        call_kwargs = mock_router.call_args.kwargs
+        self.assertNotIn("thinking", call_kwargs["adapter_operational_config"])
 
 
 class TestHackAgentAttackStrategies(unittest.TestCase):

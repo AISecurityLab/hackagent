@@ -238,3 +238,35 @@ class TestCreateRouter:
         assert operational_config["stop"] == ["END"]
         assert operational_config["response_format"] == {"type": "json_object"}
         assert operational_config["logit_bias"] == {"123": -100}
+
+    @patch("hackagent.attacks.shared.router_factory.AgentRouter")
+    def test_ollama_thinking_is_forwarded(
+        self, MockRouter, mock_client, basic_config, logger
+    ):
+        """thinking is forwarded for OLLAMA role configs."""
+        mock_instance = MagicMock()
+        mock_instance._agent_registry = {"key-1": MagicMock()}
+        MockRouter.return_value = mock_instance
+        basic_config["agent_type"] = "OLLAMA"
+        basic_config["thinking"] = False
+
+        create_router(mock_client, basic_config, logger, "test-router")
+
+        call_kwargs = MockRouter.call_args[1]
+        assert call_kwargs["adapter_operational_config"]["thinking"] is False
+
+    @patch("hackagent.attacks.shared.router_factory.AgentRouter")
+    def test_non_ollama_thinking_is_dropped(
+        self, MockRouter, mock_client, basic_config, logger
+    ):
+        """thinking is intentionally not forwarded to non-OLLAMA providers."""
+        mock_instance = MagicMock()
+        mock_instance._agent_registry = {"key-1": MagicMock()}
+        MockRouter.return_value = mock_instance
+        basic_config["agent_type"] = "OPENAI_SDK"
+        basic_config["thinking"] = False
+
+        create_router(mock_client, basic_config, logger, "test-router")
+
+        call_kwargs = MockRouter.call_args[1]
+        assert "thinking" not in call_kwargs["adapter_operational_config"]

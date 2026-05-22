@@ -66,6 +66,7 @@ class HackAgent:
         metadata: Optional[Dict[str, Any]] = None,
         target_config: Optional[Dict[str, Any]] = None,
         adapter_operational_config: Optional[Dict[str, Any]] = None,
+        thinking: Optional[bool] = None,
     ):
         """
         Initializes the HackAgent client and prepares it for interaction.
@@ -100,6 +101,10 @@ class HackAgent:
                 generation defaults such as `max_tokens`, `temperature`,
                 and `timeout`.
             adapter_operational_config: Optional configuration for the agent adapter.
+            thinking: Optional OLLAMA-only control for reasoning traces.
+                When set to `False`, requests sent through the target OLLAMA adapter
+                include `think: false` to disable thinking output. Ignored for
+                non-OLLAMA target agent types.
         """
 
         resolved_auth_token = utils.resolve_api_token(direct_api_key_param=api_key)
@@ -150,6 +155,16 @@ class HackAgent:
             **self.target_config,
             **(adapter_operational_config or {}),
         }
+
+        if processed_agent_type == AgentTypeEnum.OLLAMA:
+            if (
+                thinking is not None
+                and router_operational_config.get("thinking") is None
+            ):
+                router_operational_config["thinking"] = thinking
+        else:
+            # Keep `thinking` strictly OLLAMA-specific.
+            router_operational_config.pop("thinking", None)
 
         self.router = AgentRouter(
             backend=self.backend,

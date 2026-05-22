@@ -61,6 +61,7 @@ _PASSTHROUGH_REQUEST_CONFIG_KEYS = (
     "logit_bias",
     "tools",
     "tool_choice",
+    "thinking",
 )
 
 
@@ -118,6 +119,24 @@ def create_router(
         env_key = os.environ.get(metadata_api_key)
         api_key = env_key if env_key else metadata_api_key
 
+    # ---- Agent type resolution ----
+    raw_agent_type = config.get("agent_type", "openai")
+    if isinstance(raw_agent_type, AgentTypeEnum):
+        agent_type = raw_agent_type
+    else:
+        agent_type_str = str(raw_agent_type)
+        normalized = _AGENT_TYPE_ALIASES.get(
+            agent_type_str.upper(), agent_type_str.upper()
+        )
+        try:
+            agent_type = AgentTypeEnum(normalized)
+        except ValueError:
+            log.warning(
+                f"Invalid agent_type '{agent_type_str}' for {name}, "
+                "defaulting to OPENAI_SDK"
+            )
+            agent_type = AgentTypeEnum.OPENAI_SDK
+
     # ---- Operational config ----
     operational_config: Dict[str, Any] = {
         "name": config.get("model", model_name),
@@ -135,17 +154,8 @@ def create_router(
         if key not in operational_config or operational_config[key] is None:
             operational_config[key] = value
 
-    # ---- Agent type resolution ----
-    agent_type_str = config.get("agent_type", "openai")
-    normalized = _AGENT_TYPE_ALIASES.get(agent_type_str.upper(), agent_type_str.upper())
-    try:
-        agent_type = AgentTypeEnum(normalized)
-    except ValueError:
-        log.warning(
-            f"Invalid agent_type '{agent_type_str}' for {name}, "
-            "defaulting to OPENAI_SDK"
-        )
-        agent_type = AgentTypeEnum.OPENAI_SDK
+    if agent_type != AgentTypeEnum.OLLAMA:
+        operational_config.pop("thinking", None)
 
     # ---- Create router ----
     log.debug(f"Creating AgentRouter for '{name}' ({model_name} via {endpoint})")

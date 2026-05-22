@@ -385,6 +385,7 @@ class BaseEvaluationStep:
             "agent_type",
             "api_key",
             "api_key_env",
+            "thinking",
             "agent_metadata",
             "agent_name",
         ):

@@ -55,6 +55,7 @@ class OllamaAgent(Agent):
     - 'top_k': Top-k sampling parameter (optional)
     - 'num_ctx': Context window size (optional)
     - 'stream': Whether to stream responses (default: False)
+    - 'thinking': Optional bool/level controlling Ollama think traces
     """
 
     ADAPTER_TYPE = "OllamaAgent"
@@ -76,6 +77,7 @@ class OllamaAgent(Agent):
                 - 'top_k' (optional): Default top_k sampling
                 - 'num_ctx' (optional): Context window size
                 - 'stream' (optional): Enable streaming (default: False)
+                - 'thinking' (optional): Forwarded as Ollama `think`
         """
         super().__init__(id, config)
 
@@ -98,6 +100,7 @@ class OllamaAgent(Agent):
         self.default_top_k = self._get_config_key("top_k")
         self.default_num_ctx = self._get_config_key("num_ctx")
         self.default_stream = self._get_config_key("stream", False)
+        self.default_thinking = self._get_config_key("thinking")
 
         # Request timeout
         self.timeout = self._get_config_key(
@@ -212,6 +215,7 @@ class OllamaAgent(Agent):
         options: Dict[str, Any],
         stream: bool = False,
         system: Optional[str] = None,
+        thinking: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
         Execute a generate request to Ollama's /api/generate endpoint.
@@ -236,6 +240,8 @@ class OllamaAgent(Agent):
 
         if system:
             payload["system"] = system
+        if thinking is not None:
+            payload["think"] = thinking
 
         self.logger.info(
             f"Sending generate request to Ollama model '{self.model_name}' at '{url}'"
@@ -272,6 +278,7 @@ class OllamaAgent(Agent):
         messages: List[Dict[str, str]],
         options: Dict[str, Any],
         stream: bool = False,
+        thinking: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
         Execute a chat request to Ollama's /api/chat endpoint.
@@ -292,6 +299,8 @@ class OllamaAgent(Agent):
             "stream": stream,
             "options": options,
         }
+        if thinking is not None:
+            payload["think"] = thinking
 
         self.logger.info(
             f"Sending chat request to Ollama model '{self.model_name}' at '{url}' "
@@ -340,6 +349,7 @@ class OllamaAgent(Agent):
                 - 'top_k' (optional): Override default top_k
                 - 'system' (optional): System prompt for generate endpoint
                 - 'stream' (optional): Enable streaming
+                - 'thinking' (optional): Forwarded as Ollama `think`
 
         Returns:
             A dictionary containing:
@@ -381,18 +391,27 @@ class OllamaAgent(Agent):
 
         stream = request_data.get("stream", self.default_stream)
         system = request_data.get("system")
+        thinking = request_data.get("thinking", self.default_thinking)
 
         try:
             if messages:
                 # Use chat endpoint
-                raw_response = self._execute_chat(messages, options, stream)
+                raw_response = self._execute_chat(
+                    messages, options, stream, thinking=thinking
+                )
                 # Chat response has message.content
                 processed_response = raw_response.get("message", {}).get("content", "")
             else:
                 # Use generate endpoint
                 if prompt is None:
                     raise ValueError("Prompt request resolved to None")
-                raw_response = self._execute_generate(prompt, options, stream, system)
+                raw_response = self._execute_generate(
+                    prompt,
+                    options,
+                    stream,
+                    system,
+                    thinking=thinking,
+                )
                 # Generate response has 'response' field
                 processed_response = raw_response.get("response", "")
 
@@ -408,6 +427,7 @@ class OllamaAgent(Agent):
                     "model_name": self.model_name,
                     "endpoint": self.api_base_url,
                     "invoked_options": options,
+                    "invoked_thinking": thinking,
                     "eval_count": raw_response.get("eval_count"),
                     "eval_duration": raw_response.get("eval_duration"),
                     "prompt_eval_count": raw_response.get("prompt_eval_count"),
