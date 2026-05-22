@@ -80,6 +80,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["hackagent"]
+artifacts = [
+    "hackagent/examples/**",
+]
 
 [tool.hatch.build.targets.sdist]
 include = [
