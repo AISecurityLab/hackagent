@@ -1300,9 +1300,7 @@ class BaseEvaluationStep:
                 self._mark_error_rows(evaluated_items, error_indices)
 
             # 4. Enrich with scores (pass error indices for deterministic fields)
-            self._enrich_items_with_scores(
-                evaluated_items, error_indices=error_indices
-            )
+            self._enrich_items_with_scores(evaluated_items, error_indices=error_indices)
 
             # 5. Log ASR
             self._log_evaluation_asr(evaluated_items)
