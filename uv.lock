@@ -639,14 +639,14 @@ wheels = [
 
 [[package]]
 name = "click"
-version = "8.1.8"
+version = "8.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama", marker = "sys_platform == 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b9/2e/0090cbf739cee7d23781ad4b89a9894a41538e4fcf4c31dcdd705b78eb8b/click-8.1.8.tar.gz", hash = "sha256:ed53c9d8990d83c2a27deae68e4ee337473f6330c040a31d4225c9574d16096a", size = 226593, upload-time = "2024-12-21T18:38:44.339Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/23/e4/796662cd90cf80e3a363c99db2b88e0e394b988a575f60a17e16440cd011/click-8.4.0.tar.gz", hash = "sha256:638f1338fe1235c8f4e008e4a8a254fb5c5fbdcbb40ece3c9142ebb78e792973", size = 350843, upload-time = "2026-05-17T00:47:58.425Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7e/d4/7ebdbd03970677812aac39c869717059dbb71a4cfc033ca6e5221787892c/click-8.1.8-py3-none-any.whl", hash = "sha256:63c132bbbed01578a06712a2d1f497bb62d9c1c0d329b7903a866228027263b2", size = 98188, upload-time = "2024-12-21T18:38:41.666Z" },
+    { url = "https://files.pythonhosted.org/packages/ee/ae/8e92f8058baf87f6c7d86ee7e457668690195cc77efedb8d3797a06e3940/click-8.4.0-py3-none-any.whl", hash = "sha256:40c50b7c6c6adac2823d411041ec84f3f103f1b280d5e9ce0d7f998995832f81", size = 116147, upload-time = "2026-05-17T00:47:56.842Z" },
 ]
 
 [[package]]
@@ -669,7 +669,7 @@ wheels = [
 
 [[package]]
 name = "commitizen"
-version = "4.13.10"
+version = "4.16.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "argcomplete" },
@@ -686,9 +686,9 @@ dependencies = [
     { name = "tomlkit" },
     { name = "typing-extensions", marker = "python_full_version < '3.11'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/37/95/da2c71ed6a1c06836cdd4eb60a8b9e1bf05f4ce7029ab508081745171be9/commitizen-4.13.10.tar.gz", hash = "sha256:402b5bcd466be69ba79a3f380be6ba5b55ac658c7d2a93e82fc99668a6eb2673", size = 64106, upload-time = "2026-04-11T06:49:12.907Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d5/cd/61332a3232a1d16489a95dd76ae857f6a90a73d4f2dffd782ae243b18681/commitizen-4.16.0.tar.gz", hash = "sha256:bcf4f69b918533bed12668a4bada57f493377cae0123163c92d638f5b19c39ca", size = 65906, upload-time = "2026-05-12T04:11:02.666Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/11/3a/ad70b3c7dc3da1255668a9396429b1d820c15b74a501668158e4574c1edd/commitizen-4.13.10-py3-none-any.whl", hash = "sha256:95a281317990ac613501fdfe65745cec1fa4042bc5d003a72d332a74926e3039", size = 85746, upload-time = "2026-04-11T06:49:11.167Z" },
+    { url = "https://files.pythonhosted.org/packages/ee/5d/4336cd66bca91d83b70d0f64a95301628cc9b889266fd52fed69307359ff/commitizen-4.16.0-py3-none-any.whl", hash = "sha256:bf239e8cc528480ea93175d0af96a58a83a2a78f17a5c9505521aa815952bdcd", size = 88016, upload-time = "2026-05-12T04:11:01.018Z" },
 ]
 
 [[package]]
@@ -2368,7 +2368,7 @@ wheels = [
 
 [[package]]
 name = "hackagent"
-version = "0.9.0"
+version = "0.9.1"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
@@ -2846,7 +2846,7 @@ wheels = [
 
 [[package]]
 name = "litellm"
-version = "1.83.10"
+version = "1.85.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -2862,9 +2862,9 @@ dependencies = [
     { name = "tiktoken" },
     { name = "tokenizers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e2/16/fc51935e406887079f0d7c20427b9a15b9fc1d558e68b4e7072331b70db4/litellm-1.83.10.tar.gz", hash = "sha256:d54eaa98f93a1eb02decf593dbb525fa1ddd4cf03686c1d5c7bb69c2a9ba2a41", size = 14726546, upload-time = "2026-04-19T02:36:28.586Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/da/55/aebffceaa08688a989e9c68b3edc3a520a1f8338eb0346668774bd66ad88/litellm-1.85.1.tar.gz", hash = "sha256:3b8ef0c89ff2736cbd27109f17ff31f1bd0ab59dee9be8cadb28ec3cb167ce0d", size = 15346324, upload-time = "2026-05-21T02:30:38.185Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6f/58/8dd69d5b1ab11f206a9c9f21b6fd191bcdd4fb3ed90b8efbf3a1291fd47c/litellm-1.83.10-py3-none-any.whl", hash = "sha256:55203a7b5551efec8f2fccde29ee045ba057e768591e0b6b9fe1d12f00685ff8", size = 16334780, upload-time = "2026-04-19T02:36:25.274Z" },
+    { url = "https://files.pythonhosted.org/packages/17/a0/263a13c2253201aa11563a69d9a87f3510030aa765a16f57fc40ceefcdf5/litellm-1.85.1-py3-none-any.whl", hash = "sha256:c89eb5dfd18cce3d40b59e79c74f7f645bc7814a417c6ab25e53c786f0a6ab7b", size = 16980080, upload-time = "2026-05-21T02:30:35.096Z" },
 ]
 
 [[package]]
@@ -4253,11 +4253,11 @@ wheels = [
 
 [[package]]
 name = "packaging"
-version = "26.0"
+version = "26.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/65/ee/299d360cdc32edc7d2cf530f3accf79c4fca01e96ffc950d8a52213bd8e4/packaging-26.0.tar.gz", hash = "sha256:00243ae351a257117b6a241061796684b084ed1c516a08c48a3f7e147a9d80b4", size = 143416, upload-time = "2026-01-21T20:50:39.064Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d7/f1/e7a6dd94a8d4a5626c03e4e99c87f241ba9e350cd9e6d75123f992427270/packaging-26.2.tar.gz", hash = "sha256:ff452ff5a3e828ce110190feff1178bb1f2ea2281fa2075aadb987c2fb221661", size = 228134, upload-time = "2026-04-24T20:15:23.917Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b7/b9/c538f279a4e237a006a2c98387d081e9eb060d203d8ed34467cc0f0b9b53/packaging-26.0-py3-none-any.whl", hash = "sha256:b36f1fef9334a5588b4166f8bcd26a14e521f2b55e6b9de3aaa80d3ff7a37529", size = 74366, upload-time = "2026-01-21T20:50:37.788Z" },
+    { url = "https://files.pythonhosted.org/packages/df/b2/87e62e8c3e2f4b32e5fe99e0b86d576da1312593b39f47d8ceef365e95ed/packaging-26.2-py3-none-any.whl", hash = "sha256:5fc45236b9446107ff2415ce77c807cee2862cb6fac22b8a73826d0693b0980e", size = 100195, upload-time = "2026-04-24T20:15:22.081Z" },
 ]
 
 [[package]]
@@ -4435,7 +4435,7 @@ wheels = [
 
 [[package]]
 name = "pre-commit"
-version = "4.5.1"
+version = "4.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cfgv" },
@@ -4444,9 +4444,9 @@ dependencies = [
     { name = "pyyaml" },
     { name = "virtualenv" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/40/f1/6d86a29246dfd2e9b6237f0b5823717f60cad94d47ddc26afa916d21f525/pre_commit-4.5.1.tar.gz", hash = "sha256:eb545fcff725875197837263e977ea257a402056661f09dae08e4b149b030a61", size = 198232, upload-time = "2025-12-16T21:14:33.552Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/8e/22/2de9408ac81acbb8a7d05d4cc064a152ccf33b3d480ebe0cd292153db239/pre_commit-4.6.0.tar.gz", hash = "sha256:718d2208cef53fdc38206e40524a6d4d9576d103eb16f0fec11c875e7716e9d9", size = 198525, upload-time = "2026-04-21T20:31:41.613Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5d/19/fd3ef348460c80af7bb4669ea7926651d1f95c23ff2df18b9d24bab4f3fa/pre_commit-4.5.1-py2.py3-none-any.whl", hash = "sha256:3b3afd891e97337708c1674210f8eba659b52a38ea5f822ff142d10786221f77", size = 226437, upload-time = "2025-12-16T21:14:32.409Z" },
+    { url = "https://files.pythonhosted.org/packages/80/6e/4b28b62ecb6aae56769c34a8ff1d661473ec1e9519e2d5f8b2c150086b26/pre_commit-4.6.0-py2.py3-none-any.whl", hash = "sha256:e2cf246f7299edcabcf15f9b0571fdce06058527f0a06535068a86d38089f29b", size = 226472, upload-time = "2026-04-21T20:31:40.092Z" },
 ]
 
 [[package]]
@@ -5187,15 +5187,15 @@ wheels = [
 
 [[package]]
 name = "pytest-rerunfailures"
-version = "16.1"
+version = "16.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "packaging" },
     { name = "pytest" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/de/04/71e9520551fc8fe2cf5c1a1842e4e600265b0815f2016b7c27ec85688682/pytest_rerunfailures-16.1.tar.gz", hash = "sha256:c38b266db8a808953ebd71ac25c381cb1981a78ff9340a14bcb9f1b9bff1899e", size = 30889, upload-time = "2025-10-10T07:06:01.238Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6b/27/fd0209642f3a1069da3e0be3c7e339f942d052d81ccb1fb4eb9b187d3633/pytest_rerunfailures-16.2.tar.gz", hash = "sha256:5f5a32f15674a3d54f7598388fcd3cc1bc5c37284731a4704a44485dcdda5e23", size = 32121, upload-time = "2026-05-13T08:13:26.998Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/77/54/60eabb34445e3db3d3d874dc1dfa72751bfec3265bd611cb13c8b290adea/pytest_rerunfailures-16.1-py3-none-any.whl", hash = "sha256:5d11b12c0ca9a1665b5054052fcc1084f8deadd9328962745ef6b04e26382e86", size = 14093, upload-time = "2025-10-10T07:06:00.019Z" },
+    { url = "https://files.pythonhosted.org/packages/3f/a5/d8c1ad74529b483044b787ead2d24ecc624bca4084a509002102e4bab8cc/pytest_rerunfailures-16.2-py3-none-any.whl", hash = "sha256:c22a53d2827becc76f057d4ded123c0e726523f2f0e5f0bb4efb31fd59e1f14e", size = 14505, upload-time = "2026-05-13T08:13:25.485Z" },
 ]
 
 [[package]]
