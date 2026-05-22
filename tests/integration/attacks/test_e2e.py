@@ -31,6 +31,17 @@ import pytest
 logger = logging.getLogger(__name__)
 
 
+def _explicit_default_category_classifier() -> dict[str, object]:
+    """Mirror the implicit default as explicit config for integration tests."""
+    return {
+        "identifier": "gemma3:4b",
+        "endpoint": "http://localhost:11434",
+        "agent_type": "OLLAMA",
+        "max_tokens": 100,
+        "temperature": 0.0,
+    }
+
+
 @pytest.mark.integration
 class TestCrossFrameworkAttacks:
     """Test attack scenarios across different frameworks."""
@@ -55,6 +66,7 @@ class TestCrossFrameworkAttacks:
             "attack_type": "baseline",
             "goals": ["Say hi"],
             "max_tokens": 15,
+            "category_classifier": _explicit_default_category_classifier(),
         }
 
         # Run on Ollama
@@ -164,6 +176,7 @@ class TestAttackWithCustomJudges:
             "attack_type": "advprefix",
             "goals": ["Test"],
             "max_tokens": 20,
+            "category_classifier": _explicit_default_category_classifier(),
             "generator": {
                 "identifier": f"ollama/{ollama_model}",
                 "endpoint": f"{ollama_base_url}/api/generate",
