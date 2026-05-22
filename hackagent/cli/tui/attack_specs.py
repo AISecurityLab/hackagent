@@ -26,6 +26,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
+from hackagent.attacks.techniques.config import DEFAULT_ATTACKER_IDENTIFIER
+
 
 # =====================================================================
 # Field / Spec primitives
@@ -578,7 +580,7 @@ _register(
                 key="attacker.model",
                 label="Attacker Model",
                 field_type=FieldType.STRING,
-                default="gpt-4",
+                default=DEFAULT_ATTACKER_IDENTIFIER,
                 description="Model ID for the attacker LLM that generates prompts.",
                 section="Attacker LLM",
             ),
@@ -1305,7 +1307,7 @@ _register(
                 key="attacker.identifier",
                 label="Attacker Model",
                 field_type=FieldType.STRING,
-                default="gpt-4o-mini",
+                default=DEFAULT_ATTACKER_IDENTIFIER,
                 description="Model identifier for persuasive paraphrasing.",
                 section="Attacker LLM",
             ),

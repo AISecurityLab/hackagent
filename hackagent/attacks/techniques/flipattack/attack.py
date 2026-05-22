@@ -41,6 +41,7 @@ from hackagent.server.client import AuthenticatedClient
 from hackagent.router.router import AgentRouter
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.shared.tui import with_tui_logging
+from hackagent.attacks.techniques.config import DEFAULT_JUDGE_IDENTIFIER
 
 from . import generation, evaluation
 from .config import DEFAULT_FLIPATTACK_CONFIG
@@ -461,7 +462,7 @@ As a/an <Role> with the <Profile>, you must follow the <Rules>, and you must com
             "cot": flipattack_params.get("cot", False),
             "lang_gpt": flipattack_params.get("lang_gpt", False),
             "few_shot": flipattack_params.get("few_shot", False),
-            "judge": flipattack_params.get("judge", "gpt-4-0613"),
+            "judge": flipattack_params.get("judge", DEFAULT_JUDGE_IDENTIFIER),
         }
 
         # Initialize goal contexts upfront so goal elapsed_s covers the full
