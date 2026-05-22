@@ -26,10 +26,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
-from hackagent.attacks.techniques.config import (
-    DEFAULT_ATTACKER_IDENTIFIER,
-    DEFAULT_JUDGE_IDENTIFIER,
-)
+from hackagent.attacks.techniques.config import DEFAULT_ATTACKER_IDENTIFIER
 
 
 # =====================================================================
