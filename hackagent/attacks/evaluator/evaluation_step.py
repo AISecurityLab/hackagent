@@ -51,6 +51,11 @@ from hackagent.attacks.evaluator.judge_evaluators import EVALUATOR_MAP
 from hackagent.attacks.shared.router_factory import extract_passthrough_request_config
 from hackagent.attacks.evaluator.sync import sync_evaluation_to_server
 from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
+from hackagent.attacks.techniques.config import (
+    DEFAULT_JUDGE_IDENTIFIER,
+    DEFAULT_LOCAL_AGENT_TYPE,
+    DEFAULT_LOCAL_MODEL_ENDPOINT,
+)
 from hackagent.server.client import AuthenticatedClient
 from hackagent.router.types import AgentTypeEnum
 
@@ -349,8 +354,8 @@ class BaseEvaluationStep:
     def _resolve_judges_from_config(
         self,
         technique_params: Optional[Dict[str, Any]] = None,
-        default_judge: str = "gpt-4-0613",
-        default_type: str = "jailbreakbench",
+        default_judge: str = DEFAULT_JUDGE_IDENTIFIER,
+        default_type: str = "harmbench",
     ) -> List[Dict[str, Any]]:
         """
         Resolve the judges list from ``_raw_config``.
@@ -388,6 +393,11 @@ class BaseEvaluationStep:
             "identifier": judge_model,
             "type": judge_type,
         }
+        # For the built-in local default, inject Ollama connectivity so it
+        # works out-of-the-box without any API key.
+        if judge_model == DEFAULT_JUDGE_IDENTIFIER:
+            fallback.setdefault("endpoint", DEFAULT_LOCAL_MODEL_ENDPOINT)
+            fallback.setdefault("agent_type", DEFAULT_LOCAL_AGENT_TYPE)
         for key in (
             "endpoint",
             "agent_type",
