@@ -335,9 +335,10 @@ def adk_server_with_ollama(
         yield None
         return
 
-    # Find the examples/google_adk directory
+    # Find the examples/google_adk directory (inside the hackagent package)
     examples_dir = os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+        "hackagent",
         "examples",
         "google_adk",
     )

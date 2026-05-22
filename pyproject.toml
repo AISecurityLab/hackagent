@@ -1,6 +1,6 @@
 [project]
 name = "hackagent"
-version = "0.9.1"
+version = "0.10.0"
 description = "HackAgent is an open-source security toolkit to detect vulnerabilities of your AI Agents."
 authors = [
     {name = "AI Security Lab", email = "ais@ai4i.it"}
@@ -80,6 +80,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["hackagent"]
+artifacts = [
+    "hackagent/examples/**",
+]
 
 [tool.hatch.build.targets.sdist]
 include = [

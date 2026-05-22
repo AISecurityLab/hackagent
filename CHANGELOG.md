@@ -1,3 +1,36 @@
+## v0.10.0 (2026-05-22)
+
+### ✨ Features
+
+- possibility to enable or disable thinking with ollama
+- possibility to enable or disable thinking with ollama
+
+### 🐛🚑️ Fixes
+
+- abort attack if non-default category classifier model is not s…
+- fixed integration tests
+- abort attack if non-default category classifier model is not specified and the default model is not present in ollama
+
+### bump
+
+- **deps-dev**: bump pre-commit from 4.5.1 to 4.6.0
+- **deps**: bump click from 8.1.8 to 8.4.0
+- **deps-dev**: bump pytest-rerunfailures from 16.1 to 16.2
+- **deps-dev**: bump packaging from 26.0 to 26.2
+- version 0.9.0 → 0.9.1
+- **deps-dev**: bump commitizen from 4.13.10 to 4.16.0
+
+### fix
+
+- move examples/ inside hackagent package for correct wheel packaging
+- normalize TAP judge scores to consistent 1-10 scale
+- pass TAP success_threshold to coordinator finalize_all_goals
+- normalize TAP judge scores to a consistent 1-10 scale
+
+### 🫥 fixup
+
+- fixed merge conflict on tag bump
+
 ## v0.9.1 (2026-05-21)
 
 ## v0.9.0 (2026-05-15)

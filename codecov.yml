@@ -40,6 +40,6 @@ comment:
 ignore:
   - "tests/**/*"
   - "docs/**/*"
-  - "examples/**/*"
+  - "hackagent/examples/**/*"
   - "htmlcov/**/*"
   - "**/__pycache__/**"
