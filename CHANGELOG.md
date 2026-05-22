@@ -1,3 +1,11 @@
+## v0.10.1 (2026-05-22)
+
+### fix
+
+- replace hardcoded OpenAI model defaults with local Ollama defaults
+- resolve top-level 'judge' dict before falling back to gpt-4-0613 default
+- move examples/ inside hackagent package for correct wheel packaging
+
 ## v0.10.0 (2026-05-22)
 
 ### ✨ Features
