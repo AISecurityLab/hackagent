@@ -41,6 +41,7 @@ from hackagent.attacks.evaluator.evaluation_step import (
     JUDGE_TYPE_LABELS,
     MERGE_KEYS,
 )
+from hackagent.attacks.techniques.config import DEFAULT_JUDGE_IDENTIFIER
 from hackagent.router.types import AgentTypeEnum
 
 logger = logging.getLogger(__name__)
@@ -297,9 +298,9 @@ class TestResolveJudgesFromConfig:
         judges = step._resolve_judges_from_config()
 
         assert len(judges) == 1
-        assert judges[0]["identifier"] == "gpt-4-0613"
-        # default_type in _resolve_judges_from_config is "jailbreakbench"
-        assert judges[0]["type"] == "jailbreakbench"
+        assert judges[0]["identifier"] == DEFAULT_JUDGE_IDENTIFIER
+        # default_type in _resolve_judges_from_config is "harmbench"
+        assert judges[0]["type"] == "harmbench"
 
     def test_multiple_judges(self):
         """Test with multiple judges configured."""
