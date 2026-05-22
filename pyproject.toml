@@ -48,6 +48,8 @@ dev = [
     "cz-conventional-gitmoji>=0.7.0",
     "pytest-cov>=6.1.1",
     "pytest-rerunfailures>=14.0",
+    "pytest-xdist>=3.0",
+    "pytest-timeout>=2.0",
     "google-adk>=1.4.2",
     "anyio>=4.3.0",
     "pytest-asyncio>=0.23.7,<1.4.0",
@@ -114,7 +116,7 @@ output = "reports/coverage.xml"
 
 [tool.pytest.ini_options]
 testpaths = ["tests/unit", "tests/integration", "tests/e2e"]
-addopts = "--ignore=tests/e2e/attacks"
+addopts = "--ignore=tests/e2e/attacks --timeout=120"
 markers = [
     "integration: marks integration tests (use --run-integration to enable)",
     "ollama: marks tests that require a running Ollama instance",
@@ -123,7 +125,7 @@ markers = [
     "litellm: marks tests that require a LiteLLM-compatible backend",
     "e2e: marks end-to-end tests that require external services",
     "hackagent_backend: marks tests that require the HackAgent backend API",
-    "slow: marks slow-running tests",
+    "slow: marks slow-running tests (excluded from CI, run nightly)",
 ]
 
 [tool.datamodel-codegen]
