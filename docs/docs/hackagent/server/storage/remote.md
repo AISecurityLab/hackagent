@@ -28,3 +28,11 @@ def get_context() -> OrganizationContext
 
 Fetch org_id and user_id from the first agent (cached after first call).
 
+#### count\_result\_buckets
+
+```python
+def count_result_buckets() -> Dict[str, int]
+```
+
+Efficiently count results by evaluation status using filtered API calls.
+

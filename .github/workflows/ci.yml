@@ -135,8 +135,11 @@ jobs:
           fail_ci_if_error: true
 
   # ── Integration (offline) ─────────────────────────────────────────────────
-  # Covers tests/integration/storage/ (LocalBackend + SQLite) and
-  # tests/integration/tui/ (mock-based). No external services required.
+  # Covers tests/integration/tui/ — mock-based TUI integration tests
+  # that exercise widget composition + lifecycle without external
+  # services. (The former tests/integration/storage/ moved to
+  # tests/unit/server/storage/ since it only exercised the in-memory
+  # local backend.)
   integration-offline:
     name: Integration Tests (Offline)
     runs-on: ubuntu-latest
@@ -161,7 +164,6 @@ jobs:
       - name: Run offline integration tests with coverage
         run: >
           uv run pytest
-          tests/integration/storage/
           tests/integration/tui/
           --run-integration
           -n auto
@@ -180,17 +182,32 @@ jobs:
           retention-days: 1
 
   # ── Integration (Ollama) ──────────────────────────────────────────────────
-  # Covers tests/integration/adapters/ and tests/integration/attacks/.
+  # Covers tests/integration/router/ and tests/integration/attacks/.
   # Requires a running Ollama instance with tinyllama.
+  #
+  # Sharded across two runners (real CPUs, real parallelism):
+  #   - shard=fast → ``-m "not slow"`` (the bulk; ~few minutes)
+  #   - shard=slow → ``-m "slow"`` (advprefix multi-judge; ~14 min on CPU)
+  # Within each shard pytest-xdist spreads tests across runner cores
+  # with ``-n auto --dist=loadfile`` and Ollama is allowed to serve
+  # multiple concurrent requests via ``OLLAMA_NUM_PARALLEL=4``.
   integration-ollama:
-    name: Integration Tests (Ollama)
+    name: Integration Tests (Ollama, ${{ matrix.shard }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          - fast
+          - slow
     env:
       HACKAGENT_API_KEY: ${{ secrets.HACKAGENT_API_KEY }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       OLLAMA_MODEL: tinyllama
+      # Let Ollama serve concurrent requests from pytest-xdist workers.
+      OLLAMA_NUM_PARALLEL: "4"
       TEST_MAX_TOKENS_FAST: "15"
       TEST_MAX_TOKENS_MEDIUM: "25"
       TEST_MAX_TOKENS_SLOW: "40"
@@ -222,20 +239,28 @@ jobs:
             ollama-models-tinyllama-
 
       - name: Pull Ollama model
+        # Integration tests reuse tinyllama for the target, attacker,
+        # judges, and category classifier (via
+        # ``_fast_classifier_config``). The orchestrator's implicit
+        # default classifier (``gemma3:4b``) is much slower on CPU
+        # runners and not pulled here on purpose.
         run: ollama pull tinyllama
 
       - name: Install dependencies
         run: uv sync --group dev
 
       - name: Run Ollama integration tests with coverage
+        # Each shard handles one ``-m`` selector so the slow advprefix
+        # test (~14 min on CPU) runs on its own runner instead of
+        # bottlenecking the rest of the suite.
         run: >
           uv run pytest
-          tests/integration/adapters/
+          tests/integration/router/
           tests/integration/attacks/
           --run-integration
-          -n 2
+          -n auto
           --dist=loadfile
-          -m "not slow"
+          -m "${{ matrix.shard == 'slow' && 'slow' || 'not slow' }}"
           -v --tb=short
           --cov --cov-fail-under=0
           --cov-report=xml:reports/coverage.xml
@@ -243,7 +268,7 @@ jobs:
       - name: Upload Ollama-integration coverage artifact
         uses: actions/upload-artifact@v7
         with:
-          name: coverage-integration-ollama
+          name: coverage-integration-ollama-${{ matrix.shard }}
           path: reports/.coverage
           include-hidden-files: true
           retention-days: 1

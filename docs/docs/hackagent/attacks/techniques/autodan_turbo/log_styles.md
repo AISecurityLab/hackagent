@@ -20,7 +20,7 @@ Build colored bracket prefix for a phase tag.
 
 **Returns**:
 
-  Colored prefix like `[WARMUP]`.
+  Colored prefix like ``[WARMUP]``.
 
 #### format\_phase\_message
 
@@ -38,7 +38,7 @@ Format a full colored phase-scoped log line.
 
 **Returns**:
 
-  Colored string `[PHASE] message`.
+  Colored string ``[PHASE] message``.
 
 #### phase\_separator
 

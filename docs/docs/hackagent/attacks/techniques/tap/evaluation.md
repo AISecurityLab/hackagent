@@ -106,6 +106,10 @@ def score_candidates(goal: str,
 
 Convenience wrapper for judge scoring of prompt-response pairs.
 
+Scores are normalized to a 1-10 scale regardless of judge type:
+binary judges (0/1) are mapped to 1/10 so that
+``success_score_threshold`` works consistently.
+
 **Arguments**:
 
 - `goal` - The goal string for the prompt/response pairs.
@@ -117,7 +121,7 @@ Convenience wrapper for judge scoring of prompt-response pairs.
 
 **Returns**:
 
-  List of integer judge scores aligned with prompts.
+  List of integer judge scores (1-10 scale) aligned with prompts.
 
 #### extract\_scores
 

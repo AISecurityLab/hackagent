@@ -35,11 +35,14 @@ attack methodologies.
 def __init__(endpoint: str,
              name: Optional[str] = None,
              agent_type: Union[AgentTypeEnum, str] = AgentTypeEnum.UNKNOWN,
+             base_url: Optional[str] = None,
+             api_key: Optional[str] = None,
              raise_on_unexpected_status: bool = False,
              timeout: Optional[float] = None,
              metadata: Optional[Dict[str, Any]] = None,
              target_config: Optional[Dict[str, Any]] = None,
-             adapter_operational_config: Optional[Dict[str, Any]] = None)
+             adapter_operational_config: Optional[Dict[str, Any]] = None,
+             thinking: Optional[bool] = None)
 ```
 
 Initializes the HackAgent client and prepares it for interaction.
@@ -75,6 +78,10 @@ attack strategies.
   generation defaults such as `name`4, `name`5,
   and `name`0.
 - `name`7 - Optional configuration for the agent adapter.
+- `name`8 - Optional OLLAMA-only control for reasoning traces.
+  When set to `False`, requests sent through the target OLLAMA adapter
+  include `agent_type`0 to disable thinking output. Ignored for
+  non-OLLAMA target agent types.
 
 #### attack\_strategies
 
@@ -91,8 +98,7 @@ Lazy-loaded attack strategies dictionary.
 def hack(attack_config: Dict[str, Any],
          run_config_override: Optional[Dict[str, Any]] = None,
          fail_on_run_error: bool = True,
-         _tui_app: Optional[Any] = None,
-         _tui_log_callback: Optional[Any] = None) -> Any
+         _tui_event_bus: Optional[Any] = None) -> Any
 ```
 
 Executes a specified attack strategy against the configured victim agent.

@@ -18,8 +18,17 @@ repos:
   - repo: local
     hooks:
       - id: pytest
-        name: pytest
-        entry: uv run pytest --run-integration --ignore=tests/e2e/attacks
+        name: pytest (unit only)
+        # Integration + e2e tests run in GitHub Actions (see
+        # ``.github/workflows/ci.yml``). The local pre-commit only
+        # runs the unit suite so commits stay snappy. To run the full
+        # integration suite locally on demand:
+        #   uv run pytest tests/integration/ --run-integration
+        #
+        # ``-n 4`` (not ``-n auto``) so the hook works both on 4-vCPU
+        # CI runners and on shared HPC login nodes that advertise 64+
+        # logical CPUs but enforce per-user thread limits.
+        entry: uv run pytest tests/unit/ -n 4
         language: system
         pass_filenames: false
         files: ^(.*\.py|pyproject\.toml|poetry\.lock|.*requirements.*\.txt|.*package\.json|.*package-lock\.json)$

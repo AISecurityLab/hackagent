@@ -3,17 +3,23 @@
 
 """Main router logic for dispatching requests to appropriate agents."""
 
-from .adapters import (
-    ADKAgent,
-    OllamaAgent,
-)  # This makes it easy to access agents via router module
+from .agent import (
+    Agent,
+    AdapterConfigurationError,
+    AdapterInteractionError,
+    AdapterResponseParsingError,
+)
+from .providers.adk import ADKAgent
 from .router import AgentRouter
 from .tracking import StepTracker, TrackingContext, track_operation
 
 __all__ = [
     "AgentRouter",
-    "ADKAgent",  # Exporting specific agents for convenience
-    "OllamaAgent",  # Ollama agent for local LLMs
+    "Agent",
+    "ADKAgent",
+    "AdapterConfigurationError",
+    "AdapterInteractionError",
+    "AdapterResponseParsingError",
     "StepTracker",
     "TrackingContext",
     "track_operation",

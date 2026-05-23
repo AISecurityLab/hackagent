@@ -7,8 +7,8 @@ Best-of-N (BoN) post-processing module.
 
 This step runs **after** the generation loop, which already includes inline
 judge evaluation with early-stopping.  By the time this step executes,
-every result dict already contains `best_score`, `success`, and the
-raw judge columns (`eval_hb`, `eval_jb`, etc.).
+every result dict already contains ``best_score``, ``success``, and the
+raw judge columns (``eval_hb``, ``eval_jb``, etc.).
 
 The post-processing step is responsible for:
 - Enriching any items that are still missing scores (e.g. errors).
@@ -41,13 +41,13 @@ Post-process BoN results: enrich scores, sync, and log ASR.
 **Arguments**:
 
 - `input_data` - Dicts from the generation step, each already containing
-  `best_score`, `success`, and judge columns from inline
+  ``best_score``, ``success``, and judge columns from inline
   evaluation.
   
 
 **Returns**:
 
-  Same list, enriched with any missing `best_score` / `success`.
+  Same list, enriched with any missing ``best_score`` / ``success``.
 
 #### execute
 
@@ -58,6 +58,6 @@ def execute(input_data: List[Dict], config: Dict[str, Any],
 
 Pipeline-compatible function entry point.
 
-Wraps `BoNEvaluation` so that `attack.py` can reference
-`evaluation.execute` directly in the pipeline step definition.
+Wraps ``BoNEvaluation`` so that ``attack.py`` can reference
+``evaluation.execute`` directly in the pipeline step definition.
 

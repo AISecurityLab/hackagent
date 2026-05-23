@@ -11,8 +11,7 @@ while exposing TAP-specific hyperparameters: depth, width, and branching_factor.
 ## TapParams Objects
 
 ```python
-@dataclass
-class TapParams()
+class TapParams(BaseModel)
 ```
 
 TAP-specific parameters.
@@ -20,8 +19,7 @@ TAP-specific parameters.
 ## TapConfig Objects
 
 ```python
-@dataclass
-class TapConfig()
+class TapConfig(ConfigBase)
 ```
 
 Complete TAP configuration for use with HackAgent.hack().
