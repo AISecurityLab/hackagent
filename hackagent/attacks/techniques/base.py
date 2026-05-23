@@ -247,6 +247,7 @@ class BaseAttack(abc.ABC):
             initial_metadata=initial_metadata,
             goal_index_start=goal_index_start,
             run_start_time=run_start_time,
+            event_bus=self.config.get("_tui_event_bus"),
         )
 
         # Backward-compat: expose step_tracker as self.tracker

@@ -254,54 +254,11 @@ def with_tui_logging(
     return decorator
 
 
-def attach_tui_handler(
-    attack_instance: Any,
-    app: App,
-    callback: Callable[[str, str], None],
-    max_buffer_size: int = 1000,
-    level: int = logging.INFO,
-) -> TUILogHandler:
-    """
-    Attach a TUI log handler to an attack instance.
-
-    This function should be called before executing an attack to set up
-    the logging infrastructure for TUI display.
-
-    Args:
-        attack_instance: The attack object to attach the handler to
-        app: Textual App instance for thread-safe calls
-        callback: Function to call with (message, level) for each log
-        max_buffer_size: Maximum number of logs to buffer
-        level: Minimum log level to capture
-
-    Returns:
-        The created TUILogHandler instance
-    """
-    handler = TUILogHandler(
-        app=app,
-        callback=callback,
-        max_buffer_size=max_buffer_size,
-        level=level,
-    )
-
-    # Store the handler on the attack instance
-    attack_instance._tui_log_handler = handler
-
-    return handler
-
-
-def detach_tui_handler(attack_instance: Any) -> Optional[TUILogHandler]:
-    """
-    Detach and return the TUI log handler from an attack instance.
-
-    Args:
-        attack_instance: The attack object to detach the handler from
-
-    Returns:
-        The detached TUILogHandler instance, or None if not present
-    """
-    if hasattr(attack_instance, "_tui_log_handler"):
-        handler = attack_instance._tui_log_handler
-        delattr(attack_instance, "_tui_log_handler")
-        return handler
-    return None
+# NOTE: ``attach_tui_handler`` / ``detach_tui_handler`` were removed in the
+# TUI cleanup pass — they were never called by production code. The current
+# TUI worker (:mod:`hackagent.cli.tui.views.attacks`) installs a
+# :class:`TUILogHandler` directly on the ``hackagent`` logger; for attack
+# techniques whose logger sets ``propagate=False``, the
+# :func:`with_tui_logging` decorator above is the supported integration
+# point — set ``attack_instance._tui_log_handler`` before calling
+# ``attack_instance.run(...)`` to enable it.

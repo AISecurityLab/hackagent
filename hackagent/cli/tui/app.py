@@ -214,15 +214,26 @@ class HackAgentTUI(App):
         tabs.active = tab_id
 
     def action_refresh(self) -> None:
-        """Refresh the current tab's data."""
+        """Refresh the current tab's data.
+
+        Walks every descendant of the active TabPane (not just immediate
+        children) so nested tab widgets — including those that wrap their
+        body in a scroller — still receive the refresh.
+        """
         tabs = self.query_one(TabbedContent)
         active_pane = tabs.get_pane(tabs.active)
-        if active_pane and hasattr(active_pane, "refresh_data"):
-            # Get the first child of the TabPane (our custom tab widget)
-            for child in active_pane.children:
-                if hasattr(child, "refresh_data"):
-                    child.refresh_data()
-                    break
+        if active_pane is None:
+            return
+        try:
+            for descendant in active_pane.query("*"):
+                if hasattr(descendant, "refresh_data"):
+                    descendant.refresh_data()
+                    return
+        except Exception:
+            pass
+        # Last-resort: try the pane itself.
+        if hasattr(active_pane, "refresh_data"):
+            active_pane.refresh_data()
 
     def on_mount(self) -> None:
         """Called when the app is mounted."""
@@ -231,16 +242,16 @@ class HackAgentTUI(App):
 
     def show_success(self, message: str) -> None:
         """Show success notification with checkmark."""
-        pass
+        self.notify(f"✓ {message}", title="Success", severity="information")
 
     def show_error(self, message: str) -> None:
         """Show error notification with X mark."""
-        pass
+        self.notify(f"✗ {message}", title="Error", severity="error")
 
     def show_warning(self, message: str) -> None:
         """Show warning notification with warning sign."""
-        pass
+        self.notify(f"⚠ {message}", title="Warning", severity="warning")
 
     def show_info(self, message: str) -> None:
         """Show info notification with info icon."""
-        pass
+        self.notify(f"ℹ {message}", title="Info", severity="information")

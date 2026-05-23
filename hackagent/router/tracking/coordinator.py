@@ -114,6 +114,7 @@ class TrackingCoordinator:
         initial_metadata: Optional[Dict[str, Any]] = None,
         goal_index_start: int = 0,
         run_start_time: Optional[float] = None,
+        event_bus: Optional[Any] = None,
     ) -> "TrackingCoordinator":
         """
         Factory method to create a fully-initialized coordinator.
@@ -144,6 +145,7 @@ class TrackingCoordinator:
                 logger=_logger,
                 attack_type=attack_type,
                 category_classifier_config=category_classifier_config,
+                event_bus=event_bus,
             )
 
         tracking_context = TrackingContext(
@@ -151,6 +153,7 @@ class TrackingCoordinator:
             run_id=run_id,
             parent_result_id=None,
             logger=_logger,
+            event_bus=event_bus,
         )
         tracking_context.add_metadata("attack_type", attack_type)
         step_tracker = StepTracker(tracking_context)

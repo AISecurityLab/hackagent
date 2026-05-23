@@ -103,12 +103,55 @@ class StepTracker:
             Re-raises any exception from the tracked code block after
             recording the error state.
         """
+        bus = getattr(self.context, "event_bus", None)
+
         if not self.context.is_enabled:
-            # Tracking disabled, just yield and return
-            yield None
+            # Tracking disabled, just yield and return — but still emit
+            # lifecycle events if a bus is attached (it is decoupled from
+            # backend availability).
+            if bus is not None:
+                try:
+                    bus.emit("step_started", step_name=step_name, step_type=step_type)
+                except Exception:
+                    self.logger.debug("StepTracker event emit failed", exc_info=True)
+            try:
+                yield None
+            except Exception as e:
+                if bus is not None:
+                    try:
+                        bus.emit(
+                            "step_ended",
+                            step_name=step_name,
+                            step_type=step_type,
+                            success=False,
+                            error=str(e),
+                        )
+                    except Exception:
+                        self.logger.debug(
+                            "StepTracker event emit failed", exc_info=True
+                        )
+                raise
+            else:
+                if bus is not None:
+                    try:
+                        bus.emit(
+                            "step_ended",
+                            step_name=step_name,
+                            step_type=step_type,
+                            success=True,
+                        )
+                    except Exception:
+                        self.logger.debug(
+                            "StepTracker event emit failed", exc_info=True
+                        )
             return
 
         trace_id = None
+        if bus is not None:
+            try:
+                bus.emit("step_started", step_name=step_name, step_type=step_type)
+            except Exception:
+                self.logger.debug("StepTracker event emit failed", exc_info=True)
         try:
             # Create trace record at step start
             trace_id = self._create_trace(
@@ -128,6 +171,16 @@ class StepTracker:
                 step_type=step_type,
                 status="completed",
             )
+            if bus is not None:
+                try:
+                    bus.emit(
+                        "step_ended",
+                        step_name=step_name,
+                        step_type=step_type,
+                        success=True,
+                    )
+                except Exception:
+                    self.logger.debug("StepTracker event emit failed", exc_info=True)
 
         except Exception as e:
             # Handle step failure
@@ -139,6 +192,17 @@ class StepTracker:
                 status="failed",
                 error_message=str(e),
             )
+            if bus is not None:
+                try:
+                    bus.emit(
+                        "step_ended",
+                        step_name=step_name,
+                        step_type=step_type,
+                        success=False,
+                        error=str(e),
+                    )
+                except Exception:
+                    self.logger.debug("StepTracker event emit failed", exc_info=True)
             # Re-raise to allow caller to handle
             raise
 
