@@ -58,6 +58,7 @@ class TestCrossFrameworkAttacks:
 
     @pytest.mark.ollama
     @pytest.mark.openai_sdk
+    @pytest.mark.timeout(600)
     def test_same_attack_different_frameworks(
         self,
         skip_if_ollama_unavailable,
@@ -167,6 +168,7 @@ class TestAttackWithCustomJudges:
 
     @pytest.mark.slow
     @pytest.mark.ollama
+    @pytest.mark.timeout(900)
     def test_advprefix_with_ollama_judges(
         self,
         skip_if_ollama_unavailable,

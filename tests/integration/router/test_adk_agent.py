@@ -269,6 +269,7 @@ class TestGoogleADKHackAgentIntegration:
             f"HackAgent initialized with Google ADK: {agent.router.backend_agent}"
         )
 
+    @pytest.mark.timeout(600)
     def test_hackagent_google_adk_baseline_attack(
         self,
         skip_if_google_adk_unavailable,
