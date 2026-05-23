@@ -142,6 +142,16 @@ class _ChatRegistration:
         self.actual_api_key: Optional[str] = _resolve_api_key_from_config(
             self.config, env_var_fallback
         )
+        # Ollama doesn't authenticate — drop any ``api_key`` that callers
+        # accidentally forwarded (the orchestrator's category classifier
+        # and the attack router factory both pass ``backend.get_api_key()``
+        # which is the HackAgent backend token, not an LLM provider key).
+        # Leaving it set causes LiteLLM's ``ollama_chat`` provider to
+        # send an ``Authorization: Bearer <hackagent-token>`` header to
+        # the local Ollama server, which is misleading at best and a
+        # credential leak at worst.
+        if agent_type == AgentTypeEnum.OLLAMA:
+            self.actual_api_key = None
         # OpenAI custom-endpoint quirk: when no key is configured but an
         # endpoint is, use a placeholder so the OpenAI client (under
         # LiteLLM) doesn't choke.

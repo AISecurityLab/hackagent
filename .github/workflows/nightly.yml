@@ -41,12 +41,16 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.ollama/models
-          key: ollama-models-tinyllama-${{ runner.os }}
+          key: ollama-models-tinyllama-gemma3-4b-${{ runner.os }}
           restore-keys: |
+            ollama-models-tinyllama-gemma3-4b-
             ollama-models-tinyllama-
 
-      - name: Pull Ollama model
-        run: ollama pull tinyllama
+      - name: Pull Ollama models
+        # See ci.yml for why gemma3:4b is needed alongside tinyllama.
+        run: |
+          ollama pull tinyllama
+          ollama pull gemma3:4b
 
       - name: Install dependencies
         run: uv sync --group dev

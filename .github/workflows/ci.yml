@@ -217,12 +217,21 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.ollama/models
-          key: ollama-models-tinyllama-${{ runner.os }}
+          key: ollama-models-tinyllama-gemma3-4b-${{ runner.os }}
           restore-keys: |
+            ollama-models-tinyllama-gemma3-4b-
             ollama-models-tinyllama-
 
-      - name: Pull Ollama model
-        run: ollama pull tinyllama
+      - name: Pull Ollama models
+        # ``tinyllama`` is the test target/attacker. ``gemma3:4b`` is the
+        # default category classifier used by the orchestrator
+        # (``DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER`` in
+        # ``hackagent/attacks/techniques/config.py``). Without it the
+        # baseline e2e test hits a LiteLLM ``ollama_chat`` 404 on
+        # ``/api/show`` for ``gemma3:4b``.
+        run: |
+          ollama pull tinyllama
+          ollama pull gemma3:4b
 
       - name: Install dependencies
         run: uv sync --group dev

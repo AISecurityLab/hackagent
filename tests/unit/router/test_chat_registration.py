@@ -77,6 +77,20 @@ class TestOllamaRegistration(unittest.TestCase):
         reg = _build(AgentTypeEnum.OLLAMA, {"name": "llama3"})
         self.assertEqual(reg.api_base_url, "http://env-ollama:11434")
 
+    def test_backend_api_key_is_dropped_for_ollama(self):
+        """Ollama doesn't authenticate; any forwarded api_key is discarded.
+
+        Prevents the regression where the HackAgent backend token was
+        being sent as ``Authorization: Bearer <token>`` to local Ollama
+        servers via the orchestrator's category classifier and the
+        attack router factory.
+        """
+        reg = _build(
+            AgentTypeEnum.OLLAMA,
+            {"name": "llama3", "api_key": "sk-leaking-backend-key"},
+        )
+        self.assertIsNone(reg.actual_api_key)
+
     def test_top_k_num_ctx_stream_recorded(self):
         reg = _build(
             AgentTypeEnum.OLLAMA,
