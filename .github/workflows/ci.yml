@@ -135,8 +135,11 @@ jobs:
           fail_ci_if_error: true
 
   # ── Integration (offline) ─────────────────────────────────────────────────
-  # Covers tests/integration/storage/ (LocalBackend + SQLite) and
-  # tests/integration/tui/ (mock-based). No external services required.
+  # Covers tests/integration/tui/ — mock-based TUI integration tests
+  # that exercise widget composition + lifecycle without external
+  # services. (The former tests/integration/storage/ moved to
+  # tests/unit/server/storage/ since it only exercised the in-memory
+  # local backend.)
   integration-offline:
     name: Integration Tests (Offline)
     runs-on: ubuntu-latest
@@ -161,7 +164,6 @@ jobs:
       - name: Run offline integration tests with coverage
         run: >
           uv run pytest
-          tests/integration/storage/
           tests/integration/tui/
           --run-integration
           -n auto
