@@ -15,6 +15,8 @@ import os
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple
 
+from hackagent.router import envelope as _envelope
+
 
 # --- Common Exception Classes ---
 class AdapterConfigurationError(Exception):
@@ -266,39 +268,23 @@ class Agent(ABC):
         raw_response_headers: Optional[Dict[str, str]] = None,
         agent_specific_data: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
+        """Construct HackAgent's standardised error-response dict.
+
+        Delegates to :func:`hackagent.router.envelope.build_error_envelope`
+        so the dict shape lives in one place (see
+        ``LITELLM_ROUTER_REFACTOR_PLAN.md`` Phase A).
         """
-        Constructs a standardized error response dictionary.
-
-        Args:
-            error_message: The primary error message string.
-            status_code: The HTTP status code associated with the error.
-            raw_request: The original request data that led to the error.
-            raw_response_body: Raw response body if available.
-            raw_response_headers: Response headers if available.
-            agent_specific_data: Additional adapter-specific data.
-
-        Returns:
-            A dictionary representing a standardized error response.
-        """
-        if agent_specific_data is None:
-            agent_specific_data = {}
-
-        # Include model_name in agent_specific_data if available
-        if self.model_name and "model_name" not in agent_specific_data:
-            agent_specific_data["model_name"] = self.model_name
-
-        return {
-            "raw_request": raw_request,
-            "processed_response": None,
-            "generated_text": None,
-            "status_code": status_code if status_code is not None else 500,
-            "raw_response_headers": raw_response_headers,
-            "raw_response_body": raw_response_body,
-            "agent_specific_data": agent_specific_data,
-            "error_message": error_message,
-            "agent_id": self.id,
-            "adapter_type": self.ADAPTER_TYPE,
-        }
+        return _envelope.build_error_envelope(
+            agent_id=self.id,
+            adapter_type=self.ADAPTER_TYPE,
+            error_message=error_message,
+            status_code=status_code,
+            raw_request=raw_request,
+            raw_response_body=raw_response_body,
+            raw_response_headers=raw_response_headers,
+            agent_specific_data=agent_specific_data,
+            model_name=self.model_name,
+        )
 
     def _build_success_response(
         self,
@@ -309,50 +295,25 @@ class Agent(ABC):
         agent_specific_data: Optional[Dict[str, Any]] = None,
         status_code: int = 200,
     ) -> Dict[str, Any]:
+        """Construct HackAgent's standardised success-response dict.
+
+        Delegates to :func:`hackagent.router.envelope.build_success_envelope`.
         """
-        Constructs a standardized success response dictionary.
-
-        Args:
-            processed_response: The processed/generated text response.
-            raw_request: The original request data.
-            raw_response_body: Raw response body if available.
-            raw_response_headers: Response headers if available.
-            agent_specific_data: Additional adapter-specific data.
-            status_code: HTTP status code (default: 200).
-
-        Returns:
-            A dictionary representing a standardized success response.
-        """
-        if isinstance(processed_response, str):
-            processed_response = self._strip_think_prefix(processed_response)
-
-        if agent_specific_data is None:
-            agent_specific_data = {}
-
-        # Include model_name in agent_specific_data if available
-        if self.model_name and "model_name" not in agent_specific_data:
-            agent_specific_data["model_name"] = self.model_name
-
-        return {
-            "raw_request": raw_request,
-            "processed_response": processed_response,
-            "generated_text": processed_response,
-            "status_code": status_code,
-            "raw_response_headers": raw_response_headers,
-            "raw_response_body": raw_response_body,
-            "agent_specific_data": agent_specific_data,
-            "error_message": None,
-            "agent_id": self.id,
-            "adapter_type": self.ADAPTER_TYPE,
-        }
+        return _envelope.build_success_envelope(
+            agent_id=self.id,
+            adapter_type=self.ADAPTER_TYPE,
+            processed_response=processed_response,
+            raw_request=raw_request,
+            raw_response_body=raw_response_body,
+            raw_response_headers=raw_response_headers,
+            agent_specific_data=agent_specific_data,
+            model_name=self.model_name,
+            status_code=status_code,
+        )
 
     def _strip_think_prefix(self, text: str) -> str:
-        """Strip hidden reasoning prefix up to and including '</think>' if present."""
-        marker = "</think>"
-        marker_index = text.find(marker)
-        if marker_index == -1:
-            return text
-        return text[marker_index + len(marker) :]
+        """Strip hidden reasoning prefix up to and including '</think>'."""
+        return _envelope.strip_think_prefix(text)
 
     @abstractmethod
     def handle_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -522,29 +483,17 @@ class ChatCompletionsAgent(Agent):
         completion_result: Dict[str, Any],
         parameters: Dict[str, Any],
     ) -> Dict[str, Any]:
+        """Build the standard ``agent_specific_data`` block.
+
+        Delegates to
+        :func:`hackagent.router.envelope.build_agent_specific_data`.
+        Subclasses override to add adapter-specific metadata.
         """
-        Build the agent_specific_data dictionary for the response.
-
-        Override this method to add adapter-specific metadata.
-
-        Args:
-            completion_result: The result dictionary from _execute_completion.
-            parameters: The parameters used for the completion call.
-
-        Returns:
-            Dictionary of adapter-specific data to include in response.
-        """
-        data = {
-            "model_name": self.model_name,
-            "invoked_parameters": parameters,
-        }
-
-        # Include any additional data from the completion result
-        for key in ["usage", "finish_reason", "raw_response"]:
-            if key in completion_result:
-                data[key] = completion_result[key]
-
-        return data
+        return _envelope.build_agent_specific_data(
+            model_name=self.model_name,
+            invoked_parameters=parameters,
+            completion_result=completion_result,
+        )
 
     def handle_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
         """

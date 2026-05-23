@@ -5,6 +5,8 @@
 from hackagent.logger import get_logger
 from typing import Any, Dict, List, Optional
 
+from hackagent.router import envelope as _envelope
+
 from .base import ChatCompletionsAgent, AdapterConfigurationError
 
 # Lazy load litellm - only import when actually needed to avoid ~2s startup delay
@@ -87,27 +89,9 @@ class LiteLLMConfigurationError(AdapterConfigurationError):
 logger = get_logger(__name__)  # Module-level logger
 
 
-# Provider prefixes that LiteLLM recognises natively. When a model string
-# already starts with one of these, we leave it alone instead of prepending
-# our own provider prefix.
-_KNOWN_LITELLM_PROVIDER_PREFIXES = (
-    "openai/",
-    "anthropic/",
-    "azure/",
-    "bedrock/",
-    "vertex_ai/",
-    "huggingface/",
-    "replicate/",
-    "together_ai/",
-    "anyscale/",
-    "ollama/",
-    "ollama_chat/",
-    "groq/",
-    "mistral/",
-    "cohere/",
-    "gemini/",
-    "deepseek/",
-)
+# Sourced from envelope.py — kept here as a module-level alias so any
+# external code that imported it from this module still works.
+_KNOWN_LITELLM_PROVIDER_PREFIXES = _envelope.KNOWN_LITELLM_PROVIDER_PREFIXES
 
 
 class LiteLLMAgent(ChatCompletionsAgent):
@@ -202,14 +186,13 @@ class LiteLLMAgent(ChatCompletionsAgent):
     def _resolve_litellm_model(self, raw_model: str) -> str:
         """Return the model string to pass to ``litellm.completion``.
 
-        Honors the subclass ``PROVIDER_PREFIX`` while leaving names that
-        already carry an explicit LiteLLM provider prefix untouched.
+        Delegates to :func:`hackagent.router.envelope.resolve_litellm_model`.
+        Subclasses (notably ADKAgent) override this entirely to inject a
+        per-instance provider prefix.
         """
-        if self.PROVIDER_PREFIX is None:
-            return raw_model
-        if raw_model.startswith(_KNOWN_LITELLM_PROVIDER_PREFIXES):
-            return raw_model
-        return f"{self.PROVIDER_PREFIX}/{raw_model}"
+        return _envelope.resolve_litellm_model(
+            raw_model, provider_prefix=self.PROVIDER_PREFIX
+        )
 
     def _default_api_key_env_var(self) -> Optional[str]:
         """Return the env var used as a fallback when no API key is configured."""
@@ -261,123 +244,65 @@ class LiteLLMAgent(ChatCompletionsAgent):
         top_p: float,
         **kwargs,
     ) -> Dict[str, Any]:
-        """Build the kwargs dict for ``litellm.completion``."""
-        litellm_params: Dict[str, Any] = {
-            "model": self.litellm_model,
-            "messages": messages,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "top_p": top_p,
-        }
+        """Build the kwargs dict for ``litellm.completion``.
 
-        if self.api_base_url:
-            litellm_params["api_base"] = self.api_base_url
-        if self.actual_api_key:
-            litellm_params["api_key"] = self.actual_api_key
-
-        # When the caller provides a custom endpoint without a recognised
-        # LiteLLM provider prefix, treat it as OpenAI-compatible. This
-        # preserves the previous behaviour for plain LiteLLM users and gives
-        # us a sensible default for LangChain-style endpoints.
-        if self.api_base_url and not self.litellm_model.startswith(
-            _KNOWN_LITELLM_PROVIDER_PREFIXES
-        ):
-            litellm_params["custom_llm_provider"] = "openai"
-            litellm_params["extra_headers"] = {"User-Agent": "HackAgent/0.1.0"}
-        elif self.api_base_url:
-            # Keep the User-Agent for outbound requests even when a provider
-            # prefix is supplied — useful for self-hosted proxies.
-            litellm_params["extra_headers"] = {"User-Agent": "HackAgent/0.1.0"}
-
-        # Thinking handling — config default merged with per-request override.
+        Delegates the bulk construction to
+        :func:`hackagent.router.envelope.build_litellm_kwargs`. The
+        thinking translation still goes through ``_apply_thinking`` so
+        subclasses can specialise it.
+        """
+        thinking_payload: Dict[str, Any] = {}
         thinking = kwargs.pop("thinking", self.default_thinking)
-        self._apply_thinking(litellm_params, thinking)
+        self._apply_thinking(thinking_payload, thinking)
 
-        # Tool calls.
         tools = kwargs.pop("tools", self.default_tools)
         tool_choice = kwargs.pop("tool_choice", self.default_tool_choice)
-        if tools:
-            litellm_params["tools"] = tools
-            if tool_choice is not None:
-                litellm_params["tool_choice"] = tool_choice
-
-        # Provider-specific extra body (e.g. OpenRouter ``reasoning``).
         extra_body = kwargs.pop("extra_body", self.default_extra_body)
-        if extra_body is not None:
-            litellm_params["extra_body"] = (
-                dict(extra_body) if isinstance(extra_body, dict) else extra_body
-            )
 
-        litellm_params.update(kwargs)
-        return litellm_params
+        return _envelope.build_litellm_kwargs(
+            model=self.litellm_model,
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            top_p=top_p,
+            api_base=self.api_base_url,
+            api_key=self.actual_api_key,
+            tools=tools,
+            tool_choice=tool_choice,
+            extra_body=extra_body,
+            thinking_payload=thinking_payload,
+            extra_kwargs=kwargs,
+        )
 
     def _extract_raw_response_content(self, response: Any, context: str = "") -> str:
-        """Extract content from a litellm response object."""
-        if not (response and response.choices and response.choices[0].message):
+        """Extract content from a litellm response object.
+
+        Delegates to
+        :func:`hackagent.router.envelope.extract_text_from_response`. The
+        ``context`` argument is preserved for backwards compatibility but
+        is only used for logging when the response is malformed.
+        """
+        text = _envelope.extract_text_from_response(
+            response, model_name=self.litellm_model
+        )
+        if text == "[GENERATION_ERROR: UNEXPECTED_RESPONSE]":
             self.logger.warning(
                 f"LiteLLM received unexpected response structure for model "
                 f"'{self.litellm_model}'{context}. Response: {response}"
             )
-            return "[GENERATION_ERROR: UNEXPECTED_RESPONSE]"
-
-        message = response.choices[0].message
-        content = message.content if message.content else ""
-
-        # Reasoning models surface their output in a dedicated field; fall
-        # back to it when the regular content is empty.
-        reasoning_content = None
-        if hasattr(message, "reasoning_content") and message.reasoning_content:
-            reasoning_content = message.reasoning_content
-        elif hasattr(message, "reasoning") and message.reasoning:
-            reasoning_content = message.reasoning
-        elif (
-            hasattr(message, "provider_specific_fields")
-            and message.provider_specific_fields
-        ):
-            reasoning_content = message.provider_specific_fields.get(
-                "reasoning_content"
-            ) or message.provider_specific_fields.get("reasoning")
-
-        if content:
-            return content
-        if reasoning_content:
-            self.logger.debug(
-                f"LiteLLM using reasoning content for model "
-                f"'{self.litellm_model}' (content field was empty)"
+        elif text == "[GENERATION_ERROR: EMPTY_RESPONSE]":
+            self.logger.warning(
+                f"LiteLLM received empty content and no reasoning field for "
+                f"model '{self.litellm_model}'{context}."
             )
-            return reasoning_content
-
-        self.logger.warning(
-            f"LiteLLM received empty content and no reasoning field for model "
-            f"'{self.litellm_model}'{context}. Message: {message}"
-        )
-        return "[GENERATION_ERROR: EMPTY_RESPONSE]"
+        return text
 
     def _extract_tool_calls(self, response: Any) -> Optional[List[Dict[str, Any]]]:
-        """Extract OpenAI-style tool_calls from a LiteLLM response, if any."""
-        try:
-            message = response.choices[0].message
-        except (AttributeError, IndexError, TypeError):
-            return None
-        tool_calls = getattr(message, "tool_calls", None)
-        if not tool_calls:
-            return None
-        result = []
-        for tc in tool_calls:
-            try:
-                result.append(
-                    {
-                        "id": getattr(tc, "id", None),
-                        "type": getattr(tc, "type", "function"),
-                        "function": {
-                            "name": tc.function.name,
-                            "arguments": tc.function.arguments,
-                        },
-                    }
-                )
-            except AttributeError:
-                continue
-        return result or None
+        """Return OpenAI-style ``tool_calls`` from a ``ModelResponse``, or ``None``.
+
+        Delegates to :func:`hackagent.router.envelope.extract_tool_calls`.
+        """
+        return _envelope.extract_tool_calls(response)
 
     def _get_excluded_request_keys(self) -> set:
         """Return keys handled explicitly so they aren't re-passed as kwargs."""
@@ -483,24 +408,9 @@ class LiteLLMAgent(ChatCompletionsAgent):
                 "error_message": str(e),
             }
 
-    # ---- response shaping ------------------------------------------------
-
-    def _build_agent_specific_data(
-        self,
-        completion_result: Dict[str, Any],
-        parameters: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        """Include common LiteLLM metadata (finish_reason, usage, tools)."""
-        data = super()._build_agent_specific_data(completion_result, parameters)
-        for key in ("finish_reason", "usage", "provider_model"):
-            value = completion_result.get(key)
-            if value is not None and key not in data:
-                data[key] = value
-        if completion_result.get("tool_calls"):
-            data["tool_calls"] = completion_result["tool_calls"]
-        return data
-
     # ---- legacy convenience helpers -------------------------------------
+    # (Response-shaping is handled by the base ``ChatCompletionsAgent`` via
+    # ``envelope.build_agent_specific_data`` since Phase A.)
 
     def _execute_litellm_completion_with_messages(
         self,
