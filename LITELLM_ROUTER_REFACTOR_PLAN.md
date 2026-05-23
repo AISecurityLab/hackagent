@@ -336,10 +336,10 @@ Phases A–E (partial) landed in five commits on
 
 ### Remaining work (deferred)
 
-- **Phase F.2+ — optional follow-ups.** Adopt `litellm.Router` for
+- **Phase F.5+ — optional follow-ups.** Adopt `litellm.Router` for
   multi-deployment load balancing; streaming support
-  (`stream=True`/`CustomStreamWrapper`); richer caller-supplied
-  `metadata` plumbing for `org_id` / `attack_id` / `evaluator_id`.
+  (`stream=True`/`CustomStreamWrapper`); MCP and A2A providers
+  alongside ADK in `router/providers/`.
 
 ### Recent landings (post-original plan)
 
@@ -358,6 +358,19 @@ Phases A–E (partial) landed in five commits on
   tests are gone. `hackagent/router/adapters/` keeps only the
   exception base classes plus an `ADKAgent` re-export. ADK lives at
   `hackagent.router.providers.adk`.
+- **Phase F.2**: metadata correlation keys nested under
+  `metadata["hackagent"]` instead of flat `hackagent_*` keys. Caller
+  metadata for Langfuse/OTEL/etc. no longer collides.
+- **Phase F.3**: `hackagent/router/adapters/` deleted. `Agent` ABC +
+  exception types live at `hackagent/router/agent.py`. The dead
+  `ChatCompletionsAgent` template is gone. ADK tests moved to
+  `tests/{unit,integration}/router/test_adk_agent.py`.
+- **Phase F.4**: `hackagent/examples/litellm_multi_provider/`
+  demonstrates that `AgentTypeEnum.LITELLM` covers Anthropic, Gemini,
+  Bedrock, Groq, Mistral, Together, OpenRouter, OpenAI, … via a
+  per-provider model-string prefix. `AgentTypeEnum` docstring updated
+  to clarify that `LITELLM` is the general path and the other chat
+  types are convenience aliases.
 
 ### Tests
 
