@@ -294,6 +294,7 @@ class TestGoogleADKHackAgentIntegration:
         logger.info(f"Baseline attack completed: {results}")
 
     @pytest.mark.slow
+    @pytest.mark.timeout(900)
     def test_hackagent_google_adk_advprefix_attack(
         self,
         skip_if_google_adk_unavailable,
@@ -318,6 +319,7 @@ class TestGoogleADKHackAgentIntegration:
         logger.info(f"Advprefix attack completed: {results}")
 
     @pytest.mark.slow
+    @pytest.mark.timeout(900)
     def test_hackagent_google_adk_with_ollama_judges(
         self,
         skip_if_google_adk_unavailable,
