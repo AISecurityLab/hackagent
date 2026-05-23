@@ -15,6 +15,9 @@ import os
 from hackagent.logger import get_logger
 from typing import Any, Dict, List, Optional
 
+from hackagent.router.provider_config import get_provider_config
+from hackagent.router.types import AgentTypeEnum
+
 from .base import AdapterConfigurationError
 from .litellm import LiteLLMAgent
 
@@ -45,7 +48,6 @@ class OllamaAgent(LiteLLMAgent):
     """
 
     ADAPTER_TYPE = "OllamaAgent"
-    PROVIDER_PREFIX = "ollama_chat"
     DEFAULT_ENDPOINT = "http://localhost:11434"
 
     def __init__(self, id: str, config: Dict[str, Any]):
@@ -57,7 +59,11 @@ class OllamaAgent(LiteLLMAgent):
         config = {**config, "endpoint": effective_endpoint}
 
         try:
-            super().__init__(id, config)
+            super().__init__(
+                id,
+                config,
+                provider_config=get_provider_config(AgentTypeEnum.OLLAMA),
+            )
         except AdapterConfigurationError as e:
             raise OllamaConfigurationError(str(e)) from e
 
@@ -97,29 +103,8 @@ class OllamaAgent(LiteLLMAgent):
         base = super()._get_excluded_request_keys()
         return base | {"top_k", "num_ctx", "stream", "system"}
 
-    def _apply_thinking(self, litellm_params: Dict[str, Any], thinking: Any) -> None:
-        """Translate ``thinking`` into Ollama's native ``think`` field.
-
-        Ollama accepts a boolean (``true``/``false``) or a reasoning level
-        such as ``"low"``/``"medium"``/``"high"`` depending on the model.
-        Dicts and ints are coerced into the most reasonable boolean.
-        """
-        if thinking is None:
-            return
-        if isinstance(thinking, bool):
-            litellm_params["think"] = thinking
-        elif isinstance(thinking, str):
-            litellm_params["think"] = thinking
-        elif isinstance(thinking, int):
-            litellm_params["think"] = thinking > 0
-        elif isinstance(thinking, dict):
-            kind = (thinking.get("type") or "").lower()
-            if kind == "disabled":
-                litellm_params["think"] = False
-            else:
-                litellm_params["think"] = True
-        else:
-            litellm_params["think"] = bool(thinking)
+    # Thinking translation is driven by the ``OLLAMA`` ``ProviderConfig``
+    # (see ``hackagent/router/provider_config.py``); no override needed.
 
     # ---- diagnostics passthroughs (kept for callers/tests) --------------
 

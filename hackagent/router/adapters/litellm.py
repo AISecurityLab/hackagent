@@ -6,6 +6,7 @@ from hackagent.logger import get_logger
 from typing import Any, Dict, List, Optional
 
 from hackagent.router import envelope as _envelope
+from hackagent.router.provider_config import ProviderConfig
 
 from .base import ChatCompletionsAgent, AdapterConfigurationError
 
@@ -124,9 +125,16 @@ class LiteLLMAgent(ChatCompletionsAgent):
     # When set, the model string passed to LiteLLM is prefixed with
     # ``"{PROVIDER_PREFIX}/"`` unless it already starts with a known
     # LiteLLM provider prefix. ``None`` means "let LiteLLM auto-detect".
+    # Subclasses can either set this class attribute or pass a
+    # ``ProviderConfig`` to ``__init__`` (the new Phase B path).
     PROVIDER_PREFIX: Optional[str] = None
 
-    def __init__(self, id: str, config: Dict[str, Any]):
+    def __init__(
+        self,
+        id: str,
+        config: Dict[str, Any],
+        provider_config: Optional[ProviderConfig] = None,
+    ):
         """
         Initialise the adapter from configuration.
 
@@ -142,8 +150,15 @@ class LiteLLMAgent(ChatCompletionsAgent):
                   definitions, passed through to LiteLLM.
                 - ``thinking`` (optional): see class docstring.
                 - ``extra_body`` (optional): provider-specific request body.
+            provider_config: Optional :class:`ProviderConfig` looked up
+                from ``hackagent.router.provider_config``. When supplied,
+                it takes precedence over the class-level
+                ``PROVIDER_PREFIX`` and ``_apply_thinking`` override. This
+                is the path Phase C will use to drive the adapter from
+                ``router.py`` without subclassing.
         """
         super().__init__(id, config)
+        self._provider_config: Optional[ProviderConfig] = provider_config
 
         # Require model name
         self.model_name = self._require_config_key("name", LiteLLMConfigurationError)
@@ -186,13 +201,18 @@ class LiteLLMAgent(ChatCompletionsAgent):
     def _resolve_litellm_model(self, raw_model: str) -> str:
         """Return the model string to pass to ``litellm.completion``.
 
-        Delegates to :func:`hackagent.router.envelope.resolve_litellm_model`.
-        Subclasses (notably ADKAgent) override this entirely to inject a
-        per-instance provider prefix.
+        Honors ``self._provider_config.provider_prefix`` when a
+        :class:`ProviderConfig` was supplied, otherwise falls back to the
+        class-level ``PROVIDER_PREFIX``. Subclasses (notably
+        :class:`ADKAgent`) override this entirely to inject a per-instance
+        provider prefix.
         """
-        return _envelope.resolve_litellm_model(
-            raw_model, provider_prefix=self.PROVIDER_PREFIX
+        prefix = (
+            self._provider_config.provider_prefix
+            if self._provider_config is not None
+            else self.PROVIDER_PREFIX
         )
+        return _envelope.resolve_litellm_model(raw_model, provider_prefix=prefix)
 
     def _default_api_key_env_var(self) -> Optional[str]:
         """Return the env var used as a fallback when no API key is configured."""
@@ -207,32 +227,28 @@ class LiteLLMAgent(ChatCompletionsAgent):
     def _apply_thinking(self, litellm_params: Dict[str, Any], thinking: Any) -> None:
         """Translate the unified ``thinking`` value into LiteLLM params.
 
-        The default implementation mirrors LiteLLM's own conventions:
-            - dict: forwarded verbatim as ``thinking=...``
-            - str: forwarded as ``reasoning_effort=...``
-            - int: forwarded as ``thinking={"type": "enabled",
-              "budget_tokens": int}``
-            - True/False: forwarded as
-              ``thinking={"type": "enabled" | "disabled"}``
-        Subclasses override this method when their provider needs different
-        field names (e.g. Ollama's ``think``).
+        When a :class:`ProviderConfig` was supplied, its
+        ``thinking_translator`` is consulted; otherwise the default
+        generic translator is used. Subclasses may still override this
+        method for backwards compatibility, but the recommended path is
+        to supply a ``ProviderConfig`` instead.
         """
         if thinking is None:
             return
-        if isinstance(thinking, dict):
-            litellm_params["thinking"] = dict(thinking)
-        elif isinstance(thinking, str):
-            litellm_params["reasoning_effort"] = thinking
-        elif isinstance(thinking, bool):
-            litellm_params["thinking"] = {"type": "enabled" if thinking else "disabled"}
-        elif isinstance(thinking, int):
-            litellm_params["thinking"] = {
-                "type": "enabled",
-                "budget_tokens": int(thinking),
-            }
-        else:
-            # Best-effort passthrough for unknown shapes.
-            litellm_params["thinking"] = thinking
+        if self._provider_config is not None:
+            payload = self._provider_config.thinking_translator(
+                thinking, model_name=self.litellm_model
+            )
+            if payload:
+                litellm_params.update(payload)
+            return
+
+        # Fallback path for adapters built without a ProviderConfig.
+        from hackagent.router.provider_config import default_thinking_translator
+
+        payload = default_thinking_translator(thinking, model_name=self.litellm_model)
+        if payload:
+            litellm_params.update(payload)
 
     # ---- request preparation --------------------------------------------
 
