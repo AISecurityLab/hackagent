@@ -126,9 +126,11 @@ _ADK_CUSTOM_LLM_CLASS = None
 def _get_adk_custom_llm_class():
     """Lazily build the CustomLLM subclass once litellm is importable.
 
-    Defined as a function instead of a module-level class so this module
-    keeps loading even when litellm is missing — the LiteLLMAgent base
-    will raise a clear error before anyone tries to actually use ADK.
+    Defined as a function instead of a module-level class so this
+    module keeps loading even when litellm is missing — ``ADKAgent``
+    raises a clear ``AgentConfigurationError`` from
+    ``_register_custom_provider`` if someone actually tries to use it
+    without litellm installed.
     """
     global _ADK_CUSTOM_LLM_CLASS
     if _ADK_CUSTOM_LLM_CLASS is not None:
