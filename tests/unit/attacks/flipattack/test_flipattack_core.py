@@ -55,7 +55,6 @@ def _make_fa(**flipattack_params) -> FlipAttackAlgorithm:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestFlipAttackModes:
     """Test all four flip modes produce correct transformations."""
 
@@ -134,7 +133,6 @@ class TestFlipAttackModes:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestFlipAttackEnhancements:
     """Test CoT, LangGPT, and Few-shot enhancements."""
 
@@ -205,7 +203,6 @@ class TestFlipAttackEnhancements:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestFlipAttackSentenceSplitting:
     """Test sentence splitting for few-shot demonstrations."""
 
@@ -247,7 +244,6 @@ class TestFlipAttackSentenceSplitting:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestFlipAttackDemo:
     """Test the demo() function used for few-shot examples."""
 
@@ -284,7 +280,6 @@ class TestFlipAttackDemo:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestFlipAttackSystemPrompts:
     """Test that system prompts contain required elements."""
 

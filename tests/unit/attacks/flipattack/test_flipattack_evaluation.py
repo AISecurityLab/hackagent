@@ -30,7 +30,6 @@ Run with:
 import logging
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from hackagent.attacks.techniques.flipattack.evaluation import (
     FlipAttackEvaluation,
@@ -102,7 +101,6 @@ def _make_generation_results(goals=None, include_error=False):
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestBuildPromptPrefix:
     """Test the _build_prompt_prefix helper function."""
 
@@ -146,7 +144,6 @@ class TestBuildPromptPrefix:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestFlipAttackEvaluation:
     """Test FlipAttackEvaluation class initialization and data flow."""
 
@@ -289,7 +286,6 @@ class TestFlipAttackEvaluation:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestEvaluationModuleExecute:
     """Test the module-level evaluate.execute() function."""
 

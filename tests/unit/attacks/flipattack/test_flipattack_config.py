@@ -43,7 +43,6 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestFlipAttackParams:
     """Test FlipAttackParams dataclass."""
 
@@ -81,7 +80,6 @@ class TestFlipAttackParams:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestFlipAttackConfig:
     """Test FlipAttackConfig dataclass and serialization."""
 
@@ -192,7 +190,6 @@ class TestFlipAttackConfig:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestDefaultFlipAttackConfig:
     """Test the DEFAULT_FLIPATTACK_CONFIG dictionary."""
 

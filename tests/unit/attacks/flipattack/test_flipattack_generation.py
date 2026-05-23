@@ -86,7 +86,6 @@ def _make_config(flip_mode="FCS", cot=False, lang_gpt=False, few_shot=False):
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestFlipAttackGenerationExecute:
     """Test generation.execute() function with mocked AgentRouter."""
 

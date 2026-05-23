@@ -33,7 +33,6 @@ Run with:
 import logging
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from hackagent.attacks.techniques.advprefix.evaluation import (
     EvaluationPipeline,
@@ -104,7 +103,6 @@ def _make_completion_data(n_goals=2, n_prefixes=2, n_completions=2):
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestEvaluationPipelineInit:
     """Test EvaluationPipeline initialization."""
 
@@ -155,7 +153,6 @@ class TestEvaluationPipelineInit:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestGroupKeys:
     """Test GROUP_KEYS constant."""
 
@@ -169,7 +166,6 @@ class TestGroupKeys:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestEvaluationPipelineExecute:
     """Test the full execute() pipeline flow."""
 
@@ -238,7 +234,6 @@ class TestEvaluationPipelineExecute:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestEvaluationPipelineAggregation:
     """Test the aggregation stage."""
 
@@ -317,7 +312,6 @@ class TestEvaluationPipelineAggregation:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestNllFiltering:
     """Test NLL (cross-entropy) filtering."""
 
@@ -384,7 +378,6 @@ class TestNllFiltering:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestEvaluationPipelineSelection:
     """Test the prefix selection stage."""
 
@@ -451,7 +444,6 @@ class TestEvaluationPipelineSelection:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestEvaluationPipelineStatistics:
     """Test pipeline statistics tracking."""
 

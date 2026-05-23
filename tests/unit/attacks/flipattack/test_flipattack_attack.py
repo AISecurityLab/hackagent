@@ -67,7 +67,6 @@ def _make_mock_router():
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestRecursiveUpdate:
     """Test the _recursive_update helper function."""
 
@@ -125,7 +124,6 @@ class TestRecursiveUpdate:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestFlipAttackInitialization:
     """Test FlipAttack class initialization."""
 
@@ -181,7 +179,6 @@ class TestFlipAttackInitialization:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestFlipAttackValidation:
     """Test FlipAttack configuration validation."""
 
@@ -254,7 +251,6 @@ class TestFlipAttackValidation:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestFlipAttackPipelineSteps:
     """Test pipeline step definitions."""
 

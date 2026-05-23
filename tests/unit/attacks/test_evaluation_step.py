@@ -31,7 +31,6 @@ Run with:
 import logging
 from unittest.mock import MagicMock
 
-import pytest
 
 from hackagent.attacks.evaluator.evaluation_step import (
     BaseEvaluationStep,
@@ -83,7 +82,6 @@ def _make_step(config=None, **overrides):
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestEvaluationStepConstants:
     """Test that module-level constants are properly defined."""
 
@@ -127,7 +125,6 @@ class TestEvaluationStepConstants:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestInferJudgeType:
     """Test judge type inference from model identifiers."""
 
@@ -175,7 +172,6 @@ class TestInferJudgeType:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestResolveAgentType:
     """Test agent type resolution."""
 
@@ -217,7 +213,6 @@ class TestResolveAgentType:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestBuildBaseEvalConfig:
     """Test evaluator base config construction."""
 
@@ -264,7 +259,6 @@ class TestBuildBaseEvalConfig:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestResolveJudgesFromConfig:
     """Test judge configuration resolution."""
 
@@ -323,7 +317,6 @@ class TestResolveJudgesFromConfig:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestComputeBestScore:
     """Test best score computation across judge columns."""
 
@@ -367,7 +360,6 @@ class TestComputeBestScore:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestEnrichItemsWithScores:
     """Test score enrichment of data items."""
 
@@ -402,7 +394,6 @@ class TestEnrichItemsWithScores:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestMergeEvaluationResults:
     """Test result merging from multiple judges."""
 
@@ -493,7 +484,6 @@ class TestMergeEvaluationResults:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestNormalizeMergeKey:
     """Test merge key normalization."""
 
@@ -517,7 +507,6 @@ class TestNormalizeMergeKey:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestPrepareJudgeConfigs:
     """Test judge configuration preparation."""
 
@@ -580,7 +569,6 @@ class TestPrepareJudgeConfigs:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestLogEvaluationAsr:
     """Test ASR logging."""
 
@@ -608,7 +596,6 @@ class TestLogEvaluationAsr:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestBuildJudgeKeysFromData:
     """Test auto-detection of judge columns in data."""
 
@@ -651,7 +638,6 @@ class TestBuildJudgeKeysFromData:
 # ============================================================================
 
 
-@pytest.mark.integration
 class TestEvaluationStepStatistics:
     """Test statistics tracking."""
 
