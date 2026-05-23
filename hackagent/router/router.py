@@ -2,17 +2,19 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-from typing import Any, Dict, Optional, Type
+from typing import Any, Dict, List, Optional, Tuple, Type
 
 from hackagent.server.storage.base import AgentRecord, StorageBackend
+from hackagent.router import envelope as _envelope
 from hackagent.router.adapters.base import Agent
+from hackagent.router.provider_config import ProviderConfig, get_provider_config
 from hackagent.router.types import AgentTypeEnum
 
 # Adapter imports - these are imported at module level for backwards compatibility
 # with test patching (tests patch hackagent.router.router.LiteLLMAgent etc.)
 # The actual heavy dependency (litellm) is lazy-loaded within LiteLLMAgent
 from hackagent.router.adapters import ADKAgent
-from hackagent.router.adapters.litellm import LiteLLMAgent
+from hackagent.router.adapters.litellm import LiteLLMAgent, _get_litellm
 from hackagent.router.adapters.openai import OpenAIAgent
 from hackagent.router.adapters.ollama import OllamaAgent
 
@@ -77,6 +79,11 @@ class AgentRouter:
         """
         self.backend = backend
         self._agent_registry: dict = {}
+        # Tracks the AgentTypeEnum each registration was created under, so
+        # ``route_request`` can pick the right dispatch path (chat
+        # AgentTypes go through ``_dispatch_via_litellm`` directly;
+        # everything else still calls ``adapter.handle_request``).
+        self._agent_types: Dict[str, AgentTypeEnum] = {}
 
         context = self.backend.get_context()
         self.organization_id = context.org_id
@@ -231,6 +238,7 @@ class AgentRouter:
                 f"ROUTER_DEBUG: Called adapter_class. Resulting instance: {adapter_instance}, type: {type(adapter_instance)}"
             )
             self._agent_registry[registration_key] = adapter_instance
+            self._agent_types[registration_key] = agent_type
             logger.info(
                 f"Agent '{name}' (Backend ID: {registration_key}, Type: {agent_type.value}) "
                 f"successfully initialized and registered with adapter {adapter_class.__name__}. "
@@ -351,8 +359,26 @@ class AgentRouter:
                 registration_key=registration_key,
             )
 
+        agent_type = self._agent_types.get(registration_key)
+        provider_config = (
+            get_provider_config(agent_type) if agent_type is not None else None
+        )
+
         try:
-            response = agent_instance.handle_request(request_data)
+            if provider_config is not None:
+                # Chat-completion AgentType: drive LiteLLM directly via the
+                # router instead of going through the adapter's
+                # ``handle_request``. Phase C of #379.
+                response = self._dispatch_via_litellm(
+                    registration_key=registration_key,
+                    agent_instance=agent_instance,
+                    provider_config=provider_config,
+                    request_data=request_data,
+                )
+            else:
+                # ADK and other gap-filler AgentTypes still use the
+                # adapter path.
+                response = agent_instance.handle_request(request_data)
             logger.debug(
                 f"Successfully routed request for agent key: {registration_key}"
             )
@@ -374,3 +400,224 @@ class AgentRouter:
                 raw_request=request_data,
                 registration_key=registration_key,
             )
+
+    # ------------------------------------------------------------------ #
+    # Phase C: LiteLLM dispatch path
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _extract_messages(
+        request_data: Dict[str, Any],
+    ) -> Tuple[Optional[List[Dict[str, str]]], Optional[str]]:
+        """Return ``(messages, error_msg)`` for a chat-completion request."""
+        messages = request_data.get("messages")
+        prompt = request_data.get("prompt")
+        if messages:
+            return messages, None
+        if prompt:
+            return [{"role": "user", "content": prompt}], None
+        return (
+            None,
+            "Request data must include either 'messages' or 'prompt' field.",
+        )
+
+    def _dispatch_via_litellm(
+        self,
+        *,
+        registration_key: str,
+        agent_instance: Agent,
+        provider_config: ProviderConfig,
+        request_data: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Route a chat-completion request through ``litellm.completion``.
+
+        Reads the model string, endpoint, API key, and generation
+        defaults off the already-configured adapter instance, looks up
+        the provider-specific thinking translator from
+        ``provider_config``, then calls LiteLLM directly. The response
+        is shaped via :mod:`hackagent.router.envelope` so downstream
+        consumers see exactly the same dict as the adapter-driven path.
+        """
+        adapter_label = provider_config.adapter_label or agent_instance.ADAPTER_TYPE
+        model_name = getattr(agent_instance, "litellm_model", None) or getattr(
+            agent_instance, "model_name", None
+        )
+        if model_name is None:
+            return _envelope.build_error_envelope(
+                agent_id=registration_key,
+                adapter_type=adapter_label,
+                error_message=(
+                    f"Adapter for '{registration_key}' has no model name; "
+                    "cannot dispatch via LiteLLM."
+                ),
+                status_code=500,
+                raw_request=request_data,
+            )
+
+        messages, validation_error = self._extract_messages(request_data)
+        if validation_error:
+            return _envelope.build_error_envelope(
+                agent_id=registration_key,
+                adapter_type=adapter_label,
+                error_message=validation_error,
+                status_code=400,
+                raw_request=request_data,
+            )
+
+        # Generation defaults come from the adapter instance.
+        max_tokens = request_data.get(
+            "max_tokens", getattr(agent_instance, "default_max_tokens", 100)
+        )
+        temperature = request_data.get(
+            "temperature", getattr(agent_instance, "default_temperature", 0.8)
+        )
+        top_p = request_data.get(
+            "top_p", getattr(agent_instance, "default_top_p", 0.95)
+        )
+
+        # Translate the unified thinking knob via the provider config.
+        thinking = request_data.get(
+            "thinking", getattr(agent_instance, "default_thinking", None)
+        )
+        thinking_payload = provider_config.thinking_translator(
+            thinking, model_name=model_name
+        )
+
+        # Provider-specific pass-throughs (tools, extras, …) plus any
+        # adapter-specific extra knobs (top_k, num_ctx for Ollama, etc.).
+        tools = request_data.get(
+            "tools", getattr(agent_instance, "default_tools", None)
+        )
+        tool_choice = request_data.get(
+            "tool_choice", getattr(agent_instance, "default_tool_choice", None)
+        )
+        extra_body = request_data.get(
+            "extra_body", getattr(agent_instance, "default_extra_body", None)
+        )
+
+        excluded_keys = {
+            "prompt",
+            "messages",
+            "max_tokens",
+            "temperature",
+            "top_p",
+            "tools",
+            "tool_choice",
+            "thinking",
+            "extra_body",
+        }
+        extra_kwargs: Dict[str, Any] = {
+            k: v for k, v in request_data.items() if k not in excluded_keys
+        }
+        # Add adapter-instance defaults for the extra passthrough keys.
+        for key in provider_config.extra_passthrough_keys:
+            if key in request_data or key in extra_kwargs:
+                continue
+            default = getattr(agent_instance, f"default_{key}", None)
+            if default is not None:
+                extra_kwargs[key] = default
+
+        kwargs = _envelope.build_litellm_kwargs(
+            model=model_name,
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            top_p=top_p,
+            api_base=getattr(agent_instance, "api_base_url", None),
+            api_key=getattr(agent_instance, "actual_api_key", None),
+            tools=tools,
+            tool_choice=tool_choice,
+            extra_body=extra_body,
+            thinking_payload=thinking_payload,
+            extra_kwargs=extra_kwargs,
+        )
+
+        litellm, available = _get_litellm()
+        if not available:
+            return _envelope.build_error_envelope(
+                agent_id=registration_key,
+                adapter_type=adapter_label,
+                error_message="litellm is not installed",
+                status_code=500,
+                raw_request=request_data,
+                model_name=model_name,
+            )
+
+        try:
+            response = litellm.completion(**kwargs)
+        except Exception as exc:
+            logger.exception(
+                f"LiteLLM dispatch failed for agent {registration_key} "
+                f"(model={model_name}): {exc}"
+            )
+            return _envelope.build_error_envelope(
+                agent_id=registration_key,
+                adapter_type=adapter_label,
+                error_message=f"{adapter_label} error ({type(exc).__name__}): {exc}",
+                status_code=500,
+                raw_request=request_data,
+                model_name=model_name,
+            )
+
+        text = _envelope.extract_text_from_response(response, model_name=model_name)
+        if isinstance(text, str) and text.startswith("[GENERATION_ERROR:"):
+            return _envelope.build_error_envelope(
+                agent_id=registration_key,
+                adapter_type=adapter_label,
+                error_message=f"{adapter_label} generation error: {text}",
+                status_code=500,
+                raw_request=request_data,
+                model_name=model_name,
+            )
+
+        # Build completion_result + agent_specific_data the same way
+        # ChatCompletionsAgent did, so the envelope dict matches byte
+        # for byte.
+        invoked_parameters: Dict[str, Any] = {
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "top_p": top_p,
+        }
+        invoked_parameters.update(extra_kwargs)
+        if tools is not None:
+            invoked_parameters["tools"] = tools
+        if tool_choice is not None:
+            invoked_parameters["tool_choice"] = tool_choice
+
+        completion_result: Dict[str, Any] = {
+            "success": True,
+            "content": text,
+            "raw_response": response,
+        }
+        tool_calls = _envelope.extract_tool_calls(response)
+        if tool_calls is not None:
+            completion_result["tool_calls"] = tool_calls
+        try:
+            completion_result["finish_reason"] = response.choices[0].finish_reason
+        except (AttributeError, IndexError, TypeError):
+            pass
+        try:
+            if response.usage is not None:
+                completion_result["usage"] = response.usage.model_dump()
+        except AttributeError:
+            pass
+        try:
+            completion_result["provider_model"] = response.model
+        except AttributeError:
+            pass
+
+        agent_specific_data = _envelope.build_agent_specific_data(
+            model_name=model_name,
+            invoked_parameters=invoked_parameters,
+            completion_result=completion_result,
+        )
+
+        return _envelope.build_success_envelope(
+            agent_id=registration_key,
+            adapter_type=adapter_label,
+            processed_response=text,
+            raw_request=request_data,
+            raw_response_body=response,
+            agent_specific_data=agent_specific_data,
+            model_name=model_name,
+        )
