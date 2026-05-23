@@ -9,30 +9,22 @@ from hackagent.router import envelope as _envelope
 from hackagent.router import tracking_logger as _tracking_logger
 from hackagent.router._chat_registration import _ChatRegistration
 from hackagent.router.adapters.base import Agent
+from hackagent.router.providers.adk import ADKAgent, _get_litellm
 from hackagent.router.provider_config import ProviderConfig, get_provider_config
 from hackagent.router.types import AgentTypeEnum
-
-# Adapter imports - these stay at module level for tests that still patch
-# ``hackagent.router.router.LiteLLMAgent`` etc. As of Phase E.2 chat
-# AgentTypes no longer instantiate these classes — they build a
-# ``_ChatRegistration`` instead. ADK still uses ``ADKAgent`` because its
-# CustomLLM registration is per-instance.
-from hackagent.router.adapters import ADKAgent
-from hackagent.router.adapters.litellm import LiteLLMAgent, _get_litellm
-from hackagent.router.adapters.openai import OpenAIAgent
-from hackagent.router.adapters.ollama import OllamaAgent
 
 # Use explicit hierarchical logger name for clarity
 logger = logging.getLogger("hackagent.router")
 
 # --- Agent Type to Adapter Mapping ---
+# Phase E.2c deleted the chat adapter classes. Chat AgentTypes
+# (LITELLM, OPENAI_SDK, OLLAMA, LANGCHAIN) are now driven entirely by
+# ``hackagent.router.provider_config.get_provider_config`` plus a
+# ``_ChatRegistration``. The map only carries adapter classes for agent
+# types that need a custom Python object (ADK has a per-instance
+# CustomLLM registration side-effect).
 AGENT_TYPE_TO_ADAPTER_MAP: Dict[AgentTypeEnum, Type[Agent]] = {
     AgentTypeEnum.GOOGLE_ADK: ADKAgent,
-    AgentTypeEnum.LITELLM: LiteLLMAgent,
-    AgentTypeEnum.OPENAI_SDK: OpenAIAgent,
-    AgentTypeEnum.OLLAMA: OllamaAgent,
-    AgentTypeEnum.LANGCHAIN: LiteLLMAgent,  # LangChain agents can use LiteLLM adapter
-    # Add other agent types and their corresponding adapters here
 }
 
 
@@ -43,8 +35,9 @@ class AgentRouter:
     The `AgentRouter` is responsible for initializing an agent, which includes:
     1.  Resolving organizational context via the storage backend.
     2.  Ensuring the agent is registered in the storage backend.
-    3.  Instantiating the appropriate adapter (e.g., `ADKAgent`, `LiteLLMAgent`)
-        based on the `agent_type`.
+    3.  Building either an ``ADKAgent`` instance (for the GOOGLE_ADK
+        type, which needs a per-instance CustomLLM registration) or a
+        lightweight ``_ChatRegistration`` (for every chat AgentType).
     4.  Storing this adapter for subsequent request routing.
 
     Attributes:
@@ -101,10 +94,18 @@ class AgentRouter:
             f"User ID={self.user_id_str}"
         )
 
-        if agent_type not in AGENT_TYPE_TO_ADAPTER_MAP:
+        # Either a chat AgentType (driven by ProviderConfig) or one of
+        # the explicit adapter classes (currently just ADK).
+        if (
+            get_provider_config(agent_type) is None
+            and agent_type not in AGENT_TYPE_TO_ADAPTER_MAP
+        ):
+            supported = list(AGENT_TYPE_TO_ADAPTER_MAP.keys())
+            from hackagent.router.provider_config import PROVIDER_CONFIGS as _PC
+
+            supported.extend(_PC.keys())
             raise ValueError(
-                f"Unsupported agent type: {agent_type}. "
-                f"Supported types: {list(AGENT_TYPE_TO_ADAPTER_MAP.keys())}"
+                f"Unsupported agent type: {agent_type}. Supported types: {supported}"
             )
 
         actual_metadata = {k: v for k, v in (metadata or {}).items() if v is not None}
@@ -171,7 +172,7 @@ class AgentRouter:
             ValueError: If essential configuration for an adapter type is missing
                 (e.g., model name for LiteLLM) or if adapter instantiation fails.
         """
-        adapter_class = AGENT_TYPE_TO_ADAPTER_MAP[agent_type]
+        adapter_class = AGENT_TYPE_TO_ADAPTER_MAP.get(agent_type)
 
         logger.debug(
             f"ROUTER_DEBUG: adapter_class is: {adapter_class}, type: {type(adapter_class)}, id: {id(adapter_class)}"
@@ -181,9 +182,10 @@ class AgentRouter:
             adapter_operational_config.copy() if adapter_operational_config else {}
         )
 
-        # Every adapter now subclasses LiteLLMAgent, so the same set of
-        # config fields applies (with ADK adding a required user_id).
-        # ``name`` is the model string, ``endpoint`` is the API base URL.
+        # ``_ChatRegistration`` for chat AgentTypes and ``ADKAgent`` for
+        # ADK take the same config shape (with ADK adding a required
+        # user_id). ``name`` is the model string, ``endpoint`` is the
+        # API base URL.
         if "name" not in adapter_instance_config:
             metadata = self.backend_agent.metadata
             if isinstance(metadata, dict) and "name" in metadata:
@@ -261,6 +263,15 @@ class AgentRouter:
                 adapter_instance = adapter_class(
                     id=registration_key, config=adapter_instance_config
                 )
+            adapter_label = (
+                provider_config.adapter_label
+                if provider_config is not None
+                else (
+                    adapter_class.__name__
+                    if adapter_class
+                    else type(adapter_instance).__name__
+                )
+            )
             logger.debug(
                 f"ROUTER_DEBUG: Resulting instance: {adapter_instance}, type: {type(adapter_instance)}"
             )
@@ -268,16 +279,21 @@ class AgentRouter:
             self._agent_types[registration_key] = agent_type
             logger.info(
                 f"Agent '{name}' (Backend ID: {registration_key}, Type: {agent_type.value}) "
-                f"successfully initialized and registered with adapter {adapter_class.__name__}. "
+                f"successfully initialized and registered as {adapter_label}. "
                 f"Adapter config keys: {list(adapter_instance_config.keys())}"
             )
         except Exception as e:
+            adapter_label_for_error = (
+                provider_config.adapter_label
+                if provider_config is not None
+                else (adapter_class.__name__ if adapter_class else "adapter")
+            )
             logger.error(
                 f"Failed to instantiate adapter for agent '{name}' (Backend ID: {registration_key}): {e}",
                 exc_info=True,
             )
             raise ValueError(
-                f"Failed to instantiate adapter {adapter_class.__name__}: {e}"
+                f"Failed to instantiate adapter {adapter_label_for_error}: {e}"
             ) from e
 
     def get_agent_instance(self, registration_key: str) -> Optional[Agent]:

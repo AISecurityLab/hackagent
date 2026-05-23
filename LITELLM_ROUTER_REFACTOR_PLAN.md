@@ -336,18 +336,28 @@ Phases A–E (partial) landed in five commits on
 
 ### Remaining work (deferred)
 
-- **Phase E.2 — full deletion of the chat adapter classes.** Requires
-  replacing the per-registration adapter instance with a lightweight
-  config dataclass (`_ChatRegistration`) and dropping the public
-  `LiteLLMAgent` / `OpenAIAgent` / `OllamaAgent` symbols. Hold off
-  until we know no downstream code in `hackagent-api`,
-  `hackagent-webapp`, or external consumers depends on those imports.
-- **Phase F — optional follow-ups.** Adopt `litellm.Router` for
-  multi-deployment load balancing; surface `response_cost` and
-  `x-litellm-call-id` in the envelope; streaming support; full
-  `_build_error_response` shape unification (currently the
-  `AgentNotFound` envelope still uses ``raw_response_status`` while
-  the chat-dispatch envelope uses ``status_code``).
+- **Phase F.2+ — optional follow-ups.** Adopt `litellm.Router` for
+  multi-deployment load balancing; streaming support
+  (`stream=True`/`CustomStreamWrapper`); richer caller-supplied
+  `metadata` plumbing for `org_id` / `attack_id` / `evaluator_id`.
+
+### Recent landings (post-original plan)
+
+- **Phase F.1** (`0b0a2e5`): `extract_response_cost` and
+  `extract_litellm_call_id` envelope helpers; chat-dispatch envelope
+  now carries `response_cost` and `litellm_call_id` in
+  `agent_specific_data`. The router-level `AgentNotFound` envelope now
+  sets `status_code` alongside the legacy `raw_response_status` alias.
+- **Phase E.2a** (`c3090e9`): `ADKAgent` no longer inherits from
+  `LiteLLMAgent`; it extends `Agent` directly and implements
+  `handle_request` itself.
+- **Phase E.2b** (`5b7b9af`): chat AgentTypes no longer instantiate
+  `LiteLLMAgent` / `OpenAIAgent` / `OllamaAgent` — the router builds
+  a `_ChatRegistration` config holder.
+- **Phase E.2c**: the chat adapter classes and their unit/integration
+  tests are gone. `hackagent/router/adapters/` keeps only the
+  exception base classes plus an `ADKAgent` re-export. ADK lives at
+  `hackagent.router.providers.adk`.
 
 ### Tests
 

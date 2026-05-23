@@ -42,19 +42,15 @@ def _make_backend(org_id=None, user_id="test_user"):
 
 
 class TestAgentRouterInitialization(unittest.TestCase):
-    @patch("hackagent.router.router.LiteLLMAgent", autospec=True)
     @patch("hackagent.router.router.ADKAgent", autospec=True)
     @patch("hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
     def test_agent_router_init_creates_new_agent_if_not_exists(
         self,
         MockAgentMap,
         MockADKAdapter,
-        MockLiteLLMAdapter,
     ):
         MockAgentMap[AgentTypeEnum.GOOGLE_ADK] = MockADKAdapter
-        MockAgentMap[AgentTypeEnum.LITELLM] = MockLiteLLMAdapter
         MockADKAdapter.__name__ = "ADKAgent"
-        MockLiteLLMAdapter.__name__ = "LiteLLMAgent"
 
         mock_org_id = uuid.uuid4()
         mock_backend = _make_backend(org_id=mock_org_id, user_id="123")
@@ -103,7 +99,6 @@ class TestAgentRouterInitialization(unittest.TestCase):
                 "endpoint": agent_endpoint,
             },
         )
-        MockLiteLLMAdapter.assert_not_called()
         self.assertEqual(router.backend, mock_backend)
         self.assertIsNotNone(router.backend_agent)
         self.assertEqual(router.backend_agent.id, mock_created_agent_id)
@@ -112,19 +107,15 @@ class TestAgentRouterInitialization(unittest.TestCase):
             router._agent_registry[str(mock_created_agent_id)], mock_adk_instance
         )
 
-    @patch("hackagent.router.router.LiteLLMAgent", autospec=True)
     @patch("hackagent.router.router.ADKAgent", autospec=True)
     @patch("hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
     def test_agent_router_init_updates_existing_agent_if_metadata_differs(
         self,
         MockAgentMap,
         MockADKAdapter,
-        MockLiteLLMAdapter,
     ):
         MockAgentMap[AgentTypeEnum.GOOGLE_ADK] = MockADKAdapter
-        MockAgentMap[AgentTypeEnum.LITELLM] = MockLiteLLMAdapter
         MockADKAdapter.__name__ = "ADKAgent"
-        MockLiteLLMAdapter.__name__ = "LiteLLMAgent"
 
         mock_org_id = uuid.uuid4()
         mock_backend = _make_backend(org_id=mock_org_id, user_id="456")
@@ -429,15 +420,7 @@ class TestAnyUrlEndpointConversion(unittest.TestCase):
 
 
 class TestMetadataNoneStripping(unittest.TestCase):
-    @patch("hackagent.router.router.OllamaAgent", autospec=True)
-    @patch("hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
-    def test_none_values_stripped_from_metadata_on_create(
-        self,
-        MockAgentMap,
-        MockOllamaAdapter,
-    ):
-        MockAgentMap[AgentTypeEnum.OLLAMA] = MockOllamaAdapter
-        MockOllamaAdapter.__name__ = "OllamaAgent"
+    def test_none_values_stripped_from_metadata_on_create(self):
         mock_backend = _make_backend()
         mock_backend.create_or_update_agent.return_value = _make_agent_rec(
             agent_type_str="OLLAMA",
@@ -471,15 +454,7 @@ class TestMetadataNoneStripping(unittest.TestCase):
         self.assertNotIn("api_key", sent_metadata)
         self.assertNotIn("max_tokens", sent_metadata)
 
-    @patch("hackagent.router.router.OllamaAgent", autospec=True)
-    @patch("hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
-    def test_none_values_stripped_from_metadata_on_update(
-        self,
-        MockAgentMap,
-        MockOllamaAdapter,
-    ):
-        MockAgentMap[AgentTypeEnum.OLLAMA] = MockOllamaAdapter
-        MockOllamaAdapter.__name__ = "OllamaAgent"
+    def test_none_values_stripped_from_metadata_on_update(self):
         mock_backend = _make_backend()
         mock_backend.create_or_update_agent.return_value = _make_agent_rec(
             agent_type_str="OLLAMA",
@@ -510,15 +485,7 @@ class TestMetadataNoneStripping(unittest.TestCase):
 
 
 class TestAgentPagination(unittest.TestCase):
-    @patch("hackagent.router.router.LiteLLMAgent", autospec=True)
-    @patch("hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
-    def test_agent_found_on_page_two_is_not_recreated(
-        self,
-        MockAgentMap,
-        MockLiteLLMAdapter,
-    ):
-        MockAgentMap[AgentTypeEnum.LITELLM] = MockLiteLLMAdapter
-        MockLiteLLMAdapter.__name__ = "LiteLLMAgent"
+    def test_agent_found_on_page_two_is_not_recreated(self):
         mock_backend = _make_backend()
         target_agent_id = uuid.uuid4()
         agent_name = "llama2-uncensored"
