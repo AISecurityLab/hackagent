@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type
 
 from hackagent.server.storage.base import AgentRecord, StorageBackend
 from hackagent.router import envelope as _envelope
+from hackagent.router import tracking_logger as _tracking_logger
 from hackagent.router.adapters.base import Agent
 from hackagent.router.provider_config import ProviderConfig, get_provider_config
 from hackagent.router.types import AgentTypeEnum
@@ -84,6 +85,10 @@ class AgentRouter:
         # AgentTypes go through ``_dispatch_via_litellm`` directly;
         # everything else still calls ``adapter.handle_request``).
         self._agent_types: Dict[str, AgentTypeEnum] = {}
+
+        # Phase D: register the LiteLLM CustomLogger that captures input
+        # and output for every HackAgent-owned call. Idempotent.
+        _tracking_logger.ensure_registered()
 
         context = self.backend.get_context()
         self.organization_id = context.org_id
@@ -505,6 +510,7 @@ class AgentRouter:
             "tool_choice",
             "thinking",
             "extra_body",
+            "metadata",
         }
         extra_kwargs: Dict[str, Any] = {
             k: v for k, v in request_data.items() if k not in excluded_keys
@@ -516,6 +522,20 @@ class AgentRouter:
             default = getattr(agent_instance, f"default_{key}", None)
             if default is not None:
                 extra_kwargs[key] = default
+
+        # Phase D: attach correlation metadata so the registered
+        # HackAgentTrackingLogger can join input ↔ output ↔ cost. Any
+        # ``metadata`` already in ``request_data`` is preserved and
+        # augmented (caller-supplied keys win on collision so user
+        # tracing identifiers aren't overwritten).
+        caller_metadata = request_data.get("metadata")
+        merged_metadata: Dict[str, Any] = {
+            _tracking_logger.HACKAGENT_AGENT_ID_KEY: registration_key,
+            _tracking_logger.HACKAGENT_ADAPTER_TYPE_KEY: adapter_label,
+        }
+        if isinstance(caller_metadata, dict):
+            merged_metadata.update(caller_metadata)
+        extra_kwargs["metadata"] = merged_metadata
 
         kwargs = _envelope.build_litellm_kwargs(
             model=model_name,

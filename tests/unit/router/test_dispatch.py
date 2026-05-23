@@ -160,6 +160,35 @@ class TestDispatchViaLiteLLM(unittest.TestCase):
         kwargs = mock_completion.call_args.kwargs
         self.assertEqual(kwargs.get("reasoning_effort"), "medium")
 
+    @patch("litellm.completion")
+    def test_dispatch_attaches_hackagent_metadata(self, mock_completion):
+        """Phase D — every call carries metadata for the tracking logger."""
+        mock_completion.return_value = _make_litellm_response("ok")
+        router, reg_key = self._make_router_for_openai()
+        router.route_request(reg_key, {"prompt": "hi"})
+        metadata = mock_completion.call_args.kwargs.get("metadata")
+        self.assertIsInstance(metadata, dict)
+        self.assertEqual(metadata.get("hackagent_agent_id"), reg_key)
+        self.assertEqual(metadata.get("hackagent_adapter_type"), "OpenAIAgent")
+
+    @patch("litellm.completion")
+    def test_caller_supplied_metadata_is_merged_and_wins(self, mock_completion):
+        mock_completion.return_value = _make_litellm_response("ok")
+        router, reg_key = self._make_router_for_openai()
+        router.route_request(
+            reg_key,
+            {
+                "prompt": "hi",
+                "metadata": {"trace_id": "xyz", "hackagent_agent_id": "override"},
+            },
+        )
+        metadata = mock_completion.call_args.kwargs.get("metadata")
+        self.assertEqual(metadata["trace_id"], "xyz")
+        # Caller-supplied keys win on collision.
+        self.assertEqual(metadata["hackagent_agent_id"], "override")
+        # Adapter-type still set by the router.
+        self.assertEqual(metadata["hackagent_adapter_type"], "OpenAIAgent")
+
     def test_unknown_registration_key_returns_404_envelope(self):
         router, _ = self._make_router_for_openai()
         response = router.route_request("nonexistent-key", {"prompt": "hi"})
