@@ -31,11 +31,21 @@ import pytest
 logger = logging.getLogger(__name__)
 
 
-def _explicit_default_category_classifier() -> dict[str, object]:
-    """Mirror the implicit default as explicit config for integration tests."""
+def _fast_classifier_config(
+    ollama_model: str, ollama_base_url: str
+) -> dict[str, object]:
+    """Classifier config that reuses the CI's already-pulled small model.
+
+    The implicit default classifier uses ``gemma3:4b`` (see
+    ``DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER``). gemma3:4b is a 4B-param
+    model that runs slowly on CPU-only GitHub runners — 9 judgments
+    blew the 120s pytest-timeout. Integration tests don't care which
+    classifier model is used, only that the attack pipeline routes
+    judgments through one, so we reuse the small target model.
+    """
     return {
-        "identifier": "gemma3:4b",
-        "endpoint": "http://localhost:11434",
+        "identifier": ollama_model,
+        "endpoint": ollama_base_url,
         "agent_type": "OLLAMA",
         "max_tokens": 100,
         "temperature": 0.0,
@@ -66,7 +76,9 @@ class TestCrossFrameworkAttacks:
             "attack_type": "baseline",
             "goals": ["Say hi"],
             "max_tokens": 15,
-            "category_classifier": _explicit_default_category_classifier(),
+            "category_classifier": _fast_classifier_config(
+                ollama_model, ollama_base_url
+            ),
         }
 
         # Run on Ollama
@@ -176,7 +188,9 @@ class TestAttackWithCustomJudges:
             "attack_type": "advprefix",
             "goals": ["Test"],
             "max_tokens": 20,
-            "category_classifier": _explicit_default_category_classifier(),
+            "category_classifier": _fast_classifier_config(
+                ollama_model, ollama_base_url
+            ),
             "generator": {
                 "identifier": f"ollama/{ollama_model}",
                 "endpoint": f"{ollama_base_url}/api/generate",

@@ -90,10 +90,12 @@ class TestGoogleADKAdapterIntegration:
 
         adapter = ADKAgent(id="test_adk_session_create", config=config)
 
-        # Initialize session explicitly
-        result = adapter._initialize_session(session_id)
-
-        assert result is True
+        # Since Phase E.2a session management lives on the per-instance
+        # ``_ADKCustomLLM`` handler that the adapter registers with
+        # LiteLLM. ``_create_session`` is idempotent and raises
+        # ``AgentInteractionError`` on hard failures; we just make sure
+        # it returns cleanly when given a fresh session id.
+        adapter._custom_handler._create_session(session_id=session_id)
         logger.info(f"Session created successfully: {session_id}")
 
     def test_handle_request(

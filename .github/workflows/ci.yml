@@ -217,26 +217,26 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.ollama/models
-          key: ollama-models-tinyllama-gemma3-4b-${{ runner.os }}
+          key: ollama-models-tinyllama-${{ runner.os }}
           restore-keys: |
-            ollama-models-tinyllama-gemma3-4b-
             ollama-models-tinyllama-
 
-      - name: Pull Ollama models
-        # ``tinyllama`` is the test target/attacker. ``gemma3:4b`` is the
-        # default category classifier used by the orchestrator
-        # (``DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER`` in
-        # ``hackagent/attacks/techniques/config.py``). Without it the
-        # baseline e2e test hits a LiteLLM ``ollama_chat`` 404 on
-        # ``/api/show`` for ``gemma3:4b``.
-        run: |
-          ollama pull tinyllama
-          ollama pull gemma3:4b
+      - name: Pull Ollama model
+        # Integration tests reuse tinyllama for the target, attacker,
+        # judges, and category classifier (via
+        # ``_fast_classifier_config``). The orchestrator's implicit
+        # default classifier (``gemma3:4b``) is much slower on CPU
+        # runners and not pulled here on purpose.
+        run: ollama pull tinyllama
 
       - name: Install dependencies
         run: uv sync --group dev
 
       - name: Run Ollama integration tests with coverage
+        # Previously had ``-m "not slow"`` which deferred 3 tests
+        # (two ADK + one advprefix-with-Ollama-judges) to a separate
+        # nightly cron workflow. That workflow was deleted; slow tests
+        # now run inline on every PR — failures get a clear owner.
         run: >
           uv run pytest
           tests/integration/router/
@@ -244,7 +244,6 @@ jobs:
           --run-integration
           -n 2
           --dist=loadfile
-          -m "not slow"
           -v --tb=short
           --cov --cov-fail-under=0
           --cov-report=xml:reports/coverage.xml
