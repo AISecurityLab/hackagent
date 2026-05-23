@@ -22,9 +22,11 @@ def _hackagent_kwargs(**overrides):
         "response_cost": 0.0001,
         "litellm_params": {
             "metadata": {
-                "hackagent_agent_id": "agent-123",
-                "hackagent_adapter_type": "OpenAIAgent",
-            }
+                "hackagent": {
+                    "id": "agent-123",
+                    "adapter_type": "OpenAIAgent",
+                },
+            },
         },
     }
     base.update(overrides)

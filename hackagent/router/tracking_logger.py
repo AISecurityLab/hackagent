@@ -31,11 +31,12 @@ _REGISTERED: bool = False
 _LOGGER_INSTANCE: Optional[Any] = None
 _TRACKING_LOGGER = get_logger("hackagent.router.tracking_logger")
 
-# Sentinel metadata keys the logger uses to identify HackAgent-owned
-# calls. Other tools wiring their own ``litellm.callbacks`` won't see
-# their calls double-logged because we filter on this key.
-HACKAGENT_AGENT_ID_KEY = "hackagent_agent_id"
-HACKAGENT_ADAPTER_TYPE_KEY = "hackagent_adapter_type"
+# Sentinel metadata namespace that the logger uses to identify
+# HackAgent-owned calls. Nesting under a single ``"hackagent"`` key in
+# LiteLLM's ``metadata`` keeps our identifiers out of the way of other
+# observability tools that also write into ``metadata`` (Langfuse,
+# OTEL, Datadog, user-supplied tracing ids…).
+HACKAGENT_METADATA_KEY = "hackagent"
 
 
 def _try_import_custom_logger() -> Optional[type]:
@@ -52,8 +53,9 @@ def _extract_hackagent_metadata(kwargs: Dict[str, Any]) -> Optional[Dict[str, An
     """Pull the HackAgent metadata block out of a LiteLLM callback ``kwargs``.
 
     LiteLLM nests user-supplied ``metadata`` under ``litellm_params``. We
-    only return a dict when the metadata carries our sentinel key so
-    that callbacks fired by other libraries' calls don't get logged.
+    only return a dict when the metadata carries our ``"hackagent"``
+    namespace, so callbacks fired by other libraries' calls don't get
+    logged.
     """
     litellm_params = kwargs.get("litellm_params") or {}
     metadata = (
@@ -61,9 +63,10 @@ def _extract_hackagent_metadata(kwargs: Dict[str, Any]) -> Optional[Dict[str, An
     )
     if not isinstance(metadata, dict):
         return None
-    if HACKAGENT_AGENT_ID_KEY not in metadata:
+    hackagent_meta = metadata.get(HACKAGENT_METADATA_KEY)
+    if not isinstance(hackagent_meta, dict) or "id" not in hackagent_meta:
         return None
-    return metadata
+    return hackagent_meta
 
 
 def _extract_response_text(response_obj: Any) -> Optional[str]:
@@ -126,8 +129,8 @@ def _build_handler_class():
             _TRACKING_LOGGER.info(
                 "litellm.pre",
                 extra={
-                    "hackagent_agent_id": metadata.get(HACKAGENT_AGENT_ID_KEY),
-                    "hackagent_adapter_type": metadata.get(HACKAGENT_ADAPTER_TYPE_KEY),
+                    "hackagent_agent_id": metadata.get("id"),
+                    "hackagent_adapter_type": metadata.get("adapter_type"),
                     "litellm_model": model,
                     "prompt_preview": preview,
                 },
@@ -147,8 +150,8 @@ def _build_handler_class():
             _TRACKING_LOGGER.info(
                 "litellm.success",
                 extra={
-                    "hackagent_agent_id": metadata.get(HACKAGENT_AGENT_ID_KEY),
-                    "hackagent_adapter_type": metadata.get(HACKAGENT_ADAPTER_TYPE_KEY),
+                    "hackagent_agent_id": metadata.get("id"),
+                    "hackagent_adapter_type": metadata.get("adapter_type"),
                     "litellm_model": kwargs.get("model"),
                     "litellm_call_id": kwargs.get("litellm_call_id"),
                     "response_preview": response_preview,
@@ -175,8 +178,8 @@ def _build_handler_class():
             _TRACKING_LOGGER.warning(
                 "litellm.failure",
                 extra={
-                    "hackagent_agent_id": metadata.get(HACKAGENT_AGENT_ID_KEY),
-                    "hackagent_adapter_type": metadata.get(HACKAGENT_ADAPTER_TYPE_KEY),
+                    "hackagent_agent_id": metadata.get("id"),
+                    "hackagent_adapter_type": metadata.get("adapter_type"),
                     "litellm_model": kwargs.get("model"),
                     "litellm_call_id": kwargs.get("litellm_call_id"),
                     "exception_repr": repr(kwargs.get("exception", response_obj)),

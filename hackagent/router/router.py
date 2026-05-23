@@ -566,17 +566,29 @@ class AgentRouter:
                 extra_kwargs[key] = default
 
         # Phase D: attach correlation metadata so the registered
-        # HackAgentTrackingLogger can join input ↔ output ↔ cost. Any
-        # ``metadata`` already in ``request_data`` is preserved and
-        # augmented (caller-supplied keys win on collision so user
-        # tracing identifiers aren't overwritten).
+        # HackAgentTrackingLogger can join input ↔ output ↔ cost. Our
+        # identifiers live under the ``"hackagent"`` namespace so they
+        # never collide with caller-supplied keys (Langfuse trace ids,
+        # OTEL span ids, etc.). Caller-supplied metadata is preserved
+        # verbatim; if the caller also supplies a ``"hackagent"`` dict,
+        # their keys win on collision so they can override e.g. ``id``.
         caller_metadata = request_data.get("metadata")
-        merged_metadata: Dict[str, Any] = {
-            _tracking_logger.HACKAGENT_AGENT_ID_KEY: registration_key,
-            _tracking_logger.HACKAGENT_ADAPTER_TYPE_KEY: adapter_label,
+        hackagent_block: Dict[str, Any] = {
+            "id": registration_key,
+            "adapter_type": adapter_label,
         }
+        caller_hackagent = (
+            caller_metadata.get(_tracking_logger.HACKAGENT_METADATA_KEY)
+            if isinstance(caller_metadata, dict)
+            else None
+        )
+        if isinstance(caller_hackagent, dict):
+            hackagent_block.update(caller_hackagent)
+
+        merged_metadata: Dict[str, Any] = {}
         if isinstance(caller_metadata, dict):
             merged_metadata.update(caller_metadata)
+        merged_metadata[_tracking_logger.HACKAGENT_METADATA_KEY] = hackagent_block
         extra_kwargs["metadata"] = merged_metadata
 
         kwargs = _envelope.build_litellm_kwargs(

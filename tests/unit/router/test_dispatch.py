@@ -161,33 +161,56 @@ class TestDispatchViaLiteLLM(unittest.TestCase):
         self.assertEqual(kwargs.get("reasoning_effort"), "medium")
 
     @patch("litellm.completion")
-    def test_dispatch_attaches_hackagent_metadata(self, mock_completion):
-        """Phase D — every call carries metadata for the tracking logger."""
+    def test_dispatch_attaches_hackagent_metadata_namespace(self, mock_completion):
+        """Phase F.2 — identifiers live under ``metadata['hackagent']``."""
         mock_completion.return_value = _make_litellm_response("ok")
         router, reg_key = self._make_router_for_openai()
         router.route_request(reg_key, {"prompt": "hi"})
         metadata = mock_completion.call_args.kwargs.get("metadata")
         self.assertIsInstance(metadata, dict)
-        self.assertEqual(metadata.get("hackagent_agent_id"), reg_key)
-        self.assertEqual(metadata.get("hackagent_adapter_type"), "OpenAIAgent")
+        ha = metadata.get("hackagent")
+        self.assertIsInstance(ha, dict)
+        self.assertEqual(ha["id"], reg_key)
+        self.assertEqual(ha["adapter_type"], "OpenAIAgent")
+        # No flat hackagent_* keys at the top level any more.
+        self.assertNotIn("hackagent_agent_id", metadata)
 
     @patch("litellm.completion")
-    def test_caller_supplied_metadata_is_merged_and_wins(self, mock_completion):
+    def test_caller_metadata_outside_hackagent_namespace_preserved(
+        self, mock_completion
+    ):
+        mock_completion.return_value = _make_litellm_response("ok")
+        router, reg_key = self._make_router_for_openai()
+        router.route_request(
+            reg_key,
+            {"prompt": "hi", "metadata": {"trace_id": "xyz", "user_id": "alice"}},
+        )
+        metadata = mock_completion.call_args.kwargs.get("metadata")
+        # Caller's keys are preserved verbatim.
+        self.assertEqual(metadata["trace_id"], "xyz")
+        self.assertEqual(metadata["user_id"], "alice")
+        # Router still sets its own namespace.
+        self.assertEqual(metadata["hackagent"]["id"], reg_key)
+
+    @patch("litellm.completion")
+    def test_caller_hackagent_namespace_wins_on_collision(self, mock_completion):
+        """Caller-supplied ``metadata['hackagent']`` keys override the router's."""
         mock_completion.return_value = _make_litellm_response("ok")
         router, reg_key = self._make_router_for_openai()
         router.route_request(
             reg_key,
             {
                 "prompt": "hi",
-                "metadata": {"trace_id": "xyz", "hackagent_agent_id": "override"},
+                "metadata": {"hackagent": {"id": "override", "custom": "x"}},
             },
         )
         metadata = mock_completion.call_args.kwargs.get("metadata")
-        self.assertEqual(metadata["trace_id"], "xyz")
-        # Caller-supplied keys win on collision.
-        self.assertEqual(metadata["hackagent_agent_id"], "override")
-        # Adapter-type still set by the router.
-        self.assertEqual(metadata["hackagent_adapter_type"], "OpenAIAgent")
+        ha = metadata["hackagent"]
+        self.assertEqual(ha["id"], "override")
+        # Custom keys inside the namespace pass through.
+        self.assertEqual(ha["custom"], "x")
+        # adapter_type still set by the router since the caller didn't override it.
+        self.assertEqual(ha["adapter_type"], "OpenAIAgent")
 
     def test_unknown_registration_key_returns_404_envelope(self):
         router, _ = self._make_router_for_openai()
