@@ -55,7 +55,10 @@ class TestOpenAIAdapterIntegration:
 
         assert adapter.id == "test_openai_init"
         assert adapter.model_name == openai_config["name"]
-        assert adapter.client is not None
+        # Since #379 the OpenAI adapter routes through LiteLLM, so the
+        # model string carries an `openai/` provider prefix and there is
+        # no longer a raw OpenAI SDK client to inspect.
+        assert adapter.litellm_model.endswith(openai_config["name"])
         logger.info(f"OpenAI adapter initialized: model={adapter.model_name}")
 
     def test_chat_completion(

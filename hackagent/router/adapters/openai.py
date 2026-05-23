@@ -1,500 +1,118 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+"""
+OpenAI-compatible adapter built on top of LiteLLM.
+
+The OpenAI agent type used to talk to the OpenAI SDK directly. As of
+issue #379 every chat-completion adapter routes through LiteLLM, so this
+class is now a thin specialisation of :class:`LiteLLMAgent` that pins the
+provider prefix to ``openai`` and translates the unified ``thinking`` knob
+into OpenAI's ``reasoning_effort`` field for the o-series models.
+"""
 
 from hackagent.logger import get_logger
-import re
-import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
-from .base import ChatCompletionsAgent, AdapterConfigurationError
-
-# Lazy-load openai to improve startup time
-_openai_module = None
-_openai_available = None
-
-# Module-level names for test patching compatibility
-# These will be populated when _get_openai() is first called,
-# but tests can patch them directly
-OpenAI = None
-OPENAI_AVAILABLE = None
+from .base import AdapterConfigurationError
+from .litellm import LiteLLMAgent
 
 
-def _get_openai():
-    """Lazily import and return the openai module."""
-    global _openai_module, _openai_available, OpenAI, OPENAI_AVAILABLE
-    if _openai_module is None:
-        try:
-            import openai as _openai
-
-            _openai_module = _openai
-            _openai_available = True
-            # Also set module-level names for compatibility
-            OpenAI = _openai.OpenAI
-            OPENAI_AVAILABLE = True
-        except ImportError:
-            _openai_module = False
-            _openai_available = False
-            OPENAI_AVAILABLE = False
-    return _openai_module if _openai_module else None
-
-
-def _get_openai_exceptions():
-    """Get OpenAI exception classes, or dummy classes if not available."""
-    openai = _get_openai()
-    if openai:
-        return (
-            openai.OpenAIError,
-            openai.APIConnectionError,
-            openai.RateLimitError,
-            openai.APITimeoutError,
-        )
-    else:
-        # Return dummy exceptions
-        return (Exception, Exception, Exception, Exception)
-
-
-def _is_openai_available():
-    """Check if openai is available."""
-    global _openai_available, OPENAI_AVAILABLE
-    # Allow test patches to override OPENAI_AVAILABLE
-    if OPENAI_AVAILABLE is not None:
-        return OPENAI_AVAILABLE
-    if _openai_available is None:
-        _get_openai()
-    return _openai_available
-
-
-def _check_openai_available():
-    global OPENAI_AVAILABLE
-    if OPENAI_AVAILABLE is None:
-        OPENAI_AVAILABLE = _is_openai_available()
-    return OPENAI_AVAILABLE
-
-
-# --- Custom Exceptions (subclass from base) ---
+# Keep this exception public for backwards compatibility — downstream code
+# (and several tests) import OpenAIConfigurationError from this module.
 class OpenAIConfigurationError(AdapterConfigurationError):
     """Custom exception for OpenAI adapter configuration issues."""
 
     pass
 
 
-logger = get_logger(__name__)  # Module-level logger
-
-_CONTEXT_LIMIT_ERROR_RE = re.compile(
-    r"maximum context length is\s*(\d+)\s*tokens\s*and\s*your request has\s*(\d+)\s*input tokens",
-    flags=re.IGNORECASE,
-)
+logger = get_logger(__name__)
 
 
-class OpenAIAgent(ChatCompletionsAgent):
+# OpenAI reasoning models that natively understand ``reasoning_effort``.
+# ``thinking=True`` defaults to "medium" for these; for other models we fall
+# back to LiteLLM's generic ``thinking`` payload.
+_OPENAI_REASONING_MODEL_PREFIXES = ("o1", "o3", "o4", "gpt-5", "gpt-6")
+
+
+class OpenAIAgent(LiteLLMAgent):
     """
-    Adapter for interacting with AI agents built using the OpenAI SDK.
+    Adapter for OpenAI-compatible chat endpoints.
 
-    This adapter supports OpenAI's chat completions API, including support for
-    function calling and tool use, which are common patterns in agent implementations.
+    Configured via the ``OPENAI_SDK`` agent type. Internally uses LiteLLM,
+    so any OpenAI-compatible server (the official API, a local model server
+    exposing ``/v1/chat/completions``, OpenRouter, etc.) works as the
+    endpoint.
+
+    Reasoning / "thinking":
+        Set ``thinking`` in the adapter config or per request to enable or
+        disable the model's reasoning. For the o-series and newer GPT
+        reasoning models the value is translated to ``reasoning_effort``
+        (low/medium/high).
     """
 
     ADAPTER_TYPE = "OpenAIAgent"
-    DEFAULT_TEMPERATURE = 1.0  # OpenAI default
-    MAX_CONNECTION_RETRIES_CAP = 5
+    PROVIDER_PREFIX = "openai"
+    DEFAULT_TEMPERATURE = 1.0
 
     def __init__(self, id: str, config: Dict[str, Any]):
-        """
-        Initializes the OpenAIAgent.
+        # Custom endpoints don't always require a model name; default to
+        # ``"default"`` (the server then decides) when an endpoint is set
+        # but no model is provided.
+        if "name" not in config and config.get("endpoint"):
+            config = {**config, "name": config.get("name", "default")}
 
-        Args:
-            id: The unique identifier for this OpenAI agent instance.
-            config: Configuration dictionary for the OpenAI agent.
-                          Expected keys:
-                          - 'name': Model name (e.g., "gpt-4", "gpt-3.5-turbo").
-                          - 'endpoint' (optional): Base URL for the API (for custom endpoints).
-                          - 'api_key' (optional): Name of the environment variable holding the API key,
-                            or the API key itself. Defaults to OPENAI_API_KEY env var.
-                          - 'max_tokens' (optional): Default max tokens for generation.
-                          - 'temperature' (optional): Default temperature (defaults to 1.0).
-                          - 'timeout' (optional): Default request timeout.
-                          - 'tools' (optional): List of tool/function definitions for function calling.
-                          - 'tool_choice' (optional): Controls which tools the model can call.
-        """
-        super().__init__(id, config)
+        try:
+            super().__init__(id, config)
+        except AdapterConfigurationError as e:
+            # Re-raise as the OpenAI-flavoured subclass so legacy callers
+            # that catch OpenAIConfigurationError keep working.
+            raise OpenAIConfigurationError(str(e)) from e
 
-        if not _is_openai_available():
-            msg = (
-                f"OpenAI SDK is not installed. Please install it with: pip install openai. "
-                f"OpenAIAgent: {self.id}"
-            )
-            self.logger.error(msg)
-            raise OpenAIConfigurationError(msg)
-
-        self.api_base_url: Optional[str] = self._get_config_key("endpoint")
-
-        # Model name defaults to "default" for custom endpoints (server decides the model)
-        if "name" not in self.config:
-            if self.api_base_url:
-                # Custom endpoint - use a default model name, server will handle it
-                self.model_name = self._get_config_key("name", "default")
-                self.logger.info(
-                    "No model name specified for custom endpoint, using 'default'"
-                )
-            else:
-                self.model_name = self._require_config_key(
-                    "name", OpenAIConfigurationError
-                )
-        else:
-            self.model_name = self.config["name"]
-
-        # Handle API key resolution
-        self.actual_api_key = self._resolve_api_key(
-            config_key="api_key", env_var_fallback="OPENAI_API_KEY"
-        )
-
-        # For custom endpoints without API key, use a placeholder
-        # (some local servers don't require authentication)
+        # For custom endpoints without an API key, use a placeholder so the
+        # OpenAI client (under LiteLLM's hood) doesn't error out.
         if not self.actual_api_key and self.api_base_url:
             self.actual_api_key = "not-required"
             self.logger.info(
-                f"No API key configured for custom endpoint '{self.api_base_url}', using placeholder"
+                f"No API key configured for custom endpoint "
+                f"'{self.api_base_url}', using placeholder"
             )
 
-        # Initialize OpenAI client
-        # Check for test-patched OpenAI first, then fall back to lazy-loaded module
-        global OpenAI
-        if OpenAI is not None:
-            # Use patched or pre-loaded OpenAI class
-            openai_client_class = OpenAI
-        else:
-            # Lazy load the module
-            openai = _get_openai()
-            if openai is None:
-                raise OpenAIConfigurationError("OpenAI SDK is unavailable")
-            openai_client_class = openai.OpenAI
+    # ---- thinking translation -------------------------------------------
 
-        client_kwargs = {}
-        if self.actual_api_key:
-            client_kwargs["api_key"] = self.actual_api_key
-        if self.api_base_url:
-            client_kwargs["base_url"] = self.api_base_url
+    def _is_reasoning_model(self) -> bool:
+        bare = self.model_name.split("/")[-1]
+        return bare.startswith(_OPENAI_REASONING_MODEL_PREFIXES)
 
-        timeout = self._get_config_key(
-            "timeout", self._get_config_key("request_timeout", 120)
-        )
-        client_kwargs["timeout"] = timeout
+    def _apply_thinking(self, litellm_params: Dict[str, Any], thinking: Any) -> None:
+        """Map ``thinking`` to ``reasoning_effort`` for OpenAI reasoning models.
 
-        self.client = openai_client_class(**client_kwargs)
-
-        self.logger.info(
-            f"OpenAIAgent '{self.id}' initialized for model: '{self.model_name}'"
-            + (f" API Base: '{self.api_base_url}'" if self.api_base_url else "")
-        )
-
-        # Store default generation parameters
-        self.default_max_tokens = self._get_config_key(
-            "max_tokens", self.DEFAULT_MAX_TOKENS
-        )
-        self.default_temperature = self._get_config_key(
-            "temperature", self.DEFAULT_TEMPERATURE
-        )
-        # Provider-specific request payload (e.g., OpenRouter "reasoning").
-        # This can be overridden per-call via request_data["extra_body"].
-        self.default_extra_body = self._get_config_key("extra_body")
-        self.default_tools = self._get_config_key("tools")
-        self.default_tool_choice = self._get_config_key("tool_choice")
-        # Retry only transient transport failures and cap retries to avoid long hangs.
-        self.max_connection_retries = self._get_max_connection_retries()
-
-    def _get_excluded_request_keys(self) -> set:
-        """Returns keys to exclude when extracting additional kwargs."""
-        base_keys = super()._get_excluded_request_keys()
-        return base_keys | {"tools", "tool_choice"}
-
-    def _get_completion_parameters(
-        self, request_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Extract parameters including OpenAI-specific tools."""
-        params = super()._get_completion_parameters(request_data)
-
-        # Add OpenAI-specific parameters
-        params["tools"] = request_data.get("tools", self.default_tools)
-        params["tool_choice"] = request_data.get(
-            "tool_choice", self.default_tool_choice
-        )
-        if "extra_body" in request_data:
-            params["extra_body"] = request_data.get("extra_body")
-        elif self.default_extra_body is not None:
-            if isinstance(self.default_extra_body, dict):
-                params["extra_body"] = dict(self.default_extra_body)
-            else:
-                params["extra_body"] = self.default_extra_body
-
-        return params
-
-    def _execute_completion(
-        self,
-        messages: List[Dict[str, str]],
-        **kwargs,
-    ) -> Dict[str, Any]:
+        Non-reasoning models fall back to LiteLLM's default ``thinking``
+        passthrough, so callers can still attach arbitrary provider payload
+        if they need to.
         """
-        Execute the completion request using OpenAI's chat completions API.
+        if thinking is None:
+            return
 
-        Args:
-            messages: List of message dictionaries with 'role' and 'content'.
-            **kwargs: Additional parameters (temperature, max_tokens, tools, etc.)
-
-        Returns:
-            A dictionary containing the result with 'success', 'content', etc.
-        """
-        max_tokens = kwargs.pop("max_tokens", None)
-        temperature = kwargs.pop("temperature", self.default_temperature)
-        tools = kwargs.pop("tools", None)
-        tool_choice = kwargs.pop("tool_choice", None)
-
-        self.logger.info(
-            f"Sending request to OpenAI model '{self.model_name}' with {len(messages)} messages..."
-        )
-
-        try:
-            openai_params = {
-                "model": self.model_name,
-                "messages": messages,
-                "temperature": temperature,
-            }
-
-            if max_tokens is not None:
-                openai_params["max_tokens"] = max_tokens
-
-            if tools:
-                openai_params["tools"] = tools
-                if tool_choice:
-                    openai_params["tool_choice"] = tool_choice
-
-            # Add any additional kwargs
-            openai_params.update(kwargs)
-
-            # Log request parameters at debug level
-            self.logger.debug(
-                f"OpenAI API request params: model={self.model_name}, "
-                f"base_url={self.api_base_url}, "
-                f"messages={messages[:1] if messages else []}, "
-                f"temperature={temperature}, max_tokens={max_tokens}, "
-                f"extra_kwargs={list(kwargs.keys())}"
-            )
-
-            # Make the API call (with one automatic retry for context-limit token errors)
-            openai = _get_openai()
-            api_connection_error_type = openai.APIConnectionError if openai else tuple()
-
-            connection_retry_count = 0
-            while True:
-                try:
-                    try:
-                        response = self.client.chat.completions.create(**openai_params)
-                    except Exception as first_error:
-                        adjusted_max_tokens = self._get_adjusted_max_tokens_from_error(
-                            first_error, openai_params.get("max_tokens")
-                        )
-                        if adjusted_max_tokens is not None:
-                            self.logger.warning(
-                                "OpenAI request exceeded context window; retrying with "
-                                f"max_tokens={adjusted_max_tokens} for model '{self.model_name}'"
-                            )
-                            openai_params["max_tokens"] = adjusted_max_tokens
-                            response = self.client.chat.completions.create(
-                                **openai_params
-                            )
-                        else:
-                            raise first_error
-                    break
-                except Exception as connection_error:
-                    is_connection_error = isinstance(
-                        connection_error, api_connection_error_type
-                    )
-                    if (
-                        is_connection_error
-                        and connection_retry_count < self.max_connection_retries
-                    ):
-                        connection_retry_count += 1
-                        backoff_seconds = min(
-                            0.5 * (2 ** (connection_retry_count - 1)), 4.0
-                        )
-                        self.logger.warning(
-                            "OpenAI API connection error for model '%s'; retry %d/%d in %.1fs",
-                            self.model_name,
-                            connection_retry_count,
-                            self.max_connection_retries,
-                            backoff_seconds,
-                        )
-                        time.sleep(backoff_seconds)
-                        continue
-                    raise connection_error
-
-            # Extract response data
-            message = response.choices[0].message
-            content = message.content if message.content else ""
-
-            # For reasoning models (e.g., o1-preview, o1-mini), check reasoning field
-            if not content and hasattr(message, "reasoning") and message.reasoning:
-                content = message.reasoning
-                self.logger.info(
-                    f"OpenAI extracted text from 'reasoning' field (reasoning model) for '{self.model_name}'"
-                )
-
-            # Check if there are tool calls
-            tool_calls = None
-            if hasattr(message, "tool_calls") and message.tool_calls:
-                tool_calls = [
-                    {
-                        "id": tc.id,
-                        "type": tc.type,
-                        "function": {
-                            "name": tc.function.name,
-                            "arguments": tc.function.arguments,
-                        },
-                    }
-                    for tc in message.tool_calls
-                ]
-
-            result = {
-                "success": True,
-                "content": content,
-                "finish_reason": response.choices[0].finish_reason,
-                "usage": response.usage.model_dump() if response.usage else None,
-                "model": response.model,
-                "tool_calls": tool_calls,
-                "raw_response": response,
-            }
-
-            self.logger.info(
-                f"Successfully received response from OpenAI model '{self.model_name}'. "
-                f"Finish reason: {result['finish_reason']}"
-            )
-
-            return result
-
-        except Exception as e:
-            # Get OpenAI exceptions dynamically
-            openai = _get_openai()
-            if openai:
-                OpenAIError = openai.OpenAIError
-                APITimeoutError = openai.APITimeoutError
-                RateLimitError = openai.RateLimitError
-                APIConnectionError = openai.APIConnectionError
+        if self._is_reasoning_model():
+            if thinking is True:
+                litellm_params["reasoning_effort"] = "medium"
+            elif thinking is False:
+                # Explicit disable: omit the parameter entirely so the
+                # provider falls back to whatever its server-side default is.
+                # (OpenAI doesn't currently accept reasoning_effort="off".)
+                return
+            elif isinstance(thinking, str):
+                litellm_params["reasoning_effort"] = thinking
+            elif isinstance(thinking, dict):
+                effort = thinking.get("reasoning_effort") or thinking.get("effort")
+                if effort:
+                    litellm_params["reasoning_effort"] = effort
+                else:
+                    litellm_params["thinking"] = dict(thinking)
             else:
-                # If openai not available, these will never match
-                OpenAIError = APITimeoutError = RateLimitError = APIConnectionError = (
-                    type(None)
-                )
+                super()._apply_thinking(litellm_params, thinking)
+            return
 
-            if isinstance(e, APITimeoutError):
-                self.logger.error(
-                    f"OpenAI API timeout for model '{self.model_name}': {e}",
-                    exc_info=True,
-                )
-                return {
-                    "success": False,
-                    "error_type": "timeout",
-                    "error_message": str(e),
-                }
-            elif isinstance(e, RateLimitError):
-                self.logger.error(
-                    f"OpenAI rate limit exceeded for model '{self.model_name}': {e}",
-                    exc_info=True,
-                )
-                return {
-                    "success": False,
-                    "error_type": "rate_limit",
-                    "error_message": str(e),
-                }
-            elif isinstance(e, APIConnectionError):
-                self.logger.error(
-                    f"OpenAI API connection error for model '{self.model_name}': {e}",
-                    exc_info=True,
-                )
-                return {
-                    "success": False,
-                    "error_type": "connection",
-                    "error_message": str(e),
-                }
-            elif isinstance(e, OpenAIError):
-                self.logger.error(
-                    f"OpenAI API error for model '{self.model_name}': {e}",
-                    exc_info=True,
-                )
-                return {
-                    "success": False,
-                    "error_type": "api_error",
-                    "error_message": str(e),
-                }
-            else:
-                self.logger.exception(
-                    f"Unexpected error during OpenAI completion for model '{self.model_name}': {e}"
-                )
-                return {
-                    "success": False,
-                    "error_type": "unexpected",
-                    "error_message": f"{type(e).__name__}: {str(e)}",
-                }
-
-    def _get_max_connection_retries(self) -> int:
-        """Get connection-retry budget from config, capped to avoid excessive waits."""
-        raw_value = self._get_config_key(
-            "max_connection_retries", self.MAX_CONNECTION_RETRIES_CAP
-        )
-        try:
-            parsed = int(raw_value)
-        except (TypeError, ValueError):
-            parsed = self.MAX_CONNECTION_RETRIES_CAP
-        return max(0, min(parsed, self.MAX_CONNECTION_RETRIES_CAP))
-
-    def _get_adjusted_max_tokens_from_error(
-        self, error: Exception, current_max_tokens: Any
-    ) -> Optional[int]:
-        """Parse context-limit errors and return a safe reduced max_tokens value."""
-        if current_max_tokens is None:
-            return None
-
-        message = str(error)
-        match = _CONTEXT_LIMIT_ERROR_RE.search(message)
-        if not match:
-            return None
-
-        try:
-            max_context = int(match.group(1))
-            input_tokens = int(match.group(2))
-            current = int(current_max_tokens)
-        except (TypeError, ValueError):
-            return None
-
-        available = max_context - input_tokens
-        # Keep a small safety margin to avoid repeated boundary errors.
-        safe_max_tokens = max(1, available - 8)
-        if safe_max_tokens >= current:
-            return None
-        return safe_max_tokens
-
-    def _build_agent_specific_data(
-        self,
-        completion_result: Dict[str, Any],
-        parameters: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        """Build OpenAI-specific response data including tool calls."""
-        data = super()._build_agent_specific_data(completion_result, parameters)
-
-        # Expose provider completion metadata for latency/quality diagnostics.
-        if completion_result.get("finish_reason") is not None:
-            data["finish_reason"] = completion_result.get("finish_reason")
-        if completion_result.get("usage") is not None:
-            data["usage"] = completion_result.get("usage")
-        if completion_result.get("model") is not None:
-            data["provider_model"] = completion_result.get("model")
-
-        # Add tool calls if present
-        if completion_result.get("tool_calls"):
-            data["tool_calls"] = completion_result["tool_calls"]
-
-        # Add tools_provided flag
-        data["invoked_parameters"]["tools_provided"] = (
-            parameters.get("tools") is not None
-        )
-
-        return data
+        # Non-reasoning model: defer to the generic translation.
+        super()._apply_thinking(litellm_params, thinking)

@@ -166,143 +166,59 @@ class AgentRouter:
             adapter_operational_config.copy() if adapter_operational_config else {}
         )
 
-        if agent_type == AgentTypeEnum.GOOGLE_ADK:
-            adapter_instance_config["name"] = self.backend_agent.name
+        # Every adapter now subclasses LiteLLMAgent, so the same set of
+        # config fields applies (with ADK adding a required user_id).
+        # ``name`` is the model string, ``endpoint`` is the API base URL.
+        if "name" not in adapter_instance_config:
+            metadata = self.backend_agent.metadata
+            if isinstance(metadata, dict) and "name" in metadata:
+                adapter_instance_config["name"] = metadata["name"]
+            else:
+                logger.warning(
+                    f"Agent '{name}' (Type: {agent_type.value}) missing 'name' "
+                    f"(model string) in metadata. Defaulting to agent name "
+                    f"'{self.backend_agent.name}'."
+                )
+                adapter_instance_config["name"] = self.backend_agent.name
+
+        if "endpoint" not in adapter_instance_config and self.backend_agent.endpoint:
             adapter_instance_config["endpoint"] = str(self.backend_agent.endpoint)
+
+        # Merge through any optional generation/provider knobs stored on
+        # the backend agent's metadata so adapter subclasses see them.
+        optional_passthrough_keys = (
+            "api_key",
+            "max_tokens",
+            "temperature",
+            "top_p",
+            "top_k",
+            "num_ctx",
+            "stream",
+            "timeout",
+            "thinking",
+            "tools",
+            "tool_choice",
+            "extra_body",
+            "reasoning_effort",
+        )
+        if isinstance(self.backend_agent.metadata, dict):
+            for key in optional_passthrough_keys:
+                if (
+                    key not in adapter_instance_config
+                    and key in self.backend_agent.metadata
+                ):
+                    adapter_instance_config[key] = self.backend_agent.metadata[key]
+
+        if agent_type == AgentTypeEnum.GOOGLE_ADK:
+            # ADK uses the agent name as the app_name in its run payload.
+            adapter_instance_config["name"] = self.backend_agent.name
             if "user_id" not in adapter_instance_config:
                 logger.error(
-                    f"CRITICAL: user_id not found in adapter_instance_config for ADK agent '{self.backend_agent.name}' just before adapter instantiation. This should have been set in __init__."
+                    f"CRITICAL: user_id not found in adapter_instance_config "
+                    f"for ADK agent '{self.backend_agent.name}'. Defaulting "
+                    f"to context user_id."
                 )
                 adapter_instance_config["user_id"] = self.user_id_str
-
-        elif agent_type in [AgentTypeEnum.LITELLM, AgentTypeEnum.LANGCHAIN]:
-            if "name" not in adapter_instance_config:
-                if (
-                    isinstance(self.backend_agent.metadata, dict)
-                    and "name" in self.backend_agent.metadata
-                ):
-                    adapter_instance_config["name"] = self.backend_agent.metadata[
-                        "name"
-                    ]
-                else:
-                    logger.warning(
-                        f"Agent '{name}' (Type: {agent_type.value}) missing 'name' (model string) in metadata. "
-                        f"Defaulting to agent name '{self.backend_agent.name}'."
-                    )
-                    adapter_instance_config["name"] = self.backend_agent.name
-
-            # Always use backend agent's endpoint if not already in config
-            if (
-                "endpoint" not in adapter_instance_config
-                and self.backend_agent.endpoint
-            ):
-                adapter_instance_config["endpoint"] = str(self.backend_agent.endpoint)
-
-            optional_litellm_keys = [
-                "api_key",
-                "max_tokens",
-                "temperature",
-                "top_p",
-            ]
-            if isinstance(self.backend_agent.metadata, dict):
-                for key in optional_litellm_keys:
-                    if (
-                        key not in adapter_instance_config
-                        and key in self.backend_agent.metadata
-                    ):
-                        adapter_instance_config[key] = self.backend_agent.metadata[key]
-
-        elif agent_type == AgentTypeEnum.OPENAI_SDK:
-            if "name" not in adapter_instance_config:
-                if (
-                    isinstance(self.backend_agent.metadata, dict)
-                    and "name" in self.backend_agent.metadata
-                ):
-                    adapter_instance_config["name"] = self.backend_agent.metadata[
-                        "name"
-                    ]
-                # For custom endpoints, model name is optional (will default to 'default')
-                # Only raise error if no endpoint is configured (i.e., using OpenAI API directly)
-                elif (
-                    "endpoint" not in adapter_instance_config
-                    and not self.backend_agent.endpoint
-                ):
-                    raise ValueError(
-                        f"OpenAI SDK agent '{name}' (ID: {registration_key}) missing "
-                        f"'name' (model string) in adapter_operational_config or backend metadata. "
-                        f"Cannot configure OpenAIAgent."
-                    )
-                else:
-                    # Fall back to the registered agent name (e.g. full local model path)
-                    logger.warning(
-                        f"Agent '{name}' (Type: {agent_type.value}) missing 'name' in metadata. "
-                        f"Defaulting to agent name '{self.backend_agent.name}'."
-                    )
-                    adapter_instance_config["name"] = self.backend_agent.name
-
-            # Always use backend agent's endpoint if not already in config
-            if (
-                "endpoint" not in adapter_instance_config
-                and self.backend_agent.endpoint
-            ):
-                adapter_instance_config["endpoint"] = str(self.backend_agent.endpoint)
-
-            optional_openai_keys = [
-                "api_key",
-                "max_tokens",
-                "temperature",
-                "tools",
-                "tool_choice",
-            ]
-            if isinstance(self.backend_agent.metadata, dict):
-                for key in optional_openai_keys:
-                    if (
-                        key not in adapter_instance_config
-                        and key in self.backend_agent.metadata
-                    ):
-                        adapter_instance_config[key] = self.backend_agent.metadata[key]
-
-        elif agent_type == AgentTypeEnum.OLLAMA:
-            # Configure Ollama adapter
-            if "name" not in adapter_instance_config:
-                if (
-                    isinstance(self.backend_agent.metadata, dict)
-                    and "name" in self.backend_agent.metadata
-                ):
-                    adapter_instance_config["name"] = self.backend_agent.metadata[
-                        "name"
-                    ]
-                else:
-                    logger.warning(
-                        f"Agent '{name}' (Type: {agent_type.value}) missing 'name' (model string) in metadata. "
-                        f"Defaulting to agent name '{self.backend_agent.name}'."
-                    )
-                    adapter_instance_config["name"] = self.backend_agent.name
-
-            # Always use backend agent's endpoint if not already in config
-            if (
-                "endpoint" not in adapter_instance_config
-                and self.backend_agent.endpoint
-            ):
-                adapter_instance_config["endpoint"] = str(self.backend_agent.endpoint)
-
-            optional_ollama_keys = [
-                "max_tokens",
-                "temperature",
-                "top_p",
-                "top_k",
-                "num_ctx",
-                "stream",
-                "timeout",
-                "thinking",
-            ]
-            if isinstance(self.backend_agent.metadata, dict):
-                for key in optional_ollama_keys:
-                    if (
-                        key not in adapter_instance_config
-                        and key in self.backend_agent.metadata
-                    ):
-                        adapter_instance_config[key] = self.backend_agent.metadata[key]
 
         try:
             logger.debug(
