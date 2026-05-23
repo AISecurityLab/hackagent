@@ -284,19 +284,9 @@ class TestAgentRouterInitialization(unittest.TestCase):
         self.assertEqual(router.backend_agent.metadata, existing_metadata)
         self.assertEqual(router.backend_agent.endpoint, existing_endpoint)
 
-    @patch("hackagent.router.router.LiteLLMAgent", autospec=True)
-    @patch("hackagent.router.router.ADKAgent", autospec=True)
-    @patch("hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
-    def test_agent_router_init_creates_new_litellm_agent(
-        self,
-        MockAgentMap,
-        MockADKAdapter,
-        MockLiteLLMAdapter,
-    ):
-        MockAgentMap[AgentTypeEnum.LITELLM] = MockLiteLLMAdapter
-        MockAgentMap[AgentTypeEnum.GOOGLE_ADK] = MockADKAdapter
-        MockADKAdapter.__name__ = "ADKAgent"
-        MockLiteLLMAdapter.__name__ = "LiteLLMAgent"
+    def test_agent_router_init_creates_new_litellm_agent(self):
+        """Chat AgentTypes now register a ``_ChatRegistration`` (Phase E.2b)."""
+        from hackagent.router._chat_registration import _ChatRegistration
 
         mock_org_id = uuid.uuid4()
         mock_backend = _make_backend(org_id=mock_org_id, user_id="789")
@@ -325,18 +315,18 @@ class TestAgentRouterInitialization(unittest.TestCase):
             overwrite_metadata=True,
         )
 
-        MockADKAdapter.assert_not_called()
-        MockLiteLLMAdapter.assert_called_once()
-        mock_litellm_instance = MockLiteLLMAdapter.return_value
-        adapter_kwargs = MockLiteLLMAdapter.call_args[1]
-        self.assertEqual(adapter_kwargs["id"], str(created_id))
-        actual_config = adapter_kwargs["config"]
-        self.assertEqual(actual_config["name"], "gpt-3.5-turbo")
-        self.assertEqual(actual_config["endpoint"], agent_endpoint)
-        self.assertEqual(actual_config["api_key"], "env_var_for_llm_key")
-        self.assertEqual(actual_config["temperature"], 0.8)
-        self.assertIn(str(created_id), router._agent_registry)
-        self.assertEqual(router._agent_registry[str(created_id)], mock_litellm_instance)
+        reg_key = str(created_id)
+        self.assertIn(reg_key, router._agent_registry)
+        registration = router._agent_registry[reg_key]
+        self.assertIsInstance(registration, _ChatRegistration)
+        self.assertEqual(registration.id, reg_key)
+        self.assertEqual(registration.model_name, "gpt-3.5-turbo")
+        self.assertEqual(registration.api_base_url, agent_endpoint)
+        # ``api_key`` config value is also a valid env var name; when the
+        # env var doesn't exist it falls through as the literal value.
+        self.assertEqual(registration.actual_api_key, "env_var_for_llm_key")
+        self.assertEqual(registration.default_temperature, 0.8)
+        self.assertEqual(registration.ADAPTER_TYPE, "LiteLLMAgent")
 
 
 class TestAnyUrlEndpointConversion(unittest.TestCase):
@@ -368,89 +358,74 @@ class TestAnyUrlEndpointConversion(unittest.TestCase):
         self.assertIsInstance(endpoint_value, str)
         self.assertEqual(endpoint_value, "http://adk-endpoint.com/")
 
-    @patch("hackagent.router.router.LiteLLMAgent", autospec=True)
-    @patch("hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
-    def test_litellm_adapter_receives_str_endpoint_when_backend_returns_anyurl(
-        self,
-        MockAgentMap,
-        MockLiteLLMAdapter,
-    ):
+    def test_litellm_chat_registration_has_str_endpoint(self):
+        """Phase E.2b — chat AgentTypes store ``_ChatRegistration`` with str endpoint."""
         from pydantic import AnyUrl
 
-        MockAgentMap[AgentTypeEnum.LITELLM] = MockLiteLLMAdapter
-        MockLiteLLMAdapter.__name__ = "LiteLLMAgent"
         mock_backend = _make_backend()
+        agent_id = uuid.uuid4()
         mock_backend.create_or_update_agent.return_value = _make_agent_rec(
+            agent_id=agent_id,
             agent_type_str="LITELLM",
             endpoint=AnyUrl("http://litellm-endpoint.com/"),
             metadata={"name": "gpt-4"},
         )
-        _ = AgentRouter(
+        router = AgentRouter(
             backend=mock_backend,
             name="TestLiteLLMAgent",
             agent_type=AgentTypeEnum.LITELLM,
             endpoint="http://litellm-endpoint.com/",
             metadata={"name": "gpt-4"},
         )
-        endpoint_value = MockLiteLLMAdapter.call_args[1]["config"]["endpoint"]
-        self.assertIsInstance(endpoint_value, str)
-        self.assertEqual(endpoint_value, "http://litellm-endpoint.com/")
+        registration = router._agent_registry[str(agent_id)]
+        self.assertIsInstance(registration.api_base_url, str)
+        self.assertEqual(registration.api_base_url, "http://litellm-endpoint.com/")
 
-    @patch("hackagent.router.router.OpenAIAgent", autospec=True)
-    @patch("hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
-    def test_openai_adapter_receives_str_endpoint_when_backend_returns_anyurl(
-        self,
-        MockAgentMap,
-        MockOpenAIAdapter,
-    ):
+    def test_openai_chat_registration_has_str_endpoint(self):
         from pydantic import AnyUrl
 
-        MockAgentMap[AgentTypeEnum.OPENAI_SDK] = MockOpenAIAdapter
-        MockOpenAIAdapter.__name__ = "OpenAIAgent"
         mock_backend = _make_backend()
+        agent_id = uuid.uuid4()
         mock_backend.create_or_update_agent.return_value = _make_agent_rec(
+            agent_id=agent_id,
             agent_type_str="OPENAI_SDK",
             endpoint=AnyUrl("http://openai-endpoint.com/v1/"),
             metadata={"name": "gpt-4o"},
         )
-        _ = AgentRouter(
+        router = AgentRouter(
             backend=mock_backend,
             name="TestOpenAIAgent",
             agent_type=AgentTypeEnum.OPENAI_SDK,
             endpoint="http://openai-endpoint.com/v1/",
             metadata={"name": "gpt-4o"},
         )
-        endpoint_value = MockOpenAIAdapter.call_args[1]["config"]["endpoint"]
-        self.assertIsInstance(endpoint_value, str)
-        self.assertEqual(endpoint_value, "http://openai-endpoint.com/v1/")
+        registration = router._agent_registry[str(agent_id)]
+        self.assertIsInstance(registration.api_base_url, str)
+        self.assertEqual(registration.api_base_url, "http://openai-endpoint.com/v1/")
 
-    @patch("hackagent.router.router.OllamaAgent", autospec=True)
-    @patch("hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
-    def test_ollama_adapter_receives_str_endpoint_when_backend_returns_anyurl(
-        self,
-        MockAgentMap,
-        MockOllamaAdapter,
-    ):
+    def test_ollama_chat_registration_has_str_endpoint(self):
+        """Ollama still applies its endpoint normalisation rules."""
         from pydantic import AnyUrl
 
-        MockAgentMap[AgentTypeEnum.OLLAMA] = MockOllamaAdapter
-        MockOllamaAdapter.__name__ = "OllamaAgent"
         mock_backend = _make_backend()
+        agent_id = uuid.uuid4()
         mock_backend.create_or_update_agent.return_value = _make_agent_rec(
+            agent_id=agent_id,
             agent_type_str="OLLAMA",
             endpoint=AnyUrl("http://ollama-endpoint.com/"),
             metadata={"name": "llama3"},
         )
-        _ = AgentRouter(
+        router = AgentRouter(
             backend=mock_backend,
             name="TestOllamaAgent",
             agent_type=AgentTypeEnum.OLLAMA,
             endpoint="http://ollama-endpoint.com/",
             metadata={"name": "llama3"},
         )
-        endpoint_value = MockOllamaAdapter.call_args[1]["config"]["endpoint"]
-        self.assertIsInstance(endpoint_value, str)
-        self.assertEqual(endpoint_value, "http://ollama-endpoint.com/")
+        registration = router._agent_registry[str(agent_id)]
+        self.assertIsInstance(registration.api_base_url, str)
+        # Trailing slash is stripped by Ollama's normaliser.
+        self.assertEqual(registration.api_base_url, "http://ollama-endpoint.com")
 
 
 class TestMetadataNoneStripping(unittest.TestCase):

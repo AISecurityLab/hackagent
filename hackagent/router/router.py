@@ -7,13 +7,16 @@ from typing import Any, Dict, List, Optional, Tuple, Type
 from hackagent.server.storage.base import AgentRecord, StorageBackend
 from hackagent.router import envelope as _envelope
 from hackagent.router import tracking_logger as _tracking_logger
+from hackagent.router._chat_registration import _ChatRegistration
 from hackagent.router.adapters.base import Agent
 from hackagent.router.provider_config import ProviderConfig, get_provider_config
 from hackagent.router.types import AgentTypeEnum
 
-# Adapter imports - these are imported at module level for backwards compatibility
-# with test patching (tests patch hackagent.router.router.LiteLLMAgent etc.)
-# The actual heavy dependency (litellm) is lazy-loaded within LiteLLMAgent
+# Adapter imports - these stay at module level for tests that still patch
+# ``hackagent.router.router.LiteLLMAgent`` etc. As of Phase E.2 chat
+# AgentTypes no longer instantiate these classes — they build a
+# ``_ChatRegistration`` instead. ADK still uses ``ADKAgent`` because its
+# CustomLLM registration is per-instance.
 from hackagent.router.adapters import ADKAgent
 from hackagent.router.adapters.litellm import LiteLLMAgent, _get_litellm
 from hackagent.router.adapters.openai import OpenAIAgent
@@ -232,15 +235,34 @@ class AgentRouter:
                 )
                 adapter_instance_config["user_id"] = self.user_id_str
 
+        provider_config = get_provider_config(agent_type)
+
         try:
+            if provider_config is not None:
+                # Phase E.2b — chat AgentTypes no longer go through the
+                # heavy adapter classes; the router stores a lightweight
+                # ``_ChatRegistration`` that ``_dispatch_via_litellm`` reads
+                # off. Adapter classes remain importable for back-compat.
+                logger.debug(
+                    f"ROUTER_DEBUG: Building _ChatRegistration for "
+                    f"'{registration_key}' (Type: {agent_type.value}), "
+                    f"config_keys={list(adapter_instance_config.keys())}"
+                )
+                adapter_instance: Any = _ChatRegistration(
+                    id=registration_key,
+                    agent_type=agent_type,
+                    provider_config=provider_config,
+                    config=adapter_instance_config,
+                )
+            else:
+                logger.debug(
+                    f"ROUTER_DEBUG: About to call adapter_class(id='{registration_key}', config_keys={list(adapter_instance_config.keys())})"
+                )
+                adapter_instance = adapter_class(
+                    id=registration_key, config=adapter_instance_config
+                )
             logger.debug(
-                f"ROUTER_DEBUG: About to call adapter_class(id='{registration_key}', config_keys={list(adapter_instance_config.keys())})"
-            )
-            adapter_instance = adapter_class(
-                id=registration_key, config=adapter_instance_config
-            )
-            logger.debug(
-                f"ROUTER_DEBUG: Called adapter_class. Resulting instance: {adapter_instance}, type: {type(adapter_instance)}"
+                f"ROUTER_DEBUG: Resulting instance: {adapter_instance}, type: {type(adapter_instance)}"
             )
             self._agent_registry[registration_key] = adapter_instance
             self._agent_types[registration_key] = agent_type

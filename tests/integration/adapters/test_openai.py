@@ -327,11 +327,11 @@ class TestOpenAIRouterIntegration:
         openai_model: str,
         openai_base_url: str,
     ):
-        """Test that AgentRouter correctly creates OpenAIAgent adapter."""
+        """Test that AgentRouter correctly creates the OpenAI registration."""
         from hackagent.server.client import AuthenticatedClient
         from hackagent.router.router import AgentRouter
         from hackagent.router.types import AgentTypeEnum
-        from hackagent.router.adapters.openai import OpenAIAgent
+        from hackagent.router._chat_registration import _ChatRegistration
 
         client = AuthenticatedClient(
             base_url=hackagent_api_base_url,
@@ -349,12 +349,14 @@ class TestOpenAIRouterIntegration:
             endpoint=openai_base_url,
         )
 
-        # Verify adapter was created
+        # Since #379 Phase E.2b the router stores a ``_ChatRegistration``
+        # for chat AgentTypes; the adapter classes are no longer
+        # instantiated.
         agent_id = str(router.backend_agent.id)
-        adapter = router.get_agent_instance(registration_key=agent_id)
-
-        assert isinstance(adapter, OpenAIAgent)
-        logger.info(f"Router created OpenAI adapter: {adapter.id}")
+        registration = router.get_agent_instance(registration_key=agent_id)
+        assert isinstance(registration, _ChatRegistration)
+        assert registration.ADAPTER_TYPE == "OpenAIAgent"
+        logger.info(f"Router created OpenAI registration: {registration.id}")
 
     def test_router_handles_openai_request(
         self,
