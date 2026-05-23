@@ -2,15 +2,17 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Google ADK (Agent Development Kit) adapter built on top of LiteLLM.
+Google ADK (Agent Development Kit) provider built on top of LiteLLM.
 
 LiteLLM has no built-in provider for the ADK server protocol (POST /run
 with sessions and events), so issue #379 routes ADK through LiteLLM by
 registering a per-instance :class:`litellm.CustomLLM` handler under a
 unique provider name. The HTTP transport against the deployed ADK server
 lives in the lazily-defined ``_ADKCustomLLM`` class, while
-:class:`ADKAgent` itself is a thin :class:`LiteLLMAgent` subclass that
-registers the handler and asks LiteLLM to route through it.
+:class:`ADKAgent` registers the handler and dispatches requests via
+``litellm.completion``. Since Phase E.2a, :class:`ADKAgent` extends
+:class:`Agent` directly (not :class:`LiteLLMAgent`) so the chat-adapter
+classes can be deleted in Phase E.2c without affecting ADK.
 """
 
 import json
@@ -20,12 +22,33 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
+from hackagent.router import envelope as _envelope
 from hackagent.router.adapters.base import (
+    Agent,
     AdapterConfigurationError,
     AdapterInteractionError,
     AdapterResponseParsingError,
 )
-from hackagent.router.adapters.litellm import LiteLLMAgent, _get_litellm
+
+
+# Local copy of the LiteLLM lazy importer so ADK no longer depends on
+# ``hackagent.router.adapters.litellm`` (which is being deleted in
+# Phase E.2c).
+_litellm_module = None
+
+
+def _get_litellm():
+    """Lazily import litellm. Returns ``(module, is_available)``."""
+    global _litellm_module
+    if _litellm_module is not None:
+        return _litellm_module, True
+    try:
+        import litellm
+
+        _litellm_module = litellm
+        return litellm, True
+    except ImportError:
+        return None, False
 
 
 logger = get_logger(__name__)
@@ -304,14 +327,15 @@ def _get_adk_custom_llm_class():
     return _ADKCustomLLM
 
 
-class ADKAgent(LiteLLMAgent):
+class ADKAgent(Agent):
     """
     Adapter for a deployed Google ADK agent server.
 
-    The request travels through LiteLLM via a per-instance
-    :class:`CustomLLM` handler registered as
-    ``hackagent_adk_<id>/<app_name>``. From the router's perspective this
-    is just another LiteLLM agent.
+    Each instance registers its own :class:`litellm.CustomLLM` handler
+    under a unique provider name (``hackagent_adk_<id>``) so the call
+    goes through ``litellm.completion`` like every other LiteLLM
+    provider — even though LiteLLM has no built-in knowledge of the
+    ADK ``POST /run`` + sessions + events protocol.
 
     Required config:
         - ``name``: ADK app name (used as both the model string and the
@@ -335,29 +359,32 @@ class ADKAgent(LiteLLMAgent):
                     f"Missing required configuration key '{key}' for ADKAgent: {id}"
                 )
 
-        # Provider name is per-instance so each ADKAgent gets its own handler.
-        # Set on self before super().__init__ runs so that the base's call to
-        # _resolve_litellm_model (overridden below) sees the right value.
+        super().__init__(id, config)
+        self._init_generation_params()
+
+        self.name: str = config["name"]
+        self.model_name = self.name  # for the base ``Agent`` envelope helpers
+        self.endpoint: str = str(config["endpoint"]).strip("/")
+        self.user_id: str = config["user_id"]
+        self.timeout: int = int(config.get("timeout", 120))
+        self.fresh_session_per_request: bool = bool(
+            config.get("fresh_session_per_request", True)
+        )
+        self.session_id: str = config.get("session_id") or str(uuid.uuid4())
+
+        # Per-instance LiteLLM provider name + the model string the
+        # router will call ``litellm.completion(model=...)`` with.
         self._provider_name = f"{_ADK_PROVIDER_PREFIX}_{id}"
-
-        adk_endpoint = str(config["endpoint"]).strip("/")
-        adk_user_id = config["user_id"]
-        adk_app_name = config["name"]
-        adk_timeout = int(config.get("timeout", 120))
-        fresh = bool(config.get("fresh_session_per_request", True))
-        session_id = config.get("session_id") or str(uuid.uuid4())
-
-        # The base passes ``endpoint`` along to LiteLLM as ``api_base``; we
-        # don't want that since our custom provider hits ADK directly.
-        base_config = {k: v for k, v in config.items() if k != "endpoint"}
-        super().__init__(id, base_config)
-
-        self.endpoint = adk_endpoint
-        self.user_id = adk_user_id
-        self.name = adk_app_name
-        self.timeout = adk_timeout
-        self.fresh_session_per_request = fresh
-        self.session_id = session_id
+        self.litellm_model = f"{self._provider_name}/{self.name}"
+        # Kept for backwards compatibility with code that read these off
+        # the legacy ``LiteLLMAgent`` base; ADK has no API base/key of
+        # its own (the custom provider talks to the ADK server itself).
+        self.api_base_url: Optional[str] = None
+        self.actual_api_key: Optional[str] = None
+        self.default_thinking = None
+        self.default_tools = None
+        self.default_tool_choice = None
+        self.default_extra_body = None
 
         self._register_custom_provider()
 
@@ -402,43 +429,104 @@ class ADKAgent(LiteLLMAgent):
 
         self._custom_handler = handler
 
-    def _resolve_litellm_model(self, raw_model: str) -> str:
-        return f"{self._provider_name}/{raw_model}"
+    # ---- request handling ----------------------------------------------
 
-    # ---- forward ADK-specific request fields ----------------------------
+    def handle_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Send a single ADK turn via ``litellm.completion``.
 
-    def _get_completion_parameters(
-        self, request_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        params = super()._get_completion_parameters(request_data)
+        Implemented directly on :class:`ADKAgent` so the class no longer
+        depends on ``LiteLLMAgent`` (which Phase E.2c deletes). The
+        request flow is the same as before:
+
+            request_data → litellm.completion(model="hackagent_adk_<id>/<app>",
+                                              messages=…, session_id=…)
+                          → _ADKCustomLLM.completion → ADK ``/run``
+        """
+        is_valid, prompt_text, messages = self._validate_request(request_data)
+        if not is_valid:
+            return self._build_error_response(
+                error_message=(
+                    "Request data must include either 'messages' or 'prompt' field."
+                ),
+                status_code=400,
+                raw_request=request_data,
+            )
+        if not messages:
+            messages = self._prompt_to_messages(prompt_text)  # type: ignore[arg-type]
+
+        # ADK-specific knobs that the custom handler reads out of
+        # ``optional_params``. ``adk_session_id`` is a legacy alias.
         session_id = request_data.get("session_id", request_data.get("adk_session_id"))
+        initial_session_state = request_data.get("initial_session_state")
+
+        litellm, available = _get_litellm()
+        if not available:
+            return self._build_error_response(
+                error_message="litellm is not installed",
+                status_code=500,
+                raw_request=request_data,
+            )
+
+        kwargs: Dict[str, Any] = {
+            "model": self.litellm_model,
+            "messages": messages,
+        }
         if session_id:
-            params["session_id"] = session_id
-        if "initial_session_state" in request_data:
-            params["initial_session_state"] = request_data["initial_session_state"]
-        return params
+            kwargs["session_id"] = session_id
+        if initial_session_state is not None:
+            kwargs["initial_session_state"] = initial_session_state
 
-    def _get_excluded_request_keys(self) -> set:
-        base = super()._get_excluded_request_keys()
-        return base | {"session_id", "adk_session_id", "initial_session_state"}
+        try:
+            response = litellm.completion(**kwargs)
+        except Exception as exc:
+            self.logger.exception(
+                f"ADK litellm dispatch failed for agent {self.id}: {exc}"
+            )
+            return self._build_error_response(
+                error_message=(
+                    f"{self.ADAPTER_TYPE} error ({type(exc).__name__}): {exc}"
+                ),
+                status_code=500,
+                raw_request=request_data,
+            )
 
-    def _build_agent_specific_data(
-        self,
-        completion_result: Dict[str, Any],
-        parameters: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        data = super()._build_agent_specific_data(completion_result, parameters)
-        raw = completion_result.get("raw_response")
+        text = _envelope.extract_text_from_response(
+            response, model_name=self.litellm_model
+        )
+        if isinstance(text, str) and text.startswith("[GENERATION_ERROR:"):
+            return self._build_error_response(
+                error_message=f"{self.ADAPTER_TYPE} generation error: {text}",
+                status_code=500,
+                raw_request=request_data,
+            )
+
+        # The custom handler stashes ADK events/session_id on
+        # ``provider_specific_fields`` — pull them back out for the
+        # envelope.
         adk_fields: Dict[str, Any] = {}
         try:
             adk_fields = (
-                getattr(raw.choices[0].message, "provider_specific_fields", None) or {}
+                getattr(response.choices[0].message, "provider_specific_fields", None)
+                or {}
             )
         except (AttributeError, IndexError, TypeError):
             adk_fields = {}
-        events = adk_fields.get("adk_events_list")
-        if events is not None:
-            data["adk_events_list"] = events
+
+        invoked_parameters: Dict[str, Any] = {}
+        if session_id:
+            invoked_parameters["session_id"] = session_id
+        agent_specific_data = _envelope.build_agent_specific_data(
+            model_name=self.litellm_model,
+            invoked_parameters=invoked_parameters,
+        )
+        if adk_fields.get("adk_events_list") is not None:
+            agent_specific_data["adk_events_list"] = adk_fields["adk_events_list"]
         if "adk_session_id" in adk_fields:
-            data["adk_session_id"] = adk_fields["adk_session_id"]
-        return data
+            agent_specific_data["adk_session_id"] = adk_fields["adk_session_id"]
+
+        return self._build_success_response(
+            processed_response=text,
+            raw_request=request_data,
+            raw_response_body=response,
+            agent_specific_data=agent_specific_data,
+        )
