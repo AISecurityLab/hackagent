@@ -54,7 +54,7 @@ jobs:
       - name: Run slow integration tests
         run: >
           uv run pytest
-          tests/integration/adapters/
+          tests/integration/router/
           tests/integration/attacks/
           --run-integration
           -m "slow"

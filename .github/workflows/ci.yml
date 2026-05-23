@@ -180,7 +180,7 @@ jobs:
           retention-days: 1
 
   # ── Integration (Ollama) ──────────────────────────────────────────────────
-  # Covers tests/integration/adapters/ and tests/integration/attacks/.
+  # Covers tests/integration/router/ and tests/integration/attacks/.
   # Requires a running Ollama instance with tinyllama.
   integration-ollama:
     name: Integration Tests (Ollama)
@@ -230,7 +230,7 @@ jobs:
       - name: Run Ollama integration tests with coverage
         run: >
           uv run pytest
-          tests/integration/adapters/
+          tests/integration/router/
           tests/integration/attacks/
           --run-integration
           -n 2
