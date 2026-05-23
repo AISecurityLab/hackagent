@@ -25,6 +25,7 @@ from hackagent.router.adapters.google_adk import (
     _extract_final_text,
     _last_user_text,
 )
+from hackagent.router.providers import adk as adk_provider_module
 
 logging.disable(logging.CRITICAL)
 
@@ -43,6 +44,20 @@ def _make_handler(**overrides):
     )
     defaults.update(overrides)
     return handler_cls(**defaults)
+
+
+class TestADKModuleLayout(unittest.TestCase):
+    """Phase E — ADK lives at router/providers/adk.py with a back-compat shim."""
+
+    def test_adk_classes_resolve_to_same_object_through_both_paths(self):
+        self.assertIs(ADKAgent, adk_provider_module.ADKAgent)
+        self.assertIs(
+            AgentConfigurationError, adk_provider_module.AgentConfigurationError
+        )
+
+    def test_provider_module_exposes_helpers(self):
+        self.assertIs(_extract_final_text, adk_provider_module._extract_final_text)
+        self.assertIs(_last_user_text, adk_provider_module._last_user_text)
 
 
 class TestADKHelpers(unittest.TestCase):

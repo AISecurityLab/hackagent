@@ -302,3 +302,59 @@ green.
   request, error path, and ADK request.
 - All existing example scripts under `hackagent/examples/` keep working
   without code edits.
+
+---
+
+## 9. Status (2026-05-23)
+
+Phases A–E (partial) landed in five commits on
+`feat/litellm-unified-adapters-379`:
+
+- **Phase A** (1b3dedf): `hackagent/router/envelope.py` extracted; the
+  adapter classes delegate to its pure functions. `provider_config.py`
+  added alongside but not wired in yet.
+- **Phase B** (67cd38f): `LiteLLMAgent.__init__` now accepts an optional
+  ``ProviderConfig``. `OpenAIAgent` and `OllamaAgent` look their config
+  up from the table; their `_apply_thinking` overrides are gone.
+- **Phase C** (c14b2e0): `AgentRouter._dispatch_via_litellm` calls
+  `litellm.completion` directly for every chat-completion AgentType
+  (LITELLM, OPENAI_SDK, OLLAMA, LANGCHAIN). `adapter.handle_request` is
+  no longer on the hot path for those. ADK still goes through its
+  adapter (CustomLLM registration is per-instance, by design).
+- **Phase D**: `HackAgentTrackingLogger` (CustomLogger subclass)
+  registered on `litellm.callbacks` from `AgentRouter.__init__`;
+  `_dispatch_via_litellm` attaches `metadata={...}` so the logger can
+  correlate input ↔ output ↔ cost via `litellm_call_id`.
+- **Phase E (partial)**: ADK moved to
+  `hackagent/router/providers/adk.py`; the old
+  `hackagent/router/adapters/google_adk.py` path is a thin re-export
+  shim for backwards compatibility. The chat adapter classes
+  (`LiteLLMAgent`, `OpenAIAgent`, `OllamaAgent`) are kept and now act
+  as config containers — they no longer run on the hot path but are
+  still instantiated so external callers that `from
+  hackagent.router.adapters.openai import OpenAIAgent` keep working.
+
+### Remaining work (deferred)
+
+- **Phase E.2 — full deletion of the chat adapter classes.** Requires
+  replacing the per-registration adapter instance with a lightweight
+  config dataclass (`_ChatRegistration`) and dropping the public
+  `LiteLLMAgent` / `OpenAIAgent` / `OllamaAgent` symbols. Hold off
+  until we know no downstream code in `hackagent-api`,
+  `hackagent-webapp`, or external consumers depends on those imports.
+- **Phase F — optional follow-ups.** Adopt `litellm.Router` for
+  multi-deployment load balancing; surface `response_cost` and
+  `x-litellm-call-id` in the envelope; streaming support; full
+  `_build_error_response` shape unification (currently the
+  `AgentNotFound` envelope still uses ``raw_response_status`` while
+  the chat-dispatch envelope uses ``status_code``).
+
+### Tests
+
+1776 unit tests pass after Phase E. New coverage:
+
+- `tests/unit/router/test_envelope.py` (26 tests)
+- `tests/unit/router/test_provider_config.py` (25 tests)
+- `tests/unit/router/test_dispatch.py` (8 tests — chat dispatch + ADK
+  bypass + metadata flow)
+- `tests/unit/router/test_tracking_logger.py` (6 tests)
