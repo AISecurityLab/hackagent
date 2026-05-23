@@ -633,8 +633,7 @@ class AttackOrchestrator:
         fail_on_run_error: bool,
         max_wait_time_seconds: Optional[int] = None,
         poll_interval_seconds: Optional[int] = None,
-        _tui_app: Optional[Any] = None,
-        _tui_log_callback: Optional[Any] = None,
+        _tui_event_bus: Optional[Any] = None,
     ) -> Any:
         """
         Execute attack with server tracking.
@@ -652,8 +651,9 @@ class AttackOrchestrator:
             fail_on_run_error: Whether to raise on errors
             max_wait_time_seconds: Unused for local execution
             poll_interval_seconds: Unused for local execution
-            _tui_app: Optional TUI app for logging
-            _tui_log_callback: Optional TUI log callback
+            _tui_event_bus: Optional :class:`hackagent.cli.tui.events.TUIEventBus`
+                that receives structured events (step start/end, tool calls,
+                progress, etc.) during execution.
 
         Returns:
             Attack results from local execution
@@ -710,6 +710,22 @@ class AttackOrchestrator:
         except Exception as e:
             logger.warning(f"Failed to update run status to RUNNING: {e}")
 
+        # Make the event bus available to the technique impl and to the
+        # tracker via the shared config bag (alongside _run_id / _backend).
+        if _tui_event_bus is not None:
+            attack_config = {**attack_config, "_tui_event_bus": _tui_event_bus}
+            effective_run_config = {
+                **effective_run_config,
+                "_tui_event_bus": _tui_event_bus,
+            }
+            _tui_event_bus.emit(
+                "step_started",
+                step_name="Attack Execution",
+                attack_type=self.attack_type,
+                run_id=run_id,
+                expected_total_goals=effective_run_config.get("expected_total_goals"),
+            )
+
         # 5. Execute locally
         try:
             _total_t0 = time.perf_counter()
@@ -733,6 +749,9 @@ class AttackOrchestrator:
                     "_run_id": run_id,
                     "_backend": self.hackagent_agent.backend,
                 }
+
+                if _tui_event_bus is not None:
+                    _tui_event_bus.emit("step_started", step_name="Evaluation Pipeline")
 
                 if (self.attack_type or "").lower() == "pair":
                     from hackagent.attacks.techniques.pair.evaluation import (
@@ -778,10 +797,31 @@ class AttackOrchestrator:
             except Exception as e:
                 logger.warning(f"Evaluation failed: {e}", exc_info=True)
                 final_results = results  # fallback
+                if _tui_event_bus is not None:
+                    _tui_event_bus.emit(
+                        "step_ended",
+                        step_name="Evaluation Pipeline",
+                        success=False,
+                        error=str(e),
+                    )
+            else:
+                if _tui_event_bus is not None:
+                    _tui_event_bus.emit(
+                        "step_ended",
+                        step_name="Evaluation Pipeline",
+                        success=True,
+                    )
 
             # ⏱ timing AFTER evaluation
             _total_elapsed = round(time.perf_counter() - _total_t0, 3)
             logger.info(f"Total run time: {_total_elapsed:.1f}s")
+            if _tui_event_bus is not None:
+                _tui_event_bus.emit(
+                    "step_ended",
+                    step_name="Attack Execution",
+                    success=True,
+                    elapsed_s=_total_elapsed,
+                )
 
             # ✅ Update run status to COMPLETED
             try:
@@ -806,6 +846,13 @@ class AttackOrchestrator:
                 )
             except Exception as update_error:
                 logger.warning(f"Failed to update run status to FAILED: {update_error}")
+            if _tui_event_bus is not None:
+                _tui_event_bus.emit(
+                    "step_ended",
+                    step_name="Attack Execution",
+                    success=False,
+                    error=str(e),
+                )
             raise
 
     # ========================================================================

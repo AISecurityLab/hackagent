@@ -1064,6 +1064,14 @@ class AttacksTab(Container):
         hackagent_logger.addHandler(tui_log_handler)
         hackagent_logger.setLevel(tui_log_level)
 
+        # Build the structured event bus and hook the actions viewer.
+        # The bus is also passed to ``agent.hack(...)`` below so trackers
+        # emit goal/step/trace events as the attack runs.
+        from hackagent.cli.tui.events import TUIEventBus
+
+        tui_event_bus = TUIEventBus()
+        actions_viewer.subscribe_to_bus(tui_event_bus, self.app)
+
         logging.getLogger("httpx").setLevel(logging.CRITICAL)
         logging.getLogger("litellm").setLevel(logging.CRITICAL)
 
@@ -1118,36 +1126,91 @@ class AttacksTab(Container):
 
             start_time = time.time()
 
-            def log_callback(message: str, level: str) -> None:
-                _filtered_log_callback(message, level)
+            # Event-driven progress: each `goal_finalized` advances the bar
+            # toward 95% based on the expected goal count carried by the
+            # orchestrator's `step_started` event. Anything beyond execution
+            # (sync to backend) takes the final 5%.
+            progress_state = {"goals_done": 0, "expected": 0}
 
-            import threading
+            def _on_bus_event(event: Any) -> None:
+                et = event.event_type
+                payload = event.payload or {}
 
-            stop_progress = threading.Event()
+                if (
+                    et == "step_started"
+                    and payload.get("step_name") == "Attack Execution"
+                ):
+                    expected = payload.get("expected_total_goals") or 0
+                    progress_state["expected"] = int(expected) if expected else 0
+                    self.app.call_from_thread(progress_bar.update, progress=45)
+                    self.app.call_from_thread(
+                        status_widget.update,
+                        f"""[bold cyan]⚔️ Executing {_escape(strategy_name)} Attack...[/bold cyan]
 
-            def update_progress_gradually():
-                for progress in range(50, 91, 5):
-                    if stop_progress.is_set():
-                        break
-                    self.app.call_from_thread(progress_bar.update, progress=progress)
-                    time.sleep(2)
+[bold]Goals to process:[/bold] {progress_state["expected"] or "unknown"}
 
-            progress_thread = threading.Thread(
-                target=update_progress_gradually, daemon=True
-            )
-            progress_thread.start()
+[yellow]⏳ Attack running...[/yellow]
+[dim]Progress: 45%[/dim]""",
+                    )
+                    return
+
+                if et == "goal_finalized":
+                    progress_state["goals_done"] += 1
+                    expected = progress_state["expected"]
+                    if expected > 0:
+                        pct = 45 + int(50 * progress_state["goals_done"] / expected)
+                        pct = min(pct, 95)
+                    else:
+                        # Unknown total — creep up but never reach 95%
+                        pct = min(45 + progress_state["goals_done"] * 5, 90)
+                    self.app.call_from_thread(progress_bar.update, progress=pct)
+                    success = bool(payload.get("success"))
+                    icon = "✓" if success else "✗"
+                    elapsed = payload.get("elapsed_s")
+                    elapsed_s = (
+                        f" ({elapsed:.1f}s)"
+                        if isinstance(elapsed, (int, float))
+                        else ""
+                    )
+                    summary = (
+                        f"Goal {progress_state['goals_done']}"
+                        + (f"/{expected}" if expected else "")
+                        + f"  {icon}{elapsed_s}"
+                    )
+                    self.app.call_from_thread(
+                        status_widget.update,
+                        f"""[bold cyan]⚔️ Executing {_escape(strategy_name)} Attack...[/bold cyan]
+
+[bold]Last:[/bold] {summary}
+
+[yellow]⏳ Attack running...[/yellow]
+[dim]Progress: {pct}%[/dim]""",
+                    )
+                    return
+
+                if (
+                    et == "step_started"
+                    and payload.get("step_name") == "Evaluation Pipeline"
+                ):
+                    self.app.call_from_thread(progress_bar.update, progress=96)
+                    self.app.call_from_thread(
+                        status_widget.update,
+                        """[bold cyan]⚖ Running evaluation pipeline...[/bold cyan]
+
+[dim]Progress: 96%[/dim]""",
+                    )
+
+            tui_event_bus.subscribe(_on_bus_event)
 
             try:
                 results = agent.hack(
                     attack_config=attack_config,
                     run_config_override={"timeout": timeout},
                     fail_on_run_error=True,
-                    _tui_app=self.app,
-                    _tui_log_callback=log_callback,
+                    _tui_event_bus=tui_event_bus,
                 )
             finally:
-                stop_progress.set()
-                progress_thread.join(timeout=1)
+                tui_event_bus.unsubscribe(_on_bus_event)
                 sys.stdout = original_stdout
                 sys.stderr = original_stderr
 

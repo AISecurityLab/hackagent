@@ -114,6 +114,7 @@ class Tracker:
         logger: Optional[logging.Logger] = None,
         attack_type: Optional[str] = None,
         category_classifier_config: Optional[Dict[str, Any]] = None,
+        event_bus: Optional[Any] = None,
     ):
         """
         Initialize tracker.
@@ -123,17 +124,32 @@ class Tracker:
             run_id: Server-side run record ID
             logger: Optional logger instance
             attack_type: Optional attack type identifier for metadata
+            event_bus: Optional :class:`hackagent.cli.tui.events.TUIEventBus`.
+                When provided, the tracker emits structured events
+                (``goal_started``, ``goal_finalized``, ``evaluation``, ...)
+                so the TUI can render execution live without parsing logs.
         """
         self.backend = backend
         self.run_id = run_id
         self.logger = logger or get_logger(__name__)
         self.attack_type = attack_type
+        self.event_bus = event_bus
         self._goal_category_classifier = GoalCategoryClassifier(
             backend=backend,
             config=category_classifier_config,
             logger=self.logger,
         )
         self._goal_contexts: Dict[int, Context] = {}
+
+    def _emit(self, event_type: str, **payload: Any) -> None:
+        """Emit on ``event_bus`` if present; swallow any error."""
+        bus = self.event_bus
+        if bus is None:
+            return
+        try:
+            bus.emit(event_type, **payload)
+        except Exception:
+            self.logger.debug("Tracker event emit failed", exc_info=True)
 
     @property
     def is_enabled(self) -> bool:
@@ -175,12 +191,28 @@ class Tracker:
         if not self.is_enabled:
             self.logger.debug(f"Tracking disabled - goal {goal_index} won't be tracked")
             self._goal_contexts[goal_index] = ctx
+            # Bus delivery is independent of backend tracking — surface the
+            # event so the TUI still sees the goal even in headless mode.
+            self._emit(
+                "goal_started",
+                goal=goal,
+                goal_index=goal_index,
+                attack_type=self.attack_type,
+                result_id=None,
+            )
             return ctx
 
         try:
             run_uuid = self._get_run_uuid()
             if not run_uuid:
                 self._goal_contexts[goal_index] = ctx
+                self._emit(
+                    "goal_started",
+                    goal=goal,
+                    goal_index=goal_index,
+                    attack_type=self.attack_type,
+                    result_id=None,
+                )
                 return ctx
 
             # Classify each goal as soon as its result record is created.
@@ -225,6 +257,13 @@ class Tracker:
             )
 
         self._goal_contexts[goal_index] = ctx
+        self._emit(
+            "goal_started",
+            goal=goal,
+            goal_index=goal_index,
+            attack_type=self.attack_type,
+            result_id=ctx.result_id,
+        )
         return ctx
 
     def _classify_goal_labels(self, goal: str) -> Dict[str, str]:
@@ -389,6 +428,18 @@ class Tracker:
         }
         ctx.traces.append(trace_record)
 
+        # Surface the trace as a structured TUI event. Subscribers translate
+        # the step_type / step_name into "tool_call", "evaluation", etc.
+        self._emit(
+            "trace_added",
+            goal_index=ctx.goal_index,
+            sequence=seq,
+            step_name=step_name,
+            step_type=trace_record["step_type"],
+            content=sanitized_content,
+            elapsed_s=trace_record["elapsed_s"],
+        )
+
         # Send to backend if enabled and we have a result_id
         if not self.is_enabled or not ctx.result_id:
             return None
@@ -480,6 +531,19 @@ class Tracker:
             ctx.metadata["preserved_prior_success"] = True
         ctx.metadata["total_traces"] = len(ctx.traces)
         ctx.metadata["elapsed_s"] = round(ctx.elapsed_s, 3)
+
+        # Emit goal_finalized regardless of backend tracking so the TUI can
+        # tick progress even when running without a server-side run record.
+        self._emit(
+            "goal_finalized",
+            goal_index=ctx.goal_index,
+            goal=ctx.goal,
+            success=bool(final_success),
+            total_traces=len(ctx.traces),
+            elapsed_s=ctx.metadata["elapsed_s"],
+            evaluation_notes=evaluation_notes,
+            result_id=ctx.result_id,
+        )
 
         if not self.is_enabled or not ctx.result_id:
             return False

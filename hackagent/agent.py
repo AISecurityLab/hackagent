@@ -215,8 +215,7 @@ class HackAgent:
         attack_config: Dict[str, Any],
         run_config_override: Optional[Dict[str, Any]] = None,
         fail_on_run_error: bool = True,
-        _tui_app: Optional[Any] = None,
-        _tui_log_callback: Optional[Any] = None,
+        _tui_event_bus: Optional[Any] = None,
     ) -> Any:
         """
         Executes a specified attack strategy against the configured victim agent.
@@ -273,8 +272,7 @@ class HackAgent:
                 attack_config=attack_config,
                 run_config_override=run_config_override,
                 fail_on_run_error=fail_on_run_error,
-                _tui_app=_tui_app,
-                _tui_log_callback=_tui_log_callback,
+                _tui_event_bus=_tui_event_bus,
             )
 
         except HackAgentError:

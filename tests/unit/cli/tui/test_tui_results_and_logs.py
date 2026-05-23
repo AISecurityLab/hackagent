@@ -501,46 +501,9 @@ class TestLogTrackingFlow:
         # Verify result
         assert result == ["result"]
 
-    def test_attach_detach_tui_handler(self) -> None:
-        """Test attaching and detaching TUI handler from attack instance."""
-        from hackagent.cli.tui.logger import (
-            TUILogHandler,
-            attach_tui_handler,
-            detach_tui_handler,
-        )
-
-        class MockAttack:
-            pass
-
-        mock_app = MagicMock()
-        mock_callback = MagicMock()
-
-        attack = MockAttack()
-
-        # Attach
-        handler = attach_tui_handler(attack, mock_app, mock_callback)
-
-        assert hasattr(attack, "_tui_log_handler")
-        assert attack._tui_log_handler == handler
-        assert isinstance(handler, TUILogHandler)
-
-        # Detach
-        detached = detach_tui_handler(attack)
-
-        assert detached == handler
-        assert not hasattr(attack, "_tui_log_handler")
-
-    def test_detach_nonexistent_handler(self) -> None:
-        """Test detaching handler when none exists."""
-        from hackagent.cli.tui.logger import detach_tui_handler
-
-        class MockAttack:
-            pass
-
-        attack = MockAttack()
-        result = detach_tui_handler(attack)
-
-        assert result is None
+    # NOTE: tests for the removed ``attach_tui_handler`` / ``detach_tui_handler``
+    # helpers were dropped in the TUI cleanup pass — those helpers were never
+    # called by production code and have been removed.
 
 
 # ============================================================================

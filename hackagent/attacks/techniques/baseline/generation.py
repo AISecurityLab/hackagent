@@ -174,6 +174,7 @@ def execute_prompts(
             logger=logger,
             attack_type="baseline",
             category_classifier_config=config.get("category_classifier"),
+            event_bus=config.get("_tui_event_bus"),
         )
     else:
         logger.warning("⚠️ Missing tracking context - results will NOT be created!")
