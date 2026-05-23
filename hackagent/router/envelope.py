@@ -288,7 +288,18 @@ def build_agent_specific_data(
         "invoked_parameters": invoked_parameters,
     }
     if completion_result:
-        for key in ("usage", "finish_reason", "provider_model", "raw_response"):
+        # ``response_cost`` and ``litellm_call_id`` are free metrics that
+        # LiteLLM attaches to every successful call — surface them so
+        # downstream traces can use them without rooting in the raw
+        # response object.
+        for key in (
+            "usage",
+            "finish_reason",
+            "provider_model",
+            "raw_response",
+            "response_cost",
+            "litellm_call_id",
+        ):
             value = completion_result.get(key)
             if value is not None:
                 data[key] = value
@@ -297,3 +308,37 @@ def build_agent_specific_data(
     if extra:
         data.update(extra)
     return data
+
+
+# ---- LiteLLM response metadata extraction --------------------------------
+
+
+def extract_response_cost(response: Any) -> Optional[float]:
+    """Pull ``response_cost`` off a LiteLLM ``ModelResponse`` if present.
+
+    LiteLLM exposes the per-call cost (when the model is in its pricing
+    catalogue) via the ``_hidden_params`` attribute. Returns ``None``
+    when unavailable rather than raising, since cost tracking is
+    best-effort.
+    """
+    hidden = getattr(response, "_hidden_params", None) or {}
+    cost = hidden.get("response_cost") if isinstance(hidden, dict) else None
+    try:
+        return float(cost) if cost is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def extract_litellm_call_id(response: Any) -> Optional[str]:
+    """Pull ``litellm_call_id`` (or ``x-litellm-call-id``) off a response."""
+    hidden = getattr(response, "_hidden_params", None) or {}
+    if isinstance(hidden, dict):
+        for key in ("litellm_call_id", "x-litellm-call-id"):
+            value = hidden.get(key)
+            if value:
+                return str(value)
+    # LiteLLM also sets ``response.id`` to a unique value per call.
+    response_id = getattr(response, "id", None)
+    if response_id:
+        return str(response_id)
+    return None

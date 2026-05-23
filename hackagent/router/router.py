@@ -300,6 +300,10 @@ class AgentRouter:
             "raw_request": raw_request,
             "processed_response": None,
             "generated_text": None,
+            # Phase F.1 — ``status_code`` is the canonical field used by
+            # the new chat-dispatch envelope; ``raw_response_status`` is
+            # kept as an alias for legacy callers that read it.
+            "status_code": status_code,
             "raw_response_status": status_code,
             "raw_response_headers": None,
             "raw_response_body": None,
@@ -625,6 +629,15 @@ class AgentRouter:
             completion_result["provider_model"] = response.model
         except AttributeError:
             pass
+        # Phase F.1 — surface LiteLLM's response_cost and call_id so
+        # downstream traces can join input ↔ output ↔ spend without
+        # poking at private attributes on the raw response object.
+        response_cost = _envelope.extract_response_cost(response)
+        if response_cost is not None:
+            completion_result["response_cost"] = response_cost
+        call_id = _envelope.extract_litellm_call_id(response)
+        if call_id is not None:
+            completion_result["litellm_call_id"] = call_id
 
         agent_specific_data = _envelope.build_agent_specific_data(
             model_name=model_name,

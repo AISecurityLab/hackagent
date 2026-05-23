@@ -192,11 +192,42 @@ class TestDispatchViaLiteLLM(unittest.TestCase):
     def test_unknown_registration_key_returns_404_envelope(self):
         router, _ = self._make_router_for_openai()
         response = router.route_request("nonexistent-key", {"prompt": "hi"})
-        # The legacy router-level AgentNotFound envelope uses
-        # ``raw_response_status`` rather than ``status_code``. Phase F may
-        # unify these; we just check the actual current behaviour here.
+        # Phase F.1 unified the field name; legacy ``raw_response_status``
+        # stays as a back-compat alias.
+        self.assertEqual(response["status_code"], 404)
         self.assertEqual(response["raw_response_status"], 404)
         self.assertIn("Agent not found", response["error_message"])
+
+    @patch("litellm.completion")
+    def test_response_cost_and_call_id_surface_in_envelope(self, mock_completion):
+        """Phase F.1 — LiteLLM's response_cost / call_id show up in the envelope."""
+        response = _make_litellm_response("ok")
+        response._hidden_params = {
+            "response_cost": 0.000123,
+            "litellm_call_id": "call-abc",
+        }
+        mock_completion.return_value = response
+
+        router, reg_key = self._make_router_for_openai()
+        env = router.route_request(reg_key, {"prompt": "hi"})
+
+        self.assertEqual(env["status_code"], 200)
+        agent_data = env["agent_specific_data"]
+        self.assertAlmostEqual(agent_data["response_cost"], 0.000123)
+        self.assertEqual(agent_data["litellm_call_id"], "call-abc")
+
+    @patch("litellm.completion")
+    def test_response_cost_absent_when_not_in_hidden_params(self, mock_completion):
+        """No ``response_cost`` from LiteLLM → envelope omits the field."""
+        response = _make_litellm_response("ok")
+        # Don't set _hidden_params; cost should just be missing.
+        if hasattr(response, "_hidden_params"):
+            del response._hidden_params
+        mock_completion.return_value = response
+
+        router, reg_key = self._make_router_for_openai()
+        env = router.route_request(reg_key, {"prompt": "hi"})
+        self.assertNotIn("response_cost", env["agent_specific_data"])
 
 
 class TestDispatchADKBypassesLiteLLM(unittest.TestCase):

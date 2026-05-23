@@ -220,6 +220,35 @@ class TestEnvelopeBuilders(unittest.TestCase):
         self.assertEqual(env["status_code"], 400)
 
 
+class TestExtractResponseCostAndCallId(unittest.TestCase):
+    def test_response_cost_pulled_from_hidden_params(self):
+        response = MagicMock()
+        response._hidden_params = {"response_cost": 0.0005}
+        self.assertAlmostEqual(envelope.extract_response_cost(response), 0.0005)
+
+    def test_response_cost_returns_none_when_missing(self):
+        response = MagicMock()
+        response._hidden_params = {}
+        self.assertIsNone(envelope.extract_response_cost(response))
+
+    def test_response_cost_handles_non_numeric_gracefully(self):
+        response = MagicMock()
+        response._hidden_params = {"response_cost": "n/a"}
+        self.assertIsNone(envelope.extract_response_cost(response))
+
+    def test_call_id_prefers_hidden_params_over_response_id(self):
+        response = MagicMock()
+        response._hidden_params = {"litellm_call_id": "hidden-id"}
+        response.id = "id-field"
+        self.assertEqual(envelope.extract_litellm_call_id(response), "hidden-id")
+
+    def test_call_id_falls_back_to_response_id(self):
+        response = MagicMock()
+        response._hidden_params = {}
+        response.id = "id-field"
+        self.assertEqual(envelope.extract_litellm_call_id(response), "id-field")
+
+
 class TestBuildAgentSpecificData(unittest.TestCase):
     def test_merges_completion_metadata(self):
         data = envelope.build_agent_specific_data(
