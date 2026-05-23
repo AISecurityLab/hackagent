@@ -14,8 +14,9 @@ Manages the configuration and request routing for a single agent instance.
 The `AgentRouter` is responsible for initializing an agent, which includes:
 1.  Resolving organizational context via the storage backend.
 2.  Ensuring the agent is registered in the storage backend.
-3.  Instantiating the appropriate adapter (e.g., `ADKAgent`, `LiteLLMAgent`)
-based on the `agent_type`.
+3.  Building either an ``ADKAgent`` instance (for the GOOGLE_ADK
+type, which needs a per-instance CustomLLM registration) or a
+lightweight ``_ChatRegistration`` (for every chat AgentType).
 4.  Storing this adapter for subsequent request routing.
 
 **Attributes**:
@@ -24,7 +25,7 @@ based on the `agent_type`.
 - `organization_id` - The UUID of the organization associated with the backend.
 - `user_id_str` - The string user ID associated with the backend context.
 - `backend_agent` - The `AgentRecord` representing this agent in storage.
-- `_agent_registry` - Dict mapping agent ID → instantiated adapter `ADKAgent`0 objects.
+- ``0 - Dict mapping agent ID → instantiated adapter ``1 objects.
 
 #### \_\_init\_\_
 

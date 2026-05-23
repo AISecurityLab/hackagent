@@ -3,9 +3,9 @@ sidebar_label: profile_helpers
 title: hackagent.risks.profile_helpers
 ---
 
-Shared shorthand helpers for building evaluation campaign configurations.
+Shared shorthand helpers for building threat profiles.
 
-These are intentionally private but shared across risk configuration modules.
+These are intentionally private but shared across all threat profile modules.
 
 #### ds
 

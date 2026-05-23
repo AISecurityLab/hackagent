@@ -21,19 +21,25 @@ by semantic similarity.
 #### \_\_init\_\_
 
 ```python
-def __init__(embedding_model: str = "text-embedding-3-small",
+def __init__(embedder_config: Optional[Dict[str, Any]] = None,
+             backend: Any = None,
+             embedding_model: Optional[str] = None,
              embedding_api_key: Optional[str] = None,
              embedding_api_base: Optional[str] = None,
              logger=None)
 ```
 
-Initialize in-memory strategy store and embedding client.
+Initialize in-memory strategy store and embedding backend.
 
 **Arguments**:
 
-- `embedding_model` - Embedding model used for retrieval vectors.
-- `embedding_api_key` - Optional API key for embedding endpoint.
-- `embedding_api_base` - Optional OpenAI-compatible base URL.
+- `embedder_config` - Top-level ``embedder`` config from attack config.
+  Uses category-classifier schema/defaults.
+- `backend` - Storage backend used to initialize an embedder router.
+- `embedding_model` - Legacy embedding model argument kept for backward
+  compatibility. Prefer ``embedder_config``.
+- `embedding_api_key` - Legacy API key for OpenAI-compatible embeddings.
+- `embedding_api_base` - Legacy API base for OpenAI-compatible embeddings.
 - `logger` - Optional logger for retrieval/embedding diagnostics.
   
 
@@ -59,7 +65,7 @@ before FAISS nearest-neighbor search.
 
 **Returns**:
 
-  Float32 numpy vector if successful, otherwise `None`.
+  Float32 numpy vector if successful, otherwise ``None``.
 
 #### add
 
@@ -75,8 +81,8 @@ examples/scores/embeddings instead of duplicating entries.
 
 **Arguments**:
 
-- `strategy` - Dictionary with keys such as `Strategy`, `Definition`,
-  `Example`, `Score`, `Embeddings`.
+- `strategy` - Dictionary with keys such as ``Strategy``, ``Definition``,
+  ``Example``, ``Score``, ``Embeddings``.
 - ``1 - Whether to emit informational log upon update.
   
 
@@ -105,12 +111,12 @@ Faithfully replicates original retrival.py:pop() logic:
 
 **Returns**:
 
-  Tuple `(valid, strategies)` where:
-  - `valid` is `True` when retrieved strategies are considered
-  effective candidates to reuse, `False` when they are low-scoring
+  Tuple ``(valid, strategies)`` where:
+  - ``valid`` is ``True`` when retrieved strategies are considered
+  effective candidates to reuse, ``False`` when they are low-scoring
   strategies to avoid.
-  - `strategies` is a list of strategy dictionaries containing
-  `Strategy`, `Definition` and representative `Example`.
+  - ``strategies`` is a list of strategy dictionaries containing
+  ``Strategy``, ``Definition`` and representative ``Example``.
 
 #### all
 
@@ -122,7 +128,7 @@ Return full in-memory strategy dictionary.
 
 **Returns**:
 
-  Mapping `strategy_name -&gt; strategy_record`.
+  Mapping ``strategy_name -&gt; strategy_record``.
 
 #### size
 
@@ -146,7 +152,7 @@ Persist strategy library to pickle file.
 
 **Arguments**:
 
-- `path` - Target path without extension or full `.pkl` prefix base.
+- `path` - Target path without extension or full ``.pkl`` prefix base.
   
 
 **Returns**:
@@ -163,7 +169,7 @@ Load strategy library from pickle file if present.
 
 **Arguments**:
 
-- `path` - Source path with or without `.pkl` suffix.
+- `path` - Source path with or without ``.pkl`` suffix.
   
 
 **Returns**:

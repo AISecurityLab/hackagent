@@ -96,7 +96,7 @@ Prepare evaluated items for backend sync:
 - Add _run_id if missing
 - Ensure result_id exists
 - Build judge_keys
-- Call _sync_to_server
+- Call _sync_to_server (only if not already synced by the attack)
 
 #### get\_statistics
 

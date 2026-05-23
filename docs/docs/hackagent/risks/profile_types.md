@@ -56,7 +56,6 @@ Parameters
 ----------
 technique : str
     Key in ``hackagent.attacks.registry.ATTACK_REGISTRY``
-    (e.g. ``&quot;Baseline&quot;``, ``&quot;PAIR&quot;``, ``&quot;AdvPrefix&quot;``).
 relevance : Relevance
     How well-suited this technique is for the vulnerability.
 rationale : str

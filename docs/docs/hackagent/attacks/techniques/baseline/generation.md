@@ -64,9 +64,11 @@ grouping all attempts under a single Result per goal.
 #### execute
 
 ```python
-def execute(goals: List[str], agent_router: AgentRouter, config: Dict[str,
-                                                                      Any],
-            logger: logging.Logger) -> List[Dict[str, Any]]
+def execute(goals: List[str],
+            agent_router: AgentRouter,
+            config: Dict[str, Any],
+            logger: logging.Logger,
+            goal_tracker: Optional[Tracker] = None) -> List[Dict[str, Any]]
 ```
 
 Complete generation pipeline: generate prompts and execute them.

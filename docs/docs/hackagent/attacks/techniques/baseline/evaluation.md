@@ -11,6 +11,17 @@ Result Tracking:
     Uses Tracker (passed via config) to finalize Results per goal
     with evaluation status and add evaluation traces.
 
+#### evaluate\_responses\_with\_llm\_judges
+
+```python
+def evaluate_responses_with_llm_judges(
+        data: List[Dict[str, Any]], config: Dict[str, Any],
+        evaluator_step: BaseEvaluationStep,
+        logger: logging.Logger) -> List[Dict[str, Any]]
+```
+
+Evaluate baseline responses with configured LLM judges.
+
 #### evaluate\_responses
 
 ```python
@@ -50,11 +61,48 @@ Aggregate results by goal and template category.
 
   List of dicts with aggregated success metrics
 
+## BaselineEvaluation Objects
+
+```python
+class BaselineEvaluation(BaseEvaluationStep)
+```
+
+Evaluation step for baseline attacks.
+
+Extends ``BaseEvaluationStep`` to wrap the objective-based pattern/keyword
+evaluation logic into the shared evaluation framework.
+
 #### execute
 
 ```python
-def execute(input_data: List[Dict[str, Any]], config: Dict[str, Any],
-            logger: logging.Logger) -> Dict[str, List[Dict[str, Any]]]
+def execute(
+        input_data: List[Dict[str, Any]],
+        goal_tracker: Optional[Tracker] = None
+) -> Dict[str, List[Dict[str, Any]]]
+```
+
+Execute the complete baseline evaluation pipeline.
+
+**Arguments**:
+
+- `input_data` - List of dicts with completions
+- `goal_tracker` - Optional Tracker instance for per-goal tracking
+  
+
+**Returns**:
+
+  Dictionary with &#x27;evaluated&#x27; and &#x27;summary&#x27; lists of dicts
+
+#### execute
+
+```python
+def execute(
+        input_data: List[Dict[str, Any]],
+        config: Dict[str, Any],
+        logger: logging.Logger,
+        client: Any = None,
+        goal_tracker: Optional[Tracker] = None
+) -> Dict[str, List[Dict[str, Any]]]
 ```
 
 Complete evaluation pipeline.
@@ -69,4 +117,10 @@ Complete evaluation pipeline.
 **Returns**:
 
   Dictionary with &#x27;evaluated&#x27; and &#x27;summary&#x27; lists of dicts
+  
+
+**Notes**:
+
+  Syncing is performed by ``BaselineEvaluation.execute`` via
+  ``_sync_evaluation_to_server``.
 

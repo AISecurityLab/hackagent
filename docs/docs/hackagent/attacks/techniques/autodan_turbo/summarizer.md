@@ -16,7 +16,7 @@ def summarize_strategy(router,
                        library,
                        logger,
                        max_retries=5,
-                       summarizer_max_tokens=512,
+                       summarizer_max_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
                        role_label="summarizer")
 ```
 
@@ -41,6 +41,6 @@ second wrapper pass that enforces structured JSON output.
 
 **Returns**:
 
-  Dictionary with at least `Strategy` and `Definition` on success,
-  else `None` when extraction fails.
+  Dictionary with at least ``Strategy`` and ``Definition`` on success,
+  else ``None`` when extraction fails.
 
