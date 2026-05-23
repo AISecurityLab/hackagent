@@ -45,7 +45,7 @@ class TestGoogleADKAdapterIntegration:
         google_adk_config: Dict[str, Any],
     ):
         """Test that ADKAgent initializes correctly with real endpoint."""
-        from hackagent.router.adapters.google_adk import ADKAgent
+        from hackagent.router.providers.adk import ADKAgent
 
         adapter = ADKAgent(id="test_adk_init", config=google_adk_config)
 
@@ -65,7 +65,7 @@ class TestGoogleADKAdapterIntegration:
         google_adk_config: Dict[str, Any],
     ):
         """Test initializing adapter with custom session ID."""
-        from hackagent.router.adapters.google_adk import ADKAgent
+        from hackagent.router.providers.adk import ADKAgent
 
         custom_session_id = f"test-session-{uuid.uuid4()}"
         config = google_adk_config.copy()
@@ -82,7 +82,7 @@ class TestGoogleADKAdapterIntegration:
         google_adk_config: Dict[str, Any],
     ):
         """Test explicit session creation on ADK server."""
-        from hackagent.router.adapters.google_adk import ADKAgent
+        from hackagent.router.providers.adk import ADKAgent
 
         session_id = f"test-session-{uuid.uuid4()}"
         config = google_adk_config.copy()
@@ -102,7 +102,7 @@ class TestGoogleADKAdapterIntegration:
         google_adk_config: Dict[str, Any],
     ):
         """Test handling a request through ADK agent."""
-        from hackagent.router.adapters.google_adk import ADKAgent
+        from hackagent.router.providers.adk import ADKAgent
 
         adapter = ADKAgent(id="test_adk_request", config=google_adk_config)
 
@@ -130,7 +130,7 @@ class TestGoogleADKAdapterIntegration:
         google_adk_config: Dict[str, Any],
     ):
         """Test handling a chat-style request with messages."""
-        from hackagent.router.adapters.google_adk import ADKAgent
+        from hackagent.router.providers.adk import ADKAgent
 
         adapter = ADKAgent(id="test_adk_messages", config=google_adk_config)
 
@@ -158,7 +158,7 @@ class TestGoogleADKAdapterIntegration:
         google_adk_config: Dict[str, Any],
     ):
         """Test multi-turn conversation with ADK agent."""
-        from hackagent.router.adapters.google_adk import ADKAgent
+        from hackagent.router.providers.adk import ADKAgent
 
         adapter = ADKAgent(id="test_adk_multi_turn", config=google_adk_config)
 
@@ -196,7 +196,7 @@ class TestGoogleADKAdapterIntegration:
         google_adk_config: Dict[str, Any],
     ):
         """Test that the same session is reused across requests."""
-        from hackagent.router.adapters.google_adk import ADKAgent
+        from hackagent.router.providers.adk import ADKAgent
 
         session_id = f"test-session-{uuid.uuid4()}"
         config = google_adk_config.copy()
@@ -220,7 +220,7 @@ class TestGoogleADKAdapterIntegration:
         skip_if_google_adk_unavailable,
     ):
         """Test error handling when endpoint is invalid."""
-        from hackagent.router.adapters.google_adk import ADKAgent
+        from hackagent.router.providers.adk import ADKAgent
 
         config = {
             "name": "test_agent",
@@ -357,7 +357,7 @@ class TestGoogleADKRouterIntegration:
         from hackagent.server.client import AuthenticatedClient
         from hackagent.router.router import AgentRouter
         from hackagent.router.types import AgentTypeEnum
-        from hackagent.router.adapters.google_adk import ADKAgent
+        from hackagent.router.providers.adk import ADKAgent
 
         client = AuthenticatedClient(
             base_url=hackagent_api_base_url,
@@ -443,7 +443,7 @@ class TestGoogleADKToolUsage:
         google_adk_config: Dict[str, Any],
     ):
         """Test ADK agent that can use tools (e.g., weather lookup)."""
-        from hackagent.router.adapters.google_adk import ADKAgent
+        from hackagent.router.providers.adk import ADKAgent
 
         adapter = ADKAgent(id="test_adk_tools", config=google_adk_config)
 
@@ -466,7 +466,7 @@ class TestGoogleADKToolUsage:
         google_adk_config: Dict[str, Any],
     ):
         """Test ADK agent with complex multi-step query."""
-        from hackagent.router.adapters.google_adk import ADKAgent
+        from hackagent.router.providers.adk import ADKAgent
 
         adapter = ADKAgent(id="test_adk_complex", config=google_adk_config)
 

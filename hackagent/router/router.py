@@ -8,7 +8,7 @@ from hackagent.server.storage.base import AgentRecord, StorageBackend
 from hackagent.router import envelope as _envelope
 from hackagent.router import tracking_logger as _tracking_logger
 from hackagent.router._chat_registration import _ChatRegistration
-from hackagent.router.adapters.base import Agent
+from hackagent.router.agent import Agent
 from hackagent.router.providers.adk import ADKAgent, _get_litellm
 from hackagent.router.provider_config import ProviderConfig, get_provider_config
 from hackagent.router.types import AgentTypeEnum

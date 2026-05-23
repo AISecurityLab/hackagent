@@ -3,13 +3,23 @@
 
 """Main router logic for dispatching requests to appropriate agents."""
 
-from .adapters import ADKAgent
+from .agent import (
+    Agent,
+    AdapterConfigurationError,
+    AdapterInteractionError,
+    AdapterResponseParsingError,
+)
+from .providers.adk import ADKAgent
 from .router import AgentRouter
 from .tracking import StepTracker, TrackingContext, track_operation
 
 __all__ = [
     "AgentRouter",
+    "Agent",
     "ADKAgent",
+    "AdapterConfigurationError",
+    "AdapterInteractionError",
+    "AdapterResponseParsingError",
     "StepTracker",
     "TrackingContext",
     "track_operation",

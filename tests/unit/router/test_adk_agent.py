@@ -17,12 +17,12 @@ from unittest.mock import MagicMock, patch
 
 import requests
 
-from hackagent.router.adapters.google_adk import (
+from hackagent.router.providers.adk import (
     ADKAgent,
     AgentConfigurationError,
     AgentInteractionError,
-    _get_adk_custom_llm_class,
     _extract_final_text,
+    _get_adk_custom_llm_class,
     _last_user_text,
 )
 from hackagent.router.providers import adk as adk_provider_module
@@ -47,17 +47,12 @@ def _make_handler(**overrides):
 
 
 class TestADKModuleLayout(unittest.TestCase):
-    """Phase E — ADK lives at router/providers/adk.py with a back-compat shim."""
+    """ADK lives at ``router/providers/adk.py`` (Phase F.3)."""
 
-    def test_adk_classes_resolve_to_same_object_through_both_paths(self):
-        self.assertIs(ADKAgent, adk_provider_module.ADKAgent)
-        self.assertIs(
-            AgentConfigurationError, adk_provider_module.AgentConfigurationError
-        )
-
-    def test_provider_module_exposes_helpers(self):
+    def test_helpers_are_module_level(self):
         self.assertIs(_extract_final_text, adk_provider_module._extract_final_text)
         self.assertIs(_last_user_text, adk_provider_module._last_user_text)
+        self.assertIs(ADKAgent, adk_provider_module.ADKAgent)
 
 
 class TestADKHelpers(unittest.TestCase):

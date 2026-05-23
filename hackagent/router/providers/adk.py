@@ -23,7 +23,7 @@ from typing import Any, Dict, List, Optional
 import requests
 
 from hackagent.router import envelope as _envelope
-from hackagent.router.adapters.base import (
+from hackagent.router.agent import (
     Agent,
     AdapterConfigurationError,
     AdapterInteractionError,
@@ -31,9 +31,9 @@ from hackagent.router.adapters.base import (
 )
 
 
-# Local copy of the LiteLLM lazy importer so ADK no longer depends on
-# ``hackagent.router.adapters.litellm`` (which is being deleted in
-# Phase E.2c).
+# Local copy of the LiteLLM lazy importer. Phase E.2c deleted the old
+# ``hackagent.router.adapters.litellm`` module; this stays here so ADK
+# doesn't grow a dependency on anything outside its own provider.
 _litellm_module = None
 
 
