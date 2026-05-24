@@ -7,7 +7,9 @@
 
 <br>
 
-[App](https://app.hackagent.dev/) -- [Docs](https://docs.hackagent.dev/) -- [API](https://api.hackagent.dev/schema/redoc)
+[![Security Policy](https://img.shields.io/badge/security-policy-blue?logo=github)](SECURITY.md)
+
+<br>
 
 <br>
 
