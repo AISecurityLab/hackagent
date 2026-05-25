@@ -146,6 +146,9 @@ class DashboardPage:
         self._history_current_run_results: list[dict] = []
         self._history_visible_run_ids: list[str] = []
 
+        # Bottom panel for run details (inline in runs panel)
+        self._runs_bottom_panel: ui.column | None = None
+
         # Attack detail dialog
         self.attack_dialog: ui.dialog | None = None
         self.attack_dialog_title: ui.label | None = None
@@ -163,6 +166,7 @@ class DashboardPage:
         # Comparison dialog
         self._compare_dialog: ui.dialog | None = None
         self._compare_dialog_body: ui.column | None = None
+        self._compare_bottom_panel: ui.card | None = None
 
     # ── Public entry point ────────────────────────────────────────────────────
 
@@ -668,7 +672,7 @@ function hackAgentCopyFallback(text) {
     def _build_runs_panel(self, panel: ui.column) -> None:
         with panel.classes("w-full h-[calc(100vh-160px)] min-h-0"):
             # ── Filter bar ────────────────────────────────────────────
-            with ui.row().classes("items-center w-full gap-2 px-2 flex-wrap"):
+            with ui.row().classes("items-center w-full gap-2 px-2 flex-wrap shrink-0"):
                 ui.input(
                     placeholder="Search runs…",
                 ).props("dense outlined clearable").classes("min-w-[180px] flex-1").on(
@@ -711,7 +715,7 @@ function hackAgentCopyFallback(text) {
                     .classes("min-w-[140px]")
                 )
             # ── Count + delete row ─────────────────────────────────────
-            with ui.row().classes("items-center justify-between px-2"):
+            with ui.row().classes("items-center justify-between px-2 shrink-0"):
                 self.runs_count_label = ui.label("").classes("text-sm text-grey-6")
                 with ui.row().classes("items-center gap-2"):
                     self._runs_compare_btn = (
@@ -775,17 +779,16 @@ function hackAgentCopyFallback(text) {
                 # Move pagination bar to top via flex order
                 self.runs_table.classes("runs-table-top-pagination")
                 ui.add_css("""
-                            .runs-table-top-pagination .q-table__container {
-                                display: flex;
-                                flex-direction: column;
-                            }
-                            .runs-table-top-pagination .q-table__bottom {
-                                order: -1;
-                                border-bottom: 1px solid #e0e0e0;
-                                border-top: none;
-                            }
-
-                        """)
+                    .runs-table-top-pagination .q-table__container {
+                        display: flex;
+                        flex-direction: column;
+                    }
+                    .runs-table-top-pagination .q-table__bottom {
+                        order: -1;
+                        border-bottom: 1px solid #e0e0e0;
+                        border-top: none;
+                    }
+                """)
                 self._runs_load_more_btn = (
                     ui.button(
                         "Load more",
@@ -795,6 +798,20 @@ function hackAgentCopyFallback(text) {
                     .props("flat no-caps color=primary")
                     .classes("self-center my-2 hidden")
                 )
+
+            # ── Bottom panel for run details (hidden by default) ───────
+            self._runs_bottom_panel = (
+                ui.card()
+                .classes("w-full shrink-0 gap-0 hidden")
+                .style("height: 55%; min-height: 250px; max-height: 70%;")
+            )
+
+            # ── Bottom panel for compare (hidden by default) ──────────
+            self._compare_bottom_panel = (
+                ui.card()
+                .classes("w-full shrink-0 gap-0 hidden")
+                .style("height: 55%; min-height: 250px; max-height: 70%;")
+            )
 
     def _build_reports_panel(self, panel: ui.column) -> None:
         with panel:
@@ -861,21 +878,22 @@ function hackAgentCopyFallback(text) {
         self.run_dialog = dialog
 
     def _build_history_run_dialog(self) -> None:
-        """Build a full-window two-panel dialog for History run results."""
-        with ui.dialog() as dialog:
-            dialog.props("maximized")
-            with ui.card().classes("w-full h-full flex flex-col gap-0 rounded-none"):
+        """Build run detail content inside the inline bottom panel."""
+        if self._runs_bottom_panel is None:
+            return
+        with self._runs_bottom_panel:
+            with ui.column().classes("w-full h-full gap-0"):
                 with ui.row().classes(
-                    "items-center justify-between w-full shrink-0 px-5 py-3 border-b"
+                    "items-center justify-between w-full shrink-0 px-4 py-3 border-b"
                 ):
                     self.history_run_dialog_title = ui.label("Run Results").classes(
                         "font-semibold text-lg"
                     )
-                    ui.button(icon="close", on_click=dialog.close).props(
-                        "flat round dense"
-                    )
+                    ui.button(
+                        icon="close", on_click=self._close_runs_bottom_panel
+                    ).props("flat round dense")
                 # Two-panel body
-                with ui.row().classes("w-full flex-1 gap-0 overflow-hidden"):
+                with ui.row().classes("w-full flex-1 gap-0 overflow-hidden min-h-0"):
                     # Left: config/metrics + charts + compact card list
                     with (
                         ui.scroll_area()
@@ -916,7 +934,8 @@ function hackAgentCopyFallback(text) {
                             ui.label("← Select a goal to view details").classes(
                                 "text-grey-4 text-sm italic mt-16 w-full text-center"
                             )
-        self.history_run_dialog = dialog
+        # No dialog — panel is shown/hidden inline
+        self.history_run_dialog = None
 
     def _build_goal_filter_bar(self) -> None:
         """Render the goal filter bar with search, status select, and category select."""
@@ -1104,6 +1123,18 @@ function hackAgentCopyFallback(text) {
         self._report_goal_detail_panel = None
         self._report_current_run = None
         self._report_current_run_results = []
+
+    def _open_runs_bottom_panel(self) -> None:
+        """Show the inline bottom panel for run details."""
+        if self._compare_bottom_panel is not None:
+            self._compare_bottom_panel.classes(add="hidden")
+        if self._runs_bottom_panel is not None:
+            self._runs_bottom_panel.classes(remove="hidden")
+
+    def _close_runs_bottom_panel(self) -> None:
+        """Hide the inline bottom panel."""
+        if self._runs_bottom_panel is not None:
+            self._runs_bottom_panel.classes(add="hidden")
 
     def _close_report_goal_detail(self) -> None:
         """Close report goal detail panel inside the run report view."""
@@ -2065,30 +2096,32 @@ function hackAgentCopyFallback(text) {
 
         sorted_cats = sorted(all_categories)
 
-        # Create or reuse dialog
-        if self._compare_dialog is not None:
-            self._compare_dialog.delete()
-        with ui.dialog().props("maximized") as self._compare_dialog:
+        # Populate the inline compare bottom panel
+        if self._compare_bottom_panel is None:
+            return
+        # Hide run detail panel if open
+        self._close_runs_bottom_panel()
+        self._compare_bottom_panel.clear()
+        with self._compare_bottom_panel.style(add="overflow-y: auto;"):
+            # ── Categorical palette for run identity ──────────
+            # Avoids red/green/orange reserved for status semantics
+            colors = ["#6366f1", "#06b6d4", "#8b5cf6", "#ec4899"]
+
+            # ── Build short + full labels ─────────────────────
+            short_labels = [f"#{r.get('run_progress', '?')}" for r in runs]
+
+            # ── Header ────────────────────────────────────────
             with (
-                ui.card()
-                .classes("w-full h-full overflow-auto")
-                .style("max-width: 96vw; max-height: 90vh")
+                ui.row()
+                .classes(
+                    "items-center justify-between w-full shrink-0 px-4 py-3 border-b"
+                )
+                .style("position: sticky; top: 0; z-index: 1; background: inherit;")
             ):
-                # ── Categorical palette for run identity ──────────
-                # Avoids red/green/orange reserved for status semantics
-                colors = ["#6366f1", "#06b6d4", "#8b5cf6", "#ec4899"]
-
-                # ── Build short + full labels ─────────────────────
-                short_labels = [f"#{r.get('run_progress', '?')}" for r in runs]
-
-                # ── Header ────────────────────────────────────────
-                with ui.row().classes("items-center justify-between w-full mb-1"):
-                    ui.label(f"Comparing {len(runs)} Runs").classes(
-                        "text-lg font-semibold"
-                    )
-                    ui.button(icon="close", on_click=self._compare_dialog.close).props(
-                        "flat round dense"
-                    )
+                ui.label(f"Comparing {len(runs)} Runs").classes("text-lg font-semibold")
+                ui.button(icon="close", on_click=self._close_compare_panel).props(
+                    "flat round dense"
+                )
 
                 # ── Build config chips per run & detect differences ──
                 _attack_display_map: dict[str, str] = {
@@ -2541,81 +2574,175 @@ function hackAgentCopyFallback(text) {
                             .style(f"height: {chart_height}px")
                         )
 
-                # ── Robustness radar (overlaid) ───────────────────
-                if len(sorted_cats) >= 3:
-                    with ui.card().classes("w-full mt-3"):
-                        ui.label("Robustness by Category").classes(
-                            "font-semibold text-sm mb-1"
-                        )
-                        ui.label(
-                            "Higher = more robust (100% means no successful jailbreaks)"
-                        ).classes("text-xs text-grey-6 mb-2")
-                        radar_cats = sorted_cats[:9]
-
-                        indicators = [{"name": c, "max": 100} for c in radar_cats]
-                        series_data = []
-                        legend_names = []
-                        for i, (run, cat_data) in enumerate(zip(runs, per_run_cats)):
-                            legend_names.append(short_labels[i])
-                            values = []
-                            for cat in radar_cats:
-                                entry = cat_data.get(cat)
-                                if entry and entry["total"] > 0:
-                                    robustness = round(
-                                        100
-                                        * (entry["total"] - entry["vulnerable"])
-                                        / entry["total"],
-                                        1,
-                                    )
-                                else:
-                                    robustness = 100.0
-                                values.append(robustness)
-                            series_data.append(
-                                {
-                                    "value": values,
-                                    "name": short_labels[i],
-                                    "lineStyle": {"width": 2},
-                                    "areaStyle": {"opacity": 0.08},
-                                    "itemStyle": {"color": colors[i % len(colors)]},
-                                }
+                # ── Robustness radar + ASR vs Latency (side by side) ─────
+                with ui.row().classes("w-full mt-3 gap-3 items-stretch"):
+                    # Left: Robustness radar
+                    if len(sorted_cats) >= 3:
+                        with ui.card().classes("flex-1 min-w-[300px]"):
+                            ui.label("Robustness by Category").classes(
+                                "font-semibold text-sm mb-1"
                             )
+                            ui.label(
+                                "Higher = more robust (100% means no successful jailbreaks)"
+                            ).classes("text-xs text-grey-6 mb-2")
+                            radar_cats = sorted_cats[:9]
 
-                        ui.echart(
-                            {
-                                "tooltip": {
-                                    "trigger": "item",
-                                    "confine": True,
-                                },
-                                "legend": {
-                                    "data": legend_names,
-                                    "bottom": 0,
-                                    "textStyle": {"fontSize": 11},
-                                },
-                                "radar": {
-                                    "shape": "polygon",
-                                    "indicator": indicators,
-                                    "splitNumber": 5,
-                                    "center": ["50%", "48%"],
-                                    "radius": "62%",
-                                    "axisName": {
-                                        "fontSize": 11,
-                                        "color": "#374151",
-                                    },
-                                    "splitLine": {"lineStyle": {"color": "#e5e7eb"}},
-                                    "splitArea": {"areaStyle": {"color": ["#ffffff"]}},
-                                },
-                                "series": [
+                            indicators = [{"name": c, "max": 100} for c in radar_cats]
+                            series_data = []
+                            legend_names = []
+                            for i, (run, cat_data) in enumerate(
+                                zip(runs, per_run_cats)
+                            ):
+                                legend_names.append(short_labels[i])
+                                values = []
+                                for cat in radar_cats:
+                                    entry = cat_data.get(cat)
+                                    if entry and entry["total"] > 0:
+                                        robustness = round(
+                                            100
+                                            * (entry["total"] - entry["vulnerable"])
+                                            / entry["total"],
+                                            1,
+                                        )
+                                    else:
+                                        robustness = 100.0
+                                    values.append(robustness)
+                                series_data.append(
                                     {
-                                        "type": "radar",
-                                        "symbol": "circle",
-                                        "symbolSize": 7,
-                                        "data": series_data,
+                                        "value": values,
+                                        "name": short_labels[i],
+                                        "lineStyle": {"width": 2},
+                                        "areaStyle": {"opacity": 0.08},
+                                        "itemStyle": {"color": colors[i % len(colors)]},
                                     }
-                                ],
-                            }
-                        ).classes("w-full h-80")
+                                )
 
-        self._compare_dialog.open()
+                            ui.echart(
+                                {
+                                    "tooltip": {
+                                        "trigger": "item",
+                                        "confine": True,
+                                    },
+                                    "legend": {
+                                        "data": legend_names,
+                                        "bottom": 0,
+                                        "textStyle": {"fontSize": 11},
+                                    },
+                                    "radar": {
+                                        "shape": "polygon",
+                                        "indicator": indicators,
+                                        "splitNumber": 5,
+                                        "center": ["50%", "48%"],
+                                        "radius": "62%",
+                                        "axisName": {
+                                            "fontSize": 11,
+                                            "color": "#374151",
+                                        },
+                                        "splitLine": {
+                                            "lineStyle": {"color": "#e5e7eb"}
+                                        },
+                                        "splitArea": {
+                                            "areaStyle": {"color": ["#ffffff"]}
+                                        },
+                                    },
+                                    "series": [
+                                        {
+                                            "type": "radar",
+                                            "symbol": "circle",
+                                            "symbolSize": 7,
+                                            "data": series_data,
+                                        }
+                                    ],
+                                }
+                            ).classes("w-full h-80")
+
+                    # Right: ASR vs Latency scatter
+                    with ui.card().classes("flex-1 min-w-[300px]"):
+                        ui.label("ASR vs Latency").classes("font-semibold text-sm mb-1")
+                        ui.label(
+                            "Each point is a run — lower-left is best (low ASR, fast)"
+                        ).classes("text-xs text-grey-6 mb-2")
+                        scatter_series = []
+                        for i, run in enumerate(runs):
+                            asr_raw = run.get("overall_asr", "—")
+                            latency_s = run.get("_goal_latency_avg_s")
+                            asr_num = None
+                            if isinstance(asr_raw, (int, float)):
+                                asr_num = float(asr_raw)
+                            elif isinstance(asr_raw, str):
+                                asr_clean = asr_raw.replace("%", "").strip()
+                                try:
+                                    asr_num = float(asr_clean)
+                                except (ValueError, TypeError):
+                                    pass
+                            lat_num = None
+                            if isinstance(latency_s, (int, float)):
+                                lat_num = round(float(latency_s), 1)
+                            if asr_num is not None and lat_num is not None:
+                                scatter_series.append(
+                                    {
+                                        "name": short_labels[i],
+                                        "type": "scatter",
+                                        "symbolSize": 16,
+                                        "itemStyle": {"color": colors[i % len(colors)]},
+                                        "data": [
+                                            {
+                                                "value": [lat_num, asr_num],
+                                                "name": f"{short_labels[i]}\nLatency: {lat_num}s | ASR: {asr_num}%",
+                                            }
+                                        ],
+                                        "tooltip": {
+                                            "formatter": f"{short_labels[i]}<br/>Latency: {lat_num}s<br/>ASR: {asr_num}%",
+                                        },
+                                    }
+                                )
+                        if scatter_series:
+                            ui.echart(
+                                {
+                                    "tooltip": {
+                                        "trigger": "item",
+                                        "extraCssText": "padding:6px 10px;",
+                                    },
+                                    "legend": {
+                                        "top": 4,
+                                        "right": 8,
+                                        "textStyle": {"fontSize": 11},
+                                    },
+                                    "grid": {
+                                        "left": "14%",
+                                        "right": "8%",
+                                        "top": "14%",
+                                        "bottom": "14%",
+                                    },
+                                    "xAxis": {
+                                        "type": "value",
+                                        "name": "Avg Latency (s)",
+                                        "nameLocation": "middle",
+                                        "nameGap": 28,
+                                        "min": 0,
+                                    },
+                                    "yAxis": {
+                                        "type": "value",
+                                        "name": "ASR (%)",
+                                        "nameLocation": "middle",
+                                        "nameGap": 40,
+                                        "min": 0,
+                                        "max": 100,
+                                    },
+                                    "series": scatter_series,
+                                }
+                            ).classes("w-full h-80")
+                        else:
+                            ui.label(
+                                "Insufficient data for ASR vs Latency plot"
+                            ).classes("text-xs text-grey-5 italic")
+
+        self._compare_bottom_panel.classes(remove="hidden")
+
+    def _close_compare_panel(self) -> None:
+        """Hide the compare bottom panel."""
+        if self._compare_bottom_panel is not None:
+            self._compare_bottom_panel.classes(add="hidden")
 
     async def _delete_selected_attacks(self) -> None:
         ids = list(self._selected_attack_ids)
@@ -10181,7 +10308,7 @@ function hackAgentCopyFallback(text) {
                         )
 
     async def _open_run_history_results(self, run: dict) -> None:
-        """Open the compact results list dialog for History/Dashboard views."""
+        """Open the compact results list in a non-modal side dialog."""
         run_id_raw = str(run.get("id") or "")
 
         if self.history_run_dialog_title is not None:
@@ -10565,8 +10692,7 @@ function hackAgentCopyFallback(text) {
 
         self._history_current_run = run
 
-        if self.history_run_dialog is not None:
-            self.history_run_dialog.open()
+        self._open_runs_bottom_panel()
 
         await asyncio.sleep(0)
 
