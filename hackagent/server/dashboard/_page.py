@@ -381,26 +381,32 @@ function hackAgentCopyFallback(text) {
                             "Evaluation outcomes for the latest tested target"
                         ).classes("text-xs text-grey-6 mb-4")
                         with ui.row().classes("items-center gap-6 flex-wrap"):
-                            self.risk_chart = ui.echart(
-                                {
-                                    "series": [
-                                        {
-                                            "type": "pie",
-                                            "radius": ["58%", "80%"],
-                                            "data": [
-                                                {
-                                                    "value": 1,
-                                                    "name": "No data",
-                                                    "itemStyle": {"color": "#94a3b8"},
-                                                }
-                                            ],
-                                            "label": {"show": False},
-                                        }
-                                    ],
-                                    "graphic": [],
-                                    "tooltip": {"show": False},
-                                }
-                            ).classes("w-36 h-36 shrink-0")
+                            self.risk_chart = (
+                                ui.echart(
+                                    {
+                                        "series": [
+                                            {
+                                                "type": "pie",
+                                                "radius": ["58%", "80%"],
+                                                "data": [
+                                                    {
+                                                        "value": 1,
+                                                        "name": "No data",
+                                                        "itemStyle": {
+                                                            "color": "#94a3b8"
+                                                        },
+                                                    }
+                                                ],
+                                                "label": {"show": False},
+                                            }
+                                        ],
+                                        "graphic": [],
+                                        "tooltip": {"show": False},
+                                    }
+                                )
+                                .classes("w-36 h-36 shrink-0")
+                                .props("renderer=svg")
+                            )
                             self.risk_legend = ui.column().classes("gap-2 flex-1")
 
                     with ui.column().classes("flex-1 min-w-72"):
@@ -408,42 +414,46 @@ function hackAgentCopyFallback(text) {
                         ui.label(
                             "Evaluation outcomes for the latest tested target"
                         ).classes("text-xs text-grey-6 mb-4")
-                        self.dist_chart = ui.echart(
-                            {
-                                "xAxis": {
-                                    "type": "category",
-                                    "data": [
-                                        "Jailbreaks",
-                                        "Mitigated",
-                                        "Errors",
-                                        "Pending",
+                        self.dist_chart = (
+                            ui.echart(
+                                {
+                                    "xAxis": {
+                                        "type": "category",
+                                        "data": [
+                                            "Jailbreaks",
+                                            "Mitigated",
+                                            "Errors",
+                                            "Pending",
+                                        ],
+                                        "axisLine": {"show": False},
+                                        "axisTick": {"show": False},
+                                    },
+                                    "yAxis": {
+                                        "type": "value",
+                                        "minInterval": 1,
+                                        "splitLine": {"lineStyle": {"type": "dashed"}},
+                                    },
+                                    "series": [
+                                        {
+                                            "type": "bar",
+                                            "data": [0, 0, 0, 0],
+                                            "itemStyle": {"borderRadius": [4, 4, 0, 0]},
+                                            "barMaxWidth": 60,
+                                        }
                                     ],
-                                    "axisLine": {"show": False},
-                                    "axisTick": {"show": False},
-                                },
-                                "yAxis": {
-                                    "type": "value",
-                                    "minInterval": 1,
-                                    "splitLine": {"lineStyle": {"type": "dashed"}},
-                                },
-                                "series": [
-                                    {
-                                        "type": "bar",
-                                        "data": [0, 0, 0, 0],
-                                        "itemStyle": {"borderRadius": [4, 4, 0, 0]},
-                                        "barMaxWidth": 60,
-                                    }
-                                ],
-                                "grid": {
-                                    "left": "3%",
-                                    "right": "3%",
-                                    "top": "8%",
-                                    "bottom": "3%",
-                                    "containLabel": True,
-                                },
-                                "tooltip": {"trigger": "axis"},
-                            }
-                        ).classes("w-full h-44")
+                                    "grid": {
+                                        "left": "3%",
+                                        "right": "3%",
+                                        "top": "8%",
+                                        "bottom": "3%",
+                                        "containLabel": True,
+                                    },
+                                    "tooltip": {"trigger": "axis"},
+                                }
+                            )
+                            .classes("w-full h-44")
+                            .props("renderer=svg")
+                        )
 
             # Recent runs
             with ui.card().classes("w-full"):
@@ -675,7 +685,9 @@ function hackAgentCopyFallback(text) {
             with ui.row().classes("items-center w-full gap-2 px-2 flex-wrap shrink-0"):
                 ui.input(
                     placeholder="Search runs…",
-                ).props("dense outlined clearable").classes("min-w-[180px] flex-1").on(
+                ).props("dense outlined clearable").classes(
+                    "min-w-[100px] max-w-[180px] flex-1"
+                ).on(
                     "update:model-value",
                     lambda e: self._on_runs_search_change(
                         e.args if isinstance(e.args, str) else (e.args or "")
@@ -703,60 +715,46 @@ function hackAgentCopyFallback(text) {
                     .props("dense outlined")
                     .classes("min-w-[140px]")
                 )
-                self._runs_status_select = (
-                    ui.select(
-                        options={"": "All statuses"},
-                        value="",
-                        on_change=lambda e: self._on_runs_filter_change(
-                            "status", e.value
+                ui.space()
+                self._runs_compare_btn = (
+                    ui.button(
+                        "Compare",
+                        icon="compare_arrows",
+                        on_click=lambda: ui.timer(
+                            0,
+                            self._compare_selected_runs,
+                            once=True,
                         ),
                     )
-                    .props("dense outlined")
-                    .classes("min-w-[140px]")
+                    .props("flat dense no-caps color=primary")
+                    .classes("opacity-30 pointer-events-none")
                 )
-            # ── Count + delete row ─────────────────────────────────────
-            with ui.row().classes("items-center justify-between px-2 shrink-0"):
-                self.runs_count_label = ui.label("").classes("text-sm text-grey-6")
-                with ui.row().classes("items-center gap-2"):
-                    self._runs_compare_btn = (
-                        ui.button(
-                            "Compare",
-                            icon="compare_arrows",
-                            on_click=lambda: ui.timer(
-                                0,
-                                self._compare_selected_runs,
-                                once=True,
-                            ),
-                        )
-                        .props("flat dense no-caps color=primary")
-                        .classes("opacity-30 pointer-events-none")
+                self._runs_export_btn = (
+                    ui.button(
+                        "Export",
+                        icon="download",
+                        on_click=lambda: ui.timer(
+                            0,
+                            self._export_selected_runs,
+                            once=True,
+                        ),
                     )
-                    self._runs_export_btn = (
-                        ui.button(
-                            "Export",
-                            icon="download",
-                            on_click=lambda: ui.timer(
-                                0,
-                                self._export_selected_runs,
-                                once=True,
-                            ),
-                        )
-                        .props("flat dense no-caps color=secondary")
-                        .classes("opacity-30 pointer-events-none")
+                    .props("flat dense no-caps color=secondary")
+                    .classes("opacity-30 pointer-events-none")
+                )
+                self._runs_delete_btn = (
+                    ui.button(
+                        "Delete",
+                        icon="delete",
+                        on_click=lambda: ui.timer(
+                            0,
+                            self._delete_selected_runs,
+                            once=True,
+                        ),
                     )
-                    self._runs_delete_btn = (
-                        ui.button(
-                            "Delete",
-                            icon="delete",
-                            on_click=lambda: ui.timer(
-                                0,
-                                self._delete_selected_runs,
-                                once=True,
-                            ),
-                        )
-                        .props("flat dense no-caps color=negative")
-                        .classes("opacity-30 pointer-events-none")
-                    )
+                    .props("flat dense no-caps color=negative")
+                    .classes("opacity-30 pointer-events-none")
+                )
             # ── Scrollable run list ────────────────────────────────────
             with ui.scroll_area().classes("w-full flex-1 min-h-0"):
                 self.runs_table = make_run_table(
@@ -803,14 +801,14 @@ function hackAgentCopyFallback(text) {
             self._runs_bottom_panel = (
                 ui.card()
                 .classes("w-full shrink-0 gap-0 hidden")
-                .style("height: 55%; min-height: 250px; max-height: 70%;")
+                .style("height: 70%; min-height: 300px;")
             )
 
             # ── Bottom panel for compare (hidden by default) ──────────
             self._compare_bottom_panel = (
                 ui.card()
                 .classes("w-full shrink-0 gap-0 hidden")
-                .style("height: 55%; min-height: 250px; max-height: 70%;")
+                .style("height: 70%; min-height: 300px;")
             )
 
     def _build_reports_panel(self, panel: ui.column) -> None:
@@ -2105,10 +2103,11 @@ function hackAgentCopyFallback(text) {
         with self._compare_bottom_panel.style(add="overflow-y: auto;"):
             # ── Categorical palette for run identity ──────────
             # Avoids red/green/orange reserved for status semantics
-            colors = ["#6366f1", "#06b6d4", "#8b5cf6", "#ec4899"]
+            colors = ["#4a2377", "#8cc5e3", "#f55f74", "#0d7d87"]
 
             # ── Build short + full labels ─────────────────────
             short_labels = [f"#{r.get('run_progress', '?')}" for r in runs]
+            _runs_suffix = "_".join(short_labels).replace("#", "run")
 
             # ── Header ────────────────────────────────────────
             with (
@@ -2430,9 +2429,22 @@ function hackAgentCopyFallback(text) {
                 with ui.row().classes("w-full mt-3 gap-3 items-stretch"):
                     # Left: Risk Distribution (stacked bar)
                     with ui.card().classes("flex-1 min-w-[280px]"):
-                        ui.label("Risk Distribution").classes(
-                            "font-semibold text-sm mb-1"
-                        )
+                        _rd_chart_ref: list = []
+
+                        async def _dl_risk_dist():
+                            if _rd_chart_ref:
+                                await self._download_echart_svg(
+                                    _rd_chart_ref[0],
+                                    f"risk_distribution_{_runs_suffix}",
+                                )
+
+                        with ui.row().classes("items-center justify-between w-full"):
+                            ui.label("Risk Distribution").classes(
+                                "font-semibold text-sm"
+                            )
+                            ui.button(icon="download", on_click=_dl_risk_dist).props(
+                                "flat dense size=xs color=grey-6"
+                            )
                         metrics = ["Jailbreak", "Mitigated", "Errors", "Pending"]
                         metric_colors = ["#ef4444", "#22c55e", "#f97316", "#d1d5db"]
                         bar_series = []
@@ -2457,41 +2469,60 @@ function hackAgentCopyFallback(text) {
                                     "barMaxWidth": 40,
                                 }
                             )
-                        ui.echart(
-                            {
-                                "tooltip": {
-                                    "trigger": "axis",
-                                    "axisPointer": {"type": "shadow"},
-                                },
-                                "legend": {
-                                    "bottom": 0,
-                                    "textStyle": {"fontSize": 11},
-                                },
-                                "grid": {
-                                    "left": "3%",
-                                    "right": "4%",
-                                    "top": "8%",
-                                    "bottom": "16%",
-                                    "containLabel": True,
-                                },
-                                "xAxis": {
-                                    "type": "category",
-                                    "data": short_labels,
-                                },
-                                "yAxis": {
-                                    "type": "value",
-                                    "name": "Count",
-                                },
-                                "series": bar_series,
-                            }
-                        ).classes("w-full h-56")
+                        _rd_chart_ref.append(
+                            ui.echart(
+                                {
+                                    "tooltip": {
+                                        "trigger": "axis",
+                                        "axisPointer": {"type": "shadow"},
+                                    },
+                                    "legend": {
+                                        "bottom": 0,
+                                        "textStyle": {"fontSize": 11},
+                                    },
+                                    "grid": {
+                                        "left": "3%",
+                                        "right": "4%",
+                                        "top": "8%",
+                                        "bottom": "16%",
+                                        "containLabel": True,
+                                    },
+                                    "xAxis": {
+                                        "type": "category",
+                                        "data": short_labels,
+                                    },
+                                    "yAxis": {
+                                        "type": "value",
+                                        "name": "Count",
+                                    },
+                                    "series": bar_series,
+                                }
+                            )
+                            .classes("w-full h-56")
+                            .props("renderer=svg")
+                        )
 
                     # Right: Vulnerabilities per Category (grouped horizontal bar)
                     if sorted_cats:
                         with ui.card().classes("flex-1 min-w-[320px]"):
-                            ui.label("Vulnerabilities per Category").classes(
-                                "font-semibold text-sm mb-2"
-                            )
+                            _vc_chart_ref: list = []
+
+                            async def _dl_vuln_cat():
+                                if _vc_chart_ref:
+                                    await self._download_echart_svg(
+                                        _vc_chart_ref[0],
+                                        f"vulnerabilities_per_category_{_runs_suffix}",
+                                    )
+
+                            with ui.row().classes(
+                                "items-center justify-between w-full mb-1"
+                            ):
+                                ui.label("Vulnerabilities per Category").classes(
+                                    "font-semibold text-sm"
+                                )
+                                ui.button(icon="download", on_click=_dl_vuln_cat).props(
+                                    "flat dense size=xs color=grey-6"
+                                )
 
                             bar_cats = sorted(sorted_cats, reverse=True)
 
@@ -2523,7 +2554,7 @@ function hackAgentCopyFallback(text) {
 
                             chart_height = max(260, len(bar_cats) * 38)
 
-                            (
+                            _vc_chart_ref.append(
                                 ui.echart(
                                     {
                                         "tooltip": {
@@ -2559,6 +2590,7 @@ function hackAgentCopyFallback(text) {
                                 )
                                 .classes("w-full")
                                 .style(f"height: {chart_height}px")
+                                .props("renderer=svg")
                             )
 
                 # ── Robustness radar + ASR vs Latency (side by side) ─────
@@ -2566,9 +2598,24 @@ function hackAgentCopyFallback(text) {
                     # Left: Robustness radar
                     if len(sorted_cats) >= 3:
                         with ui.card().classes("flex-1 min-w-[300px]"):
-                            ui.label("Robustness by Category").classes(
-                                "font-semibold text-sm mb-1"
-                            )
+                            _rr_chart_ref: list = []
+
+                            async def _dl_radar():
+                                if _rr_chart_ref:
+                                    await self._download_echart_svg(
+                                        _rr_chart_ref[0],
+                                        f"robustness_radar_{_runs_suffix}",
+                                    )
+
+                            with ui.row().classes(
+                                "items-center justify-between w-full"
+                            ):
+                                ui.label("Robustness by Category").classes(
+                                    "font-semibold text-sm"
+                                )
+                                ui.button(icon="download", on_click=_dl_radar).props(
+                                    "flat dense size=xs color=grey-6"
+                                )
                             ui.label(
                                 "Higher = more robust (100% means no successful jailbreaks)"
                             ).classes("text-xs text-grey-6 mb-2")
@@ -2604,48 +2651,64 @@ function hackAgentCopyFallback(text) {
                                     }
                                 )
 
-                            ui.echart(
-                                {
-                                    "tooltip": {
-                                        "trigger": "item",
-                                        "confine": True,
-                                    },
-                                    "legend": {
-                                        "data": legend_names,
-                                        "bottom": 0,
-                                        "textStyle": {"fontSize": 11},
-                                    },
-                                    "radar": {
-                                        "shape": "polygon",
-                                        "indicator": indicators,
-                                        "splitNumber": 5,
-                                        "center": ["50%", "48%"],
-                                        "radius": "62%",
-                                        "axisName": {
-                                            "fontSize": 11,
-                                            "color": "#374151",
+                            _rr_chart_ref.append(
+                                ui.echart(
+                                    {
+                                        "tooltip": {
+                                            "trigger": "item",
+                                            "confine": True,
                                         },
-                                        "splitLine": {
-                                            "lineStyle": {"color": "#e5e7eb"}
+                                        "legend": {
+                                            "data": legend_names,
+                                            "bottom": 0,
+                                            "textStyle": {"fontSize": 11},
                                         },
-                                        "splitArea": {
-                                            "areaStyle": {"color": ["#ffffff"]}
+                                        "radar": {
+                                            "shape": "polygon",
+                                            "indicator": indicators,
+                                            "splitNumber": 5,
+                                            "center": ["50%", "48%"],
+                                            "radius": "62%",
+                                            "axisName": {
+                                                "fontSize": 11,
+                                                "color": "#374151",
+                                            },
+                                            "splitLine": {
+                                                "lineStyle": {"color": "#e5e7eb"}
+                                            },
+                                            "splitArea": {
+                                                "areaStyle": {"color": ["#ffffff"]}
+                                            },
                                         },
-                                    },
-                                    "series": [
-                                        {
-                                            "type": "radar",
-                                            "symbol": "circle",
-                                            "symbolSize": 7,
-                                            "data": series_data,
-                                        }
-                                    ],
-                                }
-                            ).classes("w-full h-80")
+                                        "series": [
+                                            {
+                                                "type": "radar",
+                                                "symbol": "circle",
+                                                "symbolSize": 7,
+                                                "data": series_data,
+                                            }
+                                        ],
+                                    }
+                                )
+                                .classes("w-full h-80")
+                                .props("renderer=svg")
+                            )
 
                     # Right: ASR vs Latency scatter
                     with ui.card().classes("flex-1 min-w-[300px]"):
-                        ui.label("ASR vs Latency").classes("font-semibold text-sm mb-1")
+                        _sl_chart_ref: list = []
+
+                        async def _dl_scatter():
+                            if _sl_chart_ref:
+                                await self._download_echart_svg(
+                                    _sl_chart_ref[0], f"asr_vs_latency_{_runs_suffix}"
+                                )
+
+                        with ui.row().classes("items-center justify-between w-full"):
+                            ui.label("ASR vs Latency").classes("font-semibold text-sm")
+                            ui.button(icon="download", on_click=_dl_scatter).props(
+                                "flat dense size=xs color=grey-6"
+                            )
                         ui.label(
                             "Each point is a run — lower-left is best (low ASR, fast)"
                         ).classes("text-xs text-grey-6 mb-2")
@@ -2684,47 +2747,74 @@ function hackAgentCopyFallback(text) {
                                     }
                                 )
                         if scatter_series:
-                            ui.echart(
-                                {
-                                    "tooltip": {
-                                        "trigger": "item",
-                                        "extraCssText": "padding:6px 10px;",
-                                    },
-                                    "legend": {
-                                        "top": 4,
-                                        "right": 8,
-                                        "textStyle": {"fontSize": 11},
-                                    },
-                                    "grid": {
-                                        "left": "14%",
-                                        "right": "8%",
-                                        "top": "14%",
-                                        "bottom": "14%",
-                                    },
-                                    "xAxis": {
-                                        "type": "value",
-                                        "name": "Avg Latency (s)",
-                                        "nameLocation": "middle",
-                                        "nameGap": 28,
-                                        "min": 0,
-                                    },
-                                    "yAxis": {
-                                        "type": "value",
-                                        "name": "ASR (%)",
-                                        "nameLocation": "middle",
-                                        "nameGap": 40,
-                                        "min": 0,
-                                        "max": 100,
-                                    },
-                                    "series": scatter_series,
-                                }
-                            ).classes("w-full h-80")
+                            _sl_chart_ref.append(
+                                ui.echart(
+                                    {
+                                        "tooltip": {
+                                            "trigger": "item",
+                                            "extraCssText": "padding:6px 10px;",
+                                        },
+                                        "legend": {
+                                            "top": 4,
+                                            "right": 8,
+                                            "textStyle": {"fontSize": 11},
+                                        },
+                                        "grid": {
+                                            "left": "14%",
+                                            "right": "8%",
+                                            "top": "14%",
+                                            "bottom": "14%",
+                                        },
+                                        "xAxis": {
+                                            "type": "value",
+                                            "name": "Avg Latency (s)",
+                                            "nameLocation": "middle",
+                                            "nameGap": 28,
+                                            "min": 0,
+                                        },
+                                        "yAxis": {
+                                            "type": "value",
+                                            "name": "ASR (%)",
+                                            "nameLocation": "middle",
+                                            "nameGap": 40,
+                                            "min": 0,
+                                            "max": 100,
+                                        },
+                                        "series": scatter_series,
+                                    }
+                                )
+                                .classes("w-full h-80")
+                                .props("renderer=svg")
+                            )
                         else:
                             ui.label(
                                 "Insufficient data for ASR vs Latency plot"
                             ).classes("text-xs text-grey-5 italic")
 
         self._compare_bottom_panel.classes(remove="hidden")
+
+    async def _download_echart_svg(self, chart, filename: str) -> None:
+        """Download an EChart as SVG via run_chart_method."""
+        import base64 as _b64
+        from urllib.parse import unquote as _unquote
+
+        try:
+            data_url = await chart.run_chart_method("getDataURL", {"type": "svg"})
+            if data_url and "," in data_url:
+                header, payload = data_url.split(",", 1)
+                if "base64" in header:
+                    svg_bytes = _b64.b64decode(payload)
+                else:
+                    svg_bytes = _unquote(payload).encode("utf-8")
+                ui.download(
+                    svg_bytes,
+                    filename=f"{filename}.svg",
+                    media_type="image/svg+xml",
+                )
+            else:
+                ui.notify("Failed to export chart", type="warning")
+        except Exception as exc:
+            ui.notify(f"Export failed: {exc}", type="negative")
 
     def _close_compare_panel(self) -> None:
         """Hide the compare bottom panel."""
@@ -8798,17 +8888,6 @@ function hackAgentCopyFallback(text) {
             self.runs_table.rows.extend(slim_rows)
             self.runs_table.update()
 
-        shown = len(filtered)
-        total = len(self._runs_all_rows)
-        if self.runs_count_label is not None:
-            if self._has_active_filter():
-                self.runs_count_label.text = (
-                    f"Showing {shown} of {total} run"
-                    f"{'s' if total != 1 else ''} (filtered)"
-                )
-            else:
-                self.runs_count_label.text = f"{total} run{'s' if total != 1 else ''}"
-
         if self._runs_load_more_btn is not None:
             self._runs_load_more_btn.classes(add="hidden")
 
@@ -8820,9 +8899,9 @@ function hackAgentCopyFallback(text) {
         all_attack_types = sorted(
             {r.get("attack_type") or "" for r in self._runs_all_rows} - {"", "—"}
         )
-        all_statuses = sorted(
-            {r.get("status") or "" for r in self._runs_all_rows} - {""}
-        )
+        # all_statuses = sorted(
+        #     {r.get("status") or "" for r in self._runs_all_rows} - {""}
+        # )
 
         if self._runs_agent_select is not None:
             opts = {"": "All targets"}
@@ -8834,11 +8913,6 @@ function hackAgentCopyFallback(text) {
             opts.update({a: a for a in all_attack_types})
             self._runs_attack_select.options = opts
             self._runs_attack_select.update()
-        if self._runs_status_select is not None:
-            opts = {"": "All statuses"}
-            opts.update({s: s for s in all_statuses})
-            self._runs_status_select.options = opts
-            self._runs_status_select.update()
 
     def _on_runs_filter_change(self, field: str, value: str) -> None:
         """Handle filter dropdown change — re-renders with filter applied."""
@@ -9416,11 +9490,17 @@ function hackAgentCopyFallback(text) {
     async def _open_run_results(self, run: dict) -> None:  # noqa: C901
         """Open report details side-by-side for a single run."""
         run_id_raw = str(run.get("id") or "")
+        _run_num = run.get("run_progress") or run.get("run_number")
         self._report_current_run = run
 
         report_area: ui.column | None = self.run_report_area
         if self.run_dialog_title is not None:
-            self.run_dialog_title.text = f"Report — Run {run_id_raw[:8]}…"
+            _title_prefix = (
+                f"Report — Run #{_run_num}"
+                if _run_num
+                else f"Report — Run {run_id_raw[:8]}…"
+            )
+            self.run_dialog_title.text = _title_prefix
         self._report_results_left_col = None
         self._report_goal_detail_panel = None
         self._report_current_run_results = []
@@ -9637,99 +9717,125 @@ function hackAgentCopyFallback(text) {
             with ui.row().classes("w-full flex-wrap gap-4 items-stretch"):
                 # Risk donut
                 with ui.card().classes("flex-1 min-w-64"):
-                    ui.label("Risk Score").classes("font-semibold text-sm mb-1")
+                    _rs_chart_ref: list = []
+
+                    async def _dl_risk_score():
+                        if _rs_chart_ref:
+                            await self._download_echart_svg(
+                                _rs_chart_ref[0], f"risk_score_run{run_id_raw[:8]}"
+                            )
+
+                    with ui.row().classes("items-center justify-between w-full"):
+                        ui.label("Risk Score").classes("font-semibold text-sm")
+                        ui.button(icon="download", on_click=_dl_risk_score).props(
+                            "flat dense size=xs color=grey-6"
+                        )
                     ui.label(
                         "Attack Success Rate across all tests in this run"
                     ).classes("text-xs text-grey-6 mb-3")
                     with ui.row().classes("items-center gap-6 flex-wrap"):
                         no_data = total_tests == 0
-                        ui.echart(
-                            {
-                                "series": [
-                                    {
-                                        "type": "pie",
-                                        "radius": ["58%", "80%"],
-                                        "data": (
-                                            [
-                                                {
-                                                    "value": 1,
-                                                    "name": "No data",
-                                                    "itemStyle": {"color": "#94a3b8"},
-                                                }
-                                            ]
-                                            if no_data
-                                            else [
-                                                {
-                                                    "value": n_jailbreaks,
-                                                    "name": "Jailbreaks",
-                                                    "itemStyle": {"color": "#ef4444"},
-                                                },
-                                                {
-                                                    "value": n_mitigated,
-                                                    "name": "Mitigated",
-                                                    "itemStyle": {"color": "#22c55e"},
-                                                },
-                                                {
-                                                    "value": n_errors,
-                                                    "name": "Errors",
-                                                    "itemStyle": {"color": "#f97316"},
-                                                },
-                                                {
-                                                    "value": max(
-                                                        0,
-                                                        total_tests
-                                                        - n_jailbreaks
-                                                        - n_mitigated
-                                                        - n_errors,
-                                                    ),
-                                                    "name": "Pending",
-                                                    "itemStyle": {"color": "#94a3b8"},
-                                                },
-                                            ]
-                                        ),
-                                        "label": {"show": False},
-                                        "emphasis": {"scale": False},
-                                    }
-                                ],
-                                "graphic": (
-                                    []
-                                    if no_data
-                                    else [
+                        _rs_chart_ref.append(
+                            ui.echart(
+                                {
+                                    "series": [
                                         {
-                                            "type": "group",
-                                            "left": "center",
-                                            "top": "center",
-                                            "children": [
-                                                {
-                                                    "type": "text",
-                                                    "style": {
-                                                        "text": f"{asr_pct:.0f}%",
-                                                        "textAlign": "center",
-                                                        "fontSize": 22,
-                                                        "fontWeight": "bold",
-                                                        "fill": risk_hex,
+                                            "type": "pie",
+                                            "radius": ["58%", "80%"],
+                                            "data": (
+                                                [
+                                                    {
+                                                        "value": 1,
+                                                        "name": "No data",
+                                                        "itemStyle": {
+                                                            "color": "#94a3b8"
+                                                        },
+                                                    }
+                                                ]
+                                                if no_data
+                                                else [
+                                                    {
+                                                        "value": n_jailbreaks,
+                                                        "name": "Jailbreaks",
+                                                        "itemStyle": {
+                                                            "color": "#ef4444"
+                                                        },
                                                     },
-                                                    "top": -14,
-                                                },
-                                                {
-                                                    "type": "text",
-                                                    "style": {
-                                                        "text": risk_label,
-                                                        "textAlign": "center",
-                                                        "fontSize": 11,
-                                                        "fill": risk_hex,
+                                                    {
+                                                        "value": n_mitigated,
+                                                        "name": "Mitigated",
+                                                        "itemStyle": {
+                                                            "color": "#22c55e"
+                                                        },
                                                     },
-                                                    "top": 12,
-                                                },
-                                            ],
+                                                    {
+                                                        "value": n_errors,
+                                                        "name": "Errors",
+                                                        "itemStyle": {
+                                                            "color": "#f97316"
+                                                        },
+                                                    },
+                                                    {
+                                                        "value": max(
+                                                            0,
+                                                            total_tests
+                                                            - n_jailbreaks
+                                                            - n_mitigated
+                                                            - n_errors,
+                                                        ),
+                                                        "name": "Pending",
+                                                        "itemStyle": {
+                                                            "color": "#94a3b8"
+                                                        },
+                                                    },
+                                                ]
+                                            ),
+                                            "label": {"show": False},
+                                            "emphasis": {"scale": False},
                                         }
-                                    ]
-                                ),
-                                "tooltip": {
-                                    "trigger": "item" if not no_data else "none"
-                                },
-                            }
-                        ).classes("w-36 h-36 shrink-0")
+                                    ],
+                                    "graphic": (
+                                        []
+                                        if no_data
+                                        else [
+                                            {
+                                                "type": "group",
+                                                "left": "center",
+                                                "top": "center",
+                                                "children": [
+                                                    {
+                                                        "type": "text",
+                                                        "style": {
+                                                            "text": f"{asr_pct:.0f}%",
+                                                            "textAlign": "center",
+                                                            "fontSize": 22,
+                                                            "fontWeight": "bold",
+                                                            "fill": risk_hex,
+                                                        },
+                                                        "top": -14,
+                                                    },
+                                                    {
+                                                        "type": "text",
+                                                        "style": {
+                                                            "text": risk_label,
+                                                            "textAlign": "center",
+                                                            "fontSize": 11,
+                                                            "fill": risk_hex,
+                                                        },
+                                                        "top": 12,
+                                                    },
+                                                ],
+                                            }
+                                        ]
+                                    ),
+                                    "tooltip": {
+                                        "trigger": "item" if not no_data else "none"
+                                    },
+                                }
+                            )
+                            .classes("w-36 h-36 shrink-0")
+                            .props("renderer=svg")
+                        )
 
                         # Legend beside donut
                         with ui.column().classes("gap-1"):
@@ -9904,6 +10010,15 @@ function hackAgentCopyFallback(text) {
                 ]
 
                 with ui.card().classes("w-full"):
+                    _rob_chart_ref: list = []
+
+                    async def _dl_robustness():
+                        if _rob_chart_ref:
+                            await self._download_echart_svg(
+                                _rob_chart_ref[0],
+                                f"robustness_by_category_run{run_id_raw[:8]}",
+                            )
+
                     with ui.row().classes("w-full items-start justify-between mb-1"):
                         with ui.column().classes("gap-0"):
                             ui.label("OVERALL ROBUSTNESS").classes(
@@ -9912,113 +10027,112 @@ function hackAgentCopyFallback(text) {
                             ui.label(f"{robustness_pct:.0f}%").classes(
                                 "text-[44px] leading-none font-bold text-green-7"
                             )
+                        ui.button(icon="download", on_click=_dl_robustness).props(
+                            "flat dense size=xs color=grey-6"
+                        )
 
                     with ui.row().classes("w-full justify-center"):
-                        ui.echart(
-                            {
-                                "toolbox": {
-                                    "show": True,
-                                    "right": 8,
-                                    "top": 4,
-                                    "feature": {
-                                        "saveAsImage": {
-                                            "show": True,
-                                            "type": "svg",
-                                            "title": "Download SVG",
-                                            "name": "robustness-by-category",
-                                        }
-                                    },
-                                },
-                                "tooltip": {
-                                    "trigger": "axis",
-                                    ":formatter": (
-                                        "function(params) {"
-                                        "const p = Array.isArray(params) ? (params[0] || {}) : (params || {});"
-                                        "const d = (p && p.data) || {};"
-                                        "const categoryTooltips = Array.isArray(d.categoryTooltips) ? d.categoryTooltips : [];"
-                                        "if (!categoryTooltips.length) { return ''; }"
-                                        "const indicatorLabels = Array.isArray(d.indicatorLabels) ? d.indicatorLabels : [];"
-                                        "const fullLabels = Array.isArray(d.fullLabels) ? d.fullLabels : [];"
-                                        "const normalizeName = function(value) {"
-                                        "  return String(value || '')"
-                                        "    .replace(/\\n+/g, ' ')"
-                                        "    .replace(/\\s+\\d+(?:\\.\\d+)?%$/i, '')"
-                                        "    .trim();"
-                                        "};"
-                                        "const candidates = [];"
-                                        "if (typeof p.axisValueLabel === 'string' && p.axisValueLabel.length > 0) { candidates.push(p.axisValueLabel); }"
-                                        "if (typeof p.axisValue === 'string' && p.axisValue.length > 0) { candidates.push(p.axisValue); }"
-                                        "if (typeof p.name === 'string' && p.name.length > 0) { candidates.push(p.name); }"
-                                        "for (const name of candidates) {"
-                                        "  let idx = indicatorLabels.indexOf(name);"
-                                        "  if (idx < 0) { idx = fullLabels.indexOf(name); }"
-                                        "  if (idx < 0) {"
-                                        "    const normalized = normalizeName(name);"
-                                        "    idx = fullLabels.findIndex((label) => normalizeName(label) === normalized);"
-                                        "  }"
-                                        "  if (idx >= 0 && idx < categoryTooltips.length) { return categoryTooltips[idx] || ''; }"
-                                        "}"
-                                        "const dimensionIndex = typeof p.dimensionIndex === 'number' ? p.dimensionIndex : -1;"
-                                        "if (dimensionIndex >= 0 && dimensionIndex < categoryTooltips.length) {"
-                                        "  return categoryTooltips[dimensionIndex] || '';"
-                                        "}"
-                                        "return categoryTooltips[0] || '';"
-                                        "}"
-                                    ),
-                                    "backgroundColor": "#ffffff",
-                                    "borderColor": "#d1d5db",
-                                    "borderWidth": 1,
-                                    "textStyle": {"color": "#111827", "fontSize": 13},
-                                    "padding": 10,
-                                },
-                                "radar": {
-                                    "shape": "polygon",
-                                    "indicator": indicators,
-                                    "splitNumber": 5,
-                                    "center": ["50%", "49%"],
-                                    "radius": "64%",
-                                    "axisName": {
-                                        "fontSize": 12,
-                                        "lineHeight": 15,
-                                        "color": "#111827",
-                                        "fontWeight": 500,
-                                    },
-                                    "splitLine": {"lineStyle": {"color": "#d1d5db"}},
-                                    "splitArea": {"areaStyle": {"color": ["#ffffff"]}},
-                                },
-                                "series": [
-                                    {
-                                        "type": "radar",
-                                        "silent": False,
-                                        "z": 3,
-                                        "symbol": "circle",
-                                        "symbolSize": 11,
-                                        "itemStyle": {
-                                            "color": "#dc2626",
-                                            "borderColor": "#ffffff",
-                                            "borderWidth": 1.5,
+                        _rob_chart_ref.append(
+                            ui.echart(
+                                {
+                                    "tooltip": {
+                                        "trigger": "axis",
+                                        ":formatter": (
+                                            "function(params) {"
+                                            "const p = Array.isArray(params) ? (params[0] || {}) : (params || {});"
+                                            "const d = (p && p.data) || {};"
+                                            "const categoryTooltips = Array.isArray(d.categoryTooltips) ? d.categoryTooltips : [];"
+                                            "if (!categoryTooltips.length) { return ''; }"
+                                            "const indicatorLabels = Array.isArray(d.indicatorLabels) ? d.indicatorLabels : [];"
+                                            "const fullLabels = Array.isArray(d.fullLabels) ? d.fullLabels : [];"
+                                            "const normalizeName = function(value) {"
+                                            "  return String(value || '')"
+                                            "    .replace(/\\n+/g, ' ')"
+                                            "    .replace(/\\s+\\d+(?:\\.\\d+)?%$/i, '')"
+                                            "    .trim();"
+                                            "};"
+                                            "const candidates = [];"
+                                            "if (typeof p.axisValueLabel === 'string' && p.axisValueLabel.length > 0) { candidates.push(p.axisValueLabel); }"
+                                            "if (typeof p.axisValue === 'string' && p.axisValue.length > 0) { candidates.push(p.axisValue); }"
+                                            "if (typeof p.name === 'string' && p.name.length > 0) { candidates.push(p.name); }"
+                                            "for (const name of candidates) {"
+                                            "  let idx = indicatorLabels.indexOf(name);"
+                                            "  if (idx < 0) { idx = fullLabels.indexOf(name); }"
+                                            "  if (idx < 0) {"
+                                            "    const normalized = normalizeName(name);"
+                                            "    idx = fullLabels.findIndex((label) => normalizeName(label) === normalized);"
+                                            "  }"
+                                            "  if (idx >= 0 && idx < categoryTooltips.length) { return categoryTooltips[idx] || ''; }"
+                                            "}"
+                                            "const dimensionIndex = typeof p.dimensionIndex === 'number' ? p.dimensionIndex : -1;"
+                                            "if (dimensionIndex >= 0 && dimensionIndex < categoryTooltips.length) {"
+                                            "  return categoryTooltips[dimensionIndex] || '';"
+                                            "}"
+                                            "return categoryTooltips[0] || '';"
+                                            "}"
+                                        ),
+                                        "backgroundColor": "#ffffff",
+                                        "borderColor": "#d1d5db",
+                                        "borderWidth": 1,
+                                        "textStyle": {
+                                            "color": "#111827",
+                                            "fontSize": 13,
                                         },
-                                        "lineStyle": {
-                                            "color": "#3b82f6",
-                                            "width": 2,
-                                        },
-                                        "areaStyle": {
-                                            "color": "rgba(59, 130, 246, 0.18)"
-                                        },
-                                        "data": [
-                                            {
-                                                "value": values,
-                                                "name": "Robustness",
-                                                "categoryTooltips": category_tooltips,
-                                                "indicatorLabels": indicator_labels,
-                                                "fullLabels": full_labels,
-                                            }
-                                        ],
+                                        "padding": 10,
                                     },
-                                ],
-                            }
-                        ).classes("w-[740px] h-[500px] max-w-full").props(
-                            "renderer=svg"
+                                    "radar": {
+                                        "shape": "polygon",
+                                        "indicator": indicators,
+                                        "splitNumber": 5,
+                                        "center": ["50%", "49%"],
+                                        "radius": "64%",
+                                        "axisName": {
+                                            "fontSize": 12,
+                                            "lineHeight": 15,
+                                            "color": "#111827",
+                                            "fontWeight": 500,
+                                        },
+                                        "splitLine": {
+                                            "lineStyle": {"color": "#d1d5db"}
+                                        },
+                                        "splitArea": {
+                                            "areaStyle": {"color": ["#ffffff"]}
+                                        },
+                                    },
+                                    "series": [
+                                        {
+                                            "type": "radar",
+                                            "silent": False,
+                                            "z": 3,
+                                            "symbol": "circle",
+                                            "symbolSize": 11,
+                                            "itemStyle": {
+                                                "color": "#dc2626",
+                                                "borderColor": "#ffffff",
+                                                "borderWidth": 1.5,
+                                            },
+                                            "lineStyle": {
+                                                "color": "#3b82f6",
+                                                "width": 2,
+                                            },
+                                            "areaStyle": {
+                                                "color": "rgba(59, 130, 246, 0.18)"
+                                            },
+                                            "data": [
+                                                {
+                                                    "value": values,
+                                                    "name": "Robustness",
+                                                    "categoryTooltips": category_tooltips,
+                                                    "indicatorLabels": indicator_labels,
+                                                    "fullLabels": full_labels,
+                                                }
+                                            ],
+                                        },
+                                    ],
+                                }
+                            )
+                            .classes("w-[740px] h-[500px] max-w-full")
+                            .props("renderer=svg")
                         )
 
                     ui.label(
@@ -10026,9 +10140,22 @@ function hackAgentCopyFallback(text) {
                     ).classes("text-xs text-grey-6 w-full text-center mt-2")
 
                 with ui.card().classes("w-full"):
-                    ui.label("Vulnerability by Category").classes(
-                        "font-semibold text-sm mb-1"
-                    )
+                    _cd_chart_ref: list = []
+
+                    async def _dl_cat_dist():
+                        if _cd_chart_ref:
+                            await self._download_echart_svg(
+                                _cd_chart_ref[0],
+                                f"category_distribution_run{run_id_raw[:8]}",
+                            )
+
+                    with ui.row().classes("items-center justify-between w-full"):
+                        ui.label("Vulnerability by Category").classes(
+                            "font-semibold text-sm"
+                        )
+                        ui.button(icon="download", on_click=_dl_cat_dist).props(
+                            "flat dense size=xs color=grey-6"
+                        )
                     ui.label(
                         "Stacked distribution of outcomes per harm category"
                     ).classes("text-xs text-grey-6 mb-3")
@@ -10065,73 +10192,80 @@ function hackAgentCopyFallback(text) {
                             }
                         )
 
-                    ui.echart(
-                        {
-                            "tooltip": {
-                                "trigger": "item",
-                                "backgroundColor": "#ffffff",
-                                "borderColor": "#d1d5db",
-                                "borderWidth": 1,
-                                "textStyle": {"color": "#111827", "fontSize": 13},
-                                "padding": 10,
-                            },
-                            "legend": {
-                                "bottom": 0,
-                                "itemWidth": 12,
-                                "itemHeight": 10,
-                                "textStyle": {"fontSize": 12},
-                            },
-                            "grid": {
-                                "left": "16%",
-                                "right": "2%",
-                                "top": "8%",
-                                "bottom": "18%",
-                                "containLabel": True,
-                            },
-                            "xAxis": {
-                                "type": "value",
-                                "splitLine": {
-                                    "lineStyle": {"type": "dashed", "color": "#e5e7eb"}
+                    _cd_chart_ref.append(
+                        ui.echart(
+                            {
+                                "tooltip": {
+                                    "trigger": "item",
+                                    "backgroundColor": "#ffffff",
+                                    "borderColor": "#d1d5db",
+                                    "borderWidth": 1,
+                                    "textStyle": {"color": "#111827", "fontSize": 13},
+                                    "padding": 10,
                                 },
-                            },
-                            "yAxis": {
-                                "type": "category",
-                                "data": bar_y_labels,
-                                "axisTick": {"show": False},
-                                "axisLabel": {
-                                    "fontSize": 11,
-                                    "lineHeight": 14,
-                                    "interval": 0,
+                                "legend": {
+                                    "bottom": 0,
+                                    "itemWidth": 12,
+                                    "itemHeight": 10,
+                                    "textStyle": {"fontSize": 12},
                                 },
-                            },
-                            "series": [
-                                {
-                                    "name": "Vulnerable",
-                                    "type": "bar",
-                                    "stack": "total",
-                                    "itemStyle": {"color": "#ef4444"},
-                                    "emphasis": {"disabled": True},
-                                    "data": vulnerable_data,
+                                "grid": {
+                                    "left": "16%",
+                                    "right": "2%",
+                                    "top": "8%",
+                                    "bottom": "18%",
+                                    "containLabel": True,
                                 },
-                                {
-                                    "name": "Mitigated",
-                                    "type": "bar",
-                                    "stack": "total",
-                                    "itemStyle": {"color": "#22c55e"},
-                                    "emphasis": {"disabled": True},
-                                    "data": mitigated_data,
+                                "xAxis": {
+                                    "type": "value",
+                                    "splitLine": {
+                                        "lineStyle": {
+                                            "type": "dashed",
+                                            "color": "#e5e7eb",
+                                        }
+                                    },
                                 },
-                                {
-                                    "name": "Error",
-                                    "type": "bar",
-                                    "stack": "total",
-                                    "itemStyle": {"color": "#f59e0b"},
-                                    "emphasis": {"disabled": True},
-                                    "data": error_data,
+                                "yAxis": {
+                                    "type": "category",
+                                    "data": bar_y_labels,
+                                    "axisTick": {"show": False},
+                                    "axisLabel": {
+                                        "fontSize": 11,
+                                        "lineHeight": 14,
+                                        "interval": 0,
+                                    },
                                 },
-                            ],
-                        }
-                    ).classes("w-full h-[320px]")
+                                "series": [
+                                    {
+                                        "name": "Vulnerable",
+                                        "type": "bar",
+                                        "stack": "total",
+                                        "itemStyle": {"color": "#ef4444"},
+                                        "emphasis": {"disabled": True},
+                                        "data": vulnerable_data,
+                                    },
+                                    {
+                                        "name": "Mitigated",
+                                        "type": "bar",
+                                        "stack": "total",
+                                        "itemStyle": {"color": "#22c55e"},
+                                        "emphasis": {"disabled": True},
+                                        "data": mitigated_data,
+                                    },
+                                    {
+                                        "name": "Error",
+                                        "type": "bar",
+                                        "stack": "total",
+                                        "itemStyle": {"color": "#f59e0b"},
+                                        "emphasis": {"disabled": True},
+                                        "data": error_data,
+                                    },
+                                ],
+                            }
+                        )
+                        .classes("w-full h-[320px]")
+                        .props("renderer=svg")
+                    )
 
             # ── 3) Scope of Testing ───────────────────────────────────
             with ui.card().classes("w-full"):
@@ -10297,9 +10431,15 @@ function hackAgentCopyFallback(text) {
     async def _open_run_history_results(self, run: dict) -> None:
         """Open the compact results list in a non-modal side dialog."""
         run_id_raw = str(run.get("id") or "")
+        _run_num = run.get("run_progress") or run.get("run_number")
 
         if self.history_run_dialog_title is not None:
-            self.history_run_dialog_title.text = f"Run Results — {run_id_raw[:8]}…"
+            _title_prefix = (
+                f"Run Results — #{_run_num}"
+                if _run_num
+                else f"Run Results — {run_id_raw[:8]}…"
+            )
+            self.history_run_dialog_title.text = _title_prefix
 
         agent = str(run.get("agent_name") or "—")
         _hr_jailbreaks = int(run.get("successful_jailbreaks") or 0)
@@ -10844,110 +10984,129 @@ function hackAgentCopyFallback(text) {
                     with ui.row().classes("w-full flex-wrap gap-4 items-stretch"):
                         # Risk donut
                         with ui.card().classes("flex-1 min-w-64"):
-                            ui.label("Risk Score").classes("font-semibold text-sm mb-1")
+                            _hrs_chart_ref: list = []
+
+                            async def _dl_hrs():
+                                if _hrs_chart_ref:
+                                    await self._download_echart_svg(
+                                        _hrs_chart_ref[0],
+                                        f"risk_score_run{run_id_raw[:8]}",
+                                    )
+
+                            with ui.row().classes(
+                                "items-center justify-between w-full"
+                            ):
+                                ui.label("Risk Score").classes("font-semibold text-sm")
+                                ui.button(icon="download", on_click=_dl_hrs).props(
+                                    "flat dense size=xs color=grey-6"
+                                )
                             ui.label("Attack Success Rate across all tests").classes(
                                 "text-xs text-grey-6 mb-3"
                             )
                             with ui.row().classes("items-center gap-6 flex-wrap"):
-                                ui.echart(
-                                    {
-                                        "series": [
-                                            {
-                                                "type": "pie",
-                                                "radius": ["58%", "80%"],
-                                                "data": (
-                                                    [
-                                                        {
-                                                            "value": 1,
-                                                            "name": "No data",
-                                                            "itemStyle": {
-                                                                "color": "#94a3b8"
-                                                            },
-                                                        }
-                                                    ]
-                                                    if _no_data
-                                                    else [
-                                                        {
-                                                            "value": _n_jailbreaks,
-                                                            "name": "Jailbreaks",
-                                                            "itemStyle": {
-                                                                "color": "#ef4444"
-                                                            },
-                                                        },
-                                                        {
-                                                            "value": _n_mitigated,
-                                                            "name": "Mitigated",
-                                                            "itemStyle": {
-                                                                "color": "#22c55e"
-                                                            },
-                                                        },
-                                                        {
-                                                            "value": _n_errors,
-                                                            "name": "Errors",
-                                                            "itemStyle": {
-                                                                "color": "#f97316"
-                                                            },
-                                                        },
-                                                        {
-                                                            "value": max(
-                                                                0,
-                                                                _total
-                                                                - _n_jailbreaks
-                                                                - _n_mitigated
-                                                                - _n_errors,
-                                                            ),
-                                                            "name": "Pending",
-                                                            "itemStyle": {
-                                                                "color": "#94a3b8"
-                                                            },
-                                                        },
-                                                    ]
-                                                ),
-                                                "label": {"show": False},
-                                                "emphasis": {"scale": False},
-                                            }
-                                        ],
-                                        "graphic": (
-                                            []
-                                            if _no_data
-                                            else [
+                                _hrs_chart_ref.append(
+                                    ui.echart(
+                                        {
+                                            "series": [
                                                 {
-                                                    "type": "group",
-                                                    "left": "center",
-                                                    "top": "center",
-                                                    "children": [
-                                                        {
-                                                            "type": "text",
-                                                            "style": {
-                                                                "text": f"{_asr:.0f}%",
-                                                                "textAlign": "center",
-                                                                "fontSize": 22,
-                                                                "fontWeight": "bold",
-                                                                "fill": _risk_hex,
+                                                    "type": "pie",
+                                                    "radius": ["58%", "80%"],
+                                                    "data": (
+                                                        [
+                                                            {
+                                                                "value": 1,
+                                                                "name": "No data",
+                                                                "itemStyle": {
+                                                                    "color": "#94a3b8"
+                                                                },
+                                                            }
+                                                        ]
+                                                        if _no_data
+                                                        else [
+                                                            {
+                                                                "value": _n_jailbreaks,
+                                                                "name": "Jailbreaks",
+                                                                "itemStyle": {
+                                                                    "color": "#ef4444"
+                                                                },
                                                             },
-                                                            "top": -14,
-                                                        },
-                                                        {
-                                                            "type": "text",
-                                                            "style": {
-                                                                "text": _risk_label,
-                                                                "textAlign": "center",
-                                                                "fontSize": 11,
-                                                                "fill": _risk_hex,
+                                                            {
+                                                                "value": _n_mitigated,
+                                                                "name": "Mitigated",
+                                                                "itemStyle": {
+                                                                    "color": "#22c55e"
+                                                                },
                                                             },
-                                                            "top": 12,
-                                                        },
-                                                    ],
+                                                            {
+                                                                "value": _n_errors,
+                                                                "name": "Errors",
+                                                                "itemStyle": {
+                                                                    "color": "#f97316"
+                                                                },
+                                                            },
+                                                            {
+                                                                "value": max(
+                                                                    0,
+                                                                    _total
+                                                                    - _n_jailbreaks
+                                                                    - _n_mitigated
+                                                                    - _n_errors,
+                                                                ),
+                                                                "name": "Pending",
+                                                                "itemStyle": {
+                                                                    "color": "#94a3b8"
+                                                                },
+                                                            },
+                                                        ]
+                                                    ),
+                                                    "label": {"show": False},
+                                                    "emphasis": {"scale": False},
                                                 }
-                                            ]
-                                        ),
-                                        "tooltip": {
-                                            "trigger": "item"
-                                            if not _no_data
-                                            else "none"
-                                        },
-                                    }
-                                ).classes("w-36 h-36 shrink-0")
+                                            ],
+                                            "graphic": (
+                                                []
+                                                if _no_data
+                                                else [
+                                                    {
+                                                        "type": "group",
+                                                        "left": "center",
+                                                        "top": "center",
+                                                        "children": [
+                                                            {
+                                                                "type": "text",
+                                                                "style": {
+                                                                    "text": f"{_asr:.0f}%",
+                                                                    "textAlign": "center",
+                                                                    "fontSize": 22,
+                                                                    "fontWeight": "bold",
+                                                                    "fill": _risk_hex,
+                                                                },
+                                                                "top": -14,
+                                                            },
+                                                            {
+                                                                "type": "text",
+                                                                "style": {
+                                                                    "text": _risk_label,
+                                                                    "textAlign": "center",
+                                                                    "fontSize": 11,
+                                                                    "fill": _risk_hex,
+                                                                },
+                                                                "top": 12,
+                                                            },
+                                                        ],
+                                                    }
+                                                ]
+                                            ),
+                                            "tooltip": {
+                                                "trigger": "item"
+                                                if not _no_data
+                                                else "none"
+                                            },
+                                        }
+                                    )
+                                    .classes("w-36 h-36 shrink-0")
+                                    .props("renderer=svg")
+                                )
 
                                 # Legend
                                 with ui.column().classes("gap-1"):
@@ -11061,66 +11220,90 @@ function hackAgentCopyFallback(text) {
                         if _hc_items:
                             with ui.column().classes("w-full gap-3"):
                                 with ui.card().classes("w-full"):
-                                    ui.label("Vulnerability by Category").classes(
-                                        "font-semibold text-sm mb-2"
-                                    )
-                                    # Always show bar chart for category breakdown
+                                    _hcb_chart_ref: list = []
+
+                                    async def _dl_hcb():
+                                        if _hcb_chart_ref:
+                                            await self._download_echart_svg(
+                                                _hcb_chart_ref[0],
+                                                f"category_breakdown_run{run_id_raw[:8]}",
+                                            )
+
+                                    with ui.row().classes(
+                                        "items-center justify-between w-full"
+                                    ):
+                                        ui.label("Vulnerability by Category").classes(
+                                            "font-semibold text-sm"
+                                        )
+                                        ui.button(
+                                            icon="download", on_click=_dl_hcb
+                                        ).props("flat dense size=xs color=grey-6")
                                     _hc_labels = [x["label"] for x in _hc_items]
                                     _hc_vuln = [x["vulnerable"] for x in _hc_items]
                                     _hc_mit = [x["mitigated"] for x in _hc_items]
                                     _hc_err = [x["errors"] for x in _hc_items]
-                                    ui.echart(
-                                        {
-                                            "tooltip": {"trigger": "axis"},
-                                            "legend": {
-                                                "data": [
-                                                    "Vulnerable",
-                                                    "Mitigated",
-                                                    "Errors",
+                                    _hcb_chart_ref.append(
+                                        ui.echart(
+                                            {
+                                                "tooltip": {"trigger": "axis"},
+                                                "legend": {
+                                                    "data": [
+                                                        "Vulnerable",
+                                                        "Mitigated",
+                                                        "Errors",
+                                                    ],
+                                                    "bottom": 0,
+                                                },
+                                                "grid": {
+                                                    "left": "3%",
+                                                    "right": "4%",
+                                                    "top": "3%",
+                                                    "bottom": "14%",
+                                                    "containLabel": True,
+                                                },
+                                                "xAxis": {"type": "value"},
+                                                "yAxis": {
+                                                    "type": "category",
+                                                    "data": _hc_labels,
+                                                    "axisLabel": {
+                                                        "width": 140,
+                                                        "overflow": "truncate",
+                                                    },
+                                                },
+                                                "series": [
+                                                    {
+                                                        "name": "Vulnerable",
+                                                        "type": "bar",
+                                                        "stack": "total",
+                                                        "data": _hc_vuln,
+                                                        "itemStyle": {
+                                                            "color": "#ef4444"
+                                                        },
+                                                    },
+                                                    {
+                                                        "name": "Mitigated",
+                                                        "type": "bar",
+                                                        "stack": "total",
+                                                        "data": _hc_mit,
+                                                        "itemStyle": {
+                                                            "color": "#22c55e"
+                                                        },
+                                                    },
+                                                    {
+                                                        "name": "Errors",
+                                                        "type": "bar",
+                                                        "stack": "total",
+                                                        "data": _hc_err,
+                                                        "itemStyle": {
+                                                            "color": "#f97316"
+                                                        },
+                                                    },
                                                 ],
-                                                "bottom": 0,
-                                            },
-                                            "grid": {
-                                                "left": "3%",
-                                                "right": "4%",
-                                                "top": "3%",
-                                                "bottom": "14%",
-                                                "containLabel": True,
-                                            },
-                                            "xAxis": {"type": "value"},
-                                            "yAxis": {
-                                                "type": "category",
-                                                "data": _hc_labels,
-                                                "axisLabel": {
-                                                    "width": 140,
-                                                    "overflow": "truncate",
-                                                },
-                                            },
-                                            "series": [
-                                                {
-                                                    "name": "Vulnerable",
-                                                    "type": "bar",
-                                                    "stack": "total",
-                                                    "data": _hc_vuln,
-                                                    "itemStyle": {"color": "#ef4444"},
-                                                },
-                                                {
-                                                    "name": "Mitigated",
-                                                    "type": "bar",
-                                                    "stack": "total",
-                                                    "data": _hc_mit,
-                                                    "itemStyle": {"color": "#22c55e"},
-                                                },
-                                                {
-                                                    "name": "Errors",
-                                                    "type": "bar",
-                                                    "stack": "total",
-                                                    "data": _hc_err,
-                                                    "itemStyle": {"color": "#f97316"},
-                                                },
-                                            ],
-                                        }
-                                    ).classes("w-full h-72")
+                                            }
+                                        )
+                                        .classes("w-full h-72")
+                                        .props("renderer=svg")
+                                    )
 
                                 # Radar chart (only when 3+ categories)
                                 if len(_hc_items) >= 3:
@@ -11135,59 +11318,78 @@ function hackAgentCopyFallback(text) {
                                     ]
 
                                     with ui.card().classes("w-full"):
-                                        ui.label("Robustness by Category").classes(
-                                            "font-semibold text-sm mb-2"
-                                        )
+                                        _hcr_chart_ref: list = []
+
+                                        async def _dl_hcr():
+                                            if _hcr_chart_ref:
+                                                await self._download_echart_svg(
+                                                    _hcr_chart_ref[0],
+                                                    f"robustness_radar_run{run_id_raw[:8]}",
+                                                )
+
+                                        with ui.row().classes(
+                                            "items-center justify-between w-full"
+                                        ):
+                                            ui.label("Robustness by Category").classes(
+                                                "font-semibold text-sm"
+                                            )
+                                            ui.button(
+                                                icon="download", on_click=_dl_hcr
+                                            ).props("flat dense size=xs color=grey-6")
                                         with ui.row().classes("w-full justify-center"):
-                                            ui.echart(
-                                                {
-                                                    "radar": {
-                                                        "shape": "polygon",
-                                                        "indicator": _hc_indicators,
-                                                        "splitNumber": 5,
-                                                        "center": ["50%", "52%"],
-                                                        "radius": "64%",
-                                                        "axisName": {
-                                                            "fontSize": 11,
-                                                            "color": "#374151",
-                                                        },
-                                                        "splitLine": {
-                                                            "lineStyle": {
-                                                                "color": "#d1d5db"
-                                                            }
-                                                        },
-                                                        "splitArea": {
-                                                            "areaStyle": {
-                                                                "color": ["#ffffff"]
-                                                            }
-                                                        },
-                                                    },
-                                                    "series": [
-                                                        {
-                                                            "type": "radar",
-                                                            "symbol": "circle",
-                                                            "symbolSize": 8,
-                                                            "itemStyle": {
-                                                                "color": "#22c55e"
+                                            _hcr_chart_ref.append(
+                                                ui.echart(
+                                                    {
+                                                        "radar": {
+                                                            "shape": "polygon",
+                                                            "indicator": _hc_indicators,
+                                                            "splitNumber": 5,
+                                                            "center": ["50%", "52%"],
+                                                            "radius": "64%",
+                                                            "axisName": {
+                                                                "fontSize": 11,
+                                                                "color": "#374151",
                                                             },
-                                                            "lineStyle": {
-                                                                "color": "#22c55e",
-                                                                "width": 2,
-                                                            },
-                                                            "areaStyle": {
-                                                                "color": "rgba(34,197,94,0.15)"
-                                                            },
-                                                            "data": [
-                                                                {
-                                                                    "value": _hc_values,
-                                                                    "name": "Robustness",
+                                                            "splitLine": {
+                                                                "lineStyle": {
+                                                                    "color": "#d1d5db"
                                                                 }
-                                                            ],
-                                                        }
-                                                    ],
-                                                    "tooltip": {"trigger": "item"},
-                                                }
-                                            ).classes("w-full h-72")
+                                                            },
+                                                            "splitArea": {
+                                                                "areaStyle": {
+                                                                    "color": ["#ffffff"]
+                                                                }
+                                                            },
+                                                        },
+                                                        "series": [
+                                                            {
+                                                                "type": "radar",
+                                                                "symbol": "circle",
+                                                                "symbolSize": 8,
+                                                                "itemStyle": {
+                                                                    "color": "#22c55e"
+                                                                },
+                                                                "lineStyle": {
+                                                                    "color": "#22c55e",
+                                                                    "width": 2,
+                                                                },
+                                                                "areaStyle": {
+                                                                    "color": "rgba(34,197,94,0.15)"
+                                                                },
+                                                                "data": [
+                                                                    {
+                                                                        "value": _hc_values,
+                                                                        "name": "Robustness",
+                                                                    }
+                                                                ],
+                                                            }
+                                                        ],
+                                                        "tooltip": {"trigger": "item"},
+                                                    }
+                                                )
+                                                .classes("w-full h-72")
+                                                .props("renderer=svg")
+                                            )
 
             if all_items and self.history_results_list_area is not None:
                 # ── Pre-parse detail data for all rows ─────────────
