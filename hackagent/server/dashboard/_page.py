@@ -2297,282 +2297,269 @@ function hackAgentCopyFallback(text) {
                     lbl for lbl, vals in _label_values.items() if len(vals) > 1
                 }
 
-                # ── Shared configuration (top) ────────────────────
-                # Show chips common to all runs (non-diff) once at top
-                _shared_labels = _all_labels - _diff_labels
-                if _shared_labels and _all_run_chips:
-                    # Take shared chips from the first run (values are identical)
-                    _shared_chips = [
-                        (ic, lbl, val)
-                        for ic, lbl, val in _all_run_chips[0]
-                        if lbl in _shared_labels
-                    ]
-                    if _shared_chips:
-                        with ui.row().classes("items-center gap-1 mb-3 flex-wrap px-1"):
-                            ui.icon("settings", size="14px").classes("text-grey-5")
-                            ui.label("Shared config").classes(
-                                "text-[10px] font-semibold uppercase text-grey-5 mr-1"
-                            )
-                            for _cic, _clbl, _cval in _shared_chips:
-                                with ui.row().classes(
-                                    "items-center gap-1 rounded px-1.5 py-0.5 bg-grey-1"
-                                ):
-                                    ui.icon(_cic, size="10px").classes("text-grey-5")
-                                    ui.label(_clbl).classes(
-                                        "text-[9px] font-semibold uppercase tracking-wide text-grey-5"
-                                    )
-                                    ui.label(_cval).classes(
-                                        "text-[10px] font-medium text-grey-8"
-                                    )
-
-                # ── Run identity cards (compact) ──────────────────
-                with ui.row().classes("w-full gap-2 flex-wrap mb-3"):
-                    for i, run in enumerate(runs):
-                        color = colors[i % len(colors)]
-                        with (
-                            ui.card()
-                            .classes("flex-1 min-w-[160px] py-2 px-3")
-                            .style(f"border-left: 4px solid {color}; box-shadow: none")
-                        ):
-                            with ui.row().classes("items-center gap-2 no-wrap"):
-                                ui.label(short_labels[i]).classes(
-                                    "text-base font-bold"
-                                ).style(f"color: {color}")
-                                with ui.column().classes("gap-0"):
-                                    ui.label(
-                                        str(run.get("attack_type") or "—")
-                                    ).classes("text-xs font-medium")
-                                    ui.label(str(run.get("agent_name") or "—")).classes(
-                                        "text-xs text-grey-6"
-                                    )
-                            with ui.row().classes("items-center gap-3 mt-1"):
-                                ui.label(f"ASR {run.get('overall_asr', '—')}").classes(
-                                    "text-sm font-bold"
-                                )
-                                ui.label(
-                                    f"{run.get('total_results', 0)} goals"
-                                ).classes("text-xs text-grey-6")
-                                ui.label(run.get("_latency") or "—").classes(
-                                    "text-xs text-grey-6"
-                                )
-                            # Only show differing config chips per run
-                            _run_chips = _all_run_chips[i]
-                            _diff_chips = [
-                                (ic, lbl, val)
-                                for ic, lbl, val in _run_chips
-                                if lbl in _diff_labels
-                            ]
-                            if _diff_chips:
-                                with ui.row().classes(
-                                    "items-center gap-1 mt-1 flex-wrap"
-                                ):
-                                    for _cic, _clbl, _cval in _diff_chips:
-                                        with ui.row().classes(
-                                            "items-center gap-1 rounded px-1.5 py-0.5 "
-                                            "bg-amber-1 ring-1 ring-amber-3"
-                                        ):
-                                            ui.icon(_cic, size="10px").classes(
-                                                "text-amber-8"
-                                            )
-                                            ui.label(_clbl).classes(
-                                                "text-[9px] font-semibold uppercase tracking-wide "
-                                                "text-amber-8"
-                                            )
-                                            ui.label(_cval).classes(
-                                                "text-[10px] font-medium text-amber-9"
-                                            )
-
-                # ── Risk Distribution donuts (side by side) ───────
+                # ── Summary Table ─────────────────────────────────
                 with ui.card().classes("w-full"):
-                    ui.label("Risk Distribution").classes("font-semibold text-sm mb-1")
-                    with ui.row().classes("w-full gap-1 justify-around flex-wrap"):
-                        for i, run in enumerate(runs):
-                            jb = int(run.get("successful_jailbreaks") or 0)
-                            mit = int(run.get("mitigations") or 0)
-                            err = int(run.get("errors") or 0)
-                            total = int(run.get("total_results") or 0)
-                            pending = max(0, total - jb - mit - err)
-                            color = colors[i % len(colors)]
-                            asr_val = run.get("overall_asr", "—")
-                            with ui.column().classes(
-                                "items-center flex-1 min-w-[140px] max-w-[220px]"
-                            ):
-                                ui.label(short_labels[i]).classes(
-                                    "text-xs font-bold"
-                                ).style(f"color: {color}")
+                    ui.label("Summary").classes("font-semibold text-sm mb-1")
+                    # Shared config (common across all runs)
+                    _shared_labels = _all_labels - _diff_labels
+                    if _shared_labels and _all_run_chips:
+                        _shared_chips = [
+                            (ic, lbl, val)
+                            for ic, lbl, val in _all_run_chips[0]
+                            if lbl in _shared_labels
+                        ]
+                        if _shared_chips:
+                            with ui.row().classes("items-center gap-1 mb-2 flex-wrap"):
+                                ui.icon("settings", size="14px").classes("text-grey-5")
+                                ui.label("Shared:").classes(
+                                    "text-xs font-semibold text-grey-5"
+                                )
+                                for _cic, _clbl, _cval in _shared_chips:
+                                    with ui.row().classes(
+                                        "items-center gap-1 rounded px-1.5 py-0.5 bg-grey-1"
+                                    ):
+                                        ui.icon(_cic, size="10px").classes(
+                                            "text-grey-5"
+                                        )
+                                        ui.label(f"{_clbl}: {_cval}").classes(
+                                            "text-[10px] font-medium text-grey-7"
+                                        )
+                    columns = [
+                        {
+                            "name": "run",
+                            "label": "Run",
+                            "field": "run",
+                            "align": "left",
+                        },
+                        {
+                            "name": "attack",
+                            "label": "Attack",
+                            "field": "attack",
+                            "align": "left",
+                        },
+                        {
+                            "name": "asr",
+                            "label": "ASR",
+                            "field": "asr",
+                            "align": "center",
+                        },
+                        {
+                            "name": "latency",
+                            "label": "Avg Latency",
+                            "field": "latency",
+                            "align": "center",
+                        },
+                        {
+                            "name": "goals",
+                            "label": "Goals",
+                            "field": "goals",
+                            "align": "center",
+                        },
+                        {
+                            "name": "cats_passed",
+                            "label": "Categories Passed",
+                            "field": "cats_passed",
+                            "align": "center",
+                        },
+                        {
+                            "name": "worst_cat",
+                            "label": "Worst Category",
+                            "field": "worst_cat",
+                            "align": "left",
+                        },
+                        {
+                            "name": "differences",
+                            "label": "Differences",
+                            "field": "differences",
+                            "align": "left",
+                        },
+                    ]
+                    table_rows = []
+                    for i, run in enumerate(runs):
+                        cat_data = per_run_cats[i]
+                        total_cats = len(cat_data)
+                        passed = sum(
+                            1
+                            for entry in cat_data.values()
+                            if entry["total"] > 0 and entry["vulnerable"] == 0
+                        )
+                        # Find worst category (highest ASR)
+                        worst_cat = "—"
+                        worst_asr = -1.0
+                        for cat, entry in cat_data.items():
+                            if entry["total"] > 0:
+                                cat_asr = entry["vulnerable"] / entry["total"]
+                                if cat_asr > worst_asr:
+                                    worst_asr = cat_asr
+                                    worst_cat = cat
+                        if worst_asr <= 0:
+                            worst_cat = "—"
+
+                        # Build differences string from differing config
+                        _run_chips = _all_run_chips[i]
+                        _diff_chips = [
+                            (ic, lbl, val)
+                            for ic, lbl, val in _run_chips
+                            if lbl in _diff_labels
+                        ]
+                        diff_str = (
+                            ", ".join(f"{lbl}: {val}" for _, lbl, val in _diff_chips)
+                            if _diff_chips
+                            else "—"
+                        )
+
+                        table_rows.append(
+                            {
+                                "run": short_labels[i],
+                                "attack": str(run.get("attack_type") or "—"),
+                                "asr": str(run.get("overall_asr", "—")),
+                                "latency": run.get("_latency") or "—",
+                                "goals": str(run.get("total_results") or 0),
+                                "cats_passed": f"{passed}/{total_cats}",
+                                "worst_cat": worst_cat if worst_cat != "—" else "None",
+                                "differences": diff_str,
+                            }
+                        )
+                    ui.table(
+                        columns=columns,
+                        rows=table_rows,
+                        row_key="run",
+                    ).classes("w-full").props("dense flat bordered")
+
+                # ── Risk Distribution + Vulnerabilities per Category (side by side) ──
+                with ui.row().classes("w-full mt-3 gap-3 items-stretch"):
+                    # Left: Risk Distribution (stacked bar)
+                    with ui.card().classes("flex-1 min-w-[280px]"):
+                        ui.label("Risk Distribution").classes(
+                            "font-semibold text-sm mb-1"
+                        )
+                        metrics = ["Jailbreak", "Mitigated", "Errors", "Pending"]
+                        metric_colors = ["#ef4444", "#22c55e", "#f97316", "#d1d5db"]
+                        bar_series = []
+                        for mi, (metric, mcolor) in enumerate(
+                            zip(metrics, metric_colors)
+                        ):
+                            values = []
+                            for run in runs:
+                                jb = int(run.get("successful_jailbreaks") or 0)
+                                mit = int(run.get("mitigations") or 0)
+                                err = int(run.get("errors") or 0)
+                                total = int(run.get("total_results") or 0)
+                                pending = max(0, total - jb - mit - err)
+                                values.append([jb, mit, err, pending][mi])
+                            bar_series.append(
+                                {
+                                    "name": metric,
+                                    "type": "bar",
+                                    "stack": "total",
+                                    "data": values,
+                                    "itemStyle": {"color": mcolor},
+                                    "barMaxWidth": 40,
+                                }
+                            )
+                        ui.echart(
+                            {
+                                "tooltip": {
+                                    "trigger": "axis",
+                                    "axisPointer": {"type": "shadow"},
+                                },
+                                "legend": {
+                                    "bottom": 0,
+                                    "textStyle": {"fontSize": 11},
+                                },
+                                "grid": {
+                                    "left": "3%",
+                                    "right": "4%",
+                                    "top": "8%",
+                                    "bottom": "16%",
+                                    "containLabel": True,
+                                },
+                                "xAxis": {
+                                    "type": "category",
+                                    "data": short_labels,
+                                },
+                                "yAxis": {
+                                    "type": "value",
+                                    "name": "Count",
+                                },
+                                "series": bar_series,
+                            }
+                        ).classes("w-full h-56")
+
+                    # Right: Vulnerabilities per Category (grouped horizontal bar)
+                    if sorted_cats:
+                        with ui.card().classes("flex-1 min-w-[320px]"):
+                            ui.label("Vulnerabilities per Category").classes(
+                                "font-semibold text-sm mb-2"
+                            )
+
+                            bar_cats = sorted(sorted_cats, reverse=True)
+
+                            vuln_data: list[list[int]] = []
+                            for _i, cat_data in enumerate(per_run_cats):
+                                vuln_vals: list[int] = []
+                                for cat in bar_cats:
+                                    entry = cat_data.get(cat)
+                                    vuln_vals.append(
+                                        entry["vulnerable"] if entry else 0
+                                    )
+                                vuln_data.append(vuln_vals)
+
+                            def _build_cat_series() -> list[dict]:
+                                series = []
+                                for idx, run in enumerate(runs):
+                                    series.append(
+                                        {
+                                            "name": short_labels[idx],
+                                            "type": "bar",
+                                            "data": vuln_data[idx],
+                                            "itemStyle": {
+                                                "color": colors[idx % len(colors)]
+                                            },
+                                            "barMaxWidth": 18,
+                                        }
+                                    )
+                                return series
+
+                            chart_height = max(260, len(bar_cats) * 38)
+
+                            (
                                 ui.echart(
                                     {
                                         "tooltip": {
-                                            "trigger": "item",
-                                            "formatter": "{b}: {c} ({d}%)",
+                                            "trigger": "axis",
+                                            "axisPointer": {"type": "shadow"},
                                         },
-                                        "series": [
-                                            {
-                                                "type": "pie",
-                                                "radius": ["44%", "74%"],
-                                                "center": ["50%", "50%"],
-                                                "label": {
-                                                    "show": True,
-                                                    "position": "inside",
-                                                    "formatter": "{c}",
-                                                    "fontSize": 9,
-                                                    "color": "#fff",
-                                                    "fontWeight": "bold",
-                                                },
-                                                "labelLine": {
-                                                    "show": False,
-                                                },
-                                                "data": [
-                                                    d
-                                                    for d in [
-                                                        {
-                                                            "value": jb,
-                                                            "name": "Jailbreak",
-                                                            "itemStyle": {
-                                                                "color": "#ef4444"
-                                                            },
-                                                        },
-                                                        {
-                                                            "value": mit,
-                                                            "name": "Mitigated",
-                                                            "itemStyle": {
-                                                                "color": "#22c55e"
-                                                            },
-                                                        },
-                                                        {
-                                                            "value": err,
-                                                            "name": "Errors",
-                                                            "itemStyle": {
-                                                                "color": "#f97316"
-                                                            },
-                                                        },
-                                                        {
-                                                            "value": pending,
-                                                            "name": "Pending",
-                                                            "itemStyle": {
-                                                                "color": "#d1d5db"
-                                                            },
-                                                        },
-                                                    ]
-                                                    if d["value"] > 0
-                                                ],
-                                            }
-                                        ],
-                                        "graphic": [
-                                            {
-                                                "type": "text",
-                                                "left": "center",
-                                                "top": "45%",
-                                                "style": {
-                                                    "text": str(asr_val),
-                                                    "fontSize": 15,
-                                                    "fontWeight": "bold",
-                                                    "fill": "#374151",
-                                                    "textAlign": "center",
-                                                },
-                                            },
-                                            {
-                                                "type": "text",
-                                                "left": "center",
-                                                "top": "57%",
-                                                "style": {
-                                                    "text": "ASR",
-                                                    "fontSize": 9,
-                                                    "fill": "#9ca3af",
-                                                    "textAlign": "center",
-                                                },
-                                            },
-                                        ],
-                                    }
-                                ).classes("w-full h-44")
-                    # Shared legend below all donuts
-                    with ui.row().classes("w-full justify-center gap-4 mt-1"):
-                        for lbl, clr in [
-                            ("Jailbreak", "#ef4444"),
-                            ("Mitigated", "#22c55e"),
-                            ("Errors", "#f97316"),
-                            ("Pending", "#d1d5db"),
-                        ]:
-                            with ui.row().classes("items-center gap-1"):
-                                ui.element("div").classes("w-2 h-2 rounded-full").style(
-                                    f"background: {clr}"
-                                )
-                                ui.label(lbl).classes("text-xs text-grey-7")
-
-                # ── Vulnerabilities per Category (grouped bar) ───
-                if sorted_cats:
-                    with ui.card().classes("w-full mt-3"):
-                        ui.label("Vulnerabilities per Category").classes(
-                            "font-semibold text-sm mb-2"
-                        )
-
-                        # Categories on Y-axis, one bar per run
-                        bar_cats = sorted(sorted_cats, reverse=True)
-
-                        # Pre-compute absolute counts per run
-                        vuln_data: list[list[int]] = []
-                        for _i, cat_data in enumerate(per_run_cats):
-                            vuln_vals: list[int] = []
-                            for cat in bar_cats:
-                                entry = cat_data.get(cat)
-                                vuln_vals.append(entry["vulnerable"] if entry else 0)
-                            vuln_data.append(vuln_vals)
-
-                        def _build_cat_series() -> list[dict]:
-                            series = []
-                            for idx, run in enumerate(runs):
-                                series.append(
-                                    {
-                                        "name": short_labels[idx],
-                                        "type": "bar",
-                                        "data": vuln_data[idx],
-                                        "itemStyle": {
-                                            "color": colors[idx % len(colors)]
+                                        "legend": {
+                                            "bottom": 0,
+                                            "textStyle": {"fontSize": 11},
                                         },
-                                        "barMaxWidth": 18,
+                                        "grid": {
+                                            "left": "3%",
+                                            "right": "4%",
+                                            "top": "3%",
+                                            "bottom": "10%",
+                                            "containLabel": True,
+                                        },
+                                        "xAxis": {
+                                            "type": "value",
+                                            "minInterval": 1,
+                                        },
+                                        "yAxis": {
+                                            "type": "category",
+                                            "data": bar_cats,
+                                            "axisLabel": {
+                                                "width": 120,
+                                                "overflow": "truncate",
+                                                "fontSize": 11,
+                                            },
+                                        },
+                                        "series": _build_cat_series(),
                                     }
                                 )
-                            return series
-
-                        chart_height = max(260, len(bar_cats) * 38)
-
-                        (
-                            ui.echart(
-                                {
-                                    "tooltip": {
-                                        "trigger": "axis",
-                                        "axisPointer": {"type": "shadow"},
-                                    },
-                                    "legend": {
-                                        "bottom": 0,
-                                        "textStyle": {"fontSize": 11},
-                                    },
-                                    "grid": {
-                                        "left": "3%",
-                                        "right": "4%",
-                                        "top": "3%",
-                                        "bottom": "10%",
-                                        "containLabel": True,
-                                    },
-                                    "xAxis": {
-                                        "type": "value",
-                                        "minInterval": 1,
-                                    },
-                                    "yAxis": {
-                                        "type": "category",
-                                        "data": bar_cats,
-                                        "axisLabel": {
-                                            "width": 120,
-                                            "overflow": "truncate",
-                                            "fontSize": 11,
-                                        },
-                                    },
-                                    "series": _build_cat_series(),
-                                }
+                                .classes("w-full")
+                                .style(f"height: {chart_height}px")
                             )
-                            .classes("w-full")
-                            .style(f"height: {chart_height}px")
-                        )
 
                 # ── Robustness radar + ASR vs Latency (side by side) ─────
                 with ui.row().classes("w-full mt-3 gap-3 items-stretch"):
