@@ -173,6 +173,31 @@ class DashboardPage:
         if _fastapi_app.storage.browser.get("hackagent_dark"):
             self.dark.enable()
 
+        # Inject a global copy-to-clipboard helper accessible from Vue template
+        # slot expressions (where `navigator` is not in Vue 3's global whitelist).
+        ui.add_head_html(
+            """<script>
+function hackAgentCopy(text) {
+  if (window.navigator && window.navigator.clipboard) {
+    window.navigator.clipboard.writeText(text).catch(function() {
+      hackAgentCopyFallback(text);
+    });
+  } else {
+    hackAgentCopyFallback(text);
+  }
+}
+function hackAgentCopyFallback(text) {
+  var el = document.createElement('textarea');
+  el.value = text;
+  el.style.cssText = 'position:fixed;top:-9999px;left:-9999px';
+  document.body.appendChild(el);
+  el.select();
+  try { document.execCommand('copy'); } catch(e) {}
+  document.body.removeChild(el);
+}
+</script>"""
+        )
+
         self._build_result_modal_dialog()
         sidebar = self._build_sidebar()
         self._build_header(sidebar)
@@ -4074,11 +4099,17 @@ class DashboardPage:
 <q-tr v-show="props.expand" :props="props" @click="props.expand = false" style="cursor:pointer">
   <q-td colspan="100%" class="bg-grey-1">
     <div class="q-pa-sm">
-      <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">PROMPT SENT TO TARGET</div>
+      <div class="row items-center justify-between q-mb-xs">
+        <span class="text-caption text-weight-bold text-uppercase text-grey-6">PROMPT SENT TO TARGET</span>
+        <span :data-cliptext="props.row._full_prompt||''" onclick="event.stopPropagation();var s=this,t=s.dataset.cliptext||'',ic=s.querySelector('.q-icon');if(window.navigator&&window.navigator.clipboard)window.navigator.clipboard.writeText(t);if(ic)ic.textContent='check';s.setAttribute('title','Copied to clipboard');setTimeout(function(){if(ic)ic.textContent='content_copy';s.setAttribute('title','Copy to clipboard');},2000);" style="display:inline-flex;cursor:pointer" title="Copy to clipboard"><q-btn flat dense size="xs" icon="content_copy" color="grey-6" /></span>
+      </div>
       <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
                   border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._full_prompt || '\u2014' }}</pre>
       <template v-if="props.row._guardrail_side !== 'before'">
-        <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">TARGET RESPONSE</div>
+        <div class="row items-center justify-between q-mb-xs">
+          <span class="text-caption text-weight-bold text-uppercase text-grey-6">TARGET RESPONSE</span>
+          <span :data-cliptext="props.row._response||''" onclick="event.stopPropagation();var s=this,t=s.dataset.cliptext||'',ic=s.querySelector('.q-icon');if(window.navigator&&window.navigator.clipboard)window.navigator.clipboard.writeText(t);if(ic)ic.textContent='check';s.setAttribute('title','Copied to clipboard');setTimeout(function(){if(ic)ic.textContent='content_copy';s.setAttribute('title','Copy to clipboard');},2000);" style="display:inline-flex;cursor:pointer" title="Copy to clipboard"><q-btn flat dense size="xs" icon="content_copy" color="grey-6" /></span>
+        </div>
         <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
                     border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._response || 'No response recorded.' }}</pre>
       </template>
@@ -4365,11 +4396,17 @@ class DashboardPage:
 <q-tr v-show="props.expand" :props="props" @click="props.expand = false" style="cursor:pointer">
   <q-td colspan="100%" class="bg-grey-1">
     <div class="q-pa-sm">
-      <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">PROMPT SENT TO TARGET</div>
+      <div class="row items-center justify-between q-mb-xs">
+        <span class="text-caption text-weight-bold text-uppercase text-grey-6">PROMPT SENT TO TARGET</span>
+        <span :data-cliptext="props.row._full_prompt||''" onclick="event.stopPropagation();var s=this,t=s.dataset.cliptext||'',ic=s.querySelector('.q-icon');if(window.navigator&&window.navigator.clipboard)window.navigator.clipboard.writeText(t);if(ic)ic.textContent='check';s.setAttribute('title','Copied to clipboard');setTimeout(function(){if(ic)ic.textContent='content_copy';s.setAttribute('title','Copy to clipboard');},2000);" style="display:inline-flex;cursor:pointer" title="Copy to clipboard"><q-btn flat dense size="xs" icon="content_copy" color="grey-6" /></span>
+      </div>
       <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
                   border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._full_prompt || '\u2014' }}</pre>
       <template v-if="props.row._guardrail_side !== 'before'">
-        <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">TARGET RESPONSE</div>
+        <div class="row items-center justify-between q-mb-xs">
+          <span class="text-caption text-weight-bold text-uppercase text-grey-6">TARGET RESPONSE</span>
+          <span :data-cliptext="props.row._response||''" onclick="event.stopPropagation();var s=this,t=s.dataset.cliptext||'',ic=s.querySelector('.q-icon');if(window.navigator&&window.navigator.clipboard)window.navigator.clipboard.writeText(t);if(ic)ic.textContent='check';s.setAttribute('title','Copied to clipboard');setTimeout(function(){if(ic)ic.textContent='content_copy';s.setAttribute('title','Copy to clipboard');},2000);" style="display:inline-flex;cursor:pointer" title="Copy to clipboard"><q-btn flat dense size="xs" icon="content_copy" color="grey-6" /></span>
+        </div>
         <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
                     border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._response || 'No response recorded.' }}</pre>
       </template>
@@ -4613,9 +4650,16 @@ class DashboardPage:
                                 "text-xs font-semibold text-grey-6 uppercase tracking-wide"
                             )
 
-                        ui.label("PROMPT SENT TO TARGET").classes(
-                            "text-[10px] text-grey-6 font-semibold uppercase tracking-wide px-1"
-                        )
+                        with ui.row().classes("w-full items-center justify-between"):
+                            ui.label("PROMPT SENT TO TARGET").classes(
+                                "text-[10px] text-grey-6 font-semibold uppercase tracking-wide px-1"
+                            )
+                            ui.button(icon="content_copy").props(
+                                "flat dense size=xs color=grey-6"
+                            ).tooltip("Copy to clipboard").on(
+                                "click",
+                                js_handler=f"(event) => {{var b=event.currentTarget,ic=b.querySelector('.q-icon');if(navigator.clipboard)navigator.clipboard.writeText({json.dumps(prompt or '')});if(ic){{ic.textContent='check';setTimeout(function(){{ic.textContent='content_copy';}},2000);}}}}",
+                            )
                         ui.html(
                             '<pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;'
                             'border-radius:4px;margin-bottom:6px;white-space:pre-wrap;word-break:break-word">'
@@ -4632,9 +4676,18 @@ class DashboardPage:
                                 }
                             )
                         else:
-                            ui.label("TARGET RESPONSE").classes(
-                                "text-[10px] text-grey-6 font-semibold uppercase tracking-wide px-1"
-                            )
+                            with ui.row().classes(
+                                "w-full items-center justify-between"
+                            ):
+                                ui.label("TARGET RESPONSE").classes(
+                                    "text-[10px] text-grey-6 font-semibold uppercase tracking-wide px-1"
+                                )
+                                ui.button(icon="content_copy").props(
+                                    "flat dense size=xs color=grey-6"
+                                ).tooltip("Copy to clipboard").on(
+                                    "click",
+                                    js_handler=f"(event) => {{var b=event.currentTarget,ic=b.querySelector('.q-icon');if(navigator.clipboard)navigator.clipboard.writeText({json.dumps(response or '')});if(ic){{ic.textContent='check';setTimeout(function(){{ic.textContent='content_copy';}},2000);}}}}",
+                                )
                             ui.html(
                                 '<pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;'
                                 'border-radius:4px;white-space:pre-wrap;word-break:break-word">'
@@ -4973,9 +5026,18 @@ class DashboardPage:
                                             ui.space()
 
                                         with ui.column().classes("p-3 gap-2"):
-                                            ui.label("Attacker").classes(
-                                                "text-[10px] font-semibold text-grey-5 uppercase tracking-wide"
-                                            )
+                                            with ui.row().classes(
+                                                "w-full items-center justify-between"
+                                            ):
+                                                ui.label("Attacker").classes(
+                                                    "text-[10px] font-semibold text-grey-5 uppercase tracking-wide"
+                                                )
+                                                ui.button(icon="content_copy").props(
+                                                    "flat dense size=xs color=grey-6"
+                                                ).tooltip("Copy to clipboard").on(
+                                                    "click",
+                                                    js_handler=f"(event) => {{var b=event.currentTarget,ic=b.querySelector('.q-icon');if(navigator.clipboard)navigator.clipboard.writeText({json.dumps(generated_prompt or '')});if(ic){{ic.textContent='check';setTimeout(function(){{ic.textContent='content_copy';}},2000);}}}}",
+                                                )
                                             ui.html(
                                                 '<pre style="font-size:11px;padding:8px;background:white;'
                                                 "border:1px solid #e0e0e0;border-radius:4px;margin:0;"
@@ -4992,9 +5054,20 @@ class DashboardPage:
                                                     }
                                                 )
                                             else:
-                                                ui.label("Target response").classes(
-                                                    "text-[10px] font-semibold text-grey-5 uppercase tracking-wide"
-                                                )
+                                                with ui.row().classes(
+                                                    "w-full items-center justify-between"
+                                                ):
+                                                    ui.label("Target response").classes(
+                                                        "text-[10px] font-semibold text-grey-5 uppercase tracking-wide"
+                                                    )
+                                                    ui.button(
+                                                        icon="content_copy"
+                                                    ).props(
+                                                        "flat dense size=xs color=grey-6"
+                                                    ).tooltip("Copy to clipboard").on(
+                                                        "click",
+                                                        js_handler=f"(event) => {{var b=event.currentTarget,ic=b.querySelector('.q-icon');if(navigator.clipboard)navigator.clipboard.writeText({json.dumps(target_response or '')});if(ic){{ic.textContent='check';setTimeout(function(){{ic.textContent='content_copy';}},2000);}}}}",
+                                                    )
                                                 ui.html(
                                                     '<pre style="font-size:11px;padding:8px;background:white;'
                                                     "border:1px solid #e0e0e0;border-radius:4px;margin:0;"
@@ -5014,9 +5087,22 @@ class DashboardPage:
                                                     )
 
                                             if assessment:
-                                                ui.label("Scorer assessment").classes(
-                                                    "text-[10px] font-semibold text-grey-5 uppercase tracking-wide"
-                                                )
+                                                with ui.row().classes(
+                                                    "w-full items-center justify-between"
+                                                ):
+                                                    ui.label(
+                                                        "Scorer assessment"
+                                                    ).classes(
+                                                        "text-[10px] font-semibold text-grey-5 uppercase tracking-wide"
+                                                    )
+                                                    ui.button(
+                                                        icon="content_copy"
+                                                    ).props(
+                                                        "flat dense size=xs color=grey-6"
+                                                    ).tooltip("Copy to clipboard").on(
+                                                        "click",
+                                                        js_handler=f"(event) => {{var b=event.currentTarget,ic=b.querySelector('.q-icon');if(navigator.clipboard)navigator.clipboard.writeText({json.dumps(assessment or '')});if(ic){{ic.textContent='check';setTimeout(function(){{ic.textContent='content_copy';}},2000);}}}}",
+                                                    )
                                                 ui.html(
                                                     '<pre style="font-size:11px;padding:8px;background:#fff8e1;'
                                                     "border:1px solid #ffe082;border-radius:4px;margin:0;"
@@ -5036,11 +5122,6 @@ class DashboardPage:
                                                         if score_delta
                                                         else ""
                                                     )
-                                                    ui.label(
-                                                        f"New strategy{_delta_str}"
-                                                    ).classes(
-                                                        "text-[10px] font-semibold text-indigo-6 uppercase tracking-wide"
-                                                    )
                                                     _strat_text = ""
                                                     if s_name:
                                                         _strat_text += (
@@ -5049,6 +5130,24 @@ class DashboardPage:
                                                     if s_defn:
                                                         _strat_text += (
                                                             f"Definition: {s_defn}"
+                                                        )
+                                                    with ui.row().classes(
+                                                        "w-full items-center justify-between"
+                                                    ):
+                                                        ui.label(
+                                                            f"New strategy{_delta_str}"
+                                                        ).classes(
+                                                            "text-[10px] font-semibold text-indigo-6 uppercase tracking-wide"
+                                                        )
+                                                        ui.button(
+                                                            icon="content_copy"
+                                                        ).props(
+                                                            "flat dense size=xs color=grey-6"
+                                                        ).tooltip(
+                                                            "Copy to clipboard"
+                                                        ).on(
+                                                            "click",
+                                                            js_handler=f"(event) => {{var b=event.currentTarget,ic=b.querySelector('.q-icon');if(navigator.clipboard)navigator.clipboard.writeText({json.dumps(_strat_text.strip())});if(ic){{ic.textContent='check';setTimeout(function(){{ic.textContent='content_copy';}},2000);}}}}",
                                                         )
                                                     ui.html(
                                                         '<pre style="font-size:11px;padding:8px;background:#f3f4fd;'
@@ -5099,6 +5198,18 @@ class DashboardPage:
                                                 _strat_text += f"Strategy: {_ws_name}\n"
                                             if _ws_defn:
                                                 _strat_text += f"Definition: {_ws_defn}"
+                                            with ui.row().classes(
+                                                "w-full items-center justify-between"
+                                            ):
+                                                ui.label("Extracted strategy").classes(
+                                                    "text-[10px] font-semibold text-indigo-6 uppercase tracking-wide"
+                                                )
+                                                ui.button(icon="content_copy").props(
+                                                    "flat dense size=xs color=grey-6"
+                                                ).tooltip("Copy to clipboard").on(
+                                                    "click",
+                                                    js_handler=f"(event) => {{var b=event.currentTarget,ic=b.querySelector('.q-icon');if(navigator.clipboard)navigator.clipboard.writeText({json.dumps(_strat_text.strip())});if(ic){{ic.textContent='check';setTimeout(function(){{ic.textContent='content_copy';}},2000);}}}}",
+                                                )
                                             ui.html(
                                                 '<pre style="font-size:11px;padding:8px;background:white;'
                                                 "border:1px solid #c5cae9;border-radius:4px;margin:0;"
@@ -5444,20 +5555,32 @@ class DashboardPage:
   <q-td colspan="100%" class="bg-grey-1">
     <div class="q-pa-sm">
       <template v-if="props.row._full_prefix !== props.row._full_sent_prompt">
-        <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">RAW ADVERSARIAL PREFIX</div>
+        <div class="row items-center justify-between q-mb-xs">
+          <span class="text-caption text-weight-bold text-uppercase text-grey-6">RAW ADVERSARIAL PREFIX</span>
+          <span :data-cliptext="props.row._full_prefix||''" onclick="event.stopPropagation();var s=this,t=s.dataset.cliptext||'',ic=s.querySelector('.q-icon');if(window.navigator&&window.navigator.clipboard)window.navigator.clipboard.writeText(t);if(ic)ic.textContent='check';s.setAttribute('title','Copied to clipboard');setTimeout(function(){if(ic)ic.textContent='content_copy';s.setAttribute('title','Copy to clipboard');},2000);" style="display:inline-flex;cursor:pointer" title="Copy to clipboard"><q-btn flat dense size="xs" icon="content_copy" color="grey-6" /></span>
+        </div>
         <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
                     border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._full_prefix || '—' }}</pre>
-        <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">PROMPT SENT TO TARGET</div>
+        <div class="row items-center justify-between q-mb-xs">
+          <span class="text-caption text-weight-bold text-uppercase text-grey-6">PROMPT SENT TO TARGET</span>
+          <span :data-cliptext="props.row._full_sent_prompt||''" onclick="event.stopPropagation();var s=this,t=s.dataset.cliptext||'',ic=s.querySelector('.q-icon');if(window.navigator&&window.navigator.clipboard)window.navigator.clipboard.writeText(t);if(ic)ic.textContent='check';s.setAttribute('title','Copied to clipboard');setTimeout(function(){if(ic)ic.textContent='content_copy';s.setAttribute('title','Copy to clipboard');},2000);" style="display:inline-flex;cursor:pointer" title="Copy to clipboard"><q-btn flat dense size="xs" icon="content_copy" color="grey-6" /></span>
+        </div>
         <pre style="font-size:11px;padding:8px;background:#fff8e1;border:1px solid #ffe082;
                     border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._full_sent_prompt }}</pre>
       </template>
       <template v-else>
-        <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">PROMPT SENT TO TARGET</div>
+        <div class="row items-center justify-between q-mb-xs">
+          <span class="text-caption text-weight-bold text-uppercase text-grey-6">PROMPT SENT TO TARGET</span>
+          <span :data-cliptext="props.row._full_sent_prompt||''" onclick="event.stopPropagation();var s=this,t=s.dataset.cliptext||'',ic=s.querySelector('.q-icon');if(window.navigator&&window.navigator.clipboard)window.navigator.clipboard.writeText(t);if(ic)ic.textContent='check';s.setAttribute('title','Copied to clipboard');setTimeout(function(){if(ic)ic.textContent='content_copy';s.setAttribute('title','Copy to clipboard');},2000);" style="display:inline-flex;cursor:pointer" title="Copy to clipboard"><q-btn flat dense size="xs" icon="content_copy" color="grey-6" /></span>
+        </div>
         <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
                     border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._full_sent_prompt || '—' }}</pre>
       </template>
       <template v-if="props.row._bucket !== 'pending' && props.row._guardrail_side !== 'before'">
-        <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">TARGET COMPLETION</div>
+        <div class="row items-center justify-between q-mb-xs">
+          <span class="text-caption text-weight-bold text-uppercase text-grey-6">TARGET COMPLETION</span>
+          <span :data-cliptext="props.row._completion||''" onclick="event.stopPropagation();var s=this,t=s.dataset.cliptext||'',ic=s.querySelector('.q-icon');if(window.navigator&&window.navigator.clipboard)window.navigator.clipboard.writeText(t);if(ic)ic.textContent='check';s.setAttribute('title','Copied to clipboard');setTimeout(function(){if(ic)ic.textContent='content_copy';s.setAttribute('title','Copy to clipboard');},2000);" style="display:inline-flex;cursor:pointer" title="Copy to clipboard"><q-btn flat dense size="xs" icon="content_copy" color="grey-6" /></span>
+        </div>
         <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
                     border-radius:4px;white-space:pre-wrap;word-break:break-word">{{ props.row._completion || 'No completion recorded.' }}</pre>
         <div v-if="props.row._error" class="text-caption text-negative text-italic q-mt-xs">
@@ -5674,12 +5797,18 @@ class DashboardPage:
 <q-tr v-show="props.expand" :props="props" @click="props.expand = false" style="cursor:pointer">
   <q-td colspan="100%" class="bg-grey-1">
     <div class="q-pa-sm">
-      <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">PROMPT SENT TO TARGET</div>
+      <div class="row items-center justify-between q-mb-xs">
+        <span class="text-caption text-weight-bold text-uppercase text-grey-6">PROMPT SENT TO TARGET</span>
+        <span v-if="props.row._full_prompt" :data-cliptext="props.row._full_prompt||''" onclick="event.stopPropagation();var s=this,t=s.dataset.cliptext||'',ic=s.querySelector('.q-icon');if(window.navigator&&window.navigator.clipboard)window.navigator.clipboard.writeText(t);if(ic)ic.textContent='check';s.setAttribute('title','Copied to clipboard');setTimeout(function(){if(ic)ic.textContent='content_copy';s.setAttribute('title','Copy to clipboard');},2000);" style="display:inline-flex;cursor:pointer" title="Copy to clipboard"><q-btn flat dense size="xs" icon="content_copy" color="grey-6" /></span>
+      </div>
       <pre v-if="props.row._full_prompt" style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
                   border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._full_prompt }}</pre>
       <div v-else class="text-caption text-italic text-grey-5 q-mb-sm">Attacker failed to generate a persuasive prompt for this technique.</div>
       <template v-if="props.row._full_prompt && props.row._guardrail_side !== 'before'">
-        <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">TARGET RESPONSE</div>
+        <div class="row items-center justify-between q-mb-xs">
+          <span class="text-caption text-weight-bold text-uppercase text-grey-6">TARGET RESPONSE</span>
+          <span :data-cliptext="props.row._response||''" onclick="event.stopPropagation();var s=this,t=s.dataset.cliptext||'',ic=s.querySelector('.q-icon');if(window.navigator&&window.navigator.clipboard)window.navigator.clipboard.writeText(t);if(ic)ic.textContent='check';s.setAttribute('title','Copied to clipboard');setTimeout(function(){if(ic)ic.textContent='content_copy';s.setAttribute('title','Copy to clipboard');},2000);" style="display:inline-flex;cursor:pointer" title="Copy to clipboard"><q-btn flat dense size="xs" icon="content_copy" color="grey-6" /></span>
+        </div>
         <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
                     border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._response || 'No response recorded.' }}</pre>
       </template>
@@ -6050,11 +6179,17 @@ class DashboardPage:
 <q-tr v-show="props.expand" :props="props" @click="props.expand = false" style="cursor:pointer">
   <q-td colspan="100%" class="bg-grey-1">
     <div class="q-pa-sm">
-      <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">PROMPT SENT TO TARGET</div>
+      <div class="row items-center justify-between q-mb-xs">
+        <span class="text-caption text-weight-bold text-uppercase text-grey-6">PROMPT SENT TO TARGET</span>
+        <span :data-cliptext="props.row._full_prompt||''" onclick="event.stopPropagation();var s=this,t=s.dataset.cliptext||'',ic=s.querySelector('.q-icon');if(window.navigator&&window.navigator.clipboard)window.navigator.clipboard.writeText(t);if(ic)ic.textContent='check';s.setAttribute('title','Copied to clipboard');setTimeout(function(){if(ic)ic.textContent='content_copy';s.setAttribute('title','Copy to clipboard');},2000);" style="display:inline-flex;cursor:pointer" title="Copy to clipboard"><q-btn flat dense size="xs" icon="content_copy" color="grey-6" /></span>
+      </div>
       <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
                   border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._full_prompt || '\u2014' }}</pre>
       <template v-if="props.row._guardrail_side !== 'before'">
-        <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">TARGET RESPONSE</div>
+        <div class="row items-center justify-between q-mb-xs">
+          <span class="text-caption text-weight-bold text-uppercase text-grey-6">TARGET RESPONSE</span>
+          <span :data-cliptext="props.row._response||''" onclick="event.stopPropagation();var s=this,t=s.dataset.cliptext||'',ic=s.querySelector('.q-icon');if(window.navigator&&window.navigator.clipboard)window.navigator.clipboard.writeText(t);if(ic)ic.textContent='check';s.setAttribute('title','Copied to clipboard');setTimeout(function(){if(ic)ic.textContent='content_copy';s.setAttribute('title','Copy to clipboard');},2000);" style="display:inline-flex;cursor:pointer" title="Copy to clipboard"><q-btn flat dense size="xs" icon="content_copy" color="grey-6" /></span>
+        </div>
         <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
                     border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._response || 'No response recorded.' }}</pre>
       </template>
@@ -6142,9 +6277,16 @@ class DashboardPage:
                 if not detail_mode:
                     body_col.set_visibility(False)
 
-                ui.label("PROMPT SENT TO TARGET").classes(
-                    "text-[10px] text-grey-6 font-semibold uppercase tracking-wide"
-                )
+                with ui.row().classes("w-full items-center justify-between"):
+                    ui.label("PROMPT SENT TO TARGET").classes(
+                        "text-[10px] text-grey-6 font-semibold uppercase tracking-wide"
+                    )
+                    ui.button(icon="content_copy").props(
+                        "flat dense size=xs color=grey-6"
+                    ).tooltip("Copy to clipboard").on(
+                        "click",
+                        js_handler=f"(event) => {{var b=event.currentTarget,ic=b.querySelector('.q-icon');if(navigator.clipboard)navigator.clipboard.writeText({json.dumps(request_text or '')});if(ic){{ic.textContent='check';setTimeout(function(){{ic.textContent='content_copy';}},2000);}}}}",
+                    )
                 ui.html(
                     '<pre style="font-size:11px;padding:8px;background:white;'
                     "border:1px solid #e0e0e0;border-radius:4px;margin-bottom:8px;"
@@ -6157,9 +6299,16 @@ class DashboardPage:
                 if _g_side == "before":
                     self._render_guardrail_event_block(guardrail_event)  # type: ignore[arg-type]
                 else:
-                    ui.label("TARGET RESPONSE").classes(
-                        "text-[10px] text-grey-6 font-semibold uppercase tracking-wide"
-                    )
+                    with ui.row().classes("w-full items-center justify-between"):
+                        ui.label("TARGET RESPONSE").classes(
+                            "text-[10px] text-grey-6 font-semibold uppercase tracking-wide"
+                        )
+                        ui.button(icon="content_copy").props(
+                            "flat dense size=xs color=grey-6"
+                        ).tooltip("Copy to clipboard").on(
+                            "click",
+                            js_handler=f"(event) => {{var b=event.currentTarget,ic=b.querySelector('.q-icon');if(navigator.clipboard)navigator.clipboard.writeText({json.dumps(response_text or '')});if(ic){{ic.textContent='check';setTimeout(function(){{ic.textContent='content_copy';}},2000);}}}}",
+                        )
                     ui.html(
                         '<pre style="font-size:11px;padding:8px;background:white;'
                         "border:1px solid #e0e0e0;border-radius:4px;"
@@ -6340,7 +6489,7 @@ class DashboardPage:
                         "Copy to clipboard"
                     ).on(
                         "click",
-                        js_handler=f"() => navigator.clipboard.writeText({json.dumps(text)})",
+                        js_handler=f"(event) => {{var b=event.currentTarget,ic=b.querySelector('.q-icon');if(navigator.clipboard)navigator.clipboard.writeText({json.dumps(text)});if(ic){{ic.textContent='check';setTimeout(function(){{ic.textContent='content_copy';}},2000);}}}}",
                     )
                 ui.label(text).classes("text-sm whitespace-pre-wrap")
 
