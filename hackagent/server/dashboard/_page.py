@@ -3862,7 +3862,7 @@ class DashboardPage:
             step_name = str(content.get("step_name") or td.get("step_name") or "")
             if step_name.startswith("Template:"):
                 interaction_traces.append((step_name, content))
-            elif content.get("evaluator") == "baseline_pattern_evaluator":
+            elif str(content.get("evaluator") or "").startswith("baseline_"):
                 eval_trace_result = content.get("result") or {}
 
         # Stable sort: by step_name then first message content
