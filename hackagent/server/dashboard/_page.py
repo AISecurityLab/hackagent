@@ -39,7 +39,6 @@ _VIEW_LABELS = {
     "dashboard": "Dashboard",
     "agents": "Targets",
     "runs": "History",
-    "reports": "Reports",
 }
 
 _RESULTS_FETCH_LIMIT = 20
@@ -268,7 +267,6 @@ function hackAgentCopyFallback(text) {
                 ("dashboard", "Dashboard", "dashboard"),
                 ("agents", "Targets", "smart_toy"),
                 ("runs", "History", "assignment"),
-                ("reports", "Reports", "assessment"),
             ]
             for view_id, label, icon_name in nav_items:
                 btn = (
@@ -326,13 +324,11 @@ function hackAgentCopyFallback(text) {
             dashboard_panel = ui.column().classes("w-full gap-6")
             agents_panel = ui.column().classes("w-full gap-4")
             runs_panel = ui.column().classes("w-full gap-4")
-            reports_panel = ui.column().classes("w-full gap-4")
 
             self.all_panels = {
                 "dashboard": dashboard_panel,
                 "agents": agents_panel,
                 "runs": runs_panel,
-                "reports": reports_panel,
             }
             for panel in self.all_panels.values():
                 panel.set_visibility(False)
@@ -341,7 +337,6 @@ function hackAgentCopyFallback(text) {
             self._build_dashboard_panel(dashboard_panel)
             self._build_agents_panel(agents_panel)
             self._build_runs_panel(runs_panel)
-            self._build_reports_panel(reports_panel)
 
     def _build_dashboard_panel(self, panel: ui.column) -> None:
         with panel:
@@ -1855,8 +1850,6 @@ function hackAgentCopyFallback(text) {
     def navigate(self, view: str, schedule_refresh: bool = True) -> None:
         if view == "runs" and self.current_view.get("value") != "runs":
             self.runs_current_page = 1
-        if view != "reports":
-            self._close_reports_detail()
         self.current_view["value"] = view
         for v, panel in self.all_panels.items():
             panel.set_visibility(v == view)
@@ -7967,8 +7960,6 @@ function hackAgentCopyFallback(text) {
                 await self._load_agents()
             elif _v == "runs":
                 await self._load_runs()
-            elif _v == "reports":
-                await self._load_history_reports()
         except Exception as exc:
             ui.notify(f"Failed to load data: {exc}", type="negative")
         finally:
