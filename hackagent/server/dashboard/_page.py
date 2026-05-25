@@ -666,123 +666,115 @@ function hackAgentCopyFallback(text) {
                 self.attacks_table.on("selection", _on_attack_select)
 
     def _build_runs_panel(self, panel: ui.column) -> None:
-        with panel:
-            with ui.card().classes(
-                "w-full h-[calc(100vh-220px)] min-h-[540px] overflow-hidden"
-            ):
-                with ui.column().classes("w-full h-full min-h-0 gap-2"):
-                    # ── Filter bar ────────────────────────────────────────────
-                    with ui.row().classes("items-center w-full gap-2 px-2 flex-wrap"):
-                        ui.input(
-                            placeholder="Search runs…",
-                        ).props("dense outlined clearable").classes(
-                            "min-w-[180px] flex-1"
-                        ).on(
-                            "update:model-value",
-                            lambda e: self._on_runs_search_change(
-                                e.args if isinstance(e.args, str) else (e.args or "")
-                            ),
-                        )
-                        self._runs_agent_select = (
-                            ui.select(
-                                options={"": "All agents"},
-                                value="",
-                                on_change=lambda e: self._on_runs_filter_change(
-                                    "agent", e.value
-                                ),
-                            )
-                            .props("dense outlined")
-                            .classes("min-w-[140px]")
-                        )
-                        self._runs_attack_select = (
-                            ui.select(
-                                options={"": "All attacks"},
-                                value="",
-                                on_change=lambda e: self._on_runs_filter_change(
-                                    "attack", e.value
-                                ),
-                            )
-                            .props("dense outlined")
-                            .classes("min-w-[140px]")
-                        )
-                        self._runs_status_select = (
-                            ui.select(
-                                options={"": "All statuses"},
-                                value="",
-                                on_change=lambda e: self._on_runs_filter_change(
-                                    "status", e.value
-                                ),
-                            )
-                            .props("dense outlined")
-                            .classes("min-w-[140px]")
-                        )
-                    # ── Count + delete row ─────────────────────────────────────
-                    with ui.row().classes("items-center justify-between px-2"):
-                        self.runs_count_label = ui.label("").classes(
-                            "text-sm text-grey-6"
-                        )
-                        with ui.row().classes("items-center gap-2"):
-                            self._runs_compare_btn = (
-                                ui.button(
-                                    "Compare",
-                                    icon="compare_arrows",
-                                    on_click=lambda: ui.timer(
-                                        0,
-                                        self._compare_selected_runs,
-                                        once=True,
-                                    ),
-                                )
-                                .props("flat dense no-caps color=primary")
-                                .classes("opacity-30 pointer-events-none")
-                            )
-                            self._runs_export_btn = (
-                                ui.button(
-                                    "Export",
-                                    icon="download",
-                                    on_click=lambda: ui.timer(
-                                        0,
-                                        self._export_selected_runs,
-                                        once=True,
-                                    ),
-                                )
-                                .props("flat dense no-caps color=secondary")
-                                .classes("opacity-30 pointer-events-none")
-                            )
-                            self._runs_delete_btn = (
-                                ui.button(
-                                    "Delete",
-                                    icon="delete",
-                                    on_click=lambda: ui.timer(
-                                        0,
-                                        self._delete_selected_runs,
-                                        once=True,
-                                    ),
-                                )
-                                .props("flat dense no-caps color=negative")
-                                .classes("opacity-30 pointer-events-none")
-                            )
-                    # ── Scrollable run list ────────────────────────────────────
-                    with ui.scroll_area().classes("w-full flex-1 min-h-0"):
-                        self.runs_table = make_run_table(
-                            on_row_click=lambda run: ui.timer(
+        with panel.classes("w-full h-[calc(100vh-160px)] min-h-0"):
+            # ── Filter bar ────────────────────────────────────────────
+            with ui.row().classes("items-center w-full gap-2 px-2 flex-wrap"):
+                ui.input(
+                    placeholder="Search runs…",
+                ).props("dense outlined clearable").classes("min-w-[180px] flex-1").on(
+                    "update:model-value",
+                    lambda e: self._on_runs_search_change(
+                        e.args if isinstance(e.args, str) else (e.args or "")
+                    ),
+                )
+                self._runs_agent_select = (
+                    ui.select(
+                        options={"": "All agents"},
+                        value="",
+                        on_change=lambda e: self._on_runs_filter_change(
+                            "agent", e.value
+                        ),
+                    )
+                    .props("dense outlined")
+                    .classes("min-w-[140px]")
+                )
+                self._runs_attack_select = (
+                    ui.select(
+                        options={"": "All attacks"},
+                        value="",
+                        on_change=lambda e: self._on_runs_filter_change(
+                            "attack", e.value
+                        ),
+                    )
+                    .props("dense outlined")
+                    .classes("min-w-[140px]")
+                )
+                self._runs_status_select = (
+                    ui.select(
+                        options={"": "All statuses"},
+                        value="",
+                        on_change=lambda e: self._on_runs_filter_change(
+                            "status", e.value
+                        ),
+                    )
+                    .props("dense outlined")
+                    .classes("min-w-[140px]")
+                )
+            # ── Count + delete row ─────────────────────────────────────
+            with ui.row().classes("items-center justify-between px-2"):
+                self.runs_count_label = ui.label("").classes("text-sm text-grey-6")
+                with ui.row().classes("items-center gap-2"):
+                    self._runs_compare_btn = (
+                        ui.button(
+                            "Compare",
+                            icon="compare_arrows",
+                            on_click=lambda: ui.timer(
                                 0,
-                                lambda r=run: asyncio.create_task(
-                                    self._open_run_history_results(r)
-                                ),
+                                self._compare_selected_runs,
                                 once=True,
                             ),
-                            include_agent=True,
-                            include_progressive_run=True,
-                            include_results=False,
-                            include_goal_latency_avg=True,
-                            include_asr=True,
-                            pagination={"rowsPerPage": 15},
-                            selection="multiple",
-                            on_select=lambda e: self._on_runs_table_select(e),
                         )
-                        # Move pagination bar to top via flex order
-                        self.runs_table.classes("runs-table-top-pagination")
-                        ui.add_css("""
+                        .props("flat dense no-caps color=primary")
+                        .classes("opacity-30 pointer-events-none")
+                    )
+                    self._runs_export_btn = (
+                        ui.button(
+                            "Export",
+                            icon="download",
+                            on_click=lambda: ui.timer(
+                                0,
+                                self._export_selected_runs,
+                                once=True,
+                            ),
+                        )
+                        .props("flat dense no-caps color=secondary")
+                        .classes("opacity-30 pointer-events-none")
+                    )
+                    self._runs_delete_btn = (
+                        ui.button(
+                            "Delete",
+                            icon="delete",
+                            on_click=lambda: ui.timer(
+                                0,
+                                self._delete_selected_runs,
+                                once=True,
+                            ),
+                        )
+                        .props("flat dense no-caps color=negative")
+                        .classes("opacity-30 pointer-events-none")
+                    )
+            # ── Scrollable run list ────────────────────────────────────
+            with ui.scroll_area().classes("w-full flex-1 min-h-0"):
+                self.runs_table = make_run_table(
+                    on_row_click=lambda run: ui.timer(
+                        0,
+                        lambda r=run: asyncio.create_task(
+                            self._open_run_history_results(r)
+                        ),
+                        once=True,
+                    ),
+                    include_agent=True,
+                    include_progressive_run=True,
+                    include_results=False,
+                    include_goal_latency_avg=True,
+                    include_asr=True,
+                    pagination={"rowsPerPage": 15},
+                    selection="multiple",
+                    on_select=lambda e: self._on_runs_table_select(e),
+                )
+                # Move pagination bar to top via flex order
+                self.runs_table.classes("runs-table-top-pagination")
+                ui.add_css("""
                             .runs-table-top-pagination .q-table__container {
                                 display: flex;
                                 flex-direction: column;
@@ -794,17 +786,15 @@ function hackAgentCopyFallback(text) {
                             }
 
                         """)
-                        self._runs_load_more_btn = (
-                            ui.button(
-                                "Load more",
-                                icon="expand_more",
-                                on_click=lambda: ui.timer(
-                                    0, self._load_more_runs, once=True
-                                ),
-                            )
-                            .props("flat no-caps color=primary")
-                            .classes("self-center my-2 hidden")
-                        )
+                self._runs_load_more_btn = (
+                    ui.button(
+                        "Load more",
+                        icon="expand_more",
+                        on_click=lambda: ui.timer(0, self._load_more_runs, once=True),
+                    )
+                    .props("flat no-caps color=primary")
+                    .classes("self-center my-2 hidden")
+                )
 
     def _build_reports_panel(self, panel: ui.column) -> None:
         with panel:
