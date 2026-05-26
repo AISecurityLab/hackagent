@@ -194,6 +194,7 @@ class HackAgent:
                 PAIROrchestrator,
                 FlipAttackOrchestrator,
                 TAPOrchestrator,
+                MMLOrchestrator,
             )
 
             self._attack_strategies = {
@@ -207,6 +208,7 @@ class HackAgent:
                 "tap": TAPOrchestrator(hackagent_agent=self),
                 "h4rm3l": H4rm3lOrchestrator(hackagent_agent=self),
                 "pap": PAPOrchestrator(hackagent_agent=self),
+                "mml": MMLOrchestrator(hackagent_agent=self),
             }
         return self._attack_strategies
 
