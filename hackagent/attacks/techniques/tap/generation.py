@@ -846,8 +846,8 @@ class TapExecutor:
             target_response_list = list(target_response_list)
 
             processed_response_list = [
-                _process_target_response(response_text, score, goal)
-                for response_text, score in zip(target_response_list, judge_scores)
+                _process_target_response(r if isinstance(r, str) else "", score, goal)
+                for r, score in zip(target_response_list, judge_scores)
             ]
 
             for conv in convs_list:
