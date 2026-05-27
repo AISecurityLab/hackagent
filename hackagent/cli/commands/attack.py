@@ -117,6 +117,38 @@ def _common_attack_options(func):
             is_flag=True,
             help="Run attack directly without opening TUI (default: open TUI)",
         ),
+        # Before guardrail options
+        click.option(
+            "--before-guardrail-name",
+            default=None,
+            help="Before-guardrail model identifier (e.g., openai/gpt-oss-safeguard-20b)",
+        ),
+        click.option(
+            "--before-guardrail-type",
+            default=None,
+            help="Before-guardrail agent type (e.g., openai-sdk, ollama)",
+        ),
+        click.option(
+            "--before-guardrail-endpoint",
+            default=None,
+            help="Before-guardrail endpoint URL",
+        ),
+        # After guardrail options
+        click.option(
+            "--after-guardrail-name",
+            default=None,
+            help="After-guardrail model identifier (e.g., openai/gpt-oss-safeguard-20b)",
+        ),
+        click.option(
+            "--after-guardrail-type",
+            default=None,
+            help="After-guardrail agent type (e.g., openai-sdk, ollama)",
+        ),
+        click.option(
+            "--after-guardrail-endpoint",
+            default=None,
+            help="After-guardrail endpoint URL",
+        ),
     ]
 
     for option in reversed(options):
@@ -180,6 +212,20 @@ def _build_attack_config(
     return attack_config
 
 
+def _build_guardrail_config(
+    name: Optional[str],
+    type: Optional[str],
+    endpoint: Optional[str],
+) -> Optional[Dict[str, Any]]:
+    """Build a guardrail config dict from individual CLI options.
+
+    Returns None if no guardrail name is provided.
+    """
+    if not name:
+        return None
+    return {"identifier": name, "agent_type": type, "endpoint": endpoint}
+
+
 def _run_attack_command(
     ctx,
     attack_type: str,
@@ -192,6 +238,12 @@ def _run_attack_command(
     timeout: int,
     dry_run: bool,
     no_tui: bool,
+    before_guardrail_name: Optional[str] = None,
+    before_guardrail_type: Optional[str] = None,
+    before_guardrail_endpoint: Optional[str] = None,
+    after_guardrail_name: Optional[str] = None,
+    after_guardrail_type: Optional[str] = None,
+    after_guardrail_endpoint: Optional[str] = None,
 ):
     """Shared implementation for all attack subcommands."""
     cli_config: CLIConfig = ctx.obj["config"]
@@ -261,12 +313,24 @@ def _run_attack_command(
     # Initialize HackAgent
     with console.status("[bold green]Initializing HackAgent..."):
         try:
+            before_guardrail = _build_guardrail_config(
+                before_guardrail_name,
+                before_guardrail_type,
+                before_guardrail_endpoint,
+            )
+            after_guardrail = _build_guardrail_config(
+                after_guardrail_name,
+                after_guardrail_type,
+                after_guardrail_endpoint,
+            )
             agent = HackAgent(
                 name=agent_name,
                 endpoint=endpoint,
                 agent_type=agent_type_enum,
                 api_key=cli_config.api_key,
                 base_url=cli_config.base_url,
+                before_guardrail=before_guardrail,
+                after_guardrail=after_guardrail,
             )
             display_success(f"Agent '{agent_name}' initialized successfully")
         except Exception as e:
@@ -407,7 +471,21 @@ def eval_cmd(
 @click.pass_context
 @handle_errors
 def advprefix(
-    ctx, agent_name, agent_type, endpoint, goals, config_file, timeout, dry_run, no_tui
+    ctx,
+    agent_name,
+    agent_type,
+    endpoint,
+    goals,
+    config_file,
+    timeout,
+    dry_run,
+    no_tui,
+    before_guardrail_name,
+    before_guardrail_type,
+    before_guardrail_endpoint,
+    after_guardrail_name,
+    after_guardrail_type,
+    after_guardrail_endpoint,
 ):
     """Execute AdvPrefix attack strategy
 
@@ -429,7 +507,7 @@ def advprefix(
           --agent-type "google-adk" \\
           --endpoint "http://localhost:8000" \\
           --config-file "attack-config.json"
-    """
+api    """
     _run_attack_command(
         ctx=ctx,
         attack_type="advprefix",
@@ -442,6 +520,12 @@ def advprefix(
         timeout=timeout,
         dry_run=dry_run,
         no_tui=no_tui,
+        before_guardrail_name=before_guardrail_name,
+        before_guardrail_type=before_guardrail_type,
+        before_guardrail_endpoint=before_guardrail_endpoint,
+        after_guardrail_name=after_guardrail_name,
+        after_guardrail_type=after_guardrail_type,
+        after_guardrail_endpoint=after_guardrail_endpoint,
     )
 
 
@@ -450,7 +534,21 @@ def advprefix(
 @click.pass_context
 @handle_errors
 def baseline(
-    ctx, agent_name, agent_type, endpoint, goals, config_file, timeout, dry_run, no_tui
+    ctx,
+    agent_name,
+    agent_type,
+    endpoint,
+    goals,
+    config_file,
+    timeout,
+    dry_run,
+    no_tui,
+    before_guardrail_name,
+    before_guardrail_type,
+    before_guardrail_endpoint,
+    after_guardrail_name,
+    after_guardrail_type,
+    after_guardrail_endpoint,
 ):
     """Execute Baseline attack strategy."""
     _run_attack_command(
@@ -465,6 +563,12 @@ def baseline(
         timeout=timeout,
         dry_run=dry_run,
         no_tui=no_tui,
+        before_guardrail_name=before_guardrail_name,
+        before_guardrail_type=before_guardrail_type,
+        before_guardrail_endpoint=before_guardrail_endpoint,
+        after_guardrail_name=after_guardrail_name,
+        after_guardrail_type=after_guardrail_type,
+        after_guardrail_endpoint=after_guardrail_endpoint,
     )
 
 
@@ -473,7 +577,21 @@ def baseline(
 @click.pass_context
 @handle_errors
 def pair(
-    ctx, agent_name, agent_type, endpoint, goals, config_file, timeout, dry_run, no_tui
+    ctx,
+    agent_name,
+    agent_type,
+    endpoint,
+    goals,
+    config_file,
+    timeout,
+    dry_run,
+    no_tui,
+    before_guardrail_name,
+    before_guardrail_type,
+    before_guardrail_endpoint,
+    after_guardrail_name,
+    after_guardrail_type,
+    after_guardrail_endpoint,
 ):
     """Execute PAIR attack strategy."""
     _run_attack_command(
@@ -488,6 +606,12 @@ def pair(
         timeout=timeout,
         dry_run=dry_run,
         no_tui=no_tui,
+        before_guardrail_name=before_guardrail_name,
+        before_guardrail_type=before_guardrail_type,
+        before_guardrail_endpoint=before_guardrail_endpoint,
+        after_guardrail_name=after_guardrail_name,
+        after_guardrail_type=after_guardrail_type,
+        after_guardrail_endpoint=after_guardrail_endpoint,
     )
 
 
@@ -496,7 +620,21 @@ def pair(
 @click.pass_context
 @handle_errors
 def flipattack(
-    ctx, agent_name, agent_type, endpoint, goals, config_file, timeout, dry_run, no_tui
+    ctx,
+    agent_name,
+    agent_type,
+    endpoint,
+    goals,
+    config_file,
+    timeout,
+    dry_run,
+    no_tui,
+    before_guardrail_name,
+    before_guardrail_type,
+    before_guardrail_endpoint,
+    after_guardrail_name,
+    after_guardrail_type,
+    after_guardrail_endpoint,
 ):
     """Execute FlipAttack strategy."""
     _run_attack_command(
@@ -511,6 +649,12 @@ def flipattack(
         timeout=timeout,
         dry_run=dry_run,
         no_tui=no_tui,
+        before_guardrail_name=before_guardrail_name,
+        before_guardrail_type=before_guardrail_type,
+        before_guardrail_endpoint=before_guardrail_endpoint,
+        after_guardrail_name=after_guardrail_name,
+        after_guardrail_type=after_guardrail_type,
+        after_guardrail_endpoint=after_guardrail_endpoint,
     )
 
 
@@ -519,7 +663,21 @@ def flipattack(
 @click.pass_context
 @handle_errors
 def tap(
-    ctx, agent_name, agent_type, endpoint, goals, config_file, timeout, dry_run, no_tui
+    ctx,
+    agent_name,
+    agent_type,
+    endpoint,
+    goals,
+    config_file,
+    timeout,
+    dry_run,
+    no_tui,
+    before_guardrail_name,
+    before_guardrail_type,
+    before_guardrail_endpoint,
+    after_guardrail_name,
+    after_guardrail_type,
+    after_guardrail_endpoint,
 ):
     """Execute TAP attack strategy."""
     _run_attack_command(
@@ -534,6 +692,12 @@ def tap(
         timeout=timeout,
         dry_run=dry_run,
         no_tui=no_tui,
+        before_guardrail_name=before_guardrail_name,
+        before_guardrail_type=before_guardrail_type,
+        before_guardrail_endpoint=before_guardrail_endpoint,
+        after_guardrail_name=after_guardrail_name,
+        after_guardrail_type=after_guardrail_type,
+        after_guardrail_endpoint=after_guardrail_endpoint,
     )
 
 
@@ -542,7 +706,21 @@ def tap(
 @click.pass_context
 @handle_errors
 def autodan_turbo(
-    ctx, agent_name, agent_type, endpoint, goals, config_file, timeout, dry_run, no_tui
+    ctx,
+    agent_name,
+    agent_type,
+    endpoint,
+    goals,
+    config_file,
+    timeout,
+    dry_run,
+    no_tui,
+    before_guardrail_name,
+    before_guardrail_type,
+    before_guardrail_endpoint,
+    after_guardrail_name,
+    after_guardrail_type,
+    after_guardrail_endpoint,
 ):
     """Execute AutoDAN-Turbo attack strategy."""
     _run_attack_command(
@@ -557,6 +735,12 @@ def autodan_turbo(
         timeout=timeout,
         dry_run=dry_run,
         no_tui=no_tui,
+        before_guardrail_name=before_guardrail_name,
+        before_guardrail_type=before_guardrail_type,
+        before_guardrail_endpoint=before_guardrail_endpoint,
+        after_guardrail_name=after_guardrail_name,
+        after_guardrail_type=after_guardrail_type,
+        after_guardrail_endpoint=after_guardrail_endpoint,
     )
 
 
@@ -565,7 +749,21 @@ def autodan_turbo(
 @click.pass_context
 @handle_errors
 def bon(
-    ctx, agent_name, agent_type, endpoint, goals, config_file, timeout, dry_run, no_tui
+    ctx,
+    agent_name,
+    agent_type,
+    endpoint,
+    goals,
+    config_file,
+    timeout,
+    dry_run,
+    no_tui,
+    before_guardrail_name,
+    before_guardrail_type,
+    before_guardrail_endpoint,
+    after_guardrail_name,
+    after_guardrail_type,
+    after_guardrail_endpoint,
 ):
     """Execute BoN attack strategy."""
     _run_attack_command(
@@ -580,6 +778,12 @@ def bon(
         timeout=timeout,
         dry_run=dry_run,
         no_tui=no_tui,
+        before_guardrail_name=before_guardrail_name,
+        before_guardrail_type=before_guardrail_type,
+        before_guardrail_endpoint=before_guardrail_endpoint,
+        after_guardrail_name=after_guardrail_name,
+        after_guardrail_type=after_guardrail_type,
+        after_guardrail_endpoint=after_guardrail_endpoint,
     )
 
 
@@ -588,7 +792,21 @@ def bon(
 @click.pass_context
 @handle_errors
 def cipherchat(
-    ctx, agent_name, agent_type, endpoint, goals, config_file, timeout, dry_run, no_tui
+    ctx,
+    agent_name,
+    agent_type,
+    endpoint,
+    goals,
+    config_file,
+    timeout,
+    dry_run,
+    no_tui,
+    before_guardrail_name,
+    before_guardrail_type,
+    before_guardrail_endpoint,
+    after_guardrail_name,
+    after_guardrail_type,
+    after_guardrail_endpoint,
 ):
     """Execute CipherChat attack strategy."""
     _run_attack_command(
@@ -603,6 +821,12 @@ def cipherchat(
         timeout=timeout,
         dry_run=dry_run,
         no_tui=no_tui,
+        before_guardrail_name=before_guardrail_name,
+        before_guardrail_type=before_guardrail_type,
+        before_guardrail_endpoint=before_guardrail_endpoint,
+        after_guardrail_name=after_guardrail_name,
+        after_guardrail_type=after_guardrail_type,
+        after_guardrail_endpoint=after_guardrail_endpoint,
     )
 
 
@@ -611,7 +835,21 @@ def cipherchat(
 @click.pass_context
 @handle_errors
 def h4rm3l(
-    ctx, agent_name, agent_type, endpoint, goals, config_file, timeout, dry_run, no_tui
+    ctx,
+    agent_name,
+    agent_type,
+    endpoint,
+    goals,
+    config_file,
+    timeout,
+    dry_run,
+    no_tui,
+    before_guardrail_name,
+    before_guardrail_type,
+    before_guardrail_endpoint,
+    after_guardrail_name,
+    after_guardrail_type,
+    after_guardrail_endpoint,
 ):
     """Execute h4rm3l attack strategy."""
     _run_attack_command(
@@ -626,6 +864,12 @@ def h4rm3l(
         timeout=timeout,
         dry_run=dry_run,
         no_tui=no_tui,
+        before_guardrail_name=before_guardrail_name,
+        before_guardrail_type=before_guardrail_type,
+        before_guardrail_endpoint=before_guardrail_endpoint,
+        after_guardrail_name=after_guardrail_name,
+        after_guardrail_type=after_guardrail_type,
+        after_guardrail_endpoint=after_guardrail_endpoint,
     )
 
 
@@ -634,7 +878,21 @@ def h4rm3l(
 @click.pass_context
 @handle_errors
 def pap(
-    ctx, agent_name, agent_type, endpoint, goals, config_file, timeout, dry_run, no_tui
+    ctx,
+    agent_name,
+    agent_type,
+    endpoint,
+    goals,
+    config_file,
+    timeout,
+    dry_run,
+    no_tui,
+    before_guardrail_name,
+    before_guardrail_type,
+    before_guardrail_endpoint,
+    after_guardrail_name,
+    after_guardrail_type,
+    after_guardrail_endpoint,
 ):
     """Execute PAP attack strategy."""
     _run_attack_command(
@@ -649,6 +907,12 @@ def pap(
         timeout=timeout,
         dry_run=dry_run,
         no_tui=no_tui,
+        before_guardrail_name=before_guardrail_name,
+        before_guardrail_type=before_guardrail_type,
+        before_guardrail_endpoint=before_guardrail_endpoint,
+        after_guardrail_name=after_guardrail_name,
+        after_guardrail_type=after_guardrail_type,
+        after_guardrail_endpoint=after_guardrail_endpoint,
     )
 
 

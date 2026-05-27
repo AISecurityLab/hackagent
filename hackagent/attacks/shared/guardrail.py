@@ -11,13 +11,15 @@ pattern used throughout the attacks package.
 
 Guardrails intercept text **before** it is sent to the target model
 (``before_guardrail``) and/or **after** a response is received
-(``after_guardrail``).  They are configured in the attack config dict with
-the same field semantics used for ``attacker`` and ``judges``:
+(``after_guardrail``).  They are configured on the ``HackAgent`` at
+initialisation time, using the same field semantics as ``attacker`` and
+``judges``:
 
-    attack_config = {
-        "attack_type": "pair",
-        "goals": [...],
-        "before_guardrail": {
+    agent = HackAgent(
+        name="llama3",
+        endpoint="http://localhost:11434",
+        agent_type="ollama",
+        before_guardrail={
             "identifier": "openai/gpt-oss-safeguard-20b",
             "endpoint": "https://openrouter.ai/api/v1",
             "api_key": "OPENROUTER_API_KEY",   # env-var name or literal
@@ -25,13 +27,13 @@ the same field semantics used for ``attacker`` and ``judges``:
             "temperature": 0.0,
             "max_tokens": 200,
         },
-        "after_guardrail": { ... },
-    }
+        after_guardrail={ ... },
+    )
 
-The ``AttackOrchestrator`` builds guardrail instances automatically from
-these configs and injects them into ``BaseAttack`` as ``_before_guardrail``
-/ ``_after_guardrail``.  Attack implementations call the helpers exposed by
-``BaseAttack`` — see ``attacks/base.py``.
+The ``HackAgent.__init__`` wires guardrail instances onto the target router
+so they apply transparently to every ``route_request`` call for all attacks.
+Attack implementations call the helpers exposed by ``BaseAttack`` — see
+``attacks/base.py``.
 """
 
 import json
