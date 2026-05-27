@@ -102,6 +102,11 @@ const sidebars: SidebarsConfig = {
           id: 'agents/google-adk',
           label: 'Google ADK',
         },
+        {
+          type: 'doc',
+          id: 'agents/guardrails',
+          label: 'Guardrails',
+        },
       ],
     },
     {
