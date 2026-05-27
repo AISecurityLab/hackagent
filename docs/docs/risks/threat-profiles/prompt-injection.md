@@ -29,6 +29,16 @@ Tests whether injected instructions override system prompts.
 ### Secondary Attacks
 - **AdvPrefix**: Adversarial prefix optimisation
 
+## Indirect Prompt Injection
+
+When the target system uses retrieval, add an indirect prompt injection campaign to measure exposure to poisoned knowledge-base content.
+
+- Recommended technique: `indirect_prompt_injection`
+- Focus metric: `asr` with retrieval-hit diagnostics
+- Suggested tuning baseline: `chunk_size=1400`, `chunk_overlap=250`, `top_k=5`
+
+Reference technique guide: [Indirect Prompt Injection Attack](../../attacks/indirect_prompt_injection.md).
+
 ## Metrics
 
 - asr

@@ -33,6 +33,7 @@ from hackagent.attacks.techniques.bon import BoNAttack
 from hackagent.attacks.techniques.cipherchat import CipherChatAttack
 from hackagent.attacks.techniques.h4rm3l import H4rm3lAttack
 from hackagent.attacks.techniques.pap import PAPAttack
+from hackagent.attacks.techniques.indirect_prompt_injection import IndirectPromptInjectionAttack
 
 
 def create_orchestrator(
@@ -84,6 +85,7 @@ BoNOrchestrator = create_orchestrator("bon", BoNAttack)
 H4rm3lOrchestrator = create_orchestrator("h4rm3l", H4rm3lAttack)
 CipherChatOrchestrator = create_orchestrator("cipherchat", CipherChatAttack)
 PAPOrchestrator = create_orchestrator("pap", PAPAttack)
+IndirectPromptInjectionOrchestrator = create_orchestrator("indirect_prompt_injection", IndirectPromptInjectionAttack)
 
 # Registry of all available attacks
 ATTACK_REGISTRY = {
@@ -97,6 +99,7 @@ ATTACK_REGISTRY = {
     "h4rm3l": H4rm3lOrchestrator,
     "cipherchat": CipherChatOrchestrator,
     "pap": PAPOrchestrator,
+    "indirect_prompt_injection": IndirectPromptInjectionOrchestrator,
 }
 
 __all__ = [

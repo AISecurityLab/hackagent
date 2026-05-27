@@ -12,6 +12,16 @@ Tests whether the LLM executes attacker-supplied instructions that override or b
 - **Indirect Injection**: Malicious instructions are embedded in retrieved/external content.
 - **Context Manipulation**: Crafted context tricks the model into ignoring guardrails.
 
+## Indirect Prompt Injection
+
+Indirect prompt injection is especially relevant for RAG-enabled systems where the user query is benign but retrieved context is adversarial.
+
+- Attack vector: poisoned KB documents that inject hidden instructions into retrieved chunks.
+- Typical effect: the model follows malicious context instructions while appearing to answer normally.
+- Why it is hard to catch: user prompts look harmless, and filtering only user input is not enough.
+
+For an end-to-end evaluation workflow (poisoning, retrieval, judging), see [Indirect Prompt Injection Attack](../../attacks/indirect_prompt_injection.md).
+
 ## Threat Profile
 
 **Objective**: jailbreak

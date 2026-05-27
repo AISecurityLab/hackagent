@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 from collections import defaultdict
 import contextlib
+import html
 import json
 import math
 import re
@@ -762,7 +763,7 @@ class DashboardPage:
                 "width: 0; min-width: 0; overflow: hidden; height: 100%;"
             )
         if self._history_left_col is not None:
-            self._history_left_col.classes(remove="w-1/2", add="w-full")
+            self._history_left_col.style("width: 100%; min-width: 100%;")
 
     def _close_reports_detail(self) -> None:
         """Close the right detail panel and restore full-width report list."""
@@ -772,7 +773,7 @@ class DashboardPage:
                 "width: 0; min-width: 0; overflow: hidden; height: 100%;"
             )
         if self._reports_left_col is not None:
-            self._reports_left_col.classes(remove="w-1/2", add="w-full")
+            self._reports_left_col.style("width: 100%; min-width: 100%;")
         self._report_results_left_col = None
         self._report_goal_detail_panel = None
         self._report_current_run = None
@@ -785,7 +786,7 @@ class DashboardPage:
                 "width: 0; min-width: 0; overflow: hidden; height: 100%;"
             )
         if self._report_results_left_col is not None:
-            self._report_results_left_col.classes(remove="w-1/2", add="w-full")
+            self._report_results_left_col.style("width: 100%; min-width: 100%;")
 
     async def _open_report_goal_detail(self, row: dict) -> None:
         """Show Result / Traces / Config tabs for a report goal in side panel."""
@@ -793,9 +794,9 @@ class DashboardPage:
             return
 
         if self._report_results_left_col is not None:
-            self._report_results_left_col.classes(remove="w-full", add="w-1/2")
+            self._report_results_left_col.style("width: 58%; min-width: 58%;")
         self._report_goal_detail_panel.style(
-            "width: 50%; min-width: 50%; height: 100%; overflow: hidden;"
+            "width: 42%; min-width: 42%; height: 100%; overflow: hidden;"
         )
 
         self._report_goal_detail_panel.clear()
@@ -884,9 +885,9 @@ class DashboardPage:
         self._history_detail_visible = True
         # Shrink left, expand right
         if self._history_left_col is not None:
-            self._history_left_col.classes(remove="w-full", add="w-1/2")
+            self._history_left_col.style("width: 58%; min-width: 58%;")
         self._history_detail_panel.style(
-            "width: 50%; min-width: 50%; height: 100%; overflow: hidden;"
+            "width: 42%; min-width: 42%; height: 100%; overflow: hidden;"
         )
 
         self._history_detail_panel.clear()
@@ -1335,23 +1336,26 @@ class DashboardPage:
                 return
 
             with container:
-                with ui.row().classes("items-center gap-2 mb-2"):
-                    ui.label(
-                        f"{len(serialized_traces)} step{'s' if len(serialized_traces) != 1 else ''}"
-                    ).classes("text-xs text-grey-6")
-                    ui.label(
-                        f"{len([t for t in serialized_traces if self._classify_trace_step(t)[0] == 'evaluation'])} traces"
-                    ).classes("text-xs text-grey-6")
+                if self._is_indirect_injection_trace_set(serialized_traces):
+                    self._render_indirect_injection_view(row, serialized_traces)
+                else:
+                    with ui.row().classes("items-center gap-2 mb-2"):
+                        ui.label(
+                            f"{len(serialized_traces)} step{'s' if len(serialized_traces) != 1 else ''}"
+                        ).classes("text-xs text-grey-6")
+                        ui.label(
+                            f"{len([t for t in serialized_traces if self._classify_trace_step(t)[0] == 'evaluation'])} traces"
+                        ).classes("text-xs text-grey-6")
 
-                for td in serialized_traces:
-                    _, label = self._classify_trace_step(td)
-                    td["_display_label"] = label
+                    for td in serialized_traces:
+                        _, label = self._classify_trace_step(td)
+                        td["_display_label"] = label
 
-                rendered_phase_view = self._render_autodan_phase_timeline(
-                    serialized_traces
-                )
-                if not rendered_phase_view:
-                    self._render_standard_trace_sections(serialized_traces)
+                    rendered_phase_view = self._render_autodan_phase_timeline(
+                        serialized_traces
+                    )
+                    if not rendered_phase_view:
+                        self._render_standard_trace_sections(serialized_traces)
 
         except Exception as exc:
             container.clear()
@@ -3973,6 +3977,14 @@ class DashboardPage:
 
         if isinstance(content, dict):
             # -----------------------------------------------------------------
+            # Indirect Prompt Injection — Document Poisoning trace
+            # -----------------------------------------------------------------
+            step_name = str(content.get("step_name") or "")
+            if step_name == "Document Poisoning" and content.get("injected_payload"):
+                self._render_indirect_injection_poisoning_trace(content)
+                return
+
+            # -----------------------------------------------------------------
             # TAP Goals block
             # -----------------------------------------------------------------
             goal = content.get("goal")
@@ -4194,6 +4206,325 @@ class DashboardPage:
 
         ui.label(str(content)).classes("text-sm whitespace-pre-wrap")
 
+    def _render_indirect_injection_poisoning_trace(self, content: dict) -> None:
+        """Render poisoning preview as context-before + bold payload + context-after."""
+        doc_id = str(content.get("document_id") or "unknown")
+        insert_idx = content.get("insertion_paragraph_index", "?")
+        context_before = str(
+            content.get("preview_before_tail")
+            or content.get("context_before")
+            or ""
+        )
+        payload = str(content.get("injected_payload") or "").strip()
+        context_after = str(
+            content.get("preview_after_head")
+            or content.get("context_after")
+            or ""
+        )
+
+        has_before = bool(content.get("preview_has_before")) or bool(context_before)
+        has_after = bool(content.get("preview_has_after")) or bool(context_after)
+
+        preview_html = ""
+        if has_before:
+            preview_html += "[...]"
+        preview_html += html.escape(context_before)
+        preview_html += f" <strong>{html.escape(payload)}</strong> "
+        preview_html += html.escape(context_after)
+        if has_after:
+            preview_html += "[...]"
+
+        with ui.card().tight().classes(
+            "w-full border border-orange-200 bg-orange-50/40 "
+            "dark:border-orange-700 dark:bg-orange-900/10"
+        ):
+            with ui.column().classes("p-4 gap-2"):
+                with ui.row().classes("items-center gap-2"):
+                    ui.label(f"Document: {doc_id}").classes("text-sm font-semibold")
+                    ui.badge(f"Paragraph #{insert_idx}", color="warning").classes(
+                        "text-xs"
+                    )
+                    ui.badge("Insertion Only", color="grey-7").classes("text-xs")
+                ui.html(
+                    "<div style='white-space: pre-wrap; line-height: 1.55'>"
+                    f"{preview_html}"
+                    "</div>"
+                ).classes("text-sm")
+                ui.label(
+                    "The payload is inserted between text snippets. Original text is preserved."
+                ).classes("text-xs text-grey-6")
+
+    @staticmethod
+    def _is_indirect_injection_trace_set(traces: list[dict]) -> bool:
+        """Return True when traces belong to indirect prompt injection flow."""
+        for trace_data in traces:
+            content = trace_data.get("content")
+            if not isinstance(content, dict):
+                continue
+
+            step_name = str(content.get("step_name") or "").strip().lower()
+            if step_name == "document poisoning" or step_name.startswith("rag query"):
+                return True
+
+            attack_type = str(content.get("attack_type") or "").strip().lower()
+            if attack_type == "indirect_prompt_injection":
+                return True
+
+            evaluator = str(content.get("evaluator") or "").strip().lower()
+            if evaluator == "indirect_injection_judge":
+                return True
+
+        return False
+
+    @staticmethod
+    def _collect_indirect_injection_trace_data(
+        traces: list[dict],
+    ) -> tuple[list[dict], list[dict]]:
+        """Extract poisoning previews and query/evaluation panels from traces."""
+
+        def _to_int(value: object, default: int) -> int:
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                return default
+
+        poisoning_traces: list[dict] = []
+        query_map: dict[int, dict] = {}
+        next_index = 1
+
+        ordered = sorted(
+            traces,
+            key=lambda item: _to_int(item.get("sequence"), 0),
+        )
+
+        for trace_data in ordered:
+            content = trace_data.get("content")
+            if not isinstance(content, dict):
+                continue
+
+            step_name = str(content.get("step_name") or "").strip()
+            step_lower = step_name.lower()
+            metadata = content.get("metadata") if isinstance(content.get("metadata"), dict) else {}
+
+            if step_lower == "document poisoning" and content.get("injected_payload"):
+                poisoning_traces.append(content)
+                continue
+
+            if step_lower.startswith("rag query"):
+                query_index = _to_int(metadata.get("query_index"), 0)
+                if query_index <= 0:
+                    match = re.search(r"#(\d+)", step_name)
+                    query_index = _to_int(match.group(1), 0) if match else 0
+                if query_index <= 0:
+                    query_index = next_index
+
+                entry = query_map.setdefault(
+                    query_index,
+                    {
+                        "query_index": query_index,
+                        "query": "",
+                        "response": "",
+                        "classification": "INCONCLUSIVE",
+                        "rationale": "",
+                    },
+                )
+
+                request_data = content.get("request")
+                if isinstance(request_data, dict):
+                    entry["query"] = str(
+                        request_data.get("prompt")
+                        or request_data.get("query")
+                        or entry["query"]
+                    )
+                elif isinstance(request_data, str) and request_data.strip():
+                    entry["query"] = request_data
+
+                response_data = content.get("response")
+                if isinstance(response_data, dict):
+                    entry["response"] = str(
+                        response_data.get("content")
+                        or response_data.get("response")
+                        or response_data.get("target_response")
+                        or entry["response"]
+                    )
+                elif isinstance(response_data, str) and response_data.strip():
+                    entry["response"] = response_data
+
+                next_index = max(next_index, query_index + 1)
+                continue
+
+            if step_lower.startswith("evaluation") or step_lower == "evaluation":
+                result_data = content.get("result") if isinstance(content.get("result"), dict) else {}
+
+                query_index = _to_int(metadata.get("query_index"), 0)
+                if query_index <= 0:
+                    query_index = _to_int(result_data.get("query_index"), 0)
+                if query_index <= 0:
+                    query_index = next_index
+
+                entry = query_map.setdefault(
+                    query_index,
+                    {
+                        "query_index": query_index,
+                        "query": "",
+                        "response": "",
+                        "classification": "INCONCLUSIVE",
+                        "rationale": "",
+                    },
+                )
+
+                metadata_query = metadata.get("query")
+                if isinstance(metadata_query, str) and metadata_query.strip() and not entry["query"]:
+                    entry["query"] = metadata_query
+
+                classification = (
+                    metadata.get("classification")
+                    or result_data.get("classification")
+                    or content.get("classification")
+                    or entry["classification"]
+                )
+                entry["classification"] = str(classification or "INCONCLUSIVE").upper()
+
+                rationale = (
+                    result_data.get("rationale")
+                    or content.get("explanation")
+                    or content.get("rationale")
+                    or entry["rationale"]
+                )
+                entry["rationale"] = str(rationale or "").strip()
+
+                next_index = max(next_index, query_index + 1)
+
+        query_panels = [query_map[idx] for idx in sorted(query_map.keys())]
+        return poisoning_traces, query_panels
+
+    @staticmethod
+    def _indirect_query_verdict_style(
+        classification: str,
+    ) -> tuple[str, str, str]:
+        """Map judge classification to UI label and response card style."""
+        cls = str(classification or "INCONCLUSIVE").upper()
+        if cls == "SUCCESS":
+            return (
+                "HARMFUL",
+                "negative",
+                "w-full border border-red-200 border-l-4 border-l-red-500 "
+                "bg-red-50 dark:border-red-700 dark:bg-red-900/20 rounded-lg shadow-sm",
+            )
+        if cls == "FAILURE":
+            return (
+                "SAFE",
+                "positive",
+                "w-full border border-green-200 border-l-4 border-l-green-500 "
+                "bg-green-50 dark:border-green-700 dark:bg-green-900/20 rounded-lg shadow-sm",
+            )
+        return (
+            "INCONCLUSIVE",
+            "warning",
+            "w-full border border-yellow-200 border-l-4 border-l-yellow-500 "
+            "bg-yellow-50 dark:border-yellow-700 dark:bg-yellow-900/20 rounded-lg shadow-sm",
+        )
+
+    def _render_indirect_injection_query_panel(self, panel: dict) -> None:
+        """Render a single expandable query panel with query/response/judge blocks."""
+        query_index = panel.get("query_index", "?")
+        query_text = str(panel.get("query") or "(query not available)")
+        response_text = str(panel.get("response") or "(response not available)")
+        classification = str(panel.get("classification") or "INCONCLUSIVE").upper()
+        rationale = str(panel.get("rationale") or "No rationale available")
+
+        verdict_label, verdict_color, response_card_classes = (
+            self._indirect_query_verdict_style(classification)
+        )
+
+        header_preview = query_text if len(query_text) <= 80 else f"{query_text[:80]}..."
+
+        with ui.card().tight().classes(
+            "w-full border border-grey-3 rounded-xl shadow-sm overflow-hidden"
+        ):
+            with ui.expansion(f"Query {query_index}", icon="quiz").classes("w-full"):
+                with ui.column().classes("w-full gap-3 p-3"):
+                    ui.label(header_preview).classes("text-sm text-grey-7 -mt-1")
+
+                    with ui.card().tight().classes(
+                        "w-full border border-grey-3 rounded-lg bg-grey-1/40 dark:bg-grey-9/20"
+                    ):
+                        with ui.column().classes("p-3 gap-1"):
+                            with ui.row().classes("items-center gap-2"):
+                                ui.icon("manage_search", size="xs", color="grey-7")
+                                ui.label("Generated Query").classes(
+                                    "text-xs font-semibold text-grey-6 uppercase"
+                                )
+                            ui.label(query_text).classes("text-sm whitespace-pre-wrap")
+
+                    with ui.card().tight().classes(response_card_classes):
+                        with ui.column().classes("p-3 gap-2"):
+                            with ui.row().classes("items-center gap-2"):
+                                ui.icon("smart_toy", size="xs", color="grey-7")
+                                ui.label("Target Response").classes(
+                                    "text-xs font-semibold uppercase"
+                                )
+                                ui.badge(verdict_label, color=verdict_color).classes(
+                                    "text-xs"
+                                )
+                            ui.label(response_text).classes("text-sm whitespace-pre-wrap")
+
+                    with ui.card().tight().classes(
+                        "w-full border border-grey-3 rounded-lg bg-white dark:bg-grey-10 shadow-sm"
+                    ):
+                        with ui.column().classes("p-3 gap-1"):
+                            with ui.row().classes("items-center gap-2"):
+                                ui.icon("gavel", size="xs", color="grey-7")
+                                ui.label("Judge Assessment").classes(
+                                    "text-xs font-semibold text-grey-6 uppercase"
+                                )
+                            ui.label(
+                                f"Verdict: {verdict_label} ({classification})"
+                            ).classes("text-sm font-medium")
+                            ui.label(rationale).classes("text-sm whitespace-pre-wrap")
+
+    def _render_indirect_injection_view(self, row: dict, traces: list[dict]) -> None:
+        """Render only goal, poisoning preview, and query panels for indirect injection."""
+        poisoning_traces, query_panels = self._collect_indirect_injection_trace_data(
+            traces
+        )
+
+        goal_text = str(row.get("goal") or "Goal not available")
+
+        with ui.column().classes("w-full gap-5"):
+            with ui.card().tight().classes("w-full border border-grey-3"):
+                with ui.column().classes("p-4 gap-1"):
+                    ui.label("Goal").classes(
+                        "text-xs font-semibold text-grey-6 uppercase"
+                    )
+                    ui.label(goal_text).classes("text-sm whitespace-pre-wrap")
+
+            with ui.column().classes("w-full gap-2"):
+                ui.label("Poisoning").classes(
+                    "text-xs font-semibold text-grey-6 uppercase"
+                )
+                if poisoning_traces:
+                    for poisoning in poisoning_traces:
+                        self._render_indirect_injection_poisoning_trace(poisoning)
+                else:
+                    with ui.card().tight().classes("w-full border border-grey-3"):
+                        ui.label("No poisoning preview available.").classes(
+                            "text-sm text-grey-6 p-3"
+                        )
+
+            with ui.column().classes("w-full gap-2"):
+                ui.label("Generated Queries").classes(
+                    "text-xs font-semibold text-grey-6 uppercase"
+                )
+                if query_panels:
+                    for panel in query_panels:
+                        self._render_indirect_injection_query_panel(panel)
+                else:
+                    with ui.card().tight().classes("w-full border border-grey-3"):
+                        ui.label("No queries available.").classes(
+                            "text-sm text-grey-6 p-3"
+                        )
+
     async def refresh_view(self) -> None:
         _v = self.current_view["value"]
         self.loading_spinner.set_visibility(True)
@@ -4379,22 +4710,25 @@ class DashboardPage:
                 trace_count_badge.set_text(str(len(serialized_traces)))
                 trace_count_badge.props("color=primary")
                 with trace_container:
-                    for td in serialized_traces:
-                        _, label = self._classify_trace_step(td)
-                        td["_display_label"] = label
-
-                    rendered_phase_view = self._render_autodan_phase_timeline(
-                        serialized_traces
-                    )
-                    if rendered_phase_view:
-                        # AutoDAN phase view is authoritative; hide generic
-                        # fallback sections to avoid duplicated Evaluation/Goal
-                        # blocks below Lifelong/Evaluation.
-                        pass
-                    elif self._is_tap_trace_set(serialized_traces):
-                        self._render_tap_trace_tree_view(serialized_traces)
+                    if self._is_indirect_injection_trace_set(serialized_traces):
+                        self._render_indirect_injection_view(result, serialized_traces)
                     else:
-                        self._render_standard_trace_sections(serialized_traces)
+                        for td in serialized_traces:
+                            _, label = self._classify_trace_step(td)
+                            td["_display_label"] = label
+
+                        rendered_phase_view = self._render_autodan_phase_timeline(
+                            serialized_traces
+                        )
+                        if rendered_phase_view:
+                            # AutoDAN phase view is authoritative; hide generic
+                            # fallback sections to avoid duplicated Evaluation/Goal
+                            # blocks below Lifelong/Evaluation.
+                            pass
+                        elif self._is_tap_trace_set(serialized_traces):
+                            self._render_tap_trace_tree_view(serialized_traces)
+                        else:
+                            self._render_standard_trace_sections(serialized_traces)
         except Exception as exc:
             trace_container.clear()
             with trace_container:
@@ -4897,7 +5231,7 @@ class DashboardPage:
 
         # Header row
         with ui.row().classes(
-            "w-full min-w-[1220px] flex-nowrap items-center px-3 py-2 border-b "
+            "w-full min-w-[1260px] flex-nowrap items-center px-3 py-2 border-b "
             "border-grey-3 text-xs font-semibold text-grey-6 gap-0"
         ):
             with ui.element("div").classes("w-10 flex items-center justify-center"):
@@ -4905,7 +5239,7 @@ class DashboardPage:
             ui.label("").classes("w-8")  # expand chevron
             ui.label("Run #").classes("w-16")
             ui.label("Agent").classes("flex-1 min-w-24")
-            ui.label("Attack").classes("w-32")
+            ui.label("Attack").classes("w-48")
             ui.label("Status").classes("w-28")
             ui.label("Total Latency").classes("w-24")
             ui.label("Per-Goal Latency (AVG)").classes("w-32")
@@ -4933,7 +5267,7 @@ class DashboardPage:
         run_container = ui.column().classes("w-full gap-0")
         with run_container:
             row_shell = ui.row().classes(
-                "w-full min-w-[1220px] flex-nowrap items-center px-3 py-2 border-b "
+                "w-full min-w-[1260px] flex-nowrap items-center px-3 py-2 border-b "
                 "border-grey-2 gap-0 hover:bg-grey-1 dark:hover:bg-grey-9 transition-colors"
             )
 
@@ -4969,10 +5303,10 @@ class DashboardPage:
                     ui.label(str(run.get("agent_name") or "—")).classes(
                         "flex-1 min-w-24 text-sm truncate whitespace-nowrap"
                     )
-                    with ui.element("div").classes("w-32"):
+                    with ui.element("div").classes("w-48"):
                         ui.badge(
                             str(run.get("attack_type") or "—"), color="orange"
-                        ).classes("text-xs")
+                        ).classes("text-xs whitespace-nowrap")
                     with ui.element("div").classes("w-28"):
                         ui.badge(status, color=status_color).classes("text-xs")
                         if status == "RUNNING":
