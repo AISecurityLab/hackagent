@@ -382,6 +382,8 @@ class AttackOrchestrator:
         run_config_for_attack = dict(run_config_override or {})
         # Run-level dashboard metadata must not leak into strict attack configs.
         run_config_for_attack.pop("expected_total_goals", None)
+        run_config_for_attack.pop("before_guardrail", None)
+        run_config_for_attack.pop("after_guardrail", None)
 
         return {
             "config": {
