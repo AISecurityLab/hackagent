@@ -165,6 +165,7 @@ class GoalsDatasetConfig(BaseModel):
 
     goals: List[str] = Field(default_factory=list)
     dataset: Optional[Union[str, Dict[str, Any]]] = None
+    intents: Optional[Union[List[Dict[str, Any]], Dict[str, Any]]] = None
 
 
 class RunConfig(BaseModel):

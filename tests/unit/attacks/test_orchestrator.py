@@ -281,6 +281,60 @@ class TestAttackOrchestratorExecution(unittest.TestCase):
 
     @patch.object(AttackOrchestrator, "_create_server_attack_record")
     @patch.object(AttackOrchestrator, "_create_server_run_record")
+    @patch.object(AttackOrchestrator, "_execute_local_attack")
+    @patch.object(
+        AttackOrchestrator,
+        "_validate_default_category_classifier_requirements",
+    )
+    @patch.object(AttackOrchestrator, "_load_goals_from_intents")
+    def test_execute_skips_classifier_preflight_when_intents_labels_exist(
+        self,
+        mock_load_from_intents,
+        mock_validate_classifier,
+        mock_execute_local,
+        mock_create_run,
+        mock_create_attack,
+    ):
+        """When intents provide explicit labels, category-classifier preflight is skipped."""
+
+        orchestrator = self.TestOrchestrator(self.mock_hack_agent)
+
+        mock_load_from_intents.return_value = (
+            ["goal from intents"],
+            {
+                0: {
+                    "category": "A. Ethical and Social Risks",
+                    "subcategory": "A1. Bias and Discrimination",
+                }
+            },
+        )
+        mock_create_attack.return_value = "attack-123"
+        mock_create_run.return_value = "run-456"
+        mock_execute_local.return_value = self.test_results
+
+        attack_config = {
+            "intents": [
+                {
+                    "category": "A",
+                    "subcategories": ["A1"],
+                    "samples_per_subcategory": 1,
+                }
+            ]
+        }
+
+        orchestrator.execute(
+            attack_config=attack_config,
+            run_config_override=None,
+            fail_on_run_error=False,
+        )
+
+        mock_validate_classifier.assert_not_called()
+        called_attack_config = mock_execute_local.call_args.kwargs["attack_config"]
+        self.assertTrue(called_attack_config["_disable_goal_category_classifier"])
+        self.assertIn("_goal_labels_by_index", called_attack_config)
+
+    @patch.object(AttackOrchestrator, "_create_server_attack_record")
+    @patch.object(AttackOrchestrator, "_create_server_run_record")
     def test_execute_local_attack_instantiates_implementation(
         self, mock_create_run, mock_create_attack
     ):
@@ -571,6 +625,81 @@ class TestAttackOrchestratorDatasetIntegration(unittest.TestCase):
         # Should NOT call load from dataset when goals are provided
         mock_load.assert_not_called()
         self.assertEqual(params["goals"], ["direct_goal"])
+
+    @patch("hackagent.attacks.orchestrator.AttackOrchestrator._load_goals_from_intents")
+    def test_prepare_attack_params_loads_from_intents(self, mock_load):
+        """Test that goals/labels are loaded from intents config when provided."""
+        mock_load.return_value = (
+            ["intent_goal1", "intent_goal2"],
+            {
+                0: {
+                    "category": "A. Ethical and Social Risks",
+                    "subcategory": "A1. Bias and Discrimination",
+                },
+                1: {
+                    "category": "A. Ethical and Social Risks",
+                    "subcategory": "A2. Insulting or Harassing Speech",
+                },
+            },
+        )
+
+        attack_config = {
+            "intents": [
+                {
+                    "category": "A",
+                    "subcategories": ["A1", "A2"],
+                    "samples_per_subcategory": 1,
+                }
+            ]
+        }
+
+        params = self.orchestrator._prepare_attack_params(attack_config)
+
+        mock_load.assert_called_once_with(attack_config["intents"])
+        self.assertEqual(params["goals"], ["intent_goal1", "intent_goal2"])
+        self.assertIn("_goal_labels_by_index", params)
+
+    @patch("hackagent.attacks.orchestrator.AttackOrchestrator._load_goals_from_intents")
+    def test_prepare_attack_params_prefers_direct_goals_over_intents(self, mock_load):
+        """Direct goals continue to have precedence over intents."""
+        attack_config = {
+            "goals": ["direct_goal"],
+            "intents": [{"category": "A"}],
+        }
+
+        params = self.orchestrator._prepare_attack_params(attack_config)
+
+        mock_load.assert_not_called()
+        self.assertEqual(params["goals"], ["direct_goal"])
+
+    @patch("hackagent.attacks.orchestrator.AttackOrchestrator._load_goals_from_intents")
+    @patch("hackagent.attacks.orchestrator.AttackOrchestrator._load_goals_from_dataset")
+    def test_prepare_attack_params_prefers_intents_over_dataset(
+        self,
+        mock_load_dataset,
+        mock_load_intents,
+    ):
+        """Intents take precedence over dataset when both are present."""
+        mock_load_intents.return_value = (
+            ["intent_goal"],
+            {
+                0: {
+                    "category": "A. Ethical and Social Risks",
+                    "subcategory": "A1. Bias and Discrimination",
+                }
+            },
+        )
+
+        attack_config = {
+            "intents": [{"category": "A"}],
+            "dataset": {"preset": "harmbench"},
+        }
+
+        params = self.orchestrator._prepare_attack_params(attack_config)
+
+        mock_load_intents.assert_called_once_with(attack_config["intents"])
+        mock_load_dataset.assert_not_called()
+        self.assertEqual(params["goals"], ["intent_goal"])
 
     @patch("hackagent.datasets.load_goals_from_config")
     def test_load_goals_from_dataset_calls_registry(self, mock_load_goals):

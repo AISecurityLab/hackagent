@@ -17,6 +17,8 @@ class TestSharedConfigDefaults(unittest.TestCase):
         self.assertEqual(classifier["endpoint"], "http://localhost:11434")
         self.assertEqual(classifier["max_tokens"], 100)
         self.assertEqual(classifier["identifier"], "gemma3:4b")
+        self.assertIn("intents", cfg)
+        self.assertIsNone(cfg["intents"])
 
     def test_typed_config_includes_category_classifier(self):
         typed = ConfigBase()
