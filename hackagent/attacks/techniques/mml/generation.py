@@ -127,11 +127,6 @@ def execute(
 
     victim_key = str(agent_router.backend_agent.id)
     batch_size = max(1, config.get("batch_size", 16))
-    raw_goal_index_offset = config.get("_goal_index_offset", 0)
-    try:
-        goal_index_offset = int(raw_goal_index_offset)
-    except (TypeError, ValueError):
-        goal_index_offset = 0
 
     _lock = threading.Lock()
     results_map: Dict[int, Dict[str, Any]] = {}
@@ -248,7 +243,7 @@ def execute(
             # Add trace to goal's Result via Tracker
             _result_id = None
             if tracker:
-                goal_ctx = tracker.get_goal_context(goal_index_offset + idx)
+                goal_ctx = tracker.get_goal_context_by_goal(goal_text)
                 if goal_ctx:
                     _result_id = goal_ctx.result_id
                     tracker.add_interaction_trace(

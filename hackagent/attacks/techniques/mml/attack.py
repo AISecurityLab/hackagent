@@ -241,6 +241,7 @@ class MMLAttack(BaseAttack):
                 "step_type_enum": "GENERATION",
                 "config_keys": [
                     "batch_size",
+                    "max_tokens",
                     "mml_params",
                     "_run_id",
                     "_backend",
