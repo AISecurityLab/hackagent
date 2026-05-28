@@ -114,6 +114,8 @@ class Tracker:
         logger: Optional[logging.Logger] = None,
         attack_type: Optional[str] = None,
         category_classifier_config: Optional[Dict[str, Any]] = None,
+        preclassified_goal_labels_by_index: Optional[Dict[Any, Dict[str, str]]] = None,
+        disable_goal_category_classifier: bool = False,
         event_bus: Optional[Any] = None,
     ):
         """
@@ -134,11 +136,34 @@ class Tracker:
         self.logger = logger or get_logger(__name__)
         self.attack_type = attack_type
         self.event_bus = event_bus
-        self._goal_category_classifier = GoalCategoryClassifier(
-            backend=backend,
-            config=category_classifier_config,
-            logger=self.logger,
-        )
+        self._preclassified_goal_labels_by_index: Dict[int, Dict[str, str]] = {}
+        raw_preclassified = preclassified_goal_labels_by_index or {}
+        if isinstance(raw_preclassified, dict):
+            for key, value in raw_preclassified.items():
+                try:
+                    idx = int(key)
+                except (TypeError, ValueError):
+                    continue
+
+                if not isinstance(value, dict):
+                    continue
+
+                category = value.get("category")
+                subcategory = value.get("subcategory")
+                if category and subcategory:
+                    self._preclassified_goal_labels_by_index[idx] = {
+                        "category": str(category),
+                        "subcategory": str(subcategory),
+                    }
+
+        if disable_goal_category_classifier:
+            self._goal_category_classifier = None
+        else:
+            self._goal_category_classifier = GoalCategoryClassifier(
+                backend=backend,
+                config=category_classifier_config,
+                logger=self.logger,
+            )
         self._goal_contexts: Dict[int, Context] = {}
 
     def _emit(self, event_type: str, **payload: Any) -> None:
@@ -216,7 +241,7 @@ class Tracker:
                 return ctx
 
             # Classify each goal as soon as its result record is created.
-            classification = self._classify_goal_labels(goal)
+            classification = self._classify_goal_labels(goal, goal_index)
             ctx.metadata.update(classification)
 
             # Create result via backend
@@ -266,12 +291,19 @@ class Tracker:
         )
         return ctx
 
-    def _classify_goal_labels(self, goal: str) -> Dict[str, str]:
+    def _classify_goal_labels(self, goal: str, goal_index: int) -> Dict[str, str]:
         """Return normalized category labels for goal metadata."""
         fallback = {
             "category": UNKNOWN_CATEGORY,
             "subcategory": UNKNOWN_SUBCATEGORY,
         }
+
+        preclassified = self._preclassified_goal_labels_by_index.get(goal_index)
+        if preclassified:
+            return {
+                "category": preclassified["category"],
+                "subcategory": preclassified["subcategory"],
+            }
 
         classifier = self._goal_category_classifier
         if not classifier:

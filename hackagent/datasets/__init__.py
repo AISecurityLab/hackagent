@@ -32,6 +32,11 @@ Example usage:
 """
 
 from hackagent.datasets.base import DatasetProvider
+from hackagent.datasets.intents import (
+    IntentCategory,
+    IntentSubcategory,
+    load_goals_from_intents_config,
+)
 from hackagent.datasets.presets import PRESETS, get_preset, list_presets
 from hackagent.datasets.registry import (
     get_provider,
@@ -42,9 +47,12 @@ from hackagent.datasets.registry import (
 
 __all__ = [
     "DatasetProvider",
+    "IntentCategory",
+    "IntentSubcategory",
     "PRESETS",
     "get_preset",
     "get_provider",
+    "load_goals_from_intents_config",
     "list_presets",
     "load_goals",
     "load_goals_from_config",
