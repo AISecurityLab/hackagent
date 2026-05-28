@@ -508,7 +508,7 @@ class AgentRouter:
                 raw_request=request_data,
                 registration_key=registration_key,
             )
-                # --- After guardrail: check the model response before returning it ---
+        # --- After guardrail: check the model response before returning it ---
         if self.after_guardrail is not None:
             _response_text = (
                 response.get("processed_response")
@@ -808,4 +808,3 @@ class AgentRouter:
             agent_specific_data=agent_specific_data,
             model_name=model_name,
         )
-
