@@ -341,6 +341,81 @@ def encode_base64(
     }
 
 
+def encode_mixed(
+    prompt: str,
+    num_replacements: int = 3,
+    image_width: int = 800,
+    image_height: int = 400,
+    font_size: int = 24,
+    background_color: str = "white",
+    text_color: str = "black",
+) -> Dict[str, Any]:
+    """Encode a prompt using word replacement, mirror, and rotation combined.
+
+    Replaces key words in the prompt with random substitutes, renders the
+    modified text to an image, then mirrors horizontally and rotates 180°.
+    Combines all three visual obfuscation techniques.
+
+    Args:
+        prompt: The original harmful prompt.
+        num_replacements: Number of words to replace.
+        image_width: Width of generated image.
+        image_height: Height of generated image.
+        font_size: Font size for text rendering.
+        background_color: Image background color.
+        text_color: Image text color.
+
+    Returns:
+        Dictionary containing:
+            - image_data_url: base64-encoded mixed-transform image data URL
+            - replacement_dict: mapping of replacement → original words
+            - scrambled_words: shuffled list of original words
+            - modified_text: the text as rendered in the image
+    """
+    words = prompt.split()
+    indices_to_replace = _select_words_to_replace(words, num_replacements)
+
+    # Build replacement mapping
+    replacement_dict = {}
+    available_replacements = random.sample(
+        _REPLACEMENT_WORDS, min(len(indices_to_replace), len(_REPLACEMENT_WORDS))
+    )
+
+    modified_words = words.copy()
+    for i, idx in enumerate(indices_to_replace):
+        original_word = words[idx]
+        replacement_word = available_replacements[i % len(available_replacements)]
+        replacement_dict[replacement_word] = original_word
+        modified_words[idx] = replacement_word
+
+    modified_text = " ".join(modified_words)
+
+    # Render modified text to image
+    img = _render_text_to_image(
+        modified_text,
+        image_width,
+        image_height,
+        font_size,
+        background_color,
+        text_color,
+    )
+
+    # Apply mirror and rotation
+    img = img.transpose(Image.FLIP_LEFT_RIGHT)
+    img = img.rotate(180)
+
+    # Scramble original words
+    scrambled_words = words.copy()
+    random.shuffle(scrambled_words)
+
+    return {
+        "image_data_url": _image_to_data_url(img),
+        "replacement_dict": replacement_dict,
+        "scrambled_words": scrambled_words,
+        "modified_text": modified_text,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Unified encoder interface
 # ---------------------------------------------------------------------------
@@ -350,6 +425,7 @@ ENCODERS = {
     "mirror": encode_mirror,
     "rotate": encode_rotate,
     "base64": encode_base64,
+    "mixed": encode_mixed,
 }
 
 
@@ -362,7 +438,7 @@ def encode_prompt(
 
     Args:
         prompt: The original harmful prompt text.
-        encoding_mode: One of "word_replacement", "mirror", "rotate", "base64".
+        encoding_mode: One of "word_replacement", "mirror", "rotate", "base64", "mixed".
         **kwargs: Additional parameters passed to the encoder (image_width,
             image_height, font_size, etc.).
 

@@ -149,7 +149,7 @@ def execute(
             "background_color": background_color,
             "text_color": text_color,
         }
-        if encoding_mode == "word_replacement":
+        if encoding_mode in ("word_replacement", "mixed"):
             encode_kwargs["num_replacements"] = num_replacements
 
         try:
@@ -246,9 +246,11 @@ def execute(
         with _lock:
             _goal_elapsed = round(time.perf_counter() - _t0, 3)
             # Add trace to goal's Result via Tracker
+            _result_id = None
             if tracker:
                 goal_ctx = tracker.get_goal_context(goal_index_offset + idx)
                 if goal_ctx:
+                    _result_id = goal_ctx.result_id
                     tracker.add_interaction_trace(
                         ctx=goal_ctx,
                         request={"prompt": text_prompt, "encoding_mode": encoding_mode},
@@ -265,7 +267,7 @@ def execute(
                             "elapsed_s": _goal_elapsed,
                         },
                     )
-            results_map[idx] = {
+            result_entry: Dict[str, Any] = {
                 "goal": goal_text,
                 "encoding_mode": encoding_mode,
                 "text_prompt": text_prompt,
@@ -275,6 +277,10 @@ def execute(
                 "error": error_message,
                 "generation_elapsed_s": _goal_elapsed,
             }
+            # Inject result_id so downstream evaluation can sync to server
+            if _result_id:
+                result_entry["result_id"] = _result_id
+            results_map[idx] = result_entry
 
         if error_message:
             logger.warning(f"Goal {idx + 1} failed: {error_message}")

@@ -86,6 +86,10 @@ class MMLAttack(BaseAttack):
             Encodes the prompt text in Base64 and renders the encoded
             string in an image. The text prompt instructs the model to
             decode the Base64 content.
+        mixed
+            Combines word replacement, horizontal mirroring, and 180-degree
+            rotation. Renders the replaced text to an image, then applies
+            both spatial transformations.
 
     Prompt styles (set via ``config["mml_params"]["prompt_style"]``):
         game
@@ -138,12 +142,64 @@ class MMLAttack(BaseAttack):
         """Run standard setup then initialise algorithm-specific state."""
         super()._setup()
         self._setup_algorithm()
+        self._warn_if_not_vlm()
 
     def _setup_algorithm(self) -> None:
         """Read MML parameters from config into instance attributes."""
         mml_params = self.config.get("mml_params", {})
         self.encoding_mode = mml_params.get("encoding_mode", "word_replacement")
         self.prompt_style = mml_params.get("prompt_style", "game")
+
+    def _warn_if_not_vlm(self) -> None:
+        """Emit a warning if the target model does not appear to be a VLM."""
+        # Known vision-capable model name patterns
+        _VISION_PATTERNS = (
+            "vision",
+            "vlm",
+            "vl",
+            "gpt-4o",
+            "gpt-4-turbo",
+            "gpt-4-vision",
+            "gemini",
+            "claude-3",
+            "qwen-vl",
+            "qwen2-vl",
+            "qwen2.5-vl",
+            "qwen3-vl",
+            "qwen3.5-vl",
+            "llava",
+            "internvl",
+            "cogvlm",
+            "pixtral",
+            "phi-3-vision",
+            "phi-3.5-vision",
+            "phi-4-multimodal",
+        )
+
+        model_name = None
+        try:
+            metadata = self.agent_router.backend_agent.metadata
+            if isinstance(metadata, dict):
+                model_name = metadata.get("name") or metadata.get("model_name")
+        except AttributeError:
+            pass
+
+        if model_name is None:
+            self.logger.warning(
+                "MML attack requires a Vision-Language Model (VLM) that supports "
+                "image inputs. Could not determine the target model name — ensure "
+                "the target supports multimodal (image_url) messages."
+            )
+            return
+
+        model_lower = model_name.lower()
+        if not any(pattern in model_lower for pattern in _VISION_PATTERNS):
+            self.logger.warning(
+                f"MML attack requires a Vision-Language Model (VLM) that supports "
+                f"image inputs. The target model '{model_name}' does not appear to "
+                f"be a VLM. If the model does support vision, you can ignore this "
+                f"warning."
+            )
 
     # ------------------------------------------------------------------
     # Pipeline definition
@@ -168,7 +224,7 @@ class MMLAttack(BaseAttack):
 
         # Validate encoding_mode
         mml_params = self.config.get("mml_params", {})
-        valid_modes = ["word_replacement", "mirror", "rotate", "base64"]
+        valid_modes = ["word_replacement", "mirror", "rotate", "base64", "mixed"]
         encoding_mode = mml_params.get("encoding_mode", "word_replacement")
 
         if encoding_mode not in valid_modes:

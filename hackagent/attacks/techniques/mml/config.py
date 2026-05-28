@@ -73,9 +73,9 @@ class MMLParams(BaseModel):
             lair scenario; ``"control"`` uses a neutral list-filling prompt.
     """
 
-    encoding_mode: Literal["word_replacement", "mirror", "rotate", "base64"] = (
-        "word_replacement"
-    )
+    encoding_mode: Literal[
+        "word_replacement", "mirror", "rotate", "base64", "mixed"
+    ] = "word_replacement"
     image_width: int = Field(default=800, ge=100)
     image_height: int = Field(default=400, ge=100)
     font_size: int = Field(default=24, ge=8)
