@@ -71,6 +71,7 @@ const sidebars: SidebarsConfig = {
         id: 'datasets/index',
       },
       items: [
+        'datasets/selecting-intent-categories',
         'datasets/presets',
         'datasets/huggingface',
         'datasets/file',

@@ -83,7 +83,9 @@ def _taxonomy_maps() -> Dict[str, Any]:
             category_to_subcategories[normalized_category_code].append(
                 normalized_subcategory_code
             )
-            subcategory_to_category[normalized_subcategory_code] = normalized_category_code
+            subcategory_to_category[normalized_subcategory_code] = (
+                normalized_category_code
+            )
 
             intents = subcategory_payload.get("intents") or []
             if not isinstance(intents, list):
@@ -242,7 +244,9 @@ def load_goals_from_intents_config(
     maps = _taxonomy_maps()
     category_code_to_label: Mapping[str, str] = maps["category_code_to_label"]
     subcategory_code_to_label: Mapping[str, str] = maps["subcategory_code_to_label"]
-    category_to_subcategories: Mapping[str, List[str]] = maps["category_to_subcategories"]
+    category_to_subcategories: Mapping[str, List[str]] = maps[
+        "category_to_subcategories"
+    ]
     subcategory_to_category: Mapping[str, str] = maps["subcategory_to_category"]
     intents_by_subcategory: Mapping[str, List[str]] = maps["intents_by_subcategory"]
 
@@ -260,7 +264,9 @@ def load_goals_from_intents_config(
 
         raw_subcategories = entry.get("subcategories")
         if raw_subcategories is None:
-            selected_subcategories = list(category_to_subcategories.get(category_code, []))
+            selected_subcategories = list(
+                category_to_subcategories.get(category_code, [])
+            )
         else:
             if not isinstance(raw_subcategories, list):
                 raise ValueError("'subcategories' must be a list when provided")

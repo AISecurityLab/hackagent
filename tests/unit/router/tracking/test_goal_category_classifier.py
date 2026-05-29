@@ -72,9 +72,7 @@ class TestTrackerGoalClassification(unittest.TestCase):
         self.assertEqual(ctx.metadata["subcategory"], UNKNOWN_SUBCATEGORY)
 
     @patch("hackagent.router.tracking.tracker.GoalCategoryClassifier")
-    def test_create_goal_result_prefers_preclassified_labels(
-        self, mock_classifier_cls
-    ):
+    def test_create_goal_result_prefers_preclassified_labels(self, mock_classifier_cls):
         mock_classifier = MagicMock()
         mock_classifier.classify_goal.return_value = {
             "category": "D. Criminal and Economic Risks",

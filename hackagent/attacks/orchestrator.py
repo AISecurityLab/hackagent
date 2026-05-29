@@ -210,9 +210,7 @@ class AttackOrchestrator:
             intents_config = None
 
         if intents_config is not None and dataset_config is not None:
-            logger.warning(
-                "Both 'intents' and 'dataset' provided. Using 'intents'."
-            )
+            logger.warning("Both 'intents' and 'dataset' provided. Using 'intents'.")
             dataset_config = None
 
         if intents_config is not None:
