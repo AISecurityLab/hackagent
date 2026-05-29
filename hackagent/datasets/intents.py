@@ -23,6 +23,9 @@ except ImportError:  # Python < 3.11
     class StrEnum(str, Enum):
         """Minimal StrEnum fallback for Python 3.10 compatibility."""
 
+        def __str__(self) -> str:
+            return str(self.value)
+
         pass
 
 
@@ -163,7 +166,10 @@ def _resolve_category_code(value: Any) -> str:
     category_code_to_label: Mapping[str, str] = maps["category_code_to_label"]
     category_plain_name_to_code: Mapping[str, str] = maps["category_plain_name_to_code"]
 
-    candidate = str(value).strip()
+    if isinstance(value, Enum):
+        candidate = str(value.value).strip()
+    else:
+        candidate = str(value).strip()
     if not candidate:
         raise ValueError("Intent category cannot be empty")
 
@@ -189,7 +195,10 @@ def _resolve_subcategory_code(value: Any) -> str:
         "subcategory_plain_name_to_code"
     ]
 
-    candidate = str(value).strip()
+    if isinstance(value, Enum):
+        candidate = str(value.value).strip()
+    else:
+        candidate = str(value).strip()
     if not candidate:
         raise ValueError("Intent subcategory cannot be empty")
 
