@@ -11,10 +11,19 @@ from __future__ import annotations
 
 import json
 import re
-from enum import StrEnum
+from enum import Enum
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Sequence, Tuple
+
+try:
+    from enum import StrEnum
+except ImportError:  # Python < 3.11
+
+    class StrEnum(str, Enum):
+        """Minimal StrEnum fallback for Python 3.10 compatibility."""
+
+        pass
 
 
 _OMNISAFEBENCH_DATASET_PATH = (
