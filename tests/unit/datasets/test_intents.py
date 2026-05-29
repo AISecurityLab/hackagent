@@ -39,9 +39,7 @@ class TestIntentGoalSelection(unittest.TestCase):
         self.assertEqual(labels[0]["category"], "A. Ethical and Social Risks")
         self.assertEqual(labels[0]["subcategory"], "A1. Bias and Discrimination")
         self.assertEqual(labels[1]["category"], "A. Ethical and Social Risks")
-        self.assertEqual(
-            labels[1]["subcategory"], "A2. Insulting or Harassing Speech"
-        )
+        self.assertEqual(labels[1]["subcategory"], "A2. Insulting or Harassing Speech")
 
     def test_defaults_select_one_per_subcategory_when_omitted(self):
         goals, labels = load_goals_from_intents_config(
