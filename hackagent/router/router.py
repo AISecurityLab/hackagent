@@ -16,6 +16,26 @@ from hackagent.router.types import AgentTypeEnum
 # Use explicit hierarchical logger name for clarity
 logger = logging.getLogger("hackagent.router")
 
+
+def _extract_prompt_text(request_data: Dict[str, Any]) -> str:
+    """Return the last user-role message content from request_data, or a full
+    string representation as fallback.  Used by guardrail checks."""
+    messages = request_data.get("messages") or []
+    for msg in reversed(messages):
+        if isinstance(msg, dict) and msg.get("role") == "user":
+            return str(msg.get("content") or "")
+    # Fallback 1: concatenate all message contents when no user-role message found
+    if messages:
+        return " ".join(
+            str(m.get("content") or "") for m in messages if isinstance(m, dict)
+        )
+    # Fallback 2: plain "prompt" key used by some attack techniques (e.g. h4rm3l)
+    prompt = request_data.get("prompt")
+    if prompt:
+        return str(prompt)
+    return ""
+
+
 # --- Agent Type to Adapter Mapping ---
 # Phase E.2c deleted the chat adapter classes. Chat AgentTypes
 # (LITELLM, OPENAI_SDK, OLLAMA, LANGCHAIN) are now driven entirely by
@@ -85,6 +105,12 @@ class AgentRouter:
         # Phase D: register the LiteLLM CustomLogger that captures input
         # and output for every HackAgent-owned call. Idempotent.
         _tracking_logger.ensure_registered()
+
+        # Optional guardrails applied transparently around every route_request call.
+        # Set temporarily by AttackOrchestrator._execute_local_attack, following
+        # the same pattern as the max_tokens per-run override.
+        self.before_guardrail = None
+        self.after_guardrail = None
 
         context = self.backend.get_context()
         self.organization_id = context.org_id
@@ -410,6 +436,42 @@ class AgentRouter:
         provider_config = (
             get_provider_config(agent_type) if agent_type is not None else None
         )
+        # --- Before guardrail: check the prompt before it reaches the model ---
+        if self.before_guardrail is not None:
+            _prompt = _extract_prompt_text(request_data)
+            if not _prompt.strip():
+                # Nothing to classify — skip silently.
+                logger.debug(
+                    "before_guardrail: empty prompt text for agent %s, skipping check.",
+                    registration_key,
+                )
+            else:
+                _gr = self.before_guardrail.check(_prompt)
+                if not _gr.is_safe:
+                    logger.warning(
+                        "before_guardrail blocked prompt for agent %s: %s",
+                        registration_key,
+                        _gr.explanation,
+                    )
+                    return {
+                        "raw_request": request_data,
+                        "processed_response": None,
+                        "generated_text": None,
+                        "raw_response_status": 200,
+                        "raw_response_headers": None,
+                        "raw_response_body": None,
+                        "agent_specific_data": {
+                            "guardrail": "before_guardrail_blocked",
+                            "side": "before",
+                            "message": "Request blocked: flagged as unsafe by guardrail.",
+                            "categories": getattr(_gr, "categories", []),
+                            "reasoning": _gr.explanation,
+                        },
+                        "error_message": None,
+                        "error_category": None,
+                        "agent_id": registration_key,
+                        "adapter_type": "guardrail",
+                    }
 
         try:
             if provider_config is not None:
@@ -429,7 +491,6 @@ class AgentRouter:
             logger.debug(
                 f"Successfully routed request for agent key: {registration_key}"
             )
-            return response
         except Exception as e:
             error_msg = f"Agent {registration_key} failed to handle request: {e}"
             logger.error(
@@ -447,6 +508,50 @@ class AgentRouter:
                 raw_request=request_data,
                 registration_key=registration_key,
             )
+
+        # --- After guardrail: check the model response before returning it ---
+        if self.after_guardrail is not None:
+            _response_text = (
+                response.get("processed_response")
+                or response.get("generated_text")
+                or ""
+            )
+            _response_text = str(_response_text).strip()
+            if not _response_text:
+                # Nothing to classify — skip silently.
+                logger.debug(
+                    "after_guardrail: empty response text for agent %s, skipping check.",
+                    registration_key,
+                )
+            else:
+                _gr = self.after_guardrail.check(_response_text)
+                if not _gr.is_safe:
+                    logger.warning(
+                        "after_guardrail blocked response for agent %s: %s",
+                        registration_key,
+                        _gr.explanation,
+                    )
+                    return {
+                        "raw_request": request_data,
+                        "processed_response": None,
+                        "generated_text": None,
+                        "raw_response_status": 200,
+                        "raw_response_headers": None,
+                        "raw_response_body": None,
+                        "agent_specific_data": {
+                            "guardrail": "after_guardrail_censored",
+                            "side": "after",
+                            "message": "Response censored: flagged as unsafe by guardrail.",
+                            "categories": getattr(_gr, "categories", []),
+                            "reasoning": _gr.explanation,
+                        },
+                        "error_message": None,
+                        "error_category": None,
+                        "agent_id": registration_key,
+                        "adapter_type": "guardrail",
+                    }
+
+        return response
 
     # ------------------------------------------------------------------ #
     # Phase C: LiteLLM dispatch path

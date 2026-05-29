@@ -40,6 +40,10 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from hackagent.attacks.evaluator.judge_evaluators import EVALUATOR_MAP
+from hackagent.attacks.shared.response_utils import (
+    get_guardrail_info,
+    is_guardrail_response,
+)
 from hackagent.attacks.shared.router_factory import extract_passthrough_request_config
 from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
 from hackagent.router.router import AgentRouter
@@ -548,14 +552,25 @@ def _search_single_goal(
                     request_data=request_data,
                 )
                 generated_text = response.get("generated_text")
-                error_message = response.get("error_message")
+                _guardrail_blocked = is_guardrail_response(response)
+                guardrail_info = (
+                    get_guardrail_info(response) if _guardrail_blocked else None
+                )
+                error_message = (
+                    None if _guardrail_blocked else response.get("error_message")
+                )
             except Exception as e:
                 generated_text = None
                 error_message = str(e)
+                guardrail_info = None
                 logger.warning(f"[{_cand_label}] Request failed — {e}")
 
             # Log per-candidate response
-            if generated_text:
+            if guardrail_info:
+                logger.info(
+                    f"[{_cand_label}] Blocked by {guardrail_info.get('side')} guardrail"
+                )
+            elif generated_text:
                 _preview = (
                     f"{generated_text[:120]}..."
                     if len(generated_text) > 120
@@ -573,6 +588,7 @@ def _search_single_goal(
                     "augmented_prompt": augmented_prompt,
                     "response": generated_text,
                     "error": error_message,
+                    "guardrail_info": guardrail_info,
                     "step": step,
                     "candidate": k,
                     "seed": seed,
@@ -710,13 +726,18 @@ def _persist_step_trace(
             continue
 
         response_text = c_res.get("response")
+        _g_info = c_res.get("guardrail_info")
         tracker.add_interaction_trace(
             ctx=goal_ctx,
             request={"prompt": c_res.get("augmented_prompt")},
-            response={
-                "generated_text": response_text,
-                "error_message": c_res.get("error"),
-            },
+            response=(
+                {"adapter_type": "guardrail", "agent_specific_data": _g_info}
+                if _g_info
+                else {
+                    "generated_text": response_text,
+                    "error_message": c_res.get("error"),
+                }
+            ),
             step_name=step_name,
             metadata={
                 "display_type": "bon_candidate",

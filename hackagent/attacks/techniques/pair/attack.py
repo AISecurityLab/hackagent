@@ -27,7 +27,11 @@ from hackagent.attacks.techniques.autodan_turbo.core import score_response
 from hackagent.attacks.objectives import OBJECTIVES
 from hackagent.attacks.shared.progress import create_progress_bar
 from hackagent.attacks.shared.prompt_parser import extract_prompt
-from hackagent.attacks.shared.response_utils import extract_response_content
+from hackagent.attacks.shared.response_utils import (
+    extract_response_content,
+    get_guardrail_info,
+    is_guardrail_response,
+)
 from hackagent.attacks.shared.router_factory import create_router
 from hackagent.attacks.shared.tui import with_tui_logging
 from hackagent.server.client import AuthenticatedClient
@@ -488,6 +492,16 @@ SCORE: {score}"""
                 request_data=request_data,
             )
 
+            # Check if a before/after guardrail blocked the request
+            if isinstance(response, dict) and is_guardrail_response(response):
+                _info = get_guardrail_info(response)
+                self.logger.info(
+                    "Target query blocked by %s guardrail",
+                    _info.get("side", "unknown"),
+                )
+                metadata["guardrail_info"] = _info
+                return (None, metadata) if include_meta else None
+
             if isinstance(response, dict):
                 agent_specific_data = response.get("agent_specific_data") or {}
                 invoked_parameters = agent_specific_data.get("invoked_parameters") or {}
@@ -735,14 +749,31 @@ SCORE: {score}"""
                 self.logger.warning(
                     f"Failed to get target response at iteration {iteration}"
                 )
-                # Add trace for failed target query
+                # Add trace for failed target query — include guardrail info if present
                 if goal_tracker and goal_ctx:
+                    _fail_response: Any = None
+                    _fail_step = f"Iteration {iteration + 1}: Target Query Failed"
+                    _fail_meta: Dict[str, Any] = {
+                        "iteration": iteration + 1,
+                        "error": "No response",
+                    }
+                    if target_meta.get("guardrail_info"):
+                        _gi = target_meta["guardrail_info"]
+                        _fail_response = {
+                            "adapter_type": "guardrail",
+                            "agent_specific_data": _gi,
+                        }
+                        _fail_step = (
+                            f"Iteration {iteration + 1}: "
+                            f"Blocked by {_gi.get('side', 'unknown')} guardrail"
+                        )
+                        _fail_meta["guardrail_info"] = _gi
                     goal_tracker.add_interaction_trace(
                         ctx=goal_ctx,
                         request={"prompt": adversarial_prompt[:500]},
-                        response=None,
-                        step_name=f"Iteration {iteration + 1}: Target Query Failed",
-                        metadata={"iteration": iteration + 1, "error": "No response"},
+                        response=_fail_response,
+                        step_name=_fail_step,
+                        metadata=_fail_meta,
                     )
                 if progress_bar and task is not None:
                     progress_bar.update(task, advance=1)

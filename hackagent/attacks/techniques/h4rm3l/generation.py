@@ -12,6 +12,10 @@ import logging
 import time
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
+from hackagent.attacks.shared.response_utils import (
+    get_guardrail_info,
+    is_guardrail_response,
+)
 from hackagent.router.router import AgentRouter
 
 from .config import PRESET_PROGRAMS
@@ -300,8 +304,18 @@ def execute(
             }
             return
 
-        generated_text = response.get("generated_text")
-        error_message = response.get("error_message")
+        # Check if a before/after guardrail blocked the request
+        _guardrail_blocked = is_guardrail_response(response)
+        if _guardrail_blocked:
+            _info = get_guardrail_info(response)
+            logger.info(
+                "[%s] Blocked by %s guardrail",
+                _label,
+                _info.get("side", "unknown"),
+            )
+
+        generated_text = None if _guardrail_blocked else response.get("generated_text")
+        error_message = None if _guardrail_blocked else response.get("error_message")
 
         # Log metadata only (avoid printing full response content)
         if generated_text:
@@ -322,19 +336,17 @@ def execute(
                 tracker.add_interaction_trace(
                     ctx=goal_ctx,
                     request=request_data,
-                    response={
-                        "generated_text": generated_text,
-                        "error_message": error_message,
-                    },
+                    response=response,
                     step_name="h4rm3l Generation",
                     metadata={
                         "program": resolved_program,
                         "original_goal": goal_text,
+                        "decoration_steps": decoration_traces,
                         "elapsed_s": _elapsed,
                     },
                 )
 
-        results_map[idx] = {
+        _result: Dict[str, Any] = {
             "goal": goal_text,
             "program": resolved_program,
             "decoration_steps": decoration_traces,
@@ -343,6 +355,9 @@ def execute(
             "error": error_message,
             "elapsed_s": _elapsed,
         }
+        if _guardrail_blocked:
+            _result["guardrail_info"] = get_guardrail_info(response)
+        results_map[idx] = _result
 
     for idx, goal_text in enumerate(goals):
         _process_goal(idx, goal_text)

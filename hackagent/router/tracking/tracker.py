@@ -803,6 +803,31 @@ class Tracker:
 
         # Dictionary response
         if isinstance(response, dict):
+            # Guardrail-blocked response: adapter_type == "guardrail".
+            # Preserve the agent_specific_data dict so the dashboard can
+            # render it as a dedicated visual block.
+            if response.get("adapter_type") == "guardrail":
+                return response.get("agent_specific_data") or {
+                    "side": "unknown",
+                    "message": "Blocked by guardrail",
+                }
+
+            # Guardrail-event dict passed directly (e.g. AdvPrefix passes the event
+            # dict as the response payload rather than the full router response).
+            if response.get("side") in ("before", "after", "unknown") and (
+                "explanation" in response or "message" in response
+            ):
+                return response
+
+            # Guardrail block detected from error_message — attacks that extract
+            # only generated_text/error_message before calling add_interaction_trace.
+            _err = str(response.get("error_message") or "")
+            if _err:
+                if "before_guardrail" in _err or "before guardrail" in _err.lower():
+                    return {"side": "before", "message": _err}
+                if "after_guardrail" in _err or "after guardrail" in _err.lower():
+                    return {"side": "after", "message": _err}
+
             return (
                 response.get("generated_text")
                 or response.get("processed_response")
