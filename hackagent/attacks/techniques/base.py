@@ -243,6 +243,10 @@ class BaseAttack(abc.ABC):
             logger=self.logger,
             attack_type=attack_type,
             category_classifier_config=self.config.get("category_classifier"),
+            preclassified_goal_labels_by_index=self.config.get("_goal_labels_by_index"),
+            disable_goal_category_classifier=bool(
+                self.config.get("_disable_goal_category_classifier")
+            ),
             goals=goals,
             initial_metadata=initial_metadata,
             goal_index_start=goal_index_start,
