@@ -195,19 +195,33 @@ class AttackOrchestrator:
         # Check for direct goals first
         goals = attack_config.get("goals")
         dataset_config = attack_config.get("dataset")
+        intents_config = attack_config.get("intents")
+        goal_labels_by_index: Optional[Dict[int, Dict[str, str]]] = None
 
         if goals is not None and dataset_config is not None:
             logger.warning(
                 "Both 'goals' and 'dataset' provided. Using 'goals' directly."
             )
             dataset_config = None
+        if goals is not None and intents_config is not None:
+            logger.warning(
+                "Both 'goals' and 'intents' provided. Using 'goals' directly."
+            )
+            intents_config = None
 
-        if dataset_config is not None:
+        if intents_config is not None and dataset_config is not None:
+            logger.warning("Both 'intents' and 'dataset' provided. Using 'intents'.")
+            dataset_config = None
+
+        if intents_config is not None:
+            goals, goal_labels_by_index = self._load_goals_from_intents(intents_config)
+        elif dataset_config is not None:
             # Load goals from dataset source
             goals = self._load_goals_from_dataset(dataset_config)
         elif goals is None:
             raise ValueError(
-                f"'{self.attack_type}' requires either 'goals' (list) or 'dataset' (config)"
+                f"'{self.attack_type}' requires either 'goals' (list), "
+                "'dataset' (config), or 'intents' (config)"
             )
 
         if not isinstance(goals, list):
@@ -217,7 +231,10 @@ class AttackOrchestrator:
             raise ValueError(f"'goals' list is empty for {self.attack_type}")
 
         logger.info(f"Prepared {len(goals)} goals for {self.attack_type} attack")
-        return {"goals": goals}
+        params: Dict[str, Any] = {"goals": goals}
+        if goal_labels_by_index:
+            params["_goal_labels_by_index"] = goal_labels_by_index
+        return params
 
     @staticmethod
     def _uses_default_category_classifier(attack_config: Dict[str, Any]) -> bool:
@@ -353,6 +370,26 @@ class AttackOrchestrator:
         except Exception as e:
             logger.error(f"Failed to load goals from dataset: {e}", exc_info=True)
             raise ValueError(f"Failed to load goals from dataset: {e}") from e
+
+    def _load_goals_from_intents(
+        self, intents_config: Any
+    ) -> Tuple[List[str], Dict[int, Dict[str, str]]]:
+        """Load goals from intent taxonomy labels and sample selectors."""
+        from hackagent.datasets.intents import load_goals_from_intents_config
+
+        logger.info("Loading goals from intents taxonomy config")
+
+        try:
+            goals, goal_labels_by_index = load_goals_from_intents_config(intents_config)
+            logger.info(
+                "Loaded %s goals from intents across %s labeled entries",
+                len(goals),
+                len(goal_labels_by_index),
+            )
+            return goals, goal_labels_by_index
+        except Exception as e:
+            logger.error(f"Failed to load goals from intents: {e}", exc_info=True)
+            raise ValueError(f"Failed to load goals from intents: {e}") from e
 
     def _get_attack_impl_kwargs(
         self,
@@ -666,9 +703,16 @@ class AttackOrchestrator:
         """
         # 1. Validate parameters
         attack_params = self._prepare_attack_params(attack_config)
+        goal_labels_by_index = attack_params.pop("_goal_labels_by_index", None)
 
         # Fail-fast preflight before creating Attack/Run DB records.
-        self._validate_default_category_classifier_requirements(attack_config)
+        # Skip this when intents already provide explicit category labels.
+        if goal_labels_by_index:
+            logger.info(
+                "Using explicit intents taxonomy labels: category classifier preflight skipped"
+            )
+        else:
+            self._validate_default_category_classifier_requirements(attack_config)
 
         # Enrich run config with expected goal cardinality so downstream views
         # can keep RUNNING until all expected goals are fully tracked.
@@ -732,6 +776,13 @@ class AttackOrchestrator:
             )
         except Exception as e:
             logger.warning(f"Failed to update run status to RUNNING: {e}")
+
+        if goal_labels_by_index:
+            attack_config = {
+                **attack_config,
+                "_goal_labels_by_index": goal_labels_by_index,
+                "_disable_goal_category_classifier": True,
+            }
 
         # Make the event bus available to the technique impl and to the
         # tracker via the shared config bag (alongside _run_id / _backend).

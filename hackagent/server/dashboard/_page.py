@@ -4955,7 +4955,11 @@ function hackAgentCopyFallback(text) {
                             )
                             _g_cats = node.get("_guardrail_categories") or []
                             self._render_guardrail_event_block(
-                                _g_side, _g_expl, _g_cats
+                                {
+                                    "side": _g_side,
+                                    "explanation": _g_expl,
+                                    "categories": _g_cats,
+                                }
                             )
                         elif node.get("target_present"):
                             response = str(node.get("target_response") or "")
@@ -5496,6 +5500,67 @@ function hackAgentCopyFallback(text) {
             return
 
         ui.label(str(content)).classes("text-sm whitespace-pre-wrap")
+
+    @staticmethod
+    def _render_guardrail_event_block(event: dict) -> None:
+        """Render a visual banner for a guardrail-blocked trace step.
+
+        * ``side="before"`` — prompt was blocked before reaching the target model:
+          shows an orange warning box.  No target response is displayed because
+          the request was never sent.
+        * ``side="after"`` — model response was censored after it was received:
+          shows a red box below the (visible) target response.
+        """
+        side = event.get("side", "unknown")
+        explanation = str(event.get("explanation") or "Blocked by guardrail")
+        categories = event.get("categories", [])
+
+        cat_html = ""
+        if categories:
+            cat_str = ", ".join(str(c) for c in categories)
+            if side == "before":
+                cat_html = f'<span style="font-weight:700;color:#c2410c">Categories: </span><span style="color:#9a3412">{cat_str}</span><br><br>'
+            elif side == "after":
+                cat_html = f'<span style="font-weight:700;color:#dc2626">Categories: </span><span style="color:#991b1b">{cat_str}</span><br><br>'
+            else:
+                cat_html = f'<span style="font-weight:700;color:#616161">Categories: </span><span style="color:#374151">{cat_str}</span><br><br>'
+
+        if side == "before":
+            heading = "⚠ BEFORE GUARDRAIL — BLOCKED"
+            border_color = "#f97316"
+            bg_color = "#fff7ed"
+            heading_color = "#c2410c"
+            expl_label = (
+                '<span style="font-weight:700;color:#c2410c">Explanation: </span>'
+            )
+        elif side == "after":
+            heading = "🚫 AFTER GUARDRAIL — CENSORED"
+            border_color = "#ef4444"
+            bg_color = "#fef2f2"
+            heading_color = "#dc2626"
+            expl_label = (
+                '<span style="font-weight:700;color:#dc2626">Explanation: </span>'
+            )
+        else:
+            heading = "🛡 GUARDRAIL — BLOCKED"
+            border_color = "#9e9e9e"
+            bg_color = "#f5f5f5"
+            heading_color = "#616161"
+            expl_label = (
+                '<span style="font-weight:700;color:#616161">Explanation: </span>'
+            )
+
+        from html import escape
+
+        ui.html(
+            f'<div style="margin-bottom:8px">'
+            f'<div style="font-size:11px;font-weight:700;text-transform:uppercase;margin-bottom:4px;color:{heading_color}">{heading}</div>'
+            f'<pre style="font-size:11px;padding:10px;background:{bg_color};border:2px solid {border_color};border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0">'
+            f"{cat_html}"
+            f"{expl_label}"
+            f'<span style="color:#6b7280">{escape(explanation)}</span>'
+            f"</pre></div>"
+        )
 
     async def refresh_view(self) -> None:
         _v = self.current_view["value"]

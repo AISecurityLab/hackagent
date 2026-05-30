@@ -71,6 +71,38 @@ class TestTrackerGoalClassification(unittest.TestCase):
         self.assertEqual(ctx.metadata["category"], UNKNOWN_CATEGORY)
         self.assertEqual(ctx.metadata["subcategory"], UNKNOWN_SUBCATEGORY)
 
+    @patch("hackagent.router.tracking.tracker.GoalCategoryClassifier")
+    def test_create_goal_result_prefers_preclassified_labels(self, mock_classifier_cls):
+        mock_classifier = MagicMock()
+        mock_classifier.classify_goal.return_value = {
+            "category": "D. Criminal and Economic Risks",
+            "subcategory": "D1. Fraud or Scams",
+        }
+        mock_classifier_cls.return_value = mock_classifier
+
+        backend = MagicMock()
+        backend.create_result.return_value = SimpleNamespace(
+            id=UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")
+        )
+
+        tracker = Tracker(
+            backend=backend,
+            run_id="12345678-1234-1234-1234-123456789abc",
+            attack_type="pair",
+            preclassified_goal_labels_by_index={
+                0: {
+                    "category": "A. Ethical and Social Risks",
+                    "subcategory": "A1. Bias and Discrimination",
+                }
+            },
+        )
+
+        ctx = tracker.create_goal_result("goal", 0)
+
+        self.assertEqual(ctx.metadata["category"], "A. Ethical and Social Risks")
+        self.assertEqual(ctx.metadata["subcategory"], "A1. Bias and Discrimination")
+        mock_classifier.classify_goal.assert_not_called()
+
 
 class TestCoordinatorCategoryClassifierConfig(unittest.TestCase):
     @patch("hackagent.router.tracking.coordinator.Tracker")
