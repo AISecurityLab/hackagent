@@ -8,7 +8,6 @@ from __future__ import annotations
 import asyncio
 from collections import defaultdict
 import contextlib
-import html
 import json
 import math
 import re
@@ -34,12 +33,23 @@ from ._helpers import (
     _result_bucket,
     _short_date,
 )
+from .attack_cards import (
+    AttackCardSharedMixin,
+    BaselineCardMixin,
+    BonCardMixin,
+    PairCardMixin,
+    AutodanCardMixin,
+    AdvprefixCardMixin,
+    PapCardMixin,
+    TapCardMixin,
+    GenericCardMixin,
+    MmlCardMixin,
+)
 
 _VIEW_LABELS = {
     "dashboard": "Dashboard",
     "agents": "Targets",
     "runs": "History",
-    "reports": "Reports",
 }
 
 _RESULTS_FETCH_LIMIT = 20
@@ -47,7 +57,18 @@ _DASHBOARD_RUN_SCAN_LIMIT = 10
 _RUNS_VIEW_PAGE_SIZE = 15
 
 
-class DashboardPage:
+class DashboardPage(
+    AttackCardSharedMixin,
+    BaselineCardMixin,
+    BonCardMixin,
+    PairCardMixin,
+    AutodanCardMixin,
+    AdvprefixCardMixin,
+    PapCardMixin,
+    TapCardMixin,
+    GenericCardMixin,
+    MmlCardMixin,
+):
     """Owns all NiceGUI widgets for a single dashboard page request.
 
     A new instance is created inside the ``@ui.page("/")`` handler for every
@@ -91,9 +112,18 @@ class DashboardPage:
         self.agents_table: ui.table | None = None
         self.runs_table: ui.table | None = None
         self.runs_count_label: ui.label | None = None
-        self.runs_page_label: ui.label | None = None
         self.runs_current_page: int = 1
         self.runs_total_pages: int = 1
+        self._runs_all_rows: list[dict] = []
+        self._runs_total_available: int = 0
+        self._runs_filter_agent: str = ""
+        self._runs_filter_attack: str = ""
+        self._runs_filter_status: str = ""
+        self._runs_filter_search: str = ""
+        self._runs_load_more_btn: ui.button | None = None
+        self._runs_agent_select: ui.select | None = None
+        self._runs_attack_select: ui.select | None = None
+        self._runs_status_select: ui.select | None = None
         self.history_reports_list_area: ui.column | None = None
         self.history_reports_summary_labels: dict[str, ui.label] = {}
         self.history_reports_count_label: ui.label | None = None
@@ -118,11 +148,17 @@ class DashboardPage:
         self.history_run_dialog_title: ui.label | None = None
         self.history_run_dialog_subtitle: ui.label | None = None
         self.history_run_config_area: ui.column | None = None
+        self.history_charts_area: ui.column | None = None
         self.history_results_list_area: ui.column | None = None
         self.history_results_empty_label: ui.label | None = None
-        self.metrics_area: ui.column | None = None
         self.history_detail_area: ui.column | None = None
         self._history_dialog_attack_str: str = ""
+        self._history_goal_filter: str = ""  # "" | "jailbreak" | "mitigated" | "error"
+        self._history_goal_filter_category: str = ""  # "" or category label
+        self._history_goal_filter_search: str = ""
+        self._history_goal_rows: list[dict] = []
+        self._history_goal_detail_data: dict[str, object] = {}
+        self._history_goal_filter_area: ui.row | None = None
 
         # New side-by-side History layout
         self._history_runs_area: ui.column | None = None
@@ -131,6 +167,9 @@ class DashboardPage:
         self._history_current_run: dict | None = None
         self._history_current_run_results: list[dict] = []
         self._history_visible_run_ids: list[str] = []
+
+        # Bottom panel for run details (inline in runs panel)
+        self._runs_bottom_panel: ui.column | None = None
 
         # Attack detail dialog
         self.attack_dialog: ui.dialog | None = None
@@ -142,7 +181,14 @@ class DashboardPage:
         self._selected_run_ids: list[str] = []
         self._selected_attack_ids: list[str] = []
         self._runs_delete_btn: ui.button | None = None
+        self._runs_compare_btn: ui.button | None = None
+        self._runs_export_btn: ui.button | None = None
         self._attacks_delete_btn: ui.button | None = None
+
+        # Comparison dialog
+        self._compare_dialog: ui.dialog | None = None
+        self._compare_dialog_body: ui.column | None = None
+        self._compare_bottom_panel: ui.card | None = None
 
     # ── Public entry point ────────────────────────────────────────────────────
 
@@ -151,6 +197,31 @@ class DashboardPage:
         self.dark = ui.dark_mode()
         if _fastapi_app.storage.browser.get("hackagent_dark"):
             self.dark.enable()
+
+        # Inject a global copy-to-clipboard helper accessible from Vue template
+        # slot expressions (where `navigator` is not in Vue 3's global whitelist).
+        ui.add_head_html(
+            """<script>
+function hackAgentCopy(text) {
+  if (window.navigator && window.navigator.clipboard) {
+    window.navigator.clipboard.writeText(text).catch(function() {
+      hackAgentCopyFallback(text);
+    });
+  } else {
+    hackAgentCopyFallback(text);
+  }
+}
+function hackAgentCopyFallback(text) {
+  var el = document.createElement('textarea');
+  el.value = text;
+  el.style.cssText = 'position:fixed;top:-9999px;left:-9999px';
+  document.body.appendChild(el);
+  el.select();
+  try { document.execCommand('copy'); } catch(e) {}
+  document.body.removeChild(el);
+}
+</script>"""
+        )
 
         self._build_result_modal_dialog()
         sidebar = self._build_sidebar()
@@ -222,7 +293,6 @@ class DashboardPage:
                 ("dashboard", "Dashboard", "dashboard"),
                 ("agents", "Targets", "smart_toy"),
                 ("runs", "History", "assignment"),
-                ("reports", "Reports", "assessment"),
             ]
             for view_id, label, icon_name in nav_items:
                 btn = (
@@ -280,13 +350,11 @@ class DashboardPage:
             dashboard_panel = ui.column().classes("w-full gap-6")
             agents_panel = ui.column().classes("w-full gap-4")
             runs_panel = ui.column().classes("w-full gap-4")
-            reports_panel = ui.column().classes("w-full gap-4")
 
             self.all_panels = {
                 "dashboard": dashboard_panel,
                 "agents": agents_panel,
                 "runs": runs_panel,
-                "reports": reports_panel,
             }
             for panel in self.all_panels.values():
                 panel.set_visibility(False)
@@ -295,7 +363,6 @@ class DashboardPage:
             self._build_dashboard_panel(dashboard_panel)
             self._build_agents_panel(agents_panel)
             self._build_runs_panel(runs_panel)
-            self._build_reports_panel(reports_panel)
 
     def _build_dashboard_panel(self, panel: ui.column) -> None:
         with panel:
@@ -336,26 +403,32 @@ class DashboardPage:
                             "Evaluation outcomes for the latest tested target"
                         ).classes("text-xs text-grey-6 mb-4")
                         with ui.row().classes("items-center gap-6 flex-wrap"):
-                            self.risk_chart = ui.echart(
-                                {
-                                    "series": [
-                                        {
-                                            "type": "pie",
-                                            "radius": ["58%", "80%"],
-                                            "data": [
-                                                {
-                                                    "value": 1,
-                                                    "name": "No data",
-                                                    "itemStyle": {"color": "#94a3b8"},
-                                                }
-                                            ],
-                                            "label": {"show": False},
-                                        }
-                                    ],
-                                    "graphic": [],
-                                    "tooltip": {"show": False},
-                                }
-                            ).classes("w-36 h-36 shrink-0")
+                            self.risk_chart = (
+                                ui.echart(
+                                    {
+                                        "series": [
+                                            {
+                                                "type": "pie",
+                                                "radius": ["58%", "80%"],
+                                                "data": [
+                                                    {
+                                                        "value": 1,
+                                                        "name": "No data",
+                                                        "itemStyle": {
+                                                            "color": "#94a3b8"
+                                                        },
+                                                    }
+                                                ],
+                                                "label": {"show": False},
+                                            }
+                                        ],
+                                        "graphic": [],
+                                        "tooltip": {"show": False},
+                                    }
+                                )
+                                .classes("w-36 h-36 shrink-0")
+                                .props("renderer=svg")
+                            )
                             self.risk_legend = ui.column().classes("gap-2 flex-1")
 
                     with ui.column().classes("flex-1 min-w-72"):
@@ -363,42 +436,46 @@ class DashboardPage:
                         ui.label(
                             "Evaluation outcomes for the latest tested target"
                         ).classes("text-xs text-grey-6 mb-4")
-                        self.dist_chart = ui.echart(
-                            {
-                                "xAxis": {
-                                    "type": "category",
-                                    "data": [
-                                        "Jailbreaks",
-                                        "Mitigated",
-                                        "Errors",
-                                        "Pending",
+                        self.dist_chart = (
+                            ui.echart(
+                                {
+                                    "xAxis": {
+                                        "type": "category",
+                                        "data": [
+                                            "Jailbreaks",
+                                            "Mitigated",
+                                            "Errors",
+                                            "Pending",
+                                        ],
+                                        "axisLine": {"show": False},
+                                        "axisTick": {"show": False},
+                                    },
+                                    "yAxis": {
+                                        "type": "value",
+                                        "minInterval": 1,
+                                        "splitLine": {"lineStyle": {"type": "dashed"}},
+                                    },
+                                    "series": [
+                                        {
+                                            "type": "bar",
+                                            "data": [0, 0, 0, 0],
+                                            "itemStyle": {"borderRadius": [4, 4, 0, 0]},
+                                            "barMaxWidth": 60,
+                                        }
                                     ],
-                                    "axisLine": {"show": False},
-                                    "axisTick": {"show": False},
-                                },
-                                "yAxis": {
-                                    "type": "value",
-                                    "minInterval": 1,
-                                    "splitLine": {"lineStyle": {"type": "dashed"}},
-                                },
-                                "series": [
-                                    {
-                                        "type": "bar",
-                                        "data": [0, 0, 0, 0],
-                                        "itemStyle": {"borderRadius": [4, 4, 0, 0]},
-                                        "barMaxWidth": 60,
-                                    }
-                                ],
-                                "grid": {
-                                    "left": "3%",
-                                    "right": "3%",
-                                    "top": "8%",
-                                    "bottom": "3%",
-                                    "containLabel": True,
-                                },
-                                "tooltip": {"trigger": "axis"},
-                            }
-                        ).classes("w-full h-44")
+                                    "grid": {
+                                        "left": "3%",
+                                        "right": "3%",
+                                        "top": "8%",
+                                        "bottom": "3%",
+                                        "containLabel": True,
+                                    },
+                                    "tooltip": {"trigger": "axis"},
+                                }
+                            )
+                            .classes("w-full h-44")
+                            .props("renderer=svg")
+                        )
 
             # Recent runs
             with ui.card().classes("w-full"):
@@ -625,44 +702,136 @@ class DashboardPage:
                 self.attacks_table.on("selection", _on_attack_select)
 
     def _build_runs_panel(self, panel: ui.column) -> None:
-        with panel:
-            with ui.card().classes(
-                "w-full h-[calc(100vh-220px)] min-h-[540px] overflow-hidden"
-            ):
-                with ui.column().classes("w-full h-full min-h-0 gap-2"):
-                    with ui.row().classes("items-center justify-between mb-1 px-2"):
-                        self.runs_count_label = ui.label("").classes(
-                            "text-sm text-grey-6"
-                        )
-                        with ui.row().classes("items-center gap-2"):
-                            self._runs_delete_btn = (
-                                ui.button(
-                                    "Delete selected",
-                                    icon="delete",
-                                    on_click=lambda: ui.timer(
-                                        0,
-                                        self._delete_selected_runs,
-                                        once=True,
-                                    ),
-                                )
-                                .props("flat dense no-caps color=negative")
-                                .classes("hidden")
-                            )
-                            ui.button(
-                                "← Prev",
-                                on_click=lambda: self._change_runs_page(-1),
-                            ).props("flat dense no-caps")
-                            self.runs_page_label = ui.label("Page 1 / 1").classes(
-                                "text-sm text-grey-6"
-                            )
-                            ui.button(
-                                "Next →",
-                                on_click=lambda: self._change_runs_page(1),
-                            ).props("flat dense no-caps")
-                    with ui.scroll_area().classes("w-full flex-1 min-h-0"):
-                        self._history_runs_area = ui.column().classes(
-                            "w-full gap-0 overflow-x-auto"
-                        )
+        with panel.classes("w-full h-[calc(100vh-160px)] min-h-0"):
+            # ── Filter bar ────────────────────────────────────────────
+            with ui.row().classes("items-center w-full gap-2 px-2 flex-wrap shrink-0"):
+                ui.input(
+                    placeholder="Search runs…",
+                ).props("dense outlined clearable").classes(
+                    "min-w-[100px] max-w-[180px] flex-1"
+                ).on(
+                    "update:model-value",
+                    lambda e: self._on_runs_search_change(
+                        e.args if isinstance(e.args, str) else (e.args or "")
+                    ),
+                )
+                self._runs_agent_select = (
+                    ui.select(
+                        options={"": "All agents"},
+                        value="",
+                        on_change=lambda e: self._on_runs_filter_change(
+                            "agent", e.value
+                        ),
+                    )
+                    .props("dense outlined")
+                    .classes("min-w-[140px]")
+                )
+                self._runs_attack_select = (
+                    ui.select(
+                        options={"": "All attacks"},
+                        value="",
+                        on_change=lambda e: self._on_runs_filter_change(
+                            "attack", e.value
+                        ),
+                    )
+                    .props("dense outlined")
+                    .classes("min-w-[140px]")
+                )
+                ui.space()
+                self._runs_compare_btn = (
+                    ui.button(
+                        "Compare",
+                        icon="compare_arrows",
+                        on_click=lambda: ui.timer(
+                            0,
+                            self._compare_selected_runs,
+                            once=True,
+                        ),
+                    )
+                    .props("flat dense no-caps color=primary")
+                    .classes("opacity-30 pointer-events-none")
+                )
+                self._runs_export_btn = (
+                    ui.button(
+                        "Export",
+                        icon="download",
+                        on_click=lambda: ui.timer(
+                            0,
+                            self._export_selected_runs,
+                            once=True,
+                        ),
+                    )
+                    .props("flat dense no-caps color=secondary")
+                    .classes("opacity-30 pointer-events-none")
+                )
+                self._runs_delete_btn = (
+                    ui.button(
+                        "Delete",
+                        icon="delete",
+                        on_click=lambda: ui.timer(
+                            0,
+                            self._delete_selected_runs,
+                            once=True,
+                        ),
+                    )
+                    .props("flat dense no-caps color=negative")
+                    .classes("opacity-30 pointer-events-none")
+                )
+            # ── Scrollable run list ────────────────────────────────────
+            with ui.scroll_area().classes("w-full flex-1 min-h-0"):
+                self.runs_table = make_run_table(
+                    on_row_click=lambda run: ui.timer(
+                        0,
+                        lambda r=run: asyncio.create_task(
+                            self._open_run_history_results(r)
+                        ),
+                        once=True,
+                    ),
+                    include_agent=True,
+                    include_progressive_run=True,
+                    include_results=False,
+                    include_goal_latency_avg=True,
+                    include_asr=True,
+                    pagination={"rowsPerPage": 15},
+                    selection="multiple",
+                    on_select=lambda e: self._on_runs_table_select(e),
+                )
+                # Move pagination bar to top via flex order
+                self.runs_table.classes("runs-table-top-pagination")
+                ui.add_css("""
+                    .runs-table-top-pagination .q-table__container {
+                        display: flex;
+                        flex-direction: column;
+                    }
+                    .runs-table-top-pagination .q-table__bottom {
+                        order: -1;
+                        border-bottom: 1px solid #e0e0e0;
+                        border-top: none;
+                    }
+                """)
+                self._runs_load_more_btn = (
+                    ui.button(
+                        "Load more",
+                        icon="expand_more",
+                        on_click=lambda: ui.timer(0, self._load_more_runs, once=True),
+                    )
+                    .props("flat no-caps color=primary")
+                    .classes("self-center my-2 hidden")
+                )
+
+            # ── Bottom panel for run details (hidden by default) ───────
+            self._runs_bottom_panel = (
+                ui.card()
+                .classes("w-full shrink-0 gap-0 hidden")
+                .style("height: 70%; min-height: 300px;")
+            )
+
+            # ── Bottom panel for compare (hidden by default) ──────────
+            self._compare_bottom_panel = (
+                ui.card()
+                .classes("w-full shrink-0 gap-0 hidden")
+                .style("height: 70%; min-height: 300px;")
+            )
 
     def _build_reports_panel(self, panel: ui.column) -> None:
         with panel:
@@ -729,33 +898,43 @@ class DashboardPage:
         self.run_dialog = dialog
 
     def _build_history_run_dialog(self) -> None:
-        """Build a two-panel dialog for History run results."""
-        with ui.dialog() as dialog:
-            with ui.card().classes("w-full max-w-[96vw] h-[90vh] flex flex-col gap-0"):
+        """Build run detail content inside the inline bottom panel."""
+        if self._runs_bottom_panel is None:
+            return
+        with self._runs_bottom_panel:
+            with ui.column().classes("w-full h-full gap-0"):
                 with ui.row().classes(
-                    "items-center justify-between w-full shrink-0 px-5 py-3 border-b"
+                    "items-center justify-between w-full shrink-0 px-4 py-3 border-b"
                 ):
                     self.history_run_dialog_title = ui.label("Run Results").classes(
                         "font-semibold text-lg"
                     )
-                    ui.button(icon="close", on_click=dialog.close).props(
-                        "flat round dense"
-                    )
+                    ui.button(
+                        icon="close", on_click=self._close_runs_bottom_panel
+                    ).props("flat round dense")
                 # Two-panel body
-                with ui.row().classes("w-full flex-1 gap-0 overflow-hidden"):
-                    # Left: config/metrics + compact card list
+                with ui.row().classes("w-full flex-1 gap-0 overflow-hidden min-h-0"):
+                    # Left: config/metrics + charts + compact card list
                     with (
                         ui.scroll_area()
                         .classes("h-full border-r")
-                        .style("flex:none;width:680px")
+                        .style("flex:1 1 50%;min-width:0")
                     ):
                         with ui.column().classes("w-full gap-3 p-4"):
                             self.history_run_config_area = ui.column().classes(
                                 "w-full gap-2"
                             )
                             ui.separator()
-                            self.metrics_area = ui.column().classes("w-full gap-2")
+                            self.history_charts_area = ui.column().classes(
+                                "w-full gap-3"
+                            )
                             ui.separator()
+                            # ── Goal filter bar ──────────────────────
+                            self._history_goal_filter_area = ui.row().classes(
+                                "items-center gap-2 px-1 w-full"
+                            )
+                            with self._history_goal_filter_area:
+                                self._build_goal_filter_bar()
                             self.history_results_empty_label = ui.label(
                                 "Loading results..."
                             ).classes("text-sm text-grey-8 py-2")
@@ -763,7 +942,11 @@ class DashboardPage:
                                 "w-full gap-1"
                             )
                     # Right: detail view
-                    with ui.scroll_area().classes("h-full flex-1"):
+                    with (
+                        ui.scroll_area()
+                        .classes("h-full")
+                        .style("flex:1 1 50%;min-width:0")
+                    ):
                         self.history_detail_area = ui.column().classes(
                             "w-full gap-3 p-6"
                         )
@@ -771,7 +954,183 @@ class DashboardPage:
                             ui.label("← Select a goal to view details").classes(
                                 "text-grey-4 text-sm italic mt-16 w-full text-center"
                             )
-        self.history_run_dialog = dialog
+        # No dialog — panel is shown/hidden inline
+        self.history_run_dialog = None
+
+    def _build_goal_filter_bar(self) -> None:
+        """Render the goal filter bar with search, status select, and category select."""
+        rows = self._history_goal_rows
+        # Status options
+        status_options: dict[str, str] = {"": "All statuses"}
+        n_jailbreak = sum(1 for r in rows if r.get("_bucket") == "jailbreak")
+        n_mitigated = sum(1 for r in rows if r.get("_bucket") == "mitigated")
+        n_error = sum(1 for r in rows if r.get("_bucket") == "error")
+        if n_jailbreak:
+            status_options["jailbreak"] = f"Jailbreaks ({n_jailbreak})"
+        if n_mitigated:
+            status_options["mitigated"] = f"Mitigated ({n_mitigated})"
+        if n_error:
+            status_options["error"] = f"Errors ({n_error})"
+
+        # Category options
+        cat_options: dict[str, str] = {"": "All categories"}
+        cats: set[str] = set()
+        for r in rows:
+            cat = r.get("_goal_category") or ""
+            if cat and cat != "N/A":
+                cats.add(str(cat))
+        for cat in sorted(cats):
+            cat_options[cat] = cat
+
+        ui.input(
+            placeholder="Search goals...",
+            value=self._history_goal_filter_search,
+            on_change=lambda e: self._on_goal_search_change(e.value),
+        ).props("dense outlined clearable").classes("flex-1 min-w-[120px]").style(
+            "max-width:220px"
+        )
+        ui.select(
+            options=status_options,
+            value=self._history_goal_filter,
+            on_change=lambda e: self._on_goal_status_change(e.value),
+        ).props("dense outlined").classes("min-w-[130px]")
+        ui.select(
+            options=cat_options,
+            value=self._history_goal_filter_category,
+            on_change=lambda e: self._on_goal_category_change(e.value),
+        ).props("dense outlined").classes("min-w-[140px]")
+
+    def _on_goal_search_change(self, value: str) -> None:
+        """Handle goal search input change."""
+        self._history_goal_filter_search = (value or "").strip()
+        self._render_filtered_history_goals()
+
+    def _on_goal_status_change(self, value: str) -> None:
+        """Handle goal status filter change."""
+        self._history_goal_filter = value or ""
+        self._render_filtered_history_goals()
+
+    def _on_goal_category_change(self, value: str) -> None:
+        """Handle goal category filter change."""
+        self._history_goal_filter_category = value or ""
+        self._render_filtered_history_goals()
+
+    def _render_filtered_history_goals(self) -> None:
+        """Re-render the goal list applying status, category, and search filters."""
+        if self.history_results_list_area is None:
+            return
+        rows = self._history_goal_rows
+        # Apply status filter
+        if self._history_goal_filter:
+            rows = [r for r in rows if r.get("_bucket") == self._history_goal_filter]
+        # Apply category filter
+        if self._history_goal_filter_category:
+            rows = [
+                r
+                for r in rows
+                if (r.get("_goal_category") or "") == self._history_goal_filter_category
+            ]
+        # Apply search filter
+        if self._history_goal_filter_search:
+            q = self._history_goal_filter_search.lower()
+            rows = [
+                r
+                for r in rows
+                if q in (r.get("goal") or "").lower()
+                or q in (r.get("_goal_category") or "").lower()
+                or q in (r.get("_goal_subcategory") or "").lower()
+            ]
+
+        self.history_results_list_area.clear()
+        if not rows:
+            with self.history_results_list_area:
+                ui.label("No matching goals").classes(
+                    "text-sm text-grey-5 italic py-4 w-full text-center"
+                )
+            return
+
+        attack_type_str = self._history_dialog_attack_str
+        detail_data = self._history_goal_detail_data
+
+        with self.history_results_list_area:
+            # Group by category
+            cat_groups: dict[str, list[dict]] = {}
+            for row in rows:
+                cat = row.get("_goal_category") or "Uncategorised"
+                cat_groups.setdefault(str(cat), []).append(row)
+
+            for cat_label in sorted(cat_groups.keys()):
+                rows_in_cat = cat_groups[cat_label]
+                with ui.row().classes("items-center gap-2 mt-3 mb-1 px-1"):
+                    ui.label(cat_label).classes(
+                        "text-xs font-semibold text-grey-6 uppercase tracking-wide"
+                    )
+
+                # Group by subcategory
+                subcat_groups: dict[str, list[dict]] = {}
+                for row in rows_in_cat:
+                    sub = str(row.get("_goal_subcategory") or "")
+                    if sub == "N/A":
+                        sub = ""
+                    subcat_groups.setdefault(sub, []).append(row)
+
+                for sub_label in sorted(subcat_groups.keys()):
+                    rows_in_sub = sorted(
+                        subcat_groups[sub_label],
+                        key=lambda r: str(r.get("goal") or "").lower(),
+                    )
+                    if sub_label:
+                        with ui.row().classes("items-center gap-2 mt-2 mb-0.5 px-3"):
+                            ui.label(sub_label).classes(
+                                "text-[10px] font-semibold text-grey-5 "
+                                "uppercase tracking-wide"
+                            )
+
+                    for _row in rows_in_sub:
+                        _rid = str(_row.get("id") or "")
+                        _data = detail_data.get(_rid)
+
+                        def _make_click(
+                            _r: dict = _row,
+                            _d: object = _data,
+                            _atk_str: str = attack_type_str,
+                        ) -> None:
+                            if self.history_detail_area is None:
+                                return
+                            self.history_detail_area.clear()
+                            with self.history_detail_area:
+                                self._render_history_goal_detail(_r, _d, _atk_str)
+
+                        self._render_compact_card(_row, _make_click)
+
+    def _render_history_goal_detail(
+        self, row: dict, data: object, attack_type_str: str
+    ) -> None:
+        """Render a single goal detail in the right panel."""
+        ha = attack_type_str.lower()
+        if ha == "baseline":
+            self._render_baseline_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
+        elif ha == "bon":
+            self._render_bon_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
+        elif ha == "pap":
+            self._render_pap_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
+        elif ha == "pair":
+            self._render_pair_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
+        elif ha == "tap":
+            _nodes, _ds = data  # type: ignore[misc]
+            self._render_tap_goal_card(row, _nodes, _ds, detail_mode=True)
+        elif ha == "advprefix":
+            _pr, _gs = data  # type: ignore[misc]
+            self._render_advprefix_goal_card(row, _pr, _gs, detail_mode=True)
+        elif ha == "autodanturbo":
+            self._render_autodan_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
+        elif ha == "mml":
+            self._render_mml_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
+        else:
+            _req, _resp, _gr_evt = data  # type: ignore[misc]
+            self._render_generic_goal_card(
+                row, _req, _resp, detail_mode=True, guardrail_event=_gr_evt
+            )
 
     def _close_reports_detail(self) -> None:
         """Close the right detail panel and restore full-width report list."""
@@ -786,6 +1145,18 @@ class DashboardPage:
         self._report_goal_detail_panel = None
         self._report_current_run = None
         self._report_current_run_results = []
+
+    def _open_runs_bottom_panel(self) -> None:
+        """Show the inline bottom panel for run details."""
+        if self._compare_bottom_panel is not None:
+            self._compare_bottom_panel.classes(add="hidden")
+        if self._runs_bottom_panel is not None:
+            self._runs_bottom_panel.classes(remove="hidden")
+
+    def _close_runs_bottom_panel(self) -> None:
+        """Hide the inline bottom panel."""
+        if self._runs_bottom_panel is not None:
+            self._runs_bottom_panel.classes(add="hidden")
 
     def _close_report_goal_detail(self) -> None:
         """Close report goal detail panel inside the run report view."""
@@ -1002,6 +1373,12 @@ class DashboardPage:
             )
             ui.label(notes).classes("text-sm")
 
+        # MML-specific rendering: Image + Prompt + Response
+        metadata = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
+        encoding_mode = metadata.get("encoding_mode")
+        if encoding_mode:
+            self._render_mml_result_section(row, metadata)
+
         # Key-value detail table
         detail_fields = self._build_result_detail_fields(row)
         if detail_fields:
@@ -1189,6 +1566,47 @@ class DashboardPage:
                         ui.label(str(m)).classes("text-sm")
                 else:
                     ui.label(str(models_info)).classes("text-sm")
+
+        # Guardrails section
+        run_cfg = (
+            run.get("run_config") if isinstance(run.get("run_config"), dict) else {}
+        )
+        before_gr = display_config.get("before_guardrail") or run_cfg.get(
+            "before_guardrail"
+        )
+        after_gr = display_config.get("after_guardrail") or run_cfg.get(
+            "after_guardrail"
+        )
+        if before_gr or after_gr:
+            with ui.column().classes("w-full gap-1"):
+                ui.label("GUARDRAILS").classes(
+                    "text-[10px] font-semibold tracking-widest text-grey-5 uppercase"
+                )
+                with ui.row().classes("flex-wrap gap-3"):
+                    if before_gr:
+                        gr_label = (
+                            before_gr.get("identifier", "—")
+                            if isinstance(before_gr, dict)
+                            else str(before_gr)
+                        )
+                        with ui.card().tight().classes("min-w-24"):
+                            with ui.column().classes("px-3 py-2 gap-0"):
+                                ui.label("BEFORE MODEL").classes(
+                                    "text-[10px] font-semibold text-grey-5"
+                                )
+                                ui.label(gr_label).classes("text-sm font-medium")
+                    if after_gr:
+                        gr_label = (
+                            after_gr.get("identifier", "—")
+                            if isinstance(after_gr, dict)
+                            else str(after_gr)
+                        )
+                        with ui.card().tight().classes("min-w-24"):
+                            with ui.column().classes("px-3 py-2 gap-0"):
+                                ui.label("AFTER MODEL").classes(
+                                    "text-[10px] font-semibold text-grey-5"
+                                )
+                                ui.label(gr_label).classes("text-sm font-medium")
 
         # IDs
         with ui.column().classes("w-full gap-1 pt-2"):
@@ -1481,8 +1899,6 @@ class DashboardPage:
     def navigate(self, view: str, schedule_refresh: bool = True) -> None:
         if view == "runs" and self.current_view.get("value") != "runs":
             self.runs_current_page = 1
-        if view != "reports":
-            self._close_reports_detail()
         self.current_view["value"] = view
         for v, panel in self.all_panels.items():
             panel.set_visibility(v == view)
@@ -1491,12 +1907,9 @@ class DashboardPage:
         if schedule_refresh:
             asyncio.create_task(self.refresh_view())
 
-    def _change_runs_page(self, delta: int) -> None:
-        new_page = self.runs_current_page + delta
-        if new_page < 1 or new_page > self.runs_total_pages:
-            return
-        self.runs_current_page = new_page
-        ui.timer(0, self._load_runs, once=True)
+    def _on_runs_table_select(self, e) -> None:
+        """Handle selection event from the runs ui.table."""
+        self._on_runs_select()
 
     def _on_runs_select(self) -> None:
         if self.runs_table is not None:
@@ -1505,9 +1918,37 @@ class DashboardPage:
             ]
         if self._runs_delete_btn is not None:
             if self._selected_run_ids:
-                self._runs_delete_btn.classes(remove="hidden")
+                self._runs_delete_btn.classes(
+                    remove="opacity-30 pointer-events-none",
+                    add="opacity-100",
+                )
             else:
-                self._runs_delete_btn.classes(add="hidden")
+                self._runs_delete_btn.classes(
+                    remove="opacity-100",
+                    add="opacity-30 pointer-events-none",
+                )
+        if self._runs_export_btn is not None:
+            if self._selected_run_ids:
+                self._runs_export_btn.classes(
+                    remove="opacity-30 pointer-events-none",
+                    add="opacity-100",
+                )
+            else:
+                self._runs_export_btn.classes(
+                    remove="opacity-100",
+                    add="opacity-30 pointer-events-none",
+                )
+        if self._runs_compare_btn is not None:
+            if len(self._selected_run_ids) >= 2:
+                self._runs_compare_btn.classes(
+                    remove="opacity-30 pointer-events-none",
+                    add="opacity-100",
+                )
+            else:
+                self._runs_compare_btn.classes(
+                    remove="opacity-100",
+                    add="opacity-30 pointer-events-none",
+                )
 
     async def _delete_selected_runs(self) -> None:
         ids = list(self._selected_run_ids)
@@ -1523,9 +1964,892 @@ class DashboardPage:
         if self.runs_table is not None:
             self.runs_table.selected.clear()
         if self._runs_delete_btn is not None:
-            self._runs_delete_btn.classes(add="hidden")
+            self._runs_delete_btn.classes(
+                remove="opacity-100",
+                add="opacity-30 pointer-events-none",
+            )
         await self._load_runs()
         await self._load_history_reports()
+
+    async def _export_selected_runs(self) -> None:
+        """Export selected runs as summary JSON download."""
+        ids = list(self._selected_run_ids)
+        if not ids:
+            ui.notify("No runs selected", type="warning")
+            return
+        try:
+            export_data = await self._build_export_data(ids)
+            short_ids = "_".join(rid[:8] for rid in ids)
+            filename = f"hackagent_export_{short_ids}.json"
+            content = json.dumps(export_data, indent=2, default=str)
+            ui.download(
+                content.encode("utf-8"),
+                filename=filename,
+                media_type="application/json",
+            )
+            ui.notify(f"Exported {len(ids)} run(s)", type="positive")
+        except Exception as exc:
+            ui.notify(f"Export failed: {exc}", type="negative")
+
+    async def _build_export_data(self, run_ids: list[str]) -> dict:
+        """Build export JSON payload for given run IDs."""
+        from datetime import datetime, timezone
+
+        export = {
+            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "runs": [],
+        }
+
+        for rid in run_ids:
+            run_row = next(
+                (r for r in self._runs_all_rows if str(r.get("id")) == rid), None
+            )
+            if not run_row:
+                continue
+
+            run_entry: dict = {
+                "id": rid,
+                "run_number": run_row.get("run_progress"),
+                "agent_name": run_row.get("agent_name"),
+                "attack_type": run_row.get("attack_type"),
+                "status": run_row.get("status"),
+                "created_at": run_row.get("created_at"),
+                "total_results": run_row.get("total_results"),
+                "successful_jailbreaks": run_row.get("successful_jailbreaks"),
+                "mitigations": run_row.get("mitigations"),
+                "errors": run_row.get("failed_attacks"),
+                "overall_asr": run_row.get("overall_asr"),
+                "latency_seconds": run_row.get("_latency_s"),
+                "avg_goal_latency_seconds": run_row.get("_goal_latency_avg_s"),
+                "run_config": run_row.get("run_config"),
+            }
+
+            # Per-category breakdown
+            run_uuid = UUID(rid)
+            cat_stats: dict[str, dict[str, int]] = defaultdict(
+                lambda: {
+                    "total": 0,
+                    "vulnerable": 0,
+                    "mitigated": 0,
+                    "errors": 0,
+                }
+            )
+            page = 1
+            while True:
+                rp = self.backend.list_results(
+                    run_id=run_uuid, page=page, page_size=100
+                )
+                if not rp.items:
+                    break
+                for result in rp.items:
+                    rd = _serialize(result)
+                    cat = self._extract_goal_classifier_label(rd, "category")
+                    if not cat or cat == "N/A":
+                        cat = "Uncategorised"
+                    es = str(rd.get("evaluation_status") or "")
+                    en = rd.get("evaluation_notes")
+                    bucket = _result_bucket(status=es, notes=en)
+                    entry = cat_stats[cat]
+                    entry["total"] += 1
+                    if bucket == "jailbreak":
+                        entry["vulnerable"] += 1
+                    elif bucket == "mitigated":
+                        entry["mitigated"] += 1
+                    elif bucket == "error":
+                        entry["errors"] += 1
+                if int(rp.total or 0) <= page * 100:
+                    break
+                page += 1
+            run_entry["categories"] = dict(cat_stats)
+
+            export["runs"].append(run_entry)
+
+        return export
+
+    async def _compare_selected_runs(self) -> None:
+        """Open a comparison dialog for 2-4 selected runs."""
+        ids = list(self._selected_run_ids)
+        if len(ids) < 2:
+            ui.notify("Select at least 2 runs to compare", type="warning")
+            return
+        if len(ids) > 4:
+            ui.notify("Select at most 4 runs to compare", type="warning")
+            return
+
+        # Gather run rows
+        runs: list[dict] = []
+        for rid in ids:
+            row = next(
+                (r for r in self._runs_all_rows if str(r.get("id")) == rid), None
+            )
+            if row:
+                runs.append(row)
+        if len(runs) < 2:
+            return
+
+        # Fetch per-category breakdown for each run
+        per_run_cats: list[dict[str, dict[str, int]]] = []
+        all_categories: set[str] = set()
+        for run in runs:
+            run_id = UUID(str(run["id"]))
+            cat_stats: dict[str, dict[str, int]] = defaultdict(
+                lambda: {"total": 0, "vulnerable": 0, "mitigated": 0, "errors": 0}
+            )
+            page = 1
+            while True:
+                rp = self.backend.list_results(run_id=run_id, page=page, page_size=100)
+                if not rp.items:
+                    break
+                for result in rp.items:
+                    rd = _serialize(result)
+                    cat = self._extract_goal_classifier_label(rd, "category")
+                    if not cat or cat == "N/A":
+                        cat = "Uncategorised"
+                    es = str(rd.get("evaluation_status") or "")
+                    en = rd.get("evaluation_notes")
+                    bucket = _result_bucket(status=es, notes=en)
+                    entry = cat_stats[cat]
+                    entry["total"] += 1
+                    if bucket == "jailbreak":
+                        entry["vulnerable"] += 1
+                    elif bucket == "mitigated":
+                        entry["mitigated"] += 1
+                    elif bucket == "error":
+                        entry["errors"] += 1
+                if int(rp.total or 0) <= page * 100:
+                    break
+                page += 1
+            per_run_cats.append(dict(cat_stats))
+            all_categories.update(cat_stats.keys())
+
+        sorted_cats = sorted(all_categories)
+
+        # Populate the inline compare bottom panel
+        if self._compare_bottom_panel is None:
+            return
+        # Hide run detail panel if open
+        self._close_runs_bottom_panel()
+        self._compare_bottom_panel.clear()
+        with self._compare_bottom_panel.style(add="overflow-y: auto;"):
+            # ── Categorical palette for run identity ──────────
+            # Avoids red/green/orange reserved for status semantics
+            colors = ["#4a2377", "#8cc5e3", "#f55f74", "#0d7d87"]
+
+            # ── Build short + full labels ─────────────────────
+            short_labels = [f"#{r.get('run_progress', '?')}" for r in runs]
+            _runs_suffix = "_".join(short_labels).replace("#", "run")
+
+            # ── Header ────────────────────────────────────────
+            with (
+                ui.row()
+                .classes(
+                    "items-center justify-between w-full shrink-0 px-4 py-3 border-b"
+                )
+                .style("position: sticky; top: 0; z-index: 1; background: inherit;")
+            ):
+                ui.label(f"Comparing {len(runs)} Runs").classes("text-lg font-semibold")
+                ui.button(icon="close", on_click=self._close_compare_panel).props(
+                    "flat round dense"
+                )
+
+                # ── Build config chips per run & detect differences ──
+                _attack_display_map: dict[str, str] = {
+                    "baseline": "Baseline",
+                    "pair": "PAIR",
+                    "tap": "TAP",
+                    "bon": "Best-of-N",
+                    "advprefix": "AdvPrefix",
+                    "autodanturbo": "AutoDAN-Turbo",
+                    "cipherchat": "CipherChat",
+                    "flipattack": "FlipAttack",
+                    "pap": "PAP",
+                    "h4rm3l": "H4rm3l",
+                }
+
+                def _compare_chips_for_run(run: dict) -> list[tuple[str, str, str]]:
+                    """Return (icon, label, value) tuples for a run."""
+                    chips: list[tuple[str, str, str]] = []
+                    rc = (
+                        run.get("run_config")
+                        if isinstance(run.get("run_config"), dict)
+                        else {}
+                    )
+                    # Get attack config from run_config or attack lookup
+                    cfg: dict = {}
+                    _atk_id = str(run.get("attack_id") or "")
+                    if _atk_id:
+                        with contextlib.suppress(Exception):
+                            _acm = self._attack_config_map_for_ids({_atk_id})
+                            _ac = _acm.get(_atk_id)
+                            if isinstance(_ac, dict) and _ac:
+                                cfg = _ac
+                    if not cfg and isinstance(rc, dict):
+                        cfg = {k: v for k, v in rc.items() if k != "evaluation_summary"}
+
+                    atk_str = str(run.get("attack_type") or "—")
+                    atk_lower = atk_str.lower()
+
+                    # Attack type
+                    chips.append(
+                        (
+                            "flash_on",
+                            "Attack",
+                            _attack_display_map.get(atk_lower, atk_str.capitalize()),
+                        )
+                    )
+
+                    # Attack-specific params
+                    if atk_lower == "flipattack":
+                        _fa = cfg.get("flipattack_params") or {}
+                        if isinstance(_fa, dict):
+                            chips.append(
+                                ("flip", "Mode", str(_fa.get("flip_mode", "FCS")))
+                            )
+                    elif atk_lower == "h4rm3l":
+                        _h4 = cfg.get("h4rm3l_params") or {}
+                        _prog = _h4.get("program", "") if isinstance(_h4, dict) else ""
+                        if _prog:
+                            chips.append(
+                                (
+                                    "layers",
+                                    "Decorators",
+                                    self._format_h4rm3l_program(_prog),
+                                )
+                            )
+                    elif atk_lower == "cipherchat":
+                        _cc = cfg.get("cipherchat_params") or {}
+                        if isinstance(_cc, dict):
+                            chips.append(
+                                ("lock", "Cipher", str(_cc.get("encode_method", "—")))
+                            )
+                    elif atk_lower == "bon":
+                        _bn = cfg.get("bon_params") or {}
+                        if isinstance(_bn, dict):
+                            chips.append(
+                                ("auto_awesome", "Steps", str(_bn.get("n_steps", 4)))
+                            )
+                    elif atk_lower == "tap":
+                        _tp = cfg.get("tap_params") or {}
+                        if isinstance(_tp, dict):
+                            chips.append(
+                                ("account_tree", "Depth", str(_tp.get("depth", 3)))
+                            )
+                            chips.append(("width", "Width", str(_tp.get("width", 4))))
+
+                    # Dataset
+                    _ds_raw = cfg.get("dataset") or rc.get("dataset")
+                    if isinstance(_ds_raw, dict):
+                        _ds_p = _ds_raw.get("preset") or ""
+                        _ds_label = (
+                            _ds_p.replace("_", " ").title() if _ds_p else "Custom"
+                        )
+                        chips.append(("dataset", "Dataset", _ds_label))
+                        _ds_lim = _ds_raw.get("limit")
+                        if _ds_lim is not None:
+                            chips.append(("filter_list", "Limit", str(_ds_lim)))
+                    elif _ds_raw:
+                        chips.append(("dataset", "Dataset", str(_ds_raw)))
+
+                    # Target
+                    _agent = str(run.get("agent_name") or "—")
+                    chips.append(("smart_toy", "Target", _agent))
+
+                    # Judge / Scorer
+                    if atk_lower in ("pair", "autodanturbo"):
+                        _sc = cfg.get("scorer") or {}
+                        if isinstance(_sc, dict):
+                            _sc_id = _sc.get("identifier") or _sc.get("model_id") or ""
+                            if _sc_id:
+                                chips.append(("analytics", "Scorer", str(_sc_id)))
+                    else:
+                        _judges = cfg.get("judges")
+                        if isinstance(_judges, list) and _judges:
+                            _j0 = _judges[0] if isinstance(_judges[0], dict) else {}
+                            _jm = _j0.get("identifier") or _j0.get("model_id") or ""
+                            _jt = _j0.get("type") or ""
+                            _jlabel = (
+                                f"{_jt}" + (f" · {_jm}" if _jm else "")
+                                if _jt
+                                else (_jm or "pattern")
+                            )
+                            chips.append(("gavel", "Judge", _jlabel))
+
+                    # Attacker
+                    _att = cfg.get("attacker") or {}
+                    if isinstance(_att, dict):
+                        _att_id = _att.get("identifier") or _att.get("model_id") or ""
+                        if _att_id:
+                            chips.append(("psychology", "Attacker", str(_att_id)))
+
+                    # Generator (AdvPrefix)
+                    if atk_lower == "advprefix":
+                        _gen = cfg.get("generator") or {}
+                        if isinstance(_gen, dict):
+                            _gen_id = (
+                                _gen.get("identifier") or _gen.get("model_id") or ""
+                            )
+                            if _gen_id:
+                                chips.append(("build", "Generator", str(_gen_id)))
+
+                    # Guardrails
+                    _bg = rc.get("before_guardrail")
+                    _ag = rc.get("after_guardrail")
+                    if isinstance(_bg, dict):
+                        chips.append(
+                            ("shield", "Before Guardrail", _bg.get("identifier", "—"))
+                        )
+                    if isinstance(_ag, dict):
+                        chips.append(
+                            ("shield", "After Guardrail", _ag.get("identifier", "—"))
+                        )
+
+                    return chips
+
+                # Collect chips per run and determine which labels differ
+                _all_run_chips: list[list[tuple[str, str, str]]] = [
+                    _compare_chips_for_run(r) for r in runs
+                ]
+                # Build label→set(values) to detect differences
+                _label_values: dict[str, set[str]] = defaultdict(set)
+                _all_labels: set[str] = set()
+                for _chips_list in _all_run_chips:
+                    for _, lbl, val in _chips_list:
+                        _label_values[lbl].add(val)
+                        _all_labels.add(lbl)
+                # Labels absent from a run count as a distinct value
+                for _chips_list in _all_run_chips:
+                    _run_labels = {lbl for _, lbl, _ in _chips_list}
+                    for lbl in _all_labels:
+                        if lbl not in _run_labels:
+                            _label_values[lbl].add("")
+                _diff_labels: set[str] = {
+                    lbl for lbl, vals in _label_values.items() if len(vals) > 1
+                }
+
+                # ── Summary Table ─────────────────────────────────
+                with ui.card().classes("w-full"):
+                    ui.label("Summary").classes("font-semibold text-sm mb-1")
+                    # Shared config (common across all runs)
+                    _shared_labels = _all_labels - _diff_labels
+                    if _shared_labels and _all_run_chips:
+                        _shared_chips = [
+                            (ic, lbl, val)
+                            for ic, lbl, val in _all_run_chips[0]
+                            if lbl in _shared_labels
+                        ]
+                        if _shared_chips:
+                            with ui.row().classes("items-center gap-1 mb-2 flex-wrap"):
+                                ui.icon("settings", size="14px").classes("text-grey-5")
+                                ui.label("Shared:").classes(
+                                    "text-xs font-semibold text-grey-5"
+                                )
+                                for _cic, _clbl, _cval in _shared_chips:
+                                    with ui.row().classes(
+                                        "items-center gap-1 rounded px-1.5 py-0.5 bg-grey-1"
+                                    ):
+                                        ui.icon(_cic, size="10px").classes(
+                                            "text-grey-5"
+                                        )
+                                        ui.label(f"{_clbl}: {_cval}").classes(
+                                            "text-[10px] font-medium text-grey-7"
+                                        )
+                    columns = [
+                        {
+                            "name": "run",
+                            "label": "Run",
+                            "field": "run",
+                            "align": "left",
+                        },
+                        {
+                            "name": "attack",
+                            "label": "Attack",
+                            "field": "attack",
+                            "align": "left",
+                        },
+                        {
+                            "name": "asr",
+                            "label": "ASR",
+                            "field": "asr",
+                            "align": "center",
+                        },
+                        {
+                            "name": "latency",
+                            "label": "Avg Latency",
+                            "field": "latency",
+                            "align": "center",
+                        },
+                        {
+                            "name": "goals",
+                            "label": "Goals",
+                            "field": "goals",
+                            "align": "center",
+                        },
+                        {
+                            "name": "cats_passed",
+                            "label": "Categories Passed",
+                            "field": "cats_passed",
+                            "align": "center",
+                        },
+                        {
+                            "name": "worst_cat",
+                            "label": "Worst Category",
+                            "field": "worst_cat",
+                            "align": "left",
+                        },
+                        {
+                            "name": "differences",
+                            "label": "Differences",
+                            "field": "differences",
+                            "align": "left",
+                        },
+                    ]
+                    table_rows = []
+                    for i, run in enumerate(runs):
+                        cat_data = per_run_cats[i]
+                        total_cats = len(cat_data)
+                        passed = sum(
+                            1
+                            for entry in cat_data.values()
+                            if entry["total"] > 0 and entry["vulnerable"] == 0
+                        )
+                        # Find worst category (highest ASR)
+                        worst_cat = "—"
+                        worst_asr = -1.0
+                        for cat, entry in cat_data.items():
+                            if entry["total"] > 0:
+                                cat_asr = entry["vulnerable"] / entry["total"]
+                                if cat_asr > worst_asr:
+                                    worst_asr = cat_asr
+                                    worst_cat = cat
+                        if worst_asr <= 0:
+                            worst_cat = "—"
+
+                        # Build differences string from differing config
+                        _run_chips = _all_run_chips[i]
+                        _diff_chips = [
+                            (ic, lbl, val)
+                            for ic, lbl, val in _run_chips
+                            if lbl in _diff_labels
+                        ]
+                        diff_str = (
+                            ", ".join(f"{lbl}: {val}" for _, lbl, val in _diff_chips)
+                            if _diff_chips
+                            else "—"
+                        )
+
+                        table_rows.append(
+                            {
+                                "run": short_labels[i],
+                                "attack": str(run.get("attack_type") or "—"),
+                                "asr": str(run.get("overall_asr", "—")),
+                                "latency": run.get("_latency") or "—",
+                                "goals": str(run.get("total_results") or 0),
+                                "cats_passed": f"{passed}/{total_cats}",
+                                "worst_cat": worst_cat if worst_cat != "—" else "None",
+                                "differences": diff_str,
+                            }
+                        )
+                    ui.table(
+                        columns=columns,
+                        rows=table_rows,
+                        row_key="run",
+                    ).classes("w-full").props("dense flat bordered")
+
+                # ── Risk Distribution + Vulnerabilities per Category (side by side) ──
+                with ui.row().classes("w-full mt-3 gap-3 items-stretch"):
+                    # Left: Risk Distribution (stacked bar)
+                    with ui.card().classes("flex-1 min-w-[280px]"):
+                        _rd_chart_ref: list = []
+
+                        async def _dl_risk_dist():
+                            if _rd_chart_ref:
+                                await self._download_echart_svg(
+                                    _rd_chart_ref[0],
+                                    f"risk_distribution_{_runs_suffix}",
+                                )
+
+                        with ui.row().classes("items-center justify-between w-full"):
+                            ui.label("Risk Distribution").classes(
+                                "font-semibold text-sm"
+                            )
+                            ui.button(icon="download", on_click=_dl_risk_dist).props(
+                                "flat dense size=xs color=grey-6"
+                            )
+                        metrics = ["Jailbreak", "Mitigated", "Errors", "Pending"]
+                        metric_colors = ["#ef4444", "#22c55e", "#f97316", "#d1d5db"]
+                        bar_series = []
+                        for mi, (metric, mcolor) in enumerate(
+                            zip(metrics, metric_colors)
+                        ):
+                            values = []
+                            for run in runs:
+                                jb = int(run.get("successful_jailbreaks") or 0)
+                                mit = int(run.get("mitigations") or 0)
+                                err = int(run.get("errors") or 0)
+                                total = int(run.get("total_results") or 0)
+                                pending = max(0, total - jb - mit - err)
+                                values.append([jb, mit, err, pending][mi])
+                            bar_series.append(
+                                {
+                                    "name": metric,
+                                    "type": "bar",
+                                    "stack": "total",
+                                    "data": values,
+                                    "itemStyle": {"color": mcolor},
+                                    "barMaxWidth": 40,
+                                }
+                            )
+                        _rd_chart_ref.append(
+                            ui.echart(
+                                {
+                                    "tooltip": {
+                                        "trigger": "axis",
+                                        "axisPointer": {"type": "shadow"},
+                                    },
+                                    "legend": {
+                                        "bottom": 0,
+                                        "textStyle": {"fontSize": 11},
+                                    },
+                                    "grid": {
+                                        "left": "3%",
+                                        "right": "4%",
+                                        "top": "8%",
+                                        "bottom": "16%",
+                                        "containLabel": True,
+                                    },
+                                    "xAxis": {
+                                        "type": "category",
+                                        "data": short_labels,
+                                    },
+                                    "yAxis": {
+                                        "type": "value",
+                                        "name": "Count",
+                                    },
+                                    "series": bar_series,
+                                }
+                            )
+                            .classes("w-full h-56")
+                            .props("renderer=svg")
+                        )
+
+                    # Right: Vulnerabilities per Category (grouped horizontal bar)
+                    if sorted_cats:
+                        with ui.card().classes("flex-1 min-w-[320px]"):
+                            _vc_chart_ref: list = []
+
+                            async def _dl_vuln_cat():
+                                if _vc_chart_ref:
+                                    await self._download_echart_svg(
+                                        _vc_chart_ref[0],
+                                        f"vulnerabilities_per_category_{_runs_suffix}",
+                                    )
+
+                            with ui.row().classes(
+                                "items-center justify-between w-full mb-1"
+                            ):
+                                ui.label("Vulnerabilities per Category").classes(
+                                    "font-semibold text-sm"
+                                )
+                                ui.button(icon="download", on_click=_dl_vuln_cat).props(
+                                    "flat dense size=xs color=grey-6"
+                                )
+
+                            bar_cats = sorted(sorted_cats, reverse=True)
+
+                            vuln_data: list[list[int]] = []
+                            for _i, cat_data in enumerate(per_run_cats):
+                                vuln_vals: list[int] = []
+                                for cat in bar_cats:
+                                    entry = cat_data.get(cat)
+                                    vuln_vals.append(
+                                        entry["vulnerable"] if entry else 0
+                                    )
+                                vuln_data.append(vuln_vals)
+
+                            def _build_cat_series() -> list[dict]:
+                                series = []
+                                for idx, run in enumerate(runs):
+                                    series.append(
+                                        {
+                                            "name": short_labels[idx],
+                                            "type": "bar",
+                                            "data": vuln_data[idx],
+                                            "itemStyle": {
+                                                "color": colors[idx % len(colors)]
+                                            },
+                                            "barMaxWidth": 18,
+                                        }
+                                    )
+                                return series
+
+                            chart_height = max(260, len(bar_cats) * 38)
+
+                            _vc_chart_ref.append(
+                                ui.echart(
+                                    {
+                                        "tooltip": {
+                                            "trigger": "axis",
+                                            "axisPointer": {"type": "shadow"},
+                                        },
+                                        "legend": {
+                                            "bottom": 0,
+                                            "textStyle": {"fontSize": 11},
+                                        },
+                                        "grid": {
+                                            "left": "3%",
+                                            "right": "4%",
+                                            "top": "3%",
+                                            "bottom": "10%",
+                                            "containLabel": True,
+                                        },
+                                        "xAxis": {
+                                            "type": "value",
+                                            "minInterval": 1,
+                                        },
+                                        "yAxis": {
+                                            "type": "category",
+                                            "data": bar_cats,
+                                            "axisLabel": {
+                                                "width": 120,
+                                                "overflow": "truncate",
+                                                "fontSize": 11,
+                                            },
+                                        },
+                                        "series": _build_cat_series(),
+                                    }
+                                )
+                                .classes("w-full")
+                                .style(f"height: {chart_height}px")
+                                .props("renderer=svg")
+                            )
+
+                # ── Robustness radar + ASR vs Latency (side by side) ─────
+                with ui.row().classes("w-full mt-3 gap-3 items-stretch"):
+                    # Left: Robustness radar
+                    if len(sorted_cats) >= 3:
+                        with ui.card().classes("flex-1 min-w-[300px]"):
+                            _rr_chart_ref: list = []
+
+                            async def _dl_radar():
+                                if _rr_chart_ref:
+                                    await self._download_echart_svg(
+                                        _rr_chart_ref[0],
+                                        f"robustness_radar_{_runs_suffix}",
+                                    )
+
+                            with ui.row().classes(
+                                "items-center justify-between w-full"
+                            ):
+                                ui.label("Robustness by Category").classes(
+                                    "font-semibold text-sm"
+                                )
+                                ui.button(icon="download", on_click=_dl_radar).props(
+                                    "flat dense size=xs color=grey-6"
+                                )
+                            ui.label(
+                                "Higher = more robust (100% means no successful jailbreaks)"
+                            ).classes("text-xs text-grey-6 mb-2")
+                            radar_cats = sorted_cats[:9]
+
+                            indicators = [{"name": c, "max": 100} for c in radar_cats]
+                            series_data = []
+                            legend_names = []
+                            for i, (run, cat_data) in enumerate(
+                                zip(runs, per_run_cats)
+                            ):
+                                legend_names.append(short_labels[i])
+                                values = []
+                                for cat in radar_cats:
+                                    entry = cat_data.get(cat)
+                                    if entry and entry["total"] > 0:
+                                        robustness = round(
+                                            100
+                                            * (entry["total"] - entry["vulnerable"])
+                                            / entry["total"],
+                                            1,
+                                        )
+                                    else:
+                                        robustness = 100.0
+                                    values.append(robustness)
+                                series_data.append(
+                                    {
+                                        "value": values,
+                                        "name": short_labels[i],
+                                        "lineStyle": {"width": 2},
+                                        "areaStyle": {"opacity": 0.08},
+                                        "itemStyle": {"color": colors[i % len(colors)]},
+                                    }
+                                )
+
+                            _rr_chart_ref.append(
+                                ui.echart(
+                                    {
+                                        "tooltip": {
+                                            "trigger": "item",
+                                            "confine": True,
+                                        },
+                                        "legend": {
+                                            "data": legend_names,
+                                            "bottom": 0,
+                                            "textStyle": {"fontSize": 11},
+                                        },
+                                        "radar": {
+                                            "shape": "polygon",
+                                            "indicator": indicators,
+                                            "splitNumber": 5,
+                                            "center": ["50%", "48%"],
+                                            "radius": "62%",
+                                            "axisName": {
+                                                "fontSize": 11,
+                                                "color": "#374151",
+                                            },
+                                            "splitLine": {
+                                                "lineStyle": {"color": "#e5e7eb"}
+                                            },
+                                            "splitArea": {
+                                                "areaStyle": {"color": ["#ffffff"]}
+                                            },
+                                        },
+                                        "series": [
+                                            {
+                                                "type": "radar",
+                                                "symbol": "circle",
+                                                "symbolSize": 7,
+                                                "data": series_data,
+                                            }
+                                        ],
+                                    }
+                                )
+                                .classes("w-full h-80")
+                                .props("renderer=svg")
+                            )
+
+                    # Right: ASR vs Latency scatter
+                    with ui.card().classes("flex-1 min-w-[300px]"):
+                        _sl_chart_ref: list = []
+
+                        async def _dl_scatter():
+                            if _sl_chart_ref:
+                                await self._download_echart_svg(
+                                    _sl_chart_ref[0], f"asr_vs_latency_{_runs_suffix}"
+                                )
+
+                        with ui.row().classes("items-center justify-between w-full"):
+                            ui.label("ASR vs Latency").classes("font-semibold text-sm")
+                            ui.button(icon="download", on_click=_dl_scatter).props(
+                                "flat dense size=xs color=grey-6"
+                            )
+                        ui.label(
+                            "Each point is a run — lower-left is best (low ASR, fast)"
+                        ).classes("text-xs text-grey-6 mb-2")
+                        scatter_series = []
+                        for i, run in enumerate(runs):
+                            asr_raw = run.get("overall_asr", "—")
+                            latency_s = run.get("_goal_latency_avg_s")
+                            asr_num = None
+                            if isinstance(asr_raw, (int, float)):
+                                asr_num = float(asr_raw)
+                            elif isinstance(asr_raw, str):
+                                asr_clean = asr_raw.replace("%", "").strip()
+                                try:
+                                    asr_num = float(asr_clean)
+                                except (ValueError, TypeError):
+                                    pass
+                            lat_num = None
+                            if isinstance(latency_s, (int, float)):
+                                lat_num = round(float(latency_s), 1)
+                            if asr_num is not None and lat_num is not None:
+                                scatter_series.append(
+                                    {
+                                        "name": short_labels[i],
+                                        "type": "scatter",
+                                        "symbolSize": 16,
+                                        "itemStyle": {"color": colors[i % len(colors)]},
+                                        "data": [
+                                            {
+                                                "value": [lat_num, asr_num],
+                                                "name": f"{short_labels[i]}\nLatency: {lat_num}s | ASR: {asr_num}%",
+                                            }
+                                        ],
+                                        "tooltip": {
+                                            "formatter": f"{short_labels[i]}<br/>Latency: {lat_num}s<br/>ASR: {asr_num}%",
+                                        },
+                                    }
+                                )
+                        if scatter_series:
+                            _sl_chart_ref.append(
+                                ui.echart(
+                                    {
+                                        "tooltip": {
+                                            "trigger": "item",
+                                            "extraCssText": "padding:6px 10px;",
+                                        },
+                                        "legend": {
+                                            "top": 4,
+                                            "right": 8,
+                                            "textStyle": {"fontSize": 11},
+                                        },
+                                        "grid": {
+                                            "left": "14%",
+                                            "right": "8%",
+                                            "top": "14%",
+                                            "bottom": "14%",
+                                        },
+                                        "xAxis": {
+                                            "type": "value",
+                                            "name": "Avg Latency (s)",
+                                            "nameLocation": "middle",
+                                            "nameGap": 28,
+                                            "min": 0,
+                                        },
+                                        "yAxis": {
+                                            "type": "value",
+                                            "name": "ASR (%)",
+                                            "nameLocation": "middle",
+                                            "nameGap": 40,
+                                            "min": 0,
+                                            "max": 100,
+                                        },
+                                        "series": scatter_series,
+                                    }
+                                )
+                                .classes("w-full h-80")
+                                .props("renderer=svg")
+                            )
+                        else:
+                            ui.label(
+                                "Insufficient data for ASR vs Latency plot"
+                            ).classes("text-xs text-grey-5 italic")
+
+        self._compare_bottom_panel.classes(remove="hidden")
+
+    async def _download_echart_svg(self, chart, filename: str) -> None:
+        """Download an EChart as SVG via run_chart_method."""
+        import base64 as _b64
+        from urllib.parse import unquote as _unquote
+
+        try:
+            data_url = await chart.run_chart_method("getDataURL", {"type": "svg"})
+            if data_url and "," in data_url:
+                header, payload = data_url.split(",", 1)
+                if "base64" in header:
+                    svg_bytes = _b64.b64decode(payload)
+                else:
+                    svg_bytes = _unquote(payload).encode("utf-8")
+                ui.download(
+                    svg_bytes,
+                    filename=f"{filename}.svg",
+                    media_type="image/svg+xml",
+                )
+            else:
+                ui.notify("Failed to export chart", type="warning")
+        except Exception as exc:
+            ui.notify(f"Export failed: {exc}", type="negative")
+
+    def _close_compare_panel(self) -> None:
+        """Hide the compare bottom panel."""
+        if self._compare_bottom_panel is not None:
+            self._compare_bottom_panel.classes(add="hidden")
 
     async def _delete_selected_attacks(self) -> None:
         ids = list(self._selected_attack_ids)
@@ -2432,65 +3756,8 @@ class DashboardPage:
             "created_at": result.get("updated_at") or result.get("created_at"),
         }
 
-    @staticmethod
-    def _extract_request_response_candidates(content: object) -> tuple[object, object]:
-        """Best-effort extraction of request/response payloads from trace content."""
-        if not isinstance(content, dict):
-            return None, None
-
-        metadata = (
-            content.get("metadata") if isinstance(content.get("metadata"), dict) else {}
-        )
-        nested_result = (
-            content.get("result") if isinstance(content.get("result"), dict) else {}
-        )
-
-        request_value = (
-            content.get("request")
-            or content.get("prefix")
-            or content.get("prompt")
-            or nested_result.get("request")
-            or nested_result.get("prefix")
-            or nested_result.get("prompt")
-            or metadata.get("request")
-            or metadata.get("prefix")
-            or metadata.get("prompt")
-        )
-        response_value = (
-            content.get("response")
-            or content.get("completion")
-            or content.get("answer")
-            or nested_result.get("response")
-            or nested_result.get("completion")
-            or nested_result.get("answer")
-            or metadata.get("response")
-            or metadata.get("completion")
-            or metadata.get("answer")
-            or metadata.get("raw_response_body")
-        )
-
-        if isinstance(request_value, dict):
-            request_value = (
-                request_value.get("prompt")
-                or request_value.get("request")
-                or request_value
-            )
-
-        if isinstance(response_value, dict):
-            response_value = (
-                response_value.get("target_response")
-                or response_value.get("response")
-                or response_value.get("completion")
-                or response_value.get("generated_text")
-                or response_value
-            )
-
-        return request_value, response_value
-
     def _ensure_evaluation_request_response(
-        self,
-        serialized_traces: list[dict],
-        result: dict,
+        self, serialized_traces: list[dict], result: dict
     ) -> list[dict]:
         """Inject Request/Response in evaluation traces so they are always visible."""
 
@@ -2655,2431 +3922,6 @@ class DashboardPage:
 
         return serialized_traces
 
-    # ── Attack-specific goal card helpers ─────────────────────────────────────
-
-    @staticmethod
-    def _border_color_for_bucket(bucket: str) -> str:
-        if bucket == "jailbreak":
-            return "border-red-400"
-        if bucket == "mitigated":
-            return "border-green-400"
-        if bucket == "failed":
-            return "border-orange-400"
-        return "border-grey-300"
-
-    def _render_compact_card(self, row: dict, on_click) -> None:
-        """Render a compact clickable goal card for the left-panel list view."""
-        goal_text = str(row.get("goal") or "—")
-        goal_number = row.get("goal_number", "?")
-        bucket = row.get("_bucket", "pending")
-        border_color = self._border_color_for_bucket(bucket)
-        with (
-            ui.card()
-            .tight()
-            .classes(
-                f"w-full border-l-4 {border_color} cursor-pointer"
-                " hover:shadow-sm transition-shadow"
-            )
-            .on("click", on_click)
-        ):
-            with ui.row().classes("items-start gap-2 px-3 py-2 w-full"):
-                ui.label(f"#{goal_number}").classes(
-                    "font-bold text-xs text-grey-5 shrink-0 w-6 pt-0.5 text-right"
-                )
-                ui.label(goal_text).classes(
-                    "text-xs text-grey-8 flex-1 leading-snug whitespace-pre-wrap"
-                )
-
-    @contextlib.contextmanager
-    def _goal_card_shell(self, row: dict, detail_mode: bool = False):
-        goal_text = str(row.get("goal") or "—")
-        goal_number = row.get("goal_number", "?")
-        bucket = row.get("_bucket", "pending")
-        border_color = self._border_color_for_bucket(bucket)
-        if detail_mode:
-            _cat = row.get("_goal_category") or ""
-            _subcat = row.get("_goal_subcategory") or ""
-            with ui.column().classes("w-full gap-2"):
-                with ui.row().classes("items-center gap-2 flex-wrap"):
-                    ui.label(f"Goal #{goal_number}").classes(
-                        "font-bold text-base shrink-0"
-                    )
-                    if bucket == "jailbreak":
-                        ui.badge("Jailbreak", color="negative").classes("text-xs")
-                    elif bucket == "mitigated":
-                        ui.badge("Mitigated", color="positive").classes("text-xs")
-                    elif bucket == "failed":
-                        ui.badge("Error", color="warning").classes("text-xs")
-                    lat = row.get("_goal_latency")
-                    if lat and lat != "—":
-                        ui.badge(f"Latency: {lat}", color="grey-7").classes("text-xs")
-                if _cat:
-                    _cat_str = _cat
-                    if _subcat and _subcat not in ("", "N/A"):
-                        _cat_str += f" › {_subcat}"
-                    ui.label(_cat_str).classes("text-xs text-grey-5 tracking-wide")
-                ui.label(goal_text).classes(
-                    "text-sm text-grey-8 whitespace-pre-wrap leading-relaxed"
-                )
-            ui.separator().classes("my-2")
-            yield
-        else:
-            with ui.card().tight().classes(f"w-full border-l-4 {border_color}"):
-                with ui.column().classes("w-full gap-2 p-3") as col:
-                    ui.label(f"Goal #{goal_number}").classes(
-                        "font-bold text-sm shrink-0"
-                    )
-                    ui.label(goal_text).classes(
-                        "text-sm text-grey-8 whitespace-pre-wrap"
-                    )
-                    yield col
-
-    @staticmethod
-    def _wire_expand_toggle(body_col) -> None:
-        toggle_btn = (
-            ui.button("Expand", icon="expand_more")
-            .props("flat no-caps size=sm color=grey-7")
-            .classes("w-full")
-        )
-        _state: dict = {"open": False}
-
-        def _toggle(_b=body_col, _btn=toggle_btn, _s=_state) -> None:
-            _s["open"] = not _s["open"]
-            _b.set_visibility(_s["open"])
-            _btn.props(
-                f"label={'Collapse' if _s['open'] else 'Expand'} icon={'expand_less' if _s['open'] else 'expand_more'} flat no-caps size=sm color=grey-7"
-            )
-
-        toggle_btn.on_click(_toggle)
-
-    # ── Baseline ──────────────────────────────────────────────────────────────
-
-    @staticmethod
-    def _parse_baseline_traces(traces: list[dict], goal: str = "") -> list[dict]:
-        """Parse Baseline attack traces into per-template rows.
-
-        Each row dict:
-          num           – 1-based row number
-          template      – attack_prompt with goal text replaced by {goal}
-          prompt        – raw attack prompt sent to target
-          response      – target model response
-          result        – "Jailbreak" | "Mitigated" | "Error"
-          _bucket       – "jailbreak" | "mitigated" | "error"
-        """
-        from collections import deque  # noqa: PLC0415
-
-        sorted_traces = sorted(traces, key=lambda x: x.get("sequence", 0))
-
-        # Baseline writes one "Template:…" interaction trace per template and
-        # one evaluation trace from the baseline_pattern_evaluator.
-        interaction_traces: list[tuple[str, dict]] = []
-        eval_trace_result: dict = {}
-
-        for td in sorted_traces:
-            content = td.get("content") or {}
-            step_name = str(content.get("step_name") or td.get("step_name") or "")
-            if step_name.startswith("Template:"):
-                interaction_traces.append((step_name, content))
-            elif content.get("evaluator") == "baseline_pattern_evaluator":
-                eval_trace_result = content.get("result") or {}
-
-        # Stable sort: by step_name then first message content
-        interaction_traces.sort(
-            key=lambda x: (
-                x[0],
-                (x[1].get("request") or {}).get("messages", [{}])[0].get("content", "")
-                if (x[1].get("request") or {}).get("messages")
-                else "",
-            )
-        )
-
-        # Build lookup: (template_category, response_length) → deque of eval entries
-        eval_by_key: dict[tuple, deque] = {}
-        for ev in eval_trace_result.get("evaluations") or []:
-            key = (
-                ev.get("template_category") or "",
-                int(ev.get("response_length") or 0),
-            )
-            if key not in eval_by_key:
-                eval_by_key[key] = deque()
-            eval_by_key[key].append(ev)
-
-        rows: list[dict] = []
-        for idx, (_, content) in enumerate(interaction_traces, start=1):
-            request = content.get("request") or {}
-            messages = request.get("messages") or []
-            attack_prompt = messages[0].get("content", "") if messages else ""
-            if not attack_prompt:
-                attack_prompt = str(request.get("prompt") or "")
-
-            _raw_resp = content.get("response")
-            _actual_resp, _g_side, _g_expl, _g_cats = (
-                DashboardPage._extract_guardrail_from_response(_raw_resp)
-            )
-            response_text = str(_actual_resp or "")
-
-            metadata = content.get("metadata") or {}
-            template_category = str(metadata.get("template_category") or "")
-            response_length = int(metadata.get("response_length") or len(response_text))
-
-            # Replace goal text in prompt with {goal} placeholder for display
-            if goal and goal in attack_prompt:
-                template_display = attack_prompt.replace(goal, "{goal}", 1)
-            else:
-                template_display = attack_prompt
-
-            # Match against the evaluator result
-            key = (template_category, response_length)
-            success: bool | None = None
-            q = eval_by_key.get(key)
-            if q:
-                ev = q.popleft()
-                success = bool(ev.get("success", False))
-
-            if _g_side:
-                bucket = "mitigated"
-            elif success is True:
-                bucket = "jailbreak"
-            elif success is False:
-                bucket = "mitigated"
-            elif response_text:
-                # Have a response but no evaluator match — treat as pending
-                bucket = "mitigated"
-            else:
-                bucket = "error"
-
-            rows.append(
-                {
-                    "num": idx,
-                    "template": template_display,
-                    "template_category": template_category,
-                    "prompt": attack_prompt,
-                    "response": response_text,
-                    "result": (
-                        "Jailbreak"
-                        if bucket == "jailbreak"
-                        else "Error"
-                        if bucket == "error"
-                        else "Mitigated"
-                    ),
-                    "_bucket": bucket,
-                    "_guardrail_side": _g_side,
-                    "_guardrail_explanation": _g_expl,
-                    "_guardrail_categories": _g_cats,
-                }
-            )
-
-        return rows
-
-    def _render_baseline_goal_card(
-        self, row: dict, template_rows: list[dict], detail_mode: bool = False
-    ) -> None:
-        """Render a Baseline goal card grouped by template category."""
-
-        def _fmt_cat(cat: str) -> str:
-            return cat.replace("_", " ").title() if cat else "Uncategorised"
-
-        # Build category groups preserving insertion order
-        groups: dict[str, list[dict]] = {}
-        for tr in template_rows:
-            cat = tr.get("template_category") or ""
-            groups.setdefault(cat, []).append(tr)
-
-        n_jailbreaks = sum(1 for r in template_rows if r["_bucket"] == "jailbreak")
-        n_mitigated = sum(1 for r in template_rows if r["_bucket"] == "mitigated")
-        n_errors = sum(1 for r in template_rows if r["_bucket"] == "error")
-
-        bl_cols = [
-            {
-                "name": "template_short",
-                "label": "Template",
-                "field": "template_short",
-                "align": "left",
-            },
-            {
-                "name": "result",
-                "label": "Result",
-                "field": "result",
-                "align": "center",
-                "style": "width:100px",
-            },
-        ]
-
-        with self._goal_card_shell(row, detail_mode):
-            if not template_rows:
-                ui.label("No Baseline template data recorded.").classes(
-                    "text-sm text-grey-6"
-                )
-                return
-
-            with ui.column().classes("w-full gap-2 mt-1") as body_col:
-                if not detail_mode:
-                    body_col.set_visibility(False)
-
-                for cat, rows_in_cat in groups.items():
-                    cat_label = _fmt_cat(cat)
-                    cat_n_jailbreaks = sum(
-                        1 for r in rows_in_cat if r["_bucket"] == "jailbreak"
-                    )
-
-                    with ui.row().classes("items-center gap-2 mt-3 mb-0.5 px-1"):
-                        ui.label(cat_label).classes(
-                            "text-xs font-semibold text-grey-6 uppercase tracking-wide"
-                        )
-                        ui.badge(
-                            f"{len(rows_in_cat)} prompt{'s' if len(rows_in_cat) != 1 else ''}",
-                            color="grey-5",
-                        ).classes("text-xs")
-                        if cat_n_jailbreaks:
-                            ui.badge(
-                                f"{cat_n_jailbreaks} jailbreak{'s' if cat_n_jailbreaks != 1 else ''}",
-                                color="negative",
-                            ).classes("text-xs")
-
-                    tbl_rows = [
-                        {
-                            "_num": tr["num"],
-                            "template_short": (
-                                (
-                                    tr["template"].replace("{goal}", "", 1)[:80]
-                                    + "\u2026"
-                                )
-                                if len(tr["template"].replace("{goal}", "", 1)) > 80
-                                else tr["template"].replace("{goal}", "", 1)
-                            )
-                            or "—",
-                            "result": tr["result"],
-                            "_bucket": tr["_bucket"],
-                            "_full_prompt": tr.get("prompt") or "",
-                            "_response": tr.get("response") or "",
-                            "_guardrail_side": tr.get("_guardrail_side") or "",
-                            "_guardrail_explanation": tr.get("_guardrail_explanation")
-                            or "",
-                            "_guardrail_categories": tr.get("_guardrail_categories")
-                            or [],
-                        }
-                        for tr in rows_in_cat
-                    ]
-
-                    tbl = (
-                        ui.table(
-                            columns=bl_cols,
-                            rows=tbl_rows,
-                            row_key="_num",
-                        )
-                        .classes("w-full text-xs")
-                        .props("dense flat")
-                    )
-                    if detail_mode:
-                        tbl.props(
-                            f":expanded-rows='{json.dumps([r['_num'] for r in tbl_rows])}'"
-                        )
-
-                    tbl.add_slot(
-                        "body",
-                        r"""
-<q-tr :props="props" @click="props.expand = !props.expand" style="cursor:pointer">
-  <q-td key="template_short" :props="props"
-        style="white-space:pre-wrap;word-break:break-word;max-width:360px">
-    {{ props.row.template_short }}
-  </q-td>
-  <q-td key="result" :props="props">
-    <q-badge v-if="props.row._bucket === 'jailbreak'" color="negative" class="text-xs">Jailbreak</q-badge>
-    <q-badge v-else-if="props.row._bucket === 'mitigated'" color="positive" class="text-xs">Mitigated</q-badge>
-    <q-badge v-else color="warning" class="text-xs">Error</q-badge>
-  </q-td>
-</q-tr>
-<q-tr v-show="props.expand" :props="props" @click="props.expand = false" style="cursor:pointer">
-  <q-td colspan="100%" class="bg-grey-1">
-    <div class="q-pa-sm">
-      <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">PROMPT SENT TO TARGET</div>
-      <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
-                  border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._full_prompt || '\u2014' }}</pre>
-      <template v-if="props.row._guardrail_side !== 'before'">
-        <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">TARGET RESPONSE</div>
-        <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
-                    border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._response || 'No response recorded.' }}</pre>
-      </template>
-      <div v-if="props.row._guardrail_side === 'before'" style="margin-bottom:8px">
-        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#c2410c">&#x26a0; BEFORE GUARDRAIL &#x2014; BLOCKED</div>
-        <pre style="font-size:11px;padding:10px;background:#fff7ed;border:2px solid #f97316;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#c2410c">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#9a3412">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#c2410c">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
-      </div>
-      <div v-else-if="props.row._guardrail_side === 'after'" style="margin-bottom:8px">
-        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#dc2626">&#x1f6ab; AFTER GUARDRAIL &#x2014; CENSORED</div>
-        <pre style="font-size:11px;padding:10px;background:#fef2f2;border:2px solid #ef4444;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#dc2626">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#991b1b">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#dc2626">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
-      </div>
-      <div v-else-if="props.row._guardrail_side" style="margin-bottom:8px">
-        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#616161">&#x1f6e1; GUARDRAIL &#x2014; BLOCKED</div>
-        <pre style="font-size:11px;padding:10px;background:#f5f5f5;border:2px solid #9e9e9e;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#616161">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#374151">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#616161">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
-      </div>
-    </div>
-  </q-td>
-</q-tr>
-""",
-                    )
-
-                # ── Summary row ───────────────────────────────────────
-                ui.separator().classes("mt-2")
-                with ui.row().classes("items-center gap-2 mt-2 flex-wrap"):
-                    ui.label("Summary:").classes("text-xs font-semibold text-grey-6")
-                    if n_jailbreaks:
-                        ui.badge(
-                            f"{n_jailbreaks} Jailbreak{'s' if n_jailbreaks != 1 else ''}",
-                            color="negative",
-                        ).classes("text-xs")
-                    ui.badge(f"{n_mitigated} Mitigated", color="positive").classes(
-                        "text-xs"
-                    )
-                    if n_errors:
-                        ui.badge(
-                            f"{n_errors} Error{'s' if n_errors != 1 else ''}",
-                            color="warning",
-                        ).classes("text-xs")
-
-            if not detail_mode:
-                self._wire_expand_toggle(body_col)
-
-    # ── Best-of-N (BoN) ───────────────────────────────────────────────────────
-
-    @staticmethod
-    def _parse_bon_traces(traces: list[dict]) -> list[dict]:
-        """Parse BoN traces into per-step groups.
-
-        Returns a list of step dicts, each containing:
-          step          – 0-based step index
-          step_label    – human label "Step N / M"
-          is_jailbreak  – True if the judge confirmed jailbreak for this step
-          candidates    – list of candidate dicts:
-              k                – 1-based candidate index
-              augmented_prompt – text sent to target
-              response         – target model response
-              response_length  – char length of response
-              is_best          – True if selected as best in the step
-              error            – error string or None
-              _guardrail_side  – "" | "before" | "after" | "unknown"
-              _guardrail_explanation – explanation string
-        """
-        candidate_traces: list[dict] = []
-        eval_traces: list[dict] = []
-
-        for td in sorted(traces, key=lambda x: x.get("sequence", 0)):
-            content = td.get("content") or {}
-            meta = content.get("metadata") or {}
-            dtype = str(meta.get("display_type") or "").lower()
-            if dtype == "bon_candidate":
-                candidate_traces.append(td)
-            elif dtype == "bon_evaluation":
-                eval_traces.append(td)
-
-        # Build lookup: step index → is_jailbreak (from evaluation traces only)
-        step_jailbreak: dict[int, bool] = {}
-        for td in eval_traces:
-            content = td.get("content") or {}
-            meta = content.get("metadata") or {}
-            s = meta.get("step")
-            if s is not None:
-                step_jailbreak[int(s)] = bool(meta.get("is_jailbreak", False))
-
-        # Group candidate traces by step
-        by_step: dict[int, list[dict]] = {}
-        for td in candidate_traces:
-            content = td.get("content") or {}
-            meta = content.get("metadata") or {}
-            s = int(meta.get("step", 0))
-            by_step.setdefault(s, []).append(td)
-
-        if not by_step:
-            return []
-
-        n_steps_seen = 1
-        for td in candidate_traces:
-            content = td.get("content") or {}
-            meta = content.get("metadata") or {}
-            n_steps_seen = max(n_steps_seen, int(meta.get("n_steps", 1)))
-
-        steps: list[dict] = []
-        for s in sorted(by_step.keys()):
-            cands = []
-            for td in sorted(
-                by_step[s],
-                key=lambda x: int(
-                    (x.get("content") or {})
-                    .get("metadata", {})
-                    .get("candidate_index", 0)
-                ),
-            ):
-                content = td.get("content") or {}
-                meta = content.get("metadata") or {}
-                request = content.get("request") or {}
-                response_obj = content.get("response")
-
-                augmented_prompt = (
-                    request.get("prompt")
-                    or (request.get("messages") or [{}])[0].get("content", "")
-                    if isinstance(request, dict)
-                    else ""
-                )
-
-                response_obj, _g_side, _g_expl, _g_cats = (
-                    DashboardPage._extract_guardrail_from_response(response_obj)
-                )
-
-                if isinstance(response_obj, dict):
-                    response_text = (
-                        response_obj.get("generated_text")
-                        or response_obj.get("completion")
-                        or ""
-                    )
-                    error_text = response_obj.get("error_message")
-                elif response_obj is not None:
-                    response_text = str(response_obj)
-                    error_text = None
-                else:
-                    response_text = ""
-                    error_text = None
-
-                resp_len = int(meta.get("response_length", len(response_text or "")))
-                cands.append(
-                    {
-                        "k": int(meta.get("candidate_index", 0)),
-                        "augmented_prompt": augmented_prompt,
-                        "response": response_text,
-                        "response_length": resp_len,
-                        "is_best": bool(meta.get("is_best", False)),
-                        "error": error_text,
-                        "_guardrail_side": _g_side,
-                        "_guardrail_explanation": _g_expl,
-                        "_guardrail_categories": _g_cats,
-                    }
-                )
-
-            steps.append(
-                {
-                    "step": s,
-                    "step_label": f"Step {s + 1} / {n_steps_seen}",
-                    "is_jailbreak": step_jailbreak.get(s, False),
-                    "candidates": cands,
-                }
-            )
-
-        return steps
-
-    def _render_bon_goal_card(
-        self, row: dict, step_groups: list[dict], detail_mode: bool = False
-    ) -> None:
-        """Render a BoN goal card with per-step candidate tables."""
-        with self._goal_card_shell(row, detail_mode):
-            if not step_groups:
-                ui.label("No BoN step results recorded.").classes("text-sm text-grey-6")
-                return
-
-            with ui.column().classes("w-full gap-2 mt-1") as body_col:
-                if not detail_mode:
-                    body_col.set_visibility(False)
-
-                for sg in step_groups:
-                    step_label = sg["step_label"]
-                    is_jailbreak_step = sg["is_jailbreak"]
-                    candidates = sg["candidates"]
-
-                    with ui.row().classes("items-center gap-2 mt-3 mb-0.5 px-1"):
-                        ui.label(step_label).classes(
-                            "text-xs font-semibold text-grey-6 uppercase tracking-wide"
-                        )
-                        if is_jailbreak_step:
-                            ui.badge("Jailbreak", color="negative").classes("text-xs")
-
-                    columns = [
-                        {
-                            "name": "k",
-                            "label": "K",
-                            "field": "k",
-                            "align": "center",
-                            "style": "width:48px",
-                        },
-                        {
-                            "name": "augmented_prompt",
-                            "label": "Augmented prompt",
-                            "field": "augmented_prompt",
-                            "align": "left",
-                        },
-                        {
-                            "name": "response_length",
-                            "label": "Response length",
-                            "field": "response_length",
-                            "align": "center",
-                            "style": "width:140px",
-                        },
-                        {
-                            "name": "result",
-                            "label": "Result",
-                            "field": "result",
-                            "align": "center",
-                            "style": "width:100px",
-                        },
-                    ]
-
-                    rows_data = []
-                    for c in candidates:
-                        if c.get("_guardrail_side"):
-                            result_label = "Mitigated"
-                        elif c["error"]:
-                            result_label = "Error"
-                        elif c["is_best"] and is_jailbreak_step:
-                            result_label = "Jailbreak"
-                        elif c["is_best"] and not is_jailbreak_step:
-                            result_label = "Mitigated"
-                        else:
-                            result_label = "—"
-                        aug = c.get("augmented_prompt") or ""
-                        rows_data.append(
-                            {
-                                "k": c["k"],
-                                "augmented_prompt": (aug[:80] + "…")
-                                if len(aug) > 80
-                                else aug or "—",
-                                "response_length": c["response_length"],
-                                "result": result_label,
-                                "_is_best": c["is_best"],
-                                "_full_prompt": aug,
-                                "_response": c.get("response") or "",
-                                "_guardrail_side": c.get("_guardrail_side") or "",
-                                "_guardrail_explanation": c.get(
-                                    "_guardrail_explanation"
-                                )
-                                or "",
-                            }
-                        )
-
-                    tbl = (
-                        ui.table(columns=columns, rows=rows_data, row_key="k")
-                        .classes("w-full text-xs")
-                        .props("dense flat")
-                    )
-                    if detail_mode:
-                        tbl.props(
-                            f":expanded-rows='{json.dumps([r['k'] for r in rows_data])}'"
-                        )
-
-                    tbl.add_slot(
-                        "body",
-                        r"""
-<q-tr :props="props" @click="props.expand = !props.expand"
-      :class="props.row._is_best ? 'bg-grey-2' : ''"
-      style="cursor:pointer">
-  <q-td key="k" :props="props">{{ props.row.k }}</q-td>
-  <q-td key="augmented_prompt" :props="props"
-        style="white-space:pre-wrap;word-break:break-word;max-width:320px">
-    {{ props.row.augmented_prompt }}
-  </q-td>
-  <q-td key="response_length" :props="props">{{ props.row.response_length }}</q-td>
-  <q-td key="result" :props="props">
-    <q-badge v-if="props.row.result === 'Jailbreak'" color="negative" class="text-xs">Jailbreak</q-badge>
-    <q-badge v-else-if="props.row.result === 'Mitigated'" color="positive" class="text-xs">Mitigated</q-badge>
-    <q-badge v-else-if="props.row.result === 'Error'" color="warning" class="text-xs">Error</q-badge>
-    <span v-else class="text-grey-5">&#8212;</span>
-  </q-td>
-</q-tr>
-<q-tr v-show="props.expand" :props="props" @click="props.expand = false" style="cursor:pointer">
-  <q-td colspan="100%" class="bg-grey-1">
-    <div class="q-pa-sm">
-      <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">PROMPT SENT TO TARGET</div>
-      <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
-                  border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._full_prompt || '\u2014' }}</pre>
-      <template v-if="props.row._guardrail_side !== 'before'">
-        <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">TARGET RESPONSE</div>
-        <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
-                    border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._response || 'No response recorded.' }}</pre>
-      </template>
-      <div v-if="props.row._guardrail_side === 'before'" style="margin-bottom:8px">
-        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#c2410c">&#x26a0; BEFORE GUARDRAIL &#x2014; BLOCKED</div>
-        <pre style="font-size:11px;padding:10px;background:#fff7ed;border:2px solid #f97316;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#c2410c">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#9a3412">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#c2410c">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
-      </div>
-      <div v-else-if="props.row._guardrail_side === 'after'" style="margin-bottom:8px">
-        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#dc2626">&#x1f6ab; AFTER GUARDRAIL &#x2014; CENSORED</div>
-        <pre style="font-size:11px;padding:10px;background:#fef2f2;border:2px solid #ef4444;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#dc2626">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#991b1b">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#dc2626">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
-      </div>
-      <div v-else-if="props.row._guardrail_side" style="margin-bottom:8px">
-        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#616161">&#x1f6e1; GUARDRAIL &#x2014; BLOCKED</div>
-        <pre style="font-size:11px;padding:10px;background:#f5f5f5;border:2px solid #9e9e9e;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#616161">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#374151">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#616161">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
-      </div>
-    </div>
-  </q-td>
-</q-tr>
-""",
-                    )
-
-            if not detail_mode:
-                self._wire_expand_toggle(body_col)
-
-    # ── H4rm3l formatting ─────────────────────────────────────────────────────
-
-    @staticmethod
-    def _format_h4rm3l_program(program: str) -> str:
-        """Convert an h4rm3l program string to a human-readable arrow chain."""
-        if not program or not isinstance(program, str):
-            return program or ""
-        p = program.strip()
-        # If it looks like a Python/h4rm3l call chain, simplify
-        import re as _re  # noqa: PLC0415
-
-        # Match Apply(transform1, Apply(transform2, ...)) style
-        names = _re.findall(r"\b([A-Za-z][A-Za-z0-9_]*)(?:\s*\()", p)
-        if names:
-            # Skip generic wrappers
-            skip = {"Apply", "Compose", "Pipeline"}
-            filtered = [n for n in names if n not in skip]
-            if filtered:
-                return " → ".join(
-                    " ".join(
-                        w.capitalize() for w in _re.sub(r"([A-Z])", r" \1", n).split()
-                    )
-                    for n in filtered
-                )
-        # Fallback: title-case snake_case names
-        if "_" in p and " " not in p:
-            return p.replace("_", " ").title()
-        return p
-
-    @staticmethod
-    def _extract_guardrail_from_response(response_value) -> tuple:
-        """Detect a guardrail event embedded in a response value.
-
-        Returns (actual_response, guardrail_side, guardrail_explanation, guardrail_categories) where:
-        - actual_response: real response string/value, or None if before-guardrail
-        - guardrail_side: "before" | "after" | "unknown" | ""
-        - guardrail_explanation: human-readable reason string
-        - guardrail_categories: list of harm category strings
-        """
-        # Legacy string-encoded format produced by old versions of
-        # tap/generation.py: "[GUARDRAIL:<side>] <reasoning>".
-        # New runs store a proper guardrail dict — this branch handles
-        # traces already persisted in the database with the old format.
-        if isinstance(response_value, str):
-            import re as _re
-
-            _m = _re.match(r"^\[GUARDRAIL:(\w+)\]\s*(.*)", response_value, _re.DOTALL)
-            if _m:
-                side = _m.group(1)
-                explanation = _m.group(2).strip() or "Blocked by guardrail"
-                return None, side, explanation, []
-            return response_value, "", "", []
-
-        if not isinstance(response_value, dict):
-            return response_value, "", "", []
-
-        # New format: adapter_type == "guardrail" with agent_specific_data
-        if response_value.get("adapter_type") == "guardrail":
-            info = response_value.get("agent_specific_data") or {}
-            side = info.get("side", "unknown")
-            explanation = str(
-                info.get("reasoning")
-                or info.get("message")
-                or info.get("explanation")
-                or "Blocked by guardrail"
-            )
-            categories = info.get("categories") or []
-            if side == "after":
-                actual = info.get("target_response") or None
-            else:
-                actual = None
-            return actual, side, explanation, categories
-
-        # Legacy format: dict with side key directly (from tracker extraction)
-        if response_value.get("side") in ("before", "after", "unknown"):
-            side = response_value.get("side", "unknown")
-            explanation = str(
-                response_value.get("reasoning")
-                or response_value.get("message")
-                or response_value.get("explanation")
-                or "Blocked by guardrail"
-            )
-            categories = response_value.get("categories") or []
-            if side == "after":
-                actual = response_value.get("target_response") or None
-            else:
-                actual = None
-            return actual, side, explanation, categories
-
-        return response_value, "", "", []
-
-    # ── PAIR ──────────────────────────────────────────────────────────────────
-
-    @staticmethod
-    def _parse_pair_traces(traces: list[dict]) -> list[dict]:
-        """Parse PAIR traces into per-iteration rows.
-
-        Each row:
-          iteration  – 1-based iteration number
-          prompt     – prompt sent to target
-          response   – target response
-          score      – judge score (int or None)
-          is_best    – True if this had the highest score
-        """
-        sorted_traces = sorted(traces, key=lambda x: x.get("sequence", 0))
-        rows: list[dict] = []
-
-        for td in sorted_traces:
-            content = td.get("content")
-            if not isinstance(content, dict):
-                continue
-            step_name = str(content.get("step_name") or "")
-            if "Iteration" not in step_name and "iteration" not in step_name:
-                continue
-            metadata = content.get("metadata") or {}
-            iteration = int(metadata.get("iteration") or len(rows) + 1)
-            req = content.get("request") or {}
-            prompt = req.get("prompt") or "" if isinstance(req, dict) else str(req)
-            if isinstance(prompt, list):
-                user_msgs = [
-                    m.get("content", "") for m in prompt if m.get("role") == "user"
-                ]
-                prompt = user_msgs[-1] if user_msgs else ""
-            resp = content.get("response")
-            resp, _pair_g_side, _pair_g_expl, _pair_g_cats = (
-                DashboardPage._extract_guardrail_from_response(resp)
-            )
-            # Fallback: guardrail info in metadata (older traces)
-            if not _pair_g_side:
-                _gi = metadata.get("guardrail_info") or {}
-                if not _gi:
-                    _tc = metadata.get("target_call") or {}
-                    _gi = _tc.get("guardrail_info") or {}
-                if _gi.get("side"):
-                    _pair_g_side = _gi["side"]
-                    _pair_g_expl = str(
-                        _gi.get("reasoning")
-                        or _gi.get("message")
-                        or _gi.get("explanation")
-                        or "Blocked by guardrail"
-                    )
-                    _pair_g_cats = _gi.get("categories") or []
-            if isinstance(resp, dict):
-                response = (
-                    resp.get("generated_text") or resp.get("completion") or str(resp)
-                )
-            elif resp is not None:
-                response = str(resp)
-            else:
-                response = ""
-            score_raw = (
-                metadata.get("score")
-                or metadata.get("judge_score")
-                or content.get("score")
-            )
-            try:
-                score = int(float(score_raw)) if score_raw is not None else None
-            except (TypeError, ValueError):
-                score = None
-            rows.append(
-                {
-                    "iteration": iteration,
-                    "prompt": str(prompt),
-                    "response": response,
-                    "score": score,
-                    "is_best": False,
-                    "_guardrail_side": _pair_g_side,
-                    "_guardrail_explanation": _pair_g_expl,
-                    "_guardrail_categories": _pair_g_cats,
-                }
-            )
-
-        # Mark best score
-        if rows:
-            scored = [r for r in rows if r["score"] is not None]
-            if scored:
-                best = max(scored, key=lambda r: r["score"])  # type: ignore[arg-type]
-                best["is_best"] = True
-
-        return rows
-
-    def _render_pair_goal_card(
-        self, row: dict, steps: list[dict], detail_mode: bool = False
-    ) -> None:
-        """Render a PAIR goal card as a conversation with per-iteration steps."""
-        with self._goal_card_shell(row, detail_mode):
-            if not steps:
-                ui.label("No PAIR iteration data recorded.").classes(
-                    "text-sm text-grey-6"
-                )
-            else:
-                with ui.column().classes("w-full gap-0 mt-1") as body_col:
-                    if not detail_mode:
-                        body_col.set_visibility(False)
-
-                    for step in steps:
-                        iteration = step["iteration"]
-                        score = step["score"]
-                        is_best = step["is_best"]
-                        prompt = step["prompt"]
-                        response = step["response"]
-                        _guardrail_side = step.get("_guardrail_side") or ""
-                        _guardrail_explanation = (
-                            step.get("_guardrail_explanation") or ""
-                        )
-                        _guardrail_categories = step.get("_guardrail_categories") or []
-
-                        with ui.row().classes("items-center gap-2 mt-3 mb-1 px-1"):
-                            _iter_label = f"Iteration {iteration}"
-                            if score is not None:
-                                _iter_label += f" — Score {score}/10"
-                            if is_best:
-                                _iter_label += " — Best"
-                            ui.label(_iter_label).classes(
-                                "text-xs font-semibold text-grey-6 uppercase tracking-wide"
-                            )
-
-                        ui.label("PROMPT SENT TO TARGET").classes(
-                            "text-[10px] text-grey-6 font-semibold uppercase tracking-wide px-1"
-                        )
-                        ui.html(
-                            '<pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;'
-                            'border-radius:4px;margin-bottom:6px;white-space:pre-wrap;word-break:break-word">'
-                            + html.escape(prompt or "—")
-                            + "</pre>"
-                        )
-
-                        if _guardrail_side == "before":
-                            self._render_guardrail_event_block(
-                                {
-                                    "side": "before",
-                                    "explanation": _guardrail_explanation,
-                                    "categories": _guardrail_categories,
-                                }
-                            )
-                        else:
-                            ui.label("TARGET RESPONSE").classes(
-                                "text-[10px] text-grey-6 font-semibold uppercase tracking-wide px-1"
-                            )
-                            ui.html(
-                                '<pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;'
-                                'border-radius:4px;white-space:pre-wrap;word-break:break-word">'
-                                + html.escape(response or "No response recorded.")
-                                + "</pre>"
-                            )
-                            if _guardrail_side:
-                                self._render_guardrail_event_block(
-                                    {
-                                        "side": _guardrail_side,
-                                        "explanation": _guardrail_explanation,
-                                        "categories": _guardrail_categories,
-                                    }
-                                )
-
-                        if iteration < steps[-1]["iteration"]:
-                            ui.separator().classes("mt-2 mb-0")
-
-                if not detail_mode:
-                    self._wire_expand_toggle(body_col)
-
-    # ── AutoDAN-Turbo ─────────────────────────────────────────────────────────
-
-    @staticmethod
-    def _parse_autodan_traces(traces: list[dict]) -> list[dict]:
-        """Parse AutoDAN-Turbo traces into per-epoch step rows."""
-        sorted_traces = sorted(traces, key=lambda x: x.get("sequence", 0))
-
-        steps: dict[tuple, dict] = {}
-        warmup_summary: dict | None = None
-
-        for td in sorted_traces:
-            content = td.get("content")
-            if not isinstance(content, dict):
-                continue
-            step_name = str(content.get("step_name") or "")
-            # AutoDAN-Turbo stores all payload fields directly in content
-            # (no nested "metadata" dict), so read epoch/iteration/stream
-            # from content directly.
-            metadata = content.get("metadata") or {}
-
-            # phase / subphase are stored directly in content by emit_phase_trace.
-            # step_name is NOT persisted to the backend, so we cannot use it for
-            # phase detection when reading DB traces.
-            phase_raw = str(content.get("phase") or "").upper()
-            subphase_raw = str(content.get("subphase") or "").upper()
-            if not phase_raw:
-                # Legacy fallback: derive from step_name for locally-stored traces
-                phase_raw = "WARMUP" if "warmup" in step_name.lower() else "LIFELONG"
-
-            if phase_raw == "WARMUP" and subphase_raw == "SUMMARIZATION":
-                warmup_summary = {
-                    "phase": "WARMUP_SUMMARY",
-                    "iteration": int(
-                        content.get("iteration") or metadata.get("iteration") or 0
-                    ),
-                    "epoch": -1,
-                    "stream": -1,
-                    "strategy": (content.get("strategy") or metadata.get("strategy")),
-                    "score": None,
-                    "is_best": False,
-                    "generated_prompt": None,
-                    "target_response": None,
-                    "assessment": None,
-                    "score_delta": None,
-                }
-                continue
-
-            # Skip bookend traces — no display content
-            if subphase_raw in ("PHASE_START", "PHASE_END", "SKIP_FINALIZED"):
-                continue
-
-            phase = phase_raw if phase_raw in ("WARMUP", "LIFELONG") else "LIFELONG"
-            # Payload fields are top-level in content; prefer them over the
-            # (usually empty) nested metadata dict.
-            iteration = int(content.get("iteration") or metadata.get("iteration") or 0)
-            epoch = int(content.get("epoch") or metadata.get("epoch") or 0)
-            stream = int(content.get("stream") or metadata.get("stream") or 0)
-            # Use (phase, iteration, epoch, stream) so each inner-loop step
-            # gets its own row while still merging the 3 sub-traces
-            # (Generation / Target Query / Scoring) that share the same key.
-            key = (phase, iteration, epoch, stream)
-
-            if key not in steps:
-                steps[key] = {
-                    "phase": phase,
-                    "iteration": iteration,
-                    "epoch": epoch,
-                    "stream": stream,
-                    "score": None,
-                    "is_best": False,
-                    "generated_prompt": None,
-                    "target_response": None,
-                    "assessment": None,
-                    "strategy": None,
-                    "score_delta": None,
-                    "_guardrail_side": "",
-                    "_guardrail_explanation": "",
-                }
-
-            step = steps[key]
-
-            # ── Attacker / jailbreak prompt ───────────────────────────────
-            # Traces store the final prompt directly as "generated_prompt".
-            # Older/router-style traces may nest it under request["prompt"].
-            if content.get("generated_prompt"):
-                step["generated_prompt"] = str(content["generated_prompt"])
-            else:
-                req = content.get("request") or {}
-                if isinstance(req, dict) and req.get("prompt"):
-                    step["generated_prompt"] = req["prompt"]
-
-            # ── Target response ───────────────────────────────────────────
-            # Traces store it as "target_response"; legacy path uses "response".
-            raw_resp = content.get("target_response") or content.get("response")
-            if raw_resp:
-                raw_resp, _adan_g_side, _adan_g_expl, _adan_g_cats = (
-                    DashboardPage._extract_guardrail_from_response(raw_resp)
-                )
-                if _adan_g_side:
-                    step["_guardrail_side"] = _adan_g_side
-                    step["_guardrail_explanation"] = _adan_g_expl
-                    step["_guardrail_categories"] = _adan_g_cats
-                if raw_resp is not None:
-                    if isinstance(raw_resp, dict):
-                        step["target_response"] = (
-                            raw_resp.get("generated_text")
-                            or raw_resp.get("completion")
-                            or str(raw_resp)
-                        )
-                    else:
-                        step["target_response"] = str(raw_resp)
-
-            # ── Score / assessment / strategy ─────────────────────────────
-            score_raw = content.get("score") or metadata.get("judge_score")
-            if score_raw is not None:
-                try:
-                    step["score"] = float(score_raw)
-                except (TypeError, ValueError):
-                    pass
-
-            if content.get("assessment"):
-                step["assessment"] = str(content["assessment"])
-            if content.get("strategy"):
-                step["strategy"] = content["strategy"]
-
-            score_delta_raw = content.get("score_delta") or metadata.get("score_delta")
-            if score_delta_raw is not None:
-                try:
-                    step["score_delta"] = float(score_delta_raw)
-                except (TypeError, ValueError):
-                    pass
-
-        _phase_order = {"WARMUP": 0, "LIFELONG": 1}
-        result = [
-            steps[k]
-            for k in sorted(
-                steps,
-                key=lambda t: (_phase_order.get(t[0], 9), t[1], t[2], t[3]),
-            )
-        ]
-        for phase_label in ("WARMUP", "LIFELONG"):
-            phase_steps = [s for s in result if s["phase"] == phase_label]
-            scored = [s for s in phase_steps if s["score"] is not None]
-            if scored:
-                best = max(scored, key=lambda s: s["score"])  # type: ignore[arg-type]
-                best["is_best"] = True
-
-        if warmup_summary:
-            last_warmup_idx = -1
-            for i, s in enumerate(result):
-                if s["phase"] == "WARMUP":
-                    last_warmup_idx = i
-            result.insert(last_warmup_idx + 1, warmup_summary)
-
-        return result
-
-    def _render_autodan_goal_card(
-        self, row: dict, steps: list[dict], detail_mode: bool = False
-    ) -> None:
-        """Render AutoDAN-Turbo goal card as a phase-divided conversation."""
-        with self._goal_card_shell(row, detail_mode):
-            if not steps:
-                ui.label("No AutoDAN-Turbo trace data recorded.").classes(
-                    "text-sm text-grey-6"
-                )
-                return
-
-            with ui.column().classes("w-full gap-3 mt-2") as body_col:
-                if not detail_mode:
-                    body_col.set_visibility(False)
-
-                phase_groups: list[tuple[str, list[dict]]] = []
-                for step in steps:
-                    phase = step["phase"]
-                    display_phase = (
-                        "WARMUP"
-                        if phase in ("WARMUP", "WARMUP_SUMMARY")
-                        else "LIFELONG"
-                    )
-                    if not phase_groups or phase_groups[-1][0] != display_phase:
-                        phase_groups.append((display_phase, []))
-                    phase_groups[-1][1].append(step)
-
-                for display_phase, phase_steps in phase_groups:
-                    _is_warmup = display_phase == "WARMUP"
-                    _phase_border = (
-                        "border-blue-grey-3" if _is_warmup else "border-teal-3"
-                    )
-                    _phase_header_bg = (
-                        "background:#eceff1" if _is_warmup else "background:#e0f2f1"
-                    )
-                    _phase_label_text = "Warm-Up" if _is_warmup else "Lifelong"
-                    _phase_icon = "explore" if _is_warmup else "loop"
-
-                    with ui.card().tight().classes(f"w-full border {_phase_border}"):
-                        with (
-                            ui.row()
-                            .classes("items-center gap-2 px-3 py-2 w-full")
-                            .style(_phase_header_bg)
-                        ):
-                            ui.icon(_phase_icon, size="xs").classes("text-grey-7")
-                            ui.label(_phase_label_text).classes(
-                                "text-xs font-bold text-grey-8 uppercase tracking-widest"
-                            )
-
-                        with ui.column().classes("w-full gap-2 p-2"):
-                            # Split WARMUP_SUMMARY out first, then group the
-                            # remaining steps by iteration so each outer-loop
-                            # iteration gets a single collapsible header with
-                            # its epoch cards nested inside.
-                            _summary_steps = [
-                                s for s in phase_steps if s["phase"] == "WARMUP_SUMMARY"
-                            ]
-                            _iter_steps = [
-                                s for s in phase_steps if s["phase"] != "WARMUP_SUMMARY"
-                            ]
-
-                            # Build ordered iteration groups preserving sort order
-                            _iter_groups: list[tuple[int, list[dict]]] = []
-                            for _step in _iter_steps:
-                                _it = _step.get("iteration", 0)
-                                if not _iter_groups or _iter_groups[-1][0] != _it:
-                                    _iter_groups.append((_it, []))
-                                _iter_groups[-1][1].append(_step)
-
-                            for _iter_num, _epoch_steps in _iter_groups:
-                                # Iteration sub-header (only shown when there
-                                # are multiple iterations in this phase)
-                                _iter_has_best = any(
-                                    s.get("is_best") for s in _epoch_steps
-                                )
-                                _iter_best_score = max(
-                                    (
-                                        s["score"]
-                                        for s in _epoch_steps
-                                        if s.get("score") is not None
-                                    ),
-                                    default=None,
-                                )
-                                if len(_iter_groups) > 1:
-                                    with ui.row().classes(
-                                        "items-center gap-2 px-1 py-0.5"
-                                    ):
-                                        ui.label(f"Iteration {_iter_num + 1}").classes(
-                                            "text-[11px] font-bold text-grey-6 uppercase tracking-widest"
-                                        )
-                                        if _iter_has_best:
-                                            _ib_str = (
-                                                f"  best {_iter_best_score:.1f} / 10"
-                                                if _iter_best_score is not None
-                                                else ""
-                                            )
-                                            ui.badge(
-                                                f"Best{_ib_str}", color="positive"
-                                            ).classes("text-xs")
-
-                                for step in _epoch_steps:
-                                    score = step["score"]
-                                    is_best = step["is_best"]
-                                    generated_prompt = step["generated_prompt"]
-                                    target_response = step["target_response"]
-                                    assessment = step.get("assessment") or ""
-                                    strategy = step.get("strategy")
-                                    score_delta = step.get("score_delta")
-                                    _adan_g_side = step.get("_guardrail_side") or ""
-                                    _adan_g_expl = (
-                                        step.get("_guardrail_explanation") or ""
-                                    )
-                                    _epoch_border = (
-                                        "border-positive"
-                                        if is_best
-                                        else "border-grey-3"
-                                    )
-
-                                    with (
-                                        ui.card()
-                                        .tight()
-                                        .classes(f"w-full border {_epoch_border}")
-                                    ):
-                                        with (
-                                            ui.row()
-                                            .classes(
-                                                "items-center gap-2 px-3 py-1.5 w-full"
-                                            )
-                                            .style("background:#f5f5f5")
-                                        ):
-                                            _score_str = (
-                                                f" — score {score:.1f} / 10"
-                                                if score is not None
-                                                else ""
-                                            )
-                                            _ep = step.get("epoch", 0)
-                                            # Only show "Epoch N" when there
-                                            # are multiple epochs per iteration
-                                            _ep_count = max(
-                                                (
-                                                    s.get("epoch", 0)
-                                                    for s in _epoch_steps
-                                                ),
-                                                default=0,
-                                            )
-                                            if _ep_count > 0:
-                                                _step_label = (
-                                                    f"Epoch {_ep + 1}{_score_str}"
-                                                )
-                                            else:
-                                                _step_label = f"Iteration {_iter_num + 1}{_score_str}"
-                                            ui.label(_step_label).classes(
-                                                "text-xs font-semibold text-grey-7 uppercase tracking-wide"
-                                            )
-                                            if is_best:
-                                                ui.badge(
-                                                    "Best", color="positive"
-                                                ).classes("text-xs")
-                                            ui.space()
-
-                                        with ui.column().classes("p-3 gap-2"):
-                                            ui.label("Attacker").classes(
-                                                "text-[10px] font-semibold text-grey-5 uppercase tracking-wide"
-                                            )
-                                            ui.html(
-                                                '<pre style="font-size:11px;padding:8px;background:white;'
-                                                "border:1px solid #e0e0e0;border-radius:4px;margin:0;"
-                                                'white-space:pre-wrap;word-break:break-word">'
-                                                + html.escape(generated_prompt or "—")
-                                                + "</pre>"
-                                            )
-
-                                            if _adan_g_side == "before":
-                                                self._render_guardrail_event_block(
-                                                    {
-                                                        "side": "before",
-                                                        "explanation": _adan_g_expl,
-                                                    }
-                                                )
-                                            else:
-                                                ui.label("Target response").classes(
-                                                    "text-[10px] font-semibold text-grey-5 uppercase tracking-wide"
-                                                )
-                                                ui.html(
-                                                    '<pre style="font-size:11px;padding:8px;background:white;'
-                                                    "border:1px solid #e0e0e0;border-radius:4px;margin:0;"
-                                                    'white-space:pre-wrap;word-break:break-word">'
-                                                    + html.escape(
-                                                        target_response
-                                                        or "No response recorded."
-                                                    )
-                                                    + "</pre>"
-                                                )
-                                                if _adan_g_side:
-                                                    self._render_guardrail_event_block(
-                                                        {
-                                                            "side": _adan_g_side,
-                                                            "explanation": _adan_g_expl,
-                                                        }
-                                                    )
-
-                                            if assessment:
-                                                ui.label("Scorer assessment").classes(
-                                                    "text-[10px] font-semibold text-grey-5 uppercase tracking-wide"
-                                                )
-                                                ui.html(
-                                                    '<pre style="font-size:11px;padding:8px;background:#fff8e1;'
-                                                    "border:1px solid #ffe082;border-radius:4px;margin:0;"
-                                                    'white-space:pre-wrap;word-break:break-word">'
-                                                    + html.escape(assessment)
-                                                    + "</pre>"
-                                                )
-
-                                            if strategy is not None and isinstance(
-                                                strategy, dict
-                                            ):
-                                                s_name = strategy.get("Strategy")
-                                                s_defn = strategy.get("Definition")
-                                                if s_name or s_defn:
-                                                    _delta_str = (
-                                                        f" (+{score_delta:.1f})"
-                                                        if score_delta
-                                                        else ""
-                                                    )
-                                                    ui.label(
-                                                        f"New strategy{_delta_str}"
-                                                    ).classes(
-                                                        "text-[10px] font-semibold text-indigo-6 uppercase tracking-wide"
-                                                    )
-                                                    _strat_text = ""
-                                                    if s_name:
-                                                        _strat_text += (
-                                                            f"Strategy: {s_name}\n"
-                                                        )
-                                                    if s_defn:
-                                                        _strat_text += (
-                                                            f"Definition: {s_defn}"
-                                                        )
-                                                    ui.html(
-                                                        '<pre style="font-size:11px;padding:8px;background:#f3f4fd;'
-                                                        "border:1px solid #c5cae9;border-radius:4px;margin:0;"
-                                                        'white-space:pre-wrap;word-break:break-word">'
-                                                        + html.escape(
-                                                            _strat_text.strip()
-                                                        )
-                                                        + "</pre>"
-                                                    )
-
-                            # Render WARMUP_SUMMARY cards (strategy extracted
-                            # by the summarizer after the warmup loop)
-                            for _ws in _summary_steps:
-                                _ws_strategy = _ws.get("strategy") or {}
-                                _ws_name = (
-                                    _ws_strategy.get("Strategy")
-                                    if isinstance(_ws_strategy, dict)
-                                    else None
-                                )
-                                _ws_defn = (
-                                    _ws_strategy.get("Definition")
-                                    if isinstance(_ws_strategy, dict)
-                                    else None
-                                )
-                                if _ws_name or _ws_defn:
-                                    with (
-                                        ui.card()
-                                        .tight()
-                                        .classes("w-full border border-indigo-2")
-                                    ):
-                                        with (
-                                            ui.row()
-                                            .classes("items-center gap-2 px-3 py-2")
-                                            .style("background:#e8eaf6")
-                                        ):
-                                            ui.icon("summarize", size="xs").classes(
-                                                "text-indigo-6"
-                                            )
-                                            ui.label(
-                                                "Summarizer — Strategy Extracted"
-                                            ).classes(
-                                                "text-xs font-bold text-indigo-8 uppercase tracking-widest"
-                                            )
-                                        with ui.column().classes("p-3 gap-1"):
-                                            _strat_text = ""
-                                            if _ws_name:
-                                                _strat_text += f"Strategy: {_ws_name}\n"
-                                            if _ws_defn:
-                                                _strat_text += f"Definition: {_ws_defn}"
-                                            ui.html(
-                                                '<pre style="font-size:11px;padding:8px;background:white;'
-                                                "border:1px solid #c5cae9;border-radius:4px;margin:0;"
-                                                'white-space:pre-wrap;word-break:break-word">'
-                                                + html.escape(_strat_text.strip())
-                                                + "</pre>"
-                                            )
-
-            if not detail_mode:
-                self._wire_expand_toggle(body_col)
-
-    # ── AdvPrefix ─────────────────────────────────────────────────────────────
-
-    @staticmethod
-    def _parse_advprefix_traces(
-        traces: list[dict],
-    ) -> tuple[list[dict], dict]:
-        """Parse AdvPrefix traces into per-prefix rows grouped by meta_prefix."""
-        sorted_traces = sorted(traces, key=lambda x: x.get("sequence", 0))
-
-        gen_stats: dict = {
-            "raw_generated": 0,
-            "after_phase1": 0,
-            "after_phase2": 0,
-        }
-
-        candidates: dict[str, dict] = {}
-
-        for td in sorted_traces:
-            content = td.get("content")
-            if not isinstance(content, dict):
-                continue
-            if "candidates" not in content and "raw_generated" not in content:
-                continue
-            gen_stats["raw_generated"] += int(content.get("raw_generated") or 0)
-            gen_stats["after_phase1"] += int(content.get("after_phase1_filtering") or 0)
-            gen_stats["after_phase2"] += int(content.get("after_phase2_filtering") or 0)
-            for cand in content.get("candidates") or []:
-                if not isinstance(cand, dict):
-                    continue
-                prefix_text = str(cand.get("prefix") or "")
-                if not prefix_text:
-                    continue
-                if prefix_text not in candidates:
-                    _raw_mp = str(cand.get("meta_prefix") or "")
-                    _mp_parts = [p.strip() for p in _raw_mp.split(",") if p.strip()]
-                    _seen: set[str] = set()
-                    _mp_dedup: list[str] = []
-                    for _p in _mp_parts:
-                        if _p not in _seen:
-                            _seen.add(_p)
-                            _mp_dedup.append(_p)
-                    _meta_prefix_str = ", ".join(_mp_dedup)
-                    candidates[prefix_text] = {
-                        "prefix": prefix_text,
-                        "_meta_prefix": _meta_prefix_str,
-                        "_nll": cand.get("prefix_nll"),
-                        "completion": "",
-                        "_bucket": "pending",
-                        "result": "Pending",
-                        "_filtered": "Pending",
-                        "_error": "",
-                    }
-
-        completion_by_prefix: dict[str, dict] = {}
-
-        for td in sorted_traces:
-            content = td.get("content")
-            if not isinstance(content, dict):
-                continue
-            if str(content.get("step_name") or "") != "Target Completion":
-                continue
-
-            metadata = content.get("metadata") or {}
-            full_prefix = str(metadata.get("prefix") or "")
-            lookup_key = full_prefix[:300]
-            error_msg = metadata.get("error_message")
-            surrogate = str(metadata.get("surrogate_attack_prompt") or "")
-
-            response = content.get("response")
-            response, _adv_g_side, _adv_g_expl, _adv_g_cats = (
-                DashboardPage._extract_guardrail_from_response(response)
-            )
-            if isinstance(response, dict):
-                completion = (
-                    response.get("generated_text") or response.get("completion") or ""
-                )
-            elif isinstance(response, str):
-                completion = response
-            elif response is None:
-                completion = ""
-            else:
-                completion = str(response)
-
-            # error_message may carry the guardrail block description when the
-            # guardrail info was not embedded in the response object itself
-            # (e.g. for runs recorded before guardrail_event propagation was added).
-            if not _adv_g_side and error_msg:
-                _emsg_lower = str(error_msg).lower()
-                if (
-                    "before_guardrail" in _emsg_lower
-                    or "before guardrail" in _emsg_lower
-                ):
-                    _adv_g_side = "before"
-                    _adv_g_expl = str(error_msg)
-                    error_msg = None
-                elif (
-                    "after_guardrail" in _emsg_lower or "after guardrail" in _emsg_lower
-                ):
-                    _adv_g_side = "after"
-                    _adv_g_expl = str(error_msg)
-                    error_msg = None
-
-            if _adv_g_side:
-                bucket = "mitigated"
-                result_label = "Mitigated"
-                error_msg = None  # guardrail takes precedence over any error_msg
-            elif error_msg:
-                bucket = "error"
-                result_label = "Error"
-            elif completion:
-                bucket = "mitigated"
-                result_label = "Mitigated"
-            else:
-                bucket = "error"
-                result_label = "Error"
-
-            comp_data = {
-                "prefix": full_prefix,
-                "completion": completion,
-                "_bucket": bucket,
-                "result": result_label,
-                "_filtered": "No",
-                "_error": str(error_msg) if error_msg else "",
-                "_meta_prefix": "",
-                "_surrogate": surrogate,
-                "_guardrail_side": _adv_g_side,
-                "_guardrail_explanation": _adv_g_expl,
-            }
-            completion_by_prefix[lookup_key] = comp_data
-
-            if lookup_key not in candidates:
-                candidates[lookup_key] = {
-                    "prefix": full_prefix,
-                    "_meta_prefix": "",
-                    "_nll": None,
-                    "completion": "",
-                    "_bucket": "pending",
-                    "result": "Pending",
-                    "_filtered": "Pending",
-                    "_error": "",
-                    "_surrogate": surrogate,
-                }
-
-        rows: list[dict] = []
-        for key, cand in candidates.items():
-            comp = completion_by_prefix.get(key)
-            if comp:
-                cand["prefix"] = comp["prefix"]
-                cand["completion"] = comp["completion"]
-                cand["_bucket"] = comp["_bucket"]
-                cand["result"] = comp["result"]
-                cand["_filtered"] = comp["_filtered"]
-                cand["_error"] = comp["_error"]
-                cand["_surrogate"] = comp.get("_surrogate", "")
-                if not cand.get("_meta_prefix") and comp["_meta_prefix"]:
-                    cand["_meta_prefix"] = comp["_meta_prefix"]
-                cand["_guardrail_side"] = comp.get("_guardrail_side") or ""
-                cand["_guardrail_explanation"] = (
-                    comp.get("_guardrail_explanation") or ""
-                )
-            _surrogate = cand.get("_surrogate") or ""
-            _prefix = cand["prefix"]
-            if _surrogate:
-                if "{prefix}" in _surrogate:
-                    cand["_sent_prompt"] = _surrogate.format(prefix=_prefix)
-                else:
-                    cand["_sent_prompt"] = _prefix + " " + _surrogate
-            else:
-                cand["_sent_prompt"] = _prefix
-            rows.append(cand)
-
-        rows.sort(key=lambda r: (r["_meta_prefix"], r["prefix"][:40]))
-        for i, r in enumerate(rows):
-            r["num"] = i + 1
-
-        unmatched_jailbreaks = 0
-        for td in sorted_traces:
-            content = td.get("content")
-            if not isinstance(content, dict):
-                continue
-            if str(content.get("step_name") or "") != "Evaluation":
-                continue
-            # Skip coordinator summary traces — they are goal-level aggregates,
-            # not per-prefix evaluation signals.
-            if str(content.get("evaluator") or "") == "tracking_coordinator":
-                continue
-            _result_val = content.get("result")
-            is_success = (
-                content.get("success") is True
-                or content.get("is_success") is True
-                or (
-                    isinstance(_result_val, dict) and _result_val.get("success") is True
-                )
-                or (content.get("score") or 0) > 0
-            )
-            if not is_success:
-                continue
-            meta = content.get("metadata") or {}
-            eval_prefix = str(meta.get("prefix") or "")
-            if eval_prefix:
-                eval_key = eval_prefix[:300]
-                matched = False
-                for r in rows:
-                    if r["prefix"][:300] == eval_key:
-                        r["_bucket"] = "jailbreak"
-                        r["result"] = "Jailbreak"
-                        matched = True
-                if not matched:
-                    unmatched_jailbreaks += 1
-            else:
-                unmatched_jailbreaks += 1
-
-        if unmatched_jailbreaks:
-            marked = 0
-            for r in rows:
-                if marked >= unmatched_jailbreaks:
-                    break
-                if r["_bucket"] in ("mitigated", "error") and not r.get(
-                    "_guardrail_side"
-                ):
-                    r["_bucket"] = "jailbreak"
-                    r["result"] = "Jailbreak"
-                    marked += 1
-
-        return rows, gen_stats
-
-    def _render_advprefix_goal_card(
-        self,
-        row: dict,
-        prefix_rows: list[dict],
-        gen_stats: dict,
-        detail_mode: bool = False,
-    ) -> None:
-        """Render an AdvPrefix goal card as a single flat table."""
-        n_jailbreaks = sum(1 for r in prefix_rows if r["_bucket"] == "jailbreak")
-        n_mitigated = sum(1 for r in prefix_rows if r["_bucket"] == "mitigated")
-        n_errors = sum(1 for r in prefix_rows if r["_bucket"] == "error")
-        n_pending = sum(1 for r in prefix_rows if r["_bucket"] == "pending")
-
-        with self._goal_card_shell(row, detail_mode):
-            if not prefix_rows:
-                ui.label("No AdvPrefix completion data recorded.").classes(
-                    "text-sm text-grey-6"
-                )
-            else:
-                with ui.column().classes("w-full gap-2 mt-1") as body_col:
-                    if not detail_mode:
-                        body_col.set_visibility(False)
-
-                    _raw = gen_stats.get("raw_generated", 0)
-                    _p1 = gen_stats.get("after_phase1", 0)
-                    _p2 = gen_stats.get("after_phase2", 0)
-                    if _raw > 0:
-                        with ui.row().classes(
-                            "items-center gap-1 text-[10px] text-grey-5 mb-1"
-                        ):
-                            ui.label(f"{_raw} generated").classes("font-mono")
-                            ui.label("→").classes("text-grey-4")
-                            ui.label(f"{_p1} after pattern filter").classes("font-mono")
-                            ui.label("→").classes("text-grey-4")
-                            ui.label(f"{_p2} after CE + top-k").classes(
-                                "font-mono font-semibold text-grey-7"
-                            )
-
-                    columns = [
-                        {
-                            "name": "num",
-                            "label": "#",
-                            "field": "num",
-                            "align": "center",
-                            "style": "width:36px",
-                        },
-                        {
-                            "name": "meta_prefix",
-                            "label": "Meta Prefix",
-                            "field": "meta_prefix",
-                            "align": "left",
-                        },
-                        {
-                            "name": "result",
-                            "label": "Result",
-                            "field": "result",
-                            "align": "center",
-                            "style": "width:100px",
-                        },
-                    ]
-
-                    tbl_rows = [
-                        {
-                            "num": r["num"],
-                            "meta_prefix": r.get("_meta_prefix") or "—",
-                            "result": r["result"],
-                            "_bucket": r["_bucket"],
-                            "_full_sent_prompt": r.get("_sent_prompt") or r["prefix"],
-                            "_full_prefix": r["prefix"],
-                            "_completion": r.get("completion") or "",
-                            "_error": r.get("_error") or "",
-                            "_guardrail_side": r.get("_guardrail_side") or "",
-                            "_guardrail_explanation": r.get("_guardrail_explanation")
-                            or "",
-                        }
-                        for r in prefix_rows
-                    ]
-
-                    tbl = (
-                        ui.table(columns=columns, rows=tbl_rows, row_key="num")
-                        .classes("w-full text-xs")
-                        .props("dense flat")
-                    )
-                    if detail_mode:
-                        tbl.props(
-                            f":expanded-rows='{json.dumps([r['num'] for r in tbl_rows])}'"
-                        )
-
-                    tbl.add_slot(
-                        "body",
-                        r"""
-<q-tr :props="props" @click="props.expand = !props.expand" style="cursor:pointer">
-  <q-td key="num" :props="props" style="font-size:10px;color:#9e9e9e">{{ props.row.num }}</q-td>
-  <q-td key="meta_prefix" :props="props"
-        style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px">
-    {{ props.row.meta_prefix }}
-  </q-td>
-  <q-td key="result" :props="props">
-    <q-badge v-if="props.row._bucket === 'jailbreak'" color="negative" class="text-xs">Jailbreak</q-badge>
-    <q-badge v-else-if="props.row._bucket === 'mitigated'" color="positive" class="text-xs">Mitigated</q-badge>
-    <q-badge v-else-if="props.row._bucket === 'pending'" color="grey" class="text-xs">Pending</q-badge>
-    <q-badge v-else color="warning" class="text-xs">Error</q-badge>
-  </q-td>
-</q-tr>
-<q-tr v-show="props.expand" :props="props" @click="props.expand = false" style="cursor:pointer">
-  <q-td colspan="100%" class="bg-grey-1">
-    <div class="q-pa-sm">
-      <template v-if="props.row._full_prefix !== props.row._full_sent_prompt">
-        <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">RAW ADVERSARIAL PREFIX</div>
-        <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
-                    border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._full_prefix || '—' }}</pre>
-        <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">PROMPT SENT TO TARGET</div>
-        <pre style="font-size:11px;padding:8px;background:#fff8e1;border:1px solid #ffe082;
-                    border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._full_sent_prompt }}</pre>
-      </template>
-      <template v-else>
-        <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">PROMPT SENT TO TARGET</div>
-        <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
-                    border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._full_sent_prompt || '—' }}</pre>
-      </template>
-      <template v-if="props.row._bucket !== 'pending' && props.row._guardrail_side !== 'before'">
-        <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">TARGET COMPLETION</div>
-        <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
-                    border-radius:4px;white-space:pre-wrap;word-break:break-word">{{ props.row._completion || 'No completion recorded.' }}</pre>
-        <div v-if="props.row._error" class="text-caption text-negative text-italic q-mt-xs">
-          Error: {{ props.row._error }}
-        </div>
-      </template>
-      <div v-else-if="props.row._bucket === 'pending'" class="text-caption text-grey-6 text-italic q-mt-xs">
-        This candidate was not executed against the target model.
-      </div>
-      <div v-if="props.row._guardrail_side === 'before'" style="margin-top:4px;margin-bottom:8px">
-        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#c2410c">⚠ BEFORE GUARDRAIL — BLOCKED</div>
-        <pre style="font-size:11px;padding:10px;background:#fff7ed;border:2px solid #f97316;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#c2410c">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#9a3412">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#c2410c">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
-      </div>
-      <div v-else-if="props.row._guardrail_side === 'after'" style="margin-top:4px;margin-bottom:8px">
-        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#dc2626">🚫 AFTER GUARDRAIL — CENSORED</div>
-        <pre style="font-size:11px;padding:10px;background:#fef2f2;border:2px solid #ef4444;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#dc2626">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#991b1b">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#dc2626">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
-      </div>
-      <div v-else-if="props.row._guardrail_side" style="margin-top:4px;margin-bottom:8px">
-        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#616161">🛡 GUARDRAIL — BLOCKED</div>
-        <pre style="font-size:11px;padding:10px;background:#f5f5f5;border:2px solid #9e9e9e;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#616161">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#374151">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#616161">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
-      </div>
-    </div>
-  </q-td>
-</q-tr>
-""",
-                    )
-
-                    ui.separator().classes("mt-2")
-                    with ui.row().classes("items-center gap-2 mt-2 flex-wrap"):
-                        ui.label("Summary:").classes(
-                            "text-xs font-semibold text-grey-6"
-                        )
-                        ui.label(
-                            f"{len(prefix_rows)} prefix{'es' if len(prefix_rows) != 1 else ''}"
-                        ).classes("text-xs text-grey-6")
-                        if n_jailbreaks:
-                            ui.badge(
-                                f"{n_jailbreaks} Jailbreak{'s' if n_jailbreaks != 1 else ''}",
-                                color="negative",
-                            ).classes("text-xs")
-                        if n_mitigated:
-                            ui.badge(
-                                f"{n_mitigated} Mitigated", color="positive"
-                            ).classes("text-xs")
-                        if n_errors:
-                            ui.badge(
-                                f"{n_errors} Error{'s' if n_errors != 1 else ''}",
-                                color="warning",
-                            ).classes("text-xs")
-                        if n_pending:
-                            ui.badge(f"{n_pending} Pending", color="grey").classes(
-                                "text-xs"
-                            )
-
-                if not detail_mode:
-                    self._wire_expand_toggle(body_col)
-
-    # ── PAP ───────────────────────────────────────────────────────────────────
-
-    @staticmethod
-    def _parse_pap_traces(traces: list[dict]) -> list[dict]:
-        """Parse PAP traces into per-technique rows for the result table."""
-        candidates: dict[int, dict] = {}
-        evaluations: dict[int, dict] = {}
-
-        for td in sorted(traces, key=lambda x: x.get("sequence", 0)):
-            content = td.get("content")
-            if not isinstance(content, dict):
-                continue
-            meta = content.get("metadata") or {}
-            display_type = meta.get("display_type") or ""
-            tech_idx = meta.get("technique_index")
-            if tech_idx is None:
-                continue
-            if display_type == "pap_candidate":
-                req = content.get("request") or {}
-                prompt = req.get("prompt") or "" if isinstance(req, dict) else ""
-                # If prompt is empty, check if there's messages format
-                if not prompt and isinstance(req, dict):
-                    msgs = req.get("messages") or []
-                    for m in reversed(msgs):
-                        if isinstance(m, dict) and m.get("role") == "user":
-                            prompt = str(m.get("content") or "")
-                            break
-                _cand_resp = content.get("response")
-                _cand_resp_actual, _cand_g_side, _cand_g_expl, _cand_g_cats = (
-                    DashboardPage._extract_guardrail_from_response(_cand_resp)
-                )
-                candidates[tech_idx] = {
-                    "technique": meta.get("technique") or "",
-                    "prompt": prompt,
-                    "response": str(_cand_resp_actual) if _cand_resp_actual else "",
-                    "_guardrail_side": _cand_g_side,
-                    "_guardrail_explanation": _cand_g_expl,
-                    "_guardrail_categories": _cand_g_cats,
-                }
-            elif display_type == "pap_evaluation":
-                _pap_raw_resp = content.get("response")
-                _pap_raw_resp, _pap_g_side, _pap_g_expl, _pap_g_cats = (
-                    DashboardPage._extract_guardrail_from_response(_pap_raw_resp)
-                )
-                _pap_response = (
-                    _pap_raw_resp.get("target_response")
-                    if isinstance(_pap_raw_resp, dict)
-                    else None
-                )
-                evaluations[tech_idx] = {
-                    "is_jailbreak": bool(meta.get("is_jailbreak")),
-                    "judge_score": meta.get("judge_score"),
-                    "response": _pap_response or "",
-                    "_guardrail_side": _pap_g_side,
-                    "_guardrail_explanation": _pap_g_expl,
-                }
-
-        rows = []
-        for idx in sorted(candidates):
-            cand = candidates[idx]
-            ev = evaluations.get(idx, {})
-            technique = cand["technique"]
-            prompt = cand["prompt"]
-            is_jailbreak = ev.get("is_jailbreak", False)
-            response = ev.get("response") or cand.get("response") or ""
-            _guardrail_side = (
-                ev.get("_guardrail_side") or cand.get("_guardrail_side") or ""
-            )
-            _guardrail_explanation = (
-                ev.get("_guardrail_explanation")
-                or cand.get("_guardrail_explanation")
-                or ""
-            )
-            if _guardrail_side:
-                bucket = "mitigated"
-            elif is_jailbreak:
-                bucket = "jailbreak"
-            elif ev:
-                bucket = "mitigated"
-            else:
-                bucket = "error"
-            rows.append(
-                {
-                    "num": idx + 1,
-                    "technique": technique,
-                    "prompt_short": (prompt[:80] + "\u2026")
-                    if len(prompt) > 80
-                    else prompt,
-                    "result": "Jailbreak"
-                    if bucket == "jailbreak"
-                    else "Mitigated"
-                    if bucket == "mitigated"
-                    else "Error",
-                    "_bucket": bucket,
-                    "_full_prompt": prompt,
-                    "_response": response,
-                    "_guardrail_side": _guardrail_side,
-                    "_guardrail_explanation": _guardrail_explanation,
-                }
-            )
-        return rows
-
-    def _render_pap_goal_card(
-        self, row: dict, technique_rows: list[dict], detail_mode: bool = False
-    ) -> None:
-        """Render a per-goal PAP result card with a per-technique table."""
-        with self._goal_card_shell(row, detail_mode):
-            if not technique_rows:
-                ui.label("No PAP technique results recorded.").classes(
-                    "text-sm text-grey-6"
-                )
-            else:
-                with ui.column().classes("w-full gap-2 mt-1") as body_col:
-                    if not detail_mode:
-                        body_col.set_visibility(False)
-
-                    pap_cols = [
-                        {
-                            "name": "technique",
-                            "label": "Technique",
-                            "field": "technique",
-                            "align": "left",
-                        },
-                        {
-                            "name": "result",
-                            "label": "Result",
-                            "field": "result",
-                            "align": "center",
-                            "style": "width:100px",
-                        },
-                    ]
-
-                    pap_tbl = (
-                        ui.table(columns=pap_cols, rows=technique_rows, row_key="num")
-                        .classes("w-full text-xs")
-                        .props("dense flat")
-                    )
-                    if detail_mode:
-                        pap_tbl.props(
-                            f":expanded-rows='{json.dumps([r['num'] for r in technique_rows])}'"
-                        )
-
-                    pap_tbl.add_slot(
-                        "body",
-                        r"""
-<q-tr :props="props" @click="props.expand = !props.expand" style="cursor:pointer">
-  <q-td key="technique" :props="props"
-        style="white-space:pre-wrap;word-break:break-word;max-width:360px">
-    {{ props.row.technique }}
-  </q-td>
-  <q-td key="result" :props="props">
-    <q-badge v-if="props.row._bucket === 'jailbreak'" color="negative" class="text-xs">Jailbreak</q-badge>
-    <q-badge v-else-if="props.row._bucket === 'mitigated'" color="positive" class="text-xs">Mitigated</q-badge>
-    <q-badge v-else color="warning" class="text-xs">Error</q-badge>
-  </q-td>
-</q-tr>
-<q-tr v-show="props.expand" :props="props" @click="props.expand = false" style="cursor:pointer">
-  <q-td colspan="100%" class="bg-grey-1">
-    <div class="q-pa-sm">
-      <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">PROMPT SENT TO TARGET</div>
-      <pre v-if="props.row._full_prompt" style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
-                  border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._full_prompt }}</pre>
-      <div v-else class="text-caption text-italic text-grey-5 q-mb-sm">Attacker failed to generate a persuasive prompt for this technique.</div>
-      <template v-if="props.row._full_prompt && props.row._guardrail_side !== 'before'">
-        <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">TARGET RESPONSE</div>
-        <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
-                    border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._response || 'No response recorded.' }}</pre>
-      </template>
-      <div v-if="props.row._guardrail_side === 'before'" style="margin-bottom:8px">
-        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#c2410c">⚠ BEFORE GUARDRAIL — BLOCKED</div>
-        <pre style="font-size:11px;padding:10px;background:#fff7ed;border:2px solid #f97316;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#c2410c">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#9a3412">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#c2410c">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
-      </div>
-      <div v-else-if="props.row._guardrail_side === 'after'" style="margin-bottom:8px">
-        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#dc2626">🚫 AFTER GUARDRAIL — CENSORED</div>
-        <pre style="font-size:11px;padding:10px;background:#fef2f2;border:2px solid #ef4444;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#dc2626">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#991b1b">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#dc2626">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
-      </div>
-      <div v-else-if="props.row._guardrail_side" style="margin-bottom:8px">
-        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#616161">🛡 GUARDRAIL — BLOCKED</div>
-        <pre style="font-size:11px;padding:10px;background:#f5f5f5;border:2px solid #9e9e9e;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#616161">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#374151">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#616161">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
-      </div>
-    </div>
-  </q-td>
-</q-tr>
-""",
-                    )
-
-                if not detail_mode:
-                    self._wire_expand_toggle(body_col)
-
-    # ── TAP ───────────────────────────────────────────────────────────────────
-
-    @staticmethod
-    def _parse_tap_traces(traces: list[dict]) -> tuple[list[dict], dict[int, dict]]:
-        """Parse TAP traces into a list of candidate node dicts."""
-        nodes: list[dict] = []
-        seen_ids: set[str] = set()
-        _interaction_counts: dict[int, int] = {}
-        _summary_counts: dict[int, int] = {}
-
-        def _add(node: dict) -> None:
-            sid = node.get("self_id") or ""
-            if sid and sid in seen_ids:
-                return
-            if sid:
-                seen_ids.add(sid)
-            nodes.append(node)
-
-        for td in sorted(traces, key=lambda x: x.get("sequence", 0)):
-            content = td.get("content")
-            if not isinstance(content, dict):
-                continue
-
-            step_name = str(content.get("step_name") or "")
-
-            if "Depth" in step_name and "Candidate" in step_name:
-                meta = content.get("metadata") or {}
-                req = content.get("request") or {}
-                prompt = req.get("prompt", "") if isinstance(req, dict) else ""
-                resp = content.get("response")
-                resp, _tap_g_side, _tap_g_expl, _tap_g_cats = (
-                    DashboardPage._extract_guardrail_from_response(resp)
-                )
-                response = str(resp) if resp not in (None, "") else ""
-                depth_level = int(meta.get("iteration") or 0)
-                _interaction_counts[depth_level] = (
-                    _interaction_counts.get(depth_level, 0) + 1
-                )
-                _add(
-                    {
-                        "depth": depth_level,
-                        "branch_index": meta.get("branch_index"),
-                        "stream_index": meta.get("stream_index"),
-                        "self_id": meta.get("self_id", ""),
-                        "parent_id": meta.get("parent_id"),
-                        "prompt": prompt,
-                        "response": response,
-                        "judge_score": meta.get("judge_score"),
-                        "on_topic": meta.get("on_topic_score"),
-                        "improvement": str(meta.get("improvement") or ""),
-                        "_guardrail_side": _tap_g_side,
-                        "_guardrail_explanation": _tap_g_expl,
-                        "_guardrail_categories": _tap_g_cats,
-                    }
-                )
-                continue
-
-            if "Depth" in step_name and "Summary" in step_name:
-                depth_level = int(content.get("depth") or 0)
-                branches = [
-                    b for b in (content.get("branches") or []) if isinstance(b, dict)
-                ]
-                _summary_counts[depth_level] = len(branches)
-                for branch in branches:
-                    _b_resp = branch.get("response")
-                    _b_resp, _b_g_side, _b_g_expl, _b_g_cats = (
-                        DashboardPage._extract_guardrail_from_response(_b_resp)
-                    )
-                    _add(
-                        {
-                            "depth": depth_level,
-                            "branch_index": branch.get("branch_index"),
-                            "stream_index": branch.get("stream_index"),
-                            "self_id": branch.get("self_id", ""),
-                            "parent_id": branch.get("parent_id"),
-                            "prompt": str(branch.get("prompt") or ""),
-                            "response": str(_b_resp or ""),
-                            "judge_score": branch.get("judge_score"),
-                            "on_topic": branch.get("on_topic_score"),
-                            "improvement": str(branch.get("improvement") or ""),
-                            "_guardrail_side": _b_g_side,
-                            "_guardrail_explanation": _b_g_expl,
-                            "_guardrail_categories": _b_g_cats,
-                        }
-                    )
-                continue
-
-            if not step_name and "depth" in content and "branches" in content:
-                depth_level = int(content.get("depth") or 0)
-                branches = [
-                    b for b in (content.get("branches") or []) if isinstance(b, dict)
-                ]
-                _summary_counts[depth_level] = len(branches)
-                for branch in branches:
-                    _b_resp2 = branch.get("response")
-                    _b_resp2, _b2_g_side, _b2_g_expl, _b2_g_cats = (
-                        DashboardPage._extract_guardrail_from_response(_b_resp2)
-                    )
-                    _add(
-                        {
-                            "depth": depth_level,
-                            "branch_index": branch.get("branch_index"),
-                            "stream_index": branch.get("stream_index"),
-                            "self_id": branch.get("self_id", ""),
-                            "parent_id": branch.get("parent_id"),
-                            "prompt": str(branch.get("prompt") or ""),
-                            "response": str(_b_resp2 or ""),
-                            "judge_score": branch.get("judge_score"),
-                            "on_topic": branch.get("on_topic_score"),
-                            "improvement": str(branch.get("improvement") or ""),
-                            "_guardrail_side": _b2_g_side,
-                            "_guardrail_explanation": _b2_g_expl,
-                            "_guardrail_categories": _b2_g_cats,
-                        }
-                    )
-                continue
-
-        if not nodes:
-            eval_idx = 0
-            for td in sorted(traces, key=lambda x: x.get("sequence", 0)):
-                content = td.get("content")
-                if not isinstance(content, dict):
-                    continue
-                if content.get("step_name") != "Evaluation":
-                    continue
-                evaluator = str(content.get("evaluator") or "")
-                if evaluator == "tracking_coordinator":
-                    continue
-                meta = content.get("metadata") or {}
-                prompt = str(meta.get("prefix") or "")
-                response = str(meta.get("completion") or "")
-                if not prompt and not response:
-                    continue
-                score_raw = content.get("score")
-                try:
-                    score_val = int(float(score_raw)) if score_raw is not None else None
-                except (TypeError, ValueError):
-                    score_val = None
-                # Binary evaluators (HarmBench, JailbreakBench) return 0/1;
-                # normalize to the 1–10 TAP scale so display is consistent
-                # with scores from Candidate traces.
-                _ev_lower = evaluator.lower()
-                if score_val is not None and (
-                    "harmbench" in _ev_lower or "jailbreakbench" in _ev_lower
-                ):
-                    score_val = 1 if score_val == 0 else 10
-                eval_idx += 1
-                nodes.append(
-                    {
-                        "depth": 0,
-                        "branch_index": eval_idx - 1,
-                        "stream_index": 0,
-                        "self_id": "",
-                        "parent_id": None,
-                        "prompt": prompt,
-                        "response": response,
-                        "judge_score": score_val,
-                        "on_topic": None,
-                        "improvement": "",
-                        "_guardrail_side": "",
-                        "_guardrail_explanation": "",
-                        "_guardrail_categories": [],
-                    }
-                )
-
-        depth_stats: dict[int, dict] = {}
-        all_depths = set(_interaction_counts) | set(_summary_counts)
-        for _d in all_depths:
-            _gen = _interaction_counts.get(_d)
-            _surv = _summary_counts.get(_d)
-            depth_stats[_d] = {
-                "generated": _gen,
-                "survived": _surv,
-                "pruned": (_gen - _surv)
-                if (_gen is not None and _surv is not None)
-                else None,
-            }
-
-        return nodes, depth_stats
-
-    def _render_tap_goal_card(
-        self,
-        row: dict,
-        nodes: list[dict],
-        depth_stats: dict[int, dict] | None = None,
-        detail_mode: bool = False,
-    ) -> None:
-        """Render a TAP goal card: one table per depth."""
-        with self._goal_card_shell(row, detail_mode):
-            if not nodes:
-                ui.label("No TAP candidate data recorded.").classes(
-                    "text-sm text-grey-6"
-                )
-            else:
-                by_depth: dict[int, list[dict]] = defaultdict(list)
-                for n in nodes:
-                    by_depth[n.get("depth") or 0].append(n)
-
-                _global_num = 0
-                _id_to_num: dict[str, int] = {}
-                for depth_level in sorted(by_depth.keys()):
-                    depth_nodes = by_depth[depth_level]
-                    depth_nodes.sort(
-                        key=lambda x: (
-                            x.get("stream_index") or 0,
-                            x.get("branch_index") or 0,
-                        )
-                    )
-                    for n in depth_nodes:
-                        _global_num += 1
-                        n["_global_num"] = _global_num
-                        sid = n.get("self_id") or ""
-                        if sid:
-                            _id_to_num[sid] = _global_num
-                for n in nodes:
-                    pid = n.get("parent_id") or ""
-                    n["_parent_num"] = _id_to_num.get(pid)
-
-                with ui.column().classes("w-full gap-2 mt-1") as body_col:
-                    if not detail_mode:
-                        body_col.set_visibility(False)
-
-                    for depth_level in sorted(by_depth.keys()):
-                        depth_nodes = by_depth[depth_level]
-                        _ds = (depth_stats or {}).get(depth_level, {})
-                        _n_cands = len(depth_nodes)
-                        _cand_label = f"{_n_cands} candidate{'s' if _n_cands != 1 else ''} after pruning"
-                        _depth_header = (
-                            "Final Evaluation"
-                            if depth_level == 0
-                            else f"Depth {depth_level}"
-                        )
-                        with ui.row().classes("items-center gap-2 mt-3 mb-0.5 px-1"):
-                            ui.label(_depth_header).classes(
-                                "text-xs font-semibold text-grey-6 uppercase tracking-wide"
-                            )
-                            ui.badge(_cand_label, color="grey-5").classes("text-xs")
-
-                        rows_data = []
-                        for idx, n in enumerate(depth_nodes):
-                            score = n.get("judge_score")
-                            on_topic = n.get("on_topic")
-                            prompt_text = n.get("prompt") or ""
-                            parent_num = n.get("_parent_num")
-                            _s_str = (
-                                f"{int(float(score))}/10" if score is not None else "—"
-                            )
-                            rows_data.append(
-                                {
-                                    "_num": n["_global_num"],
-                                    "parent_str": str(parent_num)
-                                    if parent_num is not None
-                                    else "—",
-                                    "prompt_short": (prompt_text[:80] + "…")
-                                    if len(prompt_text) > 80
-                                    else prompt_text or "—",
-                                    "score_val": float(score)
-                                    if score is not None
-                                    else -1,
-                                    "score_str": _s_str,
-                                    "on_topic_str": (
-                                        "yes"
-                                        if on_topic is not None
-                                        and int(float(on_topic)) >= 1
-                                        else "no"
-                                        if on_topic is not None
-                                        else "—"
-                                    ),
-                                    "_on_topic": on_topic,
-                                    "_full_prompt": prompt_text,
-                                    "_response": n.get("response") or "",
-                                    "_guardrail_side": n.get("_guardrail_side") or "",
-                                    "_guardrail_explanation": n.get(
-                                        "_guardrail_explanation"
-                                    )
-                                    or "",
-                                }
-                            )
-
-                        columns = [
-                            {
-                                "name": "_num",
-                                "label": "#",
-                                "field": "_num",
-                                "align": "center",
-                                "style": "width:40px",
-                            },
-                            {
-                                "name": "parent_str",
-                                "label": "Parent",
-                                "field": "parent_str",
-                                "align": "center",
-                                "style": "width:55px",
-                            },
-                            {
-                                "name": "prompt_short",
-                                "label": "Prompt",
-                                "field": "prompt_short",
-                                "align": "left",
-                            },
-                            {
-                                "name": "on_topic_str",
-                                "label": "On-topic",
-                                "field": "on_topic_str",
-                                "align": "center",
-                                "style": "width:80px",
-                            },
-                            {
-                                "name": "score_str",
-                                "label": "Score",
-                                "field": "score_str",
-                                "align": "center",
-                                "style": "width:80px",
-                            },
-                        ]
-
-                        tbl = (
-                            ui.table(columns=columns, rows=rows_data, row_key="_num")
-                            .classes("w-full text-xs")
-                            .props("dense flat")
-                        )
-                        if detail_mode:
-                            tbl.props(
-                                f":expanded-rows='{json.dumps([r['_num'] for r in rows_data])}'"
-                            )
-
-                        tbl.add_slot(
-                            "body",
-                            r"""
-<q-tr :props="props" @click="props.expand = !props.expand" style="cursor:pointer">
-  <q-td key="_num" :props="props" class="text-center text-grey-6">{{ props.row._num }}</q-td>
-  <q-td key="parent_str" :props="props" class="text-center text-grey-5">{{ props.row.parent_str }}</q-td>
-  <q-td key="prompt_short" :props="props"
-        style="white-space:pre-wrap;word-break:break-word;max-width:360px">
-    {{ props.row.prompt_short }}
-  </q-td>
-  <q-td key="on_topic_str" :props="props" class="text-center">
-    <span class="text-grey-7">{{ props.row.on_topic_str }}</span>
-  </q-td>
-  <q-td key="score_str" :props="props" class="text-center">
-    <span class="text-grey-7">{{ props.row.score_str }}</span>
-  </q-td>
-</q-tr>
-<q-tr v-show="props.expand" :props="props" @click="props.expand = false" style="cursor:pointer">
-  <q-td colspan="100%" class="bg-grey-1">
-    <div class="q-pa-sm">
-      <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">PROMPT SENT TO TARGET</div>
-      <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
-                  border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._full_prompt || '\u2014' }}</pre>
-      <template v-if="props.row._guardrail_side !== 'before'">
-        <div class="text-caption text-weight-bold text-uppercase text-grey-6 q-mb-xs">TARGET RESPONSE</div>
-        <pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;
-                    border-radius:4px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">{{ props.row._response || 'No response recorded.' }}</pre>
-      </template>
-      <div v-if="props.row._guardrail_side === 'before'" style="margin-bottom:8px">
-        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#c2410c">⚠ BEFORE GUARDRAIL — BLOCKED</div>
-        <pre style="font-size:11px;padding:10px;background:#fff7ed;border:2px solid #f97316;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#c2410c">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#9a3412">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#c2410c">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
-      </div>
-      <div v-else-if="props.row._guardrail_side === 'after'" style="margin-bottom:8px">
-        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#dc2626">🚫 AFTER GUARDRAIL — CENSORED</div>
-        <pre style="font-size:11px;padding:10px;background:#fef2f2;border:2px solid #ef4444;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#dc2626">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#991b1b">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#dc2626">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
-      </div>
-      <div v-else-if="props.row._guardrail_side" style="margin-bottom:8px">
-        <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#616161">🛡 GUARDRAIL — BLOCKED</div>
-        <pre style="font-size:11px;padding:10px;background:#f5f5f5;border:2px solid #9e9e9e;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#616161">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#374151">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#616161">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
-      </div>
-    </div>
-  </q-td>
-</q-tr>
-""",
-                        )
-
-                if not detail_mode:
-                    self._wire_expand_toggle(body_col)
-
-    # ── Generic / fallback ────────────────────────────────────────────────────
-
-    @staticmethod
-    def _extract_prompt_response_from_traces(
-        traces: list[dict],
-    ) -> tuple[str, str]:
-        """Extract the best (prompt, response) pair from generic attack traces."""
-        best_req = ""
-        best_resp = ""
-        fallback_req = ""
-        for td in sorted(traces, key=lambda x: x.get("sequence", 0)):
-            content = td.get("content")
-            if not isinstance(content, dict):
-                continue
-            req, resp = DashboardPage._extract_request_response_candidates(content)
-            req_str = (
-                json.dumps(req, indent=2)
-                if isinstance(req, (dict, list))
-                else str(req)
-                if req not in (None, "")
-                else ""
-            )
-            resp_str = (
-                json.dumps(resp, indent=2)
-                if isinstance(resp, (dict, list))
-                else str(resp)
-                if resp not in (None, "")
-                else ""
-            )
-            if req_str and resp_str:
-                best_req = req_str
-                best_resp = resp_str
-            elif req_str:
-                fallback_req = req_str
-        if best_req:
-            return best_req, best_resp
-        if fallback_req:
-            return fallback_req, "(no response recorded)"
-        return "(not available)", "(not available)"
-
-    def _render_generic_goal_card(
-        self,
-        row: dict,
-        request_text: str,
-        response_text: str,
-        detail_mode: bool = False,
-        guardrail_event: dict | None = None,
-    ) -> None:
-        """Render a per-goal result card for non-specific attacks."""
-        with self._goal_card_shell(row, detail_mode):
-            with ui.column().classes("w-full gap-2 mt-1") as body_col:
-                if not detail_mode:
-                    body_col.set_visibility(False)
-
-                ui.label("PROMPT SENT TO TARGET").classes(
-                    "text-[10px] text-grey-6 font-semibold uppercase tracking-wide"
-                )
-                ui.html(
-                    '<pre style="font-size:11px;padding:8px;background:white;'
-                    "border:1px solid #e0e0e0;border-radius:4px;margin-bottom:8px;"
-                    'white-space:pre-wrap;word-break:break-word">'
-                    + html.escape(request_text or "\u2014")
-                    + "</pre>"
-                )
-
-                _g_side = (guardrail_event or {}).get("side") or ""
-                if _g_side == "before":
-                    self._render_guardrail_event_block(guardrail_event)  # type: ignore[arg-type]
-                else:
-                    ui.label("TARGET RESPONSE").classes(
-                        "text-[10px] text-grey-6 font-semibold uppercase tracking-wide"
-                    )
-                    ui.html(
-                        '<pre style="font-size:11px;padding:8px;background:white;'
-                        "border:1px solid #e0e0e0;border-radius:4px;"
-                        'white-space:pre-wrap;word-break:break-word">'
-                        + html.escape(response_text or "No response recorded.")
-                        + "</pre>"
-                    )
-                    if _g_side:
-                        self._render_guardrail_event_block(guardrail_event)  # type: ignore[arg-type]
-
-            if not detail_mode:
-                self._wire_expand_toggle(body_col)
-
     async def _load_attack_specific_traces(
         self, row: dict, container: ui.column, attack_str: str
     ) -> None:
@@ -5128,21 +3970,13 @@ class DashboardPage:
                 elif atk == "autodanturbo":
                     detail_data = self._parse_autodan_traces(serialized_traces)
                     self._render_autodan_goal_card(row, detail_data, detail_mode=True)
+                elif atk == "mml":
+                    detail_data = self._parse_mml_traces(serialized_traces)
+                    self._render_mml_goal_card(row, detail_data, detail_mode=True)
                 else:
-                    req_text, resp_text = self._extract_prompt_response_from_traces(
-                        serialized_traces
+                    req_text, resp_text, _generic_guardrail = (
+                        self._extract_prompt_response_from_traces(serialized_traces)
                     )
-                    # Detect guardrail event for the generic case
-                    _generic_guardrail: dict | None = None
-                    for _td in serialized_traces:
-                        _r = (_td.get("content") or {}).get("response")
-                        if isinstance(_r, dict) and _r.get("side") in (
-                            "before",
-                            "after",
-                            "unknown",
-                        ):
-                            _generic_guardrail = _r
-                            break
                     self._render_generic_goal_card(
                         row,
                         req_text,
@@ -5258,7 +4092,7 @@ class DashboardPage:
                         "Copy to clipboard"
                     ).on(
                         "click",
-                        js_handler=f"() => navigator.clipboard.writeText({json.dumps(text)})",
+                        js_handler=f"(event) => {{var b=event.currentTarget,ic=b.querySelector('.q-icon');if(navigator.clipboard)navigator.clipboard.writeText({json.dumps(text)});if(ic){{ic.textContent='check';setTimeout(function(){{ic.textContent='content_copy';}},2000);}}}}",
                     )
                 ui.label(text).classes("text-sm whitespace-pre-wrap")
 
@@ -6121,7 +4955,11 @@ class DashboardPage:
                             )
                             _g_cats = node.get("_guardrail_categories") or []
                             self._render_guardrail_event_block(
-                                _g_side, _g_expl, _g_cats
+                                {
+                                    "side": _g_side,
+                                    "explanation": _g_expl,
+                                    "categories": _g_cats,
+                                }
                             )
                         elif node.get("target_present"):
                             response = str(node.get("target_response") or "")
@@ -6574,6 +5412,9 @@ class DashboardPage:
                     color = "positive" if bool(success) else "warning"
                     ui.badge(label, color=color).classes("text-xs")
 
+            # MML: render encoded image inline if present in metadata
+            self._render_mml_trace_image(metadata)
+
             for title, value in blocks:
                 if value is None or value == "":
                     continue
@@ -6731,8 +5572,6 @@ class DashboardPage:
                 await self._load_agents()
             elif _v == "runs":
                 await self._load_runs()
-            elif _v == "reports":
-                await self._load_history_reports()
         except Exception as exc:
             ui.notify(f"Failed to load data: {exc}", type="negative")
         finally:
@@ -7145,8 +5984,27 @@ class DashboardPage:
             d["_latency_s"] = self._compute_run_latency_seconds(d)
             d["_latency"] = _format_latency(d.get("_latency_s"))
             rows.append(d)
+        _DASH_FIELDS = (
+            "id",
+            "run_progress",
+            "agent_name",
+            "attack_type",
+            "status",
+            "_latency",
+            "_latency_s",
+            "_goal_latency_avg",
+            "_goal_latency_avg_s",
+            "_rel",
+            "_date",
+            "created_at",
+            "overall_asr",
+            "total_results",
+            "successful_jailbreaks",
+            "failed_attacks",
+        )
+        slim_rows = [{k: r.get(k) for k in _DASH_FIELDS} for r in rows]
         self.recent_runs_table.rows.clear()
-        self.recent_runs_table.rows.extend(rows)
+        self.recent_runs_table.rows.extend(slim_rows)
         self.recent_runs_table.update()
 
     def _count_result_buckets_for_agent(self, agent_id: UUID) -> dict[str, int]:
@@ -7327,229 +6185,167 @@ class DashboardPage:
         self.attacks_table.update()
 
     async def _load_runs(self) -> None:
-        result = self.backend.list_runs(
-            page=self.runs_current_page,
-            page_size=_RUNS_VIEW_PAGE_SIZE,
-        )
-        self.runs_total_pages = max(
-            1,
-            (result.total + _RUNS_VIEW_PAGE_SIZE - 1) // _RUNS_VIEW_PAGE_SIZE,
-        )
-        if self.runs_current_page > self.runs_total_pages:
-            self.runs_current_page = self.runs_total_pages
-            result = self.backend.list_runs(
-                page=self.runs_current_page,
-                page_size=_RUNS_VIEW_PAGE_SIZE,
-            )
+        """Load all runs from backend."""
+        self.runs_current_page = 1
+        self._runs_all_rows.clear()
+        await self._fetch_all_runs()
+        self._update_runs_filter_options()
+        self._apply_runs_filters()
 
-        run_attack_ids = {str(run.attack_id) for run in result.items}
-        run_agent_ids = {str(run.agent_id) for run in result.items}
-        attack_type_by_id = self._attack_type_map_for_ids(run_attack_ids)
-        agent_name_by_id = self._agent_name_map_for_ids(run_agent_ids)
-        rows = []
-        for idx, run in enumerate(result.items):
-            d = _serialize(run)
-            summary = self._summarize_run_results(run.id, run_data=d)
-            d["status"] = str(summary["status"])
-            attack_id = str(d.get("attack_id") or "")
-            agent_id = str(d.get("agent_id") or "")
-            d["attack_type"] = attack_type_by_id.get(
-                attack_id,
-                f"{attack_id[:8]}…" if attack_id else "—",
-            )
-            d["agent_name"] = agent_name_by_id.get(
-                agent_id,
-                d.get("run_config", {}).get("_agent_name")
-                or (f"{agent_id[:8]}…" if agent_id else "—"),
-            )
-            d["run_progress"] = max(
-                1,
-                result.total
-                - ((self.runs_current_page - 1) * _RUNS_VIEW_PAGE_SIZE + idx),
-            )
-            d["total_results"] = int(summary["total_results"])
-            d["successful_jailbreaks"] = int(summary["successful_jailbreaks"])
-            d["failed_attacks"] = int(summary["failed_attacks"])
-            d["mitigations"] = int(summary["mitigations"])
-            d["evaluation_summary"] = summary.get("evaluation_summary") or {}
-            d["is_multi_judge"] = bool(summary.get("is_multi_judge"))
-            d["overall_asr"] = summary.get("overall_asr_display") or "—"
-            d["_goal_latency_avg_s"] = summary.get("avg_goal_latency_s")
-            d["_goal_latency_avg"] = _format_latency(d.get("_goal_latency_avg_s"))
-            d["_rel"] = _rel_time(d.get("created_at"))
-            d["_date"] = _short_date(d.get("created_at"))
-            d["_latency_s"] = self._compute_run_latency_seconds(d)
-            d["_latency"] = _format_latency(d.get("_latency_s"))
-            rows.append(d)
+    async def _load_more_runs(self) -> None:
+        """No-op — all data is loaded upfront."""
+        pass
 
-        # Render expandable run list in the runs area
-        if self._history_runs_area is not None:
-            self._history_runs_area.clear()
-            with self._history_runs_area:
-                self._render_runs_table(rows, result.total)
-
-        start = (
-            (self.runs_current_page - 1) * _RUNS_VIEW_PAGE_SIZE + 1
-            if result.total
-            else 0
-        )
-        end = start + len(rows) - 1 if rows else 0
-        self.runs_count_label.text = f"Showing {start}-{end} of {result.total} run{'s' if result.total != 1 else ''}"
-        if self.runs_page_label is not None:
-            self.runs_page_label.text = (
-                f"Page {self.runs_current_page} / {self.runs_total_pages}"
-            )
-
-    def _render_runs_table(self, rows: list[dict], total: int) -> None:
-        """Render expandable run rows as a table-like layout."""
-        self._history_visible_run_ids = [str(r.get("id") or "") for r in rows]
-
-        def _toggle_all(e) -> None:
-            checked = bool(e.value)
-            page_ids = [rid for rid in self._history_visible_run_ids if rid]
-            if checked:
-                for rid in page_ids:
-                    if rid not in self._selected_run_ids:
-                        self._selected_run_ids.append(rid)
-            else:
-                self._selected_run_ids = [
-                    rid for rid in self._selected_run_ids if rid not in page_ids
-                ]
-            self._on_runs_select()
-            ui.timer(0, self._load_runs, once=True)
-
-        all_checked = bool(self._history_visible_run_ids) and all(
-            rid in self._selected_run_ids for rid in self._history_visible_run_ids
+    def _has_active_filter(self) -> bool:
+        """Return True if any filter or search is active."""
+        return bool(
+            self._runs_filter_agent
+            or self._runs_filter_attack
+            or self._runs_filter_status
+            or self._runs_filter_search
         )
 
-        # Header row
-        with ui.row().classes(
-            "w-full min-w-[1220px] flex-nowrap items-center px-3 py-2 border-b "
-            "border-grey-3 text-xs font-semibold text-grey-6 gap-0"
-        ):
-            with ui.element("div").classes("w-10 flex items-center justify-center"):
-                ui.checkbox(value=all_checked, on_change=_toggle_all).props("dense")
-            ui.label("").classes("w-8")  # expand chevron
-            ui.label("Run #").classes("w-16")
-            ui.label("Agent").classes("flex-1 min-w-24")
-            ui.label("Attack").classes("w-32")
-            ui.label("Status").classes("w-28")
-            ui.label("Total Latency").classes("w-24")
-            ui.label("Per-Goal Latency (AVG)").classes("w-32")
-            ui.label("Timestamp").classes("w-28")
-            ui.label("ASR").classes("w-16")
-
-        for run_row in rows:
-            self._render_expandable_run_row(run_row)
-
-    def _render_expandable_run_row(self, run: dict) -> None:
-        """Render a single run row with inline expansion for goals."""
-        run_id = str(run.get("id") or "")
-        status = str(run.get("status") or "—")
-        status_color = (
-            "positive"
-            if status == "COMPLETED"
-            else "info"
-            if status == "RUNNING"
-            else "negative"
-            if status == "FAILED"
-            else "warning"
-        )
-
-        # Container for the run + its expanded goals
-        run_container = ui.column().classes("w-full gap-0")
-        with run_container:
-            row_shell = ui.row().classes(
-                "w-full min-w-[1220px] flex-nowrap items-center px-3 py-2 border-b "
-                "border-grey-2 gap-0 hover:bg-grey-1 dark:hover:bg-grey-9 transition-colors"
-            )
-
-            run_checked = run_id in self._selected_run_ids
-
-            def _toggle_selected(e, rid=run_id) -> None:
-                checked = bool(e.value)
-                if checked:
-                    if rid not in self._selected_run_ids:
-                        self._selected_run_ids.append(rid)
-                else:
-                    self._selected_run_ids = [
-                        x for x in self._selected_run_ids if x != rid
-                    ]
-                self._on_runs_select()
-
-            with row_shell:
-                with ui.element("div").classes("w-10 flex items-center justify-center"):
-                    ui.checkbox(value=run_checked, on_change=_toggle_selected).props(
-                        "dense"
-                    )
-
-                run_header = ui.row().classes(
-                    "flex-1 flex-nowrap items-center gap-0 cursor-pointer"
+    async def _fetch_all_runs(self) -> None:
+        """Fetch all runs from backend."""
+        page = 1
+        while True:
+            result = self.backend.list_runs(page=page, page_size=100)
+            self._runs_total_available = result.total
+            if not result.items:
+                break
+            run_attack_ids = {str(run.attack_id) for run in result.items}
+            run_agent_ids = {str(run.agent_id) for run in result.items}
+            attack_type_by_id = self._attack_type_map_for_ids(run_attack_ids)
+            agent_name_by_id = self._agent_name_map_for_ids(run_agent_ids)
+            for idx, run in enumerate(result.items):
+                d = _serialize(run)
+                summary = self._summarize_run_results(run.id, run_data=d)
+                d["status"] = str(summary["status"])
+                attack_id = str(d.get("attack_id") or "")
+                agent_id = str(d.get("agent_id") or "")
+                d["attack_type"] = attack_type_by_id.get(
+                    attack_id,
+                    f"{attack_id[:8]}…" if attack_id else "—",
                 )
-                with run_header:
-                    ui.icon("expand_more", size="sm").classes(
-                        "w-8 text-grey-6 transition-transform"
-                    )
-                    ui.label(str(run.get("run_progress", "—"))).classes(
-                        "w-16 font-mono text-sm font-medium whitespace-nowrap"
-                    )
-                    ui.label(str(run.get("agent_name") or "—")).classes(
-                        "flex-1 min-w-24 text-sm truncate whitespace-nowrap"
-                    )
-                    with ui.element("div").classes("w-32"):
-                        ui.badge(
-                            str(run.get("attack_type") or "—"), color="orange"
-                        ).classes("text-xs")
-                    with ui.element("div").classes("w-28"):
-                        ui.badge(status, color=status_color).classes("text-xs")
-                        if status == "RUNNING":
-                            ui.spinner(color="info", size="xs").classes("ml-1")
-                    ui.label(str(run.get("_latency") or "—")).classes("w-24 text-sm")
-                    ui.label(str(run.get("_goal_latency_avg") or "—")).classes(
-                        "w-32 text-sm"
-                    )
-                    with ui.column().classes("w-28 gap-0"):
-                        ui.label(str(run.get("_rel") or "—")).classes("text-xs")
-                        ui.label(str(run.get("_date") or "—")).classes(
-                            "text-[10px] text-grey-6"
-                        )
-
-                    jb = int(run.get("successful_jailbreaks") or 0)
-                    failed_attacks = int(run.get("failed_attacks") or 0)
-                    denominator = jb + failed_attacks
-                    asr_value = str(run.get("overall_asr") or "").strip()
-                    if not asr_value:
-                        asr_value = (
-                            f"{(jb * 100.0 / denominator):.1f}%"
-                            if denominator > 0
-                            else "—"
-                        )
-                    ui.label(asr_value).classes("w-16 text-sm")
-
-            # Goals area (kept for structural compatibility but unused)
-            ui.column().classes("w-full gap-0").style("display:none")
-
-            def _open_dialog(r=run):
-                ui.timer(
-                    0,
-                    lambda rr=r: asyncio.create_task(
-                        self._open_run_history_results(rr)
-                    ),
-                    once=True,
+                d["agent_name"] = agent_name_by_id.get(
+                    agent_id,
+                    d.get("run_config", {}).get("_agent_name")
+                    or (f"{agent_id[:8]}…" if agent_id else "—"),
                 )
-
-            run_header.on("click", lambda e, fn=_open_dialog: fn())
-
-            # Auto-open dialog when navigation requested from Dashboard -> Recent Runs.
-            if self._history_expanded_run_id == run_id:
-                self._history_expanded_run_id = None
-                ui.timer(
-                    0,
-                    lambda r=run: asyncio.create_task(
-                        self._open_run_history_results(r)
-                    ),
-                    once=True,
+                d["run_progress"] = max(
+                    1,
+                    result.total - ((page - 1) * 100 + idx),
                 )
+                d["total_results"] = int(summary["total_results"])
+                d["successful_jailbreaks"] = int(summary["successful_jailbreaks"])
+                d["failed_attacks"] = int(summary["failed_attacks"])
+                d["mitigations"] = int(summary["mitigations"])
+                d["evaluation_summary"] = summary.get("evaluation_summary") or {}
+                d["is_multi_judge"] = bool(summary.get("is_multi_judge"))
+                d["overall_asr"] = summary.get("overall_asr_display") or "—"
+                d["_goal_latency_avg_s"] = summary.get("avg_goal_latency_s")
+                d["_goal_latency_avg"] = _format_latency(d.get("_goal_latency_avg_s"))
+                d["_rel"] = _rel_time(d.get("created_at"))
+                d["_date"] = _short_date(d.get("created_at"))
+                d["_latency_s"] = self._compute_run_latency_seconds(d)
+                d["_latency"] = _format_latency(d.get("_latency_s"))
+                self._runs_all_rows.append(d)
+            total_pages = max(1, math.ceil((result.total or 0) / 100))
+            if page >= total_pages:
+                break
+            page += 1
+
+    def _filter_runs_rows(self) -> list[dict]:
+        """Return subset of _runs_all_rows matching current filters."""
+        rows = self._runs_all_rows
+        if self._runs_filter_agent:
+            rows = [r for r in rows if r.get("agent_name") == self._runs_filter_agent]
+        if self._runs_filter_attack:
+            rows = [r for r in rows if r.get("attack_type") == self._runs_filter_attack]
+        if self._runs_filter_status:
+            rows = [r for r in rows if r.get("status") == self._runs_filter_status]
+        if self._runs_filter_search:
+            q = self._runs_filter_search.lower()
+            rows = [
+                r
+                for r in rows
+                if q in (r.get("agent_name") or "").lower()
+                or q in (r.get("attack_type") or "").lower()
+                or q in (r.get("status") or "").lower()
+                or q in (r.get("_date") or "").lower()
+                or q in str(r.get("id") or "").lower()
+            ]
+        return rows
+
+    def _apply_runs_filters(self) -> None:
+        """Re-render the run list with current filters applied."""
+        filtered = self._filter_runs_rows()
+
+        if self.runs_table is not None:
+            # Only send fields the table actually displays to avoid payload bloat
+            _TABLE_FIELDS = (
+                "id",
+                "run_progress",
+                "agent_name",
+                "attack_type",
+                "status",
+                "_latency",
+                "_latency_s",
+                "_goal_latency_avg",
+                "_goal_latency_avg_s",
+                "_rel",
+                "_date",
+                "created_at",
+                "overall_asr",
+                "total_results",
+                "successful_jailbreaks",
+                "failed_attacks",
+            )
+            slim_rows = [{k: r.get(k) for k in _TABLE_FIELDS} for r in filtered]
+            self.runs_table.rows.clear()
+            self.runs_table.rows.extend(slim_rows)
+            self.runs_table.update()
+
+        if self._runs_load_more_btn is not None:
+            self._runs_load_more_btn.classes(add="hidden")
+
+    def _update_runs_filter_options(self) -> None:
+        """Populate filter dropdown options from loaded run data (targets with runs)."""
+        all_agent_names = sorted(
+            {r.get("agent_name") or "" for r in self._runs_all_rows} - {"", "—"}
+        )
+        all_attack_types = sorted(
+            {r.get("attack_type") or "" for r in self._runs_all_rows} - {"", "—"}
+        )
+        # all_statuses = sorted(
+        #     {r.get("status") or "" for r in self._runs_all_rows} - {""}
+        # )
+
+        if self._runs_agent_select is not None:
+            opts = {"": "All targets"}
+            opts.update({a: a for a in all_agent_names})
+            self._runs_agent_select.options = opts
+            self._runs_agent_select.update()
+        if self._runs_attack_select is not None:
+            opts = {"": "All attacks"}
+            opts.update({a: a for a in all_attack_types})
+            self._runs_attack_select.options = opts
+            self._runs_attack_select.update()
+
+    def _on_runs_filter_change(self, field: str, value: str) -> None:
+        """Handle filter dropdown change — re-renders with filter applied."""
+        if field == "agent":
+            self._runs_filter_agent = value or ""
+        elif field == "attack":
+            self._runs_filter_attack = value or ""
+        elif field == "status":
+            self._runs_filter_status = value or ""
+        self._apply_runs_filters()
+
+    def _on_runs_search_change(self, value) -> None:
+        """Handle search input change."""
+        self._runs_filter_search = str(value) if value else ""
+        self._apply_runs_filters()
 
     async def _load_run_goals_inline(self, run: dict, goals_area: ui.column) -> None:
         """Load and render goals as a table inside the expanded run row."""
@@ -8112,11 +6908,17 @@ class DashboardPage:
     async def _open_run_results(self, run: dict) -> None:  # noqa: C901
         """Open report details side-by-side for a single run."""
         run_id_raw = str(run.get("id") or "")
+        _run_num = run.get("run_progress") or run.get("run_number")
         self._report_current_run = run
 
         report_area: ui.column | None = self.run_report_area
         if self.run_dialog_title is not None:
-            self.run_dialog_title.text = f"Report — Run {run_id_raw[:8]}…"
+            _title_prefix = (
+                f"Report — Run #{_run_num}"
+                if _run_num
+                else f"Report — Run {run_id_raw[:8]}…"
+            )
+            self.run_dialog_title.text = _title_prefix
         self._report_results_left_col = None
         self._report_goal_detail_panel = None
         self._report_current_run_results = []
@@ -8333,99 +7135,125 @@ class DashboardPage:
             with ui.row().classes("w-full flex-wrap gap-4 items-stretch"):
                 # Risk donut
                 with ui.card().classes("flex-1 min-w-64"):
-                    ui.label("Risk Score").classes("font-semibold text-sm mb-1")
+                    _rs_chart_ref: list = []
+
+                    async def _dl_risk_score():
+                        if _rs_chart_ref:
+                            await self._download_echart_svg(
+                                _rs_chart_ref[0], f"risk_score_run{run_id_raw[:8]}"
+                            )
+
+                    with ui.row().classes("items-center justify-between w-full"):
+                        ui.label("Risk Score").classes("font-semibold text-sm")
+                        ui.button(icon="download", on_click=_dl_risk_score).props(
+                            "flat dense size=xs color=grey-6"
+                        )
                     ui.label(
                         "Attack Success Rate across all tests in this run"
                     ).classes("text-xs text-grey-6 mb-3")
                     with ui.row().classes("items-center gap-6 flex-wrap"):
                         no_data = total_tests == 0
-                        ui.echart(
-                            {
-                                "series": [
-                                    {
-                                        "type": "pie",
-                                        "radius": ["58%", "80%"],
-                                        "data": (
-                                            [
-                                                {
-                                                    "value": 1,
-                                                    "name": "No data",
-                                                    "itemStyle": {"color": "#94a3b8"},
-                                                }
-                                            ]
-                                            if no_data
-                                            else [
-                                                {
-                                                    "value": n_jailbreaks,
-                                                    "name": "Jailbreaks",
-                                                    "itemStyle": {"color": "#ef4444"},
-                                                },
-                                                {
-                                                    "value": n_mitigated,
-                                                    "name": "Mitigated",
-                                                    "itemStyle": {"color": "#22c55e"},
-                                                },
-                                                {
-                                                    "value": n_errors,
-                                                    "name": "Errors",
-                                                    "itemStyle": {"color": "#f97316"},
-                                                },
-                                                {
-                                                    "value": max(
-                                                        0,
-                                                        total_tests
-                                                        - n_jailbreaks
-                                                        - n_mitigated
-                                                        - n_errors,
-                                                    ),
-                                                    "name": "Pending",
-                                                    "itemStyle": {"color": "#94a3b8"},
-                                                },
-                                            ]
-                                        ),
-                                        "label": {"show": False},
-                                        "emphasis": {"scale": False},
-                                    }
-                                ],
-                                "graphic": (
-                                    []
-                                    if no_data
-                                    else [
+                        _rs_chart_ref.append(
+                            ui.echart(
+                                {
+                                    "series": [
                                         {
-                                            "type": "group",
-                                            "left": "center",
-                                            "top": "center",
-                                            "children": [
-                                                {
-                                                    "type": "text",
-                                                    "style": {
-                                                        "text": f"{asr_pct:.0f}%",
-                                                        "textAlign": "center",
-                                                        "fontSize": 22,
-                                                        "fontWeight": "bold",
-                                                        "fill": risk_hex,
+                                            "type": "pie",
+                                            "radius": ["58%", "80%"],
+                                            "data": (
+                                                [
+                                                    {
+                                                        "value": 1,
+                                                        "name": "No data",
+                                                        "itemStyle": {
+                                                            "color": "#94a3b8"
+                                                        },
+                                                    }
+                                                ]
+                                                if no_data
+                                                else [
+                                                    {
+                                                        "value": n_jailbreaks,
+                                                        "name": "Jailbreaks",
+                                                        "itemStyle": {
+                                                            "color": "#ef4444"
+                                                        },
                                                     },
-                                                    "top": -14,
-                                                },
-                                                {
-                                                    "type": "text",
-                                                    "style": {
-                                                        "text": risk_label,
-                                                        "textAlign": "center",
-                                                        "fontSize": 11,
-                                                        "fill": risk_hex,
+                                                    {
+                                                        "value": n_mitigated,
+                                                        "name": "Mitigated",
+                                                        "itemStyle": {
+                                                            "color": "#22c55e"
+                                                        },
                                                     },
-                                                    "top": 12,
-                                                },
-                                            ],
+                                                    {
+                                                        "value": n_errors,
+                                                        "name": "Errors",
+                                                        "itemStyle": {
+                                                            "color": "#f97316"
+                                                        },
+                                                    },
+                                                    {
+                                                        "value": max(
+                                                            0,
+                                                            total_tests
+                                                            - n_jailbreaks
+                                                            - n_mitigated
+                                                            - n_errors,
+                                                        ),
+                                                        "name": "Pending",
+                                                        "itemStyle": {
+                                                            "color": "#94a3b8"
+                                                        },
+                                                    },
+                                                ]
+                                            ),
+                                            "label": {"show": False},
+                                            "emphasis": {"scale": False},
                                         }
-                                    ]
-                                ),
-                                "tooltip": {
-                                    "trigger": "item" if not no_data else "none"
-                                },
-                            }
-                        ).classes("w-36 h-36 shrink-0")
+                                    ],
+                                    "graphic": (
+                                        []
+                                        if no_data
+                                        else [
+                                            {
+                                                "type": "group",
+                                                "left": "center",
+                                                "top": "center",
+                                                "children": [
+                                                    {
+                                                        "type": "text",
+                                                        "style": {
+                                                            "text": f"{asr_pct:.0f}%",
+                                                            "textAlign": "center",
+                                                            "fontSize": 22,
+                                                            "fontWeight": "bold",
+                                                            "fill": risk_hex,
+                                                        },
+                                                        "top": -14,
+                                                    },
+                                                    {
+                                                        "type": "text",
+                                                        "style": {
+                                                            "text": risk_label,
+                                                            "textAlign": "center",
+                                                            "fontSize": 11,
+                                                            "fill": risk_hex,
+                                                        },
+                                                        "top": 12,
+                                                    },
+                                                ],
+                                            }
+                                        ]
+                                    ),
+                                    "tooltip": {
+                                        "trigger": "item" if not no_data else "none"
+                                    },
+                                }
+                            )
+                            .classes("w-36 h-36 shrink-0")
+                            .props("renderer=svg")
+                        )
 
                         # Legend beside donut
                         with ui.column().classes("gap-1"):
@@ -8545,14 +7373,8 @@ class DashboardPage:
                         }
                     )
 
-                category_items.sort(
-                    key=lambda item: (item["vuln_rate"], item["total"]),
-                    reverse=True,
-                )
+                category_items.sort(key=lambda item: item["label"])
                 top_items = category_items[:9]
-                top_items.sort(key=lambda item: item["label"])
-                if len(top_items) > 1:
-                    top_items = [top_items[0], *reversed(top_items[1:])]
 
                 def _wrap_label(text: str, line_limit: int = 18) -> str:
                     text = str(text).strip()
@@ -8606,6 +7428,15 @@ class DashboardPage:
                 ]
 
                 with ui.card().classes("w-full"):
+                    _rob_chart_ref: list = []
+
+                    async def _dl_robustness():
+                        if _rob_chart_ref:
+                            await self._download_echart_svg(
+                                _rob_chart_ref[0],
+                                f"robustness_by_category_run{run_id_raw[:8]}",
+                            )
+
                     with ui.row().classes("w-full items-start justify-between mb-1"):
                         with ui.column().classes("gap-0"):
                             ui.label("OVERALL ROBUSTNESS").classes(
@@ -8614,113 +7445,112 @@ class DashboardPage:
                             ui.label(f"{robustness_pct:.0f}%").classes(
                                 "text-[44px] leading-none font-bold text-green-7"
                             )
+                        ui.button(icon="download", on_click=_dl_robustness).props(
+                            "flat dense size=xs color=grey-6"
+                        )
 
                     with ui.row().classes("w-full justify-center"):
-                        ui.echart(
-                            {
-                                "toolbox": {
-                                    "show": True,
-                                    "right": 8,
-                                    "top": 4,
-                                    "feature": {
-                                        "saveAsImage": {
-                                            "show": True,
-                                            "type": "svg",
-                                            "title": "Download SVG",
-                                            "name": "robustness-by-category",
-                                        }
-                                    },
-                                },
-                                "tooltip": {
-                                    "trigger": "axis",
-                                    ":formatter": (
-                                        "function(params) {"
-                                        "const p = Array.isArray(params) ? (params[0] || {}) : (params || {});"
-                                        "const d = (p && p.data) || {};"
-                                        "const categoryTooltips = Array.isArray(d.categoryTooltips) ? d.categoryTooltips : [];"
-                                        "if (!categoryTooltips.length) { return ''; }"
-                                        "const indicatorLabels = Array.isArray(d.indicatorLabels) ? d.indicatorLabels : [];"
-                                        "const fullLabels = Array.isArray(d.fullLabels) ? d.fullLabels : [];"
-                                        "const normalizeName = function(value) {"
-                                        "  return String(value || '')"
-                                        "    .replace(/\\n+/g, ' ')"
-                                        "    .replace(/\\s+\\d+(?:\\.\\d+)?%$/i, '')"
-                                        "    .trim();"
-                                        "};"
-                                        "const candidates = [];"
-                                        "if (typeof p.axisValueLabel === 'string' && p.axisValueLabel.length > 0) { candidates.push(p.axisValueLabel); }"
-                                        "if (typeof p.axisValue === 'string' && p.axisValue.length > 0) { candidates.push(p.axisValue); }"
-                                        "if (typeof p.name === 'string' && p.name.length > 0) { candidates.push(p.name); }"
-                                        "for (const name of candidates) {"
-                                        "  let idx = indicatorLabels.indexOf(name);"
-                                        "  if (idx < 0) { idx = fullLabels.indexOf(name); }"
-                                        "  if (idx < 0) {"
-                                        "    const normalized = normalizeName(name);"
-                                        "    idx = fullLabels.findIndex((label) => normalizeName(label) === normalized);"
-                                        "  }"
-                                        "  if (idx >= 0 && idx < categoryTooltips.length) { return categoryTooltips[idx] || ''; }"
-                                        "}"
-                                        "const dimensionIndex = typeof p.dimensionIndex === 'number' ? p.dimensionIndex : -1;"
-                                        "if (dimensionIndex >= 0 && dimensionIndex < categoryTooltips.length) {"
-                                        "  return categoryTooltips[dimensionIndex] || '';"
-                                        "}"
-                                        "return categoryTooltips[0] || '';"
-                                        "}"
-                                    ),
-                                    "backgroundColor": "#ffffff",
-                                    "borderColor": "#d1d5db",
-                                    "borderWidth": 1,
-                                    "textStyle": {"color": "#111827", "fontSize": 13},
-                                    "padding": 10,
-                                },
-                                "radar": {
-                                    "shape": "polygon",
-                                    "indicator": indicators,
-                                    "splitNumber": 5,
-                                    "center": ["50%", "49%"],
-                                    "radius": "64%",
-                                    "axisName": {
-                                        "fontSize": 12,
-                                        "lineHeight": 15,
-                                        "color": "#111827",
-                                        "fontWeight": 500,
-                                    },
-                                    "splitLine": {"lineStyle": {"color": "#d1d5db"}},
-                                    "splitArea": {"areaStyle": {"color": ["#ffffff"]}},
-                                },
-                                "series": [
-                                    {
-                                        "type": "radar",
-                                        "silent": False,
-                                        "z": 3,
-                                        "symbol": "circle",
-                                        "symbolSize": 11,
-                                        "itemStyle": {
-                                            "color": "#dc2626",
-                                            "borderColor": "#ffffff",
-                                            "borderWidth": 1.5,
+                        _rob_chart_ref.append(
+                            ui.echart(
+                                {
+                                    "tooltip": {
+                                        "trigger": "axis",
+                                        ":formatter": (
+                                            "function(params) {"
+                                            "const p = Array.isArray(params) ? (params[0] || {}) : (params || {});"
+                                            "const d = (p && p.data) || {};"
+                                            "const categoryTooltips = Array.isArray(d.categoryTooltips) ? d.categoryTooltips : [];"
+                                            "if (!categoryTooltips.length) { return ''; }"
+                                            "const indicatorLabels = Array.isArray(d.indicatorLabels) ? d.indicatorLabels : [];"
+                                            "const fullLabels = Array.isArray(d.fullLabels) ? d.fullLabels : [];"
+                                            "const normalizeName = function(value) {"
+                                            "  return String(value || '')"
+                                            "    .replace(/\\n+/g, ' ')"
+                                            "    .replace(/\\s+\\d+(?:\\.\\d+)?%$/i, '')"
+                                            "    .trim();"
+                                            "};"
+                                            "const candidates = [];"
+                                            "if (typeof p.axisValueLabel === 'string' && p.axisValueLabel.length > 0) { candidates.push(p.axisValueLabel); }"
+                                            "if (typeof p.axisValue === 'string' && p.axisValue.length > 0) { candidates.push(p.axisValue); }"
+                                            "if (typeof p.name === 'string' && p.name.length > 0) { candidates.push(p.name); }"
+                                            "for (const name of candidates) {"
+                                            "  let idx = indicatorLabels.indexOf(name);"
+                                            "  if (idx < 0) { idx = fullLabels.indexOf(name); }"
+                                            "  if (idx < 0) {"
+                                            "    const normalized = normalizeName(name);"
+                                            "    idx = fullLabels.findIndex((label) => normalizeName(label) === normalized);"
+                                            "  }"
+                                            "  if (idx >= 0 && idx < categoryTooltips.length) { return categoryTooltips[idx] || ''; }"
+                                            "}"
+                                            "const dimensionIndex = typeof p.dimensionIndex === 'number' ? p.dimensionIndex : -1;"
+                                            "if (dimensionIndex >= 0 && dimensionIndex < categoryTooltips.length) {"
+                                            "  return categoryTooltips[dimensionIndex] || '';"
+                                            "}"
+                                            "return categoryTooltips[0] || '';"
+                                            "}"
+                                        ),
+                                        "backgroundColor": "#ffffff",
+                                        "borderColor": "#d1d5db",
+                                        "borderWidth": 1,
+                                        "textStyle": {
+                                            "color": "#111827",
+                                            "fontSize": 13,
                                         },
-                                        "lineStyle": {
-                                            "color": "#3b82f6",
-                                            "width": 2,
-                                        },
-                                        "areaStyle": {
-                                            "color": "rgba(59, 130, 246, 0.18)"
-                                        },
-                                        "data": [
-                                            {
-                                                "value": values,
-                                                "name": "Robustness",
-                                                "categoryTooltips": category_tooltips,
-                                                "indicatorLabels": indicator_labels,
-                                                "fullLabels": full_labels,
-                                            }
-                                        ],
+                                        "padding": 10,
                                     },
-                                ],
-                            }
-                        ).classes("w-[740px] h-[500px] max-w-full").props(
-                            "renderer=svg"
+                                    "radar": {
+                                        "shape": "polygon",
+                                        "indicator": indicators,
+                                        "splitNumber": 5,
+                                        "center": ["50%", "49%"],
+                                        "radius": "64%",
+                                        "axisName": {
+                                            "fontSize": 12,
+                                            "lineHeight": 15,
+                                            "color": "#111827",
+                                            "fontWeight": 500,
+                                        },
+                                        "splitLine": {
+                                            "lineStyle": {"color": "#d1d5db"}
+                                        },
+                                        "splitArea": {
+                                            "areaStyle": {"color": ["#ffffff"]}
+                                        },
+                                    },
+                                    "series": [
+                                        {
+                                            "type": "radar",
+                                            "silent": False,
+                                            "z": 3,
+                                            "symbol": "circle",
+                                            "symbolSize": 11,
+                                            "itemStyle": {
+                                                "color": "#dc2626",
+                                                "borderColor": "#ffffff",
+                                                "borderWidth": 1.5,
+                                            },
+                                            "lineStyle": {
+                                                "color": "#3b82f6",
+                                                "width": 2,
+                                            },
+                                            "areaStyle": {
+                                                "color": "rgba(59, 130, 246, 0.18)"
+                                            },
+                                            "data": [
+                                                {
+                                                    "value": values,
+                                                    "name": "Robustness",
+                                                    "categoryTooltips": category_tooltips,
+                                                    "indicatorLabels": indicator_labels,
+                                                    "fullLabels": full_labels,
+                                                }
+                                            ],
+                                        },
+                                    ],
+                                }
+                            )
+                            .classes("w-[740px] h-[500px] max-w-full")
+                            .props("renderer=svg")
                         )
 
                     ui.label(
@@ -8728,14 +7558,29 @@ class DashboardPage:
                     ).classes("text-xs text-grey-6 w-full text-center mt-2")
 
                 with ui.card().classes("w-full"):
-                    ui.label("Vulnerability by Category").classes(
-                        "font-semibold text-sm mb-1"
-                    )
+                    _cd_chart_ref: list = []
+
+                    async def _dl_cat_dist():
+                        if _cd_chart_ref:
+                            await self._download_echart_svg(
+                                _cd_chart_ref[0],
+                                f"category_distribution_run{run_id_raw[:8]}",
+                            )
+
+                    with ui.row().classes("items-center justify-between w-full"):
+                        ui.label("Vulnerability by Category").classes(
+                            "font-semibold text-sm"
+                        )
+                        ui.button(icon="download", on_click=_dl_cat_dist).props(
+                            "flat dense size=xs color=grey-6"
+                        )
                     ui.label(
                         "Stacked distribution of outcomes per harm category"
                     ).classes("text-xs text-grey-6 mb-3")
 
-                    bar_items = list(reversed(top_items))
+                    bar_items = sorted(
+                        top_items, key=lambda item: item["label"], reverse=True
+                    )
                     bar_y_labels = [item["label"] for item in bar_items]
                     vulnerable_data = []
                     mitigated_data = []
@@ -8765,73 +7610,80 @@ class DashboardPage:
                             }
                         )
 
-                    ui.echart(
-                        {
-                            "tooltip": {
-                                "trigger": "item",
-                                "backgroundColor": "#ffffff",
-                                "borderColor": "#d1d5db",
-                                "borderWidth": 1,
-                                "textStyle": {"color": "#111827", "fontSize": 13},
-                                "padding": 10,
-                            },
-                            "legend": {
-                                "bottom": 0,
-                                "itemWidth": 12,
-                                "itemHeight": 10,
-                                "textStyle": {"fontSize": 12},
-                            },
-                            "grid": {
-                                "left": "16%",
-                                "right": "2%",
-                                "top": "8%",
-                                "bottom": "18%",
-                                "containLabel": True,
-                            },
-                            "xAxis": {
-                                "type": "value",
-                                "splitLine": {
-                                    "lineStyle": {"type": "dashed", "color": "#e5e7eb"}
+                    _cd_chart_ref.append(
+                        ui.echart(
+                            {
+                                "tooltip": {
+                                    "trigger": "item",
+                                    "backgroundColor": "#ffffff",
+                                    "borderColor": "#d1d5db",
+                                    "borderWidth": 1,
+                                    "textStyle": {"color": "#111827", "fontSize": 13},
+                                    "padding": 10,
                                 },
-                            },
-                            "yAxis": {
-                                "type": "category",
-                                "data": bar_y_labels,
-                                "axisTick": {"show": False},
-                                "axisLabel": {
-                                    "fontSize": 11,
-                                    "lineHeight": 14,
-                                    "interval": 0,
+                                "legend": {
+                                    "bottom": 0,
+                                    "itemWidth": 12,
+                                    "itemHeight": 10,
+                                    "textStyle": {"fontSize": 12},
                                 },
-                            },
-                            "series": [
-                                {
-                                    "name": "Vulnerable",
-                                    "type": "bar",
-                                    "stack": "total",
-                                    "itemStyle": {"color": "#ef4444"},
-                                    "emphasis": {"disabled": True},
-                                    "data": vulnerable_data,
+                                "grid": {
+                                    "left": "16%",
+                                    "right": "2%",
+                                    "top": "8%",
+                                    "bottom": "18%",
+                                    "containLabel": True,
                                 },
-                                {
-                                    "name": "Mitigated",
-                                    "type": "bar",
-                                    "stack": "total",
-                                    "itemStyle": {"color": "#22c55e"},
-                                    "emphasis": {"disabled": True},
-                                    "data": mitigated_data,
+                                "xAxis": {
+                                    "type": "value",
+                                    "splitLine": {
+                                        "lineStyle": {
+                                            "type": "dashed",
+                                            "color": "#e5e7eb",
+                                        }
+                                    },
                                 },
-                                {
-                                    "name": "Error",
-                                    "type": "bar",
-                                    "stack": "total",
-                                    "itemStyle": {"color": "#f59e0b"},
-                                    "emphasis": {"disabled": True},
-                                    "data": error_data,
+                                "yAxis": {
+                                    "type": "category",
+                                    "data": bar_y_labels,
+                                    "axisTick": {"show": False},
+                                    "axisLabel": {
+                                        "fontSize": 11,
+                                        "lineHeight": 14,
+                                        "interval": 0,
+                                    },
                                 },
-                            ],
-                        }
-                    ).classes("w-full h-[320px]")
+                                "series": [
+                                    {
+                                        "name": "Vulnerable",
+                                        "type": "bar",
+                                        "stack": "total",
+                                        "itemStyle": {"color": "#ef4444"},
+                                        "emphasis": {"disabled": True},
+                                        "data": vulnerable_data,
+                                    },
+                                    {
+                                        "name": "Mitigated",
+                                        "type": "bar",
+                                        "stack": "total",
+                                        "itemStyle": {"color": "#22c55e"},
+                                        "emphasis": {"disabled": True},
+                                        "data": mitigated_data,
+                                    },
+                                    {
+                                        "name": "Error",
+                                        "type": "bar",
+                                        "stack": "total",
+                                        "itemStyle": {"color": "#f59e0b"},
+                                        "emphasis": {"disabled": True},
+                                        "data": error_data,
+                                    },
+                                ],
+                            }
+                        )
+                        .classes("w-full h-[320px]")
+                        .props("renderer=svg")
+                    )
 
             # ── 3) Scope of Testing ───────────────────────────────────
             with ui.card().classes("w-full"):
@@ -8995,11 +7847,17 @@ class DashboardPage:
                         )
 
     async def _open_run_history_results(self, run: dict) -> None:
-        """Open the compact results list dialog for History/Dashboard views."""
+        """Open the compact results list in a non-modal side dialog."""
         run_id_raw = str(run.get("id") or "")
+        _run_num = run.get("run_progress") or run.get("run_number")
 
         if self.history_run_dialog_title is not None:
-            self.history_run_dialog_title.text = f"Run Results — {run_id_raw[:8]}…"
+            _title_prefix = (
+                f"Run Results — #{_run_num}"
+                if _run_num
+                else f"Run Results — {run_id_raw[:8]}…"
+            )
+            self.history_run_dialog_title.text = _title_prefix
 
         agent = str(run.get("agent_name") or "—")
         _hr_jailbreaks = int(run.get("successful_jailbreaks") or 0)
@@ -9058,6 +7916,7 @@ class DashboardPage:
             if _attack_id_hr:
                 _atm_hr = self._attack_type_map_for_ids({_attack_id_hr})
                 attack_type_str = _atm_hr.get(_attack_id_hr, "—")
+        self._history_dialog_attack_str = attack_type_str
 
         if self.history_run_config_area is not None:
             self.history_run_config_area.clear()
@@ -9093,6 +7952,7 @@ class DashboardPage:
                     "flipattack": "FlipAttack",
                     "pap": "PAP",
                     "h4rm3l": "H4rm3l",
+                    "mml": "MML",
                 }
 
                 def _h_resolve_eval_label(
@@ -9219,6 +8079,12 @@ class DashboardPage:
                                 "Branching",
                                 str(_tap_p.get("branching_factor", 3)),
                             )
+                    elif _atk_lower == "mml":
+                        _mml_params = _hcfg.get("mml_params") or {}
+                        if isinstance(_mml_params, dict):
+                            _mml_enc = _mml_params.get("encoding_mode", "")
+                            if _mml_enc:
+                                _chip("image", "Encoding", str(_mml_enc))
 
                 # ── Line 2: Dataset ───────────────────────────────────
                 _h_dataset_raw = _hcfg.get("dataset") or _hrc.get("dataset")
@@ -9350,212 +8216,25 @@ class DashboardPage:
                             if _h_dec_id:
                                 _chip("layers", "Decorator LLM", str(_h_dec_id))
 
-        # ── Populate metrics area ─────────────────────────────────────────
-        if self.metrics_area is not None:
-            self.metrics_area.clear()
-            eval_summary = (
-                run_config.get("evaluation_summary")
-                if isinstance(run_config, dict)
-                else None
-            )
-
-            if isinstance(eval_summary, dict):
-                with self.metrics_area:
-                    total = eval_summary.get("total_attacks", 0)
-                    overall = eval_summary.get("overall_success_rate", 0.0)
-                    mv_asr = eval_summary.get("majority_vote_asr", 0.0)
-                    kappa = eval_summary.get("fleiss_kappa", None)
-                    per_judge = eval_summary.get("per_judge_strictness") or {}
-                    _hr_n_judges = len(
-                        [
-                            k
-                            for k in per_judge
-                            if k != "bias_gap" and not k.endswith("_mean")
-                        ]
-                    )
-                    # Use run-level goal counts for the summary cards so they
-                    # match _hr_jailbreaks/_hr_errors (which are also goal-level).
-                    _hr_total_goals = int(run.get("total_results") or 0) or int(total)
-                    _hr_mitigated = max(
-                        0, _hr_total_goals - _hr_jailbreaks - _hr_errors
-                    )
-
-                    def _fmt_pct(value: object) -> str:
-                        try:
-                            return f"{float(value) * 100:.1f}%"
-                        except (TypeError, ValueError):
-                            return str(value)
-
-                    def _is_risky(v: object) -> bool:
-                        return isinstance(v, (int, float)) and float(v) > 0
-
-                    # ── Results Summary ───────────────────────────────
-                    ui.label("RESULTS SUMMARY").classes(
-                        "text-[10px] font-semibold tracking-widest text-grey-5 uppercase mb-2"
-                    )
-                    with ui.row().classes("flex-wrap gap-2 items-start"):
-                        for _ml, _mv, _mc, _mi in [
-                            ("Total Attacks", str(_hr_total_goals), "grey-8", "quiz"),
-                            (
-                                "Jailbreaks",
-                                str(_hr_jailbreaks),
-                                "negative",
-                                "lock_open",
-                            ),
-                            (
-                                "Mitigated",
-                                str(_hr_mitigated),
-                                "positive" if _hr_mitigated > 0 else "grey-7",
-                                "security",
-                            ),
-                            (
-                                "Errors",
-                                str(_hr_errors),
-                                "warning" if _hr_errors > 0 else "grey-7",
-                                "warning_amber",
-                            ),
-                            ("Duration", _hr_run_latency_str, "grey-7", "timer"),
-                        ]:
-                            with ui.card().classes("flex-none min-w-[110px] px-3 py-2"):
-                                with ui.row().classes("items-center gap-1 mb-1"):
-                                    ui.icon(_mi, color=_mc, size="xs")
-                                    ui.label(_ml).classes(
-                                        "text-[10px] text-grey-6 font-semibold uppercase tracking-wide"
-                                    )
-                                ui.label(_mv).classes("text-xl font-bold")
-
-                    ui.separator().classes("my-2")
-
-                    # ── Evaluation Metrics ────────────────────────────
-                    ui.label("EVALUATION METRICS").classes(
-                        "text-[10px] font-semibold tracking-widest text-grey-5 uppercase mb-2"
-                    )
-                    with ui.row().classes("flex-wrap gap-2 items-start"):
-                        for _ml, _mv, _mc, _mi in (
-                            [
-                                (
-                                    "Attack Success Rate",
-                                    _fmt_pct(overall),
-                                    "negative" if _is_risky(overall) else "positive",
-                                    "lock_open" if _is_risky(overall) else "security",
-                                ),
-                            ]
-                            + (
-                                [
-                                    (
-                                        "Majority-vote ASR",
-                                        _fmt_pct(mv_asr),
-                                        "negative" if _is_risky(mv_asr) else "positive",
-                                        "how_to_vote",
-                                    ),
-                                ]
-                                if _hr_n_judges > 1
-                                else []
+                # ── Line 4: Guardrails (if present) ───────────────────
+                _h_bg = _hrc.get("before_guardrail")
+                _h_ag = _hrc.get("after_guardrail")
+                if _h_bg or _h_ag:
+                    with ui.row().classes("flex-wrap gap-2 items-center mt-1"):
+                        if _h_bg:
+                            _h_bg_id = (
+                                _h_bg.get("identifier", "—")
+                                if isinstance(_h_bg, dict)
+                                else str(_h_bg)
                             )
-                            + (
-                                [
-                                    (
-                                        "Fleiss' Kappa",
-                                        f"{float(kappa):.3f}",
-                                        "grey-7",
-                                        "balance",
-                                    )
-                                ]
-                                if kappa is not None and _hr_n_judges > 1
-                                else []
+                            _chip("shield", "Before Guardrail", _h_bg_id)
+                        if _h_ag:
+                            _h_ag_id = (
+                                _h_ag.get("identifier", "—")
+                                if isinstance(_h_ag, dict)
+                                else str(_h_ag)
                             )
-                            + (
-                                [
-                                    (
-                                        "Bias Gap",
-                                        _fmt_pct(per_judge.get("bias_gap")),
-                                        "grey-7",
-                                        "compare_arrows",
-                                    )
-                                ]
-                                if isinstance(per_judge, dict)
-                                and per_judge.get("bias_gap") is not None
-                                and _hr_n_judges > 1
-                                else []
-                            )
-                        ):
-                            with ui.card().classes("flex-none min-w-[110px] px-3 py-2"):
-                                with ui.row().classes("items-center gap-1 mb-1"):
-                                    ui.icon(_mi, color=_mc, size="xs")
-                                    ui.label(_ml).classes(
-                                        "text-[10px] text-grey-6 font-semibold uppercase tracking-wide"
-                                    )
-                                ui.label(_mv).classes("text-xl font-bold")
-
-                        if (
-                            _hr_n_judges > 1
-                            and isinstance(per_judge, dict)
-                            and any(k != "bias_gap" for k in per_judge)
-                        ):
-                            with ui.card().classes("flex-none px-3 py-2"):
-                                ui.label("PER-JUDGE ASR").classes(
-                                    "text-[10px] text-grey-6 font-semibold uppercase tracking-wide mb-1"
-                                )
-                                with ui.column().classes("gap-1"):
-                                    for judge_name, asr_val in per_judge.items():
-                                        if judge_name == "bias_gap":
-                                            continue
-                                        with ui.row().classes("items-center gap-2"):
-                                            ui.label(judge_name).classes(
-                                                "text-xs text-grey-7 font-mono"
-                                            )
-                                            ui.badge(
-                                                _fmt_pct(asr_val),
-                                                color="grey-6",
-                                            ).classes("text-xs font-mono")
-            else:
-                # No evaluation_summary in run_config (e.g. BoN) — show
-                # a basic results summary from the run-level counters.
-                _hr_total = int(run.get("total_results") or 0)
-                _hr_mitigated_fb = int(run.get("mitigations") or 0)
-                with self.metrics_area:
-                    if _hr_total > 0:
-                        ui.label("RESULTS SUMMARY").classes(
-                            "text-[10px] font-semibold tracking-widest "
-                            "text-grey-5 uppercase mb-2"
-                        )
-                        with ui.row().classes("flex-wrap gap-2 items-start"):
-                            for _ml, _mv, _mc, _mi in [
-                                ("Total Tests", str(_hr_total), "grey-8", "quiz"),
-                                (
-                                    "Vulnerabilities",
-                                    str(_hr_jailbreaks),
-                                    "negative" if _hr_jailbreaks else "grey-7",
-                                    "lock_open",
-                                ),
-                                (
-                                    "Mitigated",
-                                    str(_hr_mitigated_fb),
-                                    "positive" if _hr_mitigated_fb else "grey-7",
-                                    "security",
-                                ),
-                                (
-                                    "Errors",
-                                    str(_hr_errors),
-                                    "warning" if _hr_errors else "grey-7",
-                                    "warning_amber",
-                                ),
-                                ("Duration", _hr_run_latency_str, "grey-7", "timer"),
-                            ]:
-                                with ui.card().classes(
-                                    "flex-none min-w-[110px] px-3 py-2"
-                                ):
-                                    with ui.row().classes("items-center gap-1 mb-1"):
-                                        ui.icon(_mi, color=_mc, size="xs")
-                                        ui.label(_ml).classes(
-                                            "text-[10px] text-grey-6 font-semibold "
-                                            "uppercase tracking-wide"
-                                        )
-                                    ui.label(_mv).classes("text-xl font-bold")
-                    else:
-                        ui.label("No results available yet.").classes(
-                            "text-sm text-grey-6 py-4"
-                        )
+                            _chip("shield", "After Guardrail", _h_ag_id)
 
         if self.history_results_list_area is not None:
             self.history_results_list_area.clear()
@@ -9563,8 +8242,9 @@ class DashboardPage:
             self.history_results_empty_label.text = "Loading results…"
             self.history_results_empty_label.set_visibility(True)
 
-        if self.history_run_dialog is not None:
-            self.history_run_dialog.open()
+        self._history_current_run = run
+
+        self._open_runs_bottom_panel()
 
         await asyncio.sleep(0)
 
@@ -9691,142 +8371,502 @@ class DashboardPage:
                     )
                     self.history_results_empty_label.set_visibility(True)
 
-            if all_items and self.history_results_list_area is not None:
-                with self.history_results_list_area:
-                    # ── Pre-parse detail data for all rows ─────────────
-                    _h_atk = attack_type_str.lower()
-                    _h_detail_data: dict[str, object] = {}
-                    for _row in new_rows:
-                        _rid = str(_row.get("id") or "")
-                        if _h_atk == "baseline":
-                            _t = baseline_traces_map_hr.get(_rid, [])
-                            _h_detail_data[_rid] = self._parse_baseline_traces(
-                                _t, str(_row.get("goal") or "")
-                            )
-                        elif _h_atk == "bon":
-                            _t = bon_traces_map_hr.get(_rid, [])
-                            _h_detail_data[_rid] = self._parse_bon_traces(_t)
-                        elif _h_atk == "pap":
-                            _t = generic_traces_map_hr.get(_rid, [])
-                            _h_detail_data[_rid] = self._parse_pap_traces(_t)
-                        elif _h_atk == "pair":
-                            _t = generic_traces_map_hr.get(_rid, [])
-                            _h_detail_data[_rid] = self._parse_pair_traces(_t)
-                        elif _h_atk == "tap":
-                            _t = generic_traces_map_hr.get(_rid, [])
-                            _h_detail_data[_rid] = self._parse_tap_traces(_t)
-                        elif _h_atk == "advprefix":
-                            _t = generic_traces_map_hr.get(_rid, [])
-                            _h_detail_data[_rid] = self._parse_advprefix_traces(_t)
-                        elif _h_atk == "autodanturbo":
-                            _t = generic_traces_map_hr.get(_rid, [])
-                            _h_detail_data[_rid] = self._parse_autodan_traces(_t)
-                        else:
-                            _t = generic_traces_map_hr.get(_rid, [])
-                            _h_detail_data[_rid] = (
-                                self._extract_prompt_response_from_traces(_t)
-                            )
+            # ── Populate charts area (before goals) ───────────────────
+            if self.history_charts_area is not None and new_rows:
+                self.history_charts_area.clear()
+                _n_jailbreaks = sum(
+                    1 for r in new_rows if r.get("_bucket") == "jailbreak"
+                )
+                _n_mitigated = sum(
+                    1 for r in new_rows if r.get("_bucket") == "mitigated"
+                )
+                _n_errors = sum(1 for r in new_rows if r.get("_bucket") == "failed")
+                _total = len(new_rows)
+                _asr = (100.0 * _n_jailbreaks / _total) if _total > 0 else 0.0
+                _robustness = 100.0 - _asr
+                _risk_hex = (
+                    "#ef4444"
+                    if _asr >= 70
+                    else "#f97316"
+                    if _asr >= 40
+                    else "#eab308"
+                    if _asr >= 10
+                    else "#22c55e"
+                )
+                _risk_label = (
+                    "Critical"
+                    if _asr >= 70
+                    else "High"
+                    if _asr >= 40
+                    else "Medium"
+                    if _asr >= 10
+                    else "Low"
+                )
+                _no_data = _total == 0
 
-                    # ── Group rows by category ─────────────────────────
-                    _h_cat_groups: dict[str, list[dict]] = {}
-                    for _row in new_rows:
-                        _cat = _row.get("_goal_category") or "Uncategorised"
-                        _h_cat_groups.setdefault(str(_cat), []).append(_row)
+                with self.history_charts_area:
+                    # ── Risk donut + Robustness side by side ───────────
+                    with ui.row().classes("w-full flex-wrap gap-4 items-stretch"):
+                        # Risk donut
+                        with ui.card().classes("flex-1 min-w-64"):
+                            _hrs_chart_ref: list = []
 
-                    _h_left_num = 0
-                    for _cat_label in sorted(_h_cat_groups.keys()):
-                        _rows_in_cat = _h_cat_groups[_cat_label]
-                        with ui.row().classes("items-center gap-2 mt-3 mb-1 px-1"):
-                            ui.label(_cat_label).classes(
-                                "text-xs font-semibold text-grey-6 uppercase "
-                                "tracking-wide"
-                            )
-
-                        # ── Group by subcategory within category ──────
-                        _h_subcat_groups: dict[str, list[dict]] = {}
-                        for _row in _rows_in_cat:
-                            _sub = str(_row.get("_goal_subcategory") or "")
-                            if _sub == "N/A":
-                                _sub = ""
-                            _h_subcat_groups.setdefault(_sub, []).append(_row)
-
-                        for _h_sub_label in sorted(_h_subcat_groups.keys()):
-                            _h_rows_in_sub = sorted(
-                                _h_subcat_groups[_h_sub_label],
-                                key=lambda r: str(r.get("goal") or "").lower(),
-                            )
-                            if _h_sub_label:
-                                with ui.row().classes(
-                                    "items-center gap-2 mt-2 mb-0.5 px-3"
-                                ):
-                                    ui.label(_h_sub_label).classes(
-                                        "text-[10px] font-semibold text-grey-5 "
-                                        "uppercase tracking-wide"
+                            async def _dl_hrs():
+                                if _hrs_chart_ref:
+                                    await self._download_echart_svg(
+                                        _hrs_chart_ref[0],
+                                        f"risk_score_run{run_id_raw[:8]}",
                                     )
 
-                            for _row in _h_rows_in_sub:
-                                _h_left_num += 1
-                                _row["goal_number"] = _h_left_num
-                                _rid = str(_row.get("id") or "")
-                                _data = _h_detail_data.get(_rid)
+                            with ui.row().classes(
+                                "items-center justify-between w-full"
+                            ):
+                                ui.label("Risk Score").classes("font-semibold text-sm")
+                                ui.button(icon="download", on_click=_dl_hrs).props(
+                                    "flat dense size=xs color=grey-6"
+                                )
+                            ui.label("Attack Success Rate across all tests").classes(
+                                "text-xs text-grey-6 mb-3"
+                            )
+                            with ui.row().classes("items-center gap-6 flex-wrap"):
+                                _hrs_chart_ref.append(
+                                    ui.echart(
+                                        {
+                                            "series": [
+                                                {
+                                                    "type": "pie",
+                                                    "radius": ["58%", "80%"],
+                                                    "data": (
+                                                        [
+                                                            {
+                                                                "value": 1,
+                                                                "name": "No data",
+                                                                "itemStyle": {
+                                                                    "color": "#94a3b8"
+                                                                },
+                                                            }
+                                                        ]
+                                                        if _no_data
+                                                        else [
+                                                            {
+                                                                "value": _n_jailbreaks,
+                                                                "name": "Jailbreaks",
+                                                                "itemStyle": {
+                                                                    "color": "#ef4444"
+                                                                },
+                                                            },
+                                                            {
+                                                                "value": _n_mitigated,
+                                                                "name": "Mitigated",
+                                                                "itemStyle": {
+                                                                    "color": "#22c55e"
+                                                                },
+                                                            },
+                                                            {
+                                                                "value": _n_errors,
+                                                                "name": "Errors",
+                                                                "itemStyle": {
+                                                                    "color": "#f97316"
+                                                                },
+                                                            },
+                                                            {
+                                                                "value": max(
+                                                                    0,
+                                                                    _total
+                                                                    - _n_jailbreaks
+                                                                    - _n_mitigated
+                                                                    - _n_errors,
+                                                                ),
+                                                                "name": "Pending",
+                                                                "itemStyle": {
+                                                                    "color": "#94a3b8"
+                                                                },
+                                                            },
+                                                        ]
+                                                    ),
+                                                    "label": {"show": False},
+                                                    "emphasis": {"scale": False},
+                                                }
+                                            ],
+                                            "graphic": (
+                                                []
+                                                if _no_data
+                                                else [
+                                                    {
+                                                        "type": "group",
+                                                        "left": "center",
+                                                        "top": "center",
+                                                        "children": [
+                                                            {
+                                                                "type": "text",
+                                                                "style": {
+                                                                    "text": f"{_asr:.0f}%",
+                                                                    "textAlign": "center",
+                                                                    "fontSize": 22,
+                                                                    "fontWeight": "bold",
+                                                                    "fill": _risk_hex,
+                                                                },
+                                                                "top": -14,
+                                                            },
+                                                            {
+                                                                "type": "text",
+                                                                "style": {
+                                                                    "text": _risk_label,
+                                                                    "textAlign": "center",
+                                                                    "fontSize": 11,
+                                                                    "fill": _risk_hex,
+                                                                },
+                                                                "top": 12,
+                                                            },
+                                                        ],
+                                                    }
+                                                ]
+                                            ),
+                                            "tooltip": {
+                                                "trigger": "item"
+                                                if not _no_data
+                                                else "none"
+                                            },
+                                        }
+                                    )
+                                    .classes("w-36 h-36 shrink-0")
+                                    .props("renderer=svg")
+                                )
 
-                                def _make_h_click(
-                                    _r: dict = _row,
-                                    _d: object = _data,
-                                    _atk_str: str = attack_type_str,
-                                ) -> None:
-                                    if self.history_detail_area is None:
-                                        return
-                                    self.history_detail_area.clear()
-                                    with self.history_detail_area:
-                                        _ha = _atk_str.lower()
-                                        if _ha == "baseline":
-                                            self._render_baseline_goal_card(
-                                                _r,
-                                                _d,
-                                                detail_mode=True,  # type: ignore[arg-type]
-                                            )
-                                        elif _ha == "bon":
-                                            self._render_bon_goal_card(
-                                                _r,
-                                                _d,
-                                                detail_mode=True,  # type: ignore[arg-type]
-                                            )
-                                        elif _ha == "pap":
-                                            self._render_pap_goal_card(
-                                                _r,
-                                                _d,
-                                                detail_mode=True,  # type: ignore[arg-type]
-                                            )
-                                        elif _ha == "pair":
-                                            self._render_pair_goal_card(
-                                                _r,
-                                                _d,
-                                                detail_mode=True,  # type: ignore[arg-type]
-                                            )
-                                        elif _ha == "tap":
-                                            _nodes, _ds = _d  # type: ignore[misc]
-                                            self._render_tap_goal_card(
-                                                _r, _nodes, _ds, detail_mode=True
-                                            )
-                                        elif _ha == "advprefix":
-                                            _pr, _gs = _d  # type: ignore[misc]
-                                            self._render_advprefix_goal_card(
-                                                _r, _pr, _gs, detail_mode=True
-                                            )
-                                        elif _ha == "autodanturbo":
-                                            self._render_autodan_goal_card(
-                                                _r,
-                                                _d,
-                                                detail_mode=True,  # type: ignore[arg-type]
-                                            )
-                                        else:
-                                            _req, _resp = _d  # type: ignore[misc]
-                                            self._render_generic_goal_card(
-                                                _r, _req, _resp, detail_mode=True
+                                # Legend
+                                with ui.column().classes("gap-1"):
+                                    for _leg_l, _leg_c, _leg_clr in [
+                                        ("Jailbreaks", _n_jailbreaks, "#ef4444"),
+                                        ("Mitigated", _n_mitigated, "#22c55e"),
+                                        ("Errors", _n_errors, "#f97316"),
+                                        (
+                                            "Pending",
+                                            max(
+                                                0,
+                                                _total
+                                                - _n_jailbreaks
+                                                - _n_mitigated
+                                                - _n_errors,
+                                            ),
+                                            "#94a3b8",
+                                        ),
+                                    ]:
+                                        if _leg_c > 0 or not _no_data:
+                                            with ui.row().classes("items-center gap-2"):
+                                                ui.element("div").classes(
+                                                    "w-2.5 h-2.5 rounded-full shrink-0"
+                                                ).style(f"background:{_leg_clr}")
+                                                ui.label(f"{_leg_l}: {_leg_c}").classes(
+                                                    "text-xs"
+                                                )
+
+                        # Robustness bar
+                        with ui.card().classes("flex-1 min-w-64"):
+                            ui.label("Robustness").classes("font-semibold text-sm mb-1")
+                            ui.label("Percentage of tests the agent resisted").classes(
+                                "text-xs text-grey-6 mb-3"
+                            )
+                            with ui.column().classes("gap-3 w-full"):
+                                with ui.row().classes("items-end gap-2"):
+                                    ui.label(f"{_robustness:.0f}%").classes(
+                                        "text-4xl font-bold"
+                                    )
+                                    _rob_color = (
+                                        "positive"
+                                        if _robustness >= 80
+                                        else "warning"
+                                        if _robustness >= 50
+                                        else "negative"
+                                    )
+                                    _rob_word = (
+                                        "Strong"
+                                        if _robustness >= 80
+                                        else "Moderate"
+                                        if _robustness >= 50
+                                        else "Weak"
+                                    )
+                                    ui.badge(_rob_word, color=_rob_color).classes(
+                                        "text-xs mb-1"
+                                    )
+                                ui.linear_progress(
+                                    value=_robustness / 100.0,
+                                    show_value=False,
+                                    color=_rob_color,
+                                ).classes("w-full").props("rounded size=12px")
+                                with ui.row().classes("w-full justify-between"):
+                                    ui.label(f"{_n_mitigated} mitigated").classes(
+                                        "text-xs text-grey-6"
+                                    )
+                                    ui.label(f"{_n_jailbreaks} vulnerable").classes(
+                                        "text-xs text-grey-6"
+                                    )
+
+                    # ── Category radar (if categories exist) ──────────
+                    _hc_cat_stats: dict[str, dict[str, int]] = defaultdict(
+                        lambda: {
+                            "total": 0,
+                            "vulnerable": 0,
+                            "mitigated": 0,
+                            "errors": 0,
+                        }
+                    )
+                    for _row in new_rows:
+                        _cat = _row.get("_goal_category") or ""
+                        if not _cat or _cat == "N/A":
+                            continue
+                        _bkt = _row.get("_bucket", "pending")
+                        _entry = _hc_cat_stats[_cat]
+                        _entry["total"] += 1
+                        if _bkt == "jailbreak":
+                            _entry["vulnerable"] += 1
+                        elif _bkt == "mitigated":
+                            _entry["mitigated"] += 1
+                        elif _bkt == "failed":
+                            _entry["errors"] += 1
+
+                    if _hc_cat_stats:
+                        _hc_items = []
+                        for _lbl, _sts in _hc_cat_stats.items():
+                            _t = int(_sts.get("total") or 0)
+                            _v = int(_sts.get("vulnerable") or 0)
+                            if _t <= 0:
+                                continue
+                            _hc_items.append(
+                                {
+                                    "label": _lbl,
+                                    "total": _t,
+                                    "vulnerable": _v,
+                                    "mitigated": int(_sts.get("mitigated") or 0),
+                                    "errors": int(_sts.get("errors") or 0),
+                                    "robustness": 100.0 * (_t - _v) / _t,
+                                }
+                            )
+                        _hc_items.sort(key=lambda x: x["label"], reverse=True)
+                        if _hc_items:
+                            with ui.column().classes("w-full gap-3"):
+                                with ui.card().classes("w-full"):
+                                    _hcb_chart_ref: list = []
+
+                                    async def _dl_hcb():
+                                        if _hcb_chart_ref:
+                                            await self._download_echart_svg(
+                                                _hcb_chart_ref[0],
+                                                f"category_breakdown_run{run_id_raw[:8]}",
                                             )
 
-                                self._render_compact_card(_row, _make_h_click)
+                                    with ui.row().classes(
+                                        "items-center justify-between w-full"
+                                    ):
+                                        ui.label("Vulnerability by Category").classes(
+                                            "font-semibold text-sm"
+                                        )
+                                        ui.button(
+                                            icon="download", on_click=_dl_hcb
+                                        ).props("flat dense size=xs color=grey-6")
+                                    _hc_labels = [x["label"] for x in _hc_items]
+                                    _hc_vuln = [x["vulnerable"] for x in _hc_items]
+                                    _hc_mit = [x["mitigated"] for x in _hc_items]
+                                    _hc_err = [x["errors"] for x in _hc_items]
+                                    _hcb_chart_ref.append(
+                                        ui.echart(
+                                            {
+                                                "tooltip": {"trigger": "axis"},
+                                                "legend": {
+                                                    "data": [
+                                                        "Vulnerable",
+                                                        "Mitigated",
+                                                        "Errors",
+                                                    ],
+                                                    "bottom": 0,
+                                                },
+                                                "grid": {
+                                                    "left": "3%",
+                                                    "right": "4%",
+                                                    "top": "3%",
+                                                    "bottom": "14%",
+                                                    "containLabel": True,
+                                                },
+                                                "xAxis": {"type": "value"},
+                                                "yAxis": {
+                                                    "type": "category",
+                                                    "data": _hc_labels,
+                                                    "axisLabel": {
+                                                        "width": 140,
+                                                        "overflow": "truncate",
+                                                    },
+                                                },
+                                                "series": [
+                                                    {
+                                                        "name": "Vulnerable",
+                                                        "type": "bar",
+                                                        "stack": "total",
+                                                        "data": _hc_vuln,
+                                                        "itemStyle": {
+                                                            "color": "#ef4444"
+                                                        },
+                                                    },
+                                                    {
+                                                        "name": "Mitigated",
+                                                        "type": "bar",
+                                                        "stack": "total",
+                                                        "data": _hc_mit,
+                                                        "itemStyle": {
+                                                            "color": "#22c55e"
+                                                        },
+                                                    },
+                                                    {
+                                                        "name": "Errors",
+                                                        "type": "bar",
+                                                        "stack": "total",
+                                                        "data": _hc_err,
+                                                        "itemStyle": {
+                                                            "color": "#f97316"
+                                                        },
+                                                    },
+                                                ],
+                                            }
+                                        )
+                                        .classes("w-full h-72")
+                                        .props("renderer=svg")
+                                    )
+
+                                # Radar chart (only when 3+ categories)
+                                if len(_hc_items) >= 3:
+                                    _hc_top = _hc_items[:9]
+                                    _hc_top.sort(key=lambda x: x["label"])
+                                    _hc_indicators = [
+                                        {"name": x["label"], "max": 100}
+                                        for x in _hc_top
+                                    ]
+                                    _hc_values = [
+                                        round(x["robustness"], 1) for x in _hc_top
+                                    ]
+
+                                    with ui.card().classes("w-full"):
+                                        _hcr_chart_ref: list = []
+
+                                        async def _dl_hcr():
+                                            if _hcr_chart_ref:
+                                                await self._download_echart_svg(
+                                                    _hcr_chart_ref[0],
+                                                    f"robustness_radar_run{run_id_raw[:8]}",
+                                                )
+
+                                        with ui.row().classes(
+                                            "items-center justify-between w-full"
+                                        ):
+                                            ui.label("Robustness by Category").classes(
+                                                "font-semibold text-sm"
+                                            )
+                                            ui.button(
+                                                icon="download", on_click=_dl_hcr
+                                            ).props("flat dense size=xs color=grey-6")
+                                        with ui.row().classes("w-full justify-center"):
+                                            _hcr_chart_ref.append(
+                                                ui.echart(
+                                                    {
+                                                        "radar": {
+                                                            "shape": "polygon",
+                                                            "indicator": _hc_indicators,
+                                                            "splitNumber": 5,
+                                                            "center": ["50%", "52%"],
+                                                            "radius": "64%",
+                                                            "axisName": {
+                                                                "fontSize": 11,
+                                                                "color": "#374151",
+                                                            },
+                                                            "splitLine": {
+                                                                "lineStyle": {
+                                                                    "color": "#d1d5db"
+                                                                }
+                                                            },
+                                                            "splitArea": {
+                                                                "areaStyle": {
+                                                                    "color": ["#ffffff"]
+                                                                }
+                                                            },
+                                                        },
+                                                        "series": [
+                                                            {
+                                                                "type": "radar",
+                                                                "symbol": "circle",
+                                                                "symbolSize": 8,
+                                                                "itemStyle": {
+                                                                    "color": "#22c55e"
+                                                                },
+                                                                "lineStyle": {
+                                                                    "color": "#22c55e",
+                                                                    "width": 2,
+                                                                },
+                                                                "areaStyle": {
+                                                                    "color": "rgba(34,197,94,0.15)"
+                                                                },
+                                                                "data": [
+                                                                    {
+                                                                        "value": _hc_values,
+                                                                        "name": "Robustness",
+                                                                    }
+                                                                ],
+                                                            }
+                                                        ],
+                                                        "tooltip": {"trigger": "item"},
+                                                    }
+                                                )
+                                                .classes("w-full h-72")
+                                                .props("renderer=svg")
+                                            )
+
+            if all_items and self.history_results_list_area is not None:
+                # ── Pre-parse detail data for all rows ─────────────
+                _h_atk = attack_type_str.lower()
+                _h_detail_data: dict[str, object] = {}
+                for _row in new_rows:
+                    _rid = str(_row.get("id") or "")
+                    if _h_atk == "baseline":
+                        _t = baseline_traces_map_hr.get(_rid, [])
+                        _h_detail_data[_rid] = self._parse_baseline_traces(
+                            _t, str(_row.get("goal") or "")
+                        )
+                    elif _h_atk == "bon":
+                        _t = bon_traces_map_hr.get(_rid, [])
+                        _h_detail_data[_rid] = self._parse_bon_traces(_t)
+                    elif _h_atk == "pap":
+                        _t = generic_traces_map_hr.get(_rid, [])
+                        _h_detail_data[_rid] = self._parse_pap_traces(_t)
+                    elif _h_atk == "pair":
+                        _t = generic_traces_map_hr.get(_rid, [])
+                        _h_detail_data[_rid] = self._parse_pair_traces(_t)
+                    elif _h_atk == "tap":
+                        _t = generic_traces_map_hr.get(_rid, [])
+                        _h_detail_data[_rid] = self._parse_tap_traces(_t)
+                    elif _h_atk == "advprefix":
+                        _t = generic_traces_map_hr.get(_rid, [])
+                        _h_detail_data[_rid] = self._parse_advprefix_traces(_t)
+                    elif _h_atk == "autodanturbo":
+                        _t = generic_traces_map_hr.get(_rid, [])
+                        _h_detail_data[_rid] = self._parse_autodan_traces(_t)
+                    elif _h_atk == "mml":
+                        _t = generic_traces_map_hr.get(_rid, [])
+                        _h_detail_data[_rid] = self._parse_mml_traces(_t)
+                    else:
+                        _t = generic_traces_map_hr.get(_rid, [])
+                        _h_detail_data[_rid] = (
+                            self._extract_prompt_response_from_traces(_t)
+                        )  # returns (req, resp, guardrail_event)
+
+                # Store for filter re-rendering
+                self._history_goal_rows = new_rows
+                self._history_goal_detail_data = _h_detail_data
+                self._history_goal_filter = ""
+                self._history_goal_filter_category = ""
+                self._history_goal_filter_search = ""
+                # Update filter bar
+                if self._history_goal_filter_area is not None:
+                    self._history_goal_filter_area.clear()
+                    with self._history_goal_filter_area:
+                        self._build_goal_filter_bar()
+                # Render all goals
+                self._render_filtered_history_goals()
         except Exception as exc:
             if self.history_results_list_area is not None:
                 self.history_results_list_area.clear()

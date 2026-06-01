@@ -258,6 +258,7 @@ def execute(
     success_threshold = tap_params.get("success_score_threshold", 10)
 
     tracker = config.get("_tracker")
+    _goal_offset = int(config.get("_goal_index_offset", 0))
 
     for idx, item in enumerate(input_data):
         best_prompt = item.get("best_prompt")
@@ -277,7 +278,7 @@ def execute(
             item["is_success"] = best_score >= success_threshold
 
         if tracker:
-            goal_ctx = tracker.get_goal_context(idx)
+            goal_ctx = tracker.get_goal_context(_goal_offset + idx)
             if goal_ctx and best_score is not None:
                 tracker.add_evaluation_trace(
                     ctx=goal_ctx,

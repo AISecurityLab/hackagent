@@ -508,6 +508,49 @@ class AgentRouter:
                 raw_request=request_data,
                 registration_key=registration_key,
             )
+        # --- After guardrail: check the model response before returning it ---
+        if self.after_guardrail is not None:
+            _response_text = (
+                response.get("processed_response")
+                or response.get("generated_text")
+                or ""
+            )
+            _response_text = str(_response_text).strip()
+            if not _response_text:
+                # Nothing to classify — skip silently.
+                logger.debug(
+                    "after_guardrail: empty response text for agent %s, skipping check.",
+                    registration_key,
+                )
+            else:
+                _gr = self.after_guardrail.check(_response_text)
+                if not _gr.is_safe:
+                    logger.warning(
+                        "after_guardrail blocked response for agent %s: %s",
+                        registration_key,
+                        _gr.explanation,
+                    )
+                    return {
+                        "raw_request": request_data,
+                        "processed_response": None,
+                        "generated_text": None,
+                        "raw_response_status": 200,
+                        "raw_response_headers": None,
+                        "raw_response_body": None,
+                        "agent_specific_data": {
+                            "guardrail": "after_guardrail_censored",
+                            "side": "after",
+                            "message": "Response censored: flagged as unsafe by guardrail.",
+                            "categories": getattr(_gr, "categories", []),
+                            "reasoning": _gr.explanation,
+                        },
+                        "error_message": None,
+                        "error_category": None,
+                        "agent_id": registration_key,
+                        "adapter_type": "guardrail",
+                    }
+
+        return response
 
         # --- After guardrail: check the model response before returning it ---
         if self.after_guardrail is not None:
