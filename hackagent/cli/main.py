@@ -268,6 +268,41 @@ def init(ctx):
         # Reload config from file to get the latest saved values
         cli_config._load_default_config()
 
+    # Mode and API key setup
+    console.print("\n[cyan]☁️ Mode Configuration[/cyan]")
+    console.print("[green]Local mode (default):[/green] no API key required")
+    console.print(
+        "[green]Remote mode:[/green] requires HackAgent API key for cloud sync"
+    )
+
+    use_remote = click.confirm(
+        "Enable remote mode (cloud sync)?",
+        default=False,
+    )
+
+    if use_remote:
+        if cli_config.api_key:
+            console.print(
+                "[dim]Press Enter to keep your current API key from config/environment.[/dim]"
+            )
+
+        api_key_input = click.prompt(
+            "HackAgent API key",
+            default=cli_config.api_key or "",
+            hide_input=True,
+            show_default=False,
+        ).strip()
+
+        if api_key_input:
+            cli_config.api_key = api_key_input
+        else:
+            console.print(
+                "[yellow]⚠️ No API key provided. Falling back to local mode.[/yellow]"
+            )
+            cli_config.api_key = None
+    else:
+        cli_config.api_key = None
+
     # Verbosity level setup
     console.print("\n[cyan]🔊 Verbosity Level Configuration[/cyan]")
     console.print("0 = ERROR (only errors)")
@@ -290,10 +325,16 @@ def init(ctx):
         cli_config.save()
         console.print("\n[bold green]✅ Configuration saved[/bold green]")
 
-        console.print(
-            "[bold green]✅ Setup complete![/bold green] "
-            "[dim](Local mode: results stored in ~/.local/share/hackagent/hackagent.db)[/dim]"
-        )
+        if cli_config.api_key:
+            console.print(
+                "[bold green]✅ Setup complete![/bold green] "
+                "[dim](Remote mode enabled: runs can sync to the HackAgent platform)[/dim]"
+            )
+        else:
+            console.print(
+                "[bold green]✅ Setup complete![/bold green] "
+                "[dim](Local mode: results stored in ~/.local/share/hackagent/hackagent.db)[/dim]"
+            )
         if cli_config.should_show_info():
             console.print("\n[bold cyan]💡 Next steps:[/bold cyan]")
             console.print("  [green]hackagent eval advprefix --help[/green]")
