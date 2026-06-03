@@ -9,6 +9,10 @@
 
 [App](https://app.hackagent.dev/) -- [Docs](https://docs.hackagent.dev/) -- [API](https://api.hackagent.dev/schema/redoc)
 
+[![Security Policy](https://img.shields.io/badge/security-policy-blue?logo=github)](SECURITY.md)
+
+<br>
+
 <br>
 
 ![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)
