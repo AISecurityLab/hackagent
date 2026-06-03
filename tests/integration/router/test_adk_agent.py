@@ -33,6 +33,8 @@ import pytest
 
 logger = logging.getLogger(__name__)
 
+ADK_TEST_TIMEOUT_SECONDS = 45
+
 
 @pytest.mark.integration
 @pytest.mark.google_adk
@@ -378,6 +380,7 @@ class TestGoogleADKRouterIntegration:
             name="multi_tool_agent",
             agent_type=AgentTypeEnum.GOOGLE_ADK,
             endpoint=google_adk_agent_url,
+            adapter_operational_config={"timeout": ADK_TEST_TIMEOUT_SECONDS},
         )
 
         # Verify adapter was created
@@ -414,6 +417,7 @@ class TestGoogleADKRouterIntegration:
             name="multi_tool_agent",
             agent_type=AgentTypeEnum.GOOGLE_ADK,
             endpoint=google_adk_agent_url,
+            adapter_operational_config={"timeout": ADK_TEST_TIMEOUT_SECONDS},
         )
 
         # Route a request
