@@ -278,6 +278,188 @@ class TestDefaultCategoryClassifierPreflight(unittest.TestCase):
         self.assertIsNotNone(results)
 
 
+class TestRequiredModelAvailabilityPreflight(unittest.TestCase):
+    """Test fail-fast behavior for model availability preflight."""
+
+    def test_normalize_attack_type_for_preflight_accepts_autodan_aliases(self):
+        """AutoDAN aliases should resolve to autodan_turbo mapping key."""
+        orch, _, _ = _make_orchestrator()
+
+        self.assertEqual(
+            orch._normalize_attack_type_for_preflight("AutoDANTurbo"),
+            "autodan_turbo",
+        )
+        self.assertEqual(
+            orch._normalize_attack_type_for_preflight("autodan-turbo"),
+            "autodan_turbo",
+        )
+
+    def test_collect_targets_uses_normalized_attack_type_for_autodan_roles(self):
+        """AutoDAN preflight must include attacker/scorer/summarizer/embedder roles."""
+        orch, _, _ = _make_orchestrator()
+        orch.attack_type = "AutoDANTurbo"
+        orch.hackagent_agent.router = None
+
+        attack_config = {
+            "attack_type": "autodan_turbo",
+            "attacker": {
+                "identifier": "a-model",
+                "endpoint": "http://localhost:1111",
+                "agent_type": "OPENAI_SDK",
+            },
+            "scorer": {
+                "identifier": "s-model",
+                "endpoint": "http://localhost:2222",
+                "agent_type": "OPENAI_SDK",
+            },
+            "summarizer": {
+                "identifier": "z-model",
+                "endpoint": "http://localhost:3333",
+                "agent_type": "OPENAI_SDK",
+            },
+            "embedder": {
+                "identifier": "e-model",
+                "endpoint": "http://localhost:4444",
+                "agent_type": "OPENAI_SDK",
+            },
+        }
+
+        targets = orch._collect_model_preflight_targets(
+            attack_config,
+            goal_labels_by_index={0: {"category": "c", "subcategory": "s"}},
+        )
+
+        roles = {item["role"] for item in targets}
+        self.assertIn("attacker", roles)
+        self.assertIn("scorer", roles)
+        self.assertIn("summarizer", roles)
+        self.assertIn("embedder", roles)
+
+    def test_validate_required_models_availability_reports_model_and_endpoint(self):
+        """Error should include role, identifier, and endpoint for unavailable models."""
+        orch, _, _ = _make_orchestrator()
+
+        with patch.object(
+            AttackOrchestrator,
+            "_collect_model_preflight_targets",
+            return_value=[
+                {
+                    "role": "attacker",
+                    "identifier": "gemma3:4b",
+                    "endpoint": "http://localhost:11434",
+                    "agent_type": "OLLAMA",
+                    "kind": "router_config",
+                    "config": {
+                        "identifier": "gemma3:4b",
+                        "endpoint": "http://localhost:11434",
+                        "agent_type": "OLLAMA",
+                    },
+                }
+            ],
+        ):
+            with patch.object(
+                AttackOrchestrator,
+                "_probe_model_target",
+                return_value="model not found",
+            ):
+                message = orch._validate_required_models_availability(
+                    attack_config={"goals": ["test"]}
+                )
+
+        self.assertIsInstance(message, str)
+        self.assertIn("required models are unavailable", message)
+        self.assertIn("gemma3:4b", message)
+        self.assertIn("http://localhost:11434", message)
+
+    def test_validate_required_models_availability_lists_multiple_models(self):
+        """When target and judge are unavailable, both must appear in the error list."""
+        orch, _, _ = _make_orchestrator()
+
+        with patch.object(
+            AttackOrchestrator,
+            "_collect_model_preflight_targets",
+            return_value=[
+                {
+                    "role": "target",
+                    "identifier": "google/gemma-3-27b-it",
+                    "endpoint": "https://openrouter.ai/api/v1",
+                    "agent_type": "OPENAI_SDK",
+                    "kind": "existing_router",
+                },
+                {
+                    "role": "judge",
+                    "identifier": "mistralai/mistral-small-3.1",
+                    "endpoint": "https://openrouter.ai/api/v1",
+                    "agent_type": "OPENAI_SDK",
+                    "kind": "router_config",
+                    "config": {
+                        "identifier": "mistralai/mistral-small-3.1",
+                        "endpoint": "https://openrouter.ai/api/v1",
+                        "agent_type": "OPENAI_SDK",
+                    },
+                },
+            ],
+        ):
+            with patch.object(
+                AttackOrchestrator,
+                "_probe_model_target",
+                side_effect=[
+                    "target invalid model",
+                    "judge invalid model",
+                ],
+            ):
+                message = orch._validate_required_models_availability(
+                    attack_config={"goals": ["test"]}
+                )
+
+        self.assertIsInstance(message, str)
+        self.assertIn("Unreachable models:\n- role=target", message)
+        self.assertIn("\n- role=judge", message)
+        self.assertIn("identifier=google/gemma-3-27b-it", message)
+        self.assertIn("identifier=mistralai/mistral-small-3.1", message)
+
+    def test_execute_aborts_before_db_records_when_model_unavailable(self):
+        """Run must not start when preflight detects an unavailable model."""
+        orch, _, _ = _make_orchestrator()
+
+        attack_config = {"goals": ["test"], "attack_type": "baseline"}
+
+        with patch.object(
+            AttackOrchestrator,
+            "_validate_default_category_classifier_requirements",
+            return_value=None,
+        ):
+            with patch.object(
+                AttackOrchestrator,
+                "_validate_required_models_availability",
+                return_value=(
+                    "Attack aborted: one or more required models are unavailable. "
+                    "The run was not started. Unreachable models:\n"
+                    "- role=target  identifier=test-model  endpoint=http://localhost:11434  "
+                    "error=model not found"
+                ),
+            ):
+                with patch.object(
+                    AttackOrchestrator,
+                    "_create_server_attack_record",
+                    return_value=_VALID_ATK_ID,
+                ) as mock_create_atk:
+                    with patch.object(
+                        AttackOrchestrator,
+                        "_create_server_run_record",
+                        return_value=_VALID_RUN_ID,
+                    ) as mock_create_run:
+                        results = orch.execute(
+                            attack_config=attack_config,
+                            run_config_override=None,
+                            fail_on_run_error=False,
+                        )
+
+        self.assertEqual(results, [])
+        mock_create_atk.assert_not_called()
+        mock_create_run.assert_not_called()
+
+
 class TestAttackOrchestratorHTTPResponseParsing(unittest.TestCase):
     """Test HTTP response parsing helpers in depth."""
 

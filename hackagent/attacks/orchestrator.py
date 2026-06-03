@@ -24,11 +24,15 @@ Technique implementations remain pure algorithms, unaware of server integration.
 
 import json
 import logging
+import re
 import shutil
 import subprocess
+import sys
 import time
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
+from io import StringIO
 from hackagent.logger import get_logger
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 from uuid import UUID
@@ -97,6 +101,71 @@ class AttackOrchestrator:
 
     attack_type: str = None  # Must be overridden by subclass
     attack_impl_class: type = None  # Must be overridden by subclass
+
+    # Model-role extraction map used by pre-run availability preflight.
+    # Tuple format: (role_name, path_tuple, is_list)
+    _ATTACK_MODEL_ROLE_PATHS: Dict[
+        str, Tuple[Tuple[str, Tuple[str, ...], bool], ...]
+    ] = {
+        "advprefix": (
+            ("generator", ("generator",), False),
+            ("judge", ("judge",), False),
+            ("judge", ("judges",), True),
+        ),
+        "baseline": (
+            ("judge", ("judge",), False),
+            ("judge", ("judges",), True),
+        ),
+        "flipattack": (
+            ("judge", ("judge",), False),
+            ("judge", ("judges",), True),
+        ),
+        "tap": (
+            ("attacker", ("attacker",), False),
+            ("judge", ("judge",), False),
+            ("judge", ("judges",), True),
+            ("on_topic_judge", ("on_topic_judge",), False),
+        ),
+        "pair": (
+            ("attacker", ("attacker",), False),
+            ("scorer", ("scorer",), False),
+        ),
+        "autodan_turbo": (
+            ("attacker", ("attacker",), False),
+            ("scorer", ("scorer",), False),
+            ("summarizer", ("summarizer",), False),
+            ("embedder", ("embedder",), False),
+        ),
+        "bon": (
+            ("judge", ("judge",), False),
+            ("judge", ("judges",), True),
+        ),
+        "cipherchat": (
+            ("judge", ("judge",), False),
+            ("judge", ("judges",), True),
+        ),
+        "h4rm3l": (
+            ("judge", ("judge",), False),
+            ("judge", ("judges",), True),
+            ("decorator_llm", ("decorator_llm",), False),
+        ),
+        "pap": (
+            ("attacker", ("attacker",), False),
+            ("judge", ("judge",), False),
+            ("judge", ("judges",), True),
+        ),
+        "indirect_prompt_injection": (
+            ("attacker", ("attacker",), False),
+            ("judge", ("judge",), False),
+            ("judge", ("judges",), True),
+            ("embedder", ("rag_injection_params", "embedder"), False),
+        ),
+    }
+
+    # Accepted aliases for attack names used by registry/UI labels.
+    _ATTACK_TYPE_ALIASES: Dict[str, str] = {
+        "autodanturbo": "autodan_turbo",
+    }
 
     def __init__(self, hackagent_agent: "HackAgent"):
         """
@@ -331,6 +400,386 @@ class AttackOrchestrator:
                 f"`ollama pull {required_model}` or provide `category_classifier` "
                 "explicitly in attack_config."
             )
+
+    @staticmethod
+    @contextmanager
+    def _silence_preflight_internal_logs():
+        """Temporarily silence internal logs/stdout/stderr during probes."""
+        previous_disable = logging.root.manager.disable
+        swallowed_stdout = StringIO()
+        swallowed_stderr = StringIO()
+        logging.disable(logging.CRITICAL)
+        try:
+            with redirect_stdout(swallowed_stdout), redirect_stderr(swallowed_stderr):
+                yield
+        finally:
+            logging.disable(previous_disable)
+
+    @staticmethod
+    def _supports_ansi_stdout() -> bool:
+        """Return whether stdout supports ANSI color/status updates."""
+        stream = getattr(sys, "stdout", None)
+        return bool(stream and hasattr(stream, "isatty") and stream.isatty())
+
+    @classmethod
+    def _format_status_label(cls, ok: bool) -> str:
+        """Return status label, colorized when supported."""
+        if not cls._supports_ansi_stdout():
+            return "OK" if ok else "KO"
+        green = "\033[32m"
+        red = "\033[31m"
+        reset = "\033[0m"
+        return f"{green}OK{reset}" if ok else f"{red}KO{reset}"
+
+    def _probe_model_target_with_progress(
+        self, target: Dict[str, Any]
+    ) -> Optional[str]:
+        """Probe one model target while streaming a single-line progress status."""
+        role = str(target.get("role") or "unknown")
+        identifier = str(target.get("identifier") or "unknown")
+        prefix = f"Checking {role} ({identifier})"
+        display_stream = getattr(sys, "stdout", None)
+        if display_stream is None:
+            display_stream = sys.__stdout__
+
+        use_inline = self._supports_ansi_stdout()
+        spinner_stop = threading.Event()
+        spinner_thread: Optional[threading.Thread] = None
+
+        if use_inline:
+            dots = (".", "..", "...")
+
+            def _spinner() -> None:
+                idx = 0
+                while not spinner_stop.is_set():
+                    frame = dots[idx % len(dots)]
+                    idx += 1
+                    display_stream.write(f"\r{prefix} {frame}")
+                    display_stream.flush()
+                    time.sleep(0.2)
+
+            spinner_thread = threading.Thread(target=_spinner, daemon=True)
+            spinner_thread.start()
+        else:
+            logger.info(f"{prefix} ...")
+
+        error: Optional[str]
+        try:
+            with self._silence_preflight_internal_logs():
+                error = self._probe_model_target(target)
+        except Exception as exc:
+            error = f"health check failed ({type(exc).__name__}): {exc}"
+        finally:
+            if use_inline:
+                spinner_stop.set()
+                if spinner_thread is not None:
+                    spinner_thread.join(timeout=0.5)
+
+        status_label = self._format_status_label(ok=not error)
+        if use_inline:
+            display_stream.write(f"\r{prefix} ... {status_label}\n")
+            display_stream.flush()
+        else:
+            logger.info(f"{prefix} ... {status_label}")
+
+        return error
+
+    @staticmethod
+    def _get_nested_config_value(
+        config: Dict[str, Any], path: Tuple[str, ...]
+    ) -> Optional[Any]:
+        """Return nested dict value for the given path, or ``None``."""
+        current: Any = config
+        for key in path:
+            if not isinstance(current, dict):
+                return None
+            current = current.get(key)
+        return current
+
+    @classmethod
+    def _normalize_attack_type_for_preflight(cls, attack_type: Any) -> str:
+        """Normalize attack names so role-path lookups are robust across aliases."""
+        raw = str(attack_type or "").strip()
+        if not raw:
+            return ""
+
+        candidates: List[str] = []
+
+        lowered = raw.lower()
+        candidates.append(lowered)
+        candidates.append(lowered.replace("-", "_").replace(" ", "_"))
+
+        snake_case = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", raw)
+        candidates.append(snake_case.lower().replace("-", "_").replace(" ", "_"))
+
+        deduped_candidates: List[str] = []
+        seen: set[str] = set()
+        for candidate in candidates:
+            if not candidate or candidate in seen:
+                continue
+            seen.add(candidate)
+            deduped_candidates.append(candidate)
+
+        for candidate in deduped_candidates:
+            alias = cls._ATTACK_TYPE_ALIASES.get(candidate)
+            if alias:
+                return alias
+
+            alias = cls._ATTACK_TYPE_ALIASES.get(candidate.replace("_", ""))
+            if alias:
+                return alias
+
+            if candidate in cls._ATTACK_MODEL_ROLE_PATHS:
+                return candidate
+
+        return deduped_candidates[0]
+
+    @staticmethod
+    def _normalize_model_role_config(
+        role: str, role_config: Any
+    ) -> Optional[Dict[str, Any]]:
+        """Normalize one role config into a model descriptor, if possible."""
+        if not isinstance(role_config, dict):
+            return None
+
+        identifier = (
+            role_config.get("identifier")
+            or role_config.get("model")
+            or role_config.get("model_id")
+            or role_config.get("model_name")
+            or role_config.get("name")
+        )
+        if not identifier:
+            return None
+
+        endpoint = (
+            role_config.get("endpoint")
+            or role_config.get("agent_endpoint")
+            or role_config.get("api_base")
+            or role_config.get("base_url")
+            or ""
+        )
+
+        agent_type = role_config.get("agent_type") or ""
+        if hasattr(agent_type, "value"):
+            agent_type = agent_type.value
+
+        return {
+            "role": role,
+            "identifier": str(identifier),
+            "endpoint": str(endpoint),
+            "agent_type": str(agent_type),
+            "config": role_config,
+            "kind": "router_config",
+        }
+
+    def _collect_model_preflight_targets(
+        self,
+        attack_config: Dict[str, Any],
+        *,
+        goal_labels_by_index: Optional[Dict[int, Dict[str, str]]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Collect model endpoints that must be reachable before run start."""
+        targets: List[Dict[str, Any]] = []
+
+        router_obj = getattr(self.hackagent_agent, "router", None)
+        backend_agent = (
+            getattr(router_obj, "backend_agent", None) if router_obj else None
+        )
+        if router_obj is not None and backend_agent is not None:
+            registration_key = str(getattr(backend_agent, "id", ""))
+            agent_instance = None
+            if registration_key and hasattr(router_obj, "get_agent_instance"):
+                try:
+                    agent_instance = router_obj.get_agent_instance(registration_key)
+                except Exception:
+                    agent_instance = None
+
+            model_name = (
+                getattr(agent_instance, "model_name", None)
+                or getattr(agent_instance, "litellm_model", None)
+                or getattr(backend_agent, "name", None)
+                or "target"
+            )
+            endpoint = (
+                getattr(agent_instance, "api_base_url", None)
+                or getattr(backend_agent, "endpoint", None)
+                or ""
+            )
+            agent_type = getattr(backend_agent, "agent_type", "")
+
+            targets.append(
+                {
+                    "role": "target",
+                    "identifier": str(model_name),
+                    "endpoint": str(endpoint or ""),
+                    "agent_type": str(agent_type or ""),
+                    "kind": "existing_router",
+                    "router": router_obj,
+                    "registration_key": registration_key,
+                }
+            )
+
+        raw_attack_type = attack_config.get("attack_type") or self.attack_type
+        attack_type = self._normalize_attack_type_for_preflight(raw_attack_type)
+        role_specs = self._ATTACK_MODEL_ROLE_PATHS.get(attack_type)
+        if not role_specs:
+            return targets
+
+        seen = {
+            (
+                str(item.get("role", "")),
+                str(item.get("identifier", "")),
+                str(item.get("endpoint", "")),
+                str(item.get("agent_type", "")),
+            )
+            for item in targets
+        }
+
+        for role, path, is_list in role_specs:
+            value = self._get_nested_config_value(attack_config, path)
+            if value is None:
+                continue
+
+            items = value if (is_list and isinstance(value, list)) else [value]
+            for item in items:
+                normalized = self._normalize_model_role_config(role, item)
+                if not normalized:
+                    continue
+                key = (
+                    normalized["role"],
+                    normalized["identifier"],
+                    normalized["endpoint"],
+                    normalized["agent_type"],
+                )
+                if key in seen:
+                    continue
+                seen.add(key)
+                targets.append(normalized)
+
+        # Category classifier is part of goal tracking unless explicit labels
+        # are provided via intents (which disable per-goal classification).
+        if not goal_labels_by_index:
+            category_cfg = attack_config.get("category_classifier")
+            normalized = self._normalize_model_role_config(
+                "category_classifier", category_cfg
+            )
+            if normalized:
+                key = (
+                    normalized["role"],
+                    normalized["identifier"],
+                    normalized["endpoint"],
+                    normalized["agent_type"],
+                )
+                if key not in seen:
+                    targets.append(normalized)
+
+        return targets
+
+    @staticmethod
+    def _probe_router_registration(
+        router: Any,
+        registration_key: str,
+    ) -> Optional[str]:
+        """Issue a tiny completion request and return error text when unavailable."""
+        try:
+            response = router.route_request(
+                registration_key=registration_key,
+                request_data={
+                    "messages": [{"role": "user", "content": "healthcheck"}],
+                    "max_tokens": 1,
+                    "temperature": 0.0,
+                },
+            )
+        except Exception as exc:
+            return f"request failed ({type(exc).__name__}): {exc}"
+
+        # Some tests and custom adapters may return non-dict payloads.
+        # Treat these probes as inconclusive instead of hard-failing.
+        if not isinstance(response, dict):
+            return None
+
+        error_message = response.get("error_message")
+        if error_message:
+            return str(error_message)
+
+        return None
+
+    def _probe_model_target(self, target: Dict[str, Any]) -> Optional[str]:
+        """Probe one model target and return an error string on failure."""
+        kind = target.get("kind")
+
+        if kind == "existing_router":
+            router = target.get("router")
+            registration_key = str(target.get("registration_key") or "")
+            if router is None or not registration_key:
+                return "missing router registration"
+            return self._probe_router_registration(router, registration_key)
+
+        if kind == "router_config":
+            from hackagent.attacks.shared.router_factory import create_router
+
+            try:
+                temp_router, registration_key = create_router(
+                    backend=self.hackagent_agent.backend,
+                    config=dict(target.get("config") or {}),
+                    logger=logger,
+                    router_name=f"preflight-{target.get('role', 'model')}",
+                )
+            except Exception as exc:
+                return f"router init failed ({type(exc).__name__}): {exc}"
+
+            return self._probe_router_registration(temp_router, registration_key)
+
+        return "unknown preflight target type"
+
+    def _validate_required_models_availability(
+        self,
+        attack_config: Dict[str, Any],
+        *,
+        goal_labels_by_index: Optional[Dict[int, Dict[str, str]]] = None,
+    ) -> Optional[str]:
+        """Return a formatted error message when required models are unavailable."""
+        targets = self._collect_model_preflight_targets(
+            attack_config,
+            goal_labels_by_index=goal_labels_by_index,
+        )
+        if not targets:
+            return None
+
+        unavailable: List[Dict[str, str]] = []
+        for target in targets:
+            error = self._probe_model_target_with_progress(target)
+            if not error:
+                continue
+
+            unavailable.append(
+                {
+                    "role": str(target.get("role") or "unknown"),
+                    "identifier": str(target.get("identifier") or "unknown"),
+                    "endpoint": str(target.get("endpoint") or "<provider default>"),
+                    "agent_type": str(target.get("agent_type") or "unknown"),
+                    "error": error,
+                }
+            )
+
+        if unavailable:
+            details = "\n".join(
+                (
+                    f"- role={item['role']}  "
+                    f"identifier={item['identifier']}  "
+                    f"endpoint={item['endpoint']}  "
+                    f"error={item['error']}"
+                )
+                for item in unavailable
+            )
+            return (
+                "Attack aborted: one or more required models are unavailable. "
+                "The run was not started. Unreachable models:\n"
+                f"{details}"
+            )
+
+        return None
 
     def _load_goals_from_dataset(self, dataset_config: Dict[str, Any]) -> list:
         """
@@ -713,6 +1162,18 @@ class AttackOrchestrator:
             )
         else:
             self._validate_default_category_classifier_requirements(attack_config)
+
+        availability_error = self._validate_required_models_availability(
+            attack_config,
+            goal_labels_by_index=goal_labels_by_index,
+        )
+        if availability_error:
+            # Use the same logger/message style surfaced by HackAgent.hack so
+            # users get a visible rich ERROR line even when we abort gracefully.
+            get_logger("hackagent.agent").error(
+                f"Configuration error in HackAgent.hack: {availability_error}"
+            )
+            return []
 
         # Enrich run config with expected goal cardinality so downstream views
         # can keep RUNNING until all expected goals are fully tracked.
