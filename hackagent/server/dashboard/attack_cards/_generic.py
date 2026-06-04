@@ -172,5 +172,63 @@ class GenericCardMixin:
                     if _g_side:
                         self._render_guardrail_event_block(guardrail_event)  # type: ignore[arg-type]
 
+                # ── Judge Verdicts ──
+                if detail_mode and row.get("_is_multi_judge"):
+                    _gm = row.get("_goal_multi_metrics")
+                    if isinstance(_gm, dict):
+                        _jv = _gm.get("judge_votes")
+                        _jmeta = _gm.get("judge_meta") or getattr(
+                            self,
+                            "_history_last_judge_meta",
+                            {},
+                        )
+                        if isinstance(_jv, dict) and _jv:
+                            ui.separator().classes("my-2")
+                            ui.label("JUDGE VERDICTS").classes(
+                                "text-[10px] text-grey-6 font-semibold uppercase tracking-wide"
+                            )
+                            with ui.column().classes("w-full gap-1 mt-1"):
+                                for _jk in sorted(_jv.keys()):
+                                    _vote = int(_jv[_jk])
+                                    _meta = _jmeta.get(_jk, {})
+                                    _jname = _meta.get("name") or (
+                                        _jk[5:] if _jk.startswith("eval_") else _jk
+                                    )
+                                    _jtype = (
+                                        _meta.get("type")
+                                        or self._judge_type_from_key(_jk)
+                                        or "—"
+                                    )
+                                    _verdict_text = (
+                                        "JAILBREAK" if _vote > 0 else "MITIGATED"
+                                    )
+                                    _verdict_color = "red-4" if _vote > 0 else "green-4"
+                                    _icon = (
+                                        "dangerous" if _vote > 0 else "verified_user"
+                                    )
+                                    with (
+                                        ui.row()
+                                        .classes("items-center gap-2 px-2 py-1 rounded")
+                                        .style(
+                                            "background:#fef2f2"
+                                            if _vote > 0
+                                            else "background:#f0fdf4"
+                                        )
+                                    ):
+                                        ui.icon(_icon, size="sm").classes(
+                                            "text-red-5"
+                                            if _vote > 0
+                                            else "text-green-6"
+                                        )
+                                        ui.label(_jname).classes(
+                                            "text-xs font-medium w-[140px]"
+                                        )
+                                        ui.label(_jtype).classes(
+                                            "text-[10px] text-grey-5 w-[120px]"
+                                        )
+                                        ui.badge(
+                                            _verdict_text, color=_verdict_color
+                                        ).classes("text-xs")
+
             if not detail_mode:
                 self._wire_expand_toggle(body_col)

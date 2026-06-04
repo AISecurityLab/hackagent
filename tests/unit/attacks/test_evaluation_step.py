@@ -403,17 +403,21 @@ class TestMergeEvaluationResults:
         original = [
             {"goal": "g1", "prefix": "p1", "completion": "c1"},
         ]
-        judge_results = {
-            "harmbench": [
-                {
-                    "goal": "g1",
-                    "prefix": "p1",
-                    "completion": "c1",
-                    "eval_hb": 1,
-                    "explanation_hb": "Harmful",
-                },
-            ],
-        }
+        judge_results = [
+            (
+                "harmbench",
+                1,
+                [
+                    {
+                        "goal": "g1",
+                        "prefix": "p1",
+                        "completion": "c1",
+                        "eval_hb": 1,
+                        "explanation_hb": "Harmful",
+                    },
+                ],
+            )
+        ]
 
         merged = step._merge_evaluation_results(original, judge_results)
 
@@ -427,26 +431,34 @@ class TestMergeEvaluationResults:
         original = [
             {"goal": "g1", "prefix": "p1", "completion": "c1"},
         ]
-        judge_results = {
-            "harmbench": [
-                {
-                    "goal": "g1",
-                    "prefix": "p1",
-                    "completion": "c1",
-                    "eval_hb": 1,
-                    "explanation_hb": "Harmful",
-                },
-            ],
-            "jailbreakbench": [
-                {
-                    "goal": "g1",
-                    "prefix": "p1",
-                    "completion": "c1",
-                    "eval_jb": 0,
-                    "explanation_jb": "Safe",
-                },
-            ],
-        }
+        judge_results = [
+            (
+                "harmbench",
+                1,
+                [
+                    {
+                        "goal": "g1",
+                        "prefix": "p1",
+                        "completion": "c1",
+                        "eval_hb": 1,
+                        "explanation_hb": "Harmful",
+                    },
+                ],
+            ),
+            (
+                "jailbreakbench",
+                1,
+                [
+                    {
+                        "goal": "g1",
+                        "prefix": "p1",
+                        "completion": "c1",
+                        "eval_jb": 0,
+                        "explanation_jb": "Safe",
+                    },
+                ],
+            ),
+        ]
 
         merged = step._merge_evaluation_results(original, judge_results)
 
@@ -459,11 +471,20 @@ class TestMergeEvaluationResults:
         original = [
             {"goal": "g1", "prefix": "p1", "completion": "c1"},
         ]
-        judge_results = {
-            "harmbench": [
-                {"goal": "different", "prefix": "p1", "completion": "c1", "eval_hb": 1},
-            ],
-        }
+        judge_results = [
+            (
+                "harmbench",
+                1,
+                [
+                    {
+                        "goal": "different",
+                        "prefix": "p1",
+                        "completion": "c1",
+                        "eval_hb": 1,
+                    },
+                ],
+            )
+        ]
 
         merged = step._merge_evaluation_results(original, judge_results)
 
@@ -523,8 +544,9 @@ class TestPrepareJudgeConfigs:
         prepared = step._prepare_judge_configs(judge_configs, {})
 
         assert len(prepared) == 1
-        judge_type, config = prepared[0]
+        judge_type, judge_idx, config = prepared[0]
         assert judge_type == "harmbench"
+        assert judge_idx == 1
         assert config["model_id"] == "gpt-4-0613"
 
     def test_skips_invalid_configs(self):
@@ -560,8 +582,23 @@ class TestPrepareJudgeConfigs:
         prepared = step._prepare_judge_configs(judge_configs, {})
 
         assert len(prepared) == 1
-        config = prepared[0][1]
+        config = prepared[0][2]
         assert config["agent_metadata"]["api_key"] == "sk-test123"
+
+    def test_duplicate_judge_type_gets_unique_instance_index(self):
+        """Duplicate judge types should be indexed as distinct judge instances."""
+        step = _make_step()
+        judge_configs = [
+            {"identifier": "judge-1", "type": "harmbench"},
+            {"identifier": "judge-2", "type": "harmbench"},
+        ]
+
+        prepared = step._prepare_judge_configs(judge_configs, {})
+        assert len(prepared) == 2
+        assert prepared[0][0] == "harmbench"
+        assert prepared[0][1] == 1
+        assert prepared[1][0] == "harmbench"
+        assert prepared[1][1] == 2
 
 
 # ============================================================================

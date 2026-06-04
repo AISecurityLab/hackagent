@@ -131,10 +131,6 @@ class H4rm3lEvaluation(BaseEvaluationStep):
         self._statistics["evaluated_count"] = len(evaluated_rows)
 
         # ----- Merge results back into input_data ----- #
-        all_judge_cols: set = set()
-        for cols in self.JUDGE_COLUMN_MAP.values():
-            all_judge_cols.update(cols)
-
         normalize = self._normalize_merge_key
         lookup = {}
         for row in evaluated_rows:
@@ -143,7 +139,14 @@ class H4rm3lEvaluation(BaseEvaluationStep):
                 normalize("prefix", row.get("prefix")),
                 normalize("completion", row.get("completion")),
             )
-            lookup[key] = {c: row[c] for c in all_judge_cols if c in row}
+            # Capture all eval_* and explanation_* columns (including
+            # instance-suffixed ones like eval_hbv_1, eval_hbv_2).
+            lookup[key] = {
+                c: row[c]
+                for c in row
+                if isinstance(c, str)
+                and (c.startswith("eval_") or c.startswith("explanation_"))
+            }
 
         for i, item in enumerate(input_data):
             if i not in error_indices:

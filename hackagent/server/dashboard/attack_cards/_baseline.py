@@ -52,14 +52,26 @@ class BaselineCardMixin:
         )
 
         eval_by_key: dict[tuple, deque] = {}
+        eval_by_cat_sample: dict[tuple, deque] = {}
+        eval_by_cat_len: dict[tuple, deque] = {}
         for ev in eval_trace_result.get("evaluations") or []:
-            key = (
-                ev.get("template_category") or "",
-                int(ev.get("response_length") or 0),
-            )
+            _cat = ev.get("template_category") or ""
+            _sidx = int(ev.get("sample_index") or 0)
+            _rlen = int(ev.get("response_length") or 0)
+            key = (_cat, _sidx, _rlen)
             if key not in eval_by_key:
                 eval_by_key[key] = deque()
             eval_by_key[key].append(ev)
+
+            _k2 = (_cat, _sidx)
+            if _k2 not in eval_by_cat_sample:
+                eval_by_cat_sample[_k2] = deque()
+            eval_by_cat_sample[_k2].append(ev)
+
+            _k3 = (_cat, _rlen)
+            if _k3 not in eval_by_cat_len:
+                eval_by_cat_len[_k3] = deque()
+            eval_by_cat_len[_k3].append(ev)
 
         rows: list[dict] = []
         for idx, (_, content) in enumerate(interaction_traces, start=1):
@@ -77,6 +89,7 @@ class BaselineCardMixin:
 
             metadata = content.get("metadata") or {}
             template_category = str(metadata.get("template_category") or "")
+            sample_index = int(metadata.get("sample_index") or 0)
             response_length = int(metadata.get("response_length") or len(response_text))
 
             if goal and goal in attack_prompt:
@@ -84,12 +97,23 @@ class BaselineCardMixin:
             else:
                 template_display = attack_prompt
 
-            key = (template_category, response_length)
+            key = (template_category, sample_index, response_length)
             success: bool | None = None
+            _jcols: dict = {}
             q = eval_by_key.get(key)
+            if not q:
+                q = eval_by_cat_sample.get((template_category, sample_index))
+            if not q:
+                q = eval_by_cat_len.get((template_category, response_length))
             if q:
                 ev = q.popleft()
                 success = bool(ev.get("success", False))
+                # Extract eval_* and explanation_* judge columns
+                _jcols = {
+                    k: v
+                    for k, v in ev.items()
+                    if k.startswith("eval_") or k.startswith("explanation_")
+                }
 
             if _g_side:
                 bucket = "mitigated"
@@ -120,6 +144,7 @@ class BaselineCardMixin:
                     "_guardrail_side": _g_side,
                     "_guardrail_explanation": _g_expl,
                     "_guardrail_categories": _g_cats,
+                    "_judge_columns": _jcols,
                 }
             )
 
@@ -129,6 +154,25 @@ class BaselineCardMixin:
         self, row: dict, template_rows: list[dict], detail_mode: bool = False
     ) -> None:
         """Render a Baseline goal card grouped by template category."""
+        # Pre-compute judge verdicts for each template row
+        _gm = row.get("_goal_multi_metrics") or {}
+        _jmeta = _gm.get("judge_meta") or getattr(
+            self,
+            "_history_last_judge_meta",
+            {},
+        )
+        _goal_jvotes = _gm.get("judge_votes") or {}
+        for tr in template_rows:
+            jc = tr.get("_judge_columns")
+            if jc or _goal_jvotes:
+                # Fallback to goal-level votes for legacy traces that did not
+                # persist per-template evaluation rows.
+                tr["_judge_verdicts"] = self._build_judge_verdicts(
+                    jc or _goal_jvotes,
+                    _jmeta,
+                )
+            else:
+                tr["_judge_verdicts"] = []
 
         def _fmt_cat(cat: str) -> str:
             return cat.replace("_", " ").title() if cat else "Uncategorised"
@@ -210,6 +254,7 @@ class BaselineCardMixin:
                             or "",
                             "_guardrail_categories": tr.get("_guardrail_categories")
                             or [],
+                            "_judge_verdicts": tr.get("_judge_verdicts") or [],
                         }
                         for tr in rows_in_cat
                     ]
@@ -270,6 +315,17 @@ class BaselineCardMixin:
       <div v-else-if="props.row._guardrail_side" style="margin-bottom:8px">
         <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#616161">&#x1f6e1; GUARDRAIL &#x2014; BLOCKED</div>
         <pre style="font-size:11px;padding:10px;background:#f5f5f5;border:2px solid #9e9e9e;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#616161">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#374151">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#616161">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
+      </div>
+      <div v-if="props.row._judge_verdicts && props.row._judge_verdicts.length > 0" style="margin-top:10px">
+        <div class="text-caption text-weight-bold text-uppercase q-mb-xs text-grey-6">JUDGE VERDICTS</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div v-for="jv in props.row._judge_verdicts" style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:4px" :style="jv.vote > 0 ? 'background:#fef2f2' : 'background:#f0fdf4'">
+            <q-icon :name="jv.vote > 0 ? 'dangerous' : 'verified_user'" :color="jv.vote > 0 ? 'red-5' : 'green-6'" size="18px" />
+            <span style="font-size:12px;font-weight:600;width:140px">{{ jv.name }}</span>
+            <span style="font-size:10px;color:#9e9e9e;width:120px">{{ jv.type }}</span>
+            <q-badge :color="jv.vote > 0 ? 'negative' : 'positive'" class="text-xs">{{ jv.vote > 0 ? 'JAILBREAK' : 'MITIGATED' }}</q-badge>
+          </div>
+        </div>
       </div>
     </div>
   </q-td>

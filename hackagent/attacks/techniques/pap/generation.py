@@ -135,16 +135,25 @@ class _StepJudge:
 
         judge_cols: Dict[str, Any] = {}
         best_score = 0.0
+        _total_by_type: Dict[str, int] = {}
+        _seen_by_type: Dict[str, int] = {}
+
+        for _jt, _ev in self._judges:
+            _total_by_type[_jt] = _total_by_type.get(_jt, 0) + 1
 
         for judge_type, evaluator in self._judges:
             try:
                 evaluated = evaluator.evaluate([row.copy()])
                 if evaluated:
                     ev_row = evaluated[0]
+                    _seen_by_type[judge_type] = _seen_by_type.get(judge_type, 0) + 1
+                    _idx = _seen_by_type[judge_type]
+                    _use_suffix = _total_by_type.get(judge_type, 0) > 1
                     judge_cols_for_type = self.JUDGE_COLUMN_MAP.get(judge_type, [])
                     for col in judge_cols_for_type:
                         if col in ev_row:
-                            judge_cols[col] = ev_row[col]
+                            out_col = f"{col}_{_idx}" if _use_suffix else col
+                            judge_cols[out_col] = ev_row[col]
                     if judge_cols_for_type:
                         eval_col = judge_cols_for_type[0]
                         val = ev_row.get(eval_col)

@@ -289,11 +289,13 @@ def _evaluate_row(
     if judge_votes:
         judge_count = len(judge_votes)
         is_multi_judge = judge_count > 1
-        success = any(judge_votes)
+        positive_votes = int(sum(judge_votes))
+        # Multi-judge decision rule: success when at least half of judges vote success.
+        majority_vote = int((positive_votes * 2) >= judge_count)
+        success = bool(majority_vote)
         if is_multi_judge:
-            majority_vote = int(sum(judge_votes) > (judge_count / 2.0))
             notes_parts.append(
-                f"MajorityVote: {majority_vote} ({sum(judge_votes)}/{judge_count})"
+                f"MajorityVote: {majority_vote} ({positive_votes}/{judge_count})"
             )
             metadata_updates["majority_vote"] = majority_vote
 
