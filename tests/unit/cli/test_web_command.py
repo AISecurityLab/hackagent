@@ -6,19 +6,9 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-import httpx
 from click.testing import CliRunner
 
 from hackagent.cli.commands.web import web
-
-
-class _DummyRemoteBackend:
-    def __init__(self):
-        self.get_context_calls = 0
-
-    def get_context(self):
-        self.get_context_calls += 1
-        return {"ok": True}
 
 
 class _DummyLocalBackend:
@@ -33,66 +23,47 @@ class TestWebCommand(unittest.TestCase):
         mock_socket.__enter__.return_value.connect_ex.return_value = 1
         return mock_socket
 
-    def test_web_uses_remote_backend_when_preflight_succeeds(self):
+    def test_web_remote_mode_opens_cloud_dashboard(self):
         runner = CliRunner()
         config = MagicMock()
         config.api_key = "test-key"
         config.base_url = "https://api.hackagent.dev"
-
-        remote_backend = _DummyRemoteBackend()
-        app = MagicMock()
-
         with (
-            patch("hackagent.server.client.AuthenticatedClient") as mock_auth_client,
-            patch(
-                "hackagent.server.storage.remote.RemoteBackend",
-                return_value=remote_backend,
-            ) as mock_remote_cls,
-            patch("hackagent.server.storage.local.LocalBackend") as mock_local_cls,
-            patch(
-                "hackagent.server.dashboard.create_app", return_value=app
-            ) as mock_create_app,
-            patch("socket.socket", return_value=self._free_port_socket()),
+            patch("webbrowser.open", return_value=True) as mock_open,
+            patch("hackagent.server.dashboard.create_app") as mock_create_app,
         ):
-            result = runner.invoke(
-                web,
-                ["--host", "127.0.0.1", "--port", "7878"],
-                obj={"config": config},
-            )
+            result = runner.invoke(web, [], obj={"config": config})
 
         self.assertEqual(result.exit_code, 0)
-        self.assertEqual(remote_backend.get_context_calls, 1)
-        mock_remote_cls.assert_called_once()
-        mock_local_cls.assert_not_called()
-        mock_create_app.assert_called_once_with(backend=remote_backend)
-        app.run.assert_called_once_with(host="127.0.0.1", port=7878, show=True)
+        mock_open.assert_called_once_with("https://app.hackagent.dev")
+        mock_create_app.assert_not_called()
 
-        _, auth_kwargs = mock_auth_client.call_args
-        self.assertEqual(auth_kwargs["base_url"], "https://api.hackagent.dev")
-        self.assertEqual(auth_kwargs["token"], "test-key")
-        self.assertIsInstance(auth_kwargs["timeout"], httpx.Timeout)
-
-    def test_web_falls_back_to_local_backend_when_remote_preflight_fails(self):
+    def test_web_remote_mode_no_browser_does_not_open_browser(self):
         runner = CliRunner()
         config = MagicMock()
         config.api_key = "test-key"
         config.base_url = "https://api.hackagent.dev"
 
-        remote_backend = _DummyRemoteBackend()
+        with (
+            patch("webbrowser.open") as mock_open,
+            patch("hackagent.server.dashboard.create_app") as mock_create_app,
+        ):
+            result = runner.invoke(web, ["--no-browser"], obj={"config": config})
 
-        def _raise_preflight_error():
-            raise RuntimeError("remote unavailable")
+        self.assertEqual(result.exit_code, 0)
+        mock_open.assert_not_called()
+        mock_create_app.assert_not_called()
 
-        remote_backend.get_context = _raise_preflight_error
+    def test_web_local_mode_uses_local_dashboard(self):
+        runner = CliRunner()
+        config = MagicMock()
+        config.api_key = None
+        config.base_url = "https://api.hackagent.dev"
+
         local_backend = _DummyLocalBackend()
         app = MagicMock()
 
         with (
-            patch("hackagent.server.client.AuthenticatedClient"),
-            patch(
-                "hackagent.server.storage.remote.RemoteBackend",
-                return_value=remote_backend,
-            ),
             patch(
                 "hackagent.server.storage.local.LocalBackend",
                 return_value=local_backend,

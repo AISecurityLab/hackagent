@@ -42,8 +42,10 @@ hackagent init
 ```
 
 This will guide you through:
-1. **Set verbosity level** — Control logging detail (0=ERROR to 3=DEBUG)
-2. **Save configuration** — Stored in `~/.config/hackagent/config.json`
+1. **Choose mode** — Local (no API key) or Remote (cloud sync)
+2. **Configure remote credentials (optional)** — API key when Remote mode is enabled
+3. **Set verbosity level** — Control logging detail (0=ERROR to 3=DEBUG)
+4. **Save configuration** — Stored in `~/.config/hackagent/config.json`
 
 :::info Local and Remote
 By default, HackAgent runs locally and stores results in SQLite (`~/.local/share/hackagent/hackagent.db`).
@@ -56,7 +58,24 @@ export HACKAGENT_API_KEY="your_api_key"
 export HACKAGENT_BASE_URL="https://api.hackagent.dev"
 ```
 
+You can also configure these values interactively with:
+
+```bash
+hackagent init
+```
+
+Or set them later without re-running the wizard:
+
+```bash
+hackagent config set --api-key YOUR_KEY
+hackagent config set --base-url https://api.hackagent.dev
+```
+
 In remote mode, results are synchronized to the HackAgent platform while local mode remains available.
+
+`hackagent web` follows the selected mode:
+- Local mode: launches the local dashboard server (`http://127.0.0.1:7860` by default)
+- Remote mode: opens `https://app.hackagent.dev`
 :::
 
 ---
