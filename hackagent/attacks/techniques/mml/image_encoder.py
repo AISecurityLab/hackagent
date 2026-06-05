@@ -21,7 +21,12 @@ import random
 import textwrap
 from typing import Any, Dict, List
 
-from PIL import Image, ImageDraw, ImageFont
+try:
+    from PIL import Image, ImageDraw, ImageFont
+except ImportError:
+    raise ImportError(
+        "Pillow is required for the MML attack. Install with: pip install Pillow"
+    )
 
 
 def _get_font(font_size: int) -> ImageFont.FreeTypeFont:

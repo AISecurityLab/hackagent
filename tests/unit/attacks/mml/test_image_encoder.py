@@ -9,8 +9,10 @@ as well as internal helpers and the unified encode_prompt interface.
 """
 
 import base64
+import io
 
 import pytest
+from PIL import Image
 
 from hackagent.attacks.techniques.mml.image_encoder import (
     ENCODERS,
@@ -24,6 +26,14 @@ from hackagent.attacks.techniques.mml.image_encoder import (
     encode_rotate,
     encode_word_replacement,
 )
+
+
+def _get_pixel_data(img: Image.Image) -> list:
+    """Compatible with both Pillow <14 and >=14."""
+    try:
+        return list(img.get_flattened_data())
+    except AttributeError:
+        return list(img.getdata())
 
 
 # ============================================================================
@@ -93,7 +103,6 @@ class TestImageToDataUrl:
 
     def test_decodable_as_png(self):
         """Test that the decoded bytes are a valid PNG."""
-        import io
 
         from PIL import Image
 
@@ -237,7 +246,6 @@ class TestEncodeMirror:
 
     def test_image_is_flipped(self):
         """Test that the resulting image is actually mirrored."""
-        import io
 
         from PIL import Image
 
@@ -254,7 +262,7 @@ class TestEncodeMirror:
         flipped = original.transpose(Image.FLIP_LEFT_RIGHT)
 
         # The images should match
-        assert list(img.getdata()) == list(flipped.getdata())
+        assert _get_pixel_data(img) == _get_pixel_data(flipped)
 
 
 # ============================================================================
@@ -284,7 +292,6 @@ class TestEncodeRotate:
 
     def test_image_is_rotated(self):
         """Test that the resulting image is actually rotated 180 degrees."""
-        import io
 
         from PIL import Image
 
@@ -298,7 +305,7 @@ class TestEncodeRotate:
         original = _render_text_to_image(prompt)
         rotated = original.rotate(180)
 
-        assert list(img.getdata()) == list(rotated.getdata())
+        assert _get_pixel_data(img) == _get_pixel_data(rotated)
 
 
 # ============================================================================
@@ -328,7 +335,6 @@ class TestEncodeBase64:
 
     def test_image_contains_base64_encoded_text(self):
         """Test that the image renders the base64-encoded version."""
-        import io
 
         from PIL import Image
 
@@ -345,7 +351,7 @@ class TestEncodeBase64:
         decoded = base64.b64decode(b64_part)
         actual_img = Image.open(io.BytesIO(decoded))
 
-        assert list(actual_img.getdata()) == list(expected_img.getdata())
+        assert _get_pixel_data(actual_img) == _get_pixel_data(expected_img)
 
 
 # ============================================================================
@@ -400,7 +406,6 @@ class TestEncodeMixed:
 
     def test_image_applies_spatial_transforms(self):
         """Test that the image has mirror + rotation applied to the modified text."""
-        import io
 
         from PIL import Image
 
@@ -416,7 +421,7 @@ class TestEncodeMixed:
         expected = expected.transpose(Image.FLIP_LEFT_RIGHT)
         expected = expected.rotate(180)
 
-        assert list(img.getdata()) == list(expected.getdata())
+        assert _get_pixel_data(img) == _get_pixel_data(expected)
 
 
 # ============================================================================
