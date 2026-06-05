@@ -9,7 +9,16 @@ from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 from hackagent.attacks.orchestrator import AttackOrchestrator
+from hackagent.attacks.techniques.autodan_turbo.attack import AutoDANTurboAttack
 from hackagent.attacks.techniques.base import BaseAttack
+from hackagent.attacks.techniques.baseline.attack import BaselineAttack
+from hackagent.attacks.techniques.h4rm3l.attack import H4rm3lAttack
+from hackagent.attacks.techniques.tap.attack import TAPAttack
+from hackagent.attacks.techniques.config import (
+    DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE,
+    DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT,
+    DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
+)
 from hackagent.errors import HackAgentError
 
 
@@ -48,9 +57,14 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
     @patch.object(
         AttackOrchestrator, "_create_server_attack_record", return_value=_VALID_ATK_ID
     )
+    @patch.object(
+        AttackOrchestrator,
+        "_validate_required_models_availability",
+        return_value=None,
+    )
     @patch.object(AttackOrchestrator, "_execute_local_attack", return_value=["result"])
     def test_execute_updates_run_status_to_running(
-        self, mock_exec, mock_create_atk, mock_create_run
+        self, mock_exec, mock_validate_models, mock_create_atk, mock_create_run
     ):
         """Test that execute updates run to RUNNING status."""
         orch, hack_agent, _ = _make_orchestrator()
@@ -79,9 +93,14 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
     @patch.object(
         AttackOrchestrator, "_create_server_attack_record", return_value=_VALID_ATK_ID
     )
+    @patch.object(
+        AttackOrchestrator,
+        "_validate_required_models_availability",
+        return_value=None,
+    )
     @patch.object(AttackOrchestrator, "_execute_local_attack", return_value=["result"])
     def test_execute_updates_run_status_to_completed(
-        self, mock_exec, mock_create_atk, mock_create_run
+        self, mock_exec, mock_validate_models, mock_create_atk, mock_create_run
     ):
         """Test that execute updates run to COMPLETED on success."""
         orch, hack_agent, _ = _make_orchestrator()
@@ -110,10 +129,15 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
         AttackOrchestrator, "_create_server_attack_record", return_value=_VALID_ATK_ID
     )
     @patch.object(
+        AttackOrchestrator,
+        "_validate_required_models_availability",
+        return_value=None,
+    )
+    @patch.object(
         AttackOrchestrator, "_execute_local_attack", side_effect=RuntimeError("Boom")
     )
     def test_execute_updates_run_status_to_failed_on_error(
-        self, mock_exec, mock_create_atk, mock_create_run
+        self, mock_exec, mock_validate_models, mock_create_atk, mock_create_run
     ):
         """Test that execute updates run to FAILED on exception."""
         orch, hack_agent, _ = _make_orchestrator()
@@ -142,9 +166,14 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
     @patch.object(
         AttackOrchestrator, "_create_server_attack_record", return_value=_VALID_ATK_ID
     )
+    @patch.object(
+        AttackOrchestrator,
+        "_validate_required_models_availability",
+        return_value=None,
+    )
     @patch.object(AttackOrchestrator, "_execute_local_attack", return_value=["result"])
     def test_execute_continues_when_status_update_fails(
-        self, mock_exec, mock_create_atk, mock_create_run
+        self, mock_exec, mock_validate_models, mock_create_atk, mock_create_run
     ):
         """Test that execute continues even if status update fails."""
         orch, hack_agent, _ = _make_orchestrator()
@@ -295,9 +324,10 @@ class TestRequiredModelAvailabilityPreflight(unittest.TestCase):
         )
 
     def test_collect_targets_uses_normalized_attack_type_for_autodan_roles(self):
-        """AutoDAN preflight must include attacker/scorer/summarizer/embedder roles."""
+        """AutoDAN attack-owned roles include optional embedder and required core roles."""
         orch, _, _ = _make_orchestrator()
         orch.attack_type = "AutoDANTurbo"
+        orch.attack_impl_class = AutoDANTurboAttack
         orch.hackagent_agent.router = None
 
         attack_config = {
@@ -329,11 +359,166 @@ class TestRequiredModelAvailabilityPreflight(unittest.TestCase):
             goal_labels_by_index={0: {"category": "c", "subcategory": "s"}},
         )
 
-        roles = {item["role"] for item in targets}
-        self.assertIn("attacker", roles)
-        self.assertIn("scorer", roles)
-        self.assertIn("summarizer", roles)
-        self.assertIn("embedder", roles)
+        required_by_role = {}
+        for item in targets:
+            for role in item.get("roles", [item.get("role")]):
+                required_by_role[role] = item.get("required", True)
+
+        self.assertIn("attacker", required_by_role)
+        self.assertIn("scorer", required_by_role)
+        self.assertIn("summarizer", required_by_role)
+        self.assertIn("embedder", required_by_role)
+        self.assertTrue(required_by_role["attacker"])
+        self.assertTrue(required_by_role["scorer"])
+        self.assertTrue(required_by_role["summarizer"])
+        self.assertFalse(required_by_role["embedder"])
+
+    def test_collect_targets_deduplicates_tap_judge_and_on_topic_when_shared(self):
+        """TAP judge and fallback on_topic_judge should collapse into one probe target."""
+        orch, _, _ = _make_orchestrator()
+        orch.attack_type = "tap"
+        orch.attack_impl_class = TAPAttack
+        orch.hackagent_agent.router = None
+
+        attack_config = {
+            "attack_type": "tap",
+            "attacker": {
+                "identifier": "att-model",
+                "endpoint": "http://localhost:1111",
+                "agent_type": "OPENAI_SDK",
+            },
+            "judge": {
+                "identifier": "judge-model",
+                "endpoint": "http://localhost:2222",
+                "agent_type": "OPENAI_SDK",
+            },
+            "on_topic_judge": None,
+        }
+
+        targets = orch._collect_model_preflight_targets(attack_config)
+        judge_targets = [
+            t for t in targets if str(t.get("identifier")) == "judge-model"
+        ]
+
+        self.assertEqual(len(judge_targets), 1)
+        self.assertIn("judge", judge_targets[0].get("roles", []))
+        self.assertIn("on_topic_judge", judge_targets[0].get("roles", []))
+
+    def test_collect_targets_keeps_classifier_when_intents_are_not_used(self):
+        """Category classifier remains preflighted unless explicit goal labels are provided."""
+        orch, _, _ = _make_orchestrator()
+        orch.attack_type = "baseline"
+        orch.attack_impl_class = BaselineAttack
+        orch.hackagent_agent.router = None
+
+        attack_config = {
+            "attack_type": "baseline",
+            "evaluator_type": "pattern",
+            "category_classifier": {
+                "identifier": "cc-model",
+                "endpoint": "http://localhost:9999",
+                "agent_type": "OPENAI_SDK",
+            },
+        }
+
+        targets = orch._collect_model_preflight_targets(
+            attack_config,
+            goal_labels_by_index=None,
+        )
+        classifier_targets = [
+            t for t in targets if "category_classifier" in t.get("roles", [])
+        ]
+        self.assertEqual(len(classifier_targets), 1)
+
+    def test_collect_targets_uses_default_classifier_when_not_specified(self):
+        """When classifier is omitted and intents are not used, default classifier is preflighted."""
+        orch, _, _ = _make_orchestrator()
+        orch.attack_type = "baseline"
+        orch.attack_impl_class = BaselineAttack
+        orch.hackagent_agent.router = None
+
+        attack_config = {
+            "attack_type": "baseline",
+            "evaluator_type": "pattern",
+        }
+
+        targets = orch._collect_model_preflight_targets(
+            attack_config,
+            goal_labels_by_index=None,
+        )
+        classifier_targets = [
+            t for t in targets if "category_classifier" in t.get("roles", [])
+        ]
+
+        self.assertEqual(len(classifier_targets), 1)
+        self.assertEqual(
+            classifier_targets[0].get("identifier"),
+            DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
+        )
+        self.assertEqual(
+            classifier_targets[0].get("endpoint"),
+            DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT,
+        )
+        self.assertEqual(
+            classifier_targets[0].get("agent_type"),
+            DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE,
+        )
+
+    def test_collect_targets_h4rm3l_requires_decorator_llm_for_llm_program(self):
+        """h4rm3l must preflight decorator_llm when program uses LLM-assisted decorators."""
+        orch, _, _ = _make_orchestrator()
+        orch.attack_type = "h4rm3l"
+        orch.attack_impl_class = H4rm3lAttack
+        orch.hackagent_agent.router = None
+
+        attack_config = {
+            "attack_type": "h4rm3l",
+            "h4rm3l_params": {"program": "translate_zulu", "syntax_version": 2},
+            "decorator_llm": {
+                "identifier": "decorator-model",
+                "endpoint": "http://localhost:8888",
+                "agent_type": "OPENAI_SDK",
+            },
+            "judges": [
+                {
+                    "identifier": "judge-model",
+                    "endpoint": "http://localhost:2222",
+                    "agent_type": "OPENAI_SDK",
+                }
+            ],
+        }
+
+        targets = orch._collect_model_preflight_targets(attack_config)
+        roles = {role for item in targets for role in item.get("roles", [])}
+        self.assertIn("decorator_llm", roles)
+
+    def test_collect_targets_h4rm3l_skips_decorator_llm_for_non_llm_program(self):
+        """h4rm3l should not preflight decorator_llm for non-LLM decorator chains."""
+        orch, _, _ = _make_orchestrator()
+        orch.attack_type = "h4rm3l"
+        orch.attack_impl_class = H4rm3lAttack
+        orch.hackagent_agent.router = None
+
+        attack_config = {
+            "attack_type": "h4rm3l",
+            "h4rm3l_params": {"program": "identity", "syntax_version": 2},
+            "decorator_llm": {
+                "identifier": "decorator-model",
+                "endpoint": "http://localhost:8888",
+                "agent_type": "OPENAI_SDK",
+            },
+            "judges": [
+                {
+                    "identifier": "judge-model",
+                    "endpoint": "http://localhost:2222",
+                    "agent_type": "OPENAI_SDK",
+                }
+            ],
+        }
+
+        targets = orch._collect_model_preflight_targets(attack_config)
+        roles = {role for item in targets for role in item.get("roles", [])}
+        self.assertNotIn("decorator_llm", roles)
 
     def test_validate_required_models_availability_reports_model_and_endpoint(self):
         """Error should include role, identifier, and endpoint for unavailable models."""
@@ -417,6 +602,80 @@ class TestRequiredModelAvailabilityPreflight(unittest.TestCase):
         self.assertIn("\n- role=judge", message)
         self.assertIn("identifier=google/gemma-3-27b-it", message)
         self.assertIn("identifier=mistralai/mistral-small-3.1", message)
+
+    def test_validate_required_models_availability_skips_optional_roles_by_default(
+        self,
+    ):
+        """Optional roles should not be probed unless explicitly enabled."""
+        orch, _, _ = _make_orchestrator()
+
+        with patch.object(
+            AttackOrchestrator,
+            "_collect_model_preflight_targets",
+            return_value=[
+                {
+                    "role": "embedder",
+                    "roles": ["embedder"],
+                    "identifier": "optional-embedder",
+                    "endpoint": "http://localhost:9999",
+                    "agent_type": "OPENAI_SDK",
+                    "kind": "router_config",
+                    "required": False,
+                    "config": {
+                        "identifier": "optional-embedder",
+                        "endpoint": "http://localhost:9999",
+                        "agent_type": "OPENAI_SDK",
+                    },
+                }
+            ],
+        ):
+            with patch.object(AttackOrchestrator, "_probe_model_target") as mock_probe:
+                message = orch._validate_required_models_availability(
+                    attack_config={"goals": ["test"]}
+                )
+
+        self.assertIsNone(message)
+        mock_probe.assert_not_called()
+
+    def test_validate_required_models_availability_probes_optional_when_enabled(self):
+        """Optional roles are probed when _preflight_probe_optional_roles is set."""
+        orch, _, _ = _make_orchestrator()
+
+        with patch.object(
+            AttackOrchestrator,
+            "_collect_model_preflight_targets",
+            return_value=[
+                {
+                    "role": "embedder",
+                    "roles": ["embedder"],
+                    "identifier": "optional-embedder",
+                    "endpoint": "http://localhost:9999",
+                    "agent_type": "OPENAI_SDK",
+                    "kind": "router_config",
+                    "required": False,
+                    "config": {
+                        "identifier": "optional-embedder",
+                        "endpoint": "http://localhost:9999",
+                        "agent_type": "OPENAI_SDK",
+                    },
+                }
+            ],
+        ):
+            with patch.object(
+                AttackOrchestrator,
+                "_probe_model_target",
+                return_value="optional role unavailable",
+            ) as mock_probe:
+                message = orch._validate_required_models_availability(
+                    attack_config={
+                        "goals": ["test"],
+                        "_preflight_probe_optional_roles": True,
+                    }
+                )
+
+        self.assertIsInstance(message, str)
+        self.assertIn("optional role unavailable", message)
+        mock_probe.assert_called_once()
 
     def test_execute_aborts_before_db_records_when_model_unavailable(self):
         """Run must not start when preflight detects an unavailable model."""

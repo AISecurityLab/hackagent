@@ -106,6 +106,36 @@ class AutoDANTurboAttack(BaseAttack):
         if not self.config.get("attacker", {}).get("identifier"):
             raise ValueError("attacker.identifier required")
 
+    @classmethod
+    def get_effective_model_roles(
+        cls,
+        attack_config: Dict[str, Any],
+        *,
+        goal_labels_by_index: Dict[int, Dict[str, str]] | None = None,
+    ) -> List[Dict[str, Any]]:
+        """Resolve AutoDAN-Turbo preflight roles with optional embedder semantics."""
+        _ = goal_labels_by_index
+
+        roles: List[Dict[str, Any]] = []
+        for role_name in ("attacker", "scorer", "summarizer"):
+            role_config = attack_config.get(role_name)
+            if isinstance(role_config, dict):
+                roles.append({"role": role_name, "config": role_config})
+
+        embedder = attack_config.get("embedder")
+        if isinstance(embedder, dict):
+            roles.append(
+                {
+                    "role": "embedder",
+                    "config": embedder,
+                    "required": bool(
+                        attack_config.get("_preflight_require_embedder", False)
+                    ),
+                }
+            )
+
+        return roles
+
     def _get_pipeline_steps(self):
         """Disable BaseAttack static pipeline; orchestration is manual in ``run``.
 

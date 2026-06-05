@@ -42,6 +42,7 @@ import httpx
 from hackagent.errors import HackAgentError
 from hackagent.attacks.techniques.config import (
     DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE,
+    DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT,
     DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
 )
 from hackagent.server.storage.enums import StatusEnum
@@ -435,9 +436,10 @@ class AttackOrchestrator:
         self, target: Dict[str, Any]
     ) -> Optional[str]:
         """Probe one model target while streaming a single-line progress status."""
-        role = str(target.get("role") or "unknown")
+        role = self._format_target_roles(target)
         identifier = str(target.get("identifier") or "unknown")
-        prefix = f"Checking {role} ({identifier})"
+        optional_suffix = " [optional]" if not target.get("required", True) else ""
+        prefix = f"Checking {role} ({identifier}){optional_suffix}"
         display_stream = getattr(sys, "stdout", None)
         if display_stream is None:
             display_stream = sys.__stdout__
@@ -573,6 +575,27 @@ class AttackOrchestrator:
             "kind": "router_config",
         }
 
+    @staticmethod
+    def _format_target_roles(target: Dict[str, Any]) -> str:
+        """Format logical role labels for user-facing progress/error messages."""
+        roles = target.get("roles")
+        if isinstance(roles, list):
+            normalized = [str(role) for role in roles if role]
+            if normalized:
+                return ",".join(normalized)
+
+        role = target.get("role")
+        return str(role or "unknown")
+
+    @staticmethod
+    def _preflight_target_key(target: Dict[str, Any]) -> Tuple[str, str, str]:
+        """Build deduplication key for effective model endpoint checks."""
+        return (
+            str(target.get("identifier") or ""),
+            str(target.get("endpoint") or ""),
+            str(target.get("agent_type") or ""),
+        )
+
     def _collect_model_preflight_targets(
         self,
         attack_config: Dict[str, Any],
@@ -581,6 +604,52 @@ class AttackOrchestrator:
     ) -> List[Dict[str, Any]]:
         """Collect model endpoints that must be reachable before run start."""
         targets: List[Dict[str, Any]] = []
+        targets_by_key: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
+
+        def _register_target(
+            target: Dict[str, Any],
+            *,
+            role_name: Optional[str] = None,
+            required: bool = True,
+        ) -> None:
+            key = self._preflight_target_key(target)
+            if not any(key):
+                return
+
+            roles = target.get("roles")
+            if isinstance(roles, list) and roles:
+                normalized_roles = [str(role) for role in roles if role]
+            else:
+                normalized_roles = [str(role_name or target.get("role") or "unknown")]
+
+            existing = targets_by_key.get(key)
+            if existing is None:
+                normalized_target = dict(target)
+                normalized_target["roles"] = []
+                for role in normalized_roles:
+                    if role not in normalized_target["roles"]:
+                        normalized_target["roles"].append(role)
+                normalized_target["role"] = normalized_target["roles"][0]
+                normalized_target["required"] = bool(required)
+                targets.append(normalized_target)
+                targets_by_key[key] = normalized_target
+                return
+
+            for role in normalized_roles:
+                if role not in existing["roles"]:
+                    existing["roles"].append(role)
+            existing["role"] = existing["roles"][0]
+            existing["required"] = bool(existing.get("required", True) or required)
+
+            # Prefer probing already-built router registrations when available.
+            if (
+                existing.get("kind") == "router_config"
+                and target.get("kind") == "existing_router"
+            ):
+                existing["kind"] = "existing_router"
+                existing["router"] = target.get("router")
+                existing["registration_key"] = target.get("registration_key")
+                existing.pop("config", None)
 
         router_obj = getattr(self.hackagent_agent, "router", None)
         backend_agent = (
@@ -608,7 +677,7 @@ class AttackOrchestrator:
             )
             agent_type = getattr(backend_agent, "agent_type", "")
 
-            targets.append(
+            _register_target(
                 {
                     "role": "target",
                     "identifier": str(model_name),
@@ -617,62 +686,82 @@ class AttackOrchestrator:
                     "kind": "existing_router",
                     "router": router_obj,
                     "registration_key": registration_key,
-                }
+                },
+                role_name="target",
+                required=True,
             )
 
-        raw_attack_type = attack_config.get("attack_type") or self.attack_type
-        attack_type = self._normalize_attack_type_for_preflight(raw_attack_type)
-        role_specs = self._ATTACK_MODEL_ROLE_PATHS.get(attack_type)
-        if not role_specs:
-            return targets
+        attack_owned_roles: Optional[List[Dict[str, Any]]] = None
+        attack_impl = getattr(self, "attack_impl_class", None)
+        if attack_impl and hasattr(attack_impl, "get_effective_model_roles"):
+            try:
+                attack_owned_roles = attack_impl.get_effective_model_roles(
+                    attack_config,
+                    goal_labels_by_index=goal_labels_by_index,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Attack-owned preflight role resolution failed for %s: %s",
+                    getattr(attack_impl, "__name__", "unknown"),
+                    exc,
+                )
+                attack_owned_roles = None
 
-        seen = {
-            (
-                str(item.get("role", "")),
-                str(item.get("identifier", "")),
-                str(item.get("endpoint", "")),
-                str(item.get("agent_type", "")),
-            )
-            for item in targets
-        }
+        if attack_owned_roles is not None:
+            for role_item in attack_owned_roles:
+                if not isinstance(role_item, dict):
+                    continue
 
-        for role, path, is_list in role_specs:
-            value = self._get_nested_config_value(attack_config, path)
-            if value is None:
-                continue
+                role = str(role_item.get("role") or "").strip()
+                role_config = role_item.get("config")
+                required = bool(role_item.get("required", True))
+                if not role:
+                    continue
 
-            items = value if (is_list and isinstance(value, list)) else [value]
-            for item in items:
-                normalized = self._normalize_model_role_config(role, item)
+                normalized = self._normalize_model_role_config(role, role_config)
                 if not normalized:
                     continue
-                key = (
-                    normalized["role"],
-                    normalized["identifier"],
-                    normalized["endpoint"],
-                    normalized["agent_type"],
-                )
-                if key in seen:
-                    continue
-                seen.add(key)
-                targets.append(normalized)
+
+                _register_target(normalized, role_name=role, required=required)
+        else:
+            raw_attack_type = attack_config.get("attack_type") or self.attack_type
+            attack_type = self._normalize_attack_type_for_preflight(raw_attack_type)
+            role_specs = self._ATTACK_MODEL_ROLE_PATHS.get(attack_type)
+
+            if role_specs:
+                for role, path, is_list in role_specs:
+                    value = self._get_nested_config_value(attack_config, path)
+                    if value is None:
+                        continue
+
+                    items = value if (is_list and isinstance(value, list)) else [value]
+                    for item in items:
+                        normalized = self._normalize_model_role_config(role, item)
+                        if not normalized:
+                            continue
+                        _register_target(normalized, role_name=role, required=True)
 
         # Category classifier is part of goal tracking unless explicit labels
         # are provided via intents (which disable per-goal classification).
         if not goal_labels_by_index:
-            category_cfg = attack_config.get("category_classifier")
+            if self._uses_default_category_classifier(attack_config):
+                category_cfg = {
+                    "identifier": DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
+                    "endpoint": DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT,
+                    "agent_type": DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE,
+                }
+            else:
+                category_cfg = attack_config.get("category_classifier")
+
             normalized = self._normalize_model_role_config(
                 "category_classifier", category_cfg
             )
             if normalized:
-                key = (
-                    normalized["role"],
-                    normalized["identifier"],
-                    normalized["endpoint"],
-                    normalized["agent_type"],
+                _register_target(
+                    normalized,
+                    role_name="category_classifier",
+                    required=True,
                 )
-                if key not in seen:
-                    targets.append(normalized)
 
         return targets
 
@@ -747,15 +836,22 @@ class AttackOrchestrator:
         if not targets:
             return None
 
+        probe_optional_roles = bool(
+            attack_config.get("_preflight_probe_optional_roles", False)
+        )
+
         unavailable: List[Dict[str, str]] = []
         for target in targets:
+            if not target.get("required", True) and not probe_optional_roles:
+                continue
+
             error = self._probe_model_target_with_progress(target)
             if not error:
                 continue
 
             unavailable.append(
                 {
-                    "role": str(target.get("role") or "unknown"),
+                    "role": self._format_target_roles(target),
                     "identifier": str(target.get("identifier") or "unknown"),
                     "endpoint": str(target.get("endpoint") or "<provider default>"),
                     "agent_type": str(target.get("agent_type") or "unknown"),

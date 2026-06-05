@@ -23,6 +23,7 @@ from .decorators import (
     compile_program_with_steps,
     has_prompting_interface,
     is_llm_assisted_decorator_name,
+    program_uses_llm_assisted_decorators,
     set_prompting_interface,
 )
 
@@ -145,18 +146,10 @@ def execute(
         logger.info(f"Using custom program: {resolved_program[:80]}...")
 
     # Set up LLM-assisted decorators if needed
-    llm_keywords = [
-        "TranslateDecorator",
-        "PAPDecorator",
-        "PersonaDecorator",
-        "PersuasiveDecorator",
-        "SynonymDecorator",
-        "ResearcherDecorator",
-        "VillainDecorator",
-        "VisualObfuscationDecorator",
-        "TransformFxDecorator",
-    ]
-    needs_llm = any(kw in resolved_program for kw in llm_keywords)
+    needs_llm = program_uses_llm_assisted_decorators(
+        resolved_program,
+        syntax_version,
+    )
     decoration_llm_identifier = None
     decoration_llm_endpoint = None
 
