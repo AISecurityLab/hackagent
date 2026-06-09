@@ -276,7 +276,7 @@ class AttackOrchestrator:
                 "endpoint": _LOCAL_ROLE_ENDPOINT,
                 "agent_type": _LOCAL_ROLE_AGENT_TYPE,
                 # Keep evaluator compatibility when defaults are auto-injected.
-                "type": "harmbench_variant",
+                "type": "harmbench",
                 "api_key": None,
             },
         }
