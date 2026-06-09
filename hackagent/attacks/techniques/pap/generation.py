@@ -20,15 +20,16 @@ Based on: https://arxiv.org/abs/2401.06373
 
 import logging
 import time
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from hackagent.attacks.evaluator.judge_evaluators import EVALUATOR_MAP
+from hackagent.attacks.evaluator.inline_step_judge import (
+    InlineStepJudge,
+    build_inline_judge_base_config,
+)
 from hackagent.attacks.shared.response_utils import (
     get_guardrail_info,
     is_guardrail_response,
 )
-from hackagent.attacks.shared.router_factory import extract_passthrough_request_config
-from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
 from hackagent.attacks.techniques.config import DEFAULT_MAX_OUTPUT_TOKENS
 from hackagent.router.router import AgentRouter
 
@@ -41,131 +42,8 @@ if TYPE_CHECKING:
     from hackagent.router.tracking.tracker import Context
 
 
-# ---------------------------------------------------------------------------
-# Inline judge helper (same pattern as BoN)
-# ---------------------------------------------------------------------------
-
-
-class _StepJudge:
-    """Lightweight wrapper to call judges on a single candidate."""
-
-    JUDGE_COLUMN_MAP = {
-        "nuanced": ["eval_nj", "explanation_nj"],
-        "jailbreakbench": ["eval_jb", "explanation_jb"],
-        "harmbench": ["eval_hb", "explanation_hb"],
-        "harmbench_variant": ["eval_hbv", "explanation_hbv"],
-        "on_topic": ["eval_on_topic", "explanation_on_topic"],
-    }
-
-    def __init__(
-        self,
-        judges_config: List[Dict[str, Any]],
-        base_eval_config: Dict[str, Any],
-        client: "AuthenticatedClient",
-        logger: logging.Logger,
-        run_id: Optional[str] = None,
-        tracker: Optional["Tracker"] = None,
-    ):
-        self._judges: List[Tuple[str, Any]] = []
-        self.logger = logger
-
-        for jcfg in judges_config:
-            judge_type = jcfg.get("evaluator_type") or jcfg.get("type")
-            identifier = jcfg.get("identifier")
-            if not judge_type or judge_type not in EVALUATOR_MAP:
-                continue
-            if not identifier:
-                continue
-
-            evaluator_class = EVALUATOR_MAP[judge_type]
-            sub_cfg: Dict[str, Any] = {**base_eval_config, **jcfg}
-            sub_cfg["model_id"] = identifier
-            sub_cfg["agent_name"] = jcfg.get(
-                "agent_name",
-                f"judge-{judge_type}-{identifier.replace('/', '-')[:20]}",
-            )
-            sub_cfg["agent_type"] = jcfg.get("agent_type", "OPENAI_SDK")
-            sub_cfg["agent_endpoint"] = jcfg.get("endpoint")
-            sub_cfg["agent_metadata"] = dict(jcfg.get("agent_metadata", {}) or {})
-            sub_cfg["agent_metadata"].update(extract_passthrough_request_config(jcfg))
-
-            api_key = jcfg.get("api_key") or jcfg.get("api_key_env")
-            if api_key:
-                sub_cfg["agent_metadata"]["api_key"] = api_key
-
-            expected_fields = set(EvaluatorConfig.model_fields.keys())
-            filtered = {k: v for k, v in sub_cfg.items() if k in expected_fields}
-
-            try:
-                ev_config = EvaluatorConfig(**filtered)
-                evaluator = evaluator_class(
-                    client=client,
-                    config=ev_config,
-                    run_id=run_id,
-                    tracking_client=None,
-                    tracker=None,
-                )
-                self._judges.append((judge_type, evaluator))
-            except Exception as exc:
-                logger.warning(f"Could not initialise judge '{judge_type}': {exc}")
-
-        if not self._judges:
-            logger.warning("No valid judges initialised for inline evaluation")
-
-    @property
-    def available(self) -> bool:
-        return bool(self._judges)
-
-    def is_jailbreak(
-        self,
-        goal: str,
-        persuasive_prompt: str,
-        response: str,
-    ) -> Tuple[bool, float, Dict[str, Any]]:
-        """Evaluate a single candidate with all judges.
-
-        Returns:
-            ``(is_success, best_score, judge_columns)``
-        """
-        row = {
-            "goal": goal,
-            "prefix": persuasive_prompt,
-            "completion": response,
-        }
-
-        judge_cols: Dict[str, Any] = {}
-        best_score = 0.0
-        _total_by_type: Dict[str, int] = {}
-        _seen_by_type: Dict[str, int] = {}
-
-        for _jt, _ev in self._judges:
-            _total_by_type[_jt] = _total_by_type.get(_jt, 0) + 1
-
-        for judge_type, evaluator in self._judges:
-            try:
-                evaluated = evaluator.evaluate([row.copy()])
-                if evaluated:
-                    ev_row = evaluated[0]
-                    _seen_by_type[judge_type] = _seen_by_type.get(judge_type, 0) + 1
-                    _idx = _seen_by_type[judge_type]
-                    _use_suffix = _total_by_type.get(judge_type, 0) > 1
-                    judge_cols_for_type = self.JUDGE_COLUMN_MAP.get(judge_type, [])
-                    for col in judge_cols_for_type:
-                        if col in ev_row:
-                            out_col = f"{col}_{_idx}" if _use_suffix else col
-                            judge_cols[out_col] = ev_row[col]
-                    if judge_cols_for_type:
-                        eval_col = judge_cols_for_type[0]
-                        val = ev_row.get(eval_col)
-                        if val is not None:
-                            try:
-                                best_score = max(best_score, float(val))
-                            except (TypeError, ValueError):
-                                pass
-            except Exception as exc:
-                self.logger.warning(f"Judge '{judge_type}' failed on candidate: {exc}")
-
-        return best_score > 0, best_score, judge_cols
+# Re-export alias keeps local type hints/readability in this module.
+_StepJudge = InlineStepJudge
 
 
 # ---------------------------------------------------------------------------
@@ -287,25 +165,16 @@ def execute(
     step_judge: Optional[_StepJudge] = None
     judges_config = config.get("judges")
     if isinstance(judges_config, list) and judges_config and client is not None:
-        base_eval_cfg: Dict[str, Any] = {
-            "batch_size": config.get("batch_size_judge", 1),
-            "max_tokens_eval": config.get("max_tokens_eval", 256),
-            "filter_len": config.get("filter_len", 10),
-            "timeout": config.get("judge_timeout", 120),
-            "temperature": config.get("judge_temperature", 0.0),
-            "max_judge_retries": config.get("max_judge_retries", 1),
-            "organization_id": config.get("organization_id"),
-        }
+        base_eval_cfg = build_inline_judge_base_config(config)
         step_judge = _StepJudge(
             judges_config=judges_config,
             base_eval_config=base_eval_cfg,
             client=client,
             logger=logger,
             run_id=config.get("_run_id"),
-            tracker=tracker,
         )
         if step_judge.available:
-            logger.info(f"⚖️  Inline judge enabled ({len(step_judge._judges)} judge(s))")
+            logger.info(f"⚖️  Inline judge enabled ({step_judge.judge_count} judge(s))")
         else:
             step_judge = None
             logger.warning("No valid judges — no inline jailbreak detection")
@@ -506,7 +375,7 @@ def _attack_single_goal(
             logger.info(f"[{_label}] ⚖️  Evaluating with judge...")
             is_jailbreak, judge_score, judge_cols = step_judge.is_jailbreak(
                 goal=goal,
-                persuasive_prompt=persuasive_prompt,
+                prompt_prefix=persuasive_prompt,
                 response=response_text,
             )
             logger.info(

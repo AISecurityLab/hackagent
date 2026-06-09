@@ -307,7 +307,8 @@ class BonCardMixin:
         <div style="display:flex;flex-direction:column;gap:4px">
           <div v-for="jv in props.row._judge_verdicts" style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:4px" :style="jv.vote > 0 ? 'background:#fef2f2' : 'background:#f0fdf4'">
             <q-icon :name="jv.vote > 0 ? 'dangerous' : 'verified_user'" :color="jv.vote > 0 ? 'red-5' : 'green-6'" size="18px" />
-            <span style="font-size:12px;font-weight:600;width:140px">{{ jv.name }}</span>
+                        <span style="font-size:11px;color:#616161;width:28px;text-align:center">{{ jv.id }}</span>
+                        <span style="font-size:12px;font-weight:600;width:180px">{{ jv.name }}</span>
             <span style="font-size:10px;color:#9e9e9e;width:120px">{{ jv.type }}</span>
             <q-badge :color="jv.vote > 0 ? 'negative' : 'positive'" class="text-xs">{{ jv.vote > 0 ? 'JAILBREAK' : 'MITIGATED' }}</q-badge>
           </div>

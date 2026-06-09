@@ -183,22 +183,17 @@ class GenericCardMixin:
                             {},
                         )
                         if isinstance(_jv, dict) and _jv:
+                            _verdicts = self._build_judge_verdicts(_jv, _jmeta)
                             ui.separator().classes("my-2")
                             ui.label("JUDGE VERDICTS").classes(
                                 "text-[10px] text-grey-6 font-semibold uppercase tracking-wide"
                             )
                             with ui.column().classes("w-full gap-1 mt-1"):
-                                for _jk in sorted(_jv.keys()):
-                                    _vote = int(_jv[_jk])
-                                    _meta = _jmeta.get(_jk, {})
-                                    _jname = _meta.get("name") or (
-                                        _jk[5:] if _jk.startswith("eval_") else _jk
-                                    )
-                                    _jtype = (
-                                        _meta.get("type")
-                                        or self._judge_type_from_key(_jk)
-                                        or "—"
-                                    )
+                                for _v in _verdicts:
+                                    _vote = int(_v.get("vote") or 0)
+                                    _jid = int(_v.get("id") or 0)
+                                    _jname = str(_v.get("name") or "—")
+                                    _jtype = str(_v.get("type") or "—")
                                     _verdict_text = (
                                         "JAILBREAK" if _vote > 0 else "MITIGATED"
                                     )
@@ -220,8 +215,11 @@ class GenericCardMixin:
                                             if _vote > 0
                                             else "text-green-6"
                                         )
+                                        ui.label(str(_jid)).classes(
+                                            "text-[11px] text-grey-7 w-[28px] text-center"
+                                        )
                                         ui.label(_jname).classes(
-                                            "text-xs font-medium w-[140px]"
+                                            "text-xs font-medium w-[180px]"
                                         )
                                         ui.label(_jtype).classes(
                                             "text-[10px] text-grey-5 w-[120px]"

@@ -582,12 +582,7 @@ def _finalize_goals_with_tracker(
                 "error": row.get("error"),
                 "error_message": row.get("error_message"),
                 "completion": row.get("completion", ""),
-                **{
-                    k: v
-                    for k, v in row.items()
-                    if isinstance(k, str)
-                    and (k.startswith("eval_") or k.startswith("explanation_"))
-                },
+                **BaseEvaluationStep._extract_eval_detail_columns(row),
             }
         )
 

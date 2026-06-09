@@ -48,7 +48,7 @@ from .attack_cards import (
 )
 
 _VIEW_LABELS = {
-    "dashboard": "Dashboard",
+    "dashboard": "Home",
     "agents": "Targets",
     "runs": "History",
 }
@@ -292,7 +292,7 @@ function hackAgentCopyFallback(text) {
             ui.separator().classes("mb-1")
 
             nav_items = [
-                ("dashboard", "Dashboard", "dashboard"),
+                ("dashboard", "Home", "dashboard"),
                 ("agents", "Targets", "smart_toy"),
                 ("runs", "History", "assignment"),
             ]
@@ -332,7 +332,7 @@ function hackAgentCopyFallback(text) {
                 ui.button(icon="menu", on_click=sidebar.toggle).props(
                     "flat round dense color=white"
                 )
-                self.page_title = ui.label("Dashboard").classes(
+                self.page_title = ui.label("Home").classes(
                     "text-white font-semibold text-lg"
                 )
             with ui.row().classes("items-center gap-1"):
@@ -822,10 +822,12 @@ function hackAgentCopyFallback(text) {
                 )
 
             # ── Bottom panel for run details (hidden by default) ───────
+            # Built here but reparented to the active view on open so it can be
+            # shown both from History and from the Home "Recent Runs" panel.
             self._runs_bottom_panel = (
                 ui.card()
                 .classes("w-full shrink-0 gap-0 hidden")
-                .style("height: 70%; min-height: 300px;")
+                .style("height: 70vh; min-height: 300px;")
             )
 
             # ── Bottom panel for compare (hidden by default) ──────────
@@ -1153,10 +1155,22 @@ function hackAgentCopyFallback(text) {
         self._report_current_run_results = []
 
     def _open_runs_bottom_panel(self) -> None:
-        """Show the inline bottom panel for run details."""
+        """Show the inline bottom panel for run details.
+
+        The panel is reparented to the currently active view so the run detail
+        opens in place — both from the History view and from the Home
+        "Recent Runs" panel — without navigating away.
+        """
         if self._compare_bottom_panel is not None:
             self._compare_bottom_panel.classes(add="hidden")
         if self._runs_bottom_panel is not None:
+            target_view = self.current_view.get("value", "dashboard")
+            target_panel = self.all_panels.get(target_view) or self.all_panels.get(
+                "runs"
+            )
+            if target_panel is not None:
+                with contextlib.suppress(Exception):
+                    self._runs_bottom_panel.move(target_panel)
             self._runs_bottom_panel.classes(remove="hidden")
 
     def _close_runs_bottom_panel(self) -> None:
@@ -1908,7 +1922,7 @@ function hackAgentCopyFallback(text) {
         self.current_view["value"] = view
         for v, panel in self.all_panels.items():
             panel.set_visibility(v == view)
-        self.page_title.text = _VIEW_LABELS.get(view, "Dashboard")
+        self.page_title.text = _VIEW_LABELS.get(view, "Home")
         self._highlight_nav(view)
         if schedule_refresh:
             asyncio.create_task(self.refresh_view())
@@ -6439,6 +6453,59 @@ function hackAgentCopyFallback(text) {
                 run_judge_count > 1 if run_judge_count > 0 else summary_is_multi
             )
 
+            # Build judge metadata once per run so right-side detail cards can
+            # render the same ID/name/type shown in multi-judge tables.
+            run_judge_meta: dict[str, dict[str, Any]] = {}
+            _run_atk_id = str(run.get("attack_id") or run.get("attack") or "")
+            _run_atk_cfg = {}
+            if _run_atk_id:
+                _run_atk_cfg = self._attack_config_map_for_ids({_run_atk_id}).get(
+                    _run_atk_id, {}
+                )
+            _run_judges_cfg = (
+                _run_atk_cfg.get("judges") or []
+                if isinstance(_run_atk_cfg, dict)
+                else []
+            )
+            if isinstance(_run_judges_cfg, list):
+                _run_type_counts: dict[str, int] = {}
+                for _run_jcfg in _run_judges_cfg:
+                    if not isinstance(_run_jcfg, dict):
+                        continue
+                    _run_jtype = str(_run_jcfg.get("type") or "unknown")
+                    _run_type_counts[_run_jtype] = (
+                        _run_type_counts.get(_run_jtype, 0) + 1
+                    )
+
+                _run_type_idx: dict[str, int] = {}
+                _run_type_abbr_map = {
+                    "harmbench": "hb",
+                    "harmbench_variant": "hbv",
+                    "jailbreakbench": "jb",
+                    "nuanced": "nj",
+                    "on_topic": "on_topic",
+                }
+                for _run_judge_idx, _run_jcfg in enumerate(_run_judges_cfg):
+                    if not isinstance(_run_jcfg, dict):
+                        continue
+                    _run_jtype = str(_run_jcfg.get("type") or "unknown")
+                    _run_jname = str(
+                        _run_jcfg.get("identifier")
+                        or _run_jcfg.get("agent_name")
+                        or _run_jtype
+                    )
+                    _run_abbr = _run_type_abbr_map.get(_run_jtype, _run_jtype)
+                    _run_type_idx[_run_jtype] = _run_type_idx.get(_run_jtype, 0) + 1
+                    if _run_type_counts.get(_run_jtype, 0) > 1:
+                        _run_eval_key = f"eval_{_run_abbr}_{_run_type_idx[_run_jtype]}"
+                    else:
+                        _run_eval_key = f"eval_{_run_abbr}"
+                    run_judge_meta[_run_eval_key] = {
+                        "id": _run_judge_idx,
+                        "name": _run_jname,
+                        "type": _run_jtype.replace("_", " ").title(),
+                    }
+
             new_rows = []
             for idx, r in enumerate(sorted_items, start=1):
                 d = _serialize(r)
@@ -6484,6 +6551,8 @@ function hackAgentCopyFallback(text) {
                                         "majority_vote_asr": _javg,
                                     }
                     if goal_multi_metrics:
+                        if run_judge_meta:
+                            goal_multi_metrics["judge_meta"] = run_judge_meta
                         d["_is_multi_judge"] = True
                         d["_goal_multi_metrics"] = goal_multi_metrics
                         majority_vote_asr = self._safe_float(
@@ -7911,7 +7980,8 @@ function hackAgentCopyFallback(text) {
                     _rp_strictness = calculate_per_judge_strictness(_rp_vote_rows)
 
                 # Build judge metadata for report panel
-                _rp_judge_meta: dict[str, dict[str, str]] = {}
+                _rp_judge_meta: dict[str, dict[str, Any]] = {}
+                _rp_declared_eval_keys: list[str] = []
                 _rp_atk_id2 = str(run.get("attack_id") or run.get("attack") or "")
                 if _rp_atk_id2:
                     _rp_atk_cfgs2 = self._attack_config_map_for_ids({_rp_atk_id2})
@@ -7931,13 +8001,13 @@ function hackAgentCopyFallback(text) {
                         _jtype2 = str(_jcfg2.get("type") or "unknown")
                         _rp_type_counts[_jtype2] = _rp_type_counts.get(_jtype2, 0) + 1
                     _rp_type_idx: dict[str, int] = {}
-                    for _jcfg2 in _rp_judges_cfg_list2:
+                    for _judge_idx2, _jcfg2 in enumerate(_rp_judges_cfg_list2):
                         if not isinstance(_jcfg2, dict):
                             continue
                         _jtype2 = str(_jcfg2.get("type") or "unknown")
                         _jname2 = str(
-                            _jcfg2.get("agent_name")
-                            or _jcfg2.get("identifier")
+                            _jcfg2.get("identifier")
+                            or _jcfg2.get("agent_name")
                             or _jtype2
                         )
                         _rp_abbr_map = {
@@ -7953,22 +8023,30 @@ function hackAgentCopyFallback(text) {
                             _eval_key2 = f"eval_{_abbr2}_{_rp_type_idx[_jtype2]}"
                         else:
                             _eval_key2 = f"eval_{_abbr2}"
+                        _rp_declared_eval_keys.append(_eval_key2)
                         _rp_judge_meta[_eval_key2] = {
+                            "id": _judge_idx2,
                             "name": _jname2,
                             "type": _jtype2.replace("_", " ").title(),
                         }
 
                 with ui.card().classes("w-full"):
                     # Compute judge keys early for accurate count
-                    _rp_all_judge_keys = sorted(
-                        set(
-                            list((_rp_per_judge_asr or {}).keys())
-                            + [
-                                k
-                                for k in (_rp_strictness or {}).keys()
-                                if k != "bias_gap"
-                            ]
-                            + list(_rp_judge_meta.keys())
+                    _rp_judge_key_pool = set(
+                        list((_rp_per_judge_asr or {}).keys())
+                        + [k for k in (_rp_strictness or {}).keys() if k != "bias_gap"]
+                        + list(_rp_judge_meta.keys())
+                    )
+                    _rp_all_judge_keys = [
+                        key
+                        for key in _rp_declared_eval_keys
+                        if key in _rp_judge_key_pool
+                    ]
+                    _rp_all_judge_keys.extend(
+                        sorted(
+                            key
+                            for key in _rp_judge_key_pool
+                            if key not in _rp_all_judge_keys
                         )
                     )
                     _rp_display_count = (
@@ -8039,8 +8117,11 @@ function hackAgentCopyFallback(text) {
                     if _rp_all_judge_keys:
                         ui.separator().classes("my-1")
                         with ui.row().classes("w-full gap-0 px-2 py-1"):
+                            ui.label("ID").classes(
+                                "text-[11px] font-semibold text-grey-7 w-[52px] text-center"
+                            )
                             ui.label("Judge").classes(
-                                "text-[11px] font-semibold text-grey-7 w-[180px]"
+                                "text-[11px] font-semibold text-grey-7 w-[160px]"
                             )
                             ui.label("Type").classes(
                                 "text-[11px] font-semibold text-grey-7 w-[140px]"
@@ -8052,8 +8133,9 @@ function hackAgentCopyFallback(text) {
                                 "text-[11px] font-semibold text-grey-7 w-[90px] text-center ml-4"
                             )
 
-                        for _rp_jk in _rp_all_judge_keys:
+                        for _rp_row_idx, _rp_jk in enumerate(_rp_all_judge_keys):
                             _rp_j_meta = _rp_judge_meta.get(_rp_jk, {})
+                            _rp_j_id = _rp_j_meta.get("id", _rp_row_idx)
                             _rp_j_name = _rp_j_meta.get(
                                 "name",
                                 self._judge_key_display_name(_rp_jk),
@@ -8095,8 +8177,11 @@ function hackAgentCopyFallback(text) {
                                 "w-full gap-0 px-2 py-1 items-center "
                                 "hover:bg-grey-1 rounded"
                             ):
+                                ui.label(str(_rp_j_id)).classes(
+                                    "text-xs text-grey-7 font-medium w-[52px] text-center"
+                                )
                                 ui.label(_rp_j_name).classes(
-                                    "text-xs font-medium w-[180px] truncate"
+                                    "text-xs font-medium w-[160px] truncate"
                                 )
                                 ui.label(_rp_j_type).classes(
                                     "text-xs text-grey-6 w-[140px]"
@@ -8721,8 +8806,8 @@ function hackAgentCopyFallback(text) {
                 if isinstance(_hr_pja_check, dict) and len(_hr_pja_check) > 1:
                     _hr_is_multi = True
 
-            # Build judge metadata mapping: eval_key -> {name, type}
-            _hr_judge_meta: dict[str, dict[str, str]] = {}
+            # Build judge metadata mapping: eval_key -> {id, name, type}
+            _hr_judge_meta: dict[str, dict[str, Any]] = {}
             _hr_acfg2 = display_config if isinstance(display_config, dict) else {}
             _hr_jl2 = _hr_acfg2.get("judges") or []
             if isinstance(_hr_jl2, list):
@@ -8740,11 +8825,11 @@ function hackAgentCopyFallback(text) {
                     "nuanced": "nj",
                     "on_topic": "on_topic",
                 }
-                for _jc in _hr_jl2:
+                for _hr_judge_idx, _jc in enumerate(_hr_jl2):
                     if not isinstance(_jc, dict):
                         continue
                     _jt = str(_jc.get("type") or "unknown")
-                    _jn = str(_jc.get("agent_name") or _jc.get("identifier") or _jt)
+                    _jn = str(_jc.get("identifier") or _jc.get("agent_name") or _jt)
                     _ab = _type_abbr_map.get(_jt, _jt)
                     _hr_ti[_jt] = _hr_ti.get(_jt, 0) + 1
                     if _hr_tc.get(_jt, 0) > 1:
@@ -8752,6 +8837,7 @@ function hackAgentCopyFallback(text) {
                     else:
                         _ek = f"eval_{_ab}"
                     _hr_judge_meta[_ek] = {
+                        "id": _hr_judge_idx,
                         "name": _jn,
                         "type": _jt.replace("_", " ").title(),
                     }
@@ -9430,7 +9516,8 @@ function hackAgentCopyFallback(text) {
                         _mj_strictness = calculate_per_judge_strictness(_mj_vote_rows)
 
                     # Build judge metadata mapping: eval_key -> {name, type}
-                    _mj_judge_meta: dict[str, dict[str, str]] = {}
+                    _mj_judge_meta: dict[str, dict[str, Any]] = {}
+                    _mj_declared_eval_keys: list[str] = []
                     _mj_attack_cfg = (
                         display_config if isinstance(display_config, dict) else {}
                     )
@@ -9445,13 +9532,13 @@ function hackAgentCopyFallback(text) {
                             _type_counts[_jtype] = _type_counts.get(_jtype, 0) + 1
 
                         _type_idx: dict[str, int] = {}
-                        for _jcfg in _mj_judges_cfg_list:
+                        for _judge_idx, _jcfg in enumerate(_mj_judges_cfg_list):
                             if not isinstance(_jcfg, dict):
                                 continue
                             _jtype = str(_jcfg.get("type") or "unknown")
                             _jname = str(
-                                _jcfg.get("agent_name")
-                                or _jcfg.get("identifier")
+                                _jcfg.get("identifier")
+                                or _jcfg.get("agent_name")
                                 or _jtype
                             )
                             # Determine eval column key
@@ -9468,7 +9555,9 @@ function hackAgentCopyFallback(text) {
                                 _eval_key = f"eval_{_abbr}_{_type_idx[_jtype]}"
                             else:
                                 _eval_key = f"eval_{_abbr}"
+                            _mj_declared_eval_keys.append(_eval_key)
                             _mj_judge_meta[_eval_key] = {
+                                "id": _judge_idx,
                                 "name": _jname,
                                 "type": _jtype.replace("_", " ").title(),
                             }
@@ -9476,15 +9565,25 @@ function hackAgentCopyFallback(text) {
                     with self.history_multi_judge_panel:
                         with ui.card().classes("w-full"):
                             # Compute judge keys early for accurate count
-                            _mj_all_judge_keys = sorted(
-                                set(
-                                    list((_mj_per_judge_asr or {}).keys())
-                                    + [
-                                        k
-                                        for k in (_mj_strictness or {}).keys()
-                                        if k != "bias_gap"
-                                    ]
-                                    + list(_mj_judge_meta.keys())
+                            _mj_judge_key_pool = set(
+                                list((_mj_per_judge_asr or {}).keys())
+                                + [
+                                    k
+                                    for k in (_mj_strictness or {}).keys()
+                                    if k != "bias_gap"
+                                ]
+                                + list(_mj_judge_meta.keys())
+                            )
+                            _mj_all_judge_keys = [
+                                key
+                                for key in _mj_declared_eval_keys
+                                if key in _mj_judge_key_pool
+                            ]
+                            _mj_all_judge_keys.extend(
+                                sorted(
+                                    key
+                                    for key in _mj_judge_key_pool
+                                    if key not in _mj_all_judge_keys
                                 )
                             )
                             _mj_display_count = (
@@ -9569,8 +9668,11 @@ function hackAgentCopyFallback(text) {
                                 ui.separator().classes("my-1")
                                 # Table header
                                 with ui.row().classes("w-full gap-0 px-2 py-1"):
+                                    ui.label("ID").classes(
+                                        "text-[11px] font-semibold text-grey-7 w-[52px] text-center"
+                                    )
                                     ui.label("Judge").classes(
-                                        "text-[11px] font-semibold text-grey-7 w-[180px]"
+                                        "text-[11px] font-semibold text-grey-7 w-[160px]"
                                     )
                                     ui.label("Type").classes(
                                         "text-[11px] font-semibold text-grey-7 w-[140px]"
@@ -9582,8 +9684,9 @@ function hackAgentCopyFallback(text) {
                                         "text-[11px] font-semibold text-grey-7 w-[90px] text-center ml-4"
                                     )
 
-                                for _jk in _mj_all_judge_keys:
+                                for _row_idx, _jk in enumerate(_mj_all_judge_keys):
                                     _j_meta = _mj_judge_meta.get(_jk, {})
+                                    _j_id = _j_meta.get("id", _row_idx)
                                     _j_name = _j_meta.get(
                                         "name",
                                         self._judge_key_display_name(_jk),
@@ -9627,8 +9730,11 @@ function hackAgentCopyFallback(text) {
                                         "w-full gap-0 px-2 py-1 items-center "
                                         "hover:bg-grey-1 rounded"
                                     ):
+                                        ui.label(str(_j_id)).classes(
+                                            "text-xs text-grey-7 font-medium w-[52px] text-center"
+                                        )
                                         ui.label(_j_name).classes(
-                                            "text-xs font-medium w-[180px] truncate"
+                                            "text-xs font-medium w-[160px] truncate"
                                         )
                                         ui.label(_j_type).classes(
                                             "text-xs text-grey-6 w-[140px]"

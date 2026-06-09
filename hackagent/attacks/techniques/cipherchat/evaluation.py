@@ -60,21 +60,7 @@ class CipherChatEvaluation(BaseEvaluationStep):
         self._statistics["evaluated_count"] = len(evaluated_rows)
 
         normalize = self._normalize_merge_key
-        lookup = {}
-        for row in evaluated_rows:
-            key = (
-                normalize("goal", row.get("goal")),
-                normalize("prefix", row.get("prefix")),
-                normalize("completion", row.get("completion")),
-            )
-            # Capture all eval_* and explanation_* columns (including
-            # instance-suffixed ones like eval_hbv_1, eval_hbv_2).
-            lookup[key] = {
-                c: row[c]
-                for c in row
-                if isinstance(c, str)
-                and (c.startswith("eval_") or c.startswith("explanation_"))
-            }
+        lookup = self._build_eval_detail_lookup(evaluated_rows)
 
         for idx, item in enumerate(input_data):
             if idx in error_indices:

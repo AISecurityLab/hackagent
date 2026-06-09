@@ -185,21 +185,9 @@ class FlipAttackEvaluation(BaseEvaluationStep):
         Uses (goal, prefix, completion) lookup to match rows.
         """
         # Build lookup from evaluated rows
-        lookup: Dict[tuple, Dict[str, Any]] = {}
-        for row in evaluated_rows:
-            key = (
-                self._normalize_merge_key("goal", row.get("goal")),
-                self._normalize_merge_key("prefix", row.get("prefix")),
-                self._normalize_merge_key("completion", row.get("completion")),
-            )
-            # Capture all eval_* and explanation_* columns (including
-            # instance-suffixed ones like eval_hbv_1, eval_hbv_2).
-            lookup[key] = {
-                c: row[c]
-                for c in row
-                if isinstance(c, str)
-                and (c.startswith("eval_") or c.startswith("explanation_"))
-            }
+        lookup: Dict[tuple, Dict[str, Any]] = self._build_eval_detail_lookup(
+            evaluated_rows
+        )
 
         # Apply to input_data
         for idx, item in enumerate(input_data):

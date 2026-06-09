@@ -869,6 +869,92 @@ class BaseEvaluationStep:
         return value
 
     @staticmethod
+    def _extract_eval_detail_columns(row: Dict[str, Any]) -> Dict[str, Any]:
+        """Return judge detail columns from *row* (eval_* and explanation_*).
+
+        Intended users:
+            - h4rm3l, cipherchat, flipattack evaluation merges
+            - baseline tracker payload shaping when preserving judge details
+        """
+        return {
+            key: value
+            for key, value in row.items()
+            if isinstance(key, str)
+            and (key.startswith("eval_") or key.startswith("explanation_"))
+        }
+
+    def _build_eval_detail_lookup(
+        self,
+        evaluated_rows: List[Dict[str, Any]],
+    ) -> Dict[Tuple[str, str, str], Dict[str, Any]]:
+        """Index evaluated rows by normalized merge keys for fast result merge.
+
+        Intended users:
+            - attacks that run judges in evaluation phase and then merge back
+              into generation rows (for example h4rm3l, cipherchat, flipattack)
+        """
+        lookup: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
+        for row in evaluated_rows:
+            key = tuple(
+                self._normalize_merge_key(merge_key, row.get(merge_key))
+                for merge_key in self.MERGE_KEYS
+            )
+            lookup[key] = self._extract_eval_detail_columns(row)
+        return lookup
+
+    def _postprocess_inline_judge_results(
+        self,
+        input_data: List[Dict[str, Any]],
+        attack_label: str,
+    ) -> None:
+        """Finalize rows whose judge pass already happened in generation.
+
+        Meaning of "already judged":
+            - PAP: each technique attempt can be judged inline while generating.
+              Evaluation does not run judges again.
+            - BoN: in each step, only the step best candidate is judged
+              (one judge pass for that candidate). Evaluation does not run
+              judges again.
+
+        This helper only fills missing defaults and performs sync/ASR logging.
+
+        Intended users:
+            - PAP
+            - BoN
+            - Any attack that evaluates judges inline in generation and only
+              needs sync/ASR in evaluation.
+        """
+        self._statistics["input_count"] = len(input_data)
+
+        error_indices: set[int] = set()
+        for idx, item in enumerate(input_data):
+            if item.get("error") and not item.get("response"):
+                error_indices.add(idx)
+                item.setdefault("best_score", 0.0)
+                item.setdefault("success", False)
+                item.setdefault("evaluation_notes", f"Execution error: {item['error']}")
+            else:
+                item.setdefault("best_score", 0.0)
+                item.setdefault("success", item.get("best_score", 0) > 0)
+
+        self._statistics["evaluated_count"] = len(input_data) - len(error_indices)
+
+        n_success = sum(1 for item in input_data if item.get("success"))
+        self.logger.info(
+            f"Post-processing {len(input_data)} results "
+            f"({n_success} jailbreaks from inline judge)"
+        )
+
+        if self._tracker:
+            self.logger.info(
+                f"Skipping final tracker evaluation trace ({attack_label} uses per-step evaluations)"
+            )
+
+        judge_keys = self._build_judge_keys_from_data(input_data)
+        self._sync_to_server(input_data, judge_keys)
+        self._log_evaluation_asr(input_data)
+
+    @staticmethod
     def _to_success_bool(value: Any) -> bool:
         """Normalize common success representations to bool."""
         if isinstance(value, bool):
