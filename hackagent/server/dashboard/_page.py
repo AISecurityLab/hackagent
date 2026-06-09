@@ -11,6 +11,7 @@ import contextlib
 import json
 import math
 import re
+from typing import Any
 from uuid import UUID
 
 from nicegui import app as _fastapi_app
@@ -19,6 +20,7 @@ from nicegui import ui
 from hackagent.attacks.evaluator.metrics import (
     calculate_fleiss_kappa,
     calculate_majority_vote_asr,
+    calculate_per_judge_asr,
     calculate_per_judge_strictness,
 )
 
@@ -47,7 +49,7 @@ from .attack_cards import (
 )
 
 _VIEW_LABELS = {
-    "dashboard": "Dashboard",
+    "dashboard": "Home",
     "agents": "Targets",
     "runs": "History",
 }
@@ -149,6 +151,7 @@ class DashboardPage(
         self.history_run_dialog_subtitle: ui.label | None = None
         self.history_run_config_area: ui.column | None = None
         self.history_charts_area: ui.column | None = None
+        self.history_multi_judge_panel: ui.column | None = None
         self.history_results_list_area: ui.column | None = None
         self.history_results_empty_label: ui.label | None = None
         self.history_detail_area: ui.column | None = None
@@ -290,7 +293,7 @@ function hackAgentCopyFallback(text) {
             ui.separator().classes("mb-1")
 
             nav_items = [
-                ("dashboard", "Dashboard", "dashboard"),
+                ("dashboard", "Home", "dashboard"),
                 ("agents", "Targets", "smart_toy"),
                 ("runs", "History", "assignment"),
             ]
@@ -330,7 +333,7 @@ function hackAgentCopyFallback(text) {
                 ui.button(icon="menu", on_click=sidebar.toggle).props(
                     "flat round dense color=white"
                 )
-                self.page_title = ui.label("Dashboard").classes(
+                self.page_title = ui.label("Home").classes(
                     "text-white font-semibold text-lg"
                 )
             with ui.row().classes("items-center gap-1"):
@@ -820,10 +823,12 @@ function hackAgentCopyFallback(text) {
                 )
 
             # ── Bottom panel for run details (hidden by default) ───────
+            # Built here but reparented to the active view on open so it can be
+            # shown both from History and from the Home "Recent Runs" panel.
             self._runs_bottom_panel = (
                 ui.card()
                 .classes("w-full shrink-0 gap-0 hidden")
-                .style("height: 70%; min-height: 300px;")
+                .style("height: 70vh; min-height: 300px;")
             )
 
             # ── Bottom panel for compare (hidden by default) ──────────
@@ -929,6 +934,10 @@ function hackAgentCopyFallback(text) {
                                 "w-full gap-3"
                             )
                             ui.separator()
+                            # ── Multi-judge statistics panel ─────────
+                            self.history_multi_judge_panel = ui.column().classes(
+                                "w-full gap-0"
+                            )
                             # ── Goal filter bar ──────────────────────
                             self._history_goal_filter_area = ui.row().classes(
                                 "items-center gap-2 px-1 w-full"
@@ -1147,10 +1156,22 @@ function hackAgentCopyFallback(text) {
         self._report_current_run_results = []
 
     def _open_runs_bottom_panel(self) -> None:
-        """Show the inline bottom panel for run details."""
+        """Show the inline bottom panel for run details.
+
+        The panel is reparented to the currently active view so the run detail
+        opens in place — both from the History view and from the Home
+        "Recent Runs" panel — without navigating away.
+        """
         if self._compare_bottom_panel is not None:
             self._compare_bottom_panel.classes(add="hidden")
         if self._runs_bottom_panel is not None:
+            target_view = self.current_view.get("value", "dashboard")
+            target_panel = self.all_panels.get(target_view) or self.all_panels.get(
+                "runs"
+            )
+            if target_panel is not None:
+                with contextlib.suppress(Exception):
+                    self._runs_bottom_panel.move(target_panel)
             self._runs_bottom_panel.classes(remove="hidden")
 
     def _close_runs_bottom_panel(self) -> None:
@@ -1902,7 +1923,7 @@ function hackAgentCopyFallback(text) {
         self.current_view["value"] = view
         for v, panel in self.all_panels.items():
             panel.set_visibility(v == view)
-        self.page_title.text = _VIEW_LABELS.get(view, "Dashboard")
+        self.page_title.text = _VIEW_LABELS.get(view, "Home")
         self._highlight_nav(view)
         if schedule_refresh:
             asyncio.create_task(self.refresh_view())
@@ -3150,6 +3171,77 @@ function hackAgentCopyFallback(text) {
             return judge_key[5:]
         return str(judge_key)
 
+    @staticmethod
+    def _judge_type_from_key(judge_key: str) -> str:
+        """Infer judge type display string from eval key abbreviation."""
+        _abbr_to_type = {
+            "hb": "Harmbench",
+            "hbv": "Harmbench Variant",
+            "jb": "Jailbreakbench",
+            "nj": "Nuanced",
+            "on_topic": "On Topic",
+        }
+        stripped = judge_key[5:] if judge_key.startswith("eval_") else judge_key
+        # Remove trailing _N suffix (e.g. hbv_1 -> hbv)
+        base = (
+            stripped.rsplit("_", 1)[0]
+            if "_" in stripped and stripped.rsplit("_", 1)[1].isdigit()
+            else stripped
+        )
+        return _abbr_to_type.get(base, "")
+
+    @classmethod
+    def _build_judge_metadata(
+        cls, judges_cfg: object
+    ) -> tuple[dict[str, dict[str, Any]], list[str]]:
+        """Build eval-key metadata mapping from attack judge configuration."""
+        if not isinstance(judges_cfg, list):
+            return {}, []
+
+        type_counts: dict[str, int] = {}
+        for judge_cfg in judges_cfg:
+            if not isinstance(judge_cfg, dict):
+                continue
+            judge_type = str(judge_cfg.get("type") or "unknown")
+            type_counts[judge_type] = type_counts.get(judge_type, 0) + 1
+
+        type_idx: dict[str, int] = {}
+        type_abbr_map = {
+            "harmbench": "hb",
+            "harmbench_variant": "hbv",
+            "jailbreakbench": "jb",
+            "nuanced": "nj",
+            "on_topic": "on_topic",
+        }
+
+        judge_meta: dict[str, dict[str, Any]] = {}
+        declared_eval_keys: list[str] = []
+
+        for judge_idx, judge_cfg in enumerate(judges_cfg):
+            if not isinstance(judge_cfg, dict):
+                continue
+
+            judge_type = str(judge_cfg.get("type") or "unknown")
+            judge_name = str(
+                judge_cfg.get("identifier") or judge_cfg.get("agent_name") or judge_type
+            )
+            abbr = type_abbr_map.get(judge_type, judge_type)
+
+            type_idx[judge_type] = type_idx.get(judge_type, 0) + 1
+            if type_counts.get(judge_type, 0) > 1:
+                eval_key = f"eval_{abbr}_{type_idx[judge_type]}"
+            else:
+                eval_key = f"eval_{abbr}"
+
+            declared_eval_keys.append(eval_key)
+            judge_meta[eval_key] = {
+                "id": judge_idx,
+                "name": judge_name,
+                "type": judge_type.replace("_", " ").title(),
+            }
+
+        return judge_meta, declared_eval_keys
+
     @classmethod
     def _extract_eval_votes_from_result(cls, result_data: dict) -> dict[str, int]:
         """Collect canonical eval_* judge votes from top-level/metadata/metrics."""
@@ -3214,6 +3306,11 @@ function hackAgentCopyFallback(text) {
 
         overall_success_rate = self._safe_float(
             evaluation_summary.get("overall_success_rate")
+            if isinstance(evaluation_summary, dict)
+            else None
+        )
+        overall_effective_asr = self._safe_float(
+            evaluation_summary.get("overall_effective_asr")
             if isinstance(evaluation_summary, dict)
             else None
         )
@@ -3287,6 +3384,8 @@ function hackAgentCopyFallback(text) {
         overall_asr_rate = None
         if is_multi_judge and majority_vote_asr is not None:
             overall_asr_rate = majority_vote_asr
+        elif overall_effective_asr is not None:
+            overall_asr_rate = overall_effective_asr
         elif overall_success_rate is not None:
             overall_asr_rate = overall_success_rate
         elif total > 0:
@@ -6407,6 +6506,22 @@ function hackAgentCopyFallback(text) {
                 run_judge_count > 1 if run_judge_count > 0 else summary_is_multi
             )
 
+            # Build judge metadata once per run so right-side detail cards can
+            # render the same ID/name/type shown in multi-judge tables.
+            run_judge_meta: dict[str, dict[str, Any]] = {}
+            _run_atk_id = str(run.get("attack_id") or run.get("attack") or "")
+            _run_atk_cfg = {}
+            if _run_atk_id:
+                _run_atk_cfg = self._attack_config_map_for_ids({_run_atk_id}).get(
+                    _run_atk_id, {}
+                )
+            _run_judges_cfg = (
+                _run_atk_cfg.get("judges") or []
+                if isinstance(_run_atk_cfg, dict)
+                else []
+            )
+            run_judge_meta, _ = self._build_judge_metadata(_run_judges_cfg)
+
             new_rows = []
             for idx, r in enumerate(sorted_items, start=1):
                 d = _serialize(r)
@@ -6426,7 +6541,34 @@ function hackAgentCopyFallback(text) {
 
                 if is_multi_judge_run:
                     goal_multi_metrics = self._compute_goal_multi_judge_metrics(d)
+                    if not goal_multi_metrics:
+                        # Fallback: derive from evaluation_summary per_goal_metrics
+                        _pgm = run_eval_summary.get("per_goal_metrics")
+                        if isinstance(_pgm, dict):
+                            _goal_text = str(d.get("goal") or "")
+                            _goal_pgm = _pgm.get(_goal_text)
+                            if isinstance(_goal_pgm, dict):
+                                _pja = _goal_pgm.get("per_judge_asr")
+                                if isinstance(_pja, dict) and _pja:
+                                    # Convert ASR values (1.0/0.0 per single goal)
+                                    # to binary votes
+                                    _votes = {
+                                        k: int(float(v) >= 0.5) for k, v in _pja.items()
+                                    }
+                                    _javg = (
+                                        sum(_votes.values()) / len(_votes)
+                                        if _votes
+                                        else None
+                                    )
+                                    goal_multi_metrics = {
+                                        "judge_count": len(_votes),
+                                        "judge_votes": dict(sorted(_votes.items())),
+                                        "judge_avg": _javg,
+                                        "majority_vote_asr": _javg,
+                                    }
                     if goal_multi_metrics:
+                        if run_judge_meta:
+                            goal_multi_metrics["judge_meta"] = run_judge_meta
                         d["_is_multi_judge"] = True
                         d["_goal_multi_metrics"] = goal_multi_metrics
                         majority_vote_asr = self._safe_float(
@@ -6437,7 +6579,7 @@ function hackAgentCopyFallback(text) {
                                 goal_multi_metrics.get("judge_avg")
                             )
                         majority_is_jailbreak = bool(
-                            majority_vote_asr is not None and majority_vote_asr > 0.5
+                            majority_vote_asr is not None and majority_vote_asr >= 0.5
                         )
                         d["majority_vote"] = 1 if majority_is_jailbreak else 0
                         d["success"] = majority_is_jailbreak
@@ -6551,8 +6693,32 @@ function hackAgentCopyFallback(text) {
                                 color="indigo",
                             ).classes("text-xs")
 
+                        per_judge_asr = run_eval_summary.get("per_judge_asr")
+                        if not isinstance(per_judge_asr, dict) or not per_judge_asr:
+                            run_vote_rows = []
+                            for row in new_rows:
+                                votes = self._extract_eval_votes_from_result(row)
+                                if votes:
+                                    run_vote_rows.append(dict(votes))
+                            if run_vote_rows:
+                                per_judge_asr = calculate_per_judge_asr(run_vote_rows)
+
+                        if isinstance(per_judge_asr, dict):
+                            for judge_key in sorted(per_judge_asr.keys()):
+                                asr_value = self._safe_float(per_judge_asr[judge_key])
+                                if asr_value is None:
+                                    continue
+                                judge_name = self._judge_key_display_name(judge_key)
+                                ui.badge(
+                                    f"{judge_name} ASR: {asr_value * 100:.1f}%",
+                                    color="orange",
+                                ).classes("text-xs")
+
                         strictness = run_eval_summary.get("per_judge_strictness")
-                        if not isinstance(strictness, dict):
+                        _has_judge_strictness = isinstance(strictness, dict) and any(
+                            key != "bias_gap" for key in strictness.keys()
+                        )
+                        if not _has_judge_strictness:
                             run_vote_rows = []
                             for row in new_rows:
                                 votes = self._extract_eval_votes_from_result(row)
@@ -7719,6 +7885,303 @@ function hackAgentCopyFallback(text) {
                     )
                     ui.code(config_text, language="json").classes("w-full text-xs")
 
+            # ── 4b) Multi-Judge Statistics ─────────────────────────
+            _rp_eval_summary = self._extract_run_evaluation_summary(run)
+            _rp_judge_count = int(_rp_eval_summary.get("judge_count") or 0)
+            _rp_is_multi = bool(_rp_eval_summary.get("is_multi_judge")) or (
+                _rp_judge_count > 1
+            )
+            _rp_vote_columns: set[str] = set()
+            for _rp_row in new_rows:
+                _rp_vote_columns.update(
+                    self._extract_eval_votes_from_result(_rp_row).keys()
+                )
+            if len(_rp_vote_columns) > 1:
+                _rp_is_multi = True
+            # Fallback: check attack config judges array
+            if not _rp_is_multi:
+                _rp_atk_id = str(run.get("attack_id") or run.get("attack") or "")
+                if _rp_atk_id:
+                    _rp_atk_cfgs = self._attack_config_map_for_ids({_rp_atk_id})
+                    _rp_atk_cfg = _rp_atk_cfgs.get(_rp_atk_id, {})
+                    _rp_judges_list = (
+                        _rp_atk_cfg.get("judges") or []
+                        if isinstance(_rp_atk_cfg, dict)
+                        else []
+                    )
+                    if isinstance(_rp_judges_list, list) and len(_rp_judges_list) > 1:
+                        _rp_is_multi = True
+                        _rp_judge_count = len(_rp_judges_list)
+            # Fallback: check per_judge_asr has multiple keys
+            if not _rp_is_multi and _rp_eval_summary:
+                _rp_pja_check = _rp_eval_summary.get("per_judge_asr")
+                if isinstance(_rp_pja_check, dict) and len(_rp_pja_check) > 1:
+                    _rp_is_multi = True
+
+            # Enrich rows with multi-judge metadata for goal detail rendering
+            if _rp_is_multi:
+                for _rp_d in new_rows:
+                    _rp_d["_is_multi_judge"] = False
+                    _rp_d["_goal_multi_metrics"] = {}
+                    _rp_gm = self._compute_goal_multi_judge_metrics(_rp_d)
+                    if not _rp_gm:
+                        _rp_pgm = _rp_eval_summary.get("per_goal_metrics")
+                        if isinstance(_rp_pgm, dict):
+                            _rp_goal_text = str(_rp_d.get("goal") or "")
+                            _rp_goal_pgm = _rp_pgm.get(_rp_goal_text)
+                            if isinstance(_rp_goal_pgm, dict):
+                                _rp_pja = _rp_goal_pgm.get("per_judge_asr")
+                                if isinstance(_rp_pja, dict) and _rp_pja:
+                                    _rp_votes_d = {
+                                        k: int(float(v) >= 0.5)
+                                        for k, v in _rp_pja.items()
+                                    }
+                                    _rp_javg = (
+                                        sum(_rp_votes_d.values()) / len(_rp_votes_d)
+                                        if _rp_votes_d
+                                        else None
+                                    )
+                                    _rp_gm = {
+                                        "judge_count": len(_rp_votes_d),
+                                        "judge_votes": dict(
+                                            sorted(_rp_votes_d.items())
+                                        ),
+                                        "judge_avg": _rp_javg,
+                                        "majority_vote_asr": _rp_javg,
+                                    }
+                    if _rp_gm:
+                        _rp_d["_is_multi_judge"] = True
+                        _rp_d["_goal_multi_metrics"] = _rp_gm
+
+            if _rp_is_multi:
+                _rp_vote_rows: list[dict[str, int]] = []
+                for _rp_row in new_rows:
+                    _rp_votes = self._extract_eval_votes_from_result(_rp_row)
+                    if not _rp_votes:
+                        _rp_gm_row = _rp_row.get("_goal_multi_metrics")
+                        if isinstance(_rp_gm_row, dict):
+                            _rp_gv = _rp_gm_row.get("judge_votes")
+                            if isinstance(_rp_gv, dict) and _rp_gv:
+                                _rp_votes = {
+                                    _k: self._coerce_binary_vote(_v)
+                                    for _k, _v in _rp_gv.items()
+                                    if self._is_canonical_eval_vote_key(_k)
+                                }
+                    if _rp_votes:
+                        _rp_vote_rows.append(dict(_rp_votes))
+
+                _rp_majority_asr = self._safe_float(
+                    _rp_eval_summary.get("majority_vote_asr")
+                ) or self._safe_float(_rp_eval_summary.get("overall_majority_vote_asr"))
+                if _rp_majority_asr is None and _rp_vote_rows:
+                    _rp_majority_asr = calculate_majority_vote_asr(_rp_vote_rows)
+
+                _rp_fleiss = self._safe_float(
+                    _rp_eval_summary.get("fleiss_kappa")
+                ) or self._safe_float(_rp_eval_summary.get("overall_fleiss_kappa"))
+                if _rp_fleiss is None and _rp_vote_rows:
+                    _rp_fleiss = calculate_fleiss_kappa(_rp_vote_rows)
+
+                _rp_per_judge_asr = _rp_eval_summary.get("per_judge_asr")
+                if (
+                    not isinstance(_rp_per_judge_asr, dict) or not _rp_per_judge_asr
+                ) and _rp_vote_rows:
+                    _rp_per_judge_asr = calculate_per_judge_asr(_rp_vote_rows)
+
+                _rp_strictness = _rp_eval_summary.get("per_judge_strictness")
+                if (
+                    not isinstance(_rp_strictness, dict)
+                    or not any(k != "bias_gap" for k in _rp_strictness.keys())
+                ) and _rp_vote_rows:
+                    _rp_strictness = calculate_per_judge_strictness(_rp_vote_rows)
+
+                # Build judge metadata for report panel
+                _rp_atk_id2 = str(run.get("attack_id") or run.get("attack") or "")
+                if _rp_atk_id2:
+                    _rp_atk_cfgs2 = self._attack_config_map_for_ids({_rp_atk_id2})
+                    _rp_atk_cfg2 = _rp_atk_cfgs2.get(_rp_atk_id2, {})
+                else:
+                    _rp_atk_cfg2 = {}
+                _rp_judges_cfg_list2 = (
+                    _rp_atk_cfg2.get("judges") or []
+                    if isinstance(_rp_atk_cfg2, dict)
+                    else []
+                )
+                _rp_judge_meta, _rp_declared_eval_keys = self._build_judge_metadata(
+                    _rp_judges_cfg_list2
+                )
+
+                with ui.card().classes("w-full"):
+                    # Compute judge keys early for accurate count
+                    _rp_judge_key_pool = set(
+                        list((_rp_per_judge_asr or {}).keys())
+                        + [k for k in (_rp_strictness or {}).keys() if k != "bias_gap"]
+                        + list(_rp_judge_meta.keys())
+                    )
+                    _rp_all_judge_keys = [
+                        key
+                        for key in _rp_declared_eval_keys
+                        if key in _rp_judge_key_pool
+                    ]
+                    _rp_all_judge_keys.extend(
+                        sorted(
+                            key
+                            for key in _rp_judge_key_pool
+                            if key not in _rp_all_judge_keys
+                        )
+                    )
+                    _rp_display_count = (
+                        len(_rp_all_judge_keys)
+                        if _rp_all_judge_keys
+                        else len(_rp_vote_columns)
+                        if _rp_vote_columns
+                        else _rp_judge_count or "?"
+                    )
+                    with ui.row().classes("items-center gap-2 mb-3 justify-center"):
+                        ui.icon("groups", size="sm").classes("text-indigo-6")
+                        ui.label("Multi-Judge Statistics").classes(
+                            "font-semibold text-sm"
+                        )
+                        ui.badge(
+                            f"{_rp_display_count} judges",
+                            color="indigo",
+                        ).classes("text-xs")
+
+                    # ── Row 1: Aggregate metrics ──
+                    with ui.row().classes(
+                        "w-full flex-wrap gap-6 items-end mb-3 justify-center"
+                    ):
+                        if _rp_majority_asr is not None:
+                            with ui.column().classes("items-center gap-0 min-w-[90px]"):
+                                ui.label(f"{_rp_majority_asr * 100:.1f}%").classes(
+                                    "text-xl font-bold text-primary"
+                                )
+                                ui.label("Majority ASR").classes(
+                                    "text-[10px] text-grey-6"
+                                )
+
+                        if _rp_fleiss is not None:
+                            _rp_fk_color = (
+                                "text-green-7"
+                                if _rp_fleiss >= 0.6
+                                else "text-orange-7"
+                                if _rp_fleiss >= 0.2
+                                else "text-red-7"
+                            )
+                            with ui.column().classes("items-center gap-0 min-w-[90px]"):
+                                ui.label(f"{_rp_fleiss:.4f}").classes(
+                                    f"text-xl font-bold {_rp_fk_color}"
+                                )
+                                ui.label("Fleiss κ").classes("text-[10px] text-grey-6")
+
+                        if isinstance(_rp_strictness, dict):
+                            _rp_bg = self._safe_float(_rp_strictness.get("bias_gap"))
+                            if _rp_bg is not None:
+                                _rp_bg_color = (
+                                    "text-green-7"
+                                    if abs(_rp_bg) < 0.1
+                                    else "text-orange-7"
+                                    if abs(_rp_bg) < 0.3
+                                    else "text-red-7"
+                                )
+                                with ui.column().classes(
+                                    "items-center gap-0 min-w-[90px]"
+                                ):
+                                    ui.label(f"{_rp_bg:.4f}").classes(
+                                        f"text-xl font-bold {_rp_bg_color}"
+                                    )
+                                    ui.label("Bias Gap").classes(
+                                        "text-[10px] text-grey-6"
+                                    )
+
+                    # ── Row 2+: Per-judge table ──
+                    if _rp_all_judge_keys:
+                        ui.separator().classes("my-1")
+                        with ui.row().classes("w-full gap-0 px-2 py-1"):
+                            ui.label("ID").classes(
+                                "text-[11px] font-semibold text-grey-7 w-[52px] text-center"
+                            )
+                            ui.label("Judge").classes(
+                                "text-[11px] font-semibold text-grey-7 w-[160px]"
+                            )
+                            ui.label("Type").classes(
+                                "text-[11px] font-semibold text-grey-7 w-[140px]"
+                            )
+                            ui.label("ASR").classes(
+                                "text-[11px] font-semibold text-grey-7 w-[90px] text-center"
+                            )
+                            ui.label("Strictness").classes(
+                                "text-[11px] font-semibold text-grey-7 w-[90px] text-center ml-4"
+                            )
+
+                        for _rp_row_idx, _rp_jk in enumerate(_rp_all_judge_keys):
+                            _rp_j_meta = _rp_judge_meta.get(_rp_jk, {})
+                            _rp_j_id = _rp_j_meta.get("id", _rp_row_idx)
+                            _rp_j_name = _rp_j_meta.get(
+                                "name",
+                                self._judge_key_display_name(_rp_jk),
+                            )
+                            _rp_j_type = (
+                                _rp_j_meta.get("type")
+                                or self._judge_type_from_key(_rp_jk)
+                                or "—"
+                            )
+
+                            _rp_j_asr = self._safe_float(
+                                (_rp_per_judge_asr or {}).get(_rp_jk)
+                            )
+                            _rp_j_strict = self._safe_float(
+                                (_rp_strictness or {}).get(_rp_jk)
+                            )
+
+                            _rp_asr_color = "text-grey-5"
+                            if _rp_j_asr is not None:
+                                _rp_asr_color = (
+                                    "text-red-7"
+                                    if _rp_j_asr >= 0.7
+                                    else "text-orange-7"
+                                    if _rp_j_asr >= 0.3
+                                    else "text-green-7"
+                                )
+
+                            _rp_strict_color = "text-grey-5"
+                            if _rp_j_strict is not None:
+                                _rp_strict_color = (
+                                    "text-green-7"
+                                    if _rp_j_strict >= 0.7
+                                    else "text-orange-7"
+                                    if _rp_j_strict >= 0.3
+                                    else "text-red-7"
+                                )
+
+                            with ui.row().classes(
+                                "w-full gap-0 px-2 py-1 items-center "
+                                "hover:bg-grey-1 rounded"
+                            ):
+                                ui.label(str(_rp_j_id)).classes(
+                                    "text-xs text-grey-7 font-medium w-[52px] text-center"
+                                )
+                                ui.label(_rp_j_name).classes(
+                                    "text-xs font-medium w-[160px] truncate"
+                                )
+                                ui.label(_rp_j_type).classes(
+                                    "text-xs text-grey-6 w-[140px]"
+                                )
+                                ui.label(
+                                    f"{_rp_j_asr * 100:.1f}%"
+                                    if _rp_j_asr is not None
+                                    else "—"
+                                ).classes(
+                                    f"text-xs font-bold {_rp_asr_color} w-[90px] text-center"
+                                )
+                                ui.label(
+                                    f"{_rp_j_strict:.4f}"
+                                    if _rp_j_strict is not None
+                                    else "—"
+                                ).classes(
+                                    f"text-xs font-bold {_rp_strict_color} w-[90px] text-center ml-4"
+                                )
+
             # ── 5) Test Results ───────────────────────────────────────
             with ui.column().classes("w-full gap-3"):
                 with ui.row().classes("items-center gap-2"):
@@ -8297,6 +8760,78 @@ function hackAgentCopyFallback(text) {
                 d["_bucket"] = bucket
                 new_rows.append(d)
 
+            # ── Enrich rows with per-goal multi-judge verdicts ──────
+            _hr_eval_summary: dict = {}
+            if isinstance(run_config, dict):
+                _es = run_config.get("evaluation_summary")
+                if isinstance(_es, dict):
+                    _hr_eval_summary = _es
+            if not _hr_eval_summary:
+                _hr_eval_summary = self._extract_run_evaluation_summary(run)
+            _hr_is_multi = bool(_hr_eval_summary.get("is_multi_judge")) or (
+                int(_hr_eval_summary.get("judge_count") or 0) > 1
+            )
+            if not _hr_is_multi:
+                _hr_vc: set[str] = set()
+                for _hr_r in new_rows:
+                    _hr_vc.update(self._extract_eval_votes_from_result(_hr_r).keys())
+                if len(_hr_vc) > 1:
+                    _hr_is_multi = True
+            if not _hr_is_multi:
+                _hr_acfg = display_config if isinstance(display_config, dict) else {}
+                _hr_jl = _hr_acfg.get("judges") or []
+                if isinstance(_hr_jl, list) and len(_hr_jl) > 1:
+                    _hr_is_multi = True
+            if not _hr_is_multi and _hr_eval_summary:
+                _hr_pja_check = _hr_eval_summary.get("per_judge_asr")
+                if isinstance(_hr_pja_check, dict) and len(_hr_pja_check) > 1:
+                    _hr_is_multi = True
+
+            # Build judge metadata mapping: eval_key -> {id, name, type}
+            _hr_judge_meta: dict[str, dict[str, Any]] = {}
+            _hr_acfg2 = display_config if isinstance(display_config, dict) else {}
+            _hr_jl2 = _hr_acfg2.get("judges") or []
+            _hr_judge_meta, _ = self._build_judge_metadata(_hr_jl2)
+
+            # Keep the latest judge metadata so the right panel can
+            # reuse the exact same name/type mapping as the left panel
+            # even when row-level metadata is missing in legacy runs.
+            self._history_last_judge_meta = _hr_judge_meta
+
+            for _hr_d in new_rows:
+                _hr_d["_is_multi_judge"] = False
+                _hr_d["_goal_multi_metrics"] = {}
+                if _hr_is_multi:
+                    _hr_gm = self._compute_goal_multi_judge_metrics(_hr_d)
+                    if not _hr_gm:
+                        _hr_pgm = _hr_eval_summary.get("per_goal_metrics")
+                        if isinstance(_hr_pgm, dict):
+                            _hr_gt = str(_hr_d.get("goal") or "")
+                            _hr_gpgm = _hr_pgm.get(_hr_gt)
+                            if isinstance(_hr_gpgm, dict):
+                                _hr_pja = _hr_gpgm.get("per_judge_asr")
+                                if isinstance(_hr_pja, dict) and _hr_pja:
+                                    _hr_votes = {
+                                        k: int(float(v) >= 0.5)
+                                        for k, v in _hr_pja.items()
+                                    }
+                                    _hr_javg = (
+                                        sum(_hr_votes.values()) / len(_hr_votes)
+                                        if _hr_votes
+                                        else None
+                                    )
+                                    _hr_gm = {
+                                        "judge_count": len(_hr_votes),
+                                        "judge_votes": dict(sorted(_hr_votes.items())),
+                                        "judge_avg": _hr_javg,
+                                        "majority_vote_asr": _hr_javg,
+                                    }
+                    if _hr_gm:
+                        if _hr_judge_meta:
+                            _hr_gm["judge_meta"] = _hr_judge_meta
+                        _hr_d["_is_multi_judge"] = True
+                        _hr_d["_goal_multi_metrics"] = _hr_gm
+
             # Pre-fetch traces for Baseline / BoN views
             baseline_traces_map_hr: dict[str, list[dict]] = {}
             if attack_type_str.lower() == "baseline" and new_rows:
@@ -8815,6 +9350,322 @@ function hackAgentCopyFallback(text) {
                                                 .classes("w-full h-72")
                                                 .props("renderer=svg")
                                             )
+
+            # ── Populate multi-judge statistics panel ─────────────────
+            if self.history_multi_judge_panel is not None:
+                self.history_multi_judge_panel.clear()
+                # Compute multi-judge data — use already-resolved run_config
+                _mj_eval_summary: dict = {}
+                if isinstance(run_config, dict):
+                    _es = run_config.get("evaluation_summary")
+                    if isinstance(_es, dict):
+                        _mj_eval_summary = _es
+                if not _mj_eval_summary:
+                    _mj_eval_summary = self._extract_run_evaluation_summary(run)
+                _mj_judge_count = int(_mj_eval_summary.get("judge_count") or 0)
+                _mj_is_multi = bool(_mj_eval_summary.get("is_multi_judge")) or (
+                    _mj_judge_count > 1
+                )
+                # Also check actual vote columns in results
+                _mj_vote_columns: set[str] = set()
+                for _mj_row in new_rows:
+                    _mj_vote_columns.update(
+                        self._extract_eval_votes_from_result(_mj_row).keys()
+                    )
+                if len(_mj_vote_columns) > 1:
+                    _mj_is_multi = True
+                # Fallback: check attack config judges array
+                if not _mj_is_multi:
+                    _mj_attack_cfg = (
+                        display_config if isinstance(display_config, dict) else {}
+                    )
+                    _mj_judges_list = _mj_attack_cfg.get("judges") or []
+                    if isinstance(_mj_judges_list, list) and len(_mj_judges_list) > 1:
+                        _mj_is_multi = True
+                        _mj_judge_count = len(_mj_judges_list)
+                # Fallback: check per_judge_asr has multiple keys
+                if not _mj_is_multi and _mj_eval_summary:
+                    _mj_pja_check = _mj_eval_summary.get("per_judge_asr")
+                    if isinstance(_mj_pja_check, dict) and len(_mj_pja_check) > 1:
+                        _mj_is_multi = True
+
+                if _mj_is_multi:
+                    # Build vote rows for metric computation
+                    _mj_vote_rows: list[dict[str, int]] = []
+                    for _mj_row in new_rows:
+                        _mj_votes = self._extract_eval_votes_from_result(_mj_row)
+                        if not _mj_votes:
+                            _mj_gm_row = _mj_row.get("_goal_multi_metrics")
+                            if isinstance(_mj_gm_row, dict):
+                                _mj_gv = _mj_gm_row.get("judge_votes")
+                                if isinstance(_mj_gv, dict) and _mj_gv:
+                                    _mj_votes = {
+                                        _k: self._coerce_binary_vote(_v)
+                                        for _k, _v in _mj_gv.items()
+                                        if self._is_canonical_eval_vote_key(_k)
+                                    }
+                        if not _mj_votes:
+                            _mj_rid = str(_mj_row.get("id") or "")
+                            _mj_traces = generic_traces_map_hr.get(_mj_rid, [])
+                            _mj_trace_votes: dict[str, int] = {}
+                            for _mj_td in _mj_traces:
+                                _mj_content = _mj_td.get("content")
+                                if not isinstance(_mj_content, dict):
+                                    continue
+                                if (
+                                    str(_mj_content.get("step_name") or "")
+                                    != "Evaluation"
+                                ):
+                                    continue
+                                for _mj_src in (
+                                    _mj_content,
+                                    _mj_content.get("result")
+                                    if isinstance(_mj_content.get("result"), dict)
+                                    else {},
+                                ):
+                                    if not isinstance(_mj_src, dict):
+                                        continue
+                                    for _mj_k, _mj_v in _mj_src.items():
+                                        if not self._is_canonical_eval_vote_key(_mj_k):
+                                            continue
+                                        if _mj_v is None:
+                                            continue
+                                        _mj_trace_votes[_mj_k] = (
+                                            self._coerce_binary_vote(_mj_v)
+                                        )
+                            if _mj_trace_votes:
+                                _mj_votes = dict(sorted(_mj_trace_votes.items()))
+                        if _mj_votes:
+                            _mj_vote_rows.append(dict(_mj_votes))
+
+                    # Compute metrics
+                    _mj_majority_asr = self._safe_float(
+                        _mj_eval_summary.get("majority_vote_asr")
+                    ) or self._safe_float(
+                        _mj_eval_summary.get("overall_majority_vote_asr")
+                    )
+                    if _mj_majority_asr is None and _mj_vote_rows:
+                        _mj_majority_asr = calculate_majority_vote_asr(_mj_vote_rows)
+
+                    _mj_fleiss = self._safe_float(
+                        _mj_eval_summary.get("fleiss_kappa")
+                    ) or self._safe_float(_mj_eval_summary.get("overall_fleiss_kappa"))
+                    if _mj_fleiss is None and _mj_vote_rows:
+                        _mj_fleiss = calculate_fleiss_kappa(_mj_vote_rows)
+
+                    _mj_per_judge_asr = _mj_eval_summary.get("per_judge_asr")
+                    if (
+                        not isinstance(_mj_per_judge_asr, dict) or not _mj_per_judge_asr
+                    ) and _mj_vote_rows:
+                        _mj_per_judge_asr = calculate_per_judge_asr(_mj_vote_rows)
+
+                    _mj_strictness = _mj_eval_summary.get("per_judge_strictness")
+                    if (
+                        not isinstance(_mj_strictness, dict)
+                        or not any(k != "bias_gap" for k in _mj_strictness.keys())
+                    ) and _mj_vote_rows:
+                        _mj_strictness = calculate_per_judge_strictness(_mj_vote_rows)
+
+                    # Build judge metadata mapping: eval_key -> {name, type}
+                    _mj_attack_cfg = (
+                        display_config if isinstance(display_config, dict) else {}
+                    )
+                    _mj_judges_cfg_list = _mj_attack_cfg.get("judges") or []
+                    _mj_judge_meta, _mj_declared_eval_keys = self._build_judge_metadata(
+                        _mj_judges_cfg_list
+                    )
+
+                    with self.history_multi_judge_panel:
+                        with ui.card().classes("w-full"):
+                            # Compute judge keys early for accurate count
+                            _mj_judge_key_pool = set(
+                                list((_mj_per_judge_asr or {}).keys())
+                                + [
+                                    k
+                                    for k in (_mj_strictness or {}).keys()
+                                    if k != "bias_gap"
+                                ]
+                                + list(_mj_judge_meta.keys())
+                            )
+                            _mj_all_judge_keys = [
+                                key
+                                for key in _mj_declared_eval_keys
+                                if key in _mj_judge_key_pool
+                            ]
+                            _mj_all_judge_keys.extend(
+                                sorted(
+                                    key
+                                    for key in _mj_judge_key_pool
+                                    if key not in _mj_all_judge_keys
+                                )
+                            )
+                            _mj_display_count = (
+                                len(_mj_all_judge_keys)
+                                if _mj_all_judge_keys
+                                else len(_mj_vote_columns)
+                                if _mj_vote_columns
+                                else _mj_judge_count or "?"
+                            )
+                            with ui.row().classes(
+                                "items-center gap-2 mb-3 justify-center"
+                            ):
+                                ui.icon("groups", size="sm").classes("text-indigo-6")
+                                ui.label("Multi-Judge Statistics").classes(
+                                    "font-semibold text-sm"
+                                )
+                                ui.badge(
+                                    f"{_mj_display_count} judges",
+                                    color="indigo",
+                                ).classes("text-xs")
+
+                            # ── Row 1: Aggregate metrics ──
+                            with ui.row().classes(
+                                "w-full flex-wrap gap-6 items-end mb-3 justify-center"
+                            ):
+                                # Majority Vote ASR
+                                if _mj_majority_asr is not None:
+                                    with ui.column().classes(
+                                        "items-center gap-0 min-w-[90px]"
+                                    ):
+                                        ui.label(
+                                            f"{_mj_majority_asr * 100:.1f}%"
+                                        ).classes("text-xl font-bold text-primary")
+                                        ui.label("Majority ASR").classes(
+                                            "text-[10px] text-grey-6"
+                                        )
+
+                                # Fleiss Kappa
+                                if _mj_fleiss is not None:
+                                    _fk_color = (
+                                        "text-green-7"
+                                        if _mj_fleiss >= 0.6
+                                        else "text-orange-7"
+                                        if _mj_fleiss >= 0.2
+                                        else "text-red-7"
+                                    )
+                                    with ui.column().classes(
+                                        "items-center gap-0 min-w-[90px]"
+                                    ):
+                                        ui.label(f"{_mj_fleiss:.4f}").classes(
+                                            f"text-xl font-bold {_fk_color}"
+                                        )
+                                        ui.label("Fleiss κ").classes(
+                                            "text-[10px] text-grey-6"
+                                        )
+
+                                # Bias gap
+                                if isinstance(_mj_strictness, dict):
+                                    _bg = self._safe_float(
+                                        _mj_strictness.get("bias_gap")
+                                    )
+                                    if _bg is not None:
+                                        _bg_color = (
+                                            "text-green-7"
+                                            if abs(_bg) < 0.1
+                                            else "text-orange-7"
+                                            if abs(_bg) < 0.3
+                                            else "text-red-7"
+                                        )
+                                        with ui.column().classes(
+                                            "items-center gap-0 min-w-[90px]"
+                                        ):
+                                            ui.label(f"{_bg:.4f}").classes(
+                                                f"text-xl font-bold {_bg_color}"
+                                            )
+                                            ui.label("Bias Gap").classes(
+                                                "text-[10px] text-grey-6"
+                                            )
+
+                            # ── Row 2+: Per-judge table ──
+                            if _mj_all_judge_keys:
+                                ui.separator().classes("my-1")
+                                # Table header
+                                with ui.row().classes("w-full gap-0 px-2 py-1"):
+                                    ui.label("ID").classes(
+                                        "text-[11px] font-semibold text-grey-7 w-[52px] text-center"
+                                    )
+                                    ui.label("Judge").classes(
+                                        "text-[11px] font-semibold text-grey-7 w-[160px]"
+                                    )
+                                    ui.label("Type").classes(
+                                        "text-[11px] font-semibold text-grey-7 w-[140px]"
+                                    )
+                                    ui.label("ASR").classes(
+                                        "text-[11px] font-semibold text-grey-7 w-[90px] text-center"
+                                    )
+                                    ui.label("Strictness").classes(
+                                        "text-[11px] font-semibold text-grey-7 w-[90px] text-center ml-4"
+                                    )
+
+                                for _row_idx, _jk in enumerate(_mj_all_judge_keys):
+                                    _j_meta = _mj_judge_meta.get(_jk, {})
+                                    _j_id = _j_meta.get("id", _row_idx)
+                                    _j_name = _j_meta.get(
+                                        "name",
+                                        self._judge_key_display_name(_jk),
+                                    )
+                                    _j_type = (
+                                        _j_meta.get("type")
+                                        or self._judge_type_from_key(_jk)
+                                        or "—"
+                                    )
+
+                                    _j_asr = self._safe_float(
+                                        (_mj_per_judge_asr or {}).get(_jk)
+                                    )
+                                    _j_strict = self._safe_float(
+                                        (_mj_strictness or {}).get(_jk)
+                                    )
+
+                                    # ASR color
+                                    _asr_color = "text-grey-5"
+                                    if _j_asr is not None:
+                                        _asr_color = (
+                                            "text-red-7"
+                                            if _j_asr >= 0.7
+                                            else "text-orange-7"
+                                            if _j_asr >= 0.3
+                                            else "text-green-7"
+                                        )
+
+                                    # Strictness color
+                                    _strict_color = "text-grey-5"
+                                    if _j_strict is not None:
+                                        _strict_color = (
+                                            "text-green-7"
+                                            if _j_strict >= 0.7
+                                            else "text-orange-7"
+                                            if _j_strict >= 0.3
+                                            else "text-red-7"
+                                        )
+
+                                    with ui.row().classes(
+                                        "w-full gap-0 px-2 py-1 items-center "
+                                        "hover:bg-grey-1 rounded"
+                                    ):
+                                        ui.label(str(_j_id)).classes(
+                                            "text-xs text-grey-7 font-medium w-[52px] text-center"
+                                        )
+                                        ui.label(_j_name).classes(
+                                            "text-xs font-medium w-[160px] truncate"
+                                        )
+                                        ui.label(_j_type).classes(
+                                            "text-xs text-grey-6 w-[140px]"
+                                        )
+                                        ui.label(
+                                            f"{_j_asr * 100:.1f}%"
+                                            if _j_asr is not None
+                                            else "—"
+                                        ).classes(
+                                            f"text-xs font-bold {_asr_color} w-[90px] text-center"
+                                        )
+                                        ui.label(
+                                            f"{_j_strict:.4f}"
+                                            if _j_strict is not None
+                                            else "—"
+                                        ).classes(
+                                            f"text-xs font-bold {_strict_color} w-[90px] text-center ml-4"
+                                        )
 
             if all_items and self.history_results_list_area is not None:
                 # ── Pre-parse detail data for all rows ─────────────

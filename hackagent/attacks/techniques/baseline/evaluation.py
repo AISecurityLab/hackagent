@@ -574,6 +574,7 @@ def _finalize_goals_with_tracker(
         goal_results[goal_key]["evaluations"].append(
             {
                 "template_category": row.get("template_category"),
+                "sample_index": row.get("sample_index", 0),
                 "success": row.get("success", False),
                 "evaluation_notes": row.get("evaluation_notes", ""),
                 "response_length": row.get("response_length", 0),
@@ -581,6 +582,7 @@ def _finalize_goals_with_tracker(
                 "error": row.get("error"),
                 "error_message": row.get("error_message"),
                 "completion": row.get("completion", ""),
+                **BaseEvaluationStep._extract_eval_detail_columns(row),
             }
         )
 
@@ -625,7 +627,7 @@ def _finalize_goals_with_tracker(
                 "total_attempts": total,
                 "successful_attempts": successful,
                 "success_rate": success_rate,
-                "evaluations": results["evaluations"][:10],  # Limit for readability
+                "evaluations": results["evaluations"],
             },
             score=success_rate,
             explanation=f"{successful}/{total} attempts successful ({success_rate:.1f}%)",

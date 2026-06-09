@@ -11,9 +11,140 @@ import re
 
 from nicegui import ui
 
+# ── Common Vue template snippet for judge verdicts in expanded rows ──
+JUDGE_VERDICTS_VUE_SNIPPET = r"""
+      <div v-if="props.row._judge_verdicts && props.row._judge_verdicts.length > 0" style="margin-top:10px">
+        <div class="text-caption text-weight-bold text-uppercase q-mb-xs text-grey-6">JUDGE VERDICTS</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div v-for="jv in props.row._judge_verdicts" style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:4px" :style="jv.vote > 0 ? 'background:#fef2f2' : 'background:#f0fdf4'">
+            <q-icon :name="jv.vote > 0 ? 'dangerous' : 'verified_user'" :color="jv.vote > 0 ? 'red-5' : 'green-6'" size="18px" />
+                        <span style="font-size:11px;color:#616161;width:28px;text-align:center">{{ jv.id }}</span>
+                        <span style="font-size:12px;font-weight:600;width:180px">{{ jv.name }}</span>
+            <span style="font-size:10px;color:#9e9e9e;width:120px">{{ jv.type }}</span>
+            <q-badge :color="jv.vote > 0 ? 'negative' : 'positive'" class="text-xs">{{ jv.vote > 0 ? 'JAILBREAK' : 'MITIGATED' }}</q-badge>
+          </div>
+        </div>
+      </div>
+"""
+
+_ABBR_TO_TYPE = {
+    "hb": "Harmbench",
+    "hbv": "Harmbench Variant",
+    "jb": "Jailbreakbench",
+    "nj": "Nuanced",
+    "on_topic": "On Topic",
+}
+
 
 class AttackCardSharedMixin:
     """Mixin providing shared attack-card helpers."""
+
+    @staticmethod
+    def _build_judge_verdicts(
+        judge_columns: dict, judge_meta: dict | None = None
+    ) -> list[dict]:
+        """Build list of {id, name, type, vote} from judge_columns dict.
+
+        Uses judge_meta (from display_config.judges) for name/type resolution,
+        falling back to inferring type from the eval key abbreviation.
+
+        Ordering policy:
+            - primary: order declared in config judges list (meta id)
+            - fallback: lexical order for keys not present in metadata
+        """
+        if not judge_columns:
+            return []
+        meta = judge_meta or {}
+        votes: dict[str, int] = {}
+        for key in sorted(judge_columns.keys()):
+            if not key.startswith("eval_"):
+                continue
+            raw_val = judge_columns.get(key)
+            with contextlib.suppress(TypeError, ValueError):
+                votes[key] = int(float(raw_val) > 0)
+
+        if not votes:
+            return []
+
+        # Backfill duplicate same-type judges from metadata when old traces
+        # collapse them into a single base key (e.g. eval_hbv only).
+        effective_votes: dict[str, int] = {}
+        consumed_base_keys: set[str] = set()
+        meta_eval_keys = [
+            k
+            for k in sorted(meta.keys())
+            if isinstance(k, str) and k.startswith("eval_")
+        ]
+        for mk in meta_eval_keys:
+            if mk in votes:
+                effective_votes[mk] = votes[mk]
+                continue
+            if "_" in mk and mk.rsplit("_", 1)[1].isdigit():
+                base = mk.rsplit("_", 1)[0]
+                if base in votes:
+                    effective_votes[mk] = votes[base]
+                    consumed_base_keys.add(base)
+
+        for vk, vv in votes.items():
+            if vk not in effective_votes and vk not in consumed_base_keys:
+                effective_votes[vk] = vv
+
+        def _meta_id_for(key: str) -> int | None:
+            raw_id = (meta.get(key) or {}).get("id")
+            if raw_id is None:
+                return None
+            with contextlib.suppress(TypeError, ValueError):
+                return int(raw_id)
+            return None
+
+        ordered_meta_keys = sorted(
+            (k for k in effective_votes.keys() if k in meta),
+            key=lambda k: (
+                _meta_id_for(k) if _meta_id_for(k) is not None else 10**9,
+                str(k),
+            ),
+        )
+        ordered_fallback_keys = sorted(
+            k for k in effective_votes.keys() if k not in ordered_meta_keys
+        )
+        ordered_keys = ordered_meta_keys + ordered_fallback_keys
+
+        assigned_ids: dict[str, int] = {}
+        used_ids: set[int] = set()
+        for key in ordered_keys:
+            key_id = _meta_id_for(key)
+            if key_id is not None and key_id >= 0 and key_id not in used_ids:
+                assigned_ids[key] = key_id
+                used_ids.add(key_id)
+        next_id = 0
+        for key in ordered_keys:
+            if key in assigned_ids:
+                continue
+            while next_id in used_ids:
+                next_id += 1
+            assigned_ids[key] = next_id
+            used_ids.add(next_id)
+
+        verdicts = []
+        for key in ordered_keys:
+            m = meta.get(key, {})
+            name = m.get("name") or (key[5:] if key.startswith("eval_") else key)
+            stripped = key[5:]
+            base = (
+                stripped.rsplit("_", 1)[0]
+                if "_" in stripped and stripped.rsplit("_", 1)[1].isdigit()
+                else stripped
+            )
+            type_ = m.get("type") or _ABBR_TO_TYPE.get(base, "")
+            verdicts.append(
+                {
+                    "id": assigned_ids.get(key, 0),
+                    "name": name,
+                    "type": type_,
+                    "vote": effective_votes[key],
+                }
+            )
+        return verdicts
 
     @staticmethod
     def _border_color_for_bucket(bucket: str) -> str:
