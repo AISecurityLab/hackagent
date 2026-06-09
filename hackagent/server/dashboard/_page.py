@@ -8,7 +8,6 @@ from __future__ import annotations
 import asyncio
 from collections import defaultdict
 import contextlib
-import html
 import json
 import math
 import re
