@@ -46,6 +46,20 @@ All attacks support loading goals from AI safety benchmarks like **AgentHarm**, 
 
 :::tip Shared Category Classifier
 All attacks accept a top-level `category_classifier` config block to classify each goal at tracking time. You can customize model, endpoint, and adapter type directly in `attack_config`.
+
+Preflight behavior:
+
+- If you provide `intents` (with explicit labels), category-classifier preflight is skipped.
+- If you use `goals` or `dataset` and do **not** provide `category_classifier`, HackAgent preflights the default classifier config automatically.
+:::
+
+:::note Advanced Preflight Flags
+HackAgent also supports internal preflight-control flags in `attack_config`:
+
+- `_preflight_probe_optional_roles` (all attacks): when `true`, preflight probes optional roles too. By default optional roles are skipped.
+- `_preflight_require_embedder` (AutoDAN-Turbo only): when `true`, `embedder` is treated as required in preflight.
+
+These are advanced/debug controls and are usually not needed in standard runs.
 :::
 
 ---

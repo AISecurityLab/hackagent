@@ -177,6 +177,39 @@ class TAPAttack(BaseAttack):
             if value is None or value < 1:
                 raise ValueError(f"tap_params.{key} must be >= 1")
 
+    @classmethod
+    def get_effective_model_roles(
+        cls,
+        attack_config: Dict[str, Any],
+        *,
+        goal_labels_by_index: Optional[Dict[int, Dict[str, str]]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Resolve TAP runtime roles with on-topic fallback behavior."""
+        _ = goal_labels_by_index
+
+        roles: List[Dict[str, Any]] = []
+
+        attacker = attack_config.get("attacker")
+        if isinstance(attacker, dict):
+            roles.append({"role": "attacker", "config": attacker})
+
+        judges = attack_config.get("judges")
+        if isinstance(judges, list) and judges:
+            resolved_judges = judges
+        else:
+            judge = attack_config.get("judge")
+            resolved_judges = [judge] if isinstance(judge, dict) else []
+
+        roles.extend({"role": "judge", "config": judge} for judge in resolved_judges)
+
+        on_topic_judge = attack_config.get("on_topic_judge")
+        if isinstance(on_topic_judge, dict):
+            roles.append({"role": "on_topic_judge", "config": on_topic_judge})
+        elif resolved_judges:
+            roles.append({"role": "on_topic_judge", "config": resolved_judges[0]})
+
+        return roles
+
     def _get_pipeline_steps(self) -> List[Dict]:
         """
         Define the two TAP pipeline stages.

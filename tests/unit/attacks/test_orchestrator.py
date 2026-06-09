@@ -239,9 +239,18 @@ class TestAttackOrchestratorExecution(unittest.TestCase):
 
     @patch.object(AttackOrchestrator, "_create_server_attack_record")
     @patch.object(AttackOrchestrator, "_create_server_run_record")
+    @patch.object(
+        AttackOrchestrator,
+        "_validate_required_models_availability",
+        return_value=None,
+    )
     @patch.object(AttackOrchestrator, "_execute_local_attack")
     def test_execute_full_workflow(
-        self, mock_execute_local, mock_create_run, mock_create_attack
+        self,
+        mock_execute_local,
+        mock_validate_models,
+        mock_create_run,
+        mock_create_attack,
     ):
         """Test full execute workflow."""
 

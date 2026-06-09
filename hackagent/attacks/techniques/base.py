@@ -133,6 +133,29 @@ class BaseAttack(abc.ABC):
         """
         self._setup_logging()
 
+    @classmethod
+    def get_effective_model_roles(
+        cls,
+        attack_config: Dict[str, Any],
+        *,
+        goal_labels_by_index: Optional[Dict[int, Dict[str, str]]] = None,
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Return attack-owned preflight model roles, or ``None`` for fallback mapping.
+
+        The orchestrator consumes this hook before using its legacy static role map.
+        Each returned item should be a dict with:
+
+        - ``role``: logical role label (e.g. ``judge``)
+        - ``config``: model/router config dict for that role
+        - ``required`` (optional): whether this role must pass preflight
+
+        Returning ``None`` delegates role discovery to orchestrator fallback logic.
+        Returning ``[]`` means no attack-specific model roles are required.
+        """
+        _ = attack_config
+        _ = goal_labels_by_index
+        return None
+
     def _setup_logging(self):
         """
         Configure logging to console for this attack instance.
