@@ -1,5 +1,7 @@
 # Contributing to HackAgent
 
+Please review our [Security Policy](SECURITY.md) before contributing.
+
 First off, thank you for considering contributing to HackAgent! It's people like you that make HackAgent such a great tool. We welcome contributions of all kinds, from bug reports and feature requests to documentation improvements and code contributions.
 
 Following these guidelines helps to communicate that you respect the time of the developers managing and developing this open-source project. In return, they should reciprocate that respect in addressing your issue, assessing changes, and helping you finalize your pull requests.

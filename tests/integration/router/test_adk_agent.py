@@ -465,6 +465,7 @@ class TestGoogleADKToolUsage:
         # Tool usage details might be in response metadata
         logger.info(f"ADK tool response: {response}")
 
+    @pytest.mark.timeout(300)
     def test_adk_agent_complex_query(
         self,
         skip_if_google_adk_unavailable,

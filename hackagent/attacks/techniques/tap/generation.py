@@ -895,6 +895,7 @@ def execute(
     n_streams = tap_params.get("n_streams", 4)
 
     tracker: Optional[Tracker] = config.get("_tracker")
+    _goal_offset = int(config.get("_goal_index_offset", 0))
 
     executor = TapExecutor(
         config=config,
@@ -921,9 +922,11 @@ def execute(
                     _goal_pool.submit(
                         executor.run_single_goal,
                         goal=goal,
-                        goal_index=i,
+                        goal_index=_goal_offset + i,
                         goal_tracker=tracker,
-                        goal_ctx=tracker.get_goal_context(i) if tracker else None,
+                        goal_ctx=tracker.get_goal_context(_goal_offset + i)
+                        if tracker
+                        else None,
                         progress_bar=progress_bar,
                         task=task,
                     ): i
@@ -946,10 +949,12 @@ def execute(
                     }
         else:
             for i, goal in enumerate(goals):
-                goal_ctx = tracker.get_goal_context(i) if tracker else None
+                goal_ctx = (
+                    tracker.get_goal_context(_goal_offset + i) if tracker else None
+                )
                 results_map[i] = executor.run_single_goal(
                     goal=goal,
-                    goal_index=i,
+                    goal_index=_goal_offset + i,
                     goal_tracker=tracker,
                     goal_ctx=goal_ctx,
                     progress_bar=progress_bar,
