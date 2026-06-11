@@ -91,9 +91,12 @@ class AutodanCardMixin:
 
             raw_resp = content.get("target_response") or content.get("response")
             if raw_resp:
-                raw_resp, _adan_g_side, _adan_g_expl, _adan_g_cats = (
-                    AttackCardSharedMixin._extract_guardrail_from_response(raw_resp)
-                )
+                (
+                    raw_resp,
+                    _adan_g_side,
+                    _adan_g_expl,
+                    _adan_g_cats,
+                ) = AttackCardSharedMixin._extract_guardrail_from_response(raw_resp)
                 if _adan_g_side:
                     step["_guardrail_side"] = _adan_g_side
                     step["_guardrail_explanation"] = _adan_g_expl
@@ -343,7 +346,9 @@ class AutodanCardMixin:
                                                         icon="content_copy"
                                                     ).props(
                                                         "flat dense size=xs color=grey-6"
-                                                    ).tooltip("Copy to clipboard").on(
+                                                    ).tooltip(
+                                                        "Copy to clipboard"
+                                                    ).on(
                                                         "click",
                                                         js_handler=f"(event) => {{var b=event.currentTarget,ic=b.querySelector('.q-icon');if(navigator.clipboard)navigator.clipboard.writeText({json.dumps(target_response or '')});if(ic){{ic.textContent='check';setTimeout(function(){{ic.textContent='content_copy';}},2000);}}}}",
                                                     )
@@ -378,7 +383,9 @@ class AutodanCardMixin:
                                                         icon="content_copy"
                                                     ).props(
                                                         "flat dense size=xs color=grey-6"
-                                                    ).tooltip("Copy to clipboard").on(
+                                                    ).tooltip(
+                                                        "Copy to clipboard"
+                                                    ).on(
                                                         "click",
                                                         js_handler=f"(event) => {{var b=event.currentTarget,ic=b.querySelector('.q-icon');if(navigator.clipboard)navigator.clipboard.writeText({json.dumps(assessment or '')});if(ic){{ic.textContent='check';setTimeout(function(){{ic.textContent='content_copy';}},2000);}}}}",
                                                     )

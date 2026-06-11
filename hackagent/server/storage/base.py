@@ -147,11 +147,14 @@ class StorageBackend(Protocol):
 
     def list_agents(
         self, page: int = 1, page_size: int = 100
-    ) -> PaginatedResult[AgentRecord]: ...
+    ) -> PaginatedResult[AgentRecord]:
+        ...
 
-    def get_agent(self, agent_id: UUID) -> AgentRecord: ...
+    def get_agent(self, agent_id: UUID) -> AgentRecord:
+        ...
 
-    def delete_agent(self, agent_id: UUID) -> None: ...
+    def delete_agent(self, agent_id: UUID) -> None:
+        ...
 
     # ── Attack ────────────────────────────────────────────────────────────────
     def create_attack(
@@ -160,11 +163,13 @@ class StorageBackend(Protocol):
         agent_id: UUID,
         organization: UUID,
         configuration: Dict[str, Any],
-    ) -> AttackRecord: ...
+    ) -> AttackRecord:
+        ...
 
     def list_attacks(
         self, page: int = 1, page_size: int = 100
-    ) -> PaginatedResult[AttackRecord]: ...
+    ) -> PaginatedResult[AttackRecord]:
+        ...
 
     # ── Run ───────────────────────────────────────────────────────────────────
     def create_run(
@@ -172,7 +177,8 @@ class StorageBackend(Protocol):
         attack_id: UUID,
         agent_id: UUID,
         run_config: Dict[str, Any],
-    ) -> RunRecord: ...
+    ) -> RunRecord:
+        ...
 
     def update_run(
         self,
@@ -180,20 +186,25 @@ class StorageBackend(Protocol):
         status: Optional[str] = None,
         run_notes: Optional[str] = None,
         run_config: Optional[Dict[str, Any]] = None,
-    ) -> RunRecord: ...
+    ) -> RunRecord:
+        ...
 
     def list_runs(
         self,
         attack_id: Optional[UUID] = None,
         page: int = 1,
         page_size: int = 100,
-    ) -> PaginatedResult[RunRecord]: ...
+    ) -> PaginatedResult[RunRecord]:
+        ...
 
-    def get_run(self, run_id: UUID) -> RunRecord: ...
+    def get_run(self, run_id: UUID) -> RunRecord:
+        ...
 
-    def delete_run(self, run_id: UUID) -> None: ...
+    def delete_run(self, run_id: UUID) -> None:
+        ...
 
-    def delete_attack(self, attack_id: UUID) -> None: ...
+    def delete_attack(self, attack_id: UUID) -> None:
+        ...
 
     # ── Result ────────────────────────────────────────────────────────────────
     def create_result(
@@ -203,7 +214,8 @@ class StorageBackend(Protocol):
         goal_index: int,
         request_payload: Dict[str, Any],
         agent_specific_data: Dict[str, Any],
-    ) -> ResultRecord: ...
+    ) -> ResultRecord:
+        ...
 
     def update_result(
         self,
@@ -212,16 +224,19 @@ class StorageBackend(Protocol):
         evaluation_notes: Optional[str] = None,
         evaluation_metrics: Optional[Dict[str, Any]] = None,
         agent_specific_data: Optional[Dict[str, Any]] = None,
-    ) -> ResultRecord: ...
+    ) -> ResultRecord:
+        ...
 
     def list_results(
         self,
         run_id: Optional[UUID] = None,
         page: int = 1,
         page_size: int = 100,
-    ) -> PaginatedResult[ResultRecord]: ...
+    ) -> PaginatedResult[ResultRecord]:
+        ...
 
-    def get_result(self, result_id: UUID) -> ResultRecord: ...
+    def get_result(self, result_id: UUID) -> ResultRecord:
+        ...
 
     # ── Trace ─────────────────────────────────────────────────────────────────
     def create_trace(
@@ -230,9 +245,11 @@ class StorageBackend(Protocol):
         sequence: int,
         step_type: str,
         content: Dict[str, Any],
-    ) -> TraceRecord: ...
+    ) -> TraceRecord:
+        ...
 
-    def list_traces(self, result_id: UUID) -> List[TraceRecord]: ...
+    def list_traces(self, result_id: UUID) -> List[TraceRecord]:
+        ...
 
     def count_result_buckets(self) -> Dict[str, int]:
         """Return {total, jailbreaks, mitigated, failed, pending} across all results."""

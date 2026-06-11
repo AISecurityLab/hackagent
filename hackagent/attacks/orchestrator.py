@@ -24,6 +24,7 @@ Technique implementations remain pure algorithms, unaware of server integration.
 
 import json
 import logging
+import os
 import re
 import shutil
 import subprocess
@@ -365,6 +366,80 @@ class AttackOrchestrator:
                 models.add(model_name)
         return models
 
+    @staticmethod
+    def _auto_pull_enabled(attack_config: Dict[str, Any]) -> bool:
+        """Whether missing local Ollama models are downloaded automatically.
+
+        Enabled by default. Opt out with ``attack_config["auto_pull_models"]
+        = False`` or the ``HACKAGENT_AUTO_PULL_MODELS=0`` environment variable
+        (useful for CI / offline / metered-connection runs).
+        """
+        cfg = attack_config.get("auto_pull_models")
+        if cfg is not None:
+            return bool(cfg)
+        env = os.environ.get("HACKAGENT_AUTO_PULL_MODELS")
+        if env is not None and env.strip().lower() in ("0", "false", "no", "off"):
+            return False
+        return True
+
+    @classmethod
+    def _pull_ollama_model(cls, model: str) -> bool:
+        """Download a local Ollama model via ``ollama pull``. Returns success.
+
+        Inherits stdout/stderr so the user sees Ollama's live download progress
+        instead of a frozen terminal. Returns False (rather than raising) when
+        ollama is absent or the pull fails, so callers can fall back to their
+        existing "model unavailable" handling.
+        """
+        if shutil.which("ollama") is None:
+            return False
+        logger.info("Auto-pulling missing Ollama model '%s' via `ollama pull`", model)
+        print(
+            f"⬇️  Downloading missing Ollama model '{model}' "
+            "(set auto_pull_models=False to disable)...",
+            flush=True,
+        )
+        try:
+            result = subprocess.run(["ollama", "pull", model], check=False)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("Failed to run `ollama pull %s`: %s", model, exc)
+            return False
+        if result.returncode != 0:
+            logger.warning(
+                "`ollama pull %s` exited with code %s", model, result.returncode
+            )
+            return False
+        return True
+
+    def _autopull_missing_ollama_targets(
+        self, targets: List[Dict[str, Any]]
+    ) -> None:
+        """Best-effort: download any missing local Ollama models among *targets*.
+
+        Runs before the availability probe so attacker/judge/etc. models served
+        by a local Ollama are fetched on first use. Failures are swallowed — the
+        probe still reports anything genuinely unreachable.
+        """
+        candidates = [
+            str(t.get("identifier"))
+            for t in targets
+            if str(t.get("agent_type") or "").upper() == "OLLAMA" and t.get("identifier")
+        ]
+        if not candidates or shutil.which("ollama") is None:
+            return
+        try:
+            installed = self._get_installed_ollama_models()
+        except Exception:
+            return
+        seen: set[str] = set()
+        for model in candidates:
+            if model in seen:
+                continue
+            seen.add(model)
+            if not self._is_ollama_model_present(model, installed):
+                if self._pull_ollama_model(model):
+                    installed |= self._normalize_ollama_model_aliases(model)
+
     def _validate_default_category_classifier_requirements(
         self, attack_config: Dict[str, Any]
     ) -> None:
@@ -395,12 +470,23 @@ class AttackOrchestrator:
             ) from exc
 
         if not self._is_ollama_model_present(required_model, installed_models):
-            raise ValueError(
-                "Attack aborted: default category_classifier requires local Ollama "
-                f"model '{required_model}', but it is not present. Run "
-                f"`ollama pull {required_model}` or provide `category_classifier` "
-                "explicitly in attack_config."
-            )
+            # Auto-download the model (on by default) before giving up.
+            pulled = False
+            if self._auto_pull_enabled(attack_config) and self._pull_ollama_model(
+                required_model
+            ):
+                try:
+                    installed_models = self._get_installed_ollama_models()
+                except Exception:
+                    installed_models = set()
+                pulled = self._is_ollama_model_present(required_model, installed_models)
+            if not pulled:
+                raise ValueError(
+                    "Attack aborted: default category_classifier requires local "
+                    f"Ollama model '{required_model}', but it is not present. Run "
+                    f"`ollama pull {required_model}` or provide `category_classifier` "
+                    "explicitly in attack_config."
+                )
 
     @staticmethod
     @contextmanager
@@ -835,6 +921,11 @@ class AttackOrchestrator:
         )
         if not targets:
             return None
+
+        # Download any missing local Ollama models before probing, so the
+        # probe sees them as available (on by default; see _auto_pull_enabled).
+        if self._auto_pull_enabled(attack_config):
+            self._autopull_missing_ollama_targets(targets)
 
         probe_optional_roles = bool(
             attack_config.get("_preflight_probe_optional_roles", False)

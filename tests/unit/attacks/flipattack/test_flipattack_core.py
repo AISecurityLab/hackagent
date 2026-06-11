@@ -309,6 +309,6 @@ class TestFlipAttackSystemPrompts:
         fa = _make_fa(flip_mode="FCS")
         forbidden_words = ["sorry", "cannot", "unable", "illegal", "unethical"]
         for word in forbidden_words:
-            assert word in fa._base_system_prompt.lower(), (
-                f"Expected forbidden word '{word}' in system prompt"
-            )
+            assert (
+                word in fa._base_system_prompt.lower()
+            ), f"Expected forbidden word '{word}' in system prompt"

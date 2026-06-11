@@ -338,9 +338,7 @@ def _format_response_body(response: Any, indent: str = "     ") -> str:
                     # Text completion format (legacy)
                     text = choice.get("text", "")
                     if text and not msg:
-                        output += (
-                            f"{indent}[bright_green]📝 COMPLETION[/bright_green]\n"
-                        )
+                        output += f"{indent}[bright_green]📝 COMPLETION[/bright_green]\n"
                         lines = text.split("\n")[:15]
                         for line in lines:
                             if line.strip():
@@ -571,9 +569,7 @@ def _format_trace_block(
         goal = content.get("goal", "")
         goal_index = content.get("goal_index", "?")
         attack = content.get("attack_type", "").upper()
-        header = (
-            f"  [bold cyan]{_step_num_circle(step_num)} 🎯 INIT[/bold cyan]{ts_str}"
-        )
+        header = f"  [bold cyan]{_step_num_circle(step_num)} 🎯 INIT[/bold cyan]{ts_str}"
         body = (
             f"  [dim]│[/dim]  [bold]Attack:[/bold] [bright_white]{_escape(attack)}[/bright_white]\n"
             f"  [dim]│[/dim]  [bold]Goal #{goal_index}:[/bold] [yellow]{_escape(goal[:200])}[/yellow]\n"
@@ -646,7 +642,9 @@ def _format_trace_block(
             else "[red]✗ REFUSED[/red]"
         )
         score_color = "bright_green" if best_score > 0 else "dim"
-        header = f"  [bold green]{_step_num_circle(step_num)} 📋 SUMMARY[/bold green]{ts_str}"
+        header = (
+            f"  [bold green]{_step_num_circle(step_num)} 📋 SUMMARY[/bold green]{ts_str}"
+        )
         body = (
             f"  [dim]│[/dim]  Attempts: [bright_white]{num_results}[/bright_white]"
             f"  |  Best Score: [{score_color}]{best_score:.2f}[/{score_color}]"
@@ -2297,7 +2295,9 @@ class ResultsTab(BaseTab):
             message += "[dim]Results will be added as the attack progresses...[/dim]\n"
 
         elif status_display == "COMPLETED":
-            message += "[bold yellow]⚠️  Run completed with no results[/bold yellow]\n\n"
+            message += (
+                "[bold yellow]⚠️  Run completed with no results[/bold yellow]\n\n"
+            )
             message += "[dim]This might happen if:[/dim]\n"
             message += "[dim]  • The attack configuration didn't generate any test cases[/dim]\n"
             message += (

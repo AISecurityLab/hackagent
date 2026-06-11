@@ -4,6 +4,7 @@
 """Additional tests for AttackOrchestrator — covering execute flow and HTTP helpers."""
 
 import json
+import os
 import unittest
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
@@ -249,19 +250,32 @@ class TestDefaultCategoryClassifierPreflight(unittest.TestCase):
                 "_get_installed_ollama_models",
                 return_value={"llama3:latest"},
             ):
+                # Auto-pull is on by default; simulate an offline/failed pull so
+                # the run still aborts (and no real `ollama pull` is invoked).
                 with patch.object(
                     AttackOrchestrator,
-                    "_create_server_run_record",
-                    return_value=_VALID_RUN_ID,
-                ) as mock_create_run:
-                    with self.assertRaises(ValueError) as ctx:
-                        orch.execute(
-                            attack_config=attack_config,
-                            run_config_override=None,
-                            fail_on_run_error=False,
-                        )
+                    "_pull_ollama_model",
+                    return_value=False,
+                ) as mock_pull:
+                    with patch.object(
+                        AttackOrchestrator,
+                        "_create_server_run_record",
+                        return_value=_VALID_RUN_ID,
+                    ) as mock_create_run:
+                        with self.assertRaises(ValueError) as ctx:
+                            orch.execute(
+                                attack_config=attack_config,
+                                run_config_override=None,
+                                fail_on_run_error=False,
+                            )
 
-        self.assertIn("gemma3:4b", str(ctx.exception))
+        mock_pull.assert_called_once()
+
+        from hackagent.attacks.techniques.config import (
+            DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
+        )
+
+        self.assertIn(DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER, str(ctx.exception))
         mock_create_run.assert_not_called()
 
     def test_skips_preflight_if_classifier_is_explicitly_configured(self):
@@ -547,12 +561,16 @@ class TestRequiredModelAvailabilityPreflight(unittest.TestCase):
                 "_probe_model_target",
                 return_value="model not found",
             ):
+                # Disable auto-pull so this test exercises the report path only
+                # (and never shells out to a real `ollama pull`).
                 message = orch._validate_required_models_availability(
-                    attack_config={"goals": ["test"]}
+                    attack_config={"goals": ["test"], "auto_pull_models": False}
                 )
 
         self.assertIsInstance(message, str)
         self.assertIn("required models are unavailable", message)
+        # The model id here comes from this test's mocked role fixture, not the
+        # default, so it stays "gemma3:4b".
         self.assertIn("gemma3:4b", message)
         self.assertIn("http://localhost:11434", message)
 
@@ -876,6 +894,93 @@ class TestGetAttackImplKwargs(unittest.TestCase):
         self.assertIn("client", kwargs)
         self.assertIn("agent_router", kwargs)
         self.assertIs(kwargs["client"], hack_agent.backend)
+
+
+@unittest.skipUnless(
+    (DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE or "").upper() == "OLLAMA",
+    "default category classifier is not Ollama-based",
+)
+class TestAutoPullOllamaModels(unittest.TestCase):
+    """Auto-download missing local Ollama models instead of aborting."""
+
+    def test_auto_pull_enabled_defaults_and_overrides(self):
+        # On by default.
+        self.assertTrue(AttackOrchestrator._auto_pull_enabled({}))
+        # Explicit config opt-out.
+        self.assertFalse(
+            AttackOrchestrator._auto_pull_enabled({"auto_pull_models": False})
+        )
+        # Env opt-out.
+        with patch.dict(os.environ, {"HACKAGENT_AUTO_PULL_MODELS": "0"}):
+            self.assertFalse(AttackOrchestrator._auto_pull_enabled({}))
+            # Explicit config wins over env.
+            self.assertTrue(
+                AttackOrchestrator._auto_pull_enabled({"auto_pull_models": True})
+            )
+
+    def test_classifier_autopull_success_does_not_raise(self):
+        """Missing default classifier model is pulled, then the run proceeds."""
+        orch, _, _ = _make_orchestrator()
+        with patch(
+            "hackagent.attacks.orchestrator.shutil.which",
+            return_value="/usr/local/bin/ollama",
+        ):
+            # Missing before the pull, present after.
+            with patch.object(
+                AttackOrchestrator,
+                "_get_installed_ollama_models",
+                side_effect=[set(), {DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER}],
+            ):
+                with patch.object(
+                    AttackOrchestrator, "_pull_ollama_model", return_value=True
+                ) as mock_pull:
+                    # Should not raise.
+                    orch._validate_default_category_classifier_requirements(
+                        {"goals": ["x"]}
+                    )
+        mock_pull.assert_called_once_with(DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER)
+
+    def test_classifier_autopull_disabled_raises_without_pulling(self):
+        orch, _, _ = _make_orchestrator()
+        with patch(
+            "hackagent.attacks.orchestrator.shutil.which",
+            return_value="/usr/local/bin/ollama",
+        ):
+            with patch.object(
+                AttackOrchestrator,
+                "_get_installed_ollama_models",
+                return_value={"llama3:latest"},
+            ):
+                with patch.object(
+                    AttackOrchestrator, "_pull_ollama_model"
+                ) as mock_pull:
+                    with self.assertRaises(ValueError):
+                        orch._validate_default_category_classifier_requirements(
+                            {"goals": ["x"], "auto_pull_models": False}
+                        )
+        mock_pull.assert_not_called()
+
+    def test_autopull_missing_ollama_targets_pulls_only_missing(self):
+        orch, _, _ = _make_orchestrator()
+        targets = [
+            {"identifier": "gemma3:4b", "agent_type": "OLLAMA"},  # missing → pull
+            {"identifier": "present:latest", "agent_type": "OLLAMA"},  # present → skip
+            {"identifier": "gpt-4o", "agent_type": "OPENAI_SDK"},  # non-ollama → skip
+        ]
+        with patch(
+            "hackagent.attacks.orchestrator.shutil.which",
+            return_value="/usr/local/bin/ollama",
+        ):
+            with patch.object(
+                AttackOrchestrator,
+                "_get_installed_ollama_models",
+                return_value={"present:latest"},
+            ):
+                with patch.object(
+                    AttackOrchestrator, "_pull_ollama_model", return_value=True
+                ) as mock_pull:
+                    orch._autopull_missing_ollama_targets(targets)
+        mock_pull.assert_called_once_with("gemma3:4b")
 
 
 if __name__ == "__main__":

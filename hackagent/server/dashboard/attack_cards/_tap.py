@@ -44,9 +44,12 @@ class TapCardMixin:
                 req = content.get("request") or {}
                 prompt = req.get("prompt", "") if isinstance(req, dict) else ""
                 resp = content.get("response")
-                resp, _tap_g_side, _tap_g_expl, _tap_g_cats = (
-                    AttackCardSharedMixin._extract_guardrail_from_response(resp)
-                )
+                (
+                    resp,
+                    _tap_g_side,
+                    _tap_g_expl,
+                    _tap_g_cats,
+                ) = AttackCardSharedMixin._extract_guardrail_from_response(resp)
                 response = str(resp) if resp not in (None, "") else ""
                 depth_level = int(meta.get("iteration") or 0)
                 _interaction_counts[depth_level] = (
@@ -79,9 +82,12 @@ class TapCardMixin:
                 _summary_counts[depth_level] = len(branches)
                 for branch in branches:
                     _b_resp = branch.get("response")
-                    _b_resp, _b_g_side, _b_g_expl, _b_g_cats = (
-                        AttackCardSharedMixin._extract_guardrail_from_response(_b_resp)
-                    )
+                    (
+                        _b_resp,
+                        _b_g_side,
+                        _b_g_expl,
+                        _b_g_cats,
+                    ) = AttackCardSharedMixin._extract_guardrail_from_response(_b_resp)
                     _add(
                         {
                             "depth": depth_level,
@@ -109,9 +115,12 @@ class TapCardMixin:
                 _summary_counts[depth_level] = len(branches)
                 for branch in branches:
                     _b_resp2 = branch.get("response")
-                    _b_resp2, _b2_g_side, _b2_g_expl, _b2_g_cats = (
-                        AttackCardSharedMixin._extract_guardrail_from_response(_b_resp2)
-                    )
+                    (
+                        _b_resp2,
+                        _b2_g_side,
+                        _b2_g_expl,
+                        _b2_g_cats,
+                    ) = AttackCardSharedMixin._extract_guardrail_from_response(_b_resp2)
                     _add(
                         {
                             "depth": depth_level,

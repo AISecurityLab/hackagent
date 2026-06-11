@@ -82,9 +82,12 @@ class AdvprefixCardMixin:
             surrogate = str(metadata.get("surrogate_attack_prompt") or "")
 
             response = content.get("response")
-            response, _adv_g_side, _adv_g_expl, _adv_g_cats = (
-                AttackCardSharedMixin._extract_guardrail_from_response(response)
-            )
+            (
+                response,
+                _adv_g_side,
+                _adv_g_expl,
+                _adv_g_cats,
+            ) = AttackCardSharedMixin._extract_guardrail_from_response(response)
             if isinstance(response, dict):
                 completion = (
                     response.get("generated_text") or response.get("completion") or ""

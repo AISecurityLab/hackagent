@@ -24,6 +24,10 @@ from typing import Any, Dict, List, Optional
 
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.techniques.autodan_turbo.core import score_response
+from hackagent.attacks.techniques.config import (
+    DEFAULT_ATTACKER_IDENTIFIER,
+    DEFAULT_JUDGE_IDENTIFIER,
+)
 from hackagent.attacks.objectives import OBJECTIVES
 from hackagent.attacks.shared.progress import create_progress_bar
 from hackagent.attacks.shared.prompt_parser import extract_prompt
@@ -252,7 +256,9 @@ class PAIRAttack(BaseAttack):
             attacker_config = self.config.get("attacker", {})
 
             router_config = {
-                "identifier": attacker_config.get("identifier", "gemma3:4b"),
+                "identifier": attacker_config.get(
+                    "identifier", DEFAULT_ATTACKER_IDENTIFIER
+                ),
                 "endpoint": attacker_config.get("endpoint", "http://localhost:11434"),
                 "agent_type": attacker_config.get("agent_type", "OLLAMA"),
                 "thinking": attacker_config.get("thinking"),
@@ -301,7 +307,7 @@ class PAIRAttack(BaseAttack):
             scorer_config = self.config.get("scorer", {})
 
             router_config = {
-                "identifier": scorer_config.get("identifier", "gemma3:4b"),
+                "identifier": scorer_config.get("identifier", DEFAULT_JUDGE_IDENTIFIER),
                 "endpoint": scorer_config.get("endpoint", "http://localhost:11434"),
                 "agent_type": scorer_config.get("agent_type", "OLLAMA"),
                 "thinking": scorer_config.get("thinking"),

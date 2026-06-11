@@ -150,6 +150,7 @@ const sidebars: SidebarsConfig = {
               label: 'Providers',
               items: [
                 'hackagent/router/providers/adk',
+                'hackagent/router/providers/claude',
               ],
             },
             {

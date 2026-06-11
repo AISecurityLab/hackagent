@@ -19,9 +19,11 @@ from rich.traceback import install
 from hackagent.cli.commands import (
     agent,
     attack,
+    claude as claude_cmd,
     config,
     examples,
     results,
+    scan as scan_cmd,
     web as web_cmd,
 )
 from hackagent.cli.config import CLIConfig
@@ -484,9 +486,7 @@ def doctor(ctx):
     # Summary
     console.print("\n[cyan]📊 Summary")
     if issues_found == 0:
-        console.print(
-            "[bold green]✅ All checks passed! You're ready to use HackAgent."
-        )
+        console.print("[bold green]✅ All checks passed! You're ready to use HackAgent.")
     else:
         console.print(
             f"[bold yellow]⚠️ Found {issues_found} issue(s) that should be addressed."
@@ -569,6 +569,8 @@ def _display_welcome():
 cli.add_command(config.config)
 cli.add_command(agent.agent)
 cli.add_command(attack.eval_cmd)
+cli.add_command(scan_cmd.scan)
+cli.add_command(claude_cmd.claude)
 cli.add_command(examples.examples)
 cli.add_command(results.results)
 cli.add_command(web_cmd.web)

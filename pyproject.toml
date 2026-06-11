@@ -34,6 +34,11 @@ dependencies = [
     "faiss-cpu>=1.13.2",
     "datasets>=2.14.0",
     "nicegui>=2.0",
+    # Drives a real browser for the ``web`` provider (`hackagent scan <url>`).
+    # The Chromium *binary* is not a pip package (Playwright downloads it
+    # ~150 MB) — the web provider fetches it automatically on first use, or
+    # pre-fetch with:  playwright install chromium
+    "playwright>=1.40",
 ]
 
 

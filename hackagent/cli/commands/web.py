@@ -80,9 +80,7 @@ def web(ctx, host, port, db_path, no_browser):
     try:
         from flask import Flask  # noqa: F401
     except ImportError:
-        console.print(
-            "[bold red]❌ Flask is required for the web dashboard.[/bold red]"
-        )
+        console.print("[bold red]❌ Flask is required for the web dashboard.[/bold red]")
         console.print("\n[cyan]Install with:[/cyan]")
         console.print("  pip install 'hackagent[web]'")
         console.print("  # or")

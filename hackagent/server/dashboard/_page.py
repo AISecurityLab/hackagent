@@ -710,9 +710,9 @@ function hackAgentCopyFallback(text) {
             with ui.row().classes("items-center w-full gap-2 px-2 flex-wrap shrink-0"):
                 ui.input(
                     placeholder="Search runs…",
-                ).props("dense outlined clearable").classes(
-                    "min-w-[100px] max-w-[180px] flex-1"
-                ).on(
+                ).props(
+                    "dense outlined clearable"
+                ).classes("min-w-[100px] max-w-[180px] flex-1").on(
                     "update:model-value",
                     lambda e: self._on_runs_search_change(
                         e.args if isinstance(e.args, str) else (e.args or "")
@@ -801,7 +801,8 @@ function hackAgentCopyFallback(text) {
                 )
                 # Move pagination bar to top via flex order
                 self.runs_table.classes("runs-table-top-pagination")
-                ui.add_css("""
+                ui.add_css(
+                    """
                     .runs-table-top-pagination .q-table__container {
                         display: flex;
                         flex-direction: column;
@@ -811,7 +812,8 @@ function hackAgentCopyFallback(text) {
                         border-bottom: 1px solid #e0e0e0;
                         border-top: none;
                     }
-                """)
+                """
+                )
                 self._runs_load_more_btn = (
                     ui.button(
                         "Load more",
@@ -2474,7 +2476,9 @@ function hackAgentCopyFallback(text) {
                         columns=columns,
                         rows=table_rows,
                         row_key="run",
-                    ).classes("w-full").props("dense flat bordered")
+                    ).classes(
+                        "w-full"
+                    ).props("dense flat bordered")
 
                 # ── Risk Distribution + Vulnerabilities per Category (side by side) ──
                 with ui.row().classes("w-full mt-3 gap-3 items-stretch"):
@@ -4073,9 +4077,11 @@ function hackAgentCopyFallback(text) {
                     detail_data = self._parse_mml_traces(serialized_traces)
                     self._render_mml_goal_card(row, detail_data, detail_mode=True)
                 else:
-                    req_text, resp_text, _generic_guardrail = (
-                        self._extract_prompt_response_from_traces(serialized_traces)
-                    )
+                    (
+                        req_text,
+                        resp_text,
+                        _generic_guardrail,
+                    ) = self._extract_prompt_response_from_traces(serialized_traces)
                     self._render_generic_goal_card(
                         row,
                         req_text,
@@ -4187,9 +4193,9 @@ function hackAgentCopyFallback(text) {
                     ui.label(title).classes("text-xs text-grey-6")
                     ui.button(
                         icon="content_copy",
-                    ).props("flat dense size=xs color=grey-6").tooltip(
-                        "Copy to clipboard"
-                    ).on(
+                    ).props(
+                        "flat dense size=xs color=grey-6"
+                    ).tooltip("Copy to clipboard").on(
                         "click",
                         js_handler=f"(event) => {{var b=event.currentTarget,ic=b.querySelector('.q-icon');if(navigator.clipboard)navigator.clipboard.writeText({json.dumps(text)});if(ic){{ic.textContent='check';setTimeout(function(){{ic.textContent='content_copy';}},2000);}}}}",
                     )
@@ -4600,9 +4606,12 @@ function hackAgentCopyFallback(text) {
                 response_value.get("adapter_type") == "guardrail"
                 or response_value.get("side") in ("before", "after", "unknown")
             ):
-                _, _node_g_side, _node_g_expl, _node_g_cats = (
-                    DashboardPage._extract_guardrail_from_response(response_value)
-                )
+                (
+                    _,
+                    _node_g_side,
+                    _node_g_expl,
+                    _node_g_cats,
+                ) = DashboardPage._extract_guardrail_from_response(response_value)
                 response_text = ""
                 target_present = True
             else:
@@ -7219,9 +7228,9 @@ function hackAgentCopyFallback(text) {
             category_stats: dict[str, dict[str, int]] = defaultdict(
                 lambda: {"total": 0, "vulnerable": 0, "mitigated": 0, "errors": 0}
             )
-            category_subcategory_stats: dict[str, dict[str, dict[str, int]]] = (
-                defaultdict(lambda: defaultdict(lambda: {"total": 0, "vulnerable": 0}))
-            )
+            category_subcategory_stats: dict[
+                str, dict[str, dict[str, int]]
+            ] = defaultdict(lambda: defaultdict(lambda: {"total": 0, "vulnerable": 0}))
             for row in new_rows:
                 label = self._extract_category_label(row)
                 if not label:
@@ -9430,9 +9439,9 @@ function hackAgentCopyFallback(text) {
                                             continue
                                         if _mj_v is None:
                                             continue
-                                        _mj_trace_votes[_mj_k] = (
-                                            self._coerce_binary_vote(_mj_v)
-                                        )
+                                        _mj_trace_votes[
+                                            _mj_k
+                                        ] = self._coerce_binary_vote(_mj_v)
                             if _mj_trace_votes:
                                 _mj_votes = dict(sorted(_mj_trace_votes.items()))
                         if _mj_votes:
@@ -9701,8 +9710,10 @@ function hackAgentCopyFallback(text) {
                         _h_detail_data[_rid] = self._parse_mml_traces(_t)
                     else:
                         _t = generic_traces_map_hr.get(_rid, [])
-                        _h_detail_data[_rid] = (
-                            self._extract_prompt_response_from_traces(_t)
+                        _h_detail_data[
+                            _rid
+                        ] = self._extract_prompt_response_from_traces(
+                            _t
                         )  # returns (req, resp, guardrail_event)
 
                 # Store for filter re-rendering

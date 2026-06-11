@@ -356,94 +356,23 @@ class AttackLogViewer(Container):
             return None
 
     def copy_logs(self) -> bool:
-        """Copy currently visible logs to the clipboard (falls back to file).
+        """Copy currently visible logs to the clipboard.
+
+        Uses the shared clipboard helper (OSC 52 → OS tools → pyperclip → file).
 
         Returns:
             True if logs were copied successfully, False otherwise.
         """
+        from hackagent.cli.tui.widgets.clipboard import copy_to_clipboard
+
         log_text = self._filtered_plaintext()
         if not log_text:
             return False
-
-        # Try multiple clipboard methods
-        copied = False
-
-        # Method 1: Try subprocess clipboard tools first (more reliable in containers/SSH)
         try:
-            import subprocess
-            import platform
-
-            system = platform.system()
-            if system == "Linux":
-                # Try xclip first, then xsel
-                try:
-                    subprocess.run(
-                        ["xclip", "-selection", "clipboard"],
-                        input=log_text.encode(),
-                        check=True,
-                        stderr=subprocess.DEVNULL,
-                        timeout=2,
-                    )
-                    copied = True
-                except (
-                    FileNotFoundError,
-                    subprocess.CalledProcessError,
-                    subprocess.TimeoutExpired,
-                ):
-                    try:
-                        subprocess.run(
-                            ["xsel", "--clipboard", "--input"],
-                            input=log_text.encode(),
-                            check=True,
-                            stderr=subprocess.DEVNULL,
-                            timeout=2,
-                        )
-                        copied = True
-                    except (
-                        FileNotFoundError,
-                        subprocess.CalledProcessError,
-                        subprocess.TimeoutExpired,
-                    ):
-                        pass
-            elif system == "Darwin":  # macOS
-                subprocess.run(
-                    ["pbcopy"], input=log_text.encode(), check=True, timeout=2
-                )
-                copied = True
-            elif system == "Windows":
-                subprocess.run(["clip"], input=log_text.encode(), check=True, timeout=2)
-                copied = True
-
-            if copied:
-                return True
+            app = self.app
         except Exception:
-            pass
-
-        # Method 2: Try pyperclip as fallback (if subprocess failed)
-        if not copied:
-            try:
-                import pyperclip
-
-                pyperclip.copy(log_text)
-                return True
-            except ImportError:
-                pass
-            except Exception:
-                pass
-
-        # Method 3: Save to file as last resort
-        try:
-            import tempfile
-            import os
-
-            log_file = os.path.join(tempfile.gettempdir(), "hackagent_logs.txt")
-            with open(log_file, "w") as f:
-                f.write(log_text)
-            return True
-        except Exception:
-            pass
-
-        return False
+            app = None
+        return copy_to_clipboard(app, log_text)
 
     def view_in_pager(self) -> None:
         """View currently visible logs in $PAGER / less for navigation."""

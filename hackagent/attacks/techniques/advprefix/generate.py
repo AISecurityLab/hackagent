@@ -884,9 +884,9 @@ class PrefixGenerationPipeline:
                     result["events_list"] = agent_specific.get("events_list")
             except Exception as e:
                 result["prefix_nll"] = float("inf")
-                result["error_message"] = (
-                    f"CE worker exception: {type(e).__name__}: {e}"
-                )
+                result[
+                    "error_message"
+                ] = f"CE worker exception: {type(e).__name__}: {e}"
                 self.logger.error(
                     f"CE exception for prefix index {index}: {e}",
                     exc_info=e,

@@ -166,6 +166,7 @@ class HackAgentTUI(App):
         Binding("r", "switch_tab('results')", "Results", show=False),
         Binding("c", "switch_tab('config')", "Config", show=False),
         Binding("f5", "refresh", "Refresh", show=True),
+        Binding("ctrl+y", "copy_selection", "Copy logs", show=True),
     ]
 
     def __init__(
@@ -234,6 +235,67 @@ class HackAgentTUI(App):
         # Last-resort: try the pane itself.
         if hasattr(active_pane, "refresh_data"):
             active_pane.refresh_data()
+
+    def _active_monitor_text(self) -> tuple[str, str]:
+        """Return ``(text, source)`` for the active attack-monitor panel.
+
+        Picks the Actions panel when its tab is active, otherwise the Logs
+        panel. Returns ``("", "logs")`` when no viewer is present.
+        """
+        from hackagent.cli.tui.widgets.actions import AgentActionsViewer
+        from hackagent.cli.tui.widgets.logs import AttackLogViewer
+
+        active = None
+        try:
+            monitor = self.query_one("#attack-monitor-container")
+            active = monitor.query_one(TabbedContent).active
+        except Exception:
+            active = None
+
+        if active == "actions-tab":
+            try:
+                return self.query_one(AgentActionsViewer).get_actions_text(), "actions"
+            except Exception:
+                pass
+        try:
+            return self.query_one(AttackLogViewer).get_log_text(), "logs"
+        except Exception:
+            pass
+        try:
+            return self.query_one(AgentActionsViewer).get_actions_text(), "actions"
+        except Exception:
+            return "", "logs"
+
+    def action_copy_selection(self) -> None:
+        """Copy logs (or a text selection) to the clipboard — bound to Ctrl+Y.
+
+        If you've dragged to select text, that selection is copied. Otherwise it
+        copies the whole visible Logs (or Actions) panel — so you can copy
+        without needing the mouse at all. Uses Textual's terminal-native
+        clipboard (OSC 52), which works locally and over SSH.
+        """
+        from hackagent.cli.tui.widgets.clipboard import copy_to_clipboard
+
+        source = "selection"
+        text = ""
+        try:
+            text = self.screen.get_selected_text() or ""
+        except Exception:
+            text = ""
+        if not text:
+            text, source = self._active_monitor_text()
+        if not text:
+            self.notify(
+                "Nothing to copy yet — run an attack, or drag to select text first.",
+                title="Copy",
+                severity="warning",
+            )
+            return
+        copy_to_clipboard(self, text)
+        self.notify(
+            f"Copied {source} ({len(text)} characters) to the clipboard.",
+            title="Copy",
+        )
 
     def on_mount(self) -> None:
         """Called when the app is mounted."""

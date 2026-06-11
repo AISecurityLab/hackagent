@@ -1180,3 +1180,184 @@ class TestFormatResultFullDetails:
 
         assert "NOT_EVALUATED" in details
         console.print(details)
+
+
+# ============================================================================
+# Copying logs / text selection
+# ============================================================================
+
+
+class TestLogCopy:
+    """The Logs panel 'Copy' button and the Ctrl+Y copy-selection binding."""
+
+    def test_copy_logs_uses_osc52_clipboard(self) -> None:
+        """Copy goes through Textual's native (OSC 52) clipboard first."""
+        from unittest.mock import MagicMock, PropertyMock, patch
+
+        from hackagent.cli.tui.widgets.logs import AttackLogViewer
+
+        viewer = AttackLogViewer()
+        viewer._records = [("INFO", "hello world")]
+        fake_app = MagicMock()
+        # Force local clipboard tools to be unavailable so only OSC 52 applies.
+        with (
+            patch.object(
+                AttackLogViewer, "app", new_callable=PropertyMock, return_value=fake_app
+            ),
+            patch("subprocess.run", side_effect=FileNotFoundError()),
+        ):
+            ok = viewer.copy_logs()
+        assert ok is True
+        fake_app.copy_to_clipboard.assert_called_once()
+        assert "hello world" in fake_app.copy_to_clipboard.call_args.args[0]
+
+    def test_copy_logs_empty_returns_false(self) -> None:
+        from hackagent.cli.tui.widgets.logs import AttackLogViewer
+
+        assert AttackLogViewer().copy_logs() is False
+
+    def test_ctrl_y_binding_registered(self) -> None:
+        from hackagent.cli.tui.app import HackAgentTUI
+
+        pairs = {(b.key, b.action) for b in HackAgentTUI.BINDINGS}
+        assert ("ctrl+y", "copy_selection") in pairs
+
+    def test_action_copies_current_selection(self) -> None:
+        from unittest.mock import MagicMock, PropertyMock, patch
+
+        from hackagent.cli.tui.app import HackAgentTUI
+
+        app = HackAgentTUI(MagicMock())
+        app.copy_to_clipboard = MagicMock()
+        app.notify = MagicMock()
+        screen = MagicMock()
+        screen.get_selected_text.return_value = "selected log line"
+        with (
+            patch.object(
+                HackAgentTUI, "screen", new_callable=PropertyMock, return_value=screen
+            ),
+            patch("subprocess.run", side_effect=FileNotFoundError()),
+        ):
+            app.action_copy_selection()
+        # A selection takes priority; it goes to the clipboard via the helper.
+        app.copy_to_clipboard.assert_called_once_with("selected log line")
+
+    def test_action_falls_back_to_logs_when_no_selection(self) -> None:
+        from unittest.mock import MagicMock, PropertyMock, patch
+
+        from hackagent.cli.tui.app import HackAgentTUI
+
+        app = HackAgentTUI(MagicMock())
+        app.copy_to_clipboard = MagicMock()
+        app.notify = MagicMock()
+        # No selection, and _active_monitor_text returns visible log text.
+        screen = MagicMock()
+        screen.get_selected_text.return_value = ""
+        with (
+            patch.object(
+                HackAgentTUI, "screen", new_callable=PropertyMock, return_value=screen
+            ),
+            patch.object(
+                HackAgentTUI,
+                "_active_monitor_text",
+                return_value=("log line 1\nlog line 2", "logs"),
+            ),
+            patch("subprocess.run", side_effect=FileNotFoundError()),
+        ):
+            app.action_copy_selection()
+        app.copy_to_clipboard.assert_called_once_with("log line 1\nlog line 2")
+
+    def test_action_warns_when_nothing_to_copy(self) -> None:
+        from unittest.mock import MagicMock, PropertyMock, patch
+
+        from hackagent.cli.tui.app import HackAgentTUI
+
+        app = HackAgentTUI(MagicMock())
+        app.copy_to_clipboard = MagicMock()
+        app.notify = MagicMock()
+        screen = MagicMock()
+        screen.get_selected_text.return_value = ""
+        with (
+            patch.object(
+                HackAgentTUI, "screen", new_callable=PropertyMock, return_value=screen
+            ),
+            patch.object(
+                HackAgentTUI, "_active_monitor_text", return_value=("", "logs")
+            ),
+        ):
+            app.action_copy_selection()
+        app.copy_to_clipboard.assert_not_called()
+        app.notify.assert_called_once()
+
+
+# ============================================================================
+# Shared clipboard helper + Actions copy button
+# ============================================================================
+
+
+class TestClipboardHelper:
+    """The shared copy_to_clipboard helper used by the log/actions Copy buttons."""
+
+    def test_uses_osc52_via_app(self) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from hackagent.cli.tui.widgets.clipboard import copy_to_clipboard
+
+        app = MagicMock()
+        with patch("subprocess.run", side_effect=FileNotFoundError()):
+            ok = copy_to_clipboard(app, "hello")
+        assert ok is True
+        app.copy_to_clipboard.assert_called_once_with("hello")
+
+    def test_empty_text_returns_false(self) -> None:
+        from hackagent.cli.tui.widgets.clipboard import copy_to_clipboard
+
+        assert copy_to_clipboard(None, "") is False
+
+    def test_richlog_plaintext_joins_strip_text(self) -> None:
+        from unittest.mock import MagicMock
+
+        from hackagent.cli.tui.widgets.clipboard import richlog_plaintext
+
+        s1, s2 = MagicMock(), MagicMock()
+        s1.text = "first line"
+        s2.text = "second line"
+        log = MagicMock()
+        log.lines = [s1, s2]
+        assert richlog_plaintext(log) == "first line\nsecond line"
+
+
+class TestActionsCopy:
+    """The Copy button on the Agent Actions viewer."""
+
+    def test_copy_button_id_in_compose(self) -> None:
+        from hackagent.cli.tui.widgets.actions import AgentActionsViewer
+
+        # The "copy-actions" button id is wired into compose().
+        assert "copy-actions" in AgentActionsViewer.compose.__code__.co_consts
+
+    def test_copy_actions_uses_rendered_text(self) -> None:
+        from unittest.mock import patch
+
+        from hackagent.cli.tui.widgets.actions import AgentActionsViewer
+
+        viewer = AgentActionsViewer()
+        with (
+            patch.object(viewer, "get_actions_text", return_value="action log text"),
+            patch(
+                "hackagent.cli.tui.widgets.clipboard.copy_to_clipboard",
+                return_value=True,
+            ) as mock_copy,
+        ):
+            ok = viewer.copy_actions()
+        assert ok is True
+        assert mock_copy.call_args.args[1] == "action log text"
+
+    def test_copy_actions_empty_returns_false(self) -> None:
+        from unittest.mock import patch
+
+        from hackagent.cli.tui.widgets.actions import AgentActionsViewer
+
+        viewer = AgentActionsViewer()
+        with patch.object(viewer, "get_actions_text", return_value=""):
+            assert viewer.copy_actions() is False

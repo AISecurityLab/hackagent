@@ -71,6 +71,8 @@ def _escape(value: Any) -> str:
 # =====================================================================
 _AGENT_TYPE_CHOICES = [
     ("Google ADK", "google-adk"),
+    ("Claude Code", "claude-code"),
+    ("Web (live browser)", "web"),
     ("LiteLLM", "litellm"),
     ("LangChain", "langchain"),
     ("OpenAI SDK", "openai-sdk"),
@@ -195,9 +197,9 @@ class AttacksTab(Container):
         self._attack_config_overrides: Dict[str, Any] = copy.deepcopy(
             self.initial_data.get("attack_config_overrides", {})
         )
-        self._agent_adapter_operational_config: Optional[Dict[str, Any]] = (
-            copy.deepcopy(self.initial_data.get("agent_adapter_operational_config"))
-        )
+        self._agent_adapter_operational_config: Optional[
+            Dict[str, Any]
+        ] = copy.deepcopy(self.initial_data.get("agent_adapter_operational_config"))
         self._reduced_tui_logs = bool(self.initial_data.get("reduced_tui_logs", False))
         self._show_advanced = False
         self._advanced_hover_preview = False
@@ -728,9 +730,12 @@ class AttacksTab(Container):
         if "agent_name" in self.initial_data:
             self.query_one("#agent-name", Input).value = self.initial_data["agent_name"]
         if "agent_type" in self.initial_data:
-            self.query_one("#agent-type", Select).value = self.initial_data[
-                "agent_type"
-            ]
+            agent_type_value = self.initial_data["agent_type"]
+            # Only set known choices — an unrecognised value would raise
+            # InvalidSelectValueError and crash the tab on mount.
+            valid_types = {value for _, value in _AGENT_TYPE_CHOICES}
+            if agent_type_value in valid_types:
+                self.query_one("#agent-type", Select).value = agent_type_value
         if "endpoint" in self.initial_data:
             self.query_one("#endpoint-url", Input).value = self.initial_data["endpoint"]
         if "goals" in self.initial_data:

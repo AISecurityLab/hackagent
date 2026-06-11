@@ -40,9 +40,12 @@ class PapCardMixin:
                             prompt = str(m.get("content") or "")
                             break
                 _cand_resp = content.get("response")
-                _cand_resp_actual, _cand_g_side, _cand_g_expl, _cand_g_cats = (
-                    AttackCardSharedMixin._extract_guardrail_from_response(_cand_resp)
-                )
+                (
+                    _cand_resp_actual,
+                    _cand_g_side,
+                    _cand_g_expl,
+                    _cand_g_cats,
+                ) = AttackCardSharedMixin._extract_guardrail_from_response(_cand_resp)
                 candidates[tech_idx] = {
                     "technique": meta.get("technique") or "",
                     "prompt": prompt,
@@ -53,10 +56,13 @@ class PapCardMixin:
                 }
             elif display_type == "pap_evaluation":
                 _pap_raw_resp = content.get("response")
-                _pap_raw_resp, _pap_g_side, _pap_g_expl, _pap_g_cats = (
-                    AttackCardSharedMixin._extract_guardrail_from_response(
-                        _pap_raw_resp
-                    )
+                (
+                    _pap_raw_resp,
+                    _pap_g_side,
+                    _pap_g_expl,
+                    _pap_g_cats,
+                ) = AttackCardSharedMixin._extract_guardrail_from_response(
+                    _pap_raw_resp
                 )
                 _pap_response = (
                     _pap_raw_resp.get("target_response")

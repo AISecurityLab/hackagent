@@ -82,9 +82,12 @@ class BaselineCardMixin:
                 attack_prompt = str(request.get("prompt") or "")
 
             _raw_resp = content.get("response")
-            _actual_resp, _g_side, _g_expl, _g_cats = (
-                AttackCardSharedMixin._extract_guardrail_from_response(_raw_resp)
-            )
+            (
+                _actual_resp,
+                _g_side,
+                _g_expl,
+                _g_cats,
+            ) = AttackCardSharedMixin._extract_guardrail_from_response(_raw_resp)
             response_text = str(_actual_resp or "")
 
             metadata = content.get("metadata") or {}

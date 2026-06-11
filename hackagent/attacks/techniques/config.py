@@ -42,9 +42,15 @@ from pydantic import BaseModel, ConfigDict, Field
 
 DEFAULT_LOCAL_MODEL_ENDPOINT = "http://localhost:11434"
 DEFAULT_LOCAL_AGENT_TYPE = "OLLAMA"
-DEFAULT_ATTACKER_IDENTIFIER = "gemma3:4b"
-DEFAULT_JUDGE_IDENTIFIER = "gemma3:4b"
-DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER = "gemma3:4b"
+# One local, abliterated Ollama model for attacker / judge / category-classifier —
+# no API key, and abliterated so the attacker won't refuse to generate red-team
+# prompts. 12B (vs the old 4B) so the judge can reliably tell a refusal from a
+# real jailbreak. Pull once:  ollama pull huihui_ai/gemma3-abliterated:12b
+# (https://huggingface.co/huihui-ai/Huihui-gemma-4-12B-it-abliterated).
+DEFAULT_LOCAL_MODEL = "huihui_ai/gemma3-abliterated:12b"
+DEFAULT_ATTACKER_IDENTIFIER = DEFAULT_LOCAL_MODEL
+DEFAULT_JUDGE_IDENTIFIER = DEFAULT_LOCAL_MODEL
+DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER = DEFAULT_LOCAL_MODEL
 DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT = "http://localhost:11434"
 DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE = "OLLAMA"
 DEFAULT_CATEGORY_CLASSIFIER_MAX_TOKENS = 100
@@ -58,7 +64,7 @@ DEFAULT_MAX_OUTPUT_TOKENS = 4096
 class AttackerConfig(BaseModel):
     """Configuration for the attacker LLM.
 
-    Defaults to a local Ollama attacker endpoint using gemma3:4b so users
+    Defaults to a local Ollama attacker endpoint using an abliterated 12B model so users
     only need to override what is different for their deployment.
     """
 
@@ -103,7 +109,7 @@ class CategoryClassifierConfig(BaseModel):
 class JudgeConfig(BaseModel):
     """Configuration for one judge evaluator.
 
-    Defaults to a HarmBench judge routed through local Ollama (gemma3:4b).
+    Defaults to a HarmBench judge routed through local Ollama (abliterated 12B).
     """
 
     model_config = ConfigDict(extra="allow", validate_assignment=True)
