@@ -197,6 +197,95 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
         self.assertIsNotNone(results)
 
 
+class TestModeBasedRoleDefaults(unittest.TestCase):
+    """Test remote/local role defaults injected before attack execution."""
+
+    def test_remote_mode_injects_baseline_judge_defaults(self):
+        """Baseline judge defaults should switch to remote profile in remote mode."""
+        orch, hack_agent, _ = _make_orchestrator()
+        orch.attack_type = "baseline"
+        hack_agent.backend.get_api_key.return_value = "hk_test_remote_key"
+
+        resolved = orch._apply_mode_based_role_defaults(
+            {"attack_type": "baseline", "goals": ["test"]}
+        )
+
+        self.assertEqual(resolved["judge"]["identifier"], "hackagent-judge")
+        self.assertEqual(resolved["judge"]["endpoint"], "https://api.hackagent.dev/v1")
+        self.assertEqual(resolved["judge"]["agent_type"], "OPENAI_SDK")
+        self.assertEqual(resolved["judge"]["type"], "harmbench_variant")
+        self.assertEqual(resolved["judge"]["api_key"], "hk_test_remote_key")
+        self.assertEqual(resolved["judges"][0]["identifier"], "hackagent-judge")
+        self.assertEqual(resolved["judges"][0]["type"], "harmbench_variant")
+
+    def test_remote_mode_preserves_explicit_judge_overrides(self):
+        """Explicit judge fields must not be overwritten by remote defaults."""
+        orch, hack_agent, _ = _make_orchestrator()
+        orch.attack_type = "baseline"
+        hack_agent.backend.get_api_key.return_value = "hk_test_remote_key"
+
+        resolved = orch._apply_mode_based_role_defaults(
+            {
+                "attack_type": "baseline",
+                "goals": ["test"],
+                "judges": [
+                    {
+                        "identifier": "custom-judge",
+                        "endpoint": "https://custom.endpoint/v1",
+                        "agent_type": "OPENAI_SDK",
+                        "api_key": "custom-key",
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(resolved["judges"][0]["identifier"], "custom-judge")
+        self.assertEqual(
+            resolved["judges"][0]["endpoint"], "https://custom.endpoint/v1"
+        )
+        self.assertEqual(resolved["judges"][0]["api_key"], "custom-key")
+
+    def test_pair_remote_mode_fills_missing_role_fields(self):
+        """Partial attacker config should receive remote defaults, scorer should be added."""
+        orch, hack_agent, _ = _make_orchestrator()
+        orch.attack_type = "pair"
+        hack_agent.backend.get_api_key.return_value = "hk_test_remote_key"
+
+        resolved = orch._apply_mode_based_role_defaults(
+            {
+                "attack_type": "pair",
+                "goals": ["test"],
+                "attacker": {"identifier": "my-attacker"},
+            }
+        )
+
+        self.assertEqual(resolved["attacker"]["identifier"], "my-attacker")
+        self.assertEqual(
+            resolved["attacker"]["endpoint"], "https://api.hackagent.dev/v1"
+        )
+        self.assertEqual(resolved["attacker"]["agent_type"], "OPENAI_SDK")
+        self.assertEqual(resolved["attacker"]["api_key"], "hk_test_remote_key")
+
+        self.assertEqual(resolved["scorer"]["identifier"], "hackagent-judge")
+        self.assertEqual(resolved["scorer"]["api_key"], "hk_test_remote_key")
+
+    def test_local_mode_injects_baseline_judge_defaults(self):
+        """Without backend API key, baseline judge defaults should use local profile."""
+        orch, hack_agent, _ = _make_orchestrator()
+        orch.attack_type = "baseline"
+        hack_agent.backend.get_api_key.return_value = None
+
+        attack_config = {"attack_type": "baseline", "goals": ["test"]}
+        resolved = orch._apply_mode_based_role_defaults(attack_config)
+
+        self.assertEqual(resolved["judge"]["identifier"], "gemma3:4b")
+        self.assertEqual(resolved["judge"]["endpoint"], "http://localhost:11434")
+        self.assertEqual(resolved["judge"]["agent_type"], "OLLAMA")
+        self.assertEqual(resolved["judge"]["type"], "harmbench")
+        self.assertIsNone(resolved["judge"]["api_key"])
+        self.assertEqual(resolved["judges"][0]["identifier"], "gemma3:4b")
+
+
 class TestDefaultCategoryClassifierPreflight(unittest.TestCase):
     """Test abort behavior when default category classifier dependencies are missing."""
 

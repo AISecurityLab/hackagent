@@ -74,6 +74,10 @@ ATTACK_CATALOG: Dict[str, Dict[str, str]] = {
         "label": "PAP",
         "description": "Persuasive Adversarial Prompts using persuasion-technique taxonomies.",
     },
+    "mml": {
+        "label": "MML",
+        "description": "Multi-Modal Linkage attack encoding harmful prompts into images for VLMs.",
+    },
 }
 
 
@@ -895,6 +899,49 @@ def pap(
         ctx=ctx,
         attack_type="pap",
         attack_label=ATTACK_CATALOG["pap"]["label"],
+        agent_name=agent_name,
+        agent_type=agent_type,
+        endpoint=endpoint,
+        goals=goals,
+        config_file=config_file,
+        timeout=timeout,
+        dry_run=dry_run,
+        no_tui=no_tui,
+        before_guardrail_name=before_guardrail_name,
+        before_guardrail_type=before_guardrail_type,
+        before_guardrail_endpoint=before_guardrail_endpoint,
+        after_guardrail_name=after_guardrail_name,
+        after_guardrail_type=after_guardrail_type,
+        after_guardrail_endpoint=after_guardrail_endpoint,
+    )
+
+
+@eval_cmd.command()
+@_common_attack_options
+@click.pass_context
+@handle_errors
+def mml(
+    ctx,
+    agent_name,
+    agent_type,
+    endpoint,
+    goals,
+    config_file,
+    timeout,
+    dry_run,
+    no_tui,
+    before_guardrail_name,
+    before_guardrail_type,
+    before_guardrail_endpoint,
+    after_guardrail_name,
+    after_guardrail_type,
+    after_guardrail_endpoint,
+):
+    """Execute MML (Multi-Modal Linkage) attack strategy."""
+    _run_attack_command(
+        ctx=ctx,
+        attack_type="mml",
+        attack_label=ATTACK_CATALOG["mml"]["label"],
         agent_name=agent_name,
         agent_type=agent_type,
         endpoint=endpoint,

@@ -542,6 +542,14 @@ class TrackingCoordinator:
             extra["jailbreak_response"] = best_item["completion"]
             extra["jailbreak_prompt"] = best_item.get("prefix", "")
 
+        # MML: include image_data_url and text_prompt for dashboard rendering
+        if best_item.get("image_data_url"):
+            extra["image_data_url"] = best_item["image_data_url"]
+        if best_item.get("text_prompt"):
+            extra["jailbreak_prompt"] = best_item["text_prompt"]
+        if best_item.get("response") and not extra.get("jailbreak_response"):
+            extra["jailbreak_response"] = best_item["response"]
+
         return extra
 
     def finalize_on_error(self, error_message: str = "Pipeline failed") -> None:

@@ -1428,10 +1428,12 @@ function hackAgentCopyFallback(text) {
 
         # Combine metrics + metadata for display
         combined: dict[str, object] = {}
+        # Skip large binary data fields from the detail table
+        _skip_keys = {"image_data_url"}
         for src in (metadata, metrics):
             if isinstance(src, dict):
                 for k, v in src.items():
-                    if v not in (None, "", {}, []):
+                    if v not in (None, "", {}, []) and k not in _skip_keys:
                         combined[k] = v
 
         # Also add some top-level result fields
@@ -1448,6 +1450,90 @@ function hackAgentCopyFallback(text) {
                 display_val = json.dumps(v, default=str)
             fields.append((k, str(display_val)))
         return fields
+
+    # ── MML: render multimodal result section ────────────────────────────────
+
+    def _render_mml_result_section(self, row: dict, metadata: dict) -> None:
+        """Render MML-specific result content: encoded image, prompt, response."""
+        encoding_mode = metadata.get("encoding_mode", "unknown")
+        image_data_url = metadata.get("image_data_url", "")
+        text_prompt = (
+            metadata.get("text_prompt") or metadata.get("jailbreak_prompt") or ""
+        )
+        response = metadata.get("jailbreak_response") or metadata.get("response") or ""
+
+        with ui.column().classes("w-full gap-3"):
+            # Section header
+            with ui.row().classes("items-center gap-2"):
+                ui.icon("image", color="primary").classes("text-lg")
+                ui.label("MML Attack Details").classes("font-semibold text-sm")
+                ui.badge(f"Mode: {encoding_mode}", color="purple").classes("text-xs")
+
+            # Encoded image
+            if image_data_url:
+                with ui.card().tight().classes("w-full border border-grey-3"):
+                    with ui.column().classes("p-3 gap-2"):
+                        ui.label("ENCODED IMAGE").classes(
+                            "text-[10px] font-semibold tracking-widest text-grey-5 uppercase"
+                        )
+                        ui.html(
+                            f'<img src="{image_data_url}" '
+                            f'alt="MML encoded prompt ({encoding_mode})" '
+                            f'style="max-width:100%;height:auto;border-radius:4px;'
+                            f'border:1px solid var(--q-grey-3);" />'
+                        ).classes("w-full")
+
+            # Text prompt sent to the model
+            if text_prompt:
+                with (
+                    ui.card()
+                    .tight()
+                    .classes(
+                        "w-full border border-blue-200 bg-blue-50 dark:border-blue-700 dark:bg-blue-900/20"
+                    )
+                ):
+                    with ui.column().classes("p-3 gap-1"):
+                        with ui.row().classes("w-full items-center justify-between"):
+                            ui.label("TEXT PROMPT").classes(
+                                "text-[10px] font-semibold tracking-widest text-grey-5 uppercase"
+                            )
+                            ui.button(
+                                icon="content_copy",
+                            ).props("flat dense size=xs color=grey-6").tooltip(
+                                "Copy to clipboard"
+                            ).on(
+                                "click",
+                                js_handler=f"() => navigator.clipboard.writeText({json.dumps(text_prompt)})",
+                            )
+                        ui.label(text_prompt).classes(
+                            "text-sm whitespace-pre-wrap break-words"
+                        ).style("overflow-wrap:anywhere;")
+
+            # Target model response
+            if response:
+                with (
+                    ui.card()
+                    .tight()
+                    .classes(
+                        "w-full border border-orange-200 bg-orange-50 dark:border-orange-700 dark:bg-orange-900/20"
+                    )
+                ):
+                    with ui.column().classes("p-3 gap-1"):
+                        with ui.row().classes("w-full items-center justify-between"):
+                            ui.label("TARGET RESPONSE").classes(
+                                "text-[10px] font-semibold tracking-widest text-grey-5 uppercase"
+                            )
+                            ui.button(
+                                icon="content_copy",
+                            ).props("flat dense size=xs color=grey-6").tooltip(
+                                "Copy to clipboard"
+                            ).on(
+                                "click",
+                                js_handler=f"() => navigator.clipboard.writeText({json.dumps(response)})",
+                            )
+                        ui.label(response).classes(
+                            "text-sm whitespace-pre-wrap break-words"
+                        ).style("overflow-wrap:anywhere;")
 
     # ── History: render Config tab ───────────────────────────────────────────
 
@@ -5563,7 +5649,7 @@ function hackAgentCopyFallback(text) {
                                         color="grey-7",
                                     ).classes("text-xs")
                         for key, value in metadata.items():
-                            if key in {"prefix", "completion"}:
+                            if key in {"prefix", "completion", "image_data_url"}:
                                 continue
                             with ui.row().classes("w-full items-start gap-2"):
                                 ui.label(f"{key}:").classes("text-xs text-grey-6")
