@@ -19,6 +19,7 @@ from hackagent.attacks.techniques.config import (
     DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE,
     DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT,
     DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
+    DEFAULT_LOCAL_MODEL,
 )
 from hackagent.errors import HackAgentError
 
@@ -278,12 +279,62 @@ class TestModeBasedRoleDefaults(unittest.TestCase):
         attack_config = {"attack_type": "baseline", "goals": ["test"]}
         resolved = orch._apply_mode_based_role_defaults(attack_config)
 
-        self.assertEqual(resolved["judge"]["identifier"], "gemma3:4b")
+        self.assertEqual(resolved["judge"]["identifier"], DEFAULT_LOCAL_MODEL)
         self.assertEqual(resolved["judge"]["endpoint"], "http://localhost:11434")
         self.assertEqual(resolved["judge"]["agent_type"], "OLLAMA")
         self.assertEqual(resolved["judge"]["type"], "harmbench")
         self.assertIsNone(resolved["judge"]["api_key"])
-        self.assertEqual(resolved["judges"][0]["identifier"], "gemma3:4b")
+        self.assertEqual(resolved["judges"][0]["identifier"], DEFAULT_LOCAL_MODEL)
+
+    def test_remote_mode_routes_category_classifier_to_hackagent_api(self):
+        """With a key, the default classifier is routed to the HackAgent API."""
+        orch, hack_agent, _ = _make_orchestrator()
+        orch.attack_type = "baseline"
+        hack_agent.backend.get_api_key.return_value = "hk_test_remote_key"
+
+        resolved = orch._apply_mode_based_role_defaults(
+            {"attack_type": "baseline", "goals": ["test"]}
+        )
+
+        cc = resolved["category_classifier"]
+        self.assertEqual(cc["endpoint"], "https://api.hackagent.dev/v1")
+        self.assertEqual(cc["agent_type"], "OPENAI_SDK")
+        self.assertEqual(cc["api_key"], "hk_test_remote_key")
+
+    def test_local_mode_leaves_category_classifier_untouched(self):
+        """Without a key, the classifier keeps its local default (not injected)."""
+        orch, hack_agent, _ = _make_orchestrator()
+        orch.attack_type = "baseline"
+        hack_agent.backend.get_api_key.return_value = None
+
+        resolved = orch._apply_mode_based_role_defaults(
+            {"attack_type": "baseline", "goals": ["test"]}
+        )
+
+        self.assertNotIn("category_classifier", resolved)
+
+    def test_remote_mode_preserves_explicit_category_classifier(self):
+        """An explicit classifier config is never overwritten by remote routing."""
+        orch, hack_agent, _ = _make_orchestrator()
+        orch.attack_type = "baseline"
+        hack_agent.backend.get_api_key.return_value = "hk_test_remote_key"
+
+        resolved = orch._apply_mode_based_role_defaults(
+            {
+                "attack_type": "baseline",
+                "goals": ["test"],
+                "category_classifier": {
+                    "identifier": "cc-model",
+                    "endpoint": "https://custom/v1",
+                    "agent_type": "OPENAI_SDK",
+                },
+            }
+        )
+
+        self.assertEqual(resolved["category_classifier"]["identifier"], "cc-model")
+        self.assertEqual(
+            resolved["category_classifier"]["endpoint"], "https://custom/v1"
+        )
 
 
 class TestDefaultCategoryClassifierPreflight(unittest.TestCase):
@@ -622,6 +673,29 @@ class TestRequiredModelAvailabilityPreflight(unittest.TestCase):
         targets = orch._collect_model_preflight_targets(attack_config)
         roles = {role for item in targets for role in item.get("roles", [])}
         self.assertNotIn("decorator_llm", roles)
+
+    def test_probe_treats_empty_response_as_reachable(self):
+        """An empty generation proves the model is up — the probe must pass."""
+        router = MagicMock()
+        router.route_request.return_value = {
+            "error_message": (
+                "OllamaAgent generation error: [GENERATION_ERROR: EMPTY_RESPONSE]"
+            )
+        }
+        self.assertIsNone(
+            AttackOrchestrator._probe_router_registration(router, "rk")
+        )
+
+    def test_probe_reports_real_connectivity_errors(self):
+        """Genuine connectivity/load errors must still fail the probe."""
+        router = MagicMock()
+        router.route_request.return_value = {
+            "error_message": "request failed (APIConnectionError): connection refused"
+        }
+        self.assertIn(
+            "connection refused",
+            AttackOrchestrator._probe_router_registration(router, "rk"),
+        )
 
     def test_validate_required_models_availability_reports_model_and_endpoint(self):
         """Error should include role, identifier, and endpoint for unavailable models."""

@@ -24,7 +24,7 @@ The planner and the example attacker/judge default to a **local Ollama** model �
 no API key. Pull it once:
 
 ```bash
-ollama pull huihui_ai/gemma3-abliterated:12b   # abliterated → won't refuse to plan red-team prompts
+ollama pull hf.co/huihui-ai/Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-GGUF   # abliterated → won't refuse to plan red-team prompts
 ```
 
 ## One command (CLI)

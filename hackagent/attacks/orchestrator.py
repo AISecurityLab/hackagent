@@ -46,6 +46,13 @@ from hackagent.attacks.techniques.config import (
     DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE,
     DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT,
     DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
+    DEFAULT_LOCAL_AGENT_TYPE,
+    DEFAULT_LOCAL_MODEL,
+    DEFAULT_LOCAL_MODEL_ENDPOINT,
+    DEFAULT_REMOTE_AGENT_TYPE,
+    DEFAULT_REMOTE_ATTACKER_IDENTIFIER,
+    DEFAULT_REMOTE_JUDGE_IDENTIFIER,
+    DEFAULT_REMOTE_ROLE_ENDPOINT,
 )
 from hackagent.server.storage.enums import StatusEnum
 
@@ -56,15 +63,6 @@ logger = get_logger(__name__)
 if not logger.handlers:
     logger.addHandler(logging.NullHandler())
 logger.propagate = False
-
-_REMOTE_ROLE_ENDPOINT = "https://api.hackagent.dev/v1"
-_REMOTE_ATTACKER_IDENTIFIER = "hackagent-attacker"
-_REMOTE_JUDGE_IDENTIFIER = "hackagent-judge"
-
-_LOCAL_ROLE_ENDPOINT = "http://localhost:11434"
-_LOCAL_ROLE_IDENTIFIER = "gemma3:4b"
-_LOCAL_ROLE_AGENT_TYPE = "OLLAMA"
-
 
 class _BatchContextFilter(logging.Filter):
     """
@@ -248,18 +246,34 @@ class AttackOrchestrator:
         """Build remote role defaults with backend-key fallback semantics."""
         return {
             "attacker": {
-                "identifier": _REMOTE_ATTACKER_IDENTIFIER,
-                "endpoint": _REMOTE_ROLE_ENDPOINT,
-                "agent_type": "OPENAI_SDK",
+                "identifier": DEFAULT_REMOTE_ATTACKER_IDENTIFIER,
+                "endpoint": DEFAULT_REMOTE_ROLE_ENDPOINT,
+                "agent_type": DEFAULT_REMOTE_AGENT_TYPE,
                 "api_key": api_key,
             },
             "judge": {
-                "identifier": _REMOTE_JUDGE_IDENTIFIER,
-                "endpoint": _REMOTE_ROLE_ENDPOINT,
-                "agent_type": "OPENAI_SDK",
+                "identifier": DEFAULT_REMOTE_JUDGE_IDENTIFIER,
+                "endpoint": DEFAULT_REMOTE_ROLE_ENDPOINT,
+                "agent_type": DEFAULT_REMOTE_AGENT_TYPE,
                 "type": "harmbench_variant",
                 "api_key": api_key,
             },
+        }
+
+    @staticmethod
+    def _remote_classifier_defaults(api_key: str) -> Dict[str, Any]:
+        """Remote (HackAgent API) defaults for the goal category classifier.
+
+        Routes the classifier through the same hosted endpoint as the judge so
+        it never requires a local Ollama model when a HackAgent API key is
+        available. Without a key, the classifier keeps its local default
+        (see techniques.config) — this is only applied in remote mode.
+        """
+        return {
+            "identifier": DEFAULT_REMOTE_JUDGE_IDENTIFIER,
+            "endpoint": DEFAULT_REMOTE_ROLE_ENDPOINT,
+            "agent_type": DEFAULT_REMOTE_AGENT_TYPE,
+            "api_key": api_key,
         }
 
     @staticmethod
@@ -267,15 +281,15 @@ class AttackOrchestrator:
         """Build local role defaults from the attack_roles profile."""
         return {
             "attacker": {
-                "identifier": _LOCAL_ROLE_IDENTIFIER,
-                "endpoint": _LOCAL_ROLE_ENDPOINT,
-                "agent_type": _LOCAL_ROLE_AGENT_TYPE,
+                "identifier": DEFAULT_LOCAL_MODEL,
+                "endpoint": DEFAULT_LOCAL_MODEL_ENDPOINT,
+                "agent_type": DEFAULT_LOCAL_AGENT_TYPE,
                 "api_key": None,
             },
             "judge": {
-                "identifier": _LOCAL_ROLE_IDENTIFIER,
-                "endpoint": _LOCAL_ROLE_ENDPOINT,
-                "agent_type": _LOCAL_ROLE_AGENT_TYPE,
+                "identifier": DEFAULT_LOCAL_MODEL,
+                "endpoint": DEFAULT_LOCAL_MODEL_ENDPOINT,
+                "agent_type": DEFAULT_LOCAL_AGENT_TYPE,
                 # Keep evaluator compatibility when defaults are auto-injected.
                 "type": "harmbench",
                 "api_key": None,
@@ -316,33 +330,39 @@ class AttackOrchestrator:
         )
 
         role_mapping = self._role_defaults_mapping_for_attack(normalized_attack_type)
-        if not role_mapping:
-            return attack_config
 
         resolved = copy.deepcopy(attack_config)
-        defaults_by_family = (
-            self._remote_role_defaults(api_key)
-            if is_remote_mode
-            else self._local_role_defaults()
-        )
 
-        for role_name, role_family in role_mapping.items():
-            role_defaults = dict(defaults_by_family[role_family])
-            role_cfg = resolved.get(role_name)
-            if isinstance(role_cfg, dict):
-                self._merge_missing_keys(role_cfg, role_defaults)
-            else:
-                resolved[role_name] = role_defaults
+        if role_mapping:
+            defaults_by_family = (
+                self._remote_role_defaults(api_key)
+                if is_remote_mode
+                else self._local_role_defaults()
+            )
 
-            # Judge-based attacks usually consume list-style judge configs.
-            if role_name == "judge":
-                judges_cfg = resolved.get("judges")
-                if isinstance(judges_cfg, list) and judges_cfg:
-                    for item in judges_cfg:
-                        if isinstance(item, dict):
-                            self._merge_missing_keys(item, role_defaults)
+            for role_name, role_family in role_mapping.items():
+                role_defaults = dict(defaults_by_family[role_family])
+                role_cfg = resolved.get(role_name)
+                if isinstance(role_cfg, dict):
+                    self._merge_missing_keys(role_cfg, role_defaults)
                 else:
-                    resolved["judges"] = [dict(role_defaults)]
+                    resolved[role_name] = role_defaults
+
+                # Judge-based attacks usually consume list-style judge configs.
+                if role_name == "judge":
+                    judges_cfg = resolved.get("judges")
+                    if isinstance(judges_cfg, list) and judges_cfg:
+                        for item in judges_cfg:
+                            if isinstance(item, dict):
+                                self._merge_missing_keys(item, role_defaults)
+                    else:
+                        resolved["judges"] = [dict(role_defaults)]
+
+        # Route the goal category classifier through the HackAgent API too when
+        # a key is available, so it never needs a local Ollama model. In local
+        # mode it is left untouched (keeps its techniques.config default).
+        if is_remote_mode and self._uses_default_category_classifier(resolved):
+            resolved["category_classifier"] = self._remote_classifier_defaults(api_key)
 
         return resolved
 
@@ -1008,6 +1028,13 @@ class AttackOrchestrator:
 
         error_message = response.get("error_message")
         if error_message:
+            # An empty generation still proves the model is reachable — this
+            # probe checks availability, not output quality. The 1-token budget
+            # yields no visible text for models that emit reasoning tokens
+            # first, so don't treat that as "unavailable". Genuine connectivity
+            # / load failures surface as other error strings and still fail.
+            if "EMPTY_RESPONSE" in str(error_message):
+                return None
             return str(error_message)
 
         return None

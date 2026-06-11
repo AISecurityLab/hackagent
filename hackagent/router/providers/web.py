@@ -180,6 +180,30 @@ def _get_web_agent_custom_llm_class():
             self._page = None
             self._input = None
             self._frame = None
+            # Playwright's sync API binds every object to the thread that
+            # created it. Attacks run goals on thread-pool workers, so we pin
+            # ALL browser work to one dedicated thread and marshal calls to it.
+            self._executor = None
+
+        # ---- single-thread marshalling -----------------------------------
+
+        def _ensure_executor(self):
+            if self._executor is None:
+                from concurrent.futures import ThreadPoolExecutor
+
+                self._executor = ThreadPoolExecutor(
+                    max_workers=1, thread_name_prefix="web-session"
+                )
+
+        def _run(self, fn):
+            """Run ``fn`` on the dedicated Playwright thread, return its result.
+
+            Must NOT be called from within that thread itself (single worker →
+            self-submit would deadlock); internal helpers call each other
+            directly instead.
+            """
+            self._ensure_executor()
+            return self._executor.submit(fn).result()
 
         # ---- lifecycle ---------------------------------------------------
 
@@ -209,7 +233,9 @@ def _get_web_agent_custom_llm_class():
                     break
                 self._page.wait_for_timeout(500)
             if self._input is None:
-                self.close()
+                # Runs on the session thread already — tear down inline (routing
+                # through the executor here would self-deadlock).
+                self._close_browser()
                 hint = (
                     "pass --reply-selector and --input-selector with the box's CSS "
                     "selector (inspect it in devtools), or run --headed to watch"
@@ -225,7 +251,8 @@ def _get_web_agent_custom_llm_class():
             self._started = True
             atexit.register(self.close)
 
-        def close(self) -> None:
+        def _close_browser(self) -> None:
+            """Tear down Playwright objects. Must run on the session thread."""
             try:
                 if self._browser is not None:
                     self._browser.close()
@@ -239,6 +266,21 @@ def _get_web_agent_custom_llm_class():
             self._browser = None
             self._pw_ctx = None
             self._started = False
+
+        def close(self) -> None:
+            # Browser teardown is a Playwright call, so it must happen on the
+            # session thread. Route it through the executor, then shut the
+            # executor down. Safe to call from any thread (incl. atexit).
+            executor = self._executor
+            if executor is not None:
+                try:
+                    executor.submit(self._close_browser).result(timeout=30)
+                except Exception:
+                    pass
+                executor.shutdown(wait=False)
+                self._executor = None
+            else:
+                self._close_browser()
 
         # ---- DOM helpers -------------------------------------------------
 
@@ -316,43 +358,48 @@ def _get_web_agent_custom_llm_class():
         # ---- send --------------------------------------------------------
 
         def send(self, prompt: str) -> str:
+            # Serialize callers, then run the actual browser work on the single
+            # dedicated Playwright thread (sync API is thread-bound).
+            with self._lock:
+                return self._run(lambda: self._send_locked(prompt))
+
+        def _send_locked(self, prompt: str) -> str:
             from hackagent.router.discovery.browser import (
                 _find_send_button,
                 _type_into,
             )
 
-            with self._lock:
-                if not self._started:
-                    self._start()
+            if not self._started:
+                self._start()
 
-                before = self._message_texts()
-                try:
-                    _type_into(self._input, prompt)
-                    self._input.press("Enter")
-                except Exception as e:
-                    raise WebAgentInteractionError(
-                        f"Failed to enter the prompt: {e}"
-                    ) from e
+            before = self._message_texts()
+            try:
+                _type_into(self._input, prompt)
+                self._input.press("Enter")
+            except Exception as e:
+                raise WebAgentInteractionError(
+                    f"Failed to enter the prompt: {e}"
+                ) from e
 
-                reply = self._wait_for_reply(before, prompt)
-                if reply is None:
-                    # Try a send button, then poll again.
-                    btn = _find_send_button(self._frame)
-                    if btn is not None:
-                        try:
-                            btn.click()
-                        except Exception:
-                            pass
-                        reply = self._wait_for_reply(before, prompt)
-                if reply is None:
-                    reply = self._llm_extract_reply(prompt)
-                if reply is None:
-                    raise WebAgentInteractionError(
-                        "Sent the prompt but could not read a reply from the page. "
-                        "Pass a 'reply_selector', set 'llm_fallback_model', or run "
-                        "headless=False to inspect the widget."
-                    )
-                return reply
+            reply = self._wait_for_reply(before, prompt)
+            if reply is None:
+                # Try a send button, then poll again.
+                btn = _find_send_button(self._frame)
+                if btn is not None:
+                    try:
+                        btn.click()
+                    except Exception:
+                        pass
+                    reply = self._wait_for_reply(before, prompt)
+            if reply is None:
+                reply = self._llm_extract_reply(prompt)
+            if reply is None:
+                raise WebAgentInteractionError(
+                    "Sent the prompt but could not read a reply from the page. "
+                    "Pass a 'reply_selector', set 'llm_fallback_model', or run "
+                    "headless=False to inspect the widget."
+                )
+            return reply
 
     class _WebAgentCustomLLM(CustomLLM):
         """CustomLLM handler that drives a live browser page per prompt."""

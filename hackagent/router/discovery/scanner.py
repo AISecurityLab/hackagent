@@ -30,12 +30,11 @@ from hackagent.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Default planner model: a LOCAL, abliterated Ollama model — no API key needed,
-# and abliterated so it won't refuse to plan red-team prompts. Pull it once with
-#   ollama pull huihui_ai/gemma3-abliterated:12b
-# (https://huggingface.co/huihui-ai/Huihui-gemma-4-12B-it-abliterated). Override
-# with --planner-model / the ``model=`` arg for any LiteLLM provider.
-DEFAULT_PLANNER_MODEL = "ollama_chat/huihui_ai/gemma3-abliterated:12b"
+# Local Ollama planner default (no API key). Override with --planner-model.
+# Pull: ollama pull hf.co/huihui-ai/Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-GGUF
+DEFAULT_PLANNER_MODEL = (
+    "ollama_chat/hf.co/huihui-ai/Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-GGUF"
+)
 
 _litellm_module = None
 

@@ -42,12 +42,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 DEFAULT_LOCAL_MODEL_ENDPOINT = "http://localhost:11434"
 DEFAULT_LOCAL_AGENT_TYPE = "OLLAMA"
-# One local, abliterated Ollama model for attacker / judge / category-classifier —
-# no API key, and abliterated so the attacker won't refuse to generate red-team
-# prompts. 12B (vs the old 4B) so the judge can reliably tell a refusal from a
-# real jailbreak. Pull once:  ollama pull huihui_ai/gemma3-abliterated:12b
-# (https://huggingface.co/huihui-ai/Huihui-gemma-4-12B-it-abliterated).
-DEFAULT_LOCAL_MODEL = "huihui_ai/gemma3-abliterated:12b"
+# Local Ollama default for attacker / judge / category-classifier (no API key).
+# Pull: ollama pull hf.co/huihui-ai/Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-GGUF
+DEFAULT_LOCAL_MODEL = (
+    "hf.co/huihui-ai/Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-GGUF"
+)
 DEFAULT_ATTACKER_IDENTIFIER = DEFAULT_LOCAL_MODEL
 DEFAULT_JUDGE_IDENTIFIER = DEFAULT_LOCAL_MODEL
 DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER = DEFAULT_LOCAL_MODEL
@@ -55,6 +54,13 @@ DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT = "http://localhost:11434"
 DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE = "OLLAMA"
 DEFAULT_CATEGORY_CLASSIFIER_MAX_TOKENS = 100
 DEFAULT_MAX_OUTPUT_TOKENS = 4096
+
+# Remote defaults: attacker / judge / category-classifier served by the
+# HackAgent API (used when a HACKAGENT_API_KEY is available).
+DEFAULT_REMOTE_ROLE_ENDPOINT = "https://api.hackagent.dev/v1"
+DEFAULT_REMOTE_AGENT_TYPE = "OPENAI_SDK"
+DEFAULT_REMOTE_ATTACKER_IDENTIFIER = "hackagent-attacker"
+DEFAULT_REMOTE_JUDGE_IDENTIFIER = "hackagent-judge"
 
 # ---------------------------------------------------------------------------
 # Pydantic models
@@ -333,6 +339,11 @@ __all__ = [
     "DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE",
     "DEFAULT_CATEGORY_CLASSIFIER_MAX_TOKENS",
     "DEFAULT_MAX_OUTPUT_TOKENS",
+    "DEFAULT_REMOTE_ROLE_ENDPOINT",
+    "DEFAULT_REMOTE_AGENT_TYPE",
+    "DEFAULT_REMOTE_ATTACKER_IDENTIFIER",
+    "DEFAULT_REMOTE_JUDGE_IDENTIFIER",
+    "DEFAULT_LOCAL_MODEL",
     "AttackerConfig",
     "CategoryClassifierConfig",
     "JudgeConfig",

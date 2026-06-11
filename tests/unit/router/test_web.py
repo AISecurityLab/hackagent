@@ -113,6 +113,61 @@ class TestWebAgentHandleRequest(unittest.TestCase):
         self.assertEqual(response["status_code"], 500)
 
 
+class TestBrowserSessionThreadAffinity(unittest.TestCase):
+    """Playwright's sync API is thread-bound; the session must pin all browser
+    work to one dedicated thread regardless of which caller thread sends."""
+
+    def _make_session(self):
+        from hackagent.router.providers.web import _get_web_agent_custom_llm_class
+
+        session_cls = _get_web_agent_custom_llm_class()._session_cls
+        return session_cls(
+            url="https://x.it/chat",
+            headless=True,
+            timeout=10,
+            wait_after_send=1.0,
+            settle_ms=0,
+            input_selector=None,
+            reply_selector=None,
+            llm_fallback_model=None,
+            install_browser=False,
+            log=MagicMock(),
+        )
+
+    def test_send_runs_on_single_dedicated_thread(self):
+        import threading
+
+        session = self._make_session()
+        seen_threads = []
+
+        def _fake_send_locked(prompt):
+            seen_threads.append(threading.get_ident())
+            return f"reply:{prompt}"
+
+        session._send_locked = _fake_send_locked
+        try:
+            # Call send() from two *different* caller threads.
+            results = {}
+
+            def _call(p):
+                results[p] = session.send(p)
+
+            t1 = threading.Thread(target=_call, args=("a",))
+            t2 = threading.Thread(target=_call, args=("b",))
+            t1.start()
+            t1.join()
+            t2.start()
+            t2.join()
+
+            self.assertEqual(results, {"a": "reply:a", "b": "reply:b"})
+            # Both executions ran on the same (session) thread, which is
+            # neither caller thread — the whole point of the fix.
+            self.assertEqual(len(set(seen_threads)), 1)
+            self.assertNotIn(threading.get_ident(), seen_threads)
+        finally:
+            session.close()
+
+
 class TestRouterRegistration(unittest.TestCase):
     def test_web_agent_in_adapter_map(self):
         from hackagent.router.router import AGENT_TYPE_TO_ADAPTER_MAP
