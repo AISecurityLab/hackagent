@@ -114,6 +114,9 @@ class Tracker:
         logger: Optional[logging.Logger] = None,
         attack_type: Optional[str] = None,
         category_classifier_config: Optional[Dict[str, Any]] = None,
+        preclassified_goal_labels_by_index: Optional[Dict[Any, Dict[str, str]]] = None,
+        disable_goal_category_classifier: bool = False,
+        event_bus: Optional[Any] = None,
     ):
         """
         Initialize tracker.
@@ -123,17 +126,55 @@ class Tracker:
             run_id: Server-side run record ID
             logger: Optional logger instance
             attack_type: Optional attack type identifier for metadata
+            event_bus: Optional :class:`hackagent.cli.tui.events.TUIEventBus`.
+                When provided, the tracker emits structured events
+                (``goal_started``, ``goal_finalized``, ``evaluation``, ...)
+                so the TUI can render execution live without parsing logs.
         """
         self.backend = backend
         self.run_id = run_id
         self.logger = logger or get_logger(__name__)
         self.attack_type = attack_type
-        self._goal_category_classifier = GoalCategoryClassifier(
-            backend=backend,
-            config=category_classifier_config,
-            logger=self.logger,
-        )
+        self.event_bus = event_bus
+        self._preclassified_goal_labels_by_index: Dict[int, Dict[str, str]] = {}
+        raw_preclassified = preclassified_goal_labels_by_index or {}
+        if isinstance(raw_preclassified, dict):
+            for key, value in raw_preclassified.items():
+                try:
+                    idx = int(key)
+                except (TypeError, ValueError):
+                    continue
+
+                if not isinstance(value, dict):
+                    continue
+
+                category = value.get("category")
+                subcategory = value.get("subcategory")
+                if category and subcategory:
+                    self._preclassified_goal_labels_by_index[idx] = {
+                        "category": str(category),
+                        "subcategory": str(subcategory),
+                    }
+
+        if disable_goal_category_classifier:
+            self._goal_category_classifier = None
+        else:
+            self._goal_category_classifier = GoalCategoryClassifier(
+                backend=backend,
+                config=category_classifier_config,
+                logger=self.logger,
+            )
         self._goal_contexts: Dict[int, Context] = {}
+
+    def _emit(self, event_type: str, **payload: Any) -> None:
+        """Emit on ``event_bus`` if present; swallow any error."""
+        bus = self.event_bus
+        if bus is None:
+            return
+        try:
+            bus.emit(event_type, **payload)
+        except Exception:
+            self.logger.debug("Tracker event emit failed", exc_info=True)
 
     @property
     def is_enabled(self) -> bool:
@@ -175,16 +216,32 @@ class Tracker:
         if not self.is_enabled:
             self.logger.debug(f"Tracking disabled - goal {goal_index} won't be tracked")
             self._goal_contexts[goal_index] = ctx
+            # Bus delivery is independent of backend tracking — surface the
+            # event so the TUI still sees the goal even in headless mode.
+            self._emit(
+                "goal_started",
+                goal=goal,
+                goal_index=goal_index,
+                attack_type=self.attack_type,
+                result_id=None,
+            )
             return ctx
 
         try:
             run_uuid = self._get_run_uuid()
             if not run_uuid:
                 self._goal_contexts[goal_index] = ctx
+                self._emit(
+                    "goal_started",
+                    goal=goal,
+                    goal_index=goal_index,
+                    attack_type=self.attack_type,
+                    result_id=None,
+                )
                 return ctx
 
             # Classify each goal as soon as its result record is created.
-            classification = self._classify_goal_labels(goal)
+            classification = self._classify_goal_labels(goal, goal_index)
             ctx.metadata.update(classification)
 
             # Create result via backend
@@ -225,14 +282,28 @@ class Tracker:
             )
 
         self._goal_contexts[goal_index] = ctx
+        self._emit(
+            "goal_started",
+            goal=goal,
+            goal_index=goal_index,
+            attack_type=self.attack_type,
+            result_id=ctx.result_id,
+        )
         return ctx
 
-    def _classify_goal_labels(self, goal: str) -> Dict[str, str]:
+    def _classify_goal_labels(self, goal: str, goal_index: int) -> Dict[str, str]:
         """Return normalized category labels for goal metadata."""
         fallback = {
             "category": UNKNOWN_CATEGORY,
             "subcategory": UNKNOWN_SUBCATEGORY,
         }
+
+        preclassified = self._preclassified_goal_labels_by_index.get(goal_index)
+        if preclassified:
+            return {
+                "category": preclassified["category"],
+                "subcategory": preclassified["subcategory"],
+            }
 
         classifier = self._goal_category_classifier
         if not classifier:
@@ -389,6 +460,18 @@ class Tracker:
         }
         ctx.traces.append(trace_record)
 
+        # Surface the trace as a structured TUI event. Subscribers translate
+        # the step_type / step_name into "tool_call", "evaluation", etc.
+        self._emit(
+            "trace_added",
+            goal_index=ctx.goal_index,
+            sequence=seq,
+            step_name=step_name,
+            step_type=trace_record["step_type"],
+            content=sanitized_content,
+            elapsed_s=trace_record["elapsed_s"],
+        )
+
         # Send to backend if enabled and we have a result_id
         if not self.is_enabled or not ctx.result_id:
             return None
@@ -480,6 +563,19 @@ class Tracker:
             ctx.metadata["preserved_prior_success"] = True
         ctx.metadata["total_traces"] = len(ctx.traces)
         ctx.metadata["elapsed_s"] = round(ctx.elapsed_s, 3)
+
+        # Emit goal_finalized regardless of backend tracking so the TUI can
+        # tick progress even when running without a server-side run record.
+        self._emit(
+            "goal_finalized",
+            goal_index=ctx.goal_index,
+            goal=ctx.goal,
+            success=bool(final_success),
+            total_traces=len(ctx.traces),
+            elapsed_s=ctx.metadata["elapsed_s"],
+            evaluation_notes=evaluation_notes,
+            result_id=ctx.result_id,
+        )
 
         if not self.is_enabled or not ctx.result_id:
             return False
@@ -707,6 +803,31 @@ class Tracker:
 
         # Dictionary response
         if isinstance(response, dict):
+            # Guardrail-blocked response: adapter_type == "guardrail".
+            # Preserve the agent_specific_data dict so the dashboard can
+            # render it as a dedicated visual block.
+            if response.get("adapter_type") == "guardrail":
+                return response.get("agent_specific_data") or {
+                    "side": "unknown",
+                    "message": "Blocked by guardrail",
+                }
+
+            # Guardrail-event dict passed directly (e.g. AdvPrefix passes the event
+            # dict as the response payload rather than the full router response).
+            if response.get("side") in ("before", "after", "unknown") and (
+                "explanation" in response or "message" in response
+            ):
+                return response
+
+            # Guardrail block detected from error_message — attacks that extract
+            # only generated_text/error_message before calling add_interaction_trace.
+            _err = str(response.get("error_message") or "")
+            if _err:
+                if "before_guardrail" in _err or "before guardrail" in _err.lower():
+                    return {"side": "before", "message": _err}
+                if "after_guardrail" in _err or "after guardrail" in _err.lower():
+                    return {"side": "after", "message": _err}
+
             return (
                 response.get("generated_text")
                 or response.get("processed_response")

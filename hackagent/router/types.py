@@ -15,24 +15,41 @@ class AgentTypeEnum(str, Enum):
     """
     Enumeration of supported agent types in the HackAgent SDK.
 
-    These values correspond to the string values used in the API's agent_type field.
+    These values correspond to the string values used in the API's
+    agent_type field.
 
-    Endpoint Requirements by Type:
-    - GOOGLE_ADK: Google Agent Development Kit endpoint (custom protocol)
-    - LITELLM: Any LLM endpoint via LiteLLM (multi-provider support)
-    - OPENAI_SDK: OpenAI-compatible endpoint (should end with /v1 base path)
-    - OLLAMA: Ollama local LLM endpoint (default: http://localhost:11434)
-    - LANGCHAIN: LangServe endpoint (typically /invoke or /stream)
-    - MCP: Model Context Protocol endpoint (MCP-specific protocol)
-    - A2A: Agent-to-Agent protocol endpoint (A2A-specific protocol)
-    - UNKNOWN: Unknown agent type (fallback)
+    Recommended choice for chat-completion targets:
+        - **LITELLM** is the general-purpose path. It speaks
+          OpenAI, Anthropic, Google Gemini, AWS Bedrock, Azure, Cohere,
+          Mistral, Groq, OpenRouter, Together, vLLM, LM Studio,
+          Hugging Face Inference, NVIDIA NIM, and ~140 other providers
+          out of the box. Pass the model with a provider prefix in
+          ``adapter_operational_config["name"]`` — e.g.
+          ``"anthropic/claude-3-5-sonnet-20241022"``,
+          ``"gemini/gemini-2.0-flash"``,
+          ``"bedrock/anthropic.claude-3-sonnet-20240229-v1:0"``,
+          ``"groq/llama-3.1-70b-versatile"``.
 
-    Note: For OpenAI-compatible endpoints (OPENAI_SDK, LITELLM with custom endpoints),
-    provide the base URL ending in /v1 (e.g., http://localhost:8000/v1).
-    The OpenAI client will automatically append /chat/completions.
+    Convenience aliases (same behaviour as ``LITELLM`` with the right
+    provider prefix; kept for ergonomics and back-compat):
+        - **OPENAI_SDK**: OpenAI-compatible endpoint (the official API
+          or a local server exposing ``/v1/chat/completions``).
+        - **OLLAMA**: targets ``ollama_chat/<model>`` via LiteLLM
+          (default endpoint ``http://localhost:11434``).
+        - **LANGCHAIN**: LangServe endpoints (treated as OpenAI-compat).
 
-    For Ollama endpoints, provide the base URL (e.g., http://localhost:11434).
-    The adapter will automatically use /api/generate or /api/chat as appropriate.
+    Custom protocols (gap-fillers that LiteLLM doesn't speak natively):
+        - **GOOGLE_ADK**: deployed Google ADK agent server
+          (POST /run with session + event protocol). Implemented as a
+          per-instance ``litellm.CustomLLM`` provider.
+        - **MCP**: Model Context Protocol endpoint (placeholder).
+        - **A2A**: Agent-to-Agent protocol endpoint (placeholder).
+
+    - **UNKNOWN**: fallback used when the agent type can't be inferred.
+
+    See ``hackagent/examples/litellm_multi_provider/`` for a working
+    demo that runs the same attack against several providers by only
+    changing the model string.
     """
 
     GOOGLE_ADK = "GOOGLE_ADK"

@@ -5,7 +5,7 @@ title: hackagent.server.storage.base
 
 StorageBackend Protocol and record models.
 
-Both RemoteBackend (api.hackagent.dev) and LocalBackend (SQLite) implement
+LocalBackend (SQLite) implements
 the StorageBackend protocol, providing identical interfaces so that all
 callers — AgentRouter, Tracker, StepTracker, AttackOrchestrator, TUI — are
 fully decoupled from where data is actually persisted.
@@ -25,7 +25,7 @@ Organization and user context resolved by the storage backend.
 
 #### user\_id
 
-&quot;local&quot; for LocalBackend, int-as-str for RemoteBackend
+&quot;local&quot; for LocalBackend
 
 ## StorageBackend Objects
 
@@ -33,7 +33,7 @@ Organization and user context resolved by the storage backend.
 class StorageBackend(Protocol)
 ```
 
-Common interface for both RemoteBackend and LocalBackend.
+Common interface for storage backends.
 
 All methods are synchronous.  The protocol uses duck-typing so concrete
 backends do not need to explicitly inherit from this class.
@@ -65,4 +65,12 @@ def create_or_update_agent(name: str,
 ```
 
 Create a new agent or update an existing one with the same name.
+
+#### count\_result\_buckets
+
+```python
+def count_result_buckets() -> Dict[str, int]
+```
+
+Return {total, jailbreaks, mitigated, failed, pending} across all results.
 

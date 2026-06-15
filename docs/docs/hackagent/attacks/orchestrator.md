@@ -88,8 +88,7 @@ def execute(attack_config: Dict[str, Any],
             fail_on_run_error: bool,
             max_wait_time_seconds: Optional[int] = None,
             poll_interval_seconds: Optional[int] = None,
-            _tui_app: Optional[Any] = None,
-            _tui_log_callback: Optional[Any] = None) -> Any
+            _tui_event_bus: Optional[Any] = None) -> Any
 ```
 
 Execute attack with server tracking.
@@ -108,8 +107,9 @@ Standard workflow:
 - `fail_on_run_error` - Whether to raise on errors
 - `max_wait_time_seconds` - Unused for local execution
 - `poll_interval_seconds` - Unused for local execution
-- `_tui_app` - Optional TUI app for logging
-- `_tui_log_callback` - Optional TUI log callback
+- `_tui_event_bus` - Optional :class:`hackagent.cli.tui.events.TUIEventBus`
+  that receives structured events (step start/end, tool calls,
+  progress, etc.) during execution.
   
 
 **Returns**:

@@ -148,6 +148,12 @@ class EvaluationPipeline(BaseEvaluationStep):
         judge_keys = self._build_judge_keys_from_data(evaluated_data)
         self._sync_to_server(evaluated_data, judge_keys)
 
+        # Enrich items with best_score/success, then record per-prefix evaluation
+        # traces on the goal tracker so the dashboard can attribute jailbreaks to
+        # specific prefixes.
+        self._enrich_items_with_scores(evaluated_data)
+        self._update_tracker(evaluated_data)
+
         # Aggregation
         self.logger.info(
             f"Aggregation: Aggregating {len(evaluated_data)} evaluation results"

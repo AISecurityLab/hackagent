@@ -356,3 +356,132 @@ class AgentActionsViewer(Container):
                 count_widget.update(f"[bold]Actions:[/bold] {count}")
             except Exception:
                 pass
+
+    # ------------------------------------------------------------------
+    # Event bus integration
+    # ------------------------------------------------------------------
+
+    def subscribe_to_bus(self, bus: Any, app: Any) -> None:
+        """Subscribe this viewer to a :class:`TUIEventBus`.
+
+        Events arrive on the emitting (worker) thread, so each handler
+        marshals back onto the Textual UI thread via ``app.call_from_thread``.
+        """
+
+        def _on_event(event: Any) -> None:
+            try:
+                app.call_from_thread(self._handle_event, event)
+            except Exception:
+                pass
+
+        bus.subscribe(_on_event)
+
+    def _handle_event(self, event: Any) -> None:
+        """Translate a TUI bus event into a row in the actions viewer."""
+        et = event.event_type
+        payload = event.payload or {}
+
+        if et == "step_started":
+            self.add_step_separator(
+                payload.get("step_name", "Step"),
+                payload.get("step_number", 0) or 0,
+            )
+
+        elif et == "goal_started":
+            goal_index = payload.get("goal_index", 0)
+            goal = (payload.get("goal") or "")[:120]
+            attack_type = (payload.get("attack_type") or "").upper()
+            label = f"Goal #{goal_index + 1}"
+            if attack_type:
+                label = f"{attack_type} — {label}"
+            if goal:
+                label += f": {goal}"
+            self.add_step_separator(label, goal_index + 1)
+
+        elif et == "goal_finalized":
+            success = bool(payload.get("success"))
+            actions_widget = self.query_one("#actions-display", RichLog)
+            icon = (
+                "[bright_green]✓ JAILBREAK[/bright_green]"
+                if success
+                else "[red]✗ REFUSED[/red]"
+            )
+            elapsed = payload.get("elapsed_s")
+            elapsed_s = (
+                f"  [dim]({elapsed:.1f}s)[/dim]"
+                if isinstance(elapsed, (int, float))
+                else ""
+            )
+            actions_widget.write(
+                f"[dim]── Goal #{payload.get('goal_index', '?') + 1 if isinstance(payload.get('goal_index'), int) else '?'} {icon}{elapsed_s} ──[/dim]"
+            )
+
+        elif et == "trace_added":
+            self._render_trace(payload)
+
+    def _render_trace(self, payload: Dict[str, Any]) -> None:
+        """Render a `trace_added` payload using the existing add_* helpers."""
+        step_type = (payload.get("step_type") or "").upper()
+        step_name = payload.get("step_name") or step_type or "Trace"
+        content = payload.get("content") or {}
+        sequence = payload.get("sequence")
+
+        # Tool call / response → use add_tool_call so we get the structured
+        # arguments + result layout.
+        if step_type == "TOOL_CALL":
+            tool_name = (
+                content.get("name")
+                or content.get("tool")
+                or content.get("function", {}).get("name")
+                or "unknown"
+            )
+            args = (
+                content.get("arguments")
+                or content.get("input")
+                or content.get("parameters")
+            )
+            self.add_tool_call(
+                tool_name=tool_name,
+                arguments=args if isinstance(args, dict) else None,
+                step_number=sequence,
+            )
+            return
+
+        if step_type == "TOOL_RESPONSE":
+            tool_name = content.get("tool") or content.get("name") or "tool"
+            result = (
+                content.get("result")
+                or content.get("output")
+                or content.get("response")
+            )
+            self.add_tool_call(
+                tool_name=tool_name,
+                result=str(result) if result is not None else None,
+                step_number=sequence,
+            )
+            return
+
+        # Evaluation / scorer steps — render as a small card.
+        if step_name == "Evaluation" or content.get("evaluator"):
+            actions_widget = self.query_one("#actions-display", RichLog)
+            score = content.get("score")
+            evaluator = content.get("evaluator") or "evaluator"
+            actions_widget.write(
+                f"[bold yellow]⚖ {_escape(evaluator)}[/bold yellow]"
+                + (
+                    f"  score=[bright_white]{score}[/bright_white]"
+                    if score is not None
+                    else ""
+                )
+            )
+            return
+
+        # Generic interaction — show key/value-style summary.
+        actions_widget = self.query_one("#actions-display", RichLog)
+        actions_widget.write(
+            f"[dim]· {sequence or self._action_count + 1}[/dim]  "
+            f"[bold cyan]{_escape(step_name)}[/bold cyan] "
+            f"[dim]{_escape(step_type)}[/dim]"
+        )
+        self._action_count += 1
+        self.update_action_count(self._action_count)

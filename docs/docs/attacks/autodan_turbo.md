@@ -179,6 +179,13 @@ AutoDAN-Turbo uses a top-level `embedder` config for strategy retrieval. This ro
 | `embedder.endpoint` | Endpoint used by the embedder router | `http://localhost:11434` |
 | `embedder.agent_type` | Router adapter type for the embedder | `OLLAMA` |
 
+### Preflight Controls (Advanced)
+
+| Parameter | Scope | Description | Default |
+|-----------|-------|-------------|---------|
+| `_preflight_require_embedder` | AutoDAN-Turbo | When `true`, `embedder` is treated as required during preflight availability checks. | `false` |
+| `_preflight_probe_optional_roles` | Global (all attacks) | When `true`, preflight also probes roles marked optional by attack-specific role resolution. | `false` |
+
 ### Role Models
 
 | Role | Required keys |

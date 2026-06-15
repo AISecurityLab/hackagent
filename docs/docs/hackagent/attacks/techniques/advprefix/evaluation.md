@@ -29,7 +29,7 @@ class EvaluationPipeline(BaseEvaluationStep)
 
 Evaluation pipeline for the AdvPrefix attack.
 
-Extends `BaseEvaluationStep` (multi-judge evaluation, merge, sync)
+Extends ``BaseEvaluationStep`` (multi-judge evaluation, merge, sync)
 and adds AdvPrefix-specific aggregation and selection stages.
 
 Architecture:

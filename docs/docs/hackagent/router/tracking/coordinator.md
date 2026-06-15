@@ -98,7 +98,8 @@ def create(cls,
            goals: Optional[List[str]] = None,
            initial_metadata: Optional[Dict[str, Any]] = None,
            goal_index_start: int = 0,
-           run_start_time: Optional[float] = None) -> "TrackingCoordinator"
+           run_start_time: Optional[float] = None,
+           event_bus: Optional[Any] = None) -> "TrackingCoordinator"
 ```
 
 Factory method to create a fully-initialized coordinator.

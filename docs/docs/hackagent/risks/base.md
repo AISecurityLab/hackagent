@@ -11,7 +11,7 @@ Architecture (mirrors the attack layer):
                      BaseVulnerability ← vulnerability.assess()
 
 Each concrete vulnerability:
-  1. Defines an Enum of risk patterns in its ``types.py``
+  1. Defines an Enum of sub-types in its ``types.py``
   2. Provides prompt templates in its ``templates.py``
   3. Extends this class in its main module (e.g. ``bias.py``)
 
@@ -23,18 +23,18 @@ class BaseVulnerability(abc.ABC)
 
 Abstract base class for all vulnerabilities.
 
-Each vulnerability carries an ``Enum`` of risk patterns that can be individually selected.
+Each vulnerability carries an ``Enum`` of sub-types that can be individually selected.
 
 Subclasses must set the class-level attributes:
     - ``name``             – human-readable name
     - ``description``      – one-liner for reports
-    - ``ALLOWED_TYPES``    – list of valid risk pattern *values* (strings)
+    - ``ALLOWED_TYPES``    – list of valid sub-type *values* (strings)
     - ``_type_enum``       – the Enum class used for validation
 
 Parameters
 ----------
 types : list[Enum]
-    risk patterns to evaluate (defaults to all allowed types).
+    Sub-types to evaluate (defaults to all allowed types).
 
 #### get\_types
 
@@ -42,7 +42,7 @@ types : list[Enum]
 def get_types() -> List[Enum]
 ```
 
-Return the list of selected risk pattern enums.
+Return the list of selected sub-type enums.
 
 #### get\_values
 
@@ -50,7 +50,7 @@ Return the list of selected risk pattern enums.
 def get_values() -> List[str]
 ```
 
-Return selected risk pattern values as plain strings.
+Return selected sub-type values as plain strings.
 
 #### assess
 
@@ -61,7 +61,7 @@ def assess(model_callback: Any = None,
 
 Evaluate the target model for this vulnerability.
 
-Returns a dict mapping each risk pattern value to its test-case results.
+Returns a dict mapping each sub-type value to its test-case results.
 
 #### a\_assess
 
@@ -78,7 +78,7 @@ Async variant of :pymeth:`assess`.
 def simulate_attacks(purpose: Optional[str] = None) -> List[str]
 ```
 
-Generate baseline attack prompts for each selected risk pattern.
+Generate baseline attack prompts for each selected sub-type.
 
 Returns a flat list of attack strings.
 

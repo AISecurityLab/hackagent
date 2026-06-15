@@ -71,6 +71,7 @@ const sidebars: SidebarsConfig = {
         id: 'datasets/index',
       },
       items: [
+        'datasets/selecting-intent-categories',
         'datasets/presets',
         'datasets/huggingface',
         'datasets/file',
@@ -101,6 +102,11 @@ const sidebars: SidebarsConfig = {
           type: 'doc',
           id: 'agents/google-adk',
           label: 'Google ADK',
+        },
+        {
+          type: 'doc',
+          id: 'agents/guardrails',
+          label: 'Guardrails',
         },
       ],
     },
@@ -135,15 +141,15 @@ const sidebars: SidebarsConfig = {
           items: [
             'hackagent/router/router',
             'hackagent/router/types',
+            'hackagent/router/agent',
+            'hackagent/router/envelope',
+            'hackagent/router/provider_config',
+            'hackagent/router/tracking_logger',
             {
               type: 'category',
-              label: 'Adapters',
+              label: 'Providers',
               items: [
-                'hackagent/router/adapters/base',
-                'hackagent/router/adapters/openai',
-                'hackagent/router/adapters/ollama',
-                'hackagent/router/adapters/litellm',
-                'hackagent/router/adapters/google_adk',
+                'hackagent/router/providers/adk',
               ],
             },
             {

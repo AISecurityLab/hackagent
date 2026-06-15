@@ -100,7 +100,8 @@ def __init__(backend: StorageBackend,
              run_id: str,
              logger: Optional[logging.Logger] = None,
              attack_type: Optional[str] = None,
-             category_classifier_config: Optional[Dict[str, Any]] = None)
+             category_classifier_config: Optional[Dict[str, Any]] = None,
+             event_bus: Optional[Any] = None)
 ```
 
 Initialize tracker.
@@ -111,6 +112,10 @@ Initialize tracker.
 - `run_id` - Server-side run record ID
 - `logger` - Optional logger instance
 - `attack_type` - Optional attack type identifier for metadata
+- `event_bus` - Optional :class:`hackagent.cli.tui.events.TUIEventBus`.
+  When provided, the tracker emits structured events
+  (``goal_started``, ``goal_finalized``, ``evaluation``, ...)
+  so the TUI can render execution live without parsing logs.
 
 #### is\_enabled
 
@@ -211,7 +216,8 @@ Add a custom trace with arbitrary content.
 def finalize_goal(ctx: Context,
                   success: bool,
                   evaluation_notes: Optional[str] = None,
-                  final_metadata: Optional[Dict[str, Any]] = None) -> bool
+                  final_metadata: Optional[Dict[str, Any]] = None,
+                  evaluation_status: Optional[Any] = None) -> bool
 ```
 
 Finalize a goal&#x27;s result with evaluation status.

@@ -6,10 +6,10 @@ title: hackagent.utils
 #### display\_hackagent\_splash
 
 ```python
-def display_hackagent_splash()
+def display_hackagent_splash() -> None
 ```
 
-Displays the HackAgent splash screen using the pre-defined ASCII art.
+Display the HackAgent splash screen using the pre-defined ASCII art.
 
 #### resolve\_agent\_type
 
@@ -18,7 +18,7 @@ def resolve_agent_type(
         agent_type_input: Union[AgentTypeEnum, str]) -> AgentTypeEnum
 ```
 
-Resolves the agent type from a string or AgentTypeEnum member.
+Resolve the agent type from a string or AgentTypeEnum member.
 
 #### resolve\_api\_token
 
@@ -27,14 +27,11 @@ def resolve_api_token(direct_api_key_param: Optional[str] = None,
                       config_file_path: Optional[str] = None) -> Optional[str]
 ```
 
-Resolves the API token with this priority:
+Resolve API token with standardized priority order.
 
-1. direct `api_key` parameter
-2. `HACKAGENT_API_KEY` environment variable
-3. config file (`~/.config/hackagent/config.json`)
-4. `None` (local mode fallback)
-
-**Returns**:
-
-- `Optional[str]` - resolved API token when available, otherwise `None` for local mode.
+Priority:
+1. direct api_key parameter
+2. HACKAGENT_API_KEY environment variable
+3. config file (~/.config/hackagent/config.json or specified path)
+4. None =&gt; local mode
 

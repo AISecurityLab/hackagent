@@ -67,6 +67,19 @@ def _escape(value: Any) -> str:
 
 
 # =====================================================================
+# Shared agent-type choices reused by target agent and guardrail selects.
+# =====================================================================
+_AGENT_TYPE_CHOICES = [
+    ("Google ADK", "google-adk"),
+    ("LiteLLM", "litellm"),
+    ("LangChain", "langchain"),
+    ("OpenAI SDK", "openai-sdk"),
+    ("Ollama", "ollama"),
+    ("MCP", "mcp"),
+    ("A2A", "a2a"),
+]
+
+# =====================================================================
 # Strategy-specific config field IDs use the prefix ``cfg-`` so we can
 # query them without colliding with the static form fields.
 # =====================================================================
@@ -206,33 +219,69 @@ class AttacksTab(Container):
                 yield Static("[bold cyan]⚔️  Attack Configuration[/bold cyan]")
                 yield Static("")
 
+                # --- Before Guardrail (input filter, sits before the target) ---
+                with Collapsible(title="Before Guardrail (optional)", collapsed=True):
+                    yield Static(
+                        "[dim]Checks prompts before they reach the target model.[/dim]"
+                    )
+                    yield Label("Agent Name:")
+                    yield Input(
+                        placeholder="e.g., gpt-oss-safeguard-20b",
+                        id="before-gr-name",
+                    )
+                    yield Label("Agent Type:")
+                    yield Select(
+                        _AGENT_TYPE_CHOICES,
+                        id="before-gr-type",
+                        value="google-adk",
+                    )
+                    yield Label("Endpoint URL:")
+                    yield Input(
+                        placeholder="e.g., http://localhost:8000",
+                        id="before-gr-endpoint",
+                    )
+                yield Static("")
                 # --- Agent settings (always shown) ---
-                yield Label("Target Agent Name:")
-                yield Input(placeholder="e.g., weather-bot", id="agent-name")
-                yield Static("")
+                with Collapsible(title="Target Agent", collapsed=False):
+                    yield Label("Agent Name:")
+                    yield Input(placeholder="e.g., weather-bot", id="agent-name")
+                    yield Static("")
 
-                yield Label("Target Agent Type:")
-                yield Select(
-                    [
-                        ("Google ADK", "google-adk"),
-                        ("LiteLLM", "litellm"),
-                        ("LangChain", "langchain"),
-                        ("OpenAI SDK", "openai-sdk"),
-                        ("Ollama", "ollama"),
-                        ("MCP", "mcp"),
-                        ("A2A", "a2a"),
-                    ],
-                    id="agent-type",
-                    value="google-adk",
-                )
-                yield Static("")
+                    yield Label("Agent Type:")
+                    yield Select(
+                        _AGENT_TYPE_CHOICES,
+                        id="agent-type",
+                        value="google-adk",
+                    )
+                    yield Static("")
 
-                yield Label("Target Endpoint URL:")
-                yield Input(
-                    placeholder="e.g., http://localhost:8000", id="endpoint-url"
-                )
+                    yield Label("Endpoint URL:")
+                    yield Input(
+                        placeholder="e.g., http://localhost:8000", id="endpoint-url"
+                    )
                 yield Static("")
-
+                # --- After Guardrail (output filter, sits after the target) ---
+                with Collapsible(title="After Guardrail (optional)", collapsed=True):
+                    yield Static(
+                        "[dim]Checks responses after the target model generates them.[/dim]"
+                    )
+                    yield Label("Agent Name:")
+                    yield Input(
+                        placeholder="e.g., gpt-oss-safeguard-20b",
+                        id="after-gr-name",
+                    )
+                    yield Label("Agent Type:")
+                    yield Select(
+                        _AGENT_TYPE_CHOICES,
+                        id="after-gr-type",
+                        value="google-adk",
+                    )
+                    yield Label("Endpoint URL:")
+                    yield Input(
+                        placeholder="e.g., http://localhost:8000",
+                        id="after-gr-endpoint",
+                    )
+                yield Static("")
                 # --- Input source: Goals vs Dataset (radio toggle) ---
                 yield Static("[bold]Input Source[/bold]", classes="section-title")
                 with RadioSet(id="input-source-radio"):
@@ -1064,6 +1113,14 @@ class AttacksTab(Container):
         hackagent_logger.addHandler(tui_log_handler)
         hackagent_logger.setLevel(tui_log_level)
 
+        # Build the structured event bus and hook the actions viewer.
+        # The bus is also passed to ``agent.hack(...)`` below so trackers
+        # emit goal/step/trace events as the attack runs.
+        from hackagent.cli.tui.events import TUIEventBus
+
+        tui_event_bus = TUIEventBus()
+        actions_viewer.subscribe_to_bus(tui_event_bus, self.app)
+
         logging.getLogger("httpx").setLevel(logging.CRITICAL)
         logging.getLogger("litellm").setLevel(logging.CRITICAL)
 
@@ -1093,12 +1150,42 @@ class AttacksTab(Container):
 
             self.app.call_from_thread(progress_bar.update, progress=20)
 
+            # Build guardrail configs from form fields
+            before_gr_name = self.query_one("#before-gr-name", Input).value.strip()
+            after_gr_name = self.query_one("#after-gr-name", Input).value.strip()
+
+            before_guardrail = None
+            if before_gr_name:
+                before_gr_type_raw = self.query_one("#before-gr-type", Select).value
+                before_gr_endpoint = self.query_one(
+                    "#before-gr-endpoint", Input
+                ).value.strip()
+                before_guardrail = {
+                    "identifier": before_gr_name.capitalize,
+                    "agent_type": str(before_gr_type_raw),
+                    "endpoint": before_gr_endpoint,
+                }
+
+            after_guardrail = None
+            if after_gr_name:
+                after_gr_type_raw = self.query_one("#after-gr-type", Select).value
+                after_gr_endpoint = self.query_one(
+                    "#after-gr-endpoint", Input
+                ).value.strip()
+                after_guardrail = {
+                    "identifier": after_gr_name,
+                    "agent_type": str(after_gr_type_raw),
+                    "endpoint": after_gr_endpoint,
+                }
+
             agent = HackAgent(
                 name=agent_name,
                 endpoint=endpoint,
                 agent_type=agent_type_enum,
                 timeout=5.0,
                 adapter_operational_config=self._agent_adapter_operational_config,
+                before_guardrail=before_guardrail,
+                after_guardrail=after_guardrail,
             )
 
             self.app.call_from_thread(progress_bar.update, progress=30)
@@ -1118,36 +1205,91 @@ class AttacksTab(Container):
 
             start_time = time.time()
 
-            def log_callback(message: str, level: str) -> None:
-                _filtered_log_callback(message, level)
+            # Event-driven progress: each `goal_finalized` advances the bar
+            # toward 95% based on the expected goal count carried by the
+            # orchestrator's `step_started` event. Anything beyond execution
+            # (sync to backend) takes the final 5%.
+            progress_state = {"goals_done": 0, "expected": 0}
 
-            import threading
+            def _on_bus_event(event: Any) -> None:
+                et = event.event_type
+                payload = event.payload or {}
 
-            stop_progress = threading.Event()
+                if (
+                    et == "step_started"
+                    and payload.get("step_name") == "Attack Execution"
+                ):
+                    expected = payload.get("expected_total_goals") or 0
+                    progress_state["expected"] = int(expected) if expected else 0
+                    self.app.call_from_thread(progress_bar.update, progress=45)
+                    self.app.call_from_thread(
+                        status_widget.update,
+                        f"""[bold cyan]⚔️ Executing {_escape(strategy_name)} Attack...[/bold cyan]
 
-            def update_progress_gradually():
-                for progress in range(50, 91, 5):
-                    if stop_progress.is_set():
-                        break
-                    self.app.call_from_thread(progress_bar.update, progress=progress)
-                    time.sleep(2)
+[bold]Goals to process:[/bold] {progress_state["expected"] or "unknown"}
 
-            progress_thread = threading.Thread(
-                target=update_progress_gradually, daemon=True
-            )
-            progress_thread.start()
+[yellow]⏳ Attack running...[/yellow]
+[dim]Progress: 45%[/dim]""",
+                    )
+                    return
+
+                if et == "goal_finalized":
+                    progress_state["goals_done"] += 1
+                    expected = progress_state["expected"]
+                    if expected > 0:
+                        pct = 45 + int(50 * progress_state["goals_done"] / expected)
+                        pct = min(pct, 95)
+                    else:
+                        # Unknown total — creep up but never reach 95%
+                        pct = min(45 + progress_state["goals_done"] * 5, 90)
+                    self.app.call_from_thread(progress_bar.update, progress=pct)
+                    success = bool(payload.get("success"))
+                    icon = "✓" if success else "✗"
+                    elapsed = payload.get("elapsed_s")
+                    elapsed_s = (
+                        f" ({elapsed:.1f}s)"
+                        if isinstance(elapsed, (int, float))
+                        else ""
+                    )
+                    summary = (
+                        f"Goal {progress_state['goals_done']}"
+                        + (f"/{expected}" if expected else "")
+                        + f"  {icon}{elapsed_s}"
+                    )
+                    self.app.call_from_thread(
+                        status_widget.update,
+                        f"""[bold cyan]⚔️ Executing {_escape(strategy_name)} Attack...[/bold cyan]
+
+[bold]Last:[/bold] {summary}
+
+[yellow]⏳ Attack running...[/yellow]
+[dim]Progress: {pct}%[/dim]""",
+                    )
+                    return
+
+                if (
+                    et == "step_started"
+                    and payload.get("step_name") == "Evaluation Pipeline"
+                ):
+                    self.app.call_from_thread(progress_bar.update, progress=96)
+                    self.app.call_from_thread(
+                        status_widget.update,
+                        """[bold cyan]⚖ Running evaluation pipeline...[/bold cyan]
+
+[dim]Progress: 96%[/dim]""",
+                    )
+
+            tui_event_bus.subscribe(_on_bus_event)
 
             try:
                 results = agent.hack(
                     attack_config=attack_config,
                     run_config_override={"timeout": timeout},
                     fail_on_run_error=True,
-                    _tui_app=self.app,
-                    _tui_log_callback=log_callback,
+                    _tui_event_bus=tui_event_bus,
                 )
             finally:
-                stop_progress.set()
-                progress_thread.join(timeout=1)
+                tui_event_bus.unsubscribe(_on_bus_event)
                 sys.stdout = original_stdout
                 sys.stderr = original_stderr
 

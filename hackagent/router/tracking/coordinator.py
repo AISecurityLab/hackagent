@@ -78,6 +78,7 @@ class TrackingCoordinator:
         goal_tracker: Optional[Tracker],
         logger: Optional[logging.Logger] = None,
         run_start_time: Optional[float] = None,
+        goal_index_start: int = 0,
     ):
         """
         Initialize coordinator with pre-built trackers.
@@ -96,6 +97,7 @@ class TrackingCoordinator:
         self.logger = logger or get_logger(__name__)
         self._goals: List[str] = []
         self._goal_indices: List[int] = []
+        self._goal_index_start: int = int(goal_index_start)
         self._run_start_time: float = (
             float(run_start_time)
             if isinstance(run_start_time, (int, float))
@@ -110,10 +112,13 @@ class TrackingCoordinator:
         logger: Optional[logging.Logger] = None,
         attack_type: str = "unknown",
         category_classifier_config: Optional[Dict[str, Any]] = None,
+        preclassified_goal_labels_by_index: Optional[Dict[Any, Dict[str, str]]] = None,
+        disable_goal_category_classifier: bool = False,
         goals: Optional[List[str]] = None,
         initial_metadata: Optional[Dict[str, Any]] = None,
         goal_index_start: int = 0,
         run_start_time: Optional[float] = None,
+        event_bus: Optional[Any] = None,
     ) -> "TrackingCoordinator":
         """
         Factory method to create a fully-initialized coordinator.
@@ -124,6 +129,12 @@ class TrackingCoordinator:
             logger: Logger instance
             attack_type: Attack identifier (e.g., "advprefix", "pair")
             category_classifier_config: Optional per-goal classifier router config.
+            preclassified_goal_labels_by_index: Optional map goal_index ->
+                {"category": "X. ...", "subcategory": "Xn. ..."}. When
+                present, goal labels are taken from this map instead of querying
+                the category classifier.
+            disable_goal_category_classifier: Disable classifier initialization
+                entirely and rely on provided labels or fallback defaults.
             goals: Optional list of goals to initialize upfront
             initial_metadata: Optional metadata for goal results
             goal_index_start: Starting index to assign to the first goal
@@ -144,6 +155,9 @@ class TrackingCoordinator:
                 logger=_logger,
                 attack_type=attack_type,
                 category_classifier_config=category_classifier_config,
+                preclassified_goal_labels_by_index=preclassified_goal_labels_by_index,
+                disable_goal_category_classifier=disable_goal_category_classifier,
+                event_bus=event_bus,
             )
 
         tracking_context = TrackingContext(
@@ -151,6 +165,7 @@ class TrackingCoordinator:
             run_id=run_id,
             parent_result_id=None,
             logger=_logger,
+            event_bus=event_bus,
         )
         tracking_context.add_metadata("attack_type", attack_type)
         step_tracker = StepTracker(tracking_context)
@@ -161,6 +176,7 @@ class TrackingCoordinator:
             goal_tracker=goal_tracker,
             logger=_logger,
             run_start_time=run_start_time,
+            goal_index_start=goal_index_start,
         )
 
         # Initialize goals if provided
@@ -225,6 +241,7 @@ class TrackingCoordinator:
             initial_metadata: Optional metadata to attach to each goal result
             goal_index_start: Starting index to assign to the first goal
         """
+        self._goal_index_start = int(goal_index_start)
         self._goals = list(goals)
         self._goal_indices = [goal_index_start + i for i in range(len(goals))]
 
@@ -276,7 +293,11 @@ class TrackingCoordinator:
         self.logger.info(
             f"Initializing {len(surviving_goals)} surviving goals from pipeline data"
         )
-        self.initialize_goals(surviving_goals, initial_metadata)
+        self.initialize_goals(
+            surviving_goals,
+            initial_metadata,
+            goal_index_start=self._goal_index_start,
+        )
 
         # Backdate _start_time for each goal using generation elapsed_s so that
         # the tracked goal latency covers the entire lifecycle (generation + evaluation).
@@ -297,6 +318,37 @@ class TrackingCoordinator:
                 ctx = self.goal_tracker.get_goal_context_by_goal(goal)
                 if ctx and gen_elapsed > 0:
                     ctx._start_time -= gen_elapsed
+
+    def backdate_goal_start_times(self, pipeline_data: List[Dict[str, Any]]) -> None:
+        """Shift each goal's _start_time back by its generation elapsed_s.
+
+        Call this after generation when goals were already initialized upfront
+        (via initialize_goals) so that the tracked latency covers the full
+        lifecycle including generation time.
+
+        Args:
+            pipeline_data: Output from the Generation step (list of dicts
+                with "goal" and optional "elapsed_s" keys).
+        """
+        if not self.has_goal_tracking or not pipeline_data:
+            return
+
+        goal_gen_elapsed: Dict[str, float] = {}
+        for row in pipeline_data:
+            goal = row.get("goal", "")
+            elapsed = row.get("elapsed_s")
+            if goal and elapsed is not None:
+                try:
+                    goal_gen_elapsed[goal] = max(
+                        goal_gen_elapsed.get(goal, 0.0), float(elapsed)
+                    )
+                except (TypeError, ValueError):
+                    pass
+
+        for goal, gen_elapsed in goal_gen_elapsed.items():
+            ctx = self.goal_tracker.get_goal_context_by_goal(goal)
+            if ctx and gen_elapsed > 0:
+                ctx._start_time -= gen_elapsed
 
     def get_goal_context(self, goal_index: int) -> Optional[Context]:
         """Get tracking context for a specific goal by index."""
@@ -489,6 +541,14 @@ class TrackingCoordinator:
         if best_item.get("completion"):
             extra["jailbreak_response"] = best_item["completion"]
             extra["jailbreak_prompt"] = best_item.get("prefix", "")
+
+        # MML: include image_data_url and text_prompt for dashboard rendering
+        if best_item.get("image_data_url"):
+            extra["image_data_url"] = best_item["image_data_url"]
+        if best_item.get("text_prompt"):
+            extra["jailbreak_prompt"] = best_item["text_prompt"]
+        if best_item.get("response") and not extra.get("jailbreak_response"):
+            extra["jailbreak_response"] = best_item["response"]
 
         return extra
 

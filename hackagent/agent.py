@@ -67,6 +67,8 @@ class HackAgent:
         target_config: Optional[Dict[str, Any]] = None,
         adapter_operational_config: Optional[Dict[str, Any]] = None,
         thinking: Optional[bool] = None,
+        before_guardrail: Optional[Dict[str, Any]] = None,
+        after_guardrail: Optional[Dict[str, Any]] = None,
     ):
         """
         Initializes the HackAgent client and prepares it for interaction.
@@ -175,6 +177,22 @@ class HackAgent:
             adapter_operational_config=router_operational_config,
         )
 
+        # Wire guardrails onto the router once — they apply transparently to
+        # every route_request call for all attacks on this target.
+        if before_guardrail or after_guardrail:
+            from hackagent.attacks.shared.guardrail import create_guardrail_from_config
+
+            if before_guardrail:
+                self.router.before_guardrail = create_guardrail_from_config(
+                    before_guardrail, self.backend
+                )
+                logger.info("before_guardrail active on target router.")
+            if after_guardrail:
+                self.router.after_guardrail = create_guardrail_from_config(
+                    after_guardrail, self.backend
+                )
+                logger.info("after_guardrail active on target router.")
+
         # Attack strategies are lazy-loaded to improve startup time
         self._attack_strategies: Optional[Dict[str, Any]] = None
 
@@ -194,6 +212,7 @@ class HackAgent:
                 PAIROrchestrator,
                 FlipAttackOrchestrator,
                 TAPOrchestrator,
+                MMLOrchestrator,
             )
 
             self._attack_strategies = {
@@ -207,6 +226,7 @@ class HackAgent:
                 "tap": TAPOrchestrator(hackagent_agent=self),
                 "h4rm3l": H4rm3lOrchestrator(hackagent_agent=self),
                 "pap": PAPOrchestrator(hackagent_agent=self),
+                "mml": MMLOrchestrator(hackagent_agent=self),
             }
         return self._attack_strategies
 
@@ -215,8 +235,7 @@ class HackAgent:
         attack_config: Dict[str, Any],
         run_config_override: Optional[Dict[str, Any]] = None,
         fail_on_run_error: bool = True,
-        _tui_app: Optional[Any] = None,
-        _tui_log_callback: Optional[Any] = None,
+        _tui_event_bus: Optional[Any] = None,
     ) -> Any:
         """
         Executes a specified attack strategy against the configured victim agent.
@@ -273,8 +292,7 @@ class HackAgent:
                 attack_config=attack_config,
                 run_config_override=run_config_override,
                 fail_on_run_error=fail_on_run_error,
-                _tui_app=_tui_app,
-                _tui_log_callback=_tui_log_callback,
+                _tui_event_bus=_tui_event_bus,
             )
 
         except HackAgentError:

@@ -9,6 +9,9 @@ judge evaluation with early-stopping.  By the time this step executes,
 every result dict already contains ``best_score``, ``success``, and the
 raw judge columns.
 
+In PAP, each persuasion-technique attempt may be judged inline during
+generation. This evaluation step never re-runs judge evaluation.
+
 The post-processing step is responsible for:
 - Enriching any items still missing scores (e.g. errors).
 - Server sync of evaluation data.
@@ -22,18 +25,11 @@ from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
 from hackagent.server.client import AuthenticatedClient
 
 
-def _build_prompt_prefix(item: Dict[str, Any]) -> str:
-    """Build the 'prefix' field from a PAP result item."""
-    persuasive = item.get("persuasive_prompt")
-    if persuasive:
-        return str(persuasive)
-    return item.get("goal", "")
-
-
 class PAPEvaluation(BaseEvaluationStep):
     """Lightweight post-processing for the PAP attack.
 
-    Judge evaluation is performed inline during the generation loop.
+    Judge evaluation is performed inline during the generation loop while
+    iterating persuasion techniques.
     This step handles server sync, tracker updates, and ASR logging only.
     """
 
@@ -57,39 +53,7 @@ class PAPEvaluation(BaseEvaluationStep):
         if not input_data:
             return input_data
 
-        self._statistics["input_count"] = len(input_data)
-
-        error_indices: set = set()
-        for idx, item in enumerate(input_data):
-            if item.get("error") and not item.get("response"):
-                error_indices.add(idx)
-                item.setdefault("best_score", 0.0)
-                item.setdefault("success", False)
-                item.setdefault("evaluation_notes", f"Execution error: {item['error']}")
-            else:
-                item.setdefault("best_score", 0.0)
-                item.setdefault("success", item.get("best_score", 0) > 0)
-
-        self._statistics["evaluated_count"] = len(input_data) - len(error_indices)
-
-        n_success = sum(1 for item in input_data if item.get("success"))
-        self.logger.info(
-            f"Post-processing {len(input_data)} results "
-            f"({n_success} jailbreaks from inline judge)"
-        )
-
-        # Tracker: skip final trace (PAP uses per-technique evaluations)
-        if self._tracker:
-            self.logger.info(
-                "📊 Skipping final tracker evaluation trace (PAP uses per-technique evaluations)"
-            )
-
-        # Sync to server
-        judge_keys = self._build_judge_keys_from_data(input_data)
-        self._sync_to_server(input_data, judge_keys)
-
-        # Log ASR
-        self._log_evaluation_asr(input_data)
+        self._postprocess_inline_judge_results(input_data, attack_label="PAP")
 
         return input_data
 

@@ -30,6 +30,10 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+from hackagent.attacks.shared.response_utils import (
+    get_guardrail_info,
+    is_guardrail_response,
+)
 from hackagent.router.router import AgentRouter
 
 if TYPE_CHECKING:
@@ -149,9 +153,15 @@ def execute(
         )
 
         generated_text = response.get("generated_text")
-        error_message = response.get("error_message")
+        _guardrail_blocked = is_guardrail_response(response)
+        error_message = None if _guardrail_blocked else response.get("error_message")
 
-        if generated_text:
+        if _guardrail_blocked:
+            _info = get_guardrail_info(response)
+            logger.info(
+                f"[Goal {idx + 1}/{len(goals)}] Blocked by {_info.get('side', 'unknown')} guardrail"
+            )
+        elif generated_text:
             logger.info(
                 f"[Goal {idx + 1}/{len(goals)}] Target response:\n{generated_text}"
             )
@@ -172,10 +182,14 @@ def execute(
                     tracker.add_interaction_trace(
                         ctx=goal_ctx,
                         request=request_data,
-                        response={
-                            "generated_text": generated_text,
-                            "error_message": error_message,
-                        },
+                        response=(
+                            response
+                            if _guardrail_blocked
+                            else {
+                                "generated_text": generated_text,
+                                "error_message": error_message,
+                            }
+                        ),
                         step_name=f"FlipAttack Generation ({flip_mode})",
                         metadata={
                             "flip_mode": flip_mode,

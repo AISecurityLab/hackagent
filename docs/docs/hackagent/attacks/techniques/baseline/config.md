@@ -11,8 +11,7 @@ combining templates with goals to generate attack prompts.
 ## TemplateAttackConfig Objects
 
 ```python
-@dataclass
-class TemplateAttackConfig()
+class TemplateAttackConfig(ConfigBase)
 ```
 
 Configuration for baseline attack pipeline.
