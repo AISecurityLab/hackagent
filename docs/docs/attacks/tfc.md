@@ -50,11 +50,11 @@ graph TD
 
 | Format | `text_format` | Description |
 |--------|--------------|-------------|
-| ASCII art | `"ascii"` | Box-and-arrow text diagrams (default) |
-| Graphviz DOT | `"dot"` | Standard graph description language (`digraph { ... }`) |
+| Graphviz DOT | `"dot"` | Standard graph description language (default) |
 | Mermaid | `"mermaid"` | GitHub-flavored markdown diagram syntax |
 | TikZ (LaTeX) | `"tikz"` | LaTeX drawing package familiar from academic papers |
-| PlantUML | `"plantuml"` | UML diagram language with activity diagram syntax |
+| PlantUML | `"plantuml"` | UML diagram language with component diagram syntax |
+| ASCII art | `"ascii"` | Box-and-arrow text diagrams |
 
 ---
 
@@ -64,7 +64,7 @@ graph TD
 |--------|-------------|
 | `vertical` | Steps flow top-to-bottom in a single column |
 | `horizontal` | Steps flow left-to-right in a single row |
-| `tortuous` | Steps flow in an S-shaped serpentine path |
+| `tortuous` | Steps flow in an S-shaped serpentine path (`s_shaped` is accepted as alias) |
 
 ---
 
@@ -82,9 +82,9 @@ agent = HackAgent(
 )
 
 attack_config = {
-    "attack_type": "flowchart_text",
+    "attack_type": "tFC",
     "goals": ["Describe how to pick a lock"],
-    "flowchart_params": {
+    "tfc_params": {
         "text_format": "mermaid",  # or: dot, tikz, plantuml, ascii
         "layout": "vertical",
         "num_steps": 6,
@@ -118,12 +118,12 @@ hackagent eval flowchart-text \
 
 ## Configuration Parameters
 
-### Flowchart Parameters (`flowchart_params`)
+### Flowchart Parameters (`tfc_params`)
 
 | Parameter | Description | Default |
-|-----------|-------------|---------|
-| `text_format` | Graph language (`ascii`, `dot`, `mermaid`, `tikz`, `plantuml`) | `"ascii"` |
-| `layout` | Flowchart layout (`vertical`, `horizontal`, `tortuous`) | `"vertical"` |
+|-----------|-------------|---------||
+| `text_format` | Graph language (`dot`, `mermaid`, `tikz`, `plantuml`, `ascii`) | `"dot"` |
+| `layout` | Flowchart layout (`vertical`, `horizontal`, `tortuous` / `s_shaped`) | `"vertical"` |
 | `num_steps` | Number of steps to decompose goal into | `6` |
 | `truncate_last_step` | Truncate last step to induce completion | `true` |
 

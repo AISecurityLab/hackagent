@@ -41,10 +41,6 @@ DEFAULT_FC_CONFIG: Dict[str, Any] = {
         "layout": "vertical",
         # Graphviz DPI (resolution of rendered PNG)
         "dpi": 600,
-        # Fallback image settings (used when Graphviz is not available)
-        "image_width": 1200,
-        "image_height": 800,
-        "font_size": 16,
         # Step generation settings
         "num_steps": 6,
         # Whether to include partial/truncated last step to induce completion
@@ -108,9 +104,6 @@ class FCParams(BaseModel):
             ``"horizontal"`` (left-to-right), or ``"tortuous"`` (S-shaped).
             ``"s_shaped"`` is accepted as an alias for ``"tortuous"``.
         dpi: Resolution (dots-per-inch) for Graphviz rendering.
-        image_width: Width of fallback Pillow image in pixels.
-        image_height: Height of fallback Pillow image in pixels.
-        font_size: Font size for fallback Pillow rendering.
         num_steps: Number of steps to decompose the goal into.
         truncate_last_step: Whether to truncate the last step to induce
             the target model to complete the harmful content.
@@ -118,9 +111,6 @@ class FCParams(BaseModel):
 
     layout: Literal["vertical", "horizontal", "tortuous", "s_shaped"] = "vertical"
     dpi: int = Field(default=600, ge=72, le=1200)
-    image_width: int = Field(default=1200, ge=200)
-    image_height: int = Field(default=800, ge=200)
-    font_size: int = Field(default=16, ge=8)
     num_steps: int = Field(default=6, ge=2, le=15)
     truncate_last_step: bool = True
 

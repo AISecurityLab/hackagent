@@ -39,11 +39,6 @@ class TestDefaultFlowchartConfig(unittest.TestCase):
     def test_default_dpi(self):
         self.assertEqual(DEFAULT_FC_CONFIG["fc_params"]["dpi"], 600)
 
-    def test_default_image_dimensions(self):
-        params = DEFAULT_FC_CONFIG["fc_params"]
-        self.assertEqual(params["image_width"], 1200)
-        self.assertEqual(params["image_height"], 800)
-
     def test_step_generator_is_none_by_default(self):
         self.assertIsNone(DEFAULT_FC_CONFIG["step_generator"])
 
@@ -71,8 +66,6 @@ class TestDefaultFlowchartTextConfig(unittest.TestCase):
     def test_no_image_params(self):
         params = DEFAULT_TFC_CONFIG["tfc_params"]
         self.assertNotIn("dpi", params)
-        self.assertNotIn("image_width", params)
-        self.assertNotIn("image_height", params)
 
     def test_step_generator_is_none_by_default(self):
         self.assertIsNone(DEFAULT_TFC_CONFIG["step_generator"])
@@ -85,9 +78,6 @@ class TestFlowchartParams(unittest.TestCase):
         params = FCParams()
         self.assertEqual(params.layout, "vertical")
         self.assertEqual(params.dpi, 600)
-        self.assertEqual(params.image_width, 1200)
-        self.assertEqual(params.image_height, 800)
-        self.assertEqual(params.font_size, 16)
         self.assertEqual(params.num_steps, 6)
         self.assertTrue(params.truncate_last_step)
 

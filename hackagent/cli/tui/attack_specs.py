@@ -1407,7 +1407,7 @@ _register(
                 key="fc_params.num_steps",
                 label="Number of Steps",
                 field_type=FieldType.INTEGER,
-                default=5,
+                default=6,
                 description="Number of steps to decompose the goal into.",
                 min_value=2,
                 max_value=15,
@@ -1426,7 +1426,7 @@ _register(
                 key="fc_params.output_dir",
                 label="Output Directory",
                 field_type=FieldType.STRING,
-                default="./logs/flowchart",
+                default="./logs/fc",
                 description="Directory for saving run artifacts.",
                 section="Output",
                 advanced=True,
@@ -1441,7 +1441,7 @@ _register(
 
 _register(
     AttackConfigSpec(
-        technique_key="flowchart_text",
+        technique_key="tfc",
         display_name="tFC-Attack",
         description=(
             "Encodes harmful prompts as graph description languages "
@@ -1466,7 +1466,7 @@ _register(
                 key="tfc_params.text_format",
                 label="Text Format",
                 field_type=FieldType.CHOICE,
-                default="ascii",
+                default="dot",
                 description="Graph description language to encode the flowchart.",
                 choices=[
                     ("ASCII art", "ascii"),
@@ -1481,7 +1481,7 @@ _register(
                 key="tfc_params.num_steps",
                 label="Number of Steps",
                 field_type=FieldType.INTEGER,
-                default=5,
+                default=6,
                 description="Number of steps to decompose the goal into.",
                 min_value=2,
                 max_value=15,
@@ -1500,7 +1500,7 @@ _register(
                 key="tfc_params.output_dir",
                 label="Output Directory",
                 field_type=FieldType.STRING,
-                default="./logs/flowchart_text",
+                default="./logs/tfc",
                 description="Directory for saving run artifacts.",
                 section="Output",
                 advanced=True,

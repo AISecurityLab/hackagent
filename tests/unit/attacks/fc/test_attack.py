@@ -171,8 +171,6 @@ class TesttFCAttack(unittest.TestCase):
         )
         params = attack.config["tfc_params"]
         self.assertNotIn("dpi", params)
-        self.assertNotIn("image_width", params)
-        self.assertNotIn("image_height", params)
 
     def test_text_format_in_config(self):
         for fmt in ("dot", "mermaid", "tikz", "plantuml", "ascii"):

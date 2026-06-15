@@ -5,7 +5,6 @@
 Flowchart image renderer for FC-Attack.
 
 Generates flowchart images from step descriptions using Graphviz DOT format.
-Falls back to Pillow-based rendering if Graphviz is not available.
 Supports three layout modes: vertical, horizontal, and tortuous (S-shaped).
 
 Based on: Zhang et al., "FC-Attack: Jailbreaking Multimodal Large
@@ -261,7 +260,7 @@ def _tikz_tortuous(goal_text: str, steps: List[str], cols: int = 3) -> str:
 def steps_to_plantuml(
     goal_text: str, steps: List[str], layout: str = "vertical"
 ) -> str:
-    """Serialize steps as a PlantUML activity diagram respecting layout direction."""
+    """Serialize steps as a PlantUML flowchart respecting layout direction."""
     if layout == "horizontal":
         return _plantuml_horizontal(goal_text, steps)
     elif layout in ("tortuous", "s_shaped"):

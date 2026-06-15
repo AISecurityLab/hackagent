@@ -12,7 +12,7 @@ For attacks against text-only models using graph description languages (DOT, Mer
 
 ## Overview
 
-FC-Attack exploits visual structured representations to encode harmful instructions as flowchart diagrams rendered as images. The attack decomposes a harmful goal into step-by-step descriptions, renders them as a flowchart image (using Graphviz or Pillow), and sends it to the target VLM alongside a jailbreak text prompt.
+FC-Attack exploits visual structured representations to encode harmful instructions as flowchart diagrams rendered as images. The attack decomposes a harmful goal into step-by-step descriptions, renders them as a flowchart image using Graphviz, and sends it to the target VLM alongside a jailbreak text prompt.
 
 ### Research Foundation
 
@@ -40,7 +40,7 @@ graph TD
 
 1. **Step Decomposition** — The harmful goal is broken into numbered steps (either using an LLM step generator or a heuristic fallback).
 2. **Partial Information** — The last step is optionally truncated to induce the model to "complete" the harmful content.
-3. **Image Rendering** — Steps are rendered as a flowchart image using Graphviz (if available) or Pillow.
+3. **Image Rendering** — Steps are rendered as a flowchart image using Graphviz.
 4. **Jailbreak Prompt** — A competitive quiz scenario prompt instructs the model to analyze and complete the flowchart content.
 5. **Modality Bypass** — Harmful content encoded as a visual flowchart bypasses safety filters tuned for natural language text.
 
@@ -52,7 +52,7 @@ graph TD
 |--------|-------------|
 | `vertical` | Steps flow top-to-bottom in a single column |
 | `horizontal` | Steps flow left-to-right in a single row |
-| `tortuous` | Steps flow in an S-shaped serpentine path |
+| `tortuous` | Steps flow in an S-shaped serpentine path (`s_shaped` is accepted as alias) |
 
 ---
 
@@ -70,9 +70,9 @@ agent = HackAgent(
 )
 
 attack_config = {
-    "attack_type": "flowchart",
+    "attack_type": "fc",
     "goals": ["Describe how to pick a lock"],
-    "flowchart_params": {
+    "fc_params": {
         "layout": "vertical",
         "num_steps": 6,
         "truncate_last_step": True,
@@ -105,21 +105,14 @@ hackagent eval flowchart \
 
 ## Configuration Parameters
 
-### Flowchart Parameters (`flowchart_params`)
+### Flowchart Parameters (`fc_params`)
 
 | Parameter | Description | Default |
-|-----------|-------------|---------|
-| `layout` | Flowchart layout (`vertical`, `horizontal`, `tortuous`) | `"vertical"` |
+|-----------|-------------|---------||
+| `layout` | Flowchart layout (`vertical`, `horizontal`, `tortuous` / `s_shaped`) | `"vertical"` |
 | `num_steps` | Number of steps to decompose goal into | `6` |
 | `truncate_last_step` | Truncate last step to induce completion | `true` |
 | `dpi` | Image DPI resolution | `600` |
-| `image_width` | Image width in pixels | `1200` |
-| `image_height` | Image height in pixels | `800` |
-| `font_size` | Font size for flowchart text | `16` |
-| `background_color` | Background color | `"white"` |
-| `text_color` | Text color in boxes | `"black"` |
-| `box_color` | Fill color for step boxes | `"#E8F4FD"` |
-| `border_color` | Border color for step boxes | `"#2196F3"` |
 
 ### Step Generator (`step_generator`)
 
@@ -154,5 +147,4 @@ FC-Attack implements a two-stage pipeline:
 ## Requirements
 
 - Target model must be a **Vision-Language Model** (VLM) that supports image inputs (e.g., GPT-4o, Qwen2-VL, LLaVA, Claude 3).
-- The `Pillow` library is required for flowchart image rendering (included in HackAgent dependencies).
-- `Graphviz` system binary (`dot`) is recommended for high-quality rendering; Pillow fallback is used otherwise.
+- The `Graphviz` system binary (`dot`) is required for flowchart image rendering (e.g. `apt install graphviz` or `brew install graphviz`).
