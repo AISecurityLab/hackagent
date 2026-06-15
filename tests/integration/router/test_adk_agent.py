@@ -156,6 +156,7 @@ class TestGoogleADKAdapterIntegration:
             assert response["processed_response"] is not None
             logger.info(f"ADK chat response: {response['processed_response'][:100]}")
 
+    @pytest.mark.timeout(240)
     def test_multi_turn_conversation(
         self,
         skip_if_google_adk_unavailable,
