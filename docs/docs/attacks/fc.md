@@ -108,7 +108,7 @@ hackagent eval flowchart \
 ### Flowchart Parameters (`fc_params`)
 
 | Parameter | Description | Default |
-|-----------|-------------|---------||
+|-----------|-------------|---------|
 | `layout` | Flowchart layout (`vertical`, `horizontal`, `tortuous` / `s_shaped`) | `"vertical"` |
 | `num_steps` | Number of steps to decompose goal into | `6` |
 | `truncate_last_step` | Truncate last step to induce completion | `true` |

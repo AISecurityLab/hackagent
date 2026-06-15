@@ -121,7 +121,7 @@ hackagent eval flowchart-text \
 ### Flowchart Parameters (`tfc_params`)
 
 | Parameter | Description | Default |
-|-----------|-------------|---------||
+|-----------|-------------|---------|
 | `text_format` | Graph language (`dot`, `mermaid`, `tikz`, `plantuml`, `ascii`) | `"dot"` |
 | `layout` | Flowchart layout (`vertical`, `horizontal`, `tortuous` / `s_shaped`) | `"vertical"` |
 | `num_steps` | Number of steps to decompose goal into | `6` |
