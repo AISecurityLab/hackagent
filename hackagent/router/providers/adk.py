@@ -176,8 +176,14 @@ def _get_adk_custom_llm_class():
                 "Accept": "application/json",
             }
             payload = initial_state or {}
+            session_timeout = min(30, max(1, int(self.timeout)))
             try:
-                response = requests.post(url, headers=headers, json=payload, timeout=30)
+                response = requests.post(
+                    url,
+                    headers=headers,
+                    json=payload,
+                    timeout=session_timeout,
+                )
                 response.raise_for_status()
                 return
             except requests.exceptions.HTTPError as http_err:

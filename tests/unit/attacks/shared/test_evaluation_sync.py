@@ -41,7 +41,7 @@ class TestEvaluateRow:
         assert success is False
 
     def test_success_from_judge_keys(self):
-        row = {"eval_jb": 1, "eval_hb": 0, "eval_nj": 0}
+        row = {"eval_jb": 1, "eval_hb": 1, "eval_nj": 0}
         judge_keys = [
             {
                 "key": "eval_jb",

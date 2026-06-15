@@ -182,5 +182,79 @@ class TestCLINoCommand(unittest.TestCase):
         mock_tui.assert_called_once()
 
 
+class TestCLIInit(unittest.TestCase):
+    """Test the init setup wizard."""
+
+    @patch("hackagent.utils.display_hackagent_splash")
+    @patch("hackagent.cli.main.click.prompt")
+    @patch("hackagent.cli.main.click.confirm")
+    @patch("hackagent.cli.main.CLIConfig")
+    def test_init_configures_remote_mode(
+        self,
+        mock_config_class,
+        mock_confirm,
+        mock_prompt,
+        mock_splash,
+    ):
+        """Test init captures API key when remote mode is enabled."""
+        mock_config = MagicMock()
+        mock_config.api_key = None
+        mock_config.base_url = "https://api.hackagent.dev"
+        mock_config.verbose = 1
+        mock_config.should_show_info.return_value = False
+        mock_config.default_config_path = MagicMock()
+        mock_config.default_config_path.exists.return_value = False
+        mock_config_class.return_value = mock_config
+
+        # Prompt order in init:
+        # 1) API key, 2) verbosity level
+        mock_confirm.return_value = True
+        mock_prompt.side_effect = ["test-api-key", 2]
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["init"])
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(mock_config.api_key, "test-api-key")
+        self.assertEqual(mock_config.base_url, "https://api.hackagent.dev")
+        self.assertEqual(mock_config.verbose, 2)
+        mock_config.save.assert_called_once()
+        mock_splash.assert_called_once()
+
+    @patch("hackagent.utils.display_hackagent_splash")
+    @patch("hackagent.cli.main.click.prompt")
+    @patch("hackagent.cli.main.click.confirm")
+    @patch("hackagent.cli.main.CLIConfig")
+    def test_init_local_mode_clears_api_key(
+        self,
+        mock_config_class,
+        mock_confirm,
+        mock_prompt,
+        mock_splash,
+    ):
+        """Test init local mode clears any existing API key from config."""
+        mock_config = MagicMock()
+        mock_config.api_key = "existing-key"
+        mock_config.base_url = "https://api.hackagent.dev"
+        mock_config.verbose = 1
+        mock_config.should_show_info.return_value = False
+        mock_config.default_config_path = MagicMock()
+        mock_config.default_config_path.exists.return_value = False
+        mock_config_class.return_value = mock_config
+
+        # Local mode confirmation + verbosity prompt.
+        mock_confirm.return_value = False
+        mock_prompt.return_value = 1
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["init"])
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertIsNone(mock_config.api_key)
+        self.assertEqual(mock_config.verbose, 1)
+        mock_config.save.assert_called_once()
+        mock_splash.assert_called_once()
+
+
 if __name__ == "__main__":
     unittest.main()

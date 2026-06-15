@@ -69,6 +69,7 @@ def has_prompting_interface() -> bool:
 
 LLM_ASSISTED_DECORATOR_NAMES = {
     "TranslateDecorator",
+    "TranslateBackDecorator",
     "PAPDecorator",
     "PersonaDecorator",
     "PersuasiveDecorator",
@@ -1238,3 +1239,23 @@ def compile_program(
         return _compile_v2(program)
     else:
         raise ValueError(f"Unknown syntax_version={syntax_version}; expected 1 or 2")
+
+
+def program_uses_llm_assisted_decorators(
+    program: str,
+    syntax_version: int = 2,
+) -> bool:
+    """Return whether a program chain contains at least one LLM-assisted decorator.
+
+    This helper is used by both preflight role resolution and runtime setup to
+    keep decorator-LLM activation semantics consistent.
+    """
+    try:
+        _, decorator_steps = compile_program_with_steps(program, syntax_version)
+        return any(
+            is_llm_assisted_decorator_name(step.__class__.__name__)
+            for step in decorator_steps
+        )
+    except Exception:
+        # Best-effort fallback when program cannot be compiled yet.
+        return any(name in str(program) for name in LLM_ASSISTED_DECORATOR_NAMES)

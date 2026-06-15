@@ -38,8 +38,9 @@ class TestBaseEvaluationStepJudgeResolution(unittest.TestCase):
         )
 
         self.assertEqual(len(judges_to_run), 1)
-        judge_type, _cfg = judges_to_run[0]
+        judge_type, judge_idx, _cfg = judges_to_run[0]
         self.assertEqual(judge_type, "harmbench_variant")
+        self.assertEqual(judge_idx, 1)
 
 
 if __name__ == "__main__":

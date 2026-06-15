@@ -482,11 +482,12 @@ def google_adk_available(google_adk_agent_url: Optional[str]) -> bool:
 @pytest.fixture(scope="module")
 def google_adk_config(google_adk_agent_url: Optional[str]) -> Dict[str, Any]:
     """Return configuration dictionary for Google ADK adapter (module-scoped for speed)."""
+    adk_timeout = int(os.getenv("TEST_GOOGLE_ADK_TIMEOUT", "45"))
     return {
         "name": "multi_tool_agent",
         "endpoint": google_adk_agent_url or "http://localhost:8000",
         "user_id": "test_user",
-        "timeout": 120,
+        "timeout": max(1, adk_timeout),
     }
 
 

@@ -184,20 +184,10 @@ class FlipAttackEvaluation(BaseEvaluationStep):
 
         Uses (goal, prefix, completion) lookup to match rows.
         """
-        # Collect all judge columns
-        all_judge_cols: set = set()
-        for cols in self.JUDGE_COLUMN_MAP.values():
-            all_judge_cols.update(cols)
-
         # Build lookup from evaluated rows
-        lookup: Dict[tuple, Dict[str, Any]] = {}
-        for row in evaluated_rows:
-            key = (
-                self._normalize_merge_key("goal", row.get("goal")),
-                self._normalize_merge_key("prefix", row.get("prefix")),
-                self._normalize_merge_key("completion", row.get("completion")),
-            )
-            lookup[key] = {col: row[col] for col in all_judge_cols if col in row}
+        lookup: Dict[tuple, Dict[str, Any]] = self._build_eval_detail_lookup(
+            evaluated_rows
+        )
 
         # Apply to input_data
         for idx, item in enumerate(input_data):
