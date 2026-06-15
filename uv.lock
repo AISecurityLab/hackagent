@@ -2385,7 +2385,6 @@ dependencies = [
     { name = "pydantic", extra = ["email"] },
     { name = "python-dateutil" },
     { name = "pyyaml" },
-    { name = "requests" },
     { name = "rich" },
     { name = "textual" },
 ]
@@ -2414,7 +2413,6 @@ dev = [
 docs = [
     { name = "packaging" },
     { name = "pydoc-markdown" },
-    { name = "requests" },
     { name = "toml" },
 ]
 
@@ -2431,7 +2429,6 @@ requires-dist = [
     { name = "pydantic", extras = ["email"], specifier = ">=2.0" },
     { name = "python-dateutil", specifier = ">=2.8.0" },
     { name = "pyyaml", specifier = ">=6.0.0" },
-    { name = "requests", specifier = ">=2.31.0" },
     { name = "rich", specifier = ">=14.0.0" },
     { name = "textual", specifier = ">=1.0.0" },
 ]
@@ -2460,7 +2457,6 @@ dev = [
 docs = [
     { name = "packaging", specifier = ">=24,<27" },
     { name = "pydoc-markdown", specifier = ">=4.8.2" },
-    { name = "requests", specifier = ">=2.31.0" },
     { name = "toml", specifier = ">=0.10.2" },
 ]
 
