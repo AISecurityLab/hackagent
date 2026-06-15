@@ -7,7 +7,7 @@ sidebar_position: 10
 A jailbreak attack that converts harmful prompts into auto-generated flowchart images to exploit Vision-Language Models (VLMs).
 
 :::tip Looking for text-only LLMs?
-For attacks against text-only models using graph description languages (DOT, Mermaid, TikZ, PlantUML, ASCII), see [tFC-Attack](./flowchart_text.md).
+For attacks against text-only models using graph description languages (DOT, Mermaid, TikZ, PlantUML, ASCII), see [tFC-Attack](./tfc.md).
 :::
 
 ## Overview

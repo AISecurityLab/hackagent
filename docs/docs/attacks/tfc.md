@@ -7,7 +7,7 @@ sidebar_position: 11
 A jailbreak attack that encodes harmful prompts as text-based graph descriptions (DOT, Mermaid, TikZ, PlantUML, ASCII) to exploit text-only LLMs.
 
 :::tip Looking for multimodal VLMs?
-For attacks using rendered flowchart images against Vision-Language Models, see [FC-Attack](./flowchart.md).
+For attacks using rendered flowchart images against Vision-Language Models, see [FC-Attack](./fc.md).
 :::
 
 ## Overview
