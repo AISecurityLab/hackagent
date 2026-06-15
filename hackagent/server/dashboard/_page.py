@@ -46,6 +46,8 @@ from .attack_cards import (
     TapCardMixin,
     GenericCardMixin,
     MmlCardMixin,
+    FCCardMixin,
+    tFCCardMixin,
 )
 
 _VIEW_LABELS = {
@@ -70,6 +72,8 @@ class DashboardPage(
     TapCardMixin,
     GenericCardMixin,
     MmlCardMixin,
+    FCCardMixin,
+    tFCCardMixin,
 ):
     """Owns all NiceGUI widgets for a single dashboard page request.
 
@@ -1135,6 +1139,11 @@ function hackAgentCopyFallback(text) {
             self._render_autodan_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
         elif ha == "mml":
             self._render_mml_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
+        elif ha in ("fc", "tfc"):
+            if ha == "fc":
+                self._render_fc_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
+            else:
+                self._render_tfc_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
         else:
             _req, _resp, _gr_evt = data  # type: ignore[misc]
             self._render_generic_goal_card(
@@ -1399,6 +1408,16 @@ function hackAgentCopyFallback(text) {
         encoding_mode = metadata.get("encoding_mode")
         if encoding_mode:
             self._render_mml_result_section(row, metadata)
+
+        # FC-Attack-specific rendering: Flowchart Image + Prompt + Response
+        fc_image = metadata.get("image_data_url")
+        if fc_image:
+            self._render_fc_result_section(row, metadata)
+
+        # tFC-Attack-specific rendering: Graph text + Response
+        fc_graph_text = metadata.get("graph_text") or metadata.get("full_prompt")
+        if fc_graph_text and not fc_image:
+            self._render_tfc_result_section(row, metadata)
 
         # Key-value detail table
         detail_fields = self._build_result_detail_fields(row)
@@ -2271,6 +2290,8 @@ function hackAgentCopyFallback(text) {
                     "flipattack": "FlipAttack",
                     "pap": "PAP",
                     "h4rm3l": "H4rm3l",
+                    "fc": "FC-Attack",
+                    "tfc": "tFC-Attack",
                 }
 
                 def _compare_chips_for_run(run: dict) -> list[tuple[str, str, str]]:
@@ -4158,6 +4179,13 @@ function hackAgentCopyFallback(text) {
                 elif atk == "mml":
                     detail_data = self._parse_mml_traces(serialized_traces)
                     self._render_mml_goal_card(row, detail_data, detail_mode=True)
+                elif atk in ("fc", "tfc"):
+                    if atk == "fc":
+                        detail_data = self._parse_fc_traces(serialized_traces)
+                        self._render_fc_goal_card(row, detail_data, detail_mode=True)
+                    else:
+                        detail_data = self._parse_tfc_traces(serialized_traces)
+                        self._render_tfc_goal_card(row, detail_data, detail_mode=True)
                 else:
                     req_text, resp_text, _generic_guardrail = (
                         self._extract_prompt_response_from_traces(serialized_traces)
@@ -5599,6 +5627,9 @@ function hackAgentCopyFallback(text) {
 
             # MML: render encoded image inline if present in metadata
             self._render_mml_trace_image(metadata)
+
+            # FC-Attack: render flowchart image inline if present in metadata
+            self._render_fc_trace_image(metadata)
 
             for title, value in blocks:
                 if value is None or value == "":
@@ -8502,6 +8533,8 @@ function hackAgentCopyFallback(text) {
                     "pap": "PAP",
                     "h4rm3l": "H4rm3l",
                     "mml": "MML",
+                    "fc": "FC-Attack",
+                    "tfc": "tFC-Attack",
                 }
 
                 def _h_resolve_eval_label(
@@ -8634,6 +8667,20 @@ function hackAgentCopyFallback(text) {
                             _mml_enc = _mml_params.get("encoding_mode", "")
                             if _mml_enc:
                                 _chip("image", "Encoding", str(_mml_enc))
+                    elif _atk_lower in ("fc", "tfc"):
+                        _fc_params = (
+                            _hcfg.get("fc_params") or _hcfg.get("tfc_params") or {}
+                        )
+                        if isinstance(_fc_params, dict):
+                            _fc_layout = _fc_params.get("layout", "")
+                            if _fc_layout:
+                                _chip("account_tree", "Layout", str(_fc_layout))
+                            _fc_steps = _fc_params.get("num_steps", "")
+                            if _fc_steps:
+                                _chip("format_list_numbered", "Steps", str(_fc_steps))
+                            if _atk_lower == "tfc":
+                                _fc_tfmt = _fc_params.get("text_format", "ascii")
+                                _chip("text_fields", "Format", str(_fc_tfmt))
 
                 # ── Line 2: Dataset ───────────────────────────────────
                 _h_dataset_raw = _hcfg.get("dataset") or _hrc.get("dataset")
@@ -9785,6 +9832,12 @@ function hackAgentCopyFallback(text) {
                     elif _h_atk == "mml":
                         _t = generic_traces_map_hr.get(_rid, [])
                         _h_detail_data[_rid] = self._parse_mml_traces(_t)
+                    elif _h_atk in ("fc", "tfc"):
+                        _t = generic_traces_map_hr.get(_rid, [])
+                        if _h_atk == "fc":
+                            _h_detail_data[_rid] = self._parse_fc_traces(_t)
+                        else:
+                            _h_detail_data[_rid] = self._parse_tfc_traces(_t)
                     else:
                         _t = generic_traces_map_hr.get(_rid, [])
                         _h_detail_data[_rid] = (

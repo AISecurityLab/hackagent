@@ -17,3 +17,5 @@ from ._pap import PapCardMixin  # noqa: F401
 from ._tap import TapCardMixin  # noqa: F401
 from ._generic import GenericCardMixin  # noqa: F401
 from ._mml import MmlCardMixin  # noqa: F401
+from ._fc import FCCardMixin  # noqa: F401
+from ._tfc import tFCCardMixin  # noqa: F401
