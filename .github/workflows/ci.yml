@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: ["**"]
 
+env:
+  UV_VERSION: "0.10.11"
+
 jobs:
   commit-check:
     name: Commit Messages
@@ -20,6 +23,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Set up Python
@@ -44,6 +48,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Set up Python
@@ -79,6 +84,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Set up Python ${{ matrix.python-version }}
@@ -113,6 +119,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Set up Python
@@ -151,6 +158,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Set up Python
@@ -217,6 +225,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Set up Python
@@ -293,6 +302,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Set up Python
@@ -339,6 +349,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Set up Python

@@ -8,6 +8,9 @@ on:
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
+env:
+  UV_VERSION: "0.10.11"
+
 permissions:
   contents: read
 
@@ -33,6 +36,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Install Python dependencies
