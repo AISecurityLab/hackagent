@@ -29,7 +29,11 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from hackagent.attacks.shared.progress import create_progress_bar
 from hackagent.attacks.shared.prompt_parser import extract_prompt_and_improvement
-from hackagent.attacks.shared.response_utils import extract_response_content
+from hackagent.attacks.shared.response_utils import (
+    extract_response_content,
+    get_guardrail_info,
+    is_guardrail_response,
+)
 from hackagent.attacks.shared.router_factory import create_router
 from hackagent.server.client import AuthenticatedClient
 from hackagent.server.storage.enums import StepTypeEnum
@@ -338,6 +342,17 @@ class TapExecutor:
             registration_key=list(self.agent_router._agent_registry.keys())[0],
             request_data=request_data,
         )
+
+        # Return the raw guardrail response dict so the tracker's
+        # _extract_response_content stores agent_specific_data and the
+        # dashboard's _extract_guardrail_from_response renders it properly.
+        if isinstance(response, dict) and is_guardrail_response(response):
+            self.logger.info(
+                "Target query blocked by %s guardrail",
+                get_guardrail_info(response).get("side", "unknown"),
+            )
+            return response
+
         return extract_response_content(response, self.logger)
 
     def _expand_one_branch(
@@ -648,10 +663,15 @@ class TapExecutor:
                     [self._query_target(adv_prompt_list[0]) or ""] if _vn else []
                 )
 
+            # Judges expect plain strings; pass "" for guardrail-blocked
+            # responses (dicts) so they score 0 (not jailbroken).
+            _judge_responses = [
+                r if isinstance(r, str) else "" for r in target_response_list
+            ]
             judge_scores = self.evaluator.score_candidates(
                 goal,
                 adv_prompt_list,
-                target_response_list,
+                _judge_responses,
                 self.judges_config,
                 default=0,
             )
@@ -709,7 +729,7 @@ class TapExecutor:
                     goal_tracker.add_interaction_trace(
                         ctx=goal_ctx,
                         request={"prompt": prompt[:500]},
-                        response=response_text[:500],
+                        response=response_text,
                         step_name=f"Depth {iteration} Candidate",
                         step_type=StepTypeEnum.OTHER,
                         metadata={
@@ -736,7 +756,7 @@ class TapExecutor:
                     depth_summary.append(
                         {
                             "prompt": prompt[:500],
-                            "response": response_text[:500],
+                            "response": response_text,
                             "improvement": improv[:500],
                             "on_topic_score": on_score,
                             "judge_score": judge_score,
@@ -826,8 +846,8 @@ class TapExecutor:
             target_response_list = list(target_response_list)
 
             processed_response_list = [
-                _process_target_response(response_text, score, goal)
-                for response_text, score in zip(target_response_list, judge_scores)
+                _process_target_response(r if isinstance(r, str) else "", score, goal)
+                for r, score in zip(target_response_list, judge_scores)
             ]
 
             for conv in convs_list:
@@ -875,6 +895,7 @@ def execute(
     n_streams = tap_params.get("n_streams", 4)
 
     tracker: Optional[Tracker] = config.get("_tracker")
+    _goal_offset = int(config.get("_goal_index_offset", 0))
 
     executor = TapExecutor(
         config=config,
@@ -901,9 +922,11 @@ def execute(
                     _goal_pool.submit(
                         executor.run_single_goal,
                         goal=goal,
-                        goal_index=i,
+                        goal_index=_goal_offset + i,
                         goal_tracker=tracker,
-                        goal_ctx=tracker.get_goal_context(i) if tracker else None,
+                        goal_ctx=tracker.get_goal_context(_goal_offset + i)
+                        if tracker
+                        else None,
                         progress_bar=progress_bar,
                         task=task,
                     ): i
@@ -926,10 +949,12 @@ def execute(
                     }
         else:
             for i, goal in enumerate(goals):
-                goal_ctx = tracker.get_goal_context(i) if tracker else None
+                goal_ctx = (
+                    tracker.get_goal_context(_goal_offset + i) if tracker else None
+                )
                 results_map[i] = executor.run_single_goal(
                     goal=goal,
-                    goal_index=i,
+                    goal_index=_goal_offset + i,
                     goal_tracker=tracker,
                     goal_ctx=goal_ctx,
                     progress_bar=progress_bar,

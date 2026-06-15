@@ -29,6 +29,7 @@ from hackagent.attacks.shared.tui import with_tui_logging
 
 from . import generation, evaluation
 from .config import DEFAULT_H4RM3L_CONFIG, PRESET_PROGRAMS
+from .decorators import program_uses_llm_assisted_decorators
 
 
 def _recursive_update(target_dict, source_dict):
@@ -116,6 +117,44 @@ class H4rm3lAttack(BaseAttack):
         if syntax_version not in (1, 2):
             raise ValueError(f"syntax_version must be 1 or 2, got {syntax_version}")
 
+    @classmethod
+    def get_effective_model_roles(
+        cls,
+        attack_config: Dict[str, Any],
+        *,
+        goal_labels_by_index: Optional[Dict[int, Dict[str, str]]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Resolve h4rm3l preflight roles from effective runtime program semantics."""
+        _ = goal_labels_by_index
+
+        roles: List[Dict[str, Any]] = []
+
+        judges = attack_config.get("judges")
+        if isinstance(judges, list) and judges:
+            roles.extend({"role": "judge", "config": judge} for judge in judges)
+        else:
+            judge = attack_config.get("judge")
+            if isinstance(judge, dict):
+                roles.append({"role": "judge", "config": judge})
+
+        params = attack_config.get("h4rm3l_params")
+        if not isinstance(params, dict):
+            params = {}
+
+        program_ref = params.get("program", "IdentityDecorator()")
+        syntax_version = params.get("syntax_version", 2)
+        resolved_program = PRESET_PROGRAMS.get(program_ref, program_ref)
+
+        if program_uses_llm_assisted_decorators(resolved_program, syntax_version):
+            decorator_llm = attack_config.get("decorator_llm")
+            if not isinstance(decorator_llm, dict):
+                decorator_llm = DEFAULT_H4RM3L_CONFIG.get("decorator_llm")
+
+            if isinstance(decorator_llm, dict):
+                roles.append({"role": "decorator_llm", "config": decorator_llm})
+
+        return roles
+
     def _get_pipeline_steps(self) -> List[Dict]:
         """Define the two-stage attack pipeline."""
         return [
@@ -178,6 +217,21 @@ class H4rm3lAttack(BaseAttack):
         pipeline_steps = self._get_pipeline_steps()
         start_step = self.config.get("start_step", 1) - 1
 
+        # Initialize goal results and tracker BEFORE generation so that
+        # generation.execute() can record per-goal interaction traces.
+        h4rm3l_params = self.config.get("h4rm3l_params", {})
+        goal_metadata = {
+            "attack_type": "h4rm3l",
+            "program": h4rm3l_params.get("program", ""),
+            "syntax_version": h4rm3l_params.get("syntax_version", 2),
+        }
+        coordinator.initialize_goals(goals, initial_metadata=goal_metadata)
+        if coordinator.goal_tracker:
+            self.config["_tracker"] = coordinator.goal_tracker
+
+        if coordinator.has_goal_tracking:
+            self.logger.info("Using TrackingCoordinator for per-goal tracking")
+
         try:
             # Phase 1: Generation
             generation_output = self._execute_pipeline(
@@ -189,23 +243,8 @@ class H4rm3lAttack(BaseAttack):
                 coordinator.finalize_pipeline([], lambda _: False)
                 return []
 
-            # Phase 2: Create goal results for surviving goals
-            h4rm3l_params = self.config.get("h4rm3l_params", {})
-            goal_metadata = {
-                "attack_type": "h4rm3l",
-                "program": h4rm3l_params.get("program", ""),
-                "syntax_version": h4rm3l_params.get("syntax_version", 2),
-            }
-            coordinator.initialize_goals_from_pipeline_data(
-                pipeline_data=generation_output,
-                initial_metadata=goal_metadata,
-            )
-
-            if coordinator.has_goal_tracking:
-                self.logger.info("Using TrackingCoordinator for per-goal tracking")
-
-            if coordinator.goal_tracker:
-                self.config["_tracker"] = coordinator.goal_tracker
+            # Backdate goal start times to include generation latency.
+            coordinator.backdate_goal_start_times(generation_output)
 
             # Phase 3: Evaluation
             results = self._execute_pipeline(

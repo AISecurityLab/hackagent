@@ -12,10 +12,20 @@ from .progress import create_progress_bar
 from .response_utils import extract_response_content
 from .router_factory import create_router
 from .tui import with_tui_logging
+from .guardrail import (
+    BaseGuardrail,
+    GuardrailResult,
+    LLMGuardrail,
+    create_guardrail_from_config,
+)
 
 __all__ = [
     "create_progress_bar",
     "create_router",
     "extract_response_content",
     "with_tui_logging",
+    "BaseGuardrail",
+    "GuardrailResult",
+    "LLMGuardrail",
+    "create_guardrail_from_config",
 ]

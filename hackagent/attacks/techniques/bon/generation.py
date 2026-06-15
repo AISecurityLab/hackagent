@@ -39,9 +39,14 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from hackagent.attacks.evaluator.judge_evaluators import EVALUATOR_MAP
-from hackagent.attacks.shared.router_factory import extract_passthrough_request_config
-from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
+from hackagent.attacks.evaluator.inline_step_judge import (
+    InlineStepJudge,
+    build_inline_judge_base_config,
+)
+from hackagent.attacks.shared.response_utils import (
+    get_guardrail_info,
+    is_guardrail_response,
+)
 from hackagent.router.router import AgentRouter
 
 if TYPE_CHECKING:
@@ -50,134 +55,8 @@ if TYPE_CHECKING:
     from hackagent.router.tracking.tracker import Context
 
 
-# ---------------------------------------------------------------------------
-# Inline judge helper — evaluates a single candidate inside the search loop
-# ---------------------------------------------------------------------------
-
-
-class _StepJudge:
-    """Lightweight wrapper to call one or more judges on a single candidate.
-
-    Instantiated once per :func:`execute` call (not per step) and re-used
-    throughout the generation loop to avoid repeated router creation.
-    """
-
-    JUDGE_COLUMN_MAP = {
-        "nuanced": ["eval_nj", "explanation_nj"],
-        "jailbreakbench": ["eval_jb", "explanation_jb"],
-        "harmbench": ["eval_hb", "explanation_hb"],
-        "harmbench_variant": ["eval_hbv", "explanation_hbv"],
-        "on_topic": ["eval_on_topic", "explanation_on_topic"],
-    }
-
-    def __init__(
-        self,
-        judges_config: List[Dict[str, Any]],
-        base_eval_config: Dict[str, Any],
-        client: "AuthenticatedClient",
-        logger: logging.Logger,
-        run_id: Optional[str] = None,
-        tracker: Optional["Tracker"] = None,
-    ):
-        self._judges: List[Tuple[str, Any]] = []  # (type_str, evaluator_instance)
-        self.logger = logger
-
-        for jcfg in judges_config:
-            judge_type = jcfg.get("evaluator_type") or jcfg.get("type")
-            identifier = jcfg.get("identifier")
-            if not judge_type or judge_type not in EVALUATOR_MAP:
-                continue
-            if not identifier:
-                continue
-
-            evaluator_class = EVALUATOR_MAP[judge_type]
-
-            # Build subprocess config
-            sub_cfg: Dict[str, Any] = {**base_eval_config, **jcfg}
-            sub_cfg["model_id"] = identifier
-            sub_cfg["agent_name"] = jcfg.get(
-                "agent_name",
-                f"judge-{judge_type}-{identifier.replace('/', '-')[:20]}",
-            )
-            sub_cfg["agent_type"] = jcfg.get("agent_type", "OPENAI_SDK")
-            sub_cfg["agent_endpoint"] = jcfg.get("endpoint")
-            sub_cfg["agent_metadata"] = dict(jcfg.get("agent_metadata", {}) or {})
-            sub_cfg["agent_metadata"].update(extract_passthrough_request_config(jcfg))
-
-            api_key = jcfg.get("api_key") or jcfg.get("api_key_env")
-            if api_key:
-                sub_cfg["agent_metadata"]["api_key"] = api_key
-
-            # Filter to EvaluatorConfig fields
-            expected_fields = set(EvaluatorConfig.model_fields.keys())
-            filtered = {k: v for k, v in sub_cfg.items() if k in expected_fields}
-
-            try:
-                ev_config = EvaluatorConfig(**filtered)
-                evaluator = evaluator_class(
-                    client=client,
-                    config=ev_config,
-                    run_id=run_id,
-                    tracking_client=None,
-                    tracker=None,
-                )
-                self._judges.append((judge_type, evaluator))
-            except Exception as exc:
-                logger.warning(f"Could not initialise judge '{judge_type}': {exc}")
-
-        if not self._judges:
-            logger.warning("No valid judges initialised for inline evaluation")
-
-    # ------------------------------------------------------------------ #
-
-    @property
-    def available(self) -> bool:
-        """True if at least one judge was successfully initialised."""
-        return bool(self._judges)
-
-    def is_jailbreak(
-        self,
-        goal: str,
-        augmented_prompt: str,
-        response: str,
-    ) -> Tuple[bool, float, Dict[str, Any]]:
-        """Evaluate a single candidate with all judges.
-
-        Returns:
-            ``(is_success, best_score, judge_columns)`` where
-            *judge_columns* contains the raw eval/explanation columns
-            produced by each judge.
-        """
-        row = {
-            "goal": goal,
-            "prefix": augmented_prompt,
-            "completion": response,
-        }
-
-        judge_cols: Dict[str, Any] = {}
-        best_score = 0.0
-
-        for judge_type, evaluator in self._judges:
-            try:
-                evaluated = evaluator.evaluate([row.copy()])
-                if evaluated:
-                    ev_row = evaluated[0]
-                    # Collect judge columns
-                    for col in self.JUDGE_COLUMN_MAP.get(judge_type, []):
-                        if col in ev_row:
-                            judge_cols[col] = ev_row[col]
-                    # Check score
-                    eval_col = self.JUDGE_COLUMN_MAP[judge_type][0]
-                    val = ev_row.get(eval_col)
-                    if val is not None:
-                        try:
-                            best_score = max(best_score, float(val))
-                        except (TypeError, ValueError):
-                            pass
-            except Exception as exc:
-                self.logger.warning(f"Judge '{judge_type}' failed on candidate: {exc}")
-
-        return best_score > 0, best_score, judge_cols
+# Re-export alias keeps local type hints/readability in this module.
+_StepJudge = InlineStepJudge
 
 
 # ---------------------------------------------------------------------------
@@ -384,25 +263,16 @@ def execute(
     step_judge: Optional[_StepJudge] = None
     judges_config = config.get("judges")
     if isinstance(judges_config, list) and judges_config and client is not None:
-        base_eval_cfg: Dict[str, Any] = {
-            "batch_size": config.get("batch_size_judge", 1),
-            "max_tokens_eval": config.get("max_tokens_eval", 256),
-            "filter_len": config.get("filter_len", 10),
-            "timeout": config.get("judge_timeout", 120),
-            "temperature": config.get("judge_temperature", 0.0),
-            "max_judge_retries": config.get("max_judge_retries", 1),
-            "organization_id": config.get("organization_id"),
-        }
+        base_eval_cfg = build_inline_judge_base_config(config)
         step_judge = _StepJudge(
             judges_config=judges_config,
             base_eval_config=base_eval_cfg,
             client=client,
             logger=logger,
             run_id=config.get("_run_id"),
-            tracker=tracker,
         )
         if step_judge.available:
-            logger.info(f"⚖️  Inline judge enabled ({len(step_judge._judges)} judge(s))")
+            logger.info(f"⚖️  Inline judge enabled ({step_judge.judge_count} judge(s))")
         else:
             step_judge = None
             logger.warning("No valid judges — falling back to length heuristic only")
@@ -548,14 +418,25 @@ def _search_single_goal(
                     request_data=request_data,
                 )
                 generated_text = response.get("generated_text")
-                error_message = response.get("error_message")
+                _guardrail_blocked = is_guardrail_response(response)
+                guardrail_info = (
+                    get_guardrail_info(response) if _guardrail_blocked else None
+                )
+                error_message = (
+                    None if _guardrail_blocked else response.get("error_message")
+                )
             except Exception as e:
                 generated_text = None
                 error_message = str(e)
+                guardrail_info = None
                 logger.warning(f"[{_cand_label}] Request failed — {e}")
 
             # Log per-candidate response
-            if generated_text:
+            if guardrail_info:
+                logger.info(
+                    f"[{_cand_label}] Blocked by {guardrail_info.get('side')} guardrail"
+                )
+            elif generated_text:
                 _preview = (
                     f"{generated_text[:120]}..."
                     if len(generated_text) > 120
@@ -573,6 +454,7 @@ def _search_single_goal(
                     "augmented_prompt": augmented_prompt,
                     "response": generated_text,
                     "error": error_message,
+                    "guardrail_info": guardrail_info,
                     "step": step,
                     "candidate": k,
                     "seed": seed,
@@ -628,7 +510,7 @@ def _search_single_goal(
             logger.info(f"[{_label}] ⚖️  Evaluating best candidate with judge...")
             is_jailbreak, judge_score, judge_cols = step_judge.is_jailbreak(
                 goal=goal,
-                augmented_prompt=step_best["augmented_prompt"],
+                prompt_prefix=step_best["augmented_prompt"],
                 response=step_best["response"],
             )
             logger.info(
@@ -710,13 +592,18 @@ def _persist_step_trace(
             continue
 
         response_text = c_res.get("response")
+        _g_info = c_res.get("guardrail_info")
         tracker.add_interaction_trace(
             ctx=goal_ctx,
             request={"prompt": c_res.get("augmented_prompt")},
-            response={
-                "generated_text": response_text,
-                "error_message": c_res.get("error"),
-            },
+            response=(
+                {"adapter_type": "guardrail", "agent_specific_data": _g_info}
+                if _g_info
+                else {
+                    "generated_text": response_text,
+                    "error_message": c_res.get("error"),
+                }
+            ),
             step_name=step_name,
             metadata={
                 "display_type": "bon_candidate",

@@ -48,6 +48,9 @@ class _DummyCoordinator:
     def finalize_on_error(self, *a, **kw):
         pass
 
+    def backdate_goal_start_times(self, *a, **kw):
+        pass
+
 
 class TestRecursiveUpdate(unittest.TestCase):
     def test_nested_merge(self):

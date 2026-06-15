@@ -8,6 +8,7 @@ import unittest
 from hackagent.attacks.evaluator.metrics import (
     calculate_confidence_score,
     calculate_per_goal_metrics,
+    calculate_per_judge_asr,
     calculate_success_rate,
     generate_summary_report,
     group_by_goal,
@@ -207,6 +208,11 @@ class TestMajorityVoteASR(unittest.TestCase):
         self.assertEqual(results[0]["majority_vote"], 0)
         self.assertEqual(results[1]["majority_vote"], 0)
 
+    def test_even_judges_tie_counts_as_success(self):
+        results = [{"eval_hbv_1": 1, "eval_hbv_2": 0, "eval_hbv_3": 1, "eval_hb": 0}]
+        self.assertAlmostEqual(calculate_majority_vote_asr(results), 1.0)
+        self.assertEqual(results[0]["majority_vote"], 1)
+
 
 class TestFleissKappa(unittest.TestCase):
     """Tests for calculate_fleiss_kappa function."""
@@ -276,6 +282,20 @@ class TestPerJudgeStrictness(unittest.TestCase):
         self.assertAlmostEqual(strictness["bias_gap"], 0.0)
 
 
+class TestPerJudgeAsr(unittest.TestCase):
+    """Tests for calculate_per_judge_asr function."""
+
+    def test_per_judge_asr_with_duplicate_type_columns(self):
+        results = [
+            {"eval_hbv_1": 1, "eval_hbv_2": 0, "eval_hb": 1},
+            {"eval_hbv_1": 0, "eval_hbv_2": 0, "eval_hb": 1},
+        ]
+        per_judge = calculate_per_judge_asr(results)
+        self.assertAlmostEqual(per_judge["eval_hbv_1"], 0.5)
+        self.assertAlmostEqual(per_judge["eval_hbv_2"], 0.0)
+        self.assertAlmostEqual(per_judge["eval_hb"], 1.0)
+
+
 class TestGenerateSummaryReport(unittest.TestCase):
     """Test generate_summary_report function."""
 
@@ -314,12 +334,18 @@ class TestGenerateSummaryReport(unittest.TestCase):
         expected_keys = {
             "total_attacks",
             "overall_success_rate",
+            "overall_effective_asr",
             "overall_confidence",
             "per_goal_metrics",
             "unique_goals",
             "fleiss_kappa",
+            "overall_fleiss_kappa",
             "majority_vote_asr",
+            "overall_majority_vote_asr",
             "per_judge_strictness",
+            "per_judge_asr",
+            "judge_count",
+            "is_multi_judge",
         }
         self.assertEqual(set(report.keys()), expected_keys)
 
