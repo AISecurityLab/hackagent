@@ -59,19 +59,8 @@ class CipherChatEvaluation(BaseEvaluationStep):
         evaluated_rows = self._run_evaluation(eval_rows, judges_config, base_config)
         self._statistics["evaluated_count"] = len(evaluated_rows)
 
-        all_judge_cols: set[str] = set()
-        for cols in self.JUDGE_COLUMN_MAP.values():
-            all_judge_cols.update(cols)
-
         normalize = self._normalize_merge_key
-        lookup = {}
-        for row in evaluated_rows:
-            key = (
-                normalize("goal", row.get("goal")),
-                normalize("prefix", row.get("prefix")),
-                normalize("completion", row.get("completion")),
-            )
-            lookup[key] = {c: row[c] for c in all_judge_cols if c in row}
+        lookup = self._build_eval_detail_lookup(evaluated_rows)
 
         for idx, item in enumerate(input_data):
             if idx in error_indices:

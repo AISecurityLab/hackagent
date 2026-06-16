@@ -10,6 +10,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+from hackagent.attacks.shared.response_utils import is_guardrail_response
 from hackagent.router.router import AgentRouter
 
 from .encode_experts import encode_expert_dict
@@ -223,6 +224,10 @@ def execute(
             )
             encoded_response = response.get("generated_text")
             error_message = response.get("error_message")
+            _guardrail_blocked = is_guardrail_response(response)
+            if _guardrail_blocked:
+                error_message = None
+                encoded_response = None
         except Exception as e:  # pragma: no cover - network adapter level failure
             logger.info("[%s] No response (error=%s)", _label, e)
             with lock:
@@ -287,10 +292,14 @@ def execute(
                 tracker.add_interaction_trace(
                     ctx=goal_ctx,
                     request=request_data,
-                    response={
-                        "generated_text": encoded_response,
-                        "error_message": error_message,
-                    },
+                    response=(
+                        response
+                        if is_guardrail_response(response)
+                        else {
+                            "generated_text": encoded_response,
+                            "error_message": error_message,
+                        }
+                    ),
                     step_name=f"CipherChat Generation ({encode_method})",
                     metadata={
                         "encode_method": encode_method,

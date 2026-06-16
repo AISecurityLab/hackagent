@@ -13,6 +13,7 @@ Instead of manually specifying `goals`, use the `dataset` parameter to load goal
 - 🎯 **Presets** — 30+ ready-to-use AI safety benchmarks (AgentHarm, JailbreakBench, BeaverTails, etc.)
 - 🤗 **HuggingFace Hub** — Any public or private dataset from HuggingFace
 - 📁 **Local files** — JSON, JSONL, CSV, or TXT files from your filesystem
+- 🧭 **Intent taxonomy selection** — Pick OmniSafeBench categories/subcategories with `intents`
 
 ```mermaid
 graph LR
@@ -129,6 +130,32 @@ attack_config = {
 results = agent.hack(attack_config=attack_config)
 ```
 
+### 4. Selecting Intent Categories (OmniSafeBench)
+
+When you want category-balanced goals without manually writing prompts, use
+`intents` to select categories and subcategories directly from the
+OmniSafeBench taxonomy.
+
+```python
+attack_config = {
+    "attack_type": "h4rm3l",
+    "intents": [
+        {
+            "category": "A",
+            "subcategories": ["A1", "A2"],
+            "samples_per_subcategory": 2,
+        }
+    ],
+}
+```
+
+HackAgent maps this to canonical labels in results/dashboard format:
+`A. Ethical and Social Risks` / `A1. Bias and Discrimination`.
+
+Taxonomy source: [OmniSafeBench-MM](https://github.com/jiaxiaojunQAQ/OmniSafeBench-MM/).
+
+[See full guide: Selecting intent categories →](./selecting-intent-categories.md)
+
 ---
 
 ## Common Dataset Options
@@ -172,6 +199,7 @@ When both `shuffle` and `offset` are used, shuffling happens **first**, then off
 ## Next Steps
 
 - 📖 [**Datasets Tutorial**](../getting-started/datasets-tutorial.mdx) — Complete walkthrough with examples
+- 🧭 [**Selecting intent categories**](./selecting-intent-categories.md) — Use taxonomy categories/subcategories with strings, enums, or label codes
 - 🎯 [**Presets**](./presets.md) — All 30+ pre-configured benchmarks
 - 🤗 [**HuggingFace Provider**](./huggingface.md) — Load any HuggingFace dataset
 - 📁 [**File Provider**](./file.md) — Load from local JSON, CSV, or TXT files

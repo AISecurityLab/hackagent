@@ -5,6 +5,8 @@ logs/
 reports/
 .adk/
 slurm/
+tools/
+docs/docs/attacks/walkthroughs/
 
 # Editors
 .vscode/

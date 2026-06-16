@@ -22,6 +22,7 @@ graph LR
         H4[h4rm3l] --> |"Composable"| T
         I[CipherChat] --> |"Cipher"| T
         J[Indirect Prompt Injection] --> |"RAG Poisoning"| T
+        K[MML] --> |"Multimodal"| T
     end
     T --> R[Results & Analysis]
 ```
@@ -40,6 +41,7 @@ graph LR
 | [**CipherChat**](./cipherchat.md) | Cipher-based non-natural-language jailbreak prompts | ⭐⭐ Medium | Fast |
 | [**PAP**](./pap.md) | Persuasive adversarial paraphrasing with social-science techniques | ⭐⭐ Medium | Medium |
 | [**Indirect Prompt Injection**](./indirect_prompt_injection.md) | RAG document poisoning for indirect instruction following | ⭐⭐⭐ High | Medium |
+| [**MML**](./mml.md) | Multimodal image-encoded jailbreak for Vision-Language Models | ⭐⭐ Medium | Fast |
 | [**Baseline**](./baseline.md) | Template-based prompt injection | ⭐ Basic | Fast |
 
 :::tip Dataset Support
@@ -48,6 +50,20 @@ All attacks support loading goals from AI safety benchmarks like **AgentHarm**, 
 
 :::tip Shared Category Classifier
 All attacks accept a top-level `category_classifier` config block to classify each goal at tracking time. You can customize model, endpoint, and adapter type directly in `attack_config`.
+
+Preflight behavior:
+
+- If you provide `intents` (with explicit labels), category-classifier preflight is skipped.
+- If you use `goals` or `dataset` and do **not** provide `category_classifier`, HackAgent preflights the default classifier config automatically.
+:::
+
+:::note Advanced Preflight Flags
+HackAgent also supports internal preflight-control flags in `attack_config`:
+
+- `_preflight_probe_optional_roles` (all attacks): when `true`, preflight probes optional roles too. By default optional roles are skipped.
+- `_preflight_require_embedder` (AutoDAN-Turbo only): when `true`, `embedder` is treated as required in preflight.
+
+These are advanced/debug controls and are usually not needed in standard runs.
 :::
 
 ---
@@ -289,6 +305,8 @@ attack_config = {
 **h4rm3l** is best when you want programmable prompt transformations: it composes decorator chains for controlled, reproducible obfuscation workflows without requiring an attacker LLM.
 
 **PAP** is the best fit for human-like social engineering prompts: it uses persuasion-taxonomy paraphrasing to produce natural prompts that can bypass alignment without relying on token-level gibberish.
+
+**MML** is best when evaluating multimodal safety boundaries: it encodes attack prompts into generated images and tests whether Vision-Language Models follow hidden harmful instructions.
 
 **Baseline** is ideal for a rapid first-pass: template-based prompts sent directly to the target with no setup overhead, good for establishing a vulnerability baseline before running heavier attacks.
 

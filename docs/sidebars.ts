@@ -83,6 +83,7 @@ const sidebars: SidebarsConfig = {
         id: 'datasets/index',
       },
       items: [
+        'datasets/selecting-intent-categories',
         'datasets/presets',
         'datasets/huggingface',
         'datasets/file',
@@ -113,6 +114,11 @@ const sidebars: SidebarsConfig = {
           type: 'doc',
           id: 'agents/google-adk',
           label: 'Google ADK',
+        },
+        {
+          type: 'doc',
+          id: 'agents/guardrails',
+          label: 'Guardrails',
         },
       ],
     },

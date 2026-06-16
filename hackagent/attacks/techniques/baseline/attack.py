@@ -120,6 +120,30 @@ class BaselineAttack(BaseAttack):
                 f"Unknown objective: {objective}. Available: {list(OBJECTIVES.keys())}"
             )
 
+    @classmethod
+    def get_effective_model_roles(
+        cls,
+        attack_config: Dict[str, Any],
+        *,
+        goal_labels_by_index: Optional[Dict[int, Dict[str, str]]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Return only the model roles needed by the effective baseline evaluator."""
+        _ = goal_labels_by_index
+
+        evaluator_type = str(attack_config.get("evaluator_type", "llm_judge")).lower()
+        if evaluator_type != "llm_judge":
+            return []
+
+        judges = attack_config.get("judges")
+        if isinstance(judges, list) and judges:
+            return [{"role": "judge", "config": judge} for judge in judges]
+
+        judge_config = attack_config.get("judge_config")
+        if isinstance(judge_config, dict):
+            return [{"role": "judge", "config": judge_config}]
+
+        return []
+
     def _get_pipeline_steps(self) -> List[Dict]:
         """
         Define the two baseline pipeline stage descriptors.

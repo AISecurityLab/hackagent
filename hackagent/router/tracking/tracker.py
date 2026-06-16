@@ -114,6 +114,8 @@ class Tracker:
         logger: Optional[logging.Logger] = None,
         attack_type: Optional[str] = None,
         category_classifier_config: Optional[Dict[str, Any]] = None,
+        preclassified_goal_labels_by_index: Optional[Dict[Any, Dict[str, str]]] = None,
+        disable_goal_category_classifier: bool = False,
         event_bus: Optional[Any] = None,
     ):
         """
@@ -134,11 +136,34 @@ class Tracker:
         self.logger = logger or get_logger(__name__)
         self.attack_type = attack_type
         self.event_bus = event_bus
-        self._goal_category_classifier = GoalCategoryClassifier(
-            backend=backend,
-            config=category_classifier_config,
-            logger=self.logger,
-        )
+        self._preclassified_goal_labels_by_index: Dict[int, Dict[str, str]] = {}
+        raw_preclassified = preclassified_goal_labels_by_index or {}
+        if isinstance(raw_preclassified, dict):
+            for key, value in raw_preclassified.items():
+                try:
+                    idx = int(key)
+                except (TypeError, ValueError):
+                    continue
+
+                if not isinstance(value, dict):
+                    continue
+
+                category = value.get("category")
+                subcategory = value.get("subcategory")
+                if category and subcategory:
+                    self._preclassified_goal_labels_by_index[idx] = {
+                        "category": str(category),
+                        "subcategory": str(subcategory),
+                    }
+
+        if disable_goal_category_classifier:
+            self._goal_category_classifier = None
+        else:
+            self._goal_category_classifier = GoalCategoryClassifier(
+                backend=backend,
+                config=category_classifier_config,
+                logger=self.logger,
+            )
         self._goal_contexts: Dict[int, Context] = {}
 
     def _emit(self, event_type: str, **payload: Any) -> None:
@@ -216,7 +241,7 @@ class Tracker:
                 return ctx
 
             # Classify each goal as soon as its result record is created.
-            classification = self._classify_goal_labels(goal)
+            classification = self._classify_goal_labels(goal, goal_index)
             ctx.metadata.update(classification)
 
             # Create result via backend
@@ -266,12 +291,19 @@ class Tracker:
         )
         return ctx
 
-    def _classify_goal_labels(self, goal: str) -> Dict[str, str]:
+    def _classify_goal_labels(self, goal: str, goal_index: int) -> Dict[str, str]:
         """Return normalized category labels for goal metadata."""
         fallback = {
             "category": UNKNOWN_CATEGORY,
             "subcategory": UNKNOWN_SUBCATEGORY,
         }
+
+        preclassified = self._preclassified_goal_labels_by_index.get(goal_index)
+        if preclassified:
+            return {
+                "category": preclassified["category"],
+                "subcategory": preclassified["subcategory"],
+            }
 
         classifier = self._goal_category_classifier
         if not classifier:
@@ -771,6 +803,31 @@ class Tracker:
 
         # Dictionary response
         if isinstance(response, dict):
+            # Guardrail-blocked response: adapter_type == "guardrail".
+            # Preserve the agent_specific_data dict so the dashboard can
+            # render it as a dedicated visual block.
+            if response.get("adapter_type") == "guardrail":
+                return response.get("agent_specific_data") or {
+                    "side": "unknown",
+                    "message": "Blocked by guardrail",
+                }
+
+            # Guardrail-event dict passed directly (e.g. AdvPrefix passes the event
+            # dict as the response payload rather than the full router response).
+            if response.get("side") in ("before", "after", "unknown") and (
+                "explanation" in response or "message" in response
+            ):
+                return response
+
+            # Guardrail block detected from error_message — attacks that extract
+            # only generated_text/error_message before calling add_interaction_trace.
+            _err = str(response.get("error_message") or "")
+            if _err:
+                if "before_guardrail" in _err or "before guardrail" in _err.lower():
+                    return {"side": "before", "message": _err}
+                if "after_guardrail" in _err or "after guardrail" in _err.lower():
+                    return {"side": "after", "message": _err}
+
             return (
                 response.get("generated_text")
                 or response.get("processed_response")

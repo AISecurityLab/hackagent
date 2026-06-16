@@ -119,6 +119,49 @@ class TestDashboardPageStaticMethods(unittest.TestCase):
         self.assertEqual(DashboardPage._risk_level_from_asr(10.0), ("MEDIUM", "orange"))
         self.assertEqual(DashboardPage._risk_level_from_asr(9.9), ("LOW", "positive"))
 
+    def test_build_judge_metadata_handles_duplicate_types(self):
+        judges_cfg = [
+            {"type": "harmbench", "identifier": "hb-main"},
+            {"type": "harmbench", "agent_name": "hb-backup"},
+            {"type": "jailbreakbench", "identifier": "jb-main"},
+        ]
+
+        judge_meta, declared_eval_keys = DashboardPage._build_judge_metadata(judges_cfg)
+
+        self.assertEqual(
+            declared_eval_keys,
+            ["eval_hb_1", "eval_hb_2", "eval_jb"],
+        )
+        self.assertEqual(judge_meta["eval_hb_1"]["id"], 0)
+        self.assertEqual(judge_meta["eval_hb_1"]["name"], "hb-main")
+        self.assertEqual(judge_meta["eval_hb_1"]["type"], "Harmbench")
+        self.assertEqual(judge_meta["eval_hb_2"]["id"], 1)
+        self.assertEqual(judge_meta["eval_hb_2"]["name"], "hb-backup")
+        self.assertEqual(judge_meta["eval_jb"]["id"], 2)
+        self.assertEqual(judge_meta["eval_jb"]["name"], "jb-main")
+
+    def test_build_judge_metadata_fallbacks_and_invalid_entries(self):
+        judges_cfg = [
+            "invalid",
+            {},
+            {"type": "unknown_custom", "agent_name": "custom-judge"},
+            {"type": "on_topic"},
+        ]
+
+        judge_meta, declared_eval_keys = DashboardPage._build_judge_metadata(judges_cfg)
+
+        self.assertEqual(
+            declared_eval_keys,
+            ["eval_unknown", "eval_unknown_custom", "eval_on_topic"],
+        )
+        self.assertEqual(judge_meta["eval_unknown"]["name"], "unknown")
+        self.assertEqual(judge_meta["eval_unknown_custom"]["type"], "Unknown Custom")
+        self.assertEqual(judge_meta["eval_on_topic"]["name"], "on_topic")
+
+    def test_build_judge_metadata_empty_when_not_list(self):
+        self.assertEqual(DashboardPage._build_judge_metadata(None), ({}, []))
+        self.assertEqual(DashboardPage._build_judge_metadata({"judges": []}), ({}, []))
+
 
 if __name__ == "__main__":
     unittest.main()

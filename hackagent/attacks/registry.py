@@ -32,8 +32,11 @@ from hackagent.attacks.techniques.autodan_turbo import AutoDANTurboAttack
 from hackagent.attacks.techniques.bon import BoNAttack
 from hackagent.attacks.techniques.cipherchat import CipherChatAttack
 from hackagent.attacks.techniques.h4rm3l import H4rm3lAttack
+from hackagent.attacks.techniques.mml import MMLAttack
 from hackagent.attacks.techniques.pap import PAPAttack
-from hackagent.attacks.techniques.indirect_prompt_injection import IndirectPromptInjectionAttack
+from hackagent.attacks.techniques.indirect_prompt_injection import (
+    IndirectPromptInjectionAttack,
+)
 
 
 def create_orchestrator(
@@ -84,8 +87,11 @@ AutoDANTurboOrchestrator = create_orchestrator("AutoDANTurbo", AutoDANTurboAttac
 BoNOrchestrator = create_orchestrator("bon", BoNAttack)
 H4rm3lOrchestrator = create_orchestrator("h4rm3l", H4rm3lAttack)
 CipherChatOrchestrator = create_orchestrator("cipherchat", CipherChatAttack)
+MMLOrchestrator = create_orchestrator("MML", MMLAttack)
 PAPOrchestrator = create_orchestrator("pap", PAPAttack)
-IndirectPromptInjectionOrchestrator = create_orchestrator("indirect_prompt_injection", IndirectPromptInjectionAttack)
+IndirectPromptInjectionOrchestrator = create_orchestrator(
+    "indirect_prompt_injection", IndirectPromptInjectionAttack
+)
 
 # Registry of all available attacks
 ATTACK_REGISTRY = {
@@ -98,6 +104,7 @@ ATTACK_REGISTRY = {
     "bon": BoNOrchestrator,
     "h4rm3l": H4rm3lOrchestrator,
     "cipherchat": CipherChatOrchestrator,
+    "MML": MMLOrchestrator,
     "pap": PAPOrchestrator,
     "indirect_prompt_injection": IndirectPromptInjectionOrchestrator,
 }
@@ -112,6 +119,7 @@ __all__ = [
     "BoNOrchestrator",
     "H4rm3lOrchestrator",
     "CipherChatOrchestrator",
+    "MMLOrchestrator",
     "PAPOrchestrator",
     "ATTACK_REGISTRY",
 ]

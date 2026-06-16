@@ -24,7 +24,7 @@ Usage:
 """
 
 import logging
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger("hackagent.attacks.shared.response_utils")
 
@@ -91,3 +91,35 @@ def extract_response_content(
         return response if response else None
 
     return None
+
+
+# ---------------------------------------------------------------------------
+# Guardrail response detection
+# ---------------------------------------------------------------------------
+
+GUARDRAIL_ADAPTER_TYPE = "guardrail"
+GUARDRAIL_BLOCKED_MSG = "Blocked by guardrail"
+
+
+def is_guardrail_response(response: Any) -> bool:
+    """Return True if *response* is a guardrail-blocked response.
+
+    Detection is based on ``adapter_type == "guardrail"`` which the router
+    sets on every blocked response.  This is the single canonical check —
+    all attack modules should use this instead of ad-hoc key lookups.
+    """
+    if not isinstance(response, dict):
+        return False
+    return response.get("adapter_type") == GUARDRAIL_ADAPTER_TYPE
+
+
+def get_guardrail_info(response: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract guardrail metadata from a blocked response.
+
+    Returns a dict with ``side``, ``message``, ``categories``, and
+    ``reasoning`` when available, or an empty dict if not a guardrail
+    response.
+    """
+    if not is_guardrail_response(response):
+        return {}
+    return response.get("agent_specific_data") or {}

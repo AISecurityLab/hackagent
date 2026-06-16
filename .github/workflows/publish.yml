@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+env:
+  UV_VERSION: "0.10.11"
+
 jobs:
   publish:
     name: Publish to PyPI
@@ -22,6 +25,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Build package

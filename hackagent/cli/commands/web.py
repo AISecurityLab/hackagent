@@ -4,13 +4,14 @@
 """
 ``hackagent web`` — web dashboard command.
 
-Starts a NiceGUI server that reads from the local SQLite backend
-(or the remote backend when an API key is configured) and serves the
+In local mode, starts a NiceGUI server backed by local SQLite and serves the
 dashboard at http://<host>:<port>/.
+
+In remote mode (API key configured), opens the cloud dashboard at
+https://app.hackagent.dev.
 """
 
 import click
-import httpx
 from rich.console import Console
 
 console = Console()
@@ -45,9 +46,8 @@ console = Console()
 def web(ctx, host, port, db_path, no_browser):
     """🌐 Launch the web dashboard.
 
-    Starts a local web server that serves a full-featured security testing
-    dashboard.  Works in both offline mode (SQLite) and online mode (remote
-    API with an API key).
+    Local mode: starts a local web server that serves the dashboard.
+    Remote mode: opens the HackAgent cloud dashboard.
 
     \b
     Examples:
@@ -56,6 +56,27 @@ def web(ctx, host, port, db_path, no_browser):
       hackagent web --host 0.0.0.0     # expose on all interfaces
       hackagent web --no-browser       # skip opening a browser tab
     """
+    from hackagent.cli.config import CLIConfig
+
+    cli_config: CLIConfig = ctx.obj["config"]
+
+    # In remote mode, open the cloud dashboard directly instead of serving local UI.
+    if cli_config.api_key:
+        cloud_url = "https://app.hackagent.dev"
+        console.print(
+            "[dim]Remote mode detected: using HackAgent cloud dashboard.[/dim]"
+        )
+        console.print(f"[cyan]{cloud_url}[/cyan]")
+        if not no_browser:
+            import webbrowser
+
+            opened = webbrowser.open(cloud_url)
+            if not opened:
+                console.print(
+                    "[yellow]⚠️ Could not auto-open browser. Open the URL above manually.[/yellow]"
+                )
+        return
+
     try:
         from flask import Flask  # noqa: F401
     except ImportError:
@@ -69,40 +90,12 @@ def web(ctx, host, port, db_path, no_browser):
         ctx.exit(1)
         return
 
-    from hackagent.cli.config import CLIConfig
     from hackagent.server.dashboard import create_app
 
-    cli_config: CLIConfig = ctx.obj["config"]
-
     # ── Select backend ────────────────────────────────────────────────────────
-    backend = None
-    if cli_config.api_key:
-        try:
-            from hackagent.server.client import AuthenticatedClient
-            from hackagent.server.storage.remote import RemoteBackend
+    from hackagent.server.storage.local import LocalBackend
 
-            client = AuthenticatedClient(
-                base_url=cli_config.base_url,
-                token=cli_config.api_key,
-                # Never disable HTTP timeouts in web mode: a stuck remote call
-                # would otherwise keep the dashboard loading forever.
-                timeout=httpx.Timeout(15.0, connect=5.0, read=15.0, write=15.0),
-            )
-            candidate_backend = RemoteBackend(client=client)
-            # Preflight check to fail fast on invalid/unreachable remote config.
-            candidate_backend.get_context()
-            backend = candidate_backend
-            console.print("[dim]Using remote backend.[/dim]")
-        except Exception as exc:
-            console.print(
-                f"[yellow]⚠️  Could not connect to remote backend ({exc}). "
-                "Falling back to local SQLite.[/yellow]"
-            )
-
-    if backend is None:
-        from hackagent.server.storage.local import LocalBackend
-
-        backend = LocalBackend(db_path=db_path)
+    backend = LocalBackend(db_path=db_path)
 
     # ── Create app ────────────────────────────────────────────────────────────
     app = create_app(backend=backend)
@@ -112,7 +105,7 @@ def web(ctx, host, port, db_path, no_browser):
     console.print()
     console.print("[bold]🌐  HackAgent Dashboard[/bold]")
     console.print(f"    [cyan]→  {url}[/cyan]")
-    mode_label = "remote" if backend.__class__.__name__ == "RemoteBackend" else "local"
+    mode_label = "local"
     console.print(f"    Mode : [cyan]{mode_label}[/cyan]")
     if mode_label == "local":
         resolved_db = db_path or "~/.local/share/hackagent/hackagent.db"

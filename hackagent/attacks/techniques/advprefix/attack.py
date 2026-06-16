@@ -261,6 +261,7 @@ class AdvPrefixAttack(BaseAttack):
                     "filter_len",
                     "n_prefixes_per_goal",
                     "max_ce",
+                    "_tracker",  # For per-goal evaluation traces
                 ],
                 "input_data_arg_name": "input_data",
                 "required_args": ["logger", "client", "config"],

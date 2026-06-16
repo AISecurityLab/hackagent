@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: ["**"]
 
+env:
+  UV_VERSION: "0.10.11"
+
 jobs:
   commit-check:
     name: Commit Messages
@@ -20,6 +23,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Set up Python
@@ -31,7 +35,7 @@ jobs:
         run: uv sync --group dev
 
       - name: Check commit messages in PR
-        run: uv run cz check --rev-range ${{ github.event.pull_request.base.sha }}..${{ github.sha }}
+        run: uv run cz check --rev-range ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}
 
   python-checks:
     name: Linting and Formatting
@@ -44,6 +48,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Set up Python
@@ -79,6 +84,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Set up Python ${{ matrix.python-version }}
@@ -113,6 +119,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Set up Python
@@ -127,7 +134,7 @@ jobs:
         run: uv run pytest tests/unit/ --cov --cov-report=xml:reports/coverage.xml
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: reports/coverage.xml
@@ -151,6 +158,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Set up Python
@@ -217,6 +225,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Set up Python
@@ -293,6 +302,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Set up Python
@@ -317,6 +327,7 @@ jobs:
         with:
           name: coverage-e2e
           path: reports/.coverage
+          include-hidden-files: true
           retention-days: 1
 
   # ── Coverage merge & upload ───────────────────────────────────────────────
@@ -338,6 +349,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
 
       - name: Set up Python
@@ -355,18 +367,30 @@ jobs:
           path: coverage-artifacts/
 
       - name: Combine coverage data
+        id: combine_coverage
         run: |
-          mkdir -p reports
+          mkdir -p reports coverage-artifacts
+          mapfile -t coverage_files < <(find coverage-artifacts -name ".coverage" -type f 2>/dev/null || true)
+
+          if [ "${#coverage_files[@]}" -eq 0 ]; then
+            echo "No .coverage artifacts found. Skipping merged coverage generation."
+            echo "coverage_available=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           i=0
-          while IFS= read -r f; do
+          for f in "${coverage_files[@]}"; do
             cp "$f" "reports/.coverage.$i"
             i=$((i + 1))
-          done < <(find coverage-artifacts -name ".coverage" -type f)
+          done
+
           uv run coverage combine reports/
           uv run coverage xml -o reports/coverage-merged.xml
           uv run coverage report --skip-covered
+          echo "coverage_available=true" >> "$GITHUB_OUTPUT"
 
       - name: Upload merged coverage to Codecov
+        if: steps.combine_coverage.outputs.coverage_available == 'true'
         uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
