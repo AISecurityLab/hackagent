@@ -57,18 +57,18 @@ Drives Claude Code in headless mode (``claude -p``) through a per-instance
 speaks no HTTP.
 
 Required config:
-    - ``name``: the Claude model to drive (``sonnet``/``opus``/``haiku``
-      aliases or a full id like ``claude-opus-4-8``). Used as both the
-      ``--model`` value and the LiteLLM model string.
+- ``name``: the Claude model to drive (``sonnet``/``opus``/``haiku``
+aliases or a full id like ``claude-opus-4-8``). Used as both the
+``--model`` value and the LiteLLM model string.
 
 Optional config:
-    - ``binary`` (default ``claude``): path to the Claude Code executable.
-    - ``system_prompt`` / ``append_system_prompt``: override or extend the
-      system prompt.
-    - ``max_turns``: cap the agentic loop iterations.
-    - ``cwd``: working directory to run ``claude`` in.
-    - ``timeout`` (seconds, default 300).
-    - ``extra_args``: list of additional raw ``claude`` flags.
+- ``binary`` (default ``claude``): path to the Claude Code executable.
+- ``system_prompt`` / ``append_system_prompt``: override or extend the
+system prompt.
+- ``max_turns``: cap the agentic loop iterations.
+- ``cwd``: working directory to run ``claude`` in.
+- ``timeout`` (seconds, default 300).
+- ``extra_args``: list of additional raw ``claude`` flags.
 
 Note: ``endpoint`` is accepted for interface symmetry but ignored — Claude
 Code is local and has no endpoint URL.
@@ -86,3 +86,4 @@ Flow mirrors :class:`ADKAgent`::
     request_data → litellm.completion(model=&quot;hackagent_claude_code_&lt;id&gt;/&lt;model&gt;&quot;,
                                       messages=…)
                   → _ClaudeCodeCustomLLM.completion → ``claude -p``
+

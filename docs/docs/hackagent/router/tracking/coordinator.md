@@ -70,7 +70,8 @@ a single interface. Provides:
 def __init__(step_tracker: StepTracker,
              goal_tracker: Optional[Tracker],
              logger: Optional[logging.Logger] = None,
-             run_start_time: Optional[float] = None)
+             run_start_time: Optional[float] = None,
+             goal_index_start: int = 0)
 ```
 
 Initialize coordinator with pre-built trackers.
@@ -95,6 +96,9 @@ def create(cls,
            logger: Optional[logging.Logger] = None,
            attack_type: str = "unknown",
            category_classifier_config: Optional[Dict[str, Any]] = None,
+           preclassified_goal_labels_by_index: Optional[Dict[Any, Dict[
+               str, str]]] = None,
+           disable_goal_category_classifier: bool = False,
            goals: Optional[List[str]] = None,
            initial_metadata: Optional[Dict[str, Any]] = None,
            goal_index_start: int = 0,
@@ -111,10 +115,16 @@ Factory method to create a fully-initialized coordinator.
 - `logger` - Logger instance
 - `attack_type` - Attack identifier (e.g., &quot;advprefix&quot;, &quot;pair&quot;)
 - `category_classifier_config` - Optional per-goal classifier router config.
+- `preclassified_goal_labels_by_index` - Optional map goal_index -&gt;
+- `{"category"` - &quot;X. ...&quot;, &quot;subcategory&quot;: &quot;Xn. ...&quot;}. When
+  present, goal labels are taken from this map instead of querying
+  the category classifier.
+- `disable_goal_category_classifier` - Disable classifier initialization
+  entirely and rely on provided labels or fallback defaults.
 - `goals` - Optional list of goals to initialize upfront
 - `initial_metadata` - Optional metadata for goal results
-- `goal_index_start` - Starting index to assign to the first goal
-- `run_start_time` - Optional perf_counter timestamp used as
+- `run_id`0 - Starting index to assign to the first goal
+- `run_id`1 - Optional perf_counter timestamp used as
   run start for latency calculations.
   
 
@@ -194,6 +204,23 @@ Generation get no Result record.
 
 - `pipeline_data` - Output from the Generation step (list of dicts with &quot;goal&quot; key)
 - `initial_metadata` - Optional metadata to attach to each goal result
+
+#### backdate\_goal\_start\_times
+
+```python
+def backdate_goal_start_times(pipeline_data: List[Dict[str, Any]]) -> None
+```
+
+Shift each goal&#x27;s _start_time back by its generation elapsed_s.
+
+Call this after generation when goals were already initialized upfront
+(via initialize_goals) so that the tracked latency covers the full
+lifecycle including generation time.
+
+**Arguments**:
+
+- `pipeline_data` - Output from the Generation step (list of dicts
+  with &quot;goal&quot; and optional &quot;elapsed_s&quot; keys).
 
 #### get\_goal\_context
 

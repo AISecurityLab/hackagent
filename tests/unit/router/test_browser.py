@@ -30,8 +30,8 @@ class TestFindInput(unittest.TestCase):
         if selector_match is None:
             frame.query_selector_all.return_value = [handle]
         else:
-            frame.query_selector_all.side_effect = (
-                lambda sel: [handle] if sel == selector_match else []
+            frame.query_selector_all.side_effect = lambda sel: (
+                [handle] if sel == selector_match else []
             )
         return frame
 
@@ -83,8 +83,8 @@ class TestFindSendButton(unittest.TestCase):
         btn = MagicMock()
         btn.is_visible.return_value = True
         frame = MagicMock()
-        frame.query_selector.side_effect = (
-            lambda sel: btn if sel == "button[type=submit]" else None
+        frame.query_selector.side_effect = lambda sel: (
+            btn if sel == "button[type=submit]" else None
         )
         self.assertIs(_find_send_button(frame), btn)
 

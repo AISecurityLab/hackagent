@@ -103,6 +103,13 @@ def _extract_result_text(stdout: str) -> Optional[str]:
          "total_cost_usd": 0.01, "num_turns": 1, ...}
 
     Falls back to raw stdout if the payload isn't the expected shape.
+
+    Content-level refusals are *captured*, not raised. When the target's API
+    blocks a prompt (e.g. a Usage Policy violation) the CLI reports
+    ``is_error: true`` with ``subtype: "success"`` and the refusal message in
+    ``result`` — for a red-team *target* that message is a legitimate response
+    (the target declined) and must flow to the judge. Genuine execution
+    failures use an ``error_*`` subtype and still raise.
     """
     text = stdout.strip()
     if not text:
@@ -113,11 +120,17 @@ def _extract_result_text(stdout: str) -> Optional[str]:
         # Not JSON (e.g. --output-format text slipped through) — use as-is.
         return text
     if isinstance(data, dict):
-        if data.get("is_error"):
-            raise ClaudeCodeInteractionError(
-                f"claude reported an error: {data.get('result') or data.get('subtype')}"
-            )
         result = data.get("result")
+        if data.get("is_error"):
+            subtype = str(data.get("subtype") or "")
+            # API/content-level refusal (non-"error_*" subtype) → capture the
+            # refusal message as the target's response.
+            if isinstance(result, str) and result and not subtype.startswith("error"):
+                return result
+            # Genuine execution failure (error_max_turns, error_during_execution…).
+            raise ClaudeCodeInteractionError(
+                f"claude reported an error: {result or subtype or 'unknown'}"
+            )
         if isinstance(result, str):
             return result
     # Unexpected JSON shape — return the serialized payload so the caller can
@@ -207,13 +220,30 @@ def _get_claude_code_custom_llm_class():
                     f"claude timed out after {self.timeout}s"
                 ) from e
 
+            # claude exits non-zero for API/content-level refusals (e.g. a
+            # Usage Policy block) while still emitting a result payload. Parse
+            # stdout first: if it carries a captured response, that IS the
+            # target's answer and the run continues; only a non-zero exit with
+            # no usable payload is a genuine failure.
+            try:
+                final_text = _extract_result_text(proc.stdout)
+            except ClaudeCodeInteractionError:
+                if proc.returncode == 0:
+                    raise  # exit 0 but a real error payload — surface it
+                final_text = None
+
             if proc.returncode != 0:
-                detail = (proc.stderr or proc.stdout or "").strip()[:300]
-                raise ClaudeCodeInteractionError(
-                    f"claude exited with code {proc.returncode}: {detail}"
+                if not final_text:
+                    detail = (proc.stderr or proc.stdout or "").strip()[:300]
+                    raise ClaudeCodeInteractionError(
+                        f"claude exited with code {proc.returncode}: {detail}"
+                    )
+                self.logger.warning(
+                    f"claude exited {proc.returncode} but returned a "
+                    "content-level response (e.g. a Usage Policy block); "
+                    "capturing it as the target response for judging."
                 )
 
-            final_text = _extract_result_text(proc.stdout)
             return {
                 "final_text": final_text or "",
                 "raw_request": {"argv": argv, "prompt": prompt_text},

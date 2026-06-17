@@ -486,7 +486,9 @@ def doctor(ctx):
     # Summary
     console.print("\n[cyan]📊 Summary")
     if issues_found == 0:
-        console.print("[bold green]✅ All checks passed! You're ready to use HackAgent.")
+        console.print(
+            "[bold green]✅ All checks passed! You're ready to use HackAgent."
+        )
     else:
         console.print(
             f"[bold yellow]⚠️ Found {issues_found} issue(s) that should be addressed."

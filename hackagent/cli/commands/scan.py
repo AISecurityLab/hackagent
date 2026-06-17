@@ -18,6 +18,7 @@ This module also exposes the reusable ``run_quick_scan`` helper that backs the
 
 from __future__ import annotations
 
+import os
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -33,6 +34,7 @@ from hackagent.cli.utils import (
     display_success,
     get_agent_type_enum,
     handle_errors,
+    load_config_file,
 )
 from hackagent.router.discovery.scanner import (
     DEFAULT_PLANNER_MODEL,
@@ -64,6 +66,31 @@ _AUTH_REMINDER = (
 def _normalize_attack_type(technique: str) -> str:
     """Convert profile technique labels to CLI/runtime attack_type keys."""
     return str(technique).strip().lower()
+
+
+# api_base for an attacker/judge override, derived from the LiteLLM provider
+# prefix. The backend requires a valid URL, and LiteLLM uses it as the api_base,
+# so it must match the provider. Unknown/unprefixed → local Ollama (the common
+# --attacker-model case); use a provider-prefixed id for hosted models.
+_PROVIDER_ENDPOINTS: Dict[str, str] = {
+    "openai": "https://api.openai.com/v1",
+    "anthropic": "https://api.anthropic.com",
+    "openrouter": "https://openrouter.ai/api/v1",
+    "groq": "https://api.groq.com/openai/v1",
+    "mistral": "https://api.mistral.ai/v1",
+    "together_ai": "https://api.together.xyz/v1",
+    "deepseek": "https://api.deepseek.com",
+    "gemini": "https://generativelanguage.googleapis.com",
+}
+
+
+def _provider_endpoint(model: str) -> str:
+    """Return the api_base URL for a LiteLLM ``model`` id (by provider prefix)."""
+    m = (model or "").strip()
+    prefix = m.split("/", 1)[0].lower() if "/" in m else ""
+    if prefix in ("ollama", "ollama_chat") or not prefix:
+        return os.environ.get("OLLAMA_API_BASE") or "http://localhost:11434"
+    return _PROVIDER_ENDPOINTS.get(prefix, "http://localhost:11434")
 
 
 def _extract_asr(results: Any) -> Optional[float]:
@@ -138,8 +165,20 @@ def _format_asr(asr: Optional[float]) -> str:
 @click.option(
     "--reply-selector",
     default=None,
-    help="CSS selector pinning the bot's reply element (skips the DOM-diff "
-    "heuristic).",
+    help="CSS selector pinning the bot's reply element (skips the DOM-diff heuristic).",
+)
+@click.option(
+    "--open-selector",
+    default=None,
+    help="CSS selector for the chat-launcher bubble to click first, for widgets "
+    "that start collapsed (when the built-in launcher heuristics miss it).",
+)
+@click.option(
+    "--accept-cookies/--no-accept-cookies",
+    default=True,
+    show_default=True,
+    help="Accept/dismiss a cookie-consent banner on load (it often overlays the "
+    "page and blocks the chat launcher). Use --no-accept-cookies to leave it.",
 )
 @click.option(
     "--llm-fallback-model",
@@ -186,6 +225,17 @@ def _format_asr(asr: Optional[float]) -> str:
     help="Red-team the target. On by default; --no-attack just shows the config.",
 )
 @click.option(
+    "--config-file",
+    "config_file",
+    default=None,
+    type=click.Path(exists=True, dir_okay=False),
+    help="YAML/JSON file supplying the attack config (a `goals:` list plus "
+    "optional `attacker`, `judge`, `category_classifier`, `parameters`, "
+    "`attack_type`). Commas inside goals are preserved here, unlike --goals. "
+    "Explicit CLI flags (--goals, --attack-type, --attacker-model, "
+    "--judge-model) override the file.",
+)
+@click.option(
     "--goals",
     multiple=True,
     help="Attack goals. Repeat --goals or pass a comma-separated string.",
@@ -196,6 +246,20 @@ def _format_asr(asr: Optional[float]) -> str:
     show_default=True,
     help="Attack strategy (tap, pair, flipattack, advprefix…). Ignored when "
     "--plan picks one.",
+)
+@click.option(
+    "--attacker-model",
+    default=None,
+    help="Override the attacker LLM with any LiteLLM model id "
+    "(e.g. openai/gpt-4o-mini, anthropic/claude-sonnet-4-6, ollama_chat/llama3). "
+    "Bypasses the auto-selected remote/local attacker. Provider key comes from "
+    "the usual env var (OPENAI_API_KEY, ANTHROPIC_API_KEY, …).",
+)
+@click.option(
+    "--judge-model",
+    default=None,
+    help="Override the judge/scorer LLM with any LiteLLM model id (same form as "
+    "--attacker-model). Bypasses the auto-selected remote/local judge.",
 )
 @click.option(
     "--attack-timeout",
@@ -221,6 +285,8 @@ def scan(
     headed: bool,
     input_selector: str,
     reply_selector: str,
+    open_selector: str,
+    accept_cookies: bool,
     llm_fallback_model: str,
     install_browser: bool,
     timeout: int,
@@ -228,8 +294,11 @@ def scan(
     use_planner: bool,
     planner_model: str,
     attack: bool,
+    config_file: Optional[str],
     goals: Tuple[str, ...],
     attack_type: str,
+    attacker_model: str,
+    judge_model: str,
     attack_timeout: int,
     no_tui: bool,
     dry_run: bool,
@@ -247,6 +316,7 @@ def scan(
       hackagent scan https://www.example.com
       hackagent scan https://www.example.com --plan
       hackagent scan https://www.example.com --headed --input-selector 'textarea'
+      hackagent scan https://www.example.com --config-file goals.yaml --no-tui
       hackagent scan https://www.example.com --no-attack --json
     """
     # Imported lazily to avoid a circular import: attack.py imports
@@ -267,13 +337,29 @@ def scan(
         headless=not headed,
         input_selector=input_selector or None,
         reply_selector=reply_selector or None,
+        launcher_selector=open_selector or None,
+        dismiss_consent=accept_cookies,
         llm_fallback_model=llm_fallback_model or None,
         timeout=timeout,
     )
     # Carry the browser-install preference for the web provider's first run.
     config["install_browser"] = install_browser
 
-    user_goals = _parse_goals(goals) or None
+    # Optional config file: supplies a goals list (comma-safe, unlike --goals)
+    # plus any attack-config keys (attacker/judge/category_classifier/…). Explicit
+    # CLI flags win over the file.
+    file_config: Dict[str, Any] = {}
+    if config_file:
+        file_config = load_config_file(config_file) or {}
+        display_info(f"Loaded configuration from: {config_file}")
+
+    file_goals = file_config.get("goals")
+    if isinstance(file_goals, str):
+        file_goals = [file_goals]
+
+    # --goals (comma-split) overrides the file's goals; the file overrides nothing
+    # but the built-in DEFAULT_GOALS fallback.
+    user_goals = _parse_goals(goals) or file_goals or None
 
     # ── Planning (optional, pure LLM reasoning — no target interaction) ──────
     plan = None
@@ -341,14 +427,50 @@ def scan(
     if plan is not None:
         effective_attack_type = plan.attack_type
         resolved_goals: List[str] = plan.goals
-        planned_attack_config: Dict[str, Any] = plan.to_attack_config()
-    else:
-        effective_attack_type = attack_type
-        resolved_goals = user_goals or list(DEFAULT_GOALS)
-        planned_attack_config = {
-            "attack_type": effective_attack_type,
-            "goals": resolved_goals,
+        # The plan dictates strategy/goals/params; the file still contributes any
+        # roles the plan leaves unset (e.g. judge, category_classifier).
+        planned_attack_config: Dict[str, Any] = {
+            **file_config,
+            **plan.to_attack_config(),
         }
+    else:
+        # An explicit --attack-type wins; otherwise honor the file's, else default.
+        if attack_type != DEFAULT_ATTACK_TYPE:
+            effective_attack_type = attack_type
+        else:
+            effective_attack_type = file_config.get("attack_type") or attack_type
+        resolved_goals = user_goals or list(DEFAULT_GOALS)
+        # Base the config on the file (attacker/judge/category_classifier/params),
+        # then pin the resolved attack_type and goals on top.
+        planned_attack_config = dict(file_config)
+        planned_attack_config["attack_type"] = effective_attack_type
+        planned_attack_config["goals"] = resolved_goals
+
+    # Explicit attacker/judge overrides — point at any LiteLLM model you control,
+    # bypassing the auto-selected remote (HackAgent API) / local (Ollama)
+    # defaults. Fully specified so the orchestrator's mode-based defaults don't
+    # merge in (e.g.) a mismatched api_key. The endpoint is derived from the
+    # model's provider prefix (the backend requires a valid URL). The judge
+    # override is mirrored onto every judge-family key since the role name
+    # differs per attack (PAIR=scorer, TAP=judge, …).
+    if attacker_model:
+        planned_attack_config["attacker"] = {
+            "identifier": attacker_model,
+            "agent_type": "litellm",
+            "endpoint": _provider_endpoint(attacker_model),
+            "api_key": None,
+        }
+    if judge_model:
+        judge_cfg = {
+            "identifier": judge_model,
+            "agent_type": "litellm",
+            "endpoint": _provider_endpoint(judge_model),
+            "api_key": None,
+            "type": "harmbench",
+        }
+        planned_attack_config["judge"] = dict(judge_cfg)
+        planned_attack_config["judges"] = [dict(judge_cfg)]
+        planned_attack_config["scorer"] = dict(judge_cfg)
 
     if dry_run:
         no_tui = True

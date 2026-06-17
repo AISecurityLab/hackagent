@@ -36,31 +36,27 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
-# ---------------------------------------------------------------------------
-# Canonical service defaults
-# ---------------------------------------------------------------------------
-
-DEFAULT_LOCAL_MODEL_ENDPOINT = "http://localhost:11434"
-DEFAULT_LOCAL_AGENT_TYPE = "OLLAMA"
-# Local Ollama default for attacker / judge / category-classifier (no API key).
-# Pull: ollama pull hf.co/huihui-ai/Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-GGUF
-DEFAULT_LOCAL_MODEL = (
-    "hf.co/huihui-ai/Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-GGUF"
+# Canonical scalar service defaults now live in ``hackagent.config`` (the
+# dependency-free leaf module that is the single source of truth). They are
+# re-exported here so existing ``from hackagent.attacks.techniques.config
+# import DEFAULT_*`` callers keep working. Pydantic-model-derived defaults
+# (DEFAULT_TIMEOUT, DEFAULT_BATCH_SIZE, …) stay below, next to their models.
+from hackagent.config import (
+    DEFAULT_ATTACKER_IDENTIFIER,
+    DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE,
+    DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT,
+    DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
+    DEFAULT_CATEGORY_CLASSIFIER_MAX_TOKENS,
+    DEFAULT_JUDGE_IDENTIFIER,
+    DEFAULT_LOCAL_AGENT_TYPE,
+    DEFAULT_LOCAL_MODEL,
+    DEFAULT_LOCAL_MODEL_ENDPOINT,
+    DEFAULT_MAX_OUTPUT_TOKENS,
+    DEFAULT_REMOTE_AGENT_TYPE,
+    DEFAULT_REMOTE_ATTACKER_IDENTIFIER,
+    DEFAULT_REMOTE_JUDGE_IDENTIFIER,
+    DEFAULT_REMOTE_ROLE_ENDPOINT,
 )
-DEFAULT_ATTACKER_IDENTIFIER = DEFAULT_LOCAL_MODEL
-DEFAULT_JUDGE_IDENTIFIER = DEFAULT_LOCAL_MODEL
-DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER = DEFAULT_LOCAL_MODEL
-DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT = "http://localhost:11434"
-DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE = "OLLAMA"
-DEFAULT_CATEGORY_CLASSIFIER_MAX_TOKENS = 100
-DEFAULT_MAX_OUTPUT_TOKENS = 4096
-
-# Remote defaults: attacker / judge / category-classifier served by the
-# HackAgent API (used when a HACKAGENT_API_KEY is available).
-DEFAULT_REMOTE_ROLE_ENDPOINT = "https://api.hackagent.dev/v1"
-DEFAULT_REMOTE_AGENT_TYPE = "OPENAI_SDK"
-DEFAULT_REMOTE_ATTACKER_IDENTIFIER = "hackagent-attacker"
-DEFAULT_REMOTE_JUDGE_IDENTIFIER = "hackagent-judge"
 
 # ---------------------------------------------------------------------------
 # Pydantic models

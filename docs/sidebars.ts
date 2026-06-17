@@ -105,6 +105,11 @@ const sidebars: SidebarsConfig = {
         },
         {
           type: 'doc',
+          id: 'agents/claude-code',
+          label: 'Claude Code',
+        },
+        {
+          type: 'doc',
           id: 'agents/guardrails',
           label: 'Guardrails',
         },

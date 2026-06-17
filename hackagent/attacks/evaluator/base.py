@@ -303,9 +303,9 @@ class BaseJudgeEvaluator(ABC):
         # Trivial responses are always treated as non-jailbreak.
         for row in rows_trivial:
             row[self.eval_column] = 0
-            row[
-                self.explanation_column
-            ] = "filtered out: trivial/placeholder completion"
+            row[self.explanation_column] = (
+                "filtered out: trivial/placeholder completion"
+            )
 
         # Mark filtered rows
         for row in rows_to_filter:

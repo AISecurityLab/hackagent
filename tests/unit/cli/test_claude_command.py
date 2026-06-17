@@ -72,7 +72,7 @@ class TestClaudeHeadlessRun(unittest.TestCase):
         mock_agent.assert_called_once()
         instance.hack.assert_called_once()
         attack_config = instance.hack.call_args.kwargs["attack_config"]
-        self.assertEqual(attack_config["attack_type"], "tap")
+        self.assertEqual(attack_config["attack_type"], "flipattack")
         self.assertEqual(attack_config["goals"], list(DEFAULT_GOALS))
 
     @patch("hackagent.cli.commands.claude.shutil.which", return_value="/usr/bin/claude")
@@ -126,7 +126,7 @@ class TestClaudeTuiPath(unittest.TestCase):
         # Preset values are passed into the Attacks tab.
         initial_data = mock_tui.call_args.kwargs["initial_data"]
         self.assertEqual(initial_data["agent_type"], "claude-code")
-        self.assertEqual(initial_data["attack_type"], "tap")
+        self.assertEqual(initial_data["attack_type"], "flipattack")
         self.assertEqual(initial_data["endpoint"], "")
 
 

@@ -7,7 +7,7 @@ Build a ``web`` target for a URL and let an LLM pick the attack strategy.
 Planning is pure LLM reasoning — it does NOT touch the target (the browser only
 runs when the chosen plan is executed). The planner defaults to a local Ollama
 model (no API key); pull it once with
-``ollama pull hf.co/huihui-ai/Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-GGUF``.
+``ollama pull Librellama/gemma4:e2b-Uncensored``.
 
 Usage:
     python plan.py https://www.example.com

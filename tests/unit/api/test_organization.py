@@ -905,9 +905,9 @@ def full_updated_organization_response_data(
     ).isoformat()  # Add/update this field
     # Ensure 'credits' field is present, matching what Organization model expects (string)
     if "credits" not in updated_data:
-        updated_data[
-            "credits"
-        ] = "1000.00"  # Default or carry over, ensure it's a string
+        updated_data["credits"] = (
+            "1000.00"  # Default or carry over, ensure it's a string
+        )
     return updated_data
 
 

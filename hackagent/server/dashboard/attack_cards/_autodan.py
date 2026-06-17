@@ -346,9 +346,7 @@ class AutodanCardMixin:
                                                         icon="content_copy"
                                                     ).props(
                                                         "flat dense size=xs color=grey-6"
-                                                    ).tooltip(
-                                                        "Copy to clipboard"
-                                                    ).on(
+                                                    ).tooltip("Copy to clipboard").on(
                                                         "click",
                                                         js_handler=f"(event) => {{var b=event.currentTarget,ic=b.querySelector('.q-icon');if(navigator.clipboard)navigator.clipboard.writeText({json.dumps(target_response or '')});if(ic){{ic.textContent='check';setTimeout(function(){{ic.textContent='content_copy';}},2000);}}}}",
                                                     )
@@ -383,9 +381,7 @@ class AutodanCardMixin:
                                                         icon="content_copy"
                                                     ).props(
                                                         "flat dense size=xs color=grey-6"
-                                                    ).tooltip(
-                                                        "Copy to clipboard"
-                                                    ).on(
+                                                    ).tooltip("Copy to clipboard").on(
                                                         "click",
                                                         js_handler=f"(event) => {{var b=event.currentTarget,ic=b.querySelector('.q-icon');if(navigator.clipboard)navigator.clipboard.writeText({json.dumps(assessment or '')});if(ic){{ic.textContent='check';setTimeout(function(){{ic.textContent='content_copy';}},2000);}}}}",
                                                     )

@@ -214,9 +214,7 @@ class ConfigTab(VerticalScroll):
         if not missing:
             return "[green]✅ All dependencies installed[/green]"
         else:
-            return (
-                f"[yellow]⚠️ Some dependencies missing: {', '.join(missing)}[/yellow]"
-            )
+            return f"[yellow]⚠️ Some dependencies missing: {', '.join(missing)}[/yellow]"
 
     def refresh_data(self) -> None:
         """Refresh config data."""

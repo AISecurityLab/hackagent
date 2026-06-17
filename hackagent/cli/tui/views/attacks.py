@@ -81,6 +81,10 @@ _AGENT_TYPE_CHOICES = [
     ("A2A", "a2a"),
 ]
 
+# Agent types that run locally and therefore have no endpoint URL. For these
+# the endpoint field is legitimately empty and must not block execution.
+_ENDPOINT_OPTIONAL_AGENT_TYPES = {"claude-code"}
+
 # =====================================================================
 # Strategy-specific config field IDs use the prefix ``cfg-`` so we can
 # query them without colliding with the static form fields.
@@ -197,9 +201,9 @@ class AttacksTab(Container):
         self._attack_config_overrides: Dict[str, Any] = copy.deepcopy(
             self.initial_data.get("attack_config_overrides", {})
         )
-        self._agent_adapter_operational_config: Optional[
-            Dict[str, Any]
-        ] = copy.deepcopy(self.initial_data.get("agent_adapter_operational_config"))
+        self._agent_adapter_operational_config: Optional[Dict[str, Any]] = (
+            copy.deepcopy(self.initial_data.get("agent_adapter_operational_config"))
+        )
         self._reduced_tui_logs = bool(self.initial_data.get("reduced_tui_logs", False))
         self._show_advanced = False
         self._advanced_hover_preview = False
@@ -865,27 +869,44 @@ class AttacksTab(Container):
         using_dataset = self.query_one("#radio-dataset", RadioButton).value
 
         # ── Basic validation ──
+        # Surface why nothing happened instead of returning silently, otherwise
+        # the Execute button looks dead (e.g. the claude-code preset, which has
+        # no endpoint, used to be rejected by the blanket endpoint check).
+        errors_widget = self.query_one("#validation-errors", Static)
+
+        def _reject(message: str) -> None:
+            errors_widget.update(f"[bold red]{message}[/bold red]")
+
+        agent_type = (
+            "" if isinstance(agent_type_raw, NoSelection) else str(agent_type_raw)
+        )
+
         if not agent_name:
+            _reject("Agent name is required.")
             return
-        if isinstance(agent_type_raw, NoSelection) or not agent_type_raw:
+        if not agent_type:
+            _reject("Select an agent type.")
             return
-        if not endpoint:
+        # Endpoint is required for everything except local agent types.
+        if not endpoint and agent_type not in _ENDPOINT_OPTIONAL_AGENT_TYPES:
+            _reject("Endpoint URL is required for this agent type.")
             return
         if isinstance(strategy_raw, NoSelection) or not strategy_raw:
+            _reject("Select an attack strategy.")
             return
         try:
             timeout_int = int(timeout)
             if timeout_int <= 0:
+                _reject("Timeout must be a positive integer.")
                 return
         except ValueError:
+            _reject("Timeout must be a positive integer.")
             return
 
-        agent_type = str(agent_type_raw)
         strategy = str(strategy_raw)
 
         # ── Collect & validate strategy-specific config ──
         strategy_values = self._collect_strategy_config()
-        errors_widget = self.query_one("#validation-errors", Static)
 
         if self._current_spec:
             errors = self._current_spec.validate(strategy_values)
@@ -914,6 +935,7 @@ class AttacksTab(Container):
                 isinstance(dataset_preset_raw, type(Select.BLANK))
                 or not dataset_preset_raw
             ):
+                _reject("Select a dataset preset.")
                 return
             dataset_cfg: Dict[str, Any] = {"preset": str(dataset_preset_raw)}
             try:
@@ -935,6 +957,7 @@ class AttacksTab(Container):
             if goals:
                 attack_config["goals"] = [goals]
             else:
+                _reject("Enter at least one attack goal, or switch to a dataset.")
                 return
 
         status_widget = self.query_one("#execution-status", Static)

@@ -374,6 +374,39 @@ class PAIRAttack(BaseAttack):
         """
         return []
 
+    def _translate_complete(self, prompt: str) -> str:
+        """Single-prompt completion via the attacker router (for translation)."""
+        from hackagent.attacks.shared.response_utils import extract_response_content
+
+        keys = list(self.attacker_router._agent_registry.keys())
+        if not keys:
+            return ""
+        resp = self.attacker_router.route_request(
+            registration_key=keys[0],
+            request_data={
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 4096,
+                "temperature": 0.0,
+            },
+        )
+        return extract_response_content(resp, self.logger) or ""
+
+    def _localize_system_prompt(self, text: str, goal: str) -> str:
+        """Translate a system prompt into the goal's language (cached, best-effort).
+
+        Disable with ``translate_prompts: False`` in the attack config. Any
+        failure returns the original English text.
+        """
+        if not bool(self.config.get("translate_prompts", True)):
+            return text
+        try:
+            from hackagent.attacks.shared.translation import localize_text
+
+            return localize_text(text, goal, self._translate_complete)
+        except Exception as exc:  # pragma: no cover - defensive
+            self.logger.debug("prompt localization skipped: %s", exc)
+            return text
+
     def _query_attacker(
         self, goal: str, target_response: str, score: int, iteration: int
     ) -> Optional[str]:
@@ -397,7 +430,12 @@ class PAIRAttack(BaseAttack):
             attacker returns an unparseable response.
         """
         try:
-            system_prompt = ATTACKER_SYSTEM_PROMPT.format(goal=goal)
+            # Localize the attacker system prompt to the goal's language so a
+            # non-English goal operates natively (translated + cached per
+            # language). English goals / failures fall back to the original.
+            system_prompt = self._localize_system_prompt(
+                ATTACKER_SYSTEM_PROMPT.format(goal=goal), goal
+            )
 
             feedback_limit = int(self.config.get("attacker_feedback_max_chars", 2500))
             target_feedback = _truncate_text(target_response or "", feedback_limit)
@@ -628,7 +666,12 @@ SCORE: {score}"""
         response_for_judge = _truncate_text(response or "", judge_response_max)
 
         messages = [
-            {"role": "system", "content": JUDGE_SYSTEM_PROMPT.format(goal=goal)},
+            {
+                "role": "system",
+                "content": self._localize_system_prompt(
+                    JUDGE_SYSTEM_PROMPT.format(goal=goal), goal
+                ),
+            },
             {
                 "role": "user",
                 "content": (

@@ -270,6 +270,56 @@ class TestModeBasedRoleDefaults(unittest.TestCase):
         self.assertEqual(resolved["scorer"]["identifier"], "hackagent-judge")
         self.assertEqual(resolved["scorer"]["api_key"], "hk_test_remote_key")
 
+    def test_remote_attacker_enables_reasoning(self):
+        """The remote attacker (HackAgent generator endpoint) must keep reasoning
+        on — it maps to reasoning_effort and the endpoint rejects it disabled."""
+        from hackagent.router.provider_config import openai_thinking_translator
+
+        orch, hack_agent, _ = _make_orchestrator()
+        orch.attack_type = "pair"
+        hack_agent.backend.get_api_key.return_value = "hk_test_remote_key"
+
+        resolved = orch._apply_mode_based_role_defaults(
+            {"attack_type": "pair", "goals": ["test"]}
+        )
+        self.assertEqual(resolved["attacker"].get("thinking"), "medium")
+        # Sent both ways: reasoning_effort (OpenAI path) + extra_body.reasoning.
+        self.assertEqual(
+            resolved["attacker"].get("extra_body"), {"reasoning": {"effort": "medium"}}
+        )
+        payload = openai_thinking_translator(
+            resolved["attacker"]["thinking"], model_name="hackagent-attacker"
+        )
+        self.assertEqual(payload, {"reasoning_effort": "medium"})
+        # Judge is intentionally left without forced reasoning (it works as-is).
+        self.assertNotIn("thinking", resolved["scorer"])
+
+    def test_explicit_attacker_override_is_not_polluted_by_remote_defaults(self):
+        """A user-supplied attacker model must not inherit reasoning or the
+        HackAgent api_key from the remote defaults."""
+        orch, hack_agent, _ = _make_orchestrator()
+        orch.attack_type = "pair"
+        hack_agent.backend.get_api_key.return_value = "hk_test_remote_key"
+
+        resolved = orch._apply_mode_based_role_defaults(
+            {
+                "attack_type": "pair",
+                "goals": ["test"],
+                "attacker": {
+                    "identifier": "openai/gpt-4o-mini",
+                    "agent_type": "litellm",
+                    "endpoint": "",
+                    "api_key": None,
+                },
+            }
+        )
+        att = resolved["attacker"]
+        self.assertEqual(att["identifier"], "openai/gpt-4o-mini")
+        self.assertEqual(att["agent_type"], "litellm")
+        self.assertIsNone(att["api_key"])  # not the remote key
+        self.assertNotIn("thinking", att)  # no forced reasoning
+        self.assertNotIn("extra_body", att)
+
     def test_local_mode_injects_baseline_judge_defaults(self):
         """Without backend API key, baseline judge defaults should use local profile."""
         orch, hack_agent, _ = _make_orchestrator()
@@ -677,18 +727,19 @@ class TestRequiredModelAvailabilityPreflight(unittest.TestCase):
     def test_probe_treats_empty_response_as_reachable(self):
         """An empty generation proves the model is up — the probe must pass."""
         router = MagicMock()
+        # Plain agent (no probe_ready) → generic healthcheck-send path.
+        router.get_agent_instance.return_value = object()
         router.route_request.return_value = {
             "error_message": (
                 "OllamaAgent generation error: [GENERATION_ERROR: EMPTY_RESPONSE]"
             )
         }
-        self.assertIsNone(
-            AttackOrchestrator._probe_router_registration(router, "rk")
-        )
+        self.assertIsNone(AttackOrchestrator._probe_router_registration(router, "rk"))
 
     def test_probe_reports_real_connectivity_errors(self):
         """Genuine connectivity/load errors must still fail the probe."""
         router = MagicMock()
+        router.get_agent_instance.return_value = object()
         router.route_request.return_value = {
             "error_message": "request failed (APIConnectionError): connection refused"
         }
@@ -696,6 +747,17 @@ class TestRequiredModelAvailabilityPreflight(unittest.TestCase):
             "connection refused",
             AttackOrchestrator._probe_router_registration(router, "rk"),
         )
+
+    def test_probe_uses_probe_ready_when_available(self):
+        """Adapters exposing probe_ready() (web) get a non-invasive check — no
+        healthcheck message is sent into the live target."""
+        agent = MagicMock()
+        agent.probe_ready.return_value = None  # reachable
+        router = MagicMock()
+        router.get_agent_instance.return_value = agent
+        self.assertIsNone(AttackOrchestrator._probe_router_registration(router, "rk"))
+        agent.probe_ready.assert_called_once()
+        router.route_request.assert_not_called()
 
     def test_validate_required_models_availability_reports_model_and_endpoint(self):
         """Error should include role, identifier, and endpoint for unavailable models."""

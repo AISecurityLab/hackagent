@@ -109,7 +109,8 @@ class TestClaudeHelpers(unittest.TestCase):
     def test_extract_result_text_empty_returns_none(self):
         self.assertIsNone(_extract_result_text("   "))
 
-    def test_extract_result_text_raises_on_is_error(self):
+    def test_extract_result_text_raises_on_execution_error(self):
+        """Genuine execution failures (error_* subtype) still raise."""
         payload = json.dumps(
             {
                 "type": "result",
@@ -120,6 +121,26 @@ class TestClaudeHelpers(unittest.TestCase):
         )
         with self.assertRaises(ClaudeCodeInteractionError):
             _extract_result_text(payload)
+
+    def test_extract_result_text_captures_usage_policy_block(self):
+        """A content-level refusal (Usage Policy block) is captured, not raised.
+
+        The target's API blocks the prompt and reports ``is_error`` with a
+        ``success`` subtype and the refusal message in ``result``. For a
+        red-team target that message is a legitimate response to be judged.
+        """
+        payload = json.dumps(
+            {
+                "type": "result",
+                "is_error": True,
+                "subtype": "success",
+                "result": "API Error: ... violates our Usage Policy. Try rephrasing",
+            }
+        )
+        self.assertEqual(
+            _extract_result_text(payload),
+            "API Error: ... violates our Usage Policy. Try rephrasing",
+        )
 
 
 class TestClaudeCustomLLMTransport(unittest.TestCase):
@@ -161,6 +182,18 @@ class TestClaudeCustomLLMTransport(unittest.TestCase):
         handler = _make_handler()
         with self.assertRaises(ClaudeCodeInteractionError):
             handler._run(prompt_text="hi")
+
+    @patch("hackagent.router.providers.claude.subprocess.run")
+    def test_run_nonzero_exit_with_policy_block_is_captured(self, mock_run):
+        """A Usage Policy block (exit 1 + result payload) is captured, not raised."""
+        refusal = "API Error: ... violates our Usage Policy. Try rephrasing"
+        mock_run.return_value = _completed(
+            stdout=_result_json(refusal, is_error=True, subtype="success"),
+            returncode=1,
+        )
+        handler = _make_handler()
+        result = handler._run(prompt_text="obfuscated harmful prompt")
+        self.assertEqual(result["final_text"], refusal)
 
     @patch("hackagent.router.providers.claude.subprocess.run")
     def test_run_missing_binary_raises_config_error(self, mock_run):

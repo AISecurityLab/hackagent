@@ -243,9 +243,9 @@ class StepTracker:
                     trace_content["input_data_sample"] = deep_clean(input_data)
                 except Exception as e:
                     # If it fails, store error message instead
-                    trace_content[
-                        "input_data_sample"
-                    ] = f"Serialization Error: {str(e)}"
+                    trace_content["input_data_sample"] = (
+                        f"Serialization Error: {str(e)}"
+                    )
 
             # Add any additional metadata
             if self.context.metadata:

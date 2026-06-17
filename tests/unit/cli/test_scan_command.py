@@ -233,5 +233,54 @@ class TestRunQuickScan(unittest.TestCase):
         self.assertEqual(attack_config["dataset"]["preset"], "my-dataset")
 
 
+class TestProviderEndpoint(unittest.TestCase):
+    """--attacker-model / --judge-model need a valid api_base URL per provider
+    (the backend rejects an empty endpoint)."""
+
+    def test_ollama_models_resolve_to_local(self):
+        from hackagent.cli.commands.scan import _provider_endpoint
+
+        for m in (
+            "ollama_chat/huihui_ai/gemma-4-abliterated",
+            "ollama/huihui_ai/gemma-4-abliterated",
+            "huihui_ai/gemma-4-abliterated",  # no known prefix → local
+        ):
+            self.assertEqual(_provider_endpoint(m), "http://localhost:11434")
+
+    def test_hosted_providers_resolve_to_their_api_base(self):
+        from hackagent.cli.commands.scan import _provider_endpoint
+
+        self.assertEqual(
+            _provider_endpoint("openai/gpt-4o-mini"), "https://api.openai.com/v1"
+        )
+        self.assertEqual(
+            _provider_endpoint("anthropic/claude-sonnet-4-6"),
+            "https://api.anthropic.com",
+        )
+
+    def test_attacker_override_carries_valid_endpoint(self):
+        runner = CliRunner()
+        with patch("hackagent.cli.commands.scan.HackAgent") as mock_agent:
+            mock_agent.return_value.hack.return_value = []
+            result = runner.invoke(
+                scan,
+                [
+                    _URL,
+                    "--no-tui",
+                    "--goals",
+                    "x",
+                    "--attacker-model",
+                    "ollama_chat/huihui_ai/gemma-4-abliterated",
+                ],
+                obj={"config": _config()},
+            )
+        self.assertEqual(result.exit_code, 0, result.output)
+        attack_config = mock_agent.return_value.hack.call_args.kwargs["attack_config"]
+        att = attack_config["attacker"]
+        self.assertEqual(att["identifier"], "ollama_chat/huihui_ai/gemma-4-abliterated")
+        self.assertEqual(att["endpoint"], "http://localhost:11434")  # not empty
+        self.assertIsNone(att["api_key"])
+
+
 if __name__ == "__main__":
     unittest.main()

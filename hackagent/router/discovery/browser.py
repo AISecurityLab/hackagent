@@ -44,6 +44,120 @@ _SEND_SELECTORS = (
     "[class*=send i][role=button]",
 )
 
+# Selectors for a collapsed chat widget's launcher button. Many sites hide the
+# bot behind a floating bubble (often in an iframe) — clicking it reveals the
+# input. Vendor-specific / launcher-class selectors come first (low false
+# positive), generic aria/title hints last. Tried in order across all frames.
+_LAUNCHER_SELECTORS = (
+    # Known vendors
+    ".intercom-launcher",
+    "[class*=intercom-launcher i]",
+    "#launcher",  # Zendesk / Zopim
+    "[class*=zEWidget-launcher i]",
+    "#chat-widget-container",  # LiveChat
+    "#drift-frame-controller",
+    "[class*=drift-widget i]",
+    "#fc_frame",  # Freshchat
+    "[class*=crisp-client i] a",
+    "[class*=tidio i]",
+    # Generic launcher / chat bubble buttons
+    "[class*=launcher i]",
+    "[id*=launcher i]",
+    "button[class*=chat i]",
+    "[class*=chat i][role=button]",
+    "[id*=chat i][role=button]",
+    "[class*=chat-bubble i]",
+    "[class*=chatbot i][role=button]",
+    # "open the widget" style buttons (e.g. CSI's Camilla:
+    # class="camilla-widget-open-button" role="button")
+    "[class*=widget-open i]",
+    "[class*=open-button i]",
+    "[class*=widget i][role=button]",
+    "[role=button][class*=assist i]",
+    # aria/title hints (broadest — last)
+    "[aria-label*=chat i]",
+    "[aria-label*=assistant i]",
+    "[aria-label*=assistenza i]",  # Italian
+    "[title*=chat i]",
+    "[title*=assistant i]",
+)
+
+# Cookie/consent "accept" controls. A consent overlay commonly sits on top of
+# the page and intercepts clicks (incl. the chat launcher), so we dismiss it
+# first. Known CMP buttons (precise) first, then Playwright :has-text() matches
+# on unambiguous accept phrases (EN + IT). :has-text() is case-insensitive
+# substring, so 'Accetta' also matches 'ACCETTA TUTTI'.
+_CONSENT_SELECTORS = (
+    "#onetrust-accept-btn-handler",  # OneTrust
+    "#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll",  # Cookiebot
+    "#CybotCookiebotDialogBodyButtonAccept",
+    "#didomi-notice-agree-button",  # Didomi
+    "[data-testid=uc-accept-all-button]",  # Usercentrics
+    ".iubenda-cs-accept-btn",  # Iubenda
+    "#iubenda-cs-accept-btn",
+    ".cc-allow",  # cookieconsent
+    ".cookie-accept",
+    "[id*=cookie i] button:has-text('Accetta')",
+    "[class*=cookie i] button:has-text('Accetta')",
+    "button:has-text('Accetta tutt')",
+    "button:has-text('Acconsento')",
+    "button:has-text('Consenti tutt')",
+    "button:has-text('Ho capito')",
+    "button:has-text('Accept all')",
+    "button:has-text('Accept cookies')",
+    "button:has-text('Accept & close')",
+    "button:has-text('I agree')",
+    "button:has-text('Got it')",
+    "[role=button]:has-text('Accetta tutt')",
+    "a:has-text('Accetta tutt')",
+)
+
+
+def _click_element(handle, *, timeout: int = 2000) -> bool:
+    """Click an element robustly: scroll in, normal click, DOM-click fallback.
+
+    Returns True if either the actionable click or the direct DOM dispatch
+    succeeded. The DOM fallback (``el.click()``) bypasses pointer-event
+    interception (overlays) and actionability gating (``<div role=button>``).
+    """
+    try:
+        handle.scroll_into_view_if_needed(timeout=1000)
+    except Exception:
+        pass
+    try:
+        handle.click(timeout=timeout)
+        return True
+    except Exception:
+        try:
+            handle.evaluate("el => el.click()")
+            return True
+        except Exception:
+            return False
+
+
+def _dismiss_consent(page) -> bool:
+    """Accept/dismiss a cookie-consent banner so it can't intercept clicks.
+
+    Clicks the first visible known-CMP / accept-phrase control found across all
+    frames. Best-effort and idempotent; returns True if it clicked something.
+    """
+    for frame in page.frames:
+        for sel in _CONSENT_SELECTORS:
+            try:
+                handles = frame.query_selector_all(sel)
+            except Exception:
+                continue
+            for h in handles:
+                try:
+                    if not h.is_visible():
+                        continue
+                    if _click_element(h):
+                        return True
+                except Exception:
+                    continue
+    return False
+
+
 _PACKAGE_MISSING_MSG = (
     "Playwright is required for the web provider but is not importable. "
     "Reinstall hackagent, or:  pip install playwright"
@@ -178,6 +292,44 @@ def _find_input(page, selector=None):
             except Exception:
                 continue
     return None, None
+
+
+def _open_chat_launcher(page, selector=None) -> bool:
+    """Click a likely chat-launcher to reveal a collapsed widget.
+
+    Many sites render no chat input until the user clicks a floating bubble
+    (frequently inside an iframe). This clicks the first visible launcher it
+    finds so the caller can then poll for the now-revealed input.
+
+    Args:
+        page: the Playwright page.
+        selector: an explicit launcher CSS selector to use instead of the
+            built-in heuristics.
+
+    Returns True if it clicked something, else False.
+    """
+    selectors = (selector,) if selector else _LAUNCHER_SELECTORS
+    for frame in page.frames:
+        for sel in selectors:
+            try:
+                handles = frame.query_selector_all(sel)
+            except Exception:
+                continue
+            for h in handles:
+                try:
+                    if not h.is_visible():
+                        continue
+                    # Avoid following navigational links that merely mention
+                    # "chat" — only click buttons / non-navigating controls.
+                    href = (h.get_attribute("href") or "").strip()
+                    if href and not href.startswith("#") and selector is None:
+                        continue
+                    # Robust click (covers overlay interception / <div role=button>).
+                    if _click_element(h):
+                        return True
+                except Exception:
+                    continue
+    return False
 
 
 def _find_send_button(frame):

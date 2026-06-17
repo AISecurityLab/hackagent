@@ -326,7 +326,9 @@ class AgentActionsViewer(Container):
 
         elif event_type == "llm_response":
             content = event_data.get("content", "")
-            actions_widget.write(f"[bold green]{prefix}💬 ADK LLM RESPONSE[/bold green]")
+            actions_widget.write(
+                f"[bold green]{prefix}💬 ADK LLM RESPONSE[/bold green]"
+            )
             content_preview = str(content)[:400]
             if len(str(content)) > 400:
                 content_preview += "..."

@@ -26,15 +26,14 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
+from hackagent.config import DEFAULT_LOCAL_LITELLM_MODEL
 from hackagent.logger import get_logger
 
 logger = get_logger(__name__)
 
 # Local Ollama planner default (no API key). Override with --planner-model.
-# Pull: ollama pull hf.co/huihui-ai/Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-GGUF
-DEFAULT_PLANNER_MODEL = (
-    "ollama_chat/hf.co/huihui-ai/Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-GGUF"
-)
+# Pull: ollama pull Librellama/gemma4:e2b-Uncensored
+DEFAULT_PLANNER_MODEL = DEFAULT_LOCAL_LITELLM_MODEL
 
 _litellm_module = None
 
@@ -70,6 +69,8 @@ def build_web_target(
     headless: bool = True,
     input_selector: Optional[str] = None,
     reply_selector: Optional[str] = None,
+    launcher_selector: Optional[str] = None,
+    dismiss_consent: bool = True,
     llm_fallback_model: Optional[str] = None,
     timeout: Optional[int] = None,
 ) -> Tuple[str, Dict[str, Any]]:
@@ -88,6 +89,10 @@ def build_web_target(
         config["input_selector"] = input_selector
     if reply_selector:
         config["reply_selector"] = reply_selector
+    if launcher_selector:
+        config["launcher_selector"] = launcher_selector
+    if not dismiss_consent:
+        config["dismiss_consent"] = False
     if llm_fallback_model:
         config["llm_fallback_model"] = llm_fallback_model
     if timeout is not None:

@@ -95,9 +95,9 @@ def _taxonomy_maps() -> Dict[str, Any]:
             category_to_subcategories[normalized_category_code].append(
                 normalized_subcategory_code
             )
-            subcategory_to_category[
-                normalized_subcategory_code
-            ] = normalized_category_code
+            subcategory_to_category[normalized_subcategory_code] = (
+                normalized_category_code
+            )
 
             intents = subcategory_payload.get("intents") or []
             if not isinstance(intents, list):

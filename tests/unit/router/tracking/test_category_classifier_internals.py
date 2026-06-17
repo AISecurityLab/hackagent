@@ -193,8 +193,7 @@ class TestParseClassification(unittest.TestCase):
     def test_misaligned_letters_are_realigned(self):
         # Category says A but subcategory is E1 → category realigned to E.
         out = _parse_classification(
-            "CATEGORY: A. Ethical and Social Risks\n"
-            "SUBCATEGORY: E1. Malware Generation"
+            "CATEGORY: A. Ethical and Social Risks\nSUBCATEGORY: E1. Malware Generation"
         )
         self.assertEqual(out["category"], "E. Cybersecurity Threats")
 

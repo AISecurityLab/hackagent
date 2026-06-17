@@ -64,6 +64,7 @@ if not logger.handlers:
     logger.addHandler(logging.NullHandler())
 logger.propagate = False
 
+
 class _BatchContextFilter(logging.Filter):
     """
     Logging filter that prepends ``[Batchindex/total]`` to every log record
@@ -277,6 +278,24 @@ class AttackOrchestrator:
         }
 
     @staticmethod
+    def _enable_remote_reasoning_if_needed(role_cfg: Dict[str, Any]) -> None:
+        """Force reasoning on when a role uses the HackAgent generator endpoint.
+
+        That endpoint is a reasoning model and rejects requests with reasoning
+        disabled. We send it both ways (``thinking`` → ``reasoning_effort`` on the
+        OpenAI path, plus an explicit ``extra_body.reasoning`` for proxies that
+        expect the OpenRouter shape). Keyed on the generator identifier — not the
+        role — so an explicit user-supplied attacker model is never touched.
+        ``setdefault`` keeps any explicit caller values.
+        """
+        if not isinstance(role_cfg, dict):
+            return
+        if role_cfg.get("identifier") != DEFAULT_REMOTE_ATTACKER_IDENTIFIER:
+            return
+        role_cfg.setdefault("thinking", "medium")
+        role_cfg.setdefault("extra_body", {"reasoning": {"effort": "medium"}})
+
+    @staticmethod
     def _local_role_defaults() -> Dict[str, Dict[str, Any]]:
         """Build local role defaults from the attack_roles profile."""
         return {
@@ -347,6 +366,13 @@ class AttackOrchestrator:
                     self._merge_missing_keys(role_cfg, role_defaults)
                 else:
                     resolved[role_name] = role_defaults
+                    role_cfg = resolved[role_name]
+
+                # Enable reasoning only for a role that actually lands on the
+                # HackAgent generator endpoint (a reasoning model that rejects
+                # requests with reasoning disabled). Tied to the identifier, not
+                # the role, so an explicit --attacker-model is never affected.
+                self._enable_remote_reasoning_if_needed(role_cfg)
 
                 # Judge-based attacks usually consume list-style judge configs.
                 if role_name == "judge":
@@ -563,9 +589,7 @@ class AttackOrchestrator:
             return False
         return True
 
-    def _autopull_missing_ollama_targets(
-        self, targets: List[Dict[str, Any]]
-    ) -> None:
+    def _autopull_missing_ollama_targets(self, targets: List[Dict[str, Any]]) -> None:
         """Best-effort: download any missing local Ollama models among *targets*.
 
         Runs before the availability probe so attacker/judge/etc. models served
@@ -575,7 +599,8 @@ class AttackOrchestrator:
         candidates = [
             str(t.get("identifier"))
             for t in targets
-            if str(t.get("agent_type") or "").upper() == "OLLAMA" and t.get("identifier")
+            if str(t.get("agent_type") or "").upper() == "OLLAMA"
+            and t.get("identifier")
         ]
         if not candidates or shutil.which("ollama") is None:
             return
@@ -1008,7 +1033,30 @@ class AttackOrchestrator:
         router: Any,
         registration_key: str,
     ) -> Optional[str]:
-        """Issue a tiny completion request and return error text when unavailable."""
+        """Issue a tiny completion request and return error text when unavailable.
+
+        Adapters that expose ``probe_ready()`` (e.g. the web provider) get a
+        non-generative reachability check instead — so we don't type a junk
+        "healthcheck" message into a live chatbot and pollute its conversation
+        and the recorded transcript.
+        """
+        try:
+            agent = router.get_agent_instance(registration_key)
+        except Exception:
+            agent = None
+        probe_ready = getattr(agent, "probe_ready", None)
+        if callable(probe_ready):
+            try:
+                result = probe_ready()
+            except Exception as exc:
+                return f"request failed ({type(exc).__name__}): {exc}"
+            # None = reachable, str = error. Anything else (e.g. a test mock)
+            # is inconclusive — treat as reachable, mirroring the non-dict
+            # tolerance below.
+            if result is None or isinstance(result, str):
+                return result
+            return None
+
         try:
             response = router.route_request(
                 registration_key=registration_key,

@@ -31,6 +31,7 @@ automatically on first use.
 """
 
 import atexit
+import re
 import threading
 from typing import Any, Dict, List, Optional
 
@@ -79,9 +80,72 @@ _MESSAGE_SELECTORS = (
     "[class*=message i]",
     "[class*=msg i]",
     "[class*=bubble i]",
+    "[class*=response i]",  # e.g. CSI's Camilla: chat-item-response-text-wrapper
     "[class*=chat i] [class*=text i]",
     "[role=listitem]",
 )
+
+# Collect message-bubble texts in ONE round-trip per frame, EXCLUDING bubbles
+# that are the user's own turn — so the echoed prompt (and any junk a reasoning
+# attacker types in) never contaminates the captured reply. A bubble is "user"
+# when an author marker on it or an ancestor says so; an assistant marker wins
+# (kept), and bubbles with no marker are kept (current behaviour).
+_MESSAGE_EXTRACT_JS = r"""
+(selectors) => {
+  const USER = /(?:^|[\s_-])(user|human|outgoing|self|me|sent|question|request)(?:[\s_-]|$)/i;
+  const BOT  = /(?:^|[\s_-])(bot|assistant|agent|incoming|received|answer|response|reply|operator)(?:[\s_-]|$)/i;
+  const isUser = (node) => {
+    let n = node;
+    for (let i = 0; i < 6 && n; i++, n = n.parentElement) {
+      let cls = '';
+      try { cls = typeof n.className === 'string' ? n.className
+                  : ((n.getAttribute && n.getAttribute('class')) || ''); } catch (e) {}
+      let attrs = '';
+      if (n.getAttribute) {
+        attrs = [n.getAttribute('data-message-author-role'),
+                 n.getAttribute('data-author'),
+                 n.getAttribute('data-role'),
+                 n.getAttribute('data-from'),
+                 n.getAttribute('role')].filter(Boolean).join(' ');
+      }
+      const blob = cls + ' ' + attrs;
+      if (BOT.test(blob)) return false;
+      if (USER.test(blob)) return true;
+    }
+    return false;
+  };
+  // Collect candidate elements (skip user-authored bubbles).
+  const cands = [];
+  const seen = new Set();
+  for (const sel of selectors) {
+    let els;
+    try { els = document.querySelectorAll(sel); } catch (e) { continue; }
+    for (const el of els) {
+      if (seen.has(el)) continue;
+      seen.add(el);
+      if (isUser(el)) continue;
+      cands.push(el);
+    }
+  }
+  // Keep only INNERMOST matches: drop any element that contains another
+  // candidate. This prevents a conversation *container* (which also matches a
+  // broad selector) from being captured as one giant blob of the whole chat —
+  // we want the individual message bubbles, not their wrapper.
+  const candSet = new Set(cands);
+  const leaves = cands.filter((el) => {
+    for (const other of candSet) {
+      if (other !== el && el.contains(other)) return false;
+    }
+    return true;
+  });
+  const out = [];
+  for (const el of leaves) {
+    const t = (el.innerText || '').trim();
+    if (t) out.push(t);
+  }
+  return out;
+}
+"""
 
 
 def _last_user_text(messages: List[Dict[str, Any]]) -> Optional[str]:
@@ -101,6 +165,30 @@ def _last_user_text(messages: List[Dict[str, Any]]) -> Optional[str]:
     return None
 
 
+def _norm_ws(text: str) -> str:
+    """Collapse all whitespace runs to single spaces and strip."""
+    return re.sub(r"\s+", " ", text or "").strip()
+
+
+def _looks_like_prompt_echo(candidate: str, prompt: str) -> bool:
+    """Whether ``candidate`` is the user's prompt echoed back by the widget.
+
+    Whitespace-insensitive (chat UIs reflow newlines), and tolerant of the
+    widget clipping a long prompt: matches exact, either-way containment, or a
+    substantial shared leading run (truncated echo, possibly with an ellipsis).
+    """
+    c = _norm_ws(candidate)
+    p = _norm_ws(prompt)
+    if not p:
+        return False
+    if c == p or p in c or c in p:
+        return True
+    # Truncated echo: require a long shared prefix so short genuine replies
+    # (e.g. a one-line refusal) are never mistaken for the echo.
+    k = min(len(c), len(p))
+    return k >= 60 and c[:k] == p[:k]
+
+
 def _new_reply(before: List[str], after: List[str], prompt: str) -> Optional[str]:
     """Pick the new assistant message from message-text snapshots.
 
@@ -113,7 +201,6 @@ def _new_reply(before: List[str], after: List[str], prompt: str) -> Optional[str
     for t in before:
         before_counts[t] = before_counts.get(t, 0) + 1
 
-    prompt_norm = (prompt or "").strip()
     new_texts: List[str] = []
     for t in after:
         if before_counts.get(t, 0) > 0:
@@ -122,8 +209,8 @@ def _new_reply(before: List[str], after: List[str], prompt: str) -> Optional[str
         stripped = t.strip()
         if not stripped:
             continue
-        # Drop the user's echoed prompt (exact or contained).
-        if prompt_norm and (stripped == prompt_norm or prompt_norm in stripped):
+        # Drop the user's echoed prompt (whitespace-insensitive, incl. truncated).
+        if _looks_like_prompt_echo(stripped, prompt):
             continue
         new_texts.append(stripped)
     return new_texts[-1] if new_texts else None
@@ -159,6 +246,8 @@ def _get_web_agent_custom_llm_class():
             settle_ms: int,
             input_selector: Optional[str],
             reply_selector: Optional[str],
+            launcher_selector: Optional[str],
+            dismiss_consent: bool,
             llm_fallback_model: Optional[str],
             install_browser: bool,
             log,
@@ -171,6 +260,8 @@ def _get_web_agent_custom_llm_class():
             self.install_browser = install_browser
             self.input_selector = input_selector
             self.reply_selector = reply_selector
+            self.launcher_selector = launcher_selector
+            self.dismiss_consent = dismiss_consent
             self.llm_fallback_model = llm_fallback_model
             self.logger = log
             self._lock = threading.Lock()
@@ -209,7 +300,9 @@ def _get_web_agent_custom_llm_class():
 
         def _start(self) -> None:
             from hackagent.router.discovery.browser import (
+                _dismiss_consent,
                 _find_input,
+                _open_chat_launcher,
                 ensure_chromium,
             )
 
@@ -225,31 +318,140 @@ def _get_web_agent_custom_llm_class():
                 self.url, wait_until="domcontentloaded", timeout=self.timeout * 1000
             )
             self._page.wait_for_timeout(self.settle_ms)
+            # Accept/dismiss a cookie-consent banner first — it commonly overlays
+            # the page and would intercept clicks on the chat launcher.
+            if self.dismiss_consent:
+                try:
+                    if _dismiss_consent(self._page):
+                        self.logger.info("🍪 dismissed a cookie-consent banner")
+                        self._page.wait_for_timeout(self.settle_ms)
+                except Exception:
+                    pass
             # The chat box on SPAs often hydrates a beat after load — poll for it
-            # for a few seconds rather than giving up on the first miss.
-            for _ in range(12):
+            # for a few seconds rather than giving up on the first miss. Many
+            # sites also keep the bot collapsed behind a launcher bubble (often
+            # in an iframe); if no input shows up, click the launcher to reveal
+            # the widget, then keep polling (frames update after the click).
+            launched = False
+            for attempt in range(20):
                 self._input, self._frame = _find_input(self._page, self.input_selector)
                 if self._input is not None:
                     break
+                # Try opening the widget early, then retry a couple more times
+                # in case the first click didn't take or it loaded in a frame.
+                if attempt in (1, 6, 11):
+                    if _open_chat_launcher(self._page, self.launcher_selector):
+                        launched = True
+                        self._page.wait_for_timeout(self.settle_ms)
+                        continue
                 self._page.wait_for_timeout(500)
             if self._input is None:
+                # Collect a diagnostic from the LIVE DOM before tearing down —
+                # JS-injected widgets are invisible to static fetches, so this
+                # is the only place the real selectors are observable.
+                diag = self._page_diagnostics()
                 # Runs on the session thread already — tear down inline (routing
                 # through the executor here would self-deadlock).
                 self._close_browser()
                 hint = (
-                    "pass --reply-selector and --input-selector with the box's CSS "
-                    "selector (inspect it in devtools), or run --headed to watch"
+                    "pass --input-selector / --reply-selector with the box's CSS "
+                    "selector, --open-selector to click the chat launcher first "
+                    "(inspect them in devtools), or run --headed to watch"
                 )
                 if self.input_selector:
                     hint = (
                         f"the --input-selector {self.input_selector!r} matched "
                         "nothing visible; check it in devtools, or run --headed"
                     )
-                raise WebAgentInteractionError(
-                    f"Loaded {self.url} but could not locate a chat input ({hint})."
-                )
+                elif launched:
+                    hint = (
+                        "clicked a chat launcher but still found no input — the "
+                        "widget may need --open-selector / --input-selector, or "
+                        "run --headed to watch"
+                    )
+                msg = f"Loaded {self.url} but could not locate a chat input ({hint})."
+                if diag:
+                    msg += f"\nOn-page candidates seen — {diag}"
+                raise WebAgentInteractionError(msg)
             self._started = True
             atexit.register(self.close)
+
+        def _page_diagnostics(self, limit: int = 12) -> str:
+            """Best-effort summary of chat-like elements + iframes on the live page.
+
+            JS-injected chat widgets aren't visible to static fetches, so when
+            input-location fails this surfaces what's actually on the rendered
+            page — concrete `id`/`class`/`aria-label`s and iframe URLs the user
+            can turn into `--open-selector` / `--input-selector`. Fully guarded:
+            never raises (it runs on an already-failing path).
+            """
+            keywords = (
+                "chat",
+                "bot",
+                "assist",
+                "help",
+                "widget",
+                "messag",
+                "launcher",
+                "support",
+                "agent",
+            )
+            found: List[str] = []
+            iframe_urls: List[str] = []
+            try:
+                frames = list(self._page.frames)
+            except Exception:
+                return ""
+            for frame in frames:
+                try:
+                    furl = frame.url
+                except Exception:
+                    furl = ""
+                if (
+                    furl
+                    and furl.startswith("http")
+                    and furl.rstrip("/") != self.url.rstrip("/")
+                ):
+                    if furl not in iframe_urls:
+                        iframe_urls.append(furl)
+                for sel in ("button", "[role=button]", "a", "textarea", "input"):
+                    if len(found) >= limit:
+                        break
+                    try:
+                        els = frame.query_selector_all(sel)
+                    except Exception:
+                        continue
+                    for el in els:
+                        if len(found) >= limit:
+                            break
+                        try:
+                            if not el.is_visible():
+                                continue
+                            eid = el.get_attribute("id") or ""
+                            cls = el.get_attribute("class") or ""
+                            aria = el.get_attribute("aria-label") or ""
+                            txt = (el.inner_text() or "").strip()
+                            blob = " ".join((eid, cls, aria, txt)).lower()
+                            if not any(k in blob for k in keywords):
+                                continue
+                            desc = sel.strip("[]").split("=")[0]
+                            if eid:
+                                desc += f"#{eid}"
+                            elif cls:
+                                desc += "." + ".".join(cls.split()[:2])
+                            label = (aria or txt)[:40]
+                            if label:
+                                desc += f"  [{label}]"
+                            if desc not in found:
+                                found.append(desc)
+                        except Exception:
+                            continue
+            parts: List[str] = []
+            if found:
+                parts.append("chat-like elements: " + " ; ".join(found))
+            if iframe_urls:
+                parts.append("iframes: " + ", ".join(iframe_urls[:5]))
+            return "  ".join(parts)
 
         def _close_browser(self) -> None:
             """Tear down Playwright objects. Must run on the session thread."""
@@ -285,14 +487,13 @@ def _get_web_agent_custom_llm_class():
         # ---- DOM helpers -------------------------------------------------
 
         def _message_texts(self) -> List[str]:
-            texts: List[str] = []
-            selectors = (
-                (self.reply_selector,) if self.reply_selector else _MESSAGE_SELECTORS
-            )
-            for frame in self._page.frames:
-                for selector in selectors:
+            # Explicit reply_selector → trust it verbatim (the user pinned the
+            # bot's bubble), no user/assistant heuristics.
+            if self.reply_selector:
+                texts: List[str] = []
+                for frame in self._page.frames:
                     try:
-                        elements = frame.query_selector_all(selector)
+                        elements = frame.query_selector_all(self.reply_selector)
                     except Exception:
                         continue
                     for el in elements:
@@ -302,6 +503,21 @@ def _get_web_agent_custom_llm_class():
                             continue
                         if t:
                             texts.append(t)
+                return texts
+
+            # Heuristic: one evaluate per frame, excluding user-authored bubbles.
+            texts = []
+            for frame in self._page.frames:
+                try:
+                    frame_texts = frame.evaluate(
+                        _MESSAGE_EXTRACT_JS, list(_MESSAGE_SELECTORS)
+                    )
+                except Exception:
+                    continue
+                if isinstance(frame_texts, list):
+                    for t in frame_texts:
+                        if isinstance(t, str) and t.strip():
+                            texts.append(t.strip())
             return texts
 
         def _wait_for_reply(self, before: List[str], prompt: str) -> Optional[str]:
@@ -356,6 +572,23 @@ def _get_web_agent_custom_llm_class():
                 return None
 
         # ---- send --------------------------------------------------------
+
+        def ready(self) -> None:
+            """Start the session (load page, dismiss consent, open the widget,
+            locate the input) WITHOUT sending a message.
+
+            Used for non-invasive reachability checks so preflight doesn't type a
+            junk message into a live person-facing chatbot (which would pollute
+            the real conversation and the captured transcript). Raises
+            WebAgentInteractionError if the chat input can't be located.
+            """
+            with self._lock:
+                self._run(self._start_if_needed)
+
+        def _start_if_needed(self) -> bool:
+            if not self._started:
+                self._start()
+            return True
 
         def send(self, prompt: str) -> str:
             # Serialize callers, then run the actual browser work on the single
@@ -460,6 +693,11 @@ class WebAgent(Agent):
           built-in input-location heuristics).
         - ``reply_selector``: CSS selector pinning the reply element (skips the
           DOM-diff heuristic).
+        - ``launcher_selector``: CSS selector for the chat-launcher bubble to
+          click open first, for widgets that start collapsed (skips the
+          built-in launcher heuristics).
+        - ``dismiss_consent`` (default True): accept/dismiss a cookie-consent
+          banner on load so it can't intercept clicks on the chat launcher.
         - ``llm_fallback_model``: LiteLLM model used to read the reply only when
           the heuristics find nothing.
     """
@@ -485,6 +723,8 @@ class WebAgent(Agent):
         self.settle_ms: int = int(config.get("settle_ms", 1500))
         self.input_selector: Optional[str] = config.get("input_selector")
         self.reply_selector: Optional[str] = config.get("reply_selector")
+        self.launcher_selector: Optional[str] = config.get("launcher_selector")
+        self.dismiss_consent: bool = bool(config.get("dismiss_consent", True))
         self.llm_fallback_model: Optional[str] = config.get("llm_fallback_model")
         self.install_browser: bool = bool(config.get("install_browser", True))
 
@@ -532,6 +772,8 @@ class WebAgent(Agent):
             settle_ms=self.settle_ms,
             input_selector=self.input_selector,
             reply_selector=self.reply_selector,
+            launcher_selector=self.launcher_selector,
+            dismiss_consent=self.dismiss_consent,
             llm_fallback_model=self.llm_fallback_model,
             install_browser=self.install_browser,
             log=self.logger,
@@ -552,6 +794,21 @@ class WebAgent(Agent):
         if provider not in litellm._custom_providers:
             litellm._custom_providers.append(provider)
         self._custom_handler = handler
+
+    def probe_ready(self) -> Optional[str]:
+        """Non-invasive reachability check for preflight.
+
+        Starts the browser session and confirms the chat input is locatable
+        WITHOUT sending a message — so the availability probe never types a
+        junk "healthcheck" into the live chatbot (which would contaminate the
+        real conversation and the recorded transcript). Returns None when the
+        widget is reachable, or an error string otherwise.
+        """
+        try:
+            self._custom_handler.session.ready()
+            return None
+        except Exception as exc:
+            return f"{type(exc).__name__}: {exc}"
 
     def handle_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
         """Send a single turn to the live page via ``litellm.completion``."""
