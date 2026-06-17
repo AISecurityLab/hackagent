@@ -25,19 +25,20 @@ Tests whether injected instructions override system prompts.
 ### Primary Attacks
 - **Baseline**: Template-based prompt injection
 - **PAIR**: Iterative refinement for bypass discovery
+- **RAG Attack**: Indirect Injection via poisoned retrieval context (`attack_type="rag"`)
 
 ### Secondary Attacks
 - **AdvPrefix**: Adversarial prefix optimisation
 
-## Indirect Prompt Injection
+## Indirect Injection
 
 When the target system uses retrieval, add an indirect prompt injection campaign to measure exposure to poisoned knowledge-base content.
 
-- Recommended technique: `indirect_prompt_injection`
+- Recommended technique: `rag`
 - Focus metric: `asr` with retrieval-hit diagnostics
 - Suggested tuning baseline: `chunk_size=1400`, `chunk_overlap=250`, `top_k=5`
 
-Reference technique guide: [Indirect Prompt Injection Attack](../../attacks/indirect_prompt_injection.md).
+Reference technique guide: [RAG Attack](../../attacks/rag.md).
 
 ## Metrics
 

@@ -1136,11 +1136,7 @@ function hackAgentCopyFallback(text) {
             self._render_autodan_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
         elif ha == "mml":
             self._render_mml_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
-        elif ha in (
-            "indirect_prompt_injection",
-            "indirectpromptinjection",
-            "indirect prompt injection",
-        ):
+        elif ha == "rag":
             indirect_traces = data if isinstance(data, list) else []
             self._render_indirect_injection_view(row, indirect_traces)
         else:
@@ -4169,11 +4165,7 @@ function hackAgentCopyFallback(text) {
                 elif atk == "mml":
                     detail_data = self._parse_mml_traces(serialized_traces)
                     self._render_mml_goal_card(row, detail_data, detail_mode=True)
-                elif atk in (
-                    "indirect_prompt_injection",
-                    "indirectpromptinjection",
-                    "indirect prompt injection",
-                ):
+                elif atk == "rag":
                     self._render_indirect_injection_view(row, serialized_traces)
                 else:
                     req_text, resp_text, _generic_guardrail = (
@@ -5772,11 +5764,11 @@ function hackAgentCopyFallback(text) {
                 return True
 
             attack_type = str(content.get("attack_type") or "").strip().lower()
-            if attack_type == "indirect_prompt_injection":
+            if attack_type == "rag":
                 return True
 
             evaluator = str(content.get("evaluator") or "").strip().lower()
-            if evaluator == "indirect_injection_judge":
+            if evaluator == "rag_judge":
                 return True
 
         return False
@@ -10190,11 +10182,7 @@ function hackAgentCopyFallback(text) {
                     elif _h_atk == "mml":
                         _t = generic_traces_map_hr.get(_rid, [])
                         _h_detail_data[_rid] = self._parse_mml_traces(_t)
-                    elif _h_atk in (
-                        "indirect_prompt_injection",
-                        "indirectpromptinjection",
-                        "indirect prompt injection",
-                    ):
+                    elif _h_atk == "rag":
                         _h_detail_data[_rid] = generic_traces_map_hr.get(_rid, [])
                     else:
                         _t = generic_traces_map_hr.get(_rid, [])

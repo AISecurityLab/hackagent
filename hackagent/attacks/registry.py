@@ -34,8 +34,8 @@ from hackagent.attacks.techniques.cipherchat import CipherChatAttack
 from hackagent.attacks.techniques.h4rm3l import H4rm3lAttack
 from hackagent.attacks.techniques.mml import MMLAttack
 from hackagent.attacks.techniques.pap import PAPAttack
-from hackagent.attacks.techniques.indirect_prompt_injection import (
-    IndirectPromptInjectionAttack,
+from hackagent.attacks.techniques.rag import (
+    RagAttack,
 )
 
 
@@ -89,9 +89,7 @@ H4rm3lOrchestrator = create_orchestrator("h4rm3l", H4rm3lAttack)
 CipherChatOrchestrator = create_orchestrator("cipherchat", CipherChatAttack)
 MMLOrchestrator = create_orchestrator("MML", MMLAttack)
 PAPOrchestrator = create_orchestrator("pap", PAPAttack)
-IndirectPromptInjectionOrchestrator = create_orchestrator(
-    "indirect_prompt_injection", IndirectPromptInjectionAttack
-)
+RagOrchestrator = create_orchestrator("rag", RagAttack)
 
 # Registry of all available attacks
 ATTACK_REGISTRY = {
@@ -106,7 +104,7 @@ ATTACK_REGISTRY = {
     "cipherchat": CipherChatOrchestrator,
     "MML": MMLOrchestrator,
     "pap": PAPOrchestrator,
-    "indirect_prompt_injection": IndirectPromptInjectionOrchestrator,
+    "rag": RagOrchestrator,
 }
 
 __all__ = [
@@ -121,5 +119,6 @@ __all__ = [
     "CipherChatOrchestrator",
     "MMLOrchestrator",
     "PAPOrchestrator",
+    "RagOrchestrator",
     "ATTACK_REGISTRY",
 ]

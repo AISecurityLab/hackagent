@@ -71,7 +71,13 @@ const sidebars: SidebarsConfig = {
             'attacks/baseline',
           ],
         },
-        'attacks/indirect_prompt_injection',
+        {
+          type: 'category',
+          label: 'Indirect Injection',
+          items: [
+            'attacks/rag',
+          ],
+        },
       ],
     },
     {

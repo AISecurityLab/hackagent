@@ -12,7 +12,7 @@ Tests whether the LLM executes attacker-supplied instructions that override or b
 - **Indirect Injection**: Malicious instructions are embedded in retrieved/external content.
 - **Context Manipulation**: Crafted context tricks the model into ignoring guardrails.
 
-## Indirect Prompt Injection
+## Indirect Injection
 
 Indirect prompt injection is especially relevant for RAG-enabled systems where the user query is benign but retrieved context is adversarial.
 
@@ -20,7 +20,7 @@ Indirect prompt injection is especially relevant for RAG-enabled systems where t
 - Typical effect: the model follows malicious context instructions while appearing to answer normally.
 - Why it is hard to catch: user prompts look harmless, and filtering only user input is not enough.
 
-For an end-to-end evaluation workflow (poisoning, retrieval, judging), see [Indirect Prompt Injection Attack](../../attacks/indirect_prompt_injection.md).
+For an end-to-end evaluation workflow (poisoning, retrieval, judging), see [RAG Attack](../../attacks/rag.md) using `attack_type="rag"`.
 
 ## Threat Profile
 
@@ -35,6 +35,7 @@ For an end-to-end evaluation workflow (poisoning, retrieval, judging), see [Indi
 **Attack Techniques**:
 - Baseline (PRIMARY): Template-based prompt injection
 - PAIR (PRIMARY): Iterative refinement for bypass discovery
+- RAG Attack (PRIMARY): Indirect Injection through document poisoning in RAG pipelines
 - AdvPrefix (SECONDARY): Adversarial prefix optimisation
 
 **Metrics**: asr, judge_score

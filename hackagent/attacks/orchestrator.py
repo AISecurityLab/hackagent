@@ -166,7 +166,7 @@ class AttackOrchestrator:
             ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
         ),
-        "indirect_prompt_injection": (
+        "rag": (
             ("attacker", ("attacker",), False, "attacker"),
             ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),

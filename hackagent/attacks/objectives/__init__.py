@@ -22,14 +22,14 @@ from .base import ObjectiveConfig
 from .jailbreak import JAILBREAK, REFUSAL_PATTERNS as JAILBREAK_REFUSAL_PATTERNS
 from .harmful_behavior import HARMFUL_BEHAVIOR
 from .policy_violation import POLICY_VIOLATION
-from .indirect_prompt_injection import INDIRECT_PROMPT_INJECTION
+from .rag import RAG
 
 # Registry for easy lookup
 OBJECTIVES = {
     "jailbreak": JAILBREAK,
     "harmful_behavior": HARMFUL_BEHAVIOR,
     "policy_violation": POLICY_VIOLATION,
-    "indirect_prompt_injection": INDIRECT_PROMPT_INJECTION,
+    "rag": RAG,
 }
 
 __all__ = [
