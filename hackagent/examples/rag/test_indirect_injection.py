@@ -75,21 +75,19 @@ def _format_classification(classification: str) -> str:
 
 
 def main():
-    # Create test document directory
-    test_docs_dir = Path(__file__).parent / "test_data" / "indirect_injection_docs"
+    # Source document directory
+    test_docs_dir = Path(__file__).parent / "test_data"
     test_docs_dir.mkdir(parents=True, exist_ok=True)
 
     # Verify source document exists
     lorem_doc = test_docs_dir / "gender_studies_overview.txt"
     if not lorem_doc.exists():
         print(f"ERROR: Source document not found: {lorem_doc}")
-        print(
-            "  Place your .txt document(s) in the test_data/indirect_injection_docs/ directory."
-        )
+        print("  Place your .txt document(s) in the test_data/ directory.")
         sys.exit(1)
 
-    # Output directory for this test run
-    output_dir = Path(__file__).parent / "test_output" / "indirect_injection_run"
+    # Output directory for this run
+    output_dir = Path(__file__).parent / "output"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Initialize HackAgent with the configured target (local Ollama by default).
