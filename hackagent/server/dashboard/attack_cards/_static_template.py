@@ -1,7 +1,7 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Baseline attack card rendering."""
+"""Static template attack card rendering."""
 
 from __future__ import annotations
 
@@ -12,12 +12,12 @@ from nicegui import ui
 from ._shared import AttackCardSharedMixin
 
 
-class BaselineCardMixin:
-    """Mixin providing Baseline attack card parse + render."""
+class StaticTemplateCardMixin:
+    """Mixin providing Static Template attack card parse + render."""
 
     @staticmethod
-    def _parse_baseline_traces(traces: list[dict], goal: str = "") -> list[dict]:
-        """Parse Baseline attack traces into per-template rows.
+    def _parse_static_template_traces(traces: list[dict], goal: str = "") -> list[dict]:
+        """Parse StaticTemplate attack traces into per-template rows.
 
         Each row dict:
           num           – 1-based row number
@@ -150,10 +150,10 @@ class BaselineCardMixin:
 
         return rows
 
-    def _render_baseline_goal_card(
+    def _render_static_template_goal_card(
         self, row: dict, template_rows: list[dict], detail_mode: bool = False
     ) -> None:
-        """Render a Baseline goal card grouped by template category."""
+        """Render a StaticTemplate goal card grouped by template category."""
         # Pre-compute judge verdicts for each template row
         _gm = row.get("_goal_multi_metrics") or {}
         _jmeta = _gm.get("judge_meta") or getattr(
@@ -204,7 +204,7 @@ class BaselineCardMixin:
 
         with self._goal_card_shell(row, detail_mode):
             if not template_rows:
-                ui.label("No Baseline template data recorded.").classes(
+                ui.label("No StaticTemplate template data recorded.").classes(
                     "text-sm text-grey-6"
                 )
                 return

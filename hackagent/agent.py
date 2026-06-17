@@ -204,6 +204,7 @@ class HackAgent:
             from hackagent.attacks.registry import (
                 AdvPrefixOrchestrator,
                 AutoDANTurboOrchestrator,
+                BaselineOrchestrator,
                 StaticTemplateOrchestrator,
                 BoNOrchestrator,
                 CipherChatOrchestrator,
@@ -221,6 +222,7 @@ class HackAgent:
             self._attack_strategies = {
                 "advprefix": AdvPrefixOrchestrator(hackagent_agent=self),
                 "autodan_turbo": AutoDANTurboOrchestrator(hackagent_agent=self),
+                "baseline": BaselineOrchestrator(hackagent_agent=self),
                 "static_template": StaticTemplateOrchestrator(hackagent_agent=self),
                 "bon": BoNOrchestrator(hackagent_agent=self),
                 "cipherchat": CipherChatOrchestrator(hackagent_agent=self),

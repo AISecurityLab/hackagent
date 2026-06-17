@@ -92,6 +92,10 @@ class TestAttackRegistry(unittest.TestCase):
         """Test that registry contains RAG attack."""
         self.assertIn("rag", ATTACK_REGISTRY)
 
+    def test_registry_contains_baseline(self):
+        """Test that registry contains Baseline attack."""
+        self.assertIn("Baseline", ATTACK_REGISTRY)
+
 
 class TestAdvPrefixOrchestrator(unittest.TestCase):
     """Test AdvPrefixOrchestrator configuration."""

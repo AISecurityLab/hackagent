@@ -38,6 +38,10 @@ ATTACK_CATALOG: Dict[str, Dict[str, str]] = {
         "label": "AdvPrefix",
         "description": "Adversarial prefix generation pipeline with judge-based evaluation.",
     },
+    "baseline": {
+        "label": "Baseline",
+        "description": "Direct goal submission without transformation (control condition).",
+    },
     "static_template": {
         "label": "Static Template",
         "description": "Template-based static template jailbreak attack.",

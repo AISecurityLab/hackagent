@@ -17,7 +17,4 @@ Architecture:
 
 from .attack import StaticTemplateAttack
 
-# Backward compatibility
-BaselineAttack = StaticTemplateAttack
-
-__all__ = ["StaticTemplateAttack", "BaselineAttack"]
+__all__ = ["StaticTemplateAttack"]

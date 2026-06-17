@@ -344,7 +344,7 @@ config = {
 
 ## Use Cases
 
-### 1. Quick Static Template Jailbreak Test
+### 1. Quick Baseline Jailbreak Test
 
 FlipAttack's deterministic nature makes it ideal for a fast initial vulnerability scan:
 

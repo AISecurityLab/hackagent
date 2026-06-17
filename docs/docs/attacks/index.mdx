@@ -42,13 +42,9 @@ graph LR
 | [**PAP**](./pap.md) | Persuasive adversarial paraphrasing with social-science techniques | ⭐⭐ Medium | Medium |
 | [**RAG Attack**](./rag.md) | RAG document poisoning for indirect instruction following (Indirect Injection) | ⭐⭐⭐ High | Medium |
 | [**MML**](./mml.md) | Multimodal image-encoded jailbreak for Vision-Language Models | ⭐⭐ Medium | Fast |
-<<<<<<< HEAD
 | [**FC**](./fc.md) | Auto-generated flowchart images to jailbreak VLMs | ⭐⭐ Medium | Fast |
 | [**tFC**](./fc.md) | Auto-generated flowchart text to jailbreak LLMs | ⭐⭐ Medium | Fast |
-| [**Baseline**](./baseline.md) | Template-based prompt injection | ⭐ Basic | Fast |
-=======
 | [**Static Template**](./static-template.md) | Template-based prompt injection | ⭐ Basic | Fast |
->>>>>>> b3a3fef (refactor: migrate baseline attack to static_template)
 
 :::tip Dataset Support
 All attacks support loading goals from AI safety benchmarks like **AgentHarm**, **StrongREJECT**, and **HarmBench**. See [Dataset Providers](../datasets/) for details.
@@ -312,13 +308,9 @@ attack_config = {
 
 **PAP** is the best fit for human-like social engineering prompts: it uses persuasion-taxonomy paraphrasing to produce natural prompts that can bypass alignment without relying on token-level gibberish.
 
-<<<<<<< HEAD
 **MML** is best when evaluating multimodal safety boundaries: it encodes attack prompts into generated images and tests whether Vision-Language Models follow hidden harmful instructions.
 
-**Baseline** is ideal for a rapid first-pass: template-based prompts sent directly to the target with no setup overhead, good for establishing a vulnerability baseline before running heavier attacks.
-=======
 **Static Template** is ideal for a rapid first-pass: template-based prompts sent directly to the target with no setup overhead, good for establishing a vulnerability baseline before running heavier attacks.
->>>>>>> b3a3fef (refactor: migrate baseline attack to static_template)
 
 **RAG Attack** is the only attack testing **indirect** vectors: it evaluates whether poisoned documents in a knowledge base can manipulate the agent's responses to innocent users. Use it when assessing RAG pipeline security.
 

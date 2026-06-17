@@ -22,6 +22,7 @@ from typing import Callable, Optional, Type
 from hackagent.attacks.orchestrator import AttackOrchestrator
 from hackagent.attacks.techniques.advprefix import AdvPrefixAttack
 from hackagent.attacks.techniques.base import BaseAttack
+from hackagent.attacks.techniques.baseline import BaselineAttack
 from hackagent.attacks.techniques.pair import PAIRAttack
 from hackagent.attacks.techniques.static_template import StaticTemplateAttack
 from hackagent.attacks.techniques.flipattack import FlipAttack
@@ -79,6 +80,7 @@ def create_orchestrator(
 
 
 # Create orchestrators using factory (1 line per attack)
+BaselineOrchestrator = create_orchestrator("Baseline", BaselineAttack)
 AdvPrefixOrchestrator = create_orchestrator("AdvPrefix", AdvPrefixAttack)
 StaticTemplateOrchestrator = create_orchestrator("StaticTemplate", StaticTemplateAttack)
 PAIROrchestrator = create_orchestrator("PAIR", PAIRAttack)
@@ -96,6 +98,7 @@ RagOrchestrator = create_orchestrator("rag", RagAttack)
 
 # Registry of all available attacks
 ATTACK_REGISTRY = {
+    "Baseline": BaselineOrchestrator,
     "AdvPrefix": AdvPrefixOrchestrator,
     "StaticTemplate": StaticTemplateOrchestrator,
     "PAIR": PAIROrchestrator,
@@ -113,6 +116,7 @@ ATTACK_REGISTRY = {
 }
 
 __all__ = [
+    "BaselineOrchestrator",
     "AdvPrefixOrchestrator",
     "StaticTemplateOrchestrator",
     "PAIROrchestrator",

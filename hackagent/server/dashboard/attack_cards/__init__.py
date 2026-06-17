@@ -8,7 +8,7 @@ Each mixin provides the parse + render methods for one attack type.
 """
 
 from ._shared import AttackCardSharedMixin  # noqa: F401
-from ._baseline import BaselineCardMixin  # noqa: F401
+from ._static_template import StaticTemplateCardMixin  # noqa: F401
 from ._bon import BonCardMixin  # noqa: F401
 from ._pair import PairCardMixin  # noqa: F401
 from ._autodan import AutodanCardMixin  # noqa: F401

@@ -140,6 +140,8 @@ class DashboardRunHistoryResultsMixin:
                     else agent
                 )
                 _h_attack_display: dict[str, str] = {
+                    "static_template": "StaticTemplate",
+                    "statictemplate": "StaticTemplate",
                     "baseline": "Baseline",
                     "pair": "PAIR",
                     "tap": "TAP",
@@ -582,9 +584,12 @@ class DashboardRunHistoryResultsMixin:
                         _hr_d["_is_multi_judge"] = True
                         _hr_d["_goal_multi_metrics"] = _hr_gm
 
-            # Pre-fetch traces for Baseline / BoN views
-            baseline_traces_map_hr: dict[str, list[dict]] = {}
-            if attack_type_str.lower() == "baseline" and new_rows:
+            # Pre-fetch traces for StaticTemplate / BoN views
+            static_template_traces_map_hr: dict[str, list[dict]] = {}
+            if (
+                attack_type_str.lower() in ("static_template", "statictemplate")
+                and new_rows
+            ):
                 _hr_ids = [str(r.get("id") or "") for r in new_rows if r.get("id")]
 
                 def _load_hr_traces() -> dict[str, list[dict]]:
@@ -597,8 +602,10 @@ class DashboardRunHistoryResultsMixin:
                             _res[_rid] = []
                     return _res
 
-                baseline_traces_map_hr = await asyncio.get_event_loop().run_in_executor(
-                    None, _load_hr_traces
+                static_template_traces_map_hr = (
+                    await asyncio.get_event_loop().run_in_executor(
+                        None, _load_hr_traces
+                    )
                 )
 
             bon_traces_map_hr: dict[str, list[dict]] = {}
@@ -620,7 +627,11 @@ class DashboardRunHistoryResultsMixin:
                 )
 
             generic_traces_map_hr: dict[str, list[dict]] = {}
-            if attack_type_str.lower() not in ("baseline", "bon") and new_rows:
+            if (
+                attack_type_str.lower()
+                not in ("static_template", "statictemplate", "bon")
+                and new_rows
+            ):
                 _gen_hr_ids = [str(r.get("id") or "") for r in new_rows if r.get("id")]
 
                 def _load_gen_hr_traces() -> dict[str, list[dict]]:
@@ -1423,9 +1434,9 @@ class DashboardRunHistoryResultsMixin:
                 _h_detail_data: dict[str, object] = {}
                 for _row in new_rows:
                     _rid = str(_row.get("id") or "")
-                    if _h_atk == "baseline":
-                        _t = baseline_traces_map_hr.get(_rid, [])
-                        _h_detail_data[_rid] = self._parse_baseline_traces(
+                    if _h_atk in ("static_template", "statictemplate"):
+                        _t = static_template_traces_map_hr.get(_rid, [])
+                        _h_detail_data[_rid] = self._parse_static_template_traces(
                             _t, str(_row.get("goal") or "")
                         )
                     elif _h_atk == "bon":
