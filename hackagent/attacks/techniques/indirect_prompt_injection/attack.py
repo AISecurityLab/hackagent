@@ -226,8 +226,12 @@ def get_embeddings(
     """Get embeddings using OpenAI-compatible API."""
     import openai
 
-    api_key = config.get("api_key") or os.environ.get("OPENAI_API_KEY", "")
-    raw_endpoint = str(config.get("endpoint", "https://api.openai.com/v1")).strip()
+    # Fall back to a placeholder so keyless local backends (e.g. Ollama) work:
+    # the OpenAI client requires a non-empty api_key, but local servers ignore it.
+    api_key = config.get("api_key") or os.environ.get("OPENAI_API_KEY") or "not-needed"
+    raw_endpoint = str(
+        config.get("endpoint", "http://localhost:11434/v1")
+    ).strip()
     endpoint = raw_endpoint.rstrip("/")
     if endpoint.lower().endswith("/embeddings"):
         # OpenAI client expects API base and appends '/embeddings' internally.

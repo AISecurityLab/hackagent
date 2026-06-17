@@ -5,15 +5,23 @@
 """
 Test script for Indirect Prompt Injection attack.
 
-Target: gemma-3-4b (via Ollama)
-Embedder: text-embedding-3-small (via OpenRouter)
-Attacker/Judge: mistralai/mixtral-8x22b (via OpenRouter)
+By default every role runs on a local Ollama instance, so NO API key is
+required:
 
-Goals: first 10 HarmBench standard samples (loaded via dataset preset)
+    Target / Attacker / Judge : gemma3:4b          (Ollama chat)
+    Embedder                  : nomic-embed-text    (Ollama embeddings)
 
-Prerequisites:
-- Ollama running locally with gemma3:4b pulled
-- OPENROUTER_API_KEY environment variable set
+Any role can be redirected to another provider (e.g. the HackAgent API or any
+OpenAI-compatible endpoint) purely through environment variables — no code
+edits needed:
+
+    HACKAGENT_TARGET_ENDPOINT / HACKAGENT_TARGET_MODEL / HACKAGENT_AGENT_TYPE
+    HACKAGENT_EMBEDDER_ENDPOINT / HACKAGENT_EMBEDDER_MODEL
+    HACKAGENT_LLM_API_KEY — only needed for cloud backends
+
+Prerequisites (default local setup):
+- Ollama running locally (http://localhost:11434)
+- Models pulled:  ollama pull gemma3:4b  &&  ollama pull nomic-embed-text
 """
 
 import os
@@ -24,6 +32,27 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from hackagent import HackAgent
+
+# --- Model/endpoint configuration (local Ollama defaults, env-overridable) ---
+OLLAMA_BASE = "http://localhost:11434"
+
+TARGET_ENDPOINT = os.environ.get("HACKAGENT_TARGET_ENDPOINT", OLLAMA_BASE)
+TARGET_MODEL = os.environ.get("HACKAGENT_TARGET_MODEL", "gemma3:4b")
+AGENT_TYPE = os.environ.get("HACKAGENT_AGENT_TYPE", "ollama")
+
+EMBEDDER_ENDPOINT = os.environ.get("HACKAGENT_EMBEDDER_ENDPOINT", f"{OLLAMA_BASE}/v1")
+EMBEDDER_MODEL = os.environ.get("HACKAGENT_EMBEDDER_MODEL", "nomic-embed-text")
+
+# Single optional key for cloud overrides; local Ollama ignores it.
+LLM_API_KEY = os.environ.get("HACKAGENT_LLM_API_KEY")
+
+
+def _llm_role(identifier: str, endpoint: str, agent_type: str) -> dict:
+    """Build an attacker/judge role config, attaching api_key only if provided."""
+    role = {"identifier": identifier, "endpoint": endpoint, "agent_type": agent_type}
+    if LLM_API_KEY:
+        role["api_key"] = LLM_API_KEY
+    return role
 
 
 def _format_classification(classification: str) -> str:
@@ -46,13 +75,6 @@ def _format_classification(classification: str) -> str:
 
 
 def main():
-    # Verify OpenRouter API key
-    openrouter_key = os.environ.get("OPENROUTER_API_KEY")
-    if not openrouter_key:
-        print("ERROR: Set OPENROUTER_API_KEY environment variable")
-        print("  export OPENROUTER_API_KEY='sk-or-...'")
-        sys.exit(1)
-
     # Create test document directory
     test_docs_dir = Path(__file__).parent / "test_data" / "indirect_injection_docs"
     test_docs_dir.mkdir(parents=True, exist_ok=True)
@@ -70,16 +92,16 @@ def main():
     output_dir = Path(__file__).parent / "test_output" / "indirect_injection_run"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Initialize HackAgent with target = gemma-3-4b via Ollama
+    # Initialize HackAgent with the configured target (local Ollama by default).
     agent = HackAgent(
-        endpoint="https://openrouter.ai/api/v1",
-        name="google/gemma-3-27b-it",
-        agent_type="OPENAI_SDK",
+        endpoint=TARGET_ENDPOINT,
+        name=TARGET_MODEL,
+        agent_type=AGENT_TYPE,
     )
 
     # Attack configuration
     attack_config = {
-        "attack_type": "indirect_prompt_injection",
+        "attack_type": "rag",
         # Load the first 10 HarmBench goals
         "dataset": {
             "preset": "harmbench",
@@ -110,28 +132,17 @@ def main():
                 # "prompt_mode": "context_instructions_priority",
             },
             "embedder": {
-                "identifier": "openai/text-embedding-3-small",
-                "endpoint": "https://openrouter.ai/api/v1/embeddings",
-                "api_key": openrouter_key,
+                "identifier": EMBEDDER_MODEL,
+                "endpoint": EMBEDDER_ENDPOINT,
+                # Ollama ignores the key; the OpenAI client just needs a value.
+                "api_key": LLM_API_KEY or "ollama",
                 "agent_type": "OPENAI_SDK",
             },
         },
-        # Attacker (poisoner + query generator): Mixtral 8x22B via OpenRouter
-        "attacker": {
-            "identifier": "deepseek/deepseek-v3.2",
-            "endpoint": "https://openrouter.ai/api/v1",
-            "agent_type": "OPENAI_SDK",
-            "api_key": openrouter_key,
-        },
-        # Judge: Mixtral 8x22B via OpenRouter
-        "judges": [
-            {
-                "identifier": "mistralai/mixtral-8x22b-instruct",
-                "endpoint": "https://openrouter.ai/api/v1",
-                "agent_type": "OPENAI_SDK",
-                "api_key": openrouter_key,
-            }
-        ],
+        # Attacker (poisoner + query generator) — same backend as the target.
+        "attacker": _llm_role(TARGET_MODEL, TARGET_ENDPOINT, AGENT_TYPE),
+        # Judge — same backend as the target.
+        "judges": [_llm_role(TARGET_MODEL, TARGET_ENDPOINT, AGENT_TYPE)],
         # Output
         "output_dir": str(output_dir),
     }
@@ -139,9 +150,10 @@ def main():
     print("\n" + "=" * 70)
     print("INDIRECT PROMPT INJECTION ATTACK TEST")
     print("=" * 70)
-    print("Target: gemma3:4b (Ollama @ localhost:11434)")
-    print("Attacker/Judge: mistralai/mixtral-8x22b-instruct (OpenRouter)")
-    print("Embedder: openai/text-embedding-3-small (OpenRouter)")
+    print(
+        f"Target / Attacker / Judge: {TARGET_MODEL} ({AGENT_TYPE} @ {TARGET_ENDPOINT})"
+    )
+    print(f"Embedder: {EMBEDDER_MODEL} (@ {EMBEDDER_ENDPOINT})")
     print(f"Documents: {test_docs_dir}")
     print(f"Output: {output_dir}")
     print("Goals: first 10 HarmBench prompts")

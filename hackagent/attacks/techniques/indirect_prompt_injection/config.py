@@ -38,8 +38,8 @@ DEFAULT_INDIRECT_PROMPT_INJECTION_CONFIG: Dict[str, Any] = {
             "prompt_mode": "standard",
         },
         "embedder": {
-            "identifier": "text-embedding-3-small",
-            "endpoint": "https://api.openai.com/v1",
+            "identifier": "nomic-embed-text",
+            "endpoint": "http://localhost:11434/v1",
             "api_key": None,
         },
     },
