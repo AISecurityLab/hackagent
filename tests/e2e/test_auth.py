@@ -4,7 +4,7 @@
 import os
 
 import pytest
-import requests
+import httpx
 
 
 @pytest.mark.e2e
@@ -22,5 +22,5 @@ def test_auth_endpoint():
         "accept": "application/json",
         "Authorization": f"Bearer {api_key}",
     }
-    response = requests.get(f"{base_url}/api/v1/auth", headers=headers)
+    response = httpx.get(f"{base_url}/api/v1/auth", headers=headers)
     assert response.status_code == 200

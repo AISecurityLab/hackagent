@@ -391,7 +391,7 @@ jobs:
 
       - name: Upload merged coverage to Codecov
         if: steps.combine_coverage.outputs.coverage_available == 'true'
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: reports/coverage-merged.xml
