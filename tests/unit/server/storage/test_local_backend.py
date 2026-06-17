@@ -551,7 +551,9 @@ class TestLocalBackendDeleteAndBuckets(unittest.TestCase):
 
     def test_delete_attack_cascades_runs_results_and_traces(self):
         org = self.backend.get_context().org_id
-        other_attack = self.backend.create_attack("baseline", self.agent.id, org, {})
+        other_attack = self.backend.create_attack(
+            "static_template", self.agent.id, org, {}
+        )
 
         run_a = self.backend.create_run(self.attack.id, self.agent.id, {})
         run_b = self.backend.create_run(other_attack.id, self.agent.id, {})

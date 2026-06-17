@@ -67,7 +67,7 @@ HackAgent uses a modular pipeline to test agent robustness end-to-end.
 
 | Component | Description |
 |-----------|-------------|
-| **Attack Engine** | Orchestrates attacks using AdvPrefix, AutoDAN-Turbo, PAIR, TAP, FlipAttack, BoN, h4rm3l, CipherChat, PAP, and Baseline |
+| **Attack Engine** | Orchestrates attacks using AdvPrefix, AutoDAN-Turbo, PAIR, TAP, FlipAttack, BoN, h4rm3l, CipherChat, PAP, and Static Template |
 | **Generator** | LLM role that creates adversarial prompts to test the target agent |
 | **Judge** | LLM role that evaluates whether attacks bypass safety measures |
 | **Target Agent** | Your AI agent under test across supported frameworks |

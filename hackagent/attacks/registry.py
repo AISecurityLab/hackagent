@@ -23,7 +23,7 @@ from hackagent.attacks.orchestrator import AttackOrchestrator
 from hackagent.attacks.techniques.advprefix import AdvPrefixAttack
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.techniques.pair import PAIRAttack
-from hackagent.attacks.techniques.baseline import BaselineAttack
+from hackagent.attacks.techniques.static_template import StaticTemplateAttack
 from hackagent.attacks.techniques.flipattack import FlipAttack
 from hackagent.attacks.techniques.tap import (
     TAPAttack,
@@ -80,7 +80,7 @@ def create_orchestrator(
 
 # Create orchestrators using factory (1 line per attack)
 AdvPrefixOrchestrator = create_orchestrator("AdvPrefix", AdvPrefixAttack)
-BaselineOrchestrator = create_orchestrator("Baseline", BaselineAttack)
+StaticTemplateOrchestrator = create_orchestrator("StaticTemplate", StaticTemplateAttack)
 PAIROrchestrator = create_orchestrator("PAIR", PAIRAttack)
 FlipAttackOrchestrator = create_orchestrator("FlipAttack", FlipAttack)
 TAPOrchestrator = create_orchestrator("TAP", TAPAttack)
@@ -97,7 +97,7 @@ RagOrchestrator = create_orchestrator("rag", RagAttack)
 # Registry of all available attacks
 ATTACK_REGISTRY = {
     "AdvPrefix": AdvPrefixOrchestrator,
-    "Baseline": BaselineOrchestrator,
+    "StaticTemplate": StaticTemplateOrchestrator,
     "PAIR": PAIROrchestrator,
     "FlipAttack": FlipAttackOrchestrator,
     "TAP": TAPOrchestrator,
@@ -114,7 +114,7 @@ ATTACK_REGISTRY = {
 
 __all__ = [
     "AdvPrefixOrchestrator",
-    "BaselineOrchestrator",
+    "StaticTemplateOrchestrator",
     "PAIROrchestrator",
     "FlipAttackOrchestrator",
     "TAPOrchestrator",

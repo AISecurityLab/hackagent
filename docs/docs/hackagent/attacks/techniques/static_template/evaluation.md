@@ -1,9 +1,9 @@
 ---
 sidebar_label: evaluation
-title: hackagent.attacks.techniques.baseline.evaluation
+title: hackagent.attacks.techniques.static_template.evaluation
 ---
 
-Evaluation module for baseline attacks.
+Evaluation module for static template attacks.
 
 Evaluates attack success using objectives and shared evaluators.
 
@@ -20,7 +20,7 @@ def evaluate_responses_with_llm_judges(
         logger: logging.Logger) -> List[Dict[str, Any]]
 ```
 
-Evaluate baseline responses with configured LLM judges.
+Evaluate static template responses with configured LLM judges.
 
 #### evaluate\_responses
 
@@ -61,13 +61,13 @@ Aggregate results by goal and template category.
 
   List of dicts with aggregated success metrics
 
-## BaselineEvaluation Objects
+## StaticTemplateEvaluation Objects
 
 ```python
-class BaselineEvaluation(BaseEvaluationStep)
+class StaticTemplateEvaluation(BaseEvaluationStep)
 ```
 
-Evaluation step for baseline attacks.
+Evaluation step for static template attacks.
 
 Extends ``BaseEvaluationStep`` to wrap the objective-based pattern/keyword
 evaluation logic into the shared evaluation framework.
@@ -81,7 +81,7 @@ def execute(
 ) -> Dict[str, List[Dict[str, Any]]]
 ```
 
-Execute the complete baseline evaluation pipeline.
+Execute the complete static template evaluation pipeline.
 
 **Arguments**:
 
@@ -121,6 +121,6 @@ Complete evaluation pipeline.
 
 **Notes**:
 
-  Syncing is performed by ``BaselineEvaluation.execute`` via
+  Syncing is performed by ``StaticTemplateEvaluation.execute`` via
   ``_sync_evaluation_to_server``.
 

@@ -8,7 +8,7 @@ from hackagent.risks.profile_helpers import (
     ds,
     PRIMARY,
     SECONDARY,
-    BASELINE_ONLY,
+    STATIC_TEMPLATE_ONLY,
 )
 from hackagent.risks.misinformation import Misinformation
 
@@ -26,7 +26,7 @@ MISINFORMATION_PROFILE = ThreatProfile(
             "SaladBench for broader misinformation coverage",
         ),
     ],
-    attacks=BASELINE_ONLY,
+    attacks=STATIC_TEMPLATE_ONLY,
     objective="harmful_behavior",
     metrics=["truthfulness_score", "accuracy_score"],
     description="Tests whether the LLM produces factual fabrications or misinformation.",

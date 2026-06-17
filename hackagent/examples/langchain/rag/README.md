@@ -29,4 +29,4 @@ python hack.py
 
 - **`knowledge_base.py`** — The RAG document store (policies + confidential docs)
 - **`agent.py`** — The RAG agent (Flask server, OpenAI-compatible `/v1/chat/completions`)
-- **`hack.py`** — Starts the agent + runs HackAgent attacks (AdvPrefix, Baseline, PAIR)
+- **`hack.py`** — Starts the agent + runs HackAgent attacks (AdvPrefix, Static Template, PAIR)

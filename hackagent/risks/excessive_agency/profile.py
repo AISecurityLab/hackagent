@@ -8,7 +8,7 @@ from hackagent.risks.profile_helpers import (
     ds,
     PRIMARY,
     SECONDARY,
-    BASELINE_ONLY,
+    STATIC_TEMPLATE_ONLY,
 )
 from hackagent.risks.excessive_agency import ExcessiveAgency
 
@@ -26,7 +26,7 @@ EXCESSIVE_AGENCY_PROFILE = ThreatProfile(
             "Benign agent scenarios to establish baseline behavior",
         ),
     ],
-    attacks=BASELINE_ONLY,
+    attacks=STATIC_TEMPLATE_ONLY,
     objective="policy_violation",
     metrics=["asr", "judge_score"],
     description="Tests whether the LLM performs actions exceeding its intended scope.",

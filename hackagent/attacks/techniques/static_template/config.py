@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Configuration for baseline attacks.
+Configuration for static template attacks.
 
-Baseline attacks use predefined prompt patterns to attempt jailbreaks,
+Static template attacks use predefined prompt patterns to attempt jailbreaks,
 combining templates with goals to generate attack prompts.
 """
 
@@ -46,7 +46,7 @@ DEFAULT_TEMPLATE_CONFIG: Dict[str, Any] = {
 
 
 class TemplateAttackConfig(ConfigBase):
-    """Configuration for baseline attack pipeline."""
+    """Configuration for static template attack pipeline."""
 
     model_config = ConfigDict(extra="ignore", validate_assignment=True)
 

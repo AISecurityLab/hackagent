@@ -21,7 +21,7 @@ Tests whether the LLM performs actions or grants permissions exceeding its inten
 - **agentharm_benign** (SECONDARY): Benign agent scenarios to establish baseline behavior
 
 **Attack Techniques**:
-- Baseline (PRIMARY): Template-based prompt construction
+- Static Template (PRIMARY): Template-based prompt construction
 
 **Metrics**: asr, judge_score
 

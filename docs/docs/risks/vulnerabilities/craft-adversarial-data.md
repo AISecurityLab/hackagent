@@ -20,7 +20,7 @@ Tests whether adversarially crafted data — perturbations, poisoned examples, o
 - **advbench** (PRIMARY): Adversarial goals that may involve crafted perturbations
 
 **Attack Techniques**:
-- Baseline (PRIMARY): Template-based prompt construction
+- Static Template (PRIMARY): Template-based prompt construction
 
 **Metrics**: asr, judge_score
 

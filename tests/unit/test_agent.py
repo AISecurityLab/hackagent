@@ -179,7 +179,7 @@ class TestHackAgentAttackStrategies(unittest.TestCase):
         strategies = agent.attack_strategies
 
         self.assertIn("advprefix", strategies)
-        self.assertIn("baseline", strategies)
+        self.assertIn("static_template", strategies)
         self.assertIn("pair", strategies)
 
     @patch("hackagent.agent.AgentRouter")

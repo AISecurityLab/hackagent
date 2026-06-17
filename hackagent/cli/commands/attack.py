@@ -38,9 +38,9 @@ ATTACK_CATALOG: Dict[str, Dict[str, str]] = {
         "label": "AdvPrefix",
         "description": "Adversarial prefix generation pipeline with judge-based evaluation.",
     },
-    "baseline": {
-        "label": "Baseline",
-        "description": "Template-based baseline jailbreak attack.",
+    "static_template": {
+        "label": "Static Template",
+        "description": "Template-based static template jailbreak attack.",
     },
     "pair": {
         "label": "PAIR",
@@ -541,7 +541,7 @@ api    """
 @_common_attack_options
 @click.pass_context
 @handle_errors
-def baseline(
+def static_template(
     ctx,
     agent_name,
     agent_type,
@@ -558,11 +558,11 @@ def baseline(
     after_guardrail_type,
     after_guardrail_endpoint,
 ):
-    """Execute Baseline attack strategy."""
+    """Execute Static Template attack strategy."""
     _run_attack_command(
         ctx=ctx,
-        attack_type="baseline",
-        attack_label=ATTACK_CATALOG["baseline"]["label"],
+        attack_type="static_template",
+        attack_label=ATTACK_CATALOG["static_template"]["label"],
         agent_name=agent_name,
         agent_type=agent_type,
         endpoint=endpoint,

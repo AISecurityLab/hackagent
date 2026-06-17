@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Baseline attack implementation.
+Static template attack implementation.
 
 Uses predefined prompt templates to attempt jailbreaks by combining
 templates with harmful goals.
@@ -21,9 +21,9 @@ from . import generation, evaluation
 from .config import DEFAULT_TEMPLATE_CONFIG
 
 
-class BaselineAttack(BaseAttack):
+class StaticTemplateAttack(BaseAttack):
     """
-    Baseline attack using predefined prompt templates.
+    Static template attack using predefined prompt templates.
 
     Combines a library of prompt templates across several jailbreak
     categories with each goal string to produce attack prompts, sends
@@ -32,23 +32,23 @@ class BaselineAttack(BaseAttack):
 
     Pipeline stages
     ---------------
-    1. **Generation** (:func:`~hackagent.attacks.techniques.baseline.generation.execute`) —
+    1. **Generation** (:func:`~hackagent.attacks.techniques.static_template.generation.execute`) —
        selects up to ``templates_per_category`` templates from each
        category in ``template_categories``, injects each goal, and
        collects target-model responses.
-    2. **Evaluation** (:func:`~hackagent.attacks.techniques.baseline.evaluation.execute`) —
+    2. **Evaluation** (:func:`~hackagent.attacks.techniques.static_template.evaluation.execute`) —
        scores responses for jailbreak success using the configured
        ``evaluator_type`` (``"pattern"``, ``"keyword"``, or ``"llm_judge"``).
 
-    This attack is useful as a **sanity-check baseline**: it requires no
+    This attack is useful as a **sanity-check**: it requires no
     additional LLM (unlike PAIR/TAP/AdvPrefix) and surfaces naive template
     weaknesses in the target model.
 
     Attributes:
-        config: Merged baseline configuration dictionary.
+        config: Merged static template configuration dictionary.
         client: Authenticated HackAgent API client.
         agent_router: Router for the victim model.
-        logger: Hierarchical logger at ``hackagent.attacks.baseline``.
+        logger: Hierarchical logger at ``hackagent.attacks.static_template``.
     """
 
     def __init__(
@@ -58,11 +58,11 @@ class BaselineAttack(BaseAttack):
         agent_router: Optional[AgentRouter] = None,
     ):
         """
-        Initialize baseline attack.
+        Initialize static template attack.
 
         Args:
             config: Configuration override dictionary merged into
-                :data:`~hackagent.attacks.techniques.baseline.config.DEFAULT_TEMPLATE_CONFIG`.
+                :data:`~hackagent.attacks.techniques.static_template.config.DEFAULT_TEMPLATE_CONFIG`.
             client: Authenticated HackAgent API client.
             agent_router: Router for the victim model.
 
@@ -80,14 +80,14 @@ class BaselineAttack(BaseAttack):
             current_config.update(config)
 
         # Set logger name for hierarchical logging
-        self.logger = logging.getLogger("hackagent.attacks.baseline")
+        self.logger = logging.getLogger("hackagent.attacks.static_template")
 
         # Call parent - handles all setup
         super().__init__(current_config, client, agent_router)
 
     def _validate_config(self):
         """
-        Validate baseline-specific configuration.
+        Validate static-template-specific configuration.
 
         Checks presence of all required top-level keys and verifies that
         the configured ``objective`` exists in the
@@ -127,7 +127,7 @@ class BaselineAttack(BaseAttack):
         *,
         goal_labels_by_index: Optional[Dict[int, Dict[str, str]]] = None,
     ) -> List[Dict[str, Any]]:
-        """Return only the model roles needed by the effective baseline evaluator."""
+        """Return only the model roles needed by the effective static template evaluator."""
         _ = goal_labels_by_index
 
         evaluator_type = str(attack_config.get("evaluator_type", "llm_judge")).lower()
@@ -146,16 +146,16 @@ class BaselineAttack(BaseAttack):
 
     def _get_pipeline_steps(self) -> List[Dict]:
         """
-        Define the two baseline pipeline stage descriptors.
+        Define the two static template pipeline stage descriptors.
 
         Stage 1 — **Generation**
-            (:func:`~hackagent.attacks.techniques.baseline.generation.execute`):
+            (:func:`~hackagent.attacks.techniques.static_template.generation.execute`):
             Selects templates, injects goals, and collects target responses.
             Configurable via ``template_categories``, ``templates_per_category``,
             ``max_tokens``, ``temperature``, and ``n_samples_per_template``.
 
         Stage 2 — **Evaluation**
-            (:func:`~hackagent.attacks.techniques.baseline.evaluation.execute`):
+            (:func:`~hackagent.attacks.techniques.static_template.evaluation.execute`):
             Scores responses for jailbreak success using the configured
             ``evaluator_type``.  Short responses (``< min_response_length``
             tokens) are skipped.
@@ -166,7 +166,7 @@ class BaselineAttack(BaseAttack):
         """
         return [
             {
-                "name": "Generation: Generate and Execute Baseline Prompts",
+                "name": "Generation: Generate and Execute Static Template Prompts",
                 "function": generation.execute,
                 "step_type_enum": "GENERATION",
                 "config_keys": [
@@ -219,7 +219,7 @@ class BaselineAttack(BaseAttack):
         step_config: Dict,
         input_data: Any,
     ) -> Dict:
-        """Inject shared goal tracker into baseline stage functions."""
+        """Inject shared goal tracker into static template stage functions."""
         args = super()._build_step_args(step_info, step_config, input_data)
         if self.coordinator and self.coordinator.goal_tracker:
             args["goal_tracker"] = self.coordinator.goal_tracker
@@ -229,7 +229,7 @@ class BaselineAttack(BaseAttack):
     @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
     def run(self, goals: List[str]) -> Dict[str, Any]:
         """
-        Execute baseline attack.
+        Execute static template attack.
 
         Uses TrackingCoordinator for unified pipeline and goal tracking.
 
@@ -244,7 +244,7 @@ class BaselineAttack(BaseAttack):
 
         # Initialize unified coordinator
         coordinator = self._initialize_coordinator(
-            attack_type="baseline",
+            attack_type="static_template",
             goals=goals,
             initial_metadata={"objective": self.config.get("objective")},
         )
@@ -256,7 +256,7 @@ class BaselineAttack(BaseAttack):
             # Execute pipeline using base class
             results = self._execute_pipeline(self._get_pipeline_steps(), goals)
 
-            # Custom success check for baseline (checks dict structure)
+            # Custom success check for static_template (checks dict structure)
             def success_check(output):
                 return output and isinstance(output, dict)
 
@@ -268,5 +268,7 @@ class BaselineAttack(BaseAttack):
         except Exception as e:
             self.logger.error(f"Pipeline failed: {e}", exc_info=True)
             # Crash-safe: finalize all tracking on error
-            coordinator.finalize_on_error("Baseline pipeline failed with exception")
+            coordinator.finalize_on_error(
+                "Static template pipeline failed with exception"
+            )
             raise

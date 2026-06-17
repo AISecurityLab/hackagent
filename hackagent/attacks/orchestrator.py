@@ -124,7 +124,7 @@ class AttackOrchestrator:
             ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
         ),
-        "baseline": (
+        "static_template": (
             ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
         ),

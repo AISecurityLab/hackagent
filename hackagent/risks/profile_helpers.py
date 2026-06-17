@@ -52,17 +52,17 @@ def atk(
 # Standard attack combos
 
 JAILBREAK_ATTACKS: List[AttackRecommendation] = [
-    atk("Baseline", PRIMARY, "Template-based prompt injection"),
+    atk("StaticTemplate", PRIMARY, "Template-based prompt injection"),
     atk("PAIR", PRIMARY, "Iterative refinement for bypass discovery"),
     atk("AdvPrefix", SECONDARY, "Adversarial prefix optimisation"),
 ]
 
-BASELINE_ONLY: List[AttackRecommendation] = [
-    atk("Baseline", PRIMARY, "Template-based prompt construction"),
+STATIC_TEMPLATE_ONLY: List[AttackRecommendation] = [
+    atk("StaticTemplate", PRIMARY, "Template-based prompt construction"),
 ]
 
 ALL_ATTACKS: List[AttackRecommendation] = [
-    atk("Baseline", PRIMARY, "Template-based attack"),
+    atk("StaticTemplate", PRIMARY, "Template-based attack"),
     atk("PAIR", PRIMARY, "Iterative refinement"),
     atk("AdvPrefix", PRIMARY, "Adversarial prefix optimisation"),
 ]

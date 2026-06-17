@@ -348,4 +348,4 @@ for target in targets:
 - [Attack Overview](./index.mdx) — Compare all attack types
 - [PAIR Attacks](./pair.md) — Linear iterative refinement
 - [AdvPrefix Attacks](./advprefix.md) — Prefix optimisation approach
-- [Baseline Attacks](./baseline.md) — Quick template-based testing
+- [Static Template Attacks](./static-template.md) — Quick template-based testing

@@ -21,7 +21,7 @@ Tests whether the LLM produces factual fabrications, invented sources, or misrep
 - **saladbench** (SECONDARY): SaladBench for broader misinformation coverage
 
 **Attack Techniques**:
-- Baseline (PRIMARY): Template-based prompt construction
+- Static Template (PRIMARY): Template-based prompt construction
 
 **Metrics**: truthfulness_score, accuracy_score
 

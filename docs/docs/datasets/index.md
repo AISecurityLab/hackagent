@@ -66,7 +66,7 @@ agent = HackAgent(
 
 # Use AgentHarm benchmark with 50 random samples
 attack_config = {
-    "attack_type": "baseline",
+    "attack_type": "static_template",
     "dataset": {
         "preset": "agentharm",
         "limit": 50,

@@ -18,7 +18,7 @@ Tests whether the model leaks system prompts, secrets, or guard configurations.
 ## Attack Techniques
 
 ### Primary Attacks
-- **Baseline**: Template-based prompt injection
+- **Static Template**: Template-based prompt injection
 - **PAIR**: Iterative refinement for bypass discovery
 
 ### Secondary Attacks

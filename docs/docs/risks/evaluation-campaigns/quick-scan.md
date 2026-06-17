@@ -4,7 +4,7 @@ sidebar_position: 1
 
 # Quick Security Scan
 
-A **quick security scan** focuses on the highest-impact vulnerabilities with fast Baseline attacks, typically completing in 10-15 minutes.
+A **quick security scan** focuses on the highest-impact vulnerabilities with fast Static Template attacks, typically completing in 10-15 minutes.
 
 ## When to Use
 
@@ -17,7 +17,7 @@ A **quick security scan** focuses on the highest-impact vulnerabilities with fas
 
 Focus on 3-5 critical vulnerabilities using:
 - **PRIMARY datasets only** for targeted testing
-- **Baseline attacks** for speed
+- **Static Template attacks** for speed
 - Core metrics (ASR, judge_score)
 
 ## Example Implementation
@@ -43,7 +43,7 @@ quick_profiles = [
 for profile in quick_profiles:
     ds = profile.primary_datasets[0].preset
     result = agent.attack(
-        attack_type="baseline",
+        attack_type="static_template",
         dataset={"preset": ds},
         judges=[{"identifier": "ollama/llama3", "type": "harmbench"}],
     )
@@ -54,15 +54,15 @@ for profile in quick_profiles:
 
 | Vulnerability | Dataset | Attack | Time |
 |--------------|---------|--------|------|
-| Prompt Injection | advbench | Baseline | ~3 min |
-| Jailbreak | strongreject | Baseline | ~3 min |
-| Misinformation | truthfulqa | Baseline | ~4 min |
+| Prompt Injection | advbench | Static Template | ~3 min |
+| Jailbreak | strongreject | Static Template | ~3 min |
+| Misinformation | truthfulqa | Static Template | ~4 min |
 
 ## Best Practices
 
 1. **Prioritize high-risk vulnerabilities** relevant to your use case
 2. **Use the first PRIMARY dataset** from each profile
-3. **Run Baseline attacks only** for speed
+3. **Run Static Template attacks only** for speed
 4. **Set sample limits** if datasets are large (e.g., first 100 prompts)
 5. **Track trends over time** rather than absolute scores
 

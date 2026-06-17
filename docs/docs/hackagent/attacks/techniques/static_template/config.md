@@ -1,11 +1,11 @@
 ---
 sidebar_label: config
-title: hackagent.attacks.techniques.baseline.config
+title: hackagent.attacks.techniques.static_template.config
 ---
 
-Configuration for baseline attacks.
+Configuration for static template attacks.
 
-Baseline attacks use predefined prompt patterns to attempt jailbreaks,
+Static Template attacks use predefined prompt patterns to attempt jailbreaks,
 combining templates with goals to generate attack prompts.
 
 ## TemplateAttackConfig Objects
@@ -14,7 +14,7 @@ combining templates with goals to generate attack prompts.
 class TemplateAttackConfig(ConfigBase)
 ```
 
-Configuration for baseline attack pipeline.
+Configuration for static template attack pipeline.
 
 #### from\_dict
 

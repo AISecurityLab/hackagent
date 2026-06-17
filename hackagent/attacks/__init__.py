@@ -14,7 +14,7 @@ Architecture:
     - objectives/: Define WHAT vulnerability we test (metadata/config)
     - techniques/: Define HOW we generate attacks (implementation)
         - advprefix/: Prefix optimization technique
-        - baseline/: Baseline prompt injection
+        - static_template/: Static template prompt injection
         - pair/: LLM-driven iterative refinement
     - shared/: Cross-cutting infrastructure (progress, response utils,
       router factory, TUI) — legacy evaluator/generator shims re-export
@@ -24,7 +24,7 @@ Architecture:
 
 Available attacks:
 - AdvPrefixOrchestrator: Adversarial prefix generation orchestrator
-- BaselineOrchestrator: Baseline prompt injection orchestrator
+- StaticTemplateOrchestrator: Static template prompt injection orchestrator
 - PAIROrchestrator: Prompt Automatic Iterative Refinement orchestrator
 
 The module integrates with the HackAgent backend for result tracking and reporting.
@@ -34,7 +34,7 @@ from .registry import (
     ATTACK_REGISTRY,
     AdvPrefixOrchestrator,
     AutoDANTurboOrchestrator,
-    BaselineOrchestrator,
+    StaticTemplateOrchestrator,
     CipherChatOrchestrator,
     PAIROrchestrator,
     FlipAttackOrchestrator,
@@ -45,7 +45,7 @@ __all__ = [
     "ATTACK_REGISTRY",
     "AdvPrefixOrchestrator",
     "AutoDANTurboOrchestrator",
-    "BaselineOrchestrator",
+    "StaticTemplateOrchestrator",
     "CipherChatOrchestrator",
     "PAIROrchestrator",
     "FlipAttackOrchestrator",

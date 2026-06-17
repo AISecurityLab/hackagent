@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Template generation module for baseline attacks.
+Template generation module for static template attacks.
 
 Generates attack prompts by combining predefined templates with goals.
 
@@ -27,7 +27,7 @@ from hackagent.router.router import AgentRouter
 from hackagent.router.tracking import Tracker
 
 
-logger = logging.getLogger("hackagent.attacks.baseline.generation")
+logger = logging.getLogger("hackagent.attacks.static_template.generation")
 
 
 def _safe_goal_index(value: Any, fallback: int = -1) -> int:
@@ -63,7 +63,7 @@ def generate_prompts(
     Returns:
         List of dicts with keys: goal, template_category, template, attack_prompt
     """
-    logger.info(f"Generating baseline prompts for {len(goals)} goals...")
+    logger.info(f"Generating static template prompts for {len(goals)} goals...")
 
     # Get template configuration
     categories = config.get("template_categories", [])
@@ -170,12 +170,12 @@ def execute_prompts(
     if goal_tracker:
         logger.info("📊 Using Tracker for per-goal result tracking")
     elif run_id and client:
-        logger.info(f"📊 Creating Tracker for baseline (run_id={run_id})")
+        logger.info(f"📊 Creating Tracker for static_template (run_id={run_id})")
         goal_tracker = Tracker(
             backend=client,
             run_id=run_id,
             logger=logger,
-            attack_type="baseline",
+            attack_type="static_template",
             category_classifier_config=config.get("category_classifier"),
             event_bus=config.get("_tui_event_bus"),
         )
@@ -293,7 +293,9 @@ def execute_prompts(
         with _lock:
             results_map[idx] = row_completions
 
-    with create_progress_bar("[cyan]Executing baseline prompts...", total_requests) as (
+    with create_progress_bar(
+        "[cyan]Executing static template prompts...", total_requests
+    ) as (
         progress_bar,
         task,
     ):

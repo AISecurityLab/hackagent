@@ -10,7 +10,7 @@ Pre-configured dataset presets provide instant access to **30+ popular AI safety
 
 ```python
 attack_config = {
-    "attack_type": "baseline",
+    "attack_type": "static_template",
     "dataset": {
         "preset": "agentharm",  # Preset name
         "limit": 50,            # Optional: max goals
@@ -136,7 +136,7 @@ attack_config = {
 ```python
 # Large-scale safety evaluation
 attack_config = {
-    "attack_type": "baseline",
+    "attack_type": "static_template",
     "dataset": {"preset": "beavertails", "limit": 1000, "shuffle": True},
 }
 ```
@@ -199,7 +199,7 @@ attack_config = {
 ```python
 # Test for over-refusal
 attack_config = {
-    "attack_type": "baseline",
+    "attack_type": "static_template",
     "dataset": {"preset": "xstest"},
 }
 ```
@@ -257,7 +257,7 @@ for domain in ["wmdp_bio", "wmdp_cyber", "wmdp_chem"]:
 ```python
 # Test hazardous scientific knowledge
 attack_config = {
-    "attack_type": "baseline",
+    "attack_type": "static_template",
     "dataset": {"preset": "sosbench", "limit": 100},
 }
 ```
@@ -302,7 +302,7 @@ attack_config = {
 ```python
 # Test against real-world toxic prompts
 attack_config = {
-    "attack_type": "baseline",
+    "attack_type": "static_template",
     "dataset": {"preset": "toxicchat", "limit": 200},
 }
 ```
@@ -340,7 +340,7 @@ attack_config = {
 ```python
 # Evaluate discrimination in decision-making
 attack_config = {
-    "attack_type": "baseline",
+    "attack_type": "static_template",
     "dataset": {"preset": "discrim_eval", "limit": 1000},
 }
 ```
@@ -363,7 +363,7 @@ attack_config = {
 ```python
 # Test prompt injection defenses
 attack_config = {
-    "attack_type": "baseline",
+    "attack_type": "static_template",
     "dataset": {"preset": "prompt_injections"},
 }
 ```

@@ -14,11 +14,11 @@ you can use `intents` with categories/subcategories. See
 ### Basic CLI Example
 
 ```bash
-hackagent eval baseline \
+hackagent eval static-template \
   --agent-name "target_agent" \
   --agent-type "google-adk" \
   --endpoint "http://localhost:8000" \
-  --config-file "configs/baseline-agentharm.json" \
+  --config-file "configs/static-template-agentharm.json" \
   --no-tui
 ```
 
@@ -34,7 +34,7 @@ agent = HackAgent(
 )
 
 attack_config = {
-    "attack_type": "baseline",
+    "attack_type": "static_template",
     "dataset": {
         "preset": "agentharm",
         "limit": 50,
@@ -78,7 +78,7 @@ These are the core options supported across dataset sources.
 
 ```python
 attack_config = {
-    "attack_type": "baseline",
+    "attack_type": "static_template",
     "dataset": {
         "preset": "strongreject",
         "limit": 100,

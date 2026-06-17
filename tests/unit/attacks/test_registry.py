@@ -9,12 +9,12 @@ from hackagent.attacks.orchestrator import AttackOrchestrator
 from hackagent.attacks.registry import (
     ATTACK_REGISTRY,
     AdvPrefixOrchestrator,
-    BaselineOrchestrator,
+    StaticTemplateOrchestrator,
     PAIROrchestrator,
     create_orchestrator,
 )
 from hackagent.attacks.techniques.advprefix.attack import AdvPrefixAttack
-from hackagent.attacks.techniques.baseline.attack import BaselineAttack
+from hackagent.attacks.techniques.static_template.attack import StaticTemplateAttack
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.techniques.pair.attack import PAIRAttack
 
@@ -40,9 +40,9 @@ class TestAttackRegistry(unittest.TestCase):
         """Test that registry contains AdvPrefix attack."""
         self.assertIn("AdvPrefix", ATTACK_REGISTRY)
 
-    def test_registry_contains_baseline(self):
-        """Test that registry contains Baseline attack."""
-        self.assertIn("Baseline", ATTACK_REGISTRY)
+    def test_registry_contains_static_template(self):
+        """Test that registry contains StaticTemplate attack."""
+        self.assertIn("StaticTemplate", ATTACK_REGISTRY)
 
     def test_registry_contains_pair(self):
         """Test that registry contains PAIR attack."""
@@ -109,20 +109,22 @@ class TestAdvPrefixOrchestrator(unittest.TestCase):
         self.assertEqual(AdvPrefixOrchestrator.attack_impl_class, AdvPrefixAttack)
 
 
-class TestBaselineOrchestrator(unittest.TestCase):
-    """Test BaselineOrchestrator configuration."""
+class TestStaticTemplateOrchestrator(unittest.TestCase):
+    """Test StaticTemplateOrchestrator configuration."""
 
     def test_orchestrator_is_subclass(self):
-        """Test that BaselineOrchestrator is a subclass of AttackOrchestrator."""
-        self.assertTrue(issubclass(BaselineOrchestrator, AttackOrchestrator))
+        """Test that StaticTemplateOrchestrator is a subclass of AttackOrchestrator."""
+        self.assertTrue(issubclass(StaticTemplateOrchestrator, AttackOrchestrator))
 
-    def test_attack_type_is_baseline(self):
-        """Test that attack_type is set to 'Baseline'."""
-        self.assertEqual(BaselineOrchestrator.attack_type, "Baseline")
+    def test_attack_type_is_static_template(self):
+        """Test that attack_type is set to 'StaticTemplate'."""
+        self.assertEqual(StaticTemplateOrchestrator.attack_type, "StaticTemplate")
 
     def test_attack_impl_class_is_correct(self):
-        """Test that attack_impl_class is BaselineAttack."""
-        self.assertEqual(BaselineOrchestrator.attack_impl_class, BaselineAttack)
+        """Test that attack_impl_class is StaticTemplateAttack."""
+        self.assertEqual(
+            StaticTemplateOrchestrator.attack_impl_class, StaticTemplateAttack
+        )
 
 
 class TestPAIROrchestrator(unittest.TestCase):

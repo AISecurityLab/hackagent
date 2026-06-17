@@ -74,10 +74,10 @@
                 },
                 {
                   "items": [
-                    "reference/hackagent/attacks/techniques/baseline/attack",
-                    "reference/hackagent/attacks/techniques/baseline/config",
-                    "reference/hackagent/attacks/techniques/baseline/evaluation",
-                    "reference/hackagent/attacks/techniques/baseline/generation"
+                    "reference/hackagent/attacks/techniques/static_template/attack",
+                    "reference/hackagent/attacks/techniques/static_template/config",
+                    "reference/hackagent/attacks/techniques/static_template/evaluation",
+                    "reference/hackagent/attacks/techniques/static_template/generation"
                   ],
                   "label": "hackagent.attacks.techniques.baseline",
                   "type": "category"

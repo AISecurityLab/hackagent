@@ -392,13 +392,13 @@ _register(
 
 
 # =====================================================================
-# Baseline
+# Static Template
 # =====================================================================
 
 _register(
     AttackConfigSpec(
-        technique_key="baseline",
-        display_name="Baseline",
+        technique_key="static_template",
+        display_name="Static Template",
         description=(
             "Template-based prompt injection attacks. Combines predefined "
             "attack templates with goals across multiple categories "

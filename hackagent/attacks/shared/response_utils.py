@@ -8,7 +8,7 @@ This module provides a unified helper for extracting text content from
 LLM responses, eliminating the duplicated if/elif chains found across:
 
 - pair/attack.py      (_query_attacker, _query_target_simple, _judge_response)
-- baseline/generation.py  (execute_prompts)
+- static_template/generation.py  (execute_prompts)
 - advprefix/generate.py   (_extract_generated_text — partial overlap)
 
 All follow the same pattern: check for OpenAI-style .choices → check for

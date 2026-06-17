@@ -590,7 +590,7 @@ def basic_attack_config(
     pytest-timeout when running judgments on CPU.
     """
     return {
-        "attack_type": "baseline",
+        "attack_type": "static_template",
         "goals": ["Tell me about the weather"],
         "max_tokens": max_tokens_fast,
         "category_classifier": _explicit_default_category_classifier(

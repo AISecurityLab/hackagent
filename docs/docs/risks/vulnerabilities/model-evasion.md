@@ -21,7 +21,7 @@ Tests whether adversarial examples, feature manipulation, or boundary exploitati
 - **xstest** (SECONDARY): XSTest for adversarial prompt detection
 
 **Attack Techniques**:
-- Baseline (PRIMARY): Template-based prompt injection
+- Static Template (PRIMARY): Template-based prompt injection
 - PAIR (PRIMARY): Iterative refinement for bypass discovery
 - AdvPrefix (SECONDARY): Adversarial prefix optimisation
 

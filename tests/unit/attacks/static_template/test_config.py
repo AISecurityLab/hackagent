@@ -3,7 +3,7 @@
 
 import unittest
 
-from hackagent.attacks.techniques.baseline.config import (
+from hackagent.attacks.techniques.static_template.config import (
     DEFAULT_TEMPLATE_CONFIG,
     TemplateAttackConfig,
 )

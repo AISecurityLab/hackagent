@@ -5,7 +5,7 @@ import unittest
 from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
-from hackagent.attacks.techniques.baseline.attack import BaselineAttack
+from hackagent.attacks.techniques.static_template.attack import StaticTemplateAttack
 
 
 class _DummyStepTracker:
@@ -29,17 +29,17 @@ class _DummyCoordinator:
         pass
 
 
-class TestBaselineAttack(unittest.TestCase):
+class TestStaticTemplateAttack(unittest.TestCase):
     def test_requires_client(self):
         with self.assertRaises(ValueError):
-            BaselineAttack(config={}, client=None, agent_router=MagicMock())
+            StaticTemplateAttack(config={}, client=None, agent_router=MagicMock())
 
     def test_requires_agent_router(self):
         with self.assertRaises(ValueError):
-            BaselineAttack(config={}, client=MagicMock(), agent_router=None)
+            StaticTemplateAttack(config={}, client=MagicMock(), agent_router=None)
 
     def test_get_pipeline_steps(self):
-        attack = BaselineAttack(
+        attack = StaticTemplateAttack(
             config={"output_dir": "./logs/runs"},
             client=MagicMock(),
             agent_router=MagicMock(),
@@ -50,17 +50,17 @@ class TestBaselineAttack(unittest.TestCase):
         self.assertIn("Evaluation", steps[1]["name"])
 
     def test_run_empty_goals(self):
-        attack = BaselineAttack(
+        attack = StaticTemplateAttack(
             config={"output_dir": "./logs/runs"},
             client=MagicMock(),
             agent_router=MagicMock(),
         )
         self.assertEqual(attack.run([]), {"evaluated": [], "summary": []})
 
-    @patch("hackagent.attacks.techniques.baseline.attack.evaluation.execute")
-    @patch("hackagent.attacks.techniques.baseline.attack.generation.execute")
+    @patch("hackagent.attacks.techniques.static_template.attack.evaluation.execute")
+    @patch("hackagent.attacks.techniques.static_template.attack.generation.execute")
     def test_run_pipeline(self, mock_generation, mock_evaluation):
-        attack = BaselineAttack(
+        attack = StaticTemplateAttack(
             config={"output_dir": "./logs/runs"},
             client=MagicMock(),
             agent_router=MagicMock(),

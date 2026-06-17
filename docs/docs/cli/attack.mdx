@@ -33,7 +33,7 @@ hackagent eval \
 | Attack | CLI Command |
 |--------|-------------|
 | AdvPrefix | `hackagent eval advprefix` |
-| Baseline | `hackagent eval baseline` |
+| Static Template | `hackagent eval static-template` |
 | PAIR | `hackagent eval pair` |
 | FlipAttack | `hackagent eval flipattack` |
 | TAP | `hackagent eval tap` |
@@ -146,12 +146,12 @@ Most of these keys have internal defaults, so they are runtime-required but usua
 
   </TabItem>
 
-  <TabItem value="baseline" label="Baseline">
+  <TabItem value="static_template" label="StaticTemplate">
 
 ### CLI Command
 
 ```bash
-hackagent eval baseline \
+hackagent eval static-template \
   --agent-name "my-agent" \
   --agent-type "google-adk" \
   --endpoint "http://localhost:8000" \

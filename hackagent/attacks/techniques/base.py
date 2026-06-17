@@ -13,7 +13,7 @@ Architecture:
 
 Attack techniques are organized in:
     techniques/advprefix/attack.py    - AdvPrefixAttack
-    techniques/baseline/attack.py - BaselineAttack
+    techniques/static_template/attack.py - StaticTemplateAttack
     techniques/pair/attack.py         - PAIRAttack
 
 Each technique:

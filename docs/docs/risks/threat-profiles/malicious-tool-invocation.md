@@ -18,7 +18,7 @@ Tests for untrusted plugin execution, data exfiltration, and privilege escalatio
 ## Attack Techniques
 
 ### Primary Attacks
-- **Baseline**: Template-based prompt construction
+- **Static Template**: Template-based prompt construction
 
 ## Metrics
 

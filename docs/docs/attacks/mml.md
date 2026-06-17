@@ -411,5 +411,5 @@ Key fields:
 - [Attack Overview](./index.mdx) — Compare all attack types
 - [FlipAttack](./flipattack.md) — Character-level text obfuscation
 - [CipherChat](./cipherchat.md) — Cipher-based encoding attacks
-- [Baseline Attacks](./baseline.md) — Quick template-based testing
+- [Static Template Attacks](./static-template.md) — Quick template-based testing
 - [PAIR Attacks](./pair.md) — Iterative refinement with attacker LLM

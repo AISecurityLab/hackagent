@@ -273,7 +273,7 @@ class TestGoogleADKHackAgentIntegration:
         )
 
     @pytest.mark.timeout(600)
-    def test_hackagent_google_adk_baseline_attack(
+    def test_hackagent_google_adk_static_template_attack(
         self,
         skip_if_google_adk_unavailable,
         skip_if_no_hackagent_key,
@@ -281,7 +281,7 @@ class TestGoogleADKHackAgentIntegration:
         google_adk_agent_url: str,
         basic_attack_config: Dict[str, Any],
     ):
-        """Test running a baseline attack against Google ADK agent."""
+        """Test running a static template attack against Google ADK agent."""
         from hackagent import AgentTypeEnum
 
         agent = hackagent_client_factory(
@@ -290,7 +290,7 @@ class TestGoogleADKHackAgentIntegration:
             agent_type=AgentTypeEnum.GOOGLE_ADK,
         )
 
-        logger.info("Starting baseline attack against Google ADK agent...")
+        logger.info("Starting static template attack against Google ADK agent...")
         results = agent.hack(attack_config=basic_attack_config)
 
         assert results is not None

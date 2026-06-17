@@ -62,7 +62,7 @@ class TestEvaluationStatusUpdates(unittest.TestCase):
         """
         FIXED: evaluation.py now correctly uses bool return from evaluator.
         """
-        from hackagent.attacks.techniques.baseline import evaluation
+        from hackagent.attacks.techniques.static_template import evaluation
         import inspect
 
         # Get the source code of evaluate_responses
@@ -133,7 +133,7 @@ class TestEvaluationStatusUpdates(unittest.TestCase):
         The execute_prompts function now uses Tracker with goal_contexts
         to track results. Each goal gets a Context object with a result_id.
         """
-        from hackagent.attacks.techniques.baseline import generation
+        from hackagent.attacks.techniques.static_template import generation
         import inspect
 
         # Check the execute_prompts function source
@@ -148,13 +148,13 @@ class TestEvaluationStatusUpdates(unittest.TestCase):
 class TestEvaluationEndToEnd(unittest.TestCase):
     """End-to-end tests for the evaluation pipeline."""
 
-    def test_baseline_attack_evaluation_now_updates_results(self):
+    def test_static_template_attack_evaluation_now_updates_results(self):
         """
         FIXED: Baseline attack now updates results after evaluation.
 
         The evaluation step now calls result_partial_update to sync status to server.
         """
-        from hackagent.attacks.techniques.baseline import evaluation
+        from hackagent.attacks.techniques.static_template import evaluation
         import inspect
 
         # Check that evaluation.py now calls result_partial_update
@@ -174,7 +174,7 @@ class TestEvaluationEndToEnd(unittest.TestCase):
 
     def test_sync_evaluation_function_exists(self):
         """Test that _sync_evaluation_to_server function exists and is called."""
-        from hackagent.attacks.techniques.baseline.evaluation import (
+        from hackagent.attacks.techniques.static_template.evaluation import (
             _sync_evaluation_to_server,
             execute,
         )
@@ -189,7 +189,7 @@ class TestEvaluationEndToEnd(unittest.TestCase):
 
     def test_update_result_status_function(self):
         """Test that _update_result_status function works correctly."""
-        from hackagent.attacks.techniques.baseline.evaluation import (
+        from hackagent.attacks.techniques.static_template.evaluation import (
             _update_result_status,
         )
 
@@ -220,8 +220,8 @@ class _DummyRouter:
         return {"generated_text": "dummy completion"}
 
 
-class TestBaselineTrackerConsistency(unittest.TestCase):
-    """Regression tests for baseline tracker wiring and goal finalization."""
+class TestStaticTemplateTrackerConsistency(unittest.TestCase):
+    """Regression tests for static template tracker wiring and goal finalization."""
 
     def _build_backend(self):
         backend = MagicMock()
@@ -234,7 +234,9 @@ class TestBaselineTrackerConsistency(unittest.TestCase):
         return backend
 
     def test_execute_prompts_reuses_existing_goal_context(self):
-        from hackagent.attacks.techniques.baseline.generation import execute_prompts
+        from hackagent.attacks.techniques.static_template.generation import (
+            execute_prompts,
+        )
 
         backend = self._build_backend()
         tracker = Tracker(
@@ -270,7 +272,7 @@ class TestBaselineTrackerConsistency(unittest.TestCase):
         )
 
     def test_finalize_goals_marks_missing_prompts_as_failed(self):
-        from hackagent.attacks.techniques.baseline.evaluation import (
+        from hackagent.attacks.techniques.static_template.evaluation import (
             _finalize_goals_with_tracker,
         )
 
@@ -312,7 +314,9 @@ class TestBaselineTrackerConsistency(unittest.TestCase):
         )
 
     def test_generate_prompts_respects_goal_index_offset(self):
-        from hackagent.attacks.techniques.baseline.generation import generate_prompts
+        from hackagent.attacks.techniques.static_template.generation import (
+            generate_prompts,
+        )
 
         config = {
             "template_categories": ["role_play"],

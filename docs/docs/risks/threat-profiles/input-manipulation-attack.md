@@ -18,7 +18,7 @@ Tests for SQL injection, command injection, and shell escape sequences.
 ## Attack Techniques
 
 ### Primary Attacks
-- **Baseline**: Template-based prompt injection
+- **Static Template**: Template-based prompt injection
 - **PAIR**: Iterative refinement for bypass discovery
 
 ### Secondary Attacks

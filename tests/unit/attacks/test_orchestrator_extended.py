@@ -11,7 +11,7 @@ from uuid import uuid4
 from hackagent.attacks.orchestrator import AttackOrchestrator
 from hackagent.attacks.techniques.autodan_turbo.attack import AutoDANTurboAttack
 from hackagent.attacks.techniques.base import BaseAttack
-from hackagent.attacks.techniques.baseline.attack import BaselineAttack
+from hackagent.attacks.techniques.static_template.attack import StaticTemplateAttack
 from hackagent.attacks.techniques.h4rm3l.attack import H4rm3lAttack
 from hackagent.attacks.techniques.tap.attack import TAPAttack
 from hackagent.attacks.techniques.config import (
@@ -199,14 +199,14 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
 class TestModeBasedRoleDefaults(unittest.TestCase):
     """Test remote/local role defaults injected before attack execution."""
 
-    def test_remote_mode_injects_baseline_judge_defaults(self):
+    def test_remote_mode_injects_static_template_judge_defaults(self):
         """Baseline judge defaults should switch to remote profile in remote mode."""
         orch, hack_agent, _ = _make_orchestrator()
-        orch.attack_type = "baseline"
+        orch.attack_type = "static_template"
         hack_agent.backend.get_api_key.return_value = "hk_test_remote_key"
 
         resolved = orch._apply_mode_based_role_defaults(
-            {"attack_type": "baseline", "goals": ["test"]}
+            {"attack_type": "static_template", "goals": ["test"]}
         )
 
         self.assertEqual(resolved["judge"]["identifier"], "hackagent-judge")
@@ -220,12 +220,12 @@ class TestModeBasedRoleDefaults(unittest.TestCase):
     def test_remote_mode_preserves_explicit_judge_overrides(self):
         """Explicit judge fields must not be overwritten by remote defaults."""
         orch, hack_agent, _ = _make_orchestrator()
-        orch.attack_type = "baseline"
+        orch.attack_type = "static_template"
         hack_agent.backend.get_api_key.return_value = "hk_test_remote_key"
 
         resolved = orch._apply_mode_based_role_defaults(
             {
-                "attack_type": "baseline",
+                "attack_type": "static_template",
                 "goals": ["test"],
                 "judges": [
                     {
@@ -268,13 +268,13 @@ class TestModeBasedRoleDefaults(unittest.TestCase):
         self.assertEqual(resolved["scorer"]["identifier"], "hackagent-judge")
         self.assertEqual(resolved["scorer"]["api_key"], "hk_test_remote_key")
 
-    def test_local_mode_injects_baseline_judge_defaults(self):
-        """Without backend API key, baseline judge defaults should use local profile."""
+    def test_local_mode_injects_static_template_judge_defaults(self):
+        """Without backend API key, static template judge defaults should use local profile."""
         orch, hack_agent, _ = _make_orchestrator()
-        orch.attack_type = "baseline"
+        orch.attack_type = "static_template"
         hack_agent.backend.get_api_key.return_value = None
 
-        attack_config = {"attack_type": "baseline", "goals": ["test"]}
+        attack_config = {"attack_type": "static_template", "goals": ["test"]}
         resolved = orch._apply_mode_based_role_defaults(attack_config)
 
         self.assertEqual(resolved["judge"]["identifier"], "gemma3:4b")
@@ -496,12 +496,12 @@ class TestRequiredModelAvailabilityPreflight(unittest.TestCase):
     def test_collect_targets_keeps_classifier_when_intents_are_not_used(self):
         """Category classifier remains preflighted unless explicit goal labels are provided."""
         orch, _, _ = _make_orchestrator()
-        orch.attack_type = "baseline"
-        orch.attack_impl_class = BaselineAttack
+        orch.attack_type = "static_template"
+        orch.attack_impl_class = StaticTemplateAttack
         orch.hackagent_agent.router = None
 
         attack_config = {
-            "attack_type": "baseline",
+            "attack_type": "static_template",
             "evaluator_type": "pattern",
             "category_classifier": {
                 "identifier": "cc-model",
@@ -522,12 +522,12 @@ class TestRequiredModelAvailabilityPreflight(unittest.TestCase):
     def test_collect_targets_uses_default_classifier_when_not_specified(self):
         """When classifier is omitted and intents are not used, default classifier is preflighted."""
         orch, _, _ = _make_orchestrator()
-        orch.attack_type = "baseline"
-        orch.attack_impl_class = BaselineAttack
+        orch.attack_type = "static_template"
+        orch.attack_impl_class = StaticTemplateAttack
         orch.hackagent_agent.router = None
 
         attack_config = {
-            "attack_type": "baseline",
+            "attack_type": "static_template",
             "evaluator_type": "pattern",
         }
 
@@ -770,7 +770,7 @@ class TestRequiredModelAvailabilityPreflight(unittest.TestCase):
         """Run must not start when preflight detects an unavailable model."""
         orch, _, _ = _make_orchestrator()
 
-        attack_config = {"goals": ["test"], "attack_type": "baseline"}
+        attack_config = {"goals": ["test"], "attack_type": "static_template"}
 
         with patch.object(
             AttackOrchestrator,

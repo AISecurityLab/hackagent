@@ -334,4 +334,4 @@ for target in targets:
 
 - [Attack Overview](./index.mdx) — Compare all attack types
 - [AdvPrefix Attacks](./advprefix) — Alternative sophisticated attack
-- [Baseline Attacks](./baseline) — Quick template-based testing
+- [Static Template Attacks](./static-template) — Quick template-based testing

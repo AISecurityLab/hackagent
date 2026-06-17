@@ -19,7 +19,7 @@ Tests for training data extraction, architecture disclosure, and config leakage.
 ## Attack Techniques
 
 ### Primary Attacks
-- **Baseline**: Template-based prompt injection
+- **Static Template**: Template-based prompt injection
 - **PAIR**: Iterative refinement for bypass discovery
 
 ### Secondary Attacks

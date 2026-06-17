@@ -21,7 +21,7 @@ Tests whether the LLM performs actions exceeding its intended scope.
 ## Attack Techniques
 
 ### Primary Attacks
-- **Baseline**: Template-based prompt construction
+- **Static Template**: Template-based prompt construction
 
 ## Metrics
 

@@ -33,7 +33,7 @@ For an end-to-end evaluation workflow (poisoning, retrieval, judging), see [RAG 
 - **strongreject** (SECONDARY): Forbidden prompts to test injection guardrails
 
 **Attack Techniques**:
-- Baseline (PRIMARY): Template-based prompt injection
+- Static Template (PRIMARY): Template-based prompt injection
 - PAIR (PRIMARY): Iterative refinement for bypass discovery
 - RAG Attack (PRIMARY): Indirect Injection through document poisoning in RAG pipelines
 - AdvPrefix (SECONDARY): Adversarial prefix optimisation
