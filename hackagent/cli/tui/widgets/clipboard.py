@@ -44,6 +44,8 @@ def copy_to_clipboard(app: Any, text: str) -> bool:
             app.copy_to_clipboard(text)
             copied = True
     except Exception:
+        # OSC-52 may be unsupported by the terminal; ignore and let the
+        # deterministic OS-tool / pyperclip / temp-file fallbacks below run.
         pass
 
     # 2) OS clipboard tools.
@@ -77,6 +79,8 @@ def copy_to_clipboard(app: Any, text: str) -> bool:
                 ):
                     continue
     except Exception:
+        # OS clipboard tools may be missing or fail; ignore and fall through to
+        # the pyperclip and temp-file fallbacks below.
         pass
 
     # 3) pyperclip.
@@ -87,6 +91,8 @@ def copy_to_clipboard(app: Any, text: str) -> bool:
             pyperclip.copy(text)
             copied = True
         except Exception:
+            # pyperclip absent or no backend available; the temp-file fallback
+            # below still preserves the content.
             pass
 
     if copied:

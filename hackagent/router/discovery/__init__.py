@@ -23,6 +23,18 @@ from hackagent.router.discovery.scanner import (
     plan_attack,
 )
 
+# Browser helpers are imported directly: the ``browser`` module keeps its
+# Playwright imports inside the functions that need them, so importing it here
+# never pulls Playwright at package-import time. Importing the names explicitly
+# (rather than resolving them via ``__getattr__``) keeps every entry in
+# ``__all__`` defined in module scope for static analysis.
+from hackagent.router.discovery.browser import (
+    BrowserScanError,
+    chromium_installed,
+    ensure_chromium,
+    install_chromium,
+)
+
 __all__ = [
     # Planner
     "plan_attack",
@@ -33,26 +45,9 @@ __all__ = [
     "AutoPlanResult",
     "PlannerError",
     "DEFAULT_PLANNER_MODEL",
-    # Browser helpers (lazily exposed — keep Playwright optional)
+    # Browser helpers
     "BrowserScanError",
     "ensure_chromium",
     "chromium_installed",
     "install_chromium",
 ]
-
-_BROWSER_EXPORTS = (
-    "BrowserScanError",
-    "ensure_chromium",
-    "chromium_installed",
-    "install_chromium",
-)
-
-
-def __getattr__(name):
-    # Lazily expose the browser helpers so importing the discovery package never
-    # pulls in Playwright (an optional dependency) until the web provider runs.
-    if name in _BROWSER_EXPORTS:
-        from hackagent.router.discovery import browser
-
-        return getattr(browser, name)
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

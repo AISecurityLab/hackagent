@@ -80,7 +80,7 @@ _MESSAGE_SELECTORS = (
     "[class*=message i]",
     "[class*=msg i]",
     "[class*=bubble i]",
-    "[class*=response i]",  # e.g. CSI's Camilla: chat-item-response-text-wrapper
+    "[class*=response i]",  # e.g. chat-item-response-text-wrapper
     "[class*=chat i] [class*=text i]",
     "[role=listitem]",
 )

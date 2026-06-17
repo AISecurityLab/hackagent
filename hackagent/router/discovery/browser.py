@@ -68,8 +68,8 @@ _LAUNCHER_SELECTORS = (
     "[id*=chat i][role=button]",
     "[class*=chat-bubble i]",
     "[class*=chatbot i][role=button]",
-    # "open the widget" style buttons (e.g. CSI's Camilla:
-    # class="camilla-widget-open-button" role="button")
+    # "open the widget" style buttons (e.g.
+    # class="chat-widget-open-button" role="button")
     "[class*=widget-open i]",
     "[class*=open-button i]",
     "[class*=widget i][role=button]",
@@ -123,6 +123,8 @@ def _click_element(handle, *, timeout: int = 2000) -> bool:
     try:
         handle.scroll_into_view_if_needed(timeout=1000)
     except Exception:
+        # Best-effort scroll: if it fails the click attempts below still run
+        # (the element may already be in view, or the DOM-click fallback works).
         pass
     try:
         handle.click(timeout=timeout)

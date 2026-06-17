@@ -33,34 +33,34 @@ class TestPromptTranslation(unittest.TestCase):
 
         def complete(p):
             if p.startswith("Identify"):
-                return "Italian.\n"
+                return "French.\n"
             translate_calls.append(p)
-            return "Sei un assistente di red teaming."
+            return "Vous êtes un assistant de red teaming."
 
         text = "You are a red teaming assistant."
-        out1 = localize_text(text, "mi spiegami come curarmi", complete)
-        self.assertEqual(out1, "Sei un assistente di red teaming.")
+        out1 = localize_text(text, "comment puis-je me soigner", complete)
+        self.assertEqual(out1, "Vous êtes un assistant de red teaming.")
 
         # Same text + same language (different goal) → translate cache hit.
-        out2 = localize_text(text, "un'altra frase italiana", complete)
+        out2 = localize_text(text, "une autre phrase française", complete)
         self.assertEqual(out2, out1)
         self.assertEqual(len(translate_calls), 1)  # translated only once
 
     def test_translation_failure_falls_back_to_original(self):
         def complete(p):
             if p.startswith("Identify"):
-                return "Italian"
+                return "French"
             raise RuntimeError("model down")
 
         text = "original english prompt"
-        self.assertEqual(localize_text(text, "ciao mondo", complete), text)
+        self.assertEqual(localize_text(text, "salut le monde", complete), text)
 
     def test_empty_translation_falls_back_to_original(self):
         def complete(p):
-            return "Italian" if p.startswith("Identify") else "   "
+            return "French" if p.startswith("Identify") else "   "
 
         text = "original"
-        self.assertEqual(localize_text(text, "ciao", complete), text)
+        self.assertEqual(localize_text(text, "salut", complete), text)
 
     def test_detect_language_caches_per_goal(self):
         calls = []
@@ -79,7 +79,7 @@ class TestPromptTranslation(unittest.TestCase):
             detect_language("hola", lambda p: "The language is Spanish."), "Spanish"
         )
         clear_cache()
-        self.assertEqual(detect_language("ciao", lambda p: "Italian."), "Italian")
+        self.assertEqual(detect_language("hallo welt", lambda p: "German."), "German")
 
 
 if __name__ == "__main__":

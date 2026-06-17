@@ -274,8 +274,9 @@ def _get_claude_code_custom_llm_class():
             model_response.choices[0].message.content = result["final_text"]  # type: ignore[attr-defined]
             try:
                 model_response.choices[0].finish_reason = "stop"  # type: ignore[attr-defined]
-            except Exception:
-                pass
+            except Exception as exc:
+                # Optional field on the response object; skipping it is non-fatal.
+                self.logger.debug(f"Could not set finish_reason: {exc}")
             model_response.model = (
                 kwargs.get("model")
                 or f"{_CLAUDE_CODE_PROVIDER_PREFIX}/{self.model or 'default'}"
@@ -286,8 +287,9 @@ def _get_claude_code_custom_llm_class():
                     "claude_code_raw_stdout": result["raw_response_body"],
                     "claude_code_stderr": result["stderr"],
                 }
-            except Exception:
-                pass
+            except Exception as exc:
+                # Optional diagnostic fields; skipping them is non-fatal.
+                self.logger.debug(f"Could not set provider_specific_fields: {exc}")
             return model_response
 
         async def acompletion(self, *args, **kwargs):

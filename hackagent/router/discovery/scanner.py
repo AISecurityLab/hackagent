@@ -246,7 +246,7 @@ def _build_user_prompt(
         json.dumps(target_desc, indent=2, ensure_ascii=False),
         "",
         "ATTACK CATALOG (choose exactly one attack_type; only use listed "
-        "parameter keys for that strategy):",
+        + "parameter keys for that strategy):",
         json.dumps(catalog, indent=2, ensure_ascii=False),
         "",
     ]
