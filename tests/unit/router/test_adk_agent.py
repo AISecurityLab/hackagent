@@ -15,7 +15,7 @@ import unittest
 import uuid
 from unittest.mock import MagicMock, patch
 
-import requests
+import httpx
 
 from hackagent.router.providers.adk import (
     ADKAgent,
@@ -28,6 +28,17 @@ from hackagent.router.providers.adk import (
 from hackagent.router.providers import adk as adk_provider_module
 
 logging.disable(logging.CRITICAL)
+
+
+def _make_httpx_http_status_error(
+    status_code: int, text: str = "boom"
+) -> httpx.HTTPStatusError:
+    """Build an HTTPStatusError with attached request/response for tests."""
+    request = httpx.Request("POST", "http://fake-adk.com")
+    response = httpx.Response(status_code, text=text, request=request)
+    return httpx.HTTPStatusError(
+        f"HTTP Error: {status_code}", request=request, response=response
+    )
 
 
 def _make_handler(**overrides):
@@ -96,7 +107,7 @@ class TestADKHelpers(unittest.TestCase):
 
 
 class TestADKCustomLLMTransport(unittest.TestCase):
-    @patch("requests.post")
+    @patch("httpx.post")
     def test_create_session_success(self, mock_post):
         mock_post.return_value = MagicMock(
             status_code=200, raise_for_status=MagicMock()
@@ -107,7 +118,7 @@ class TestADKCustomLLMTransport(unittest.TestCase):
         self.assertEqual(kwargs["timeout"], 30)
         self.assertEqual(kwargs["json"], {})
 
-    @patch("requests.post")
+    @patch("httpx.post")
     def test_create_session_with_initial_state(self, mock_post):
         mock_post.return_value = MagicMock(
             status_code=200, raise_for_status=MagicMock()
@@ -116,48 +127,46 @@ class TestADKCustomLLMTransport(unittest.TestCase):
         handler._create_session(session_id="abc", initial_state={"k": "v"})
         self.assertEqual(mock_post.call_args.kwargs["json"], {"k": "v"})
 
-    @patch("requests.post")
+    @patch("httpx.post")
     def test_create_session_409_is_idempotent(self, mock_post):
         mock_resp = MagicMock(status_code=409)
-        mock_resp.raise_for_status.side_effect = requests.exceptions.HTTPError(
-            response=mock_resp
-        )
+        mock_resp.raise_for_status.side_effect = _make_httpx_http_status_error(409)
         mock_post.return_value = mock_resp
         handler = _make_handler()
         handler._create_session(session_id="abc")  # no raise
 
-    @patch("requests.post")
+    @patch("httpx.post")
     def test_create_session_400_with_already_exists_text_is_idempotent(self, mock_post):
         mock_resp = MagicMock(
             status_code=400,
             text="Session already exists for this user and app.",
         )
-        mock_resp.raise_for_status.side_effect = requests.exceptions.HTTPError(
-            response=mock_resp
+        mock_resp.raise_for_status.side_effect = _make_httpx_http_status_error(
+            400, text="Session already exists for this user and app."
         )
         mock_post.return_value = mock_resp
         handler = _make_handler()
         handler._create_session(session_id="abc")
 
-    @patch("requests.post")
+    @patch("httpx.post")
     def test_create_session_other_http_error_raises(self, mock_post):
         mock_resp = MagicMock(status_code=500, text="boom")
-        mock_resp.raise_for_status.side_effect = requests.exceptions.HTTPError(
-            response=mock_resp
-        )
+        mock_resp.raise_for_status.side_effect = _make_httpx_http_status_error(500)
         mock_post.return_value = mock_resp
         handler = _make_handler()
         with self.assertRaises(AgentInteractionError):
             handler._create_session(session_id="abc")
 
-    @patch("requests.post")
+    @patch("httpx.post")
     def test_create_session_connection_error_raises(self, mock_post):
-        mock_post.side_effect = requests.exceptions.ConnectionError("nope")
+        mock_post.side_effect = httpx.RequestError(
+            "nope", request=httpx.Request("POST", "http://fake-adk.com")
+        )
         handler = _make_handler()
         with self.assertRaises(AgentInteractionError):
             handler._create_session(session_id="abc")
 
-    @patch("requests.post")
+    @patch("httpx.post")
     def test_run_returns_final_text_from_events(self, mock_post):
         events = [
             {"content": {"parts": [{"text": "ignored"}]}},
@@ -246,7 +255,7 @@ class TestADKAgentHandleRequest(unittest.TestCase):
         response = self.adapter.handle_request({})
         self.assertEqual(response["status_code"], 400)
 
-    @patch("requests.post")
+    @patch("httpx.post")
     def test_handle_request_success_routes_through_adk(self, mock_post):
         # First call creates the session; second call is /run.
         session_resp = MagicMock(status_code=200, raise_for_status=MagicMock())
@@ -265,7 +274,7 @@ class TestADKAgentHandleRequest(unittest.TestCase):
         self.assertEqual(agent_data.get("adk_events_list"), run_events)
         self.assertEqual(agent_data.get("adk_session_id"), self.adapter.session_id)
 
-    @patch("requests.post")
+    @patch("httpx.post")
     def test_handle_request_uses_explicit_session_id(self, mock_post):
         session_resp = MagicMock(status_code=200, raise_for_status=MagicMock())
         run_resp = MagicMock(status_code=200, headers={}, text="[]")
@@ -284,13 +293,11 @@ class TestADKAgentHandleRequest(unittest.TestCase):
         session_call_url = mock_post.call_args_list[0][0][0]
         self.assertIn("/sessions/explicit-123", session_call_url)
 
-    @patch("requests.post")
+    @patch("httpx.post")
     def test_handle_request_run_http_error_returns_500(self, mock_post):
         session_resp = MagicMock(status_code=200, raise_for_status=MagicMock())
         run_resp = MagicMock(status_code=500, text="boom", headers={})
-        run_resp.raise_for_status.side_effect = requests.exceptions.HTTPError(
-            response=run_resp
-        )
+        run_resp.raise_for_status.side_effect = _make_httpx_http_status_error(500)
         mock_post.side_effect = [session_resp, run_resp]
         response = self.adapter.handle_request({"prompt": "hi"})
         self.assertEqual(response["status_code"], 500)

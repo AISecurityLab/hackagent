@@ -20,7 +20,7 @@ import uuid
 from hackagent.logger import get_logger
 from typing import Any, Dict, List, Optional
 
-import requests
+import httpx
 
 from hackagent.router import envelope as _envelope
 from hackagent.router.agent import (
@@ -178,7 +178,7 @@ def _get_adk_custom_llm_class():
             payload = initial_state or {}
             session_timeout = min(30, max(1, int(self.timeout)))
             try:
-                response = requests.post(
+                response = httpx.post(
                     url,
                     headers=headers,
                     json=payload,
@@ -186,7 +186,7 @@ def _get_adk_custom_llm_class():
                 )
                 response.raise_for_status()
                 return
-            except requests.exceptions.HTTPError as http_err:
+            except httpx.HTTPStatusError as http_err:
                 response_text = ""
                 status_code = None
                 if http_err.response is not None:
@@ -206,7 +206,7 @@ def _get_adk_custom_llm_class():
                     f"HTTP Error {status_code} creating session "
                     f"{session_id}: {response_text[:200]}"
                 ) from http_err
-            except requests.exceptions.RequestException as e:
+            except httpx.RequestError as e:
                 raise AgentInteractionError(
                     f"Request failed creating session {session_id}: {e}"
                 ) from e
@@ -228,18 +228,18 @@ def _get_adk_custom_llm_class():
             }
 
             try:
-                response = requests.post(
+                response = httpx.post(
                     url, headers=headers, json=payload, timeout=self.timeout
                 )
-            except requests.exceptions.Timeout as e:
+            except httpx.TimeoutException as e:
                 raise AgentInteractionError(f"Request timed out: {e}") from e
-            except requests.exceptions.RequestException as e:
+            except httpx.RequestError as e:
                 raise AgentInteractionError(f"Request failed: {e}") from e
 
             response_body = response.text
             try:
                 response.raise_for_status()
-            except requests.exceptions.HTTPError as http_err:
+            except httpx.HTTPStatusError as http_err:
                 raise AgentInteractionError(
                     f"HTTP Error: {response.status_code}"
                 ) from http_err

@@ -423,7 +423,7 @@ jobs:
 ### Slack Notifications
 
 ```python
-import requests
+import httpx
 
 def send_slack_alert(campaign_name, results):
     """Send Slack notification for campaign results."""
@@ -450,7 +450,7 @@ def send_slack_alert(campaign_name, results):
             "short": False,
         })
 
-    requests.post(webhook_url, json=message)
+    httpx.post(webhook_url, json=message)
 ```
 
 ## Learn More
