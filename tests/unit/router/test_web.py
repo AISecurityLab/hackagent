@@ -255,7 +255,9 @@ class TestMessageTexts(unittest.TestCase):
         session = _make_session()
         frame = MagicMock()
         # The JS already filtered out user bubbles; it returns only bot texts.
-        frame.evaluate.return_value = ["I can only provide information about this service."]
+        frame.evaluate.return_value = [
+            "I can only provide information about this service."
+        ]
         session._page = MagicMock()
         session._page.frames = [frame]
 
