@@ -134,6 +134,17 @@ SUBCATEGORY_BY_PLAIN_NAME = {
 }
 
 
+# Process-level cache of confirmed LLM classifications, keyed by
+# (classifier identifier, goal text). Classification is deterministic
+# (temperature 0) over a fixed taxonomy, so a given goal never needs
+# re-classifying within a process — even across attacks that each build their
+# own Tracker/classifier. Only parsed LLM results are cached; heuristic/fallback
+# labels are not, so a transient classifier outage can't poison the cache.
+# ponytail: unbounded dict — fine for per-process goal sets (hundreds–thousands).
+# If a long-lived process classifies unbounded distinct goals, cap it (LRU).
+_CLASSIFICATION_CACHE: Dict[Tuple[str, str], Dict[str, str]] = {}
+
+
 SYSTEM_PROMPT = (
     "You are a strict safety taxonomy classifier. "
     "Given one goal and a taxonomy, select exactly one category and one subcategory. "
@@ -275,10 +286,16 @@ class GoalCategoryClassifier:
             "category": UNKNOWN_CATEGORY,
             "subcategory": UNKNOWN_SUBCATEGORY,
         }
-        heuristic = _heuristic_classification(goal)
 
         if not goal or not goal.strip():
             return fallback
+
+        cache_key = (str(self._config.get("identifier") or ""), goal)
+        cached = _CLASSIFICATION_CACHE.get(cache_key)
+        if cached is not None:
+            return cached
+
+        heuristic = _heuristic_classification(goal)
 
         if not self._enabled or not self._router or not self._registration_key:
             return heuristic or fallback
@@ -311,6 +328,7 @@ class GoalCategoryClassifier:
             raw_text = _extract_response_content(response) or ""
             parsed = _parse_classification(raw_text)
             if parsed:
+                _CLASSIFICATION_CACHE[cache_key] = parsed
                 return parsed
             return heuristic or fallback
         except Exception as exc:
@@ -516,4 +534,5 @@ __all__ = [
     "RISK_CATEGORIES",
     "UNKNOWN_CATEGORY",
     "UNKNOWN_SUBCATEGORY",
+    "_CLASSIFICATION_CACHE",
 ]
