@@ -133,6 +133,15 @@ class StorageBackend(Protocol):
         """Return the API key used by this backend, or None (local mode)."""
         ...
 
+    # ── Lifecycle ──────────────────────────────────────────────────────────────
+    def flush(self) -> None:
+        """Block until all deferred writes are persisted (no-op if synchronous)."""
+        ...
+
+    def close(self) -> None:
+        """Release resources / stop background workers. Idempotent."""
+        ...
+
     # ── Agent ─────────────────────────────────────────────────────────────────
     def create_or_update_agent(
         self,

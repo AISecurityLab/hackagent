@@ -1694,6 +1694,15 @@ class AttackOrchestrator:
                     error=str(e),
                 )
             raise
+        finally:
+            # Drain any deferred remote writes (traces/status) so the run is
+            # fully persisted before execute() returns. No-op for local mode.
+            flush = getattr(self.hackagent_agent.backend, "flush", None)
+            if callable(flush):
+                try:
+                    flush()
+                except Exception as flush_error:  # noqa: BLE001
+                    logger.warning(f"Failed to flush backend writes: {flush_error}")
 
     # ========================================================================
     # HTTP Response Helpers
