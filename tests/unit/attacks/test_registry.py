@@ -80,9 +80,13 @@ class TestAttackRegistry(unittest.TestCase):
         """Test that registry contains MML attack."""
         self.assertIn("MML", ATTACK_REGISTRY)
 
-    def test_registry_has_eleven_attacks(self):
-        """Test that registry has exactly eleven attacks."""
-        self.assertEqual(len(ATTACK_REGISTRY), 11)
+    def test_registry_contains_rag(self):
+        """Test that registry contains RAG attack."""
+        self.assertIn("rag", ATTACK_REGISTRY)
+
+    def test_registry_has_twelve_attacks(self):
+        """Test that registry has exactly twelve attacks."""
+        self.assertEqual(len(ATTACK_REGISTRY), 12)
 
 
 class TestAdvPrefixOrchestrator(unittest.TestCase):

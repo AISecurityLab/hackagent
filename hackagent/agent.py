@@ -208,6 +208,7 @@ class HackAgent:
                 BoNOrchestrator,
                 CipherChatOrchestrator,
                 H4rm3lOrchestrator,
+                RagOrchestrator,
                 PAPOrchestrator,
                 PAIROrchestrator,
                 FlipAttackOrchestrator,
@@ -226,6 +227,7 @@ class HackAgent:
                 "tap": TAPOrchestrator(hackagent_agent=self),
                 "h4rm3l": H4rm3lOrchestrator(hackagent_agent=self),
                 "pap": PAPOrchestrator(hackagent_agent=self),
+                "rag": RagOrchestrator(hackagent_agent=self),
                 "mml": MMLOrchestrator(hackagent_agent=self),
             }
         return self._attack_strategies

@@ -73,6 +73,7 @@ def make_run_table(
             "field": "attack_type",
             "align": "left",
             "sortable": True,
+            "style": "min-width: 180px;",
         }
     )
     columns.extend(
@@ -160,7 +161,7 @@ def make_run_table(
         r"""
         <q-td :props="props" class="cursor-pointer"
               @click="$emit('rowClick', props.row)">
-          <q-badge color="orange" :label="props.row.attack_type || '—'" />
+          <q-badge color="orange" class="text-no-wrap" :label="props.row.attack_type || '—'" />
         </q-td>
         """,
     )

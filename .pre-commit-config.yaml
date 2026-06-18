@@ -7,10 +7,13 @@ repos:
         additional_dependencies: [cz-conventional-gitmoji==0.7.0]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.9
+    # Keep in sync with the ruff version resolved by uv / used in CI
+    # (.github/workflows/ci.yml runs `uv run ruff …`). Version drift here
+    # lets the hook pass locally while CI's ruff fails.
+    rev: v0.15.15
     hooks:
       # Run the linter.
-      - id: ruff
+      - id: ruff-check
         args: [--fix]
       # Run the formatter.
       - id: ruff-format
