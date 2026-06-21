@@ -155,6 +155,9 @@ class LocalBackend:
         """
         self._conn.close()
 
+    def flush(self) -> None:
+        """No-op: local writes are synchronous (mirrors RemoteBackend.flush)."""
+
     # ── Context ──────────────────────────────────────────────────────────────
 
     def get_api_key(self) -> Optional[str]:

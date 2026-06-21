@@ -557,9 +557,12 @@ class TestRemoteBackendResult(unittest.TestCase):
                 evaluation_status="SUCCESSFUL_JAILBREAK",
                 evaluation_notes="Passed",
             )
+            # update_result is now deferred to the background writer; flush so the
+            # PATCH runs while the mock is still patched in.
+            self.backend.flush()
+            mock_patch.sync_detailed.assert_called_once()
 
         self.assertIsInstance(rec, ResultRecord)
-        mock_patch.sync_detailed.assert_called_once()
 
     def test_create_trace_success(self):
         result_id = _uid()
@@ -578,6 +581,10 @@ class TestRemoteBackendResult(unittest.TestCase):
                 step_type="OTHER",
                 content={"msg": "hello"},
             )
+            # Trace POST is deferred to the background writer; flush so it runs
+            # while the mock is still patched in.
+            self.backend.flush()
+            mock_create.sync_detailed.assert_called_once()
 
         self.assertIsInstance(rec, TraceRecord)
         self.assertEqual(rec.result_id, result_id)
@@ -599,6 +606,7 @@ class TestRemoteBackendResult(unittest.TestCase):
                 step_type="OTHER",
                 content={"msg": "hello"},
             )
+            self.backend.flush()
 
         self.assertIsInstance(rec, TraceRecord)
         self.assertIsInstance(rec.id, UUID)
