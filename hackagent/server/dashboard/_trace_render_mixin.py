@@ -764,7 +764,8 @@ class DashboardTraceRenderMixin:
 
             # MML: render encoded image inline if present in metadata
             self._render_mml_trace_image(metadata)
-
+            # FC-Attack: render flowchart image inline if present in metadata
+            self._render_fc_trace_image(metadata)
             for title, value in blocks:
                 if value is None or value == "":
                     continue

@@ -172,6 +172,20 @@ class AttackOrchestrator:
             ("judge", ("judges",), True, "judge"),
             ("embedder", ("rag_injection_params", "embedder"), False, None),
         ),
+        "fc": (
+            ("step_generator", ("step_generator",), False, "attacker"),
+            ("judge", ("judge",), False, "judge"),
+            ("judge", ("judges",), True, "judge"),
+        ),
+        "tfc": (
+            ("step_generator", ("step_generator",), False, "attacker"),
+            ("judge", ("judge",), False, "judge"),
+            ("judge", ("judges",), True, "judge"),
+        ),
+        "mml": (
+            ("judge", ("judge",), False, "judge"),
+            ("judge", ("judges",), True, "judge"),
+        ),
     }
 
     # Accepted aliases for attack names used by registry/UI labels.

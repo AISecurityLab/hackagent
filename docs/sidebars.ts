@@ -69,6 +69,9 @@ const sidebars: SidebarsConfig = {
             'attacks/cipherchat',
             'attacks/pap',
             'attacks/baseline',
+            'attacks/mml',
+            'attacks/fc',
+            'attacks/tfc',
           ],
         },
         {

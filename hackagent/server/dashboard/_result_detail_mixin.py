@@ -148,6 +148,16 @@ class DashboardResultDetailMixin:
         if encoding_mode:
             self._render_mml_result_section(row, metadata)
 
+        # FC-Attack-specific rendering: Flowchart Image + Prompt + Response
+        fc_image = metadata.get("image_data_url")
+        if fc_image:
+            self._render_fc_result_section(row, metadata)
+
+        # tFC-Attack-specific rendering: Graph text + Response
+        fc_graph_text = metadata.get("graph_text") or metadata.get("full_prompt")
+        if fc_graph_text and not fc_image:
+            self._render_tfc_result_section(row, metadata)
+
         # Key-value detail table
         detail_fields = self._build_result_detail_fields(row)
         if detail_fields:

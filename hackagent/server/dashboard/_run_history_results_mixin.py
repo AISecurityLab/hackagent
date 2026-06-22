@@ -151,6 +151,8 @@ class DashboardRunHistoryResultsMixin:
                     "pap": "PAP",
                     "h4rm3l": "H4rm3l",
                     "mml": "MML",
+                    "fc": "FC-Attack",
+                    "tfc": "tFC-Attack",
                 }
 
                 def _h_resolve_eval_label(
@@ -283,7 +285,20 @@ class DashboardRunHistoryResultsMixin:
                             _mml_enc = _mml_params.get("encoding_mode", "")
                             if _mml_enc:
                                 _chip("image", "Encoding", str(_mml_enc))
-
+                    elif _atk_lower in ("fc", "tfc"):
+                        _fc_params = (
+                            _hcfg.get("fc_params") or _hcfg.get("tfc_params") or {}
+                        )
+                        if isinstance(_fc_params, dict):
+                            _fc_layout = _fc_params.get("layout", "")
+                            if _fc_layout:
+                                _chip("account_tree", "Layout", str(_fc_layout))
+                            _fc_steps = _fc_params.get("num_steps", "")
+                            if _fc_steps:
+                                _chip("format_list_numbered", "Steps", str(_fc_steps))
+                            if _atk_lower == "tfc":
+                                _fc_tfmt = _fc_params.get("text_format", "ascii")
+                                _chip("text_fields", "Format", str(_fc_tfmt))
                 # ── Line 2: Dataset ───────────────────────────────────
                 _h_dataset_raw = _hcfg.get("dataset") or _hrc.get("dataset")
                 if _h_dataset_raw is not None:
@@ -1434,6 +1449,12 @@ class DashboardRunHistoryResultsMixin:
                     elif _h_atk == "mml":
                         _t = generic_traces_map_hr.get(_rid, [])
                         _h_detail_data[_rid] = self._parse_mml_traces(_t)
+                    elif _h_atk in ("fc", "tfc"):
+                        _t = generic_traces_map_hr.get(_rid, [])
+                        if _h_atk == "fc":
+                            _h_detail_data[_rid] = self._parse_fc_traces(_t)
+                        else:
+                            _h_detail_data[_rid] = self._parse_tfc_traces(_t)
                     else:
                         _t = generic_traces_map_hr.get(_rid, [])
                         _h_detail_data[_rid] = (

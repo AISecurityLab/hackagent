@@ -293,6 +293,8 @@ class DashboardRunsMixin:
                     "flipattack": "FlipAttack",
                     "pap": "PAP",
                     "h4rm3l": "H4rm3l",
+                    "fc": "FC-Attack",
+                    "tfc": "tFC-Attack",
                 }
 
                 def _compare_chips_for_run(run: dict) -> list[tuple[str, str, str]]:

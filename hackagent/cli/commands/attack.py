@@ -78,6 +78,14 @@ ATTACK_CATALOG: Dict[str, Dict[str, str]] = {
         "label": "MML",
         "description": "Multi-Modal Linkage attack encoding harmful prompts into images for VLMs.",
     },
+    "fc": {
+        "label": "FC-Attack",
+        "description": "FC-Attack: auto-generated flowchart images to jailbreak VLMs.",
+    },
+    "tfc": {
+        "label": "tFC-Attack",
+        "description": "tFC-Attack: text-only flowchart encoding attack for any LLM (DOT, Mermaid, TikZ, PlantUML, ASCII).",
+    },
 }
 
 
@@ -942,6 +950,92 @@ def mml(
         ctx=ctx,
         attack_type="mml",
         attack_label=ATTACK_CATALOG["mml"]["label"],
+        agent_name=agent_name,
+        agent_type=agent_type,
+        endpoint=endpoint,
+        goals=goals,
+        config_file=config_file,
+        timeout=timeout,
+        dry_run=dry_run,
+        no_tui=no_tui,
+        before_guardrail_name=before_guardrail_name,
+        before_guardrail_type=before_guardrail_type,
+        before_guardrail_endpoint=before_guardrail_endpoint,
+        after_guardrail_name=after_guardrail_name,
+        after_guardrail_type=after_guardrail_type,
+        after_guardrail_endpoint=after_guardrail_endpoint,
+    )
+
+
+@eval_cmd.command()
+@_common_attack_options
+@click.pass_context
+@handle_errors
+def fc(
+    ctx,
+    agent_name,
+    agent_type,
+    endpoint,
+    goals,
+    config_file,
+    timeout,
+    dry_run,
+    no_tui,
+    before_guardrail_name,
+    before_guardrail_type,
+    before_guardrail_endpoint,
+    after_guardrail_name,
+    after_guardrail_type,
+    after_guardrail_endpoint,
+):
+    """Execute FC-Attack strategy against a VLM."""
+    _run_attack_command(
+        ctx=ctx,
+        attack_type="fc",
+        attack_label=ATTACK_CATALOG["fc"]["label"],
+        agent_name=agent_name,
+        agent_type=agent_type,
+        endpoint=endpoint,
+        goals=goals,
+        config_file=config_file,
+        timeout=timeout,
+        dry_run=dry_run,
+        no_tui=no_tui,
+        before_guardrail_name=before_guardrail_name,
+        before_guardrail_type=before_guardrail_type,
+        before_guardrail_endpoint=before_guardrail_endpoint,
+        after_guardrail_name=after_guardrail_name,
+        after_guardrail_type=after_guardrail_type,
+        after_guardrail_endpoint=after_guardrail_endpoint,
+    )
+
+
+@eval_cmd.command()
+@_common_attack_options
+@click.pass_context
+@handle_errors
+def tfc(
+    ctx,
+    agent_name,
+    agent_type,
+    endpoint,
+    goals,
+    config_file,
+    timeout,
+    dry_run,
+    no_tui,
+    before_guardrail_name,
+    before_guardrail_type,
+    before_guardrail_endpoint,
+    after_guardrail_name,
+    after_guardrail_type,
+    after_guardrail_endpoint,
+):
+    """Execute tFC-Attack (text-only flowchart) strategy against any LLM."""
+    _run_attack_command(
+        ctx=ctx,
+        attack_type="tfc",
+        attack_label=ATTACK_CATALOG["tfc"]["label"],
         agent_name=agent_name,
         agent_type=agent_type,
         endpoint=endpoint,
