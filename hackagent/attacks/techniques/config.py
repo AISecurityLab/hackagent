@@ -50,6 +50,17 @@ DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE = "OLLAMA"
 DEFAULT_CATEGORY_CLASSIFIER_MAX_TOKENS = 100
 DEFAULT_MAX_OUTPUT_TOKENS = 4096
 
+# Default local embedder served by Ollama (used by any attack that needs an
+# embedder, e.g. the RAG Attack and AutoDAN-Turbo strategy retrieval).
+DEFAULT_EMBEDDER_IDENTIFIER = "embeddinggemma"
+DEFAULT_EMBEDDER_ENDPOINT = "http://localhost:11434"
+DEFAULT_EMBEDDER_AGENT_TYPE = "OLLAMA"
+# OpenAI-compatible base URL exposed by Ollama (used by the RAG Attack, which
+# embeds through an OpenAI-compatible client and posts to ``/v1/embeddings``).
+DEFAULT_EMBEDDER_OPENAI_ENDPOINT = "http://localhost:11434/v1"
+# Ollama ignores the key but the OpenAI client requires a non-empty value.
+DEFAULT_EMBEDDER_OPENAI_API_KEY = "ollama"
+
 # ---------------------------------------------------------------------------
 # Pydantic models
 # ---------------------------------------------------------------------------
@@ -239,6 +250,32 @@ def default_category_classifier() -> Dict[str, Any]:
     return CategoryClassifierConfig().model_dump()
 
 
+def default_embedder() -> Dict[str, Any]:
+    """Return a fresh embedder config dict (local ``embeddinggemma`` on Ollama).
+
+    Used by router-based embedder roles such as AutoDAN-Turbo strategy retrieval.
+    """
+    return {
+        "identifier": DEFAULT_EMBEDDER_IDENTIFIER,
+        "endpoint": DEFAULT_EMBEDDER_ENDPOINT,
+        "agent_type": DEFAULT_EMBEDDER_AGENT_TYPE,
+        "api_key": None,
+    }
+
+
+def default_rag_embedder() -> Dict[str, Any]:
+    """Return a fresh RAG embedder config dict (local ``embeddinggemma`` on Ollama).
+
+    The RAG Attack embeds through an OpenAI-compatible client, so the endpoint
+    points at Ollama's ``/v1`` base and a placeholder API key is provided.
+    """
+    return {
+        "identifier": DEFAULT_EMBEDDER_IDENTIFIER,
+        "endpoint": DEFAULT_EMBEDDER_OPENAI_ENDPOINT,
+        "api_key": DEFAULT_EMBEDDER_OPENAI_API_KEY,
+    }
+
+
 def default_judges() -> List[Dict[str, Any]]:
     """Return a fresh default judges list (one HarmBench judge)."""
     return [default_judge()]
@@ -327,6 +364,11 @@ __all__ = [
     "DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE",
     "DEFAULT_CATEGORY_CLASSIFIER_MAX_TOKENS",
     "DEFAULT_MAX_OUTPUT_TOKENS",
+    "DEFAULT_EMBEDDER_IDENTIFIER",
+    "DEFAULT_EMBEDDER_ENDPOINT",
+    "DEFAULT_EMBEDDER_AGENT_TYPE",
+    "DEFAULT_EMBEDDER_OPENAI_ENDPOINT",
+    "DEFAULT_EMBEDDER_OPENAI_API_KEY",
     "AttackerConfig",
     "CategoryClassifierConfig",
     "JudgeConfig",
@@ -344,6 +386,8 @@ __all__ = [
     "default_attacker",
     "default_judge",
     "default_category_classifier",
+    "default_embedder",
+    "default_rag_embedder",
     "default_judges",
     "default_judge_eval",
     "default_target",

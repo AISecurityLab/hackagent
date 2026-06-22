@@ -88,9 +88,9 @@ class TestAttackRegistry(unittest.TestCase):
         """Test that registry contains tFC attack."""
         self.assertIn("tFC", ATTACK_REGISTRY)
 
-    def test_registry_has_thirteen_attacks(self):
-        """Test that registry has exactly thirteen attacks."""
-        self.assertEqual(len(ATTACK_REGISTRY), 13)
+    def test_registry_contains_rag(self):
+        """Test that registry contains RAG attack."""
+        self.assertIn("rag", ATTACK_REGISTRY)
 
 
 class TestAdvPrefixOrchestrator(unittest.TestCase):

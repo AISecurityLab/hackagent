@@ -22,7 +22,7 @@ import subprocess
 import sys
 import time
 
-import requests
+import httpx
 
 from hackagent import HackAgent
 
@@ -91,12 +91,12 @@ def start_adk_server():
     # Wait for server to become healthy
     for _ in range(30):
         try:
-            r = requests.get(f"http://localhost:{PORT}/list-apps", timeout=2)
+            r = httpx.get(f"http://localhost:{PORT}/list-apps", timeout=2)
             if r.status_code == 200:
                 apps = r.json()
                 print(f"ADK server ready — discovered apps: {apps}")
                 return proc
-        except requests.ConnectionError:
+        except httpx.RequestError:
             pass
         time.sleep(1)
 

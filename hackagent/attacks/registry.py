@@ -35,6 +35,9 @@ from hackagent.attacks.techniques.fc import FCAttack, tFCAttack
 from hackagent.attacks.techniques.h4rm3l import H4rm3lAttack
 from hackagent.attacks.techniques.mml import MMLAttack
 from hackagent.attacks.techniques.pap import PAPAttack
+from hackagent.attacks.techniques.rag import (
+    RagAttack,
+)
 
 
 def create_orchestrator(
@@ -89,6 +92,7 @@ MMLOrchestrator = create_orchestrator("MML", MMLAttack)
 FCOrchestrator = create_orchestrator("FC", FCAttack)
 tFCOrchestrator = create_orchestrator("tFC", tFCAttack)
 PAPOrchestrator = create_orchestrator("pap", PAPAttack)
+RagOrchestrator = create_orchestrator("rag", RagAttack)
 
 # Registry of all available attacks
 ATTACK_REGISTRY = {
@@ -105,6 +109,7 @@ ATTACK_REGISTRY = {
     "FC": FCOrchestrator,
     "tFC": tFCOrchestrator,
     "pap": PAPOrchestrator,
+    "rag": RagOrchestrator,
 }
 
 __all__ = [
@@ -121,5 +126,6 @@ __all__ = [
     "FCOrchestrator",
     "tFCOrchestrator",
     "PAPOrchestrator",
+    "RagOrchestrator",
     "ATTACK_REGISTRY",
 ]

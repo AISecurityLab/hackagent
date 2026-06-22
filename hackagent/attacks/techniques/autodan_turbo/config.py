@@ -22,7 +22,7 @@ from hackagent.attacks.techniques.config import (
     ConfigBase,
     DEFAULT_CONFIG_BASE,
     DEFAULT_MAX_OUTPUT_TOKENS,
-    default_category_classifier,
+    default_embedder,
 )
 
 
@@ -72,7 +72,7 @@ class AutoDANTurboConfig(ConfigBase):
     summarizer: AttackerConfig = Field(
         default_factory=lambda: AttackerConfig(identifier="hackagent-summarizer")
     )
-    embedder: Dict[str, Any] = Field(default_factory=default_category_classifier)
+    embedder: Dict[str, Any] = Field(default_factory=default_embedder)
     target_request_overrides: Dict[str, Any] = Field(default_factory=dict)
 
     @classmethod
@@ -133,8 +133,8 @@ DEFAULT_AUTODAN_TURBO_CONFIG: Dict[str, Any] = {
     # Summarizer LLM configuration (extracts strategies from prompt pairs)
     "summarizer": _default_role_config("hackagent-summarizer"),
     # Embedder role used by strategy retrieval.
-    # Shares the same schema and defaults as category_classifier.
-    "embedder": default_category_classifier(),
+    # Defaults to a local Ollama embeddinggemma embedder.
+    "embedder": default_embedder(),
     # Optional passthrough parameters for target requests
     # (provider/model-specific, e.g. OpenRouter/OpenAI reasoning controls)
     "target_request_overrides": {},
