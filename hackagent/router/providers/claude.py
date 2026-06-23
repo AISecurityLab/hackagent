@@ -183,17 +183,37 @@ def _get_claude_code_custom_llm_class():
             self.logger = log
 
         def _build_argv(self) -> List[str]:
-            """Assemble the ``claude`` argv (prompt is fed via stdin)."""
-            argv = [self.binary, "-p", "--output-format", "json"]
-            if self.model:
-                argv += ["--model", self.model]
+            """Assemble the CLI argv based on whether we use claude natively or via ollama."""
+            argv = [self.binary]
+            is_ollama = "ollama" in self.binary.lower()
+
+            if is_ollama:
+                # 1. Argomenti per Ollama
+                argv.extend(["launch", "claude"])
+                if self.model:
+                    argv.extend(["--model", self.model])
+                
+                # Flag auto-pull e separatore per gli argomenti di Claude Code
+                argv.extend(["--yes", "--"])
+                
+                # 2. Argomenti passati direttamente a Claude Code
+                argv.extend(["-p", "--output-format", "json"])
+            else:
+                # Comportamento nativo di Claude Code
+                argv.extend(["-p", "--output-format", "json"])
+                if self.model:
+                    argv.extend(["--model", self.model])
+
+            # Argomenti comuni per Claude Code (con Ollama finiscono correttamente dopo il "--")
             if self.system_prompt:
-                argv += ["--system-prompt", self.system_prompt]
+                argv.extend(["--system-prompt", self.system_prompt])
             if self.append_system_prompt:
-                argv += ["--append-system-prompt", self.append_system_prompt]
+                argv.extend(["--append-system-prompt", self.append_system_prompt])
             if self.max_turns is not None:
-                argv += ["--max-turns", str(self.max_turns)]
-            argv += self.extra_args
+                argv.extend(["--max-turns", str(self.max_turns)])
+            
+            argv.extend(self.extra_args)
+            
             return argv
 
         def _run(self, prompt_text: str) -> Dict[str, Any]:
