@@ -148,6 +148,16 @@ class DashboardResultDetailMixin:
         if encoding_mode:
             self._render_mml_result_section(row, metadata)
 
+        # FC-Attack-specific rendering: Flowchart Image + Prompt + Response
+        fc_image = metadata.get("image_data_url")
+        if fc_image:
+            self._render_fc_result_section(row, metadata)
+
+        # tFC-Attack-specific rendering: Graph text + Response
+        fc_graph_text = metadata.get("graph_text") or metadata.get("full_prompt")
+        if fc_graph_text and not fc_image:
+            self._render_tfc_result_section(row, metadata)
+
         # Key-value detail table
         detail_fields = self._build_result_detail_fields(row)
         if detail_fields:
@@ -545,11 +555,14 @@ class DashboardResultDetailMixin:
                     _, label = self._classify_trace_step(td)
                     td["_display_label"] = label
 
-                rendered_phase_view = self._render_autodan_phase_timeline(
-                    serialized_traces
-                )
-                if not rendered_phase_view:
-                    self._render_standard_trace_sections(serialized_traces)
+                if self._is_indirect_injection_trace_set(serialized_traces):
+                    self._render_indirect_injection_view(row, serialized_traces)
+                else:
+                    rendered_phase_view = self._render_autodan_phase_timeline(
+                        serialized_traces
+                    )
+                    if not rendered_phase_view:
+                        self._render_standard_trace_sections(serialized_traces)
 
         except Exception as exc:
             container.clear()
@@ -768,6 +781,8 @@ class DashboardResultDetailMixin:
                         # fallback sections to avoid duplicated Evaluation/Goal
                         # blocks below Lifelong/Evaluation.
                         pass
+                    elif self._is_indirect_injection_trace_set(serialized_traces):
+                        self._render_indirect_injection_view(result, serialized_traces)
                     elif self._is_tap_trace_set(serialized_traces):
                         self._render_tap_trace_tree_view(serialized_traces)
                     else:

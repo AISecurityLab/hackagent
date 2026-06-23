@@ -28,6 +28,18 @@ DEFAULT_LOCAL_MODEL = "Librellama/gemma4:e2b-Uncensored"
 # LiteLLM provider prefix for talking to a local Ollama chat endpoint.
 OLLAMA_PROVIDER_PREFIX = "ollama_chat"
 
+
+# Default local embedder served by Ollama (used by any attack that needs an
+# embedder, e.g. the RAG Attack and AutoDAN-Turbo strategy retrieval).
+DEFAULT_EMBEDDER_IDENTIFIER = "embeddinggemma"
+DEFAULT_EMBEDDER_ENDPOINT = "http://localhost:11434"
+DEFAULT_EMBEDDER_AGENT_TYPE = "OLLAMA"
+# OpenAI-compatible base URL exposed by Ollama (used by the RAG Attack, which
+# embeds through an OpenAI-compatible client and posts to ``/v1/embeddings``).
+DEFAULT_EMBEDDER_OPENAI_ENDPOINT = "http://localhost:11434/v1"
+# Ollama ignores the key but the OpenAI client requires a non-empty value.
+DEFAULT_EMBEDDER_OPENAI_API_KEY = "ollama"
+
 # Same model expressed as a LiteLLM model string (provider-prefixed). Callers
 # that hand a single string to LiteLLM (e.g. the discovery planner) want this
 # form; callers that split identifier/endpoint/agent_type want DEFAULT_LOCAL_MODEL.

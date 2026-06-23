@@ -48,6 +48,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from hackagent.server.storage.enums import StatusEnum
 
+from .category_classifier import GoalCategoryClassifier
 from .context import TrackingContext
 from .step import StepTracker
 from .tracker import Context, Tracker
@@ -145,6 +146,35 @@ class TrackingCoordinator:
             Initialized TrackingCoordinator
         """
         _logger = logger or get_logger(__name__)
+
+        # Classify all goals up front in a single batched LLM call, then hand
+        # the labels to the Tracker as preclassified — this removes the
+        # per-goal classifier call that previously sat on the attack hot path.
+        if (
+            goals
+            and backend is not None
+            and run_id
+            and not disable_goal_category_classifier
+            and not preclassified_goal_labels_by_index
+        ):
+            try:
+                classifier = GoalCategoryClassifier(
+                    backend=backend,
+                    config=category_classifier_config,
+                    logger=_logger,
+                )
+                base_index = int(goal_index_start)
+                preclassified_goal_labels_by_index = {
+                    base_index + i: labels
+                    for i, labels in classifier.classify_goals(list(goals)).items()
+                }
+                disable_goal_category_classifier = True
+            except Exception as exc:  # noqa: BLE001 - never block tracking on this
+                _logger.warning(
+                    "Batch goal classification failed; falling back to per-goal "
+                    "classification: %s",
+                    exc,
+                )
 
         # Build goal Tracker
         goal_tracker = None

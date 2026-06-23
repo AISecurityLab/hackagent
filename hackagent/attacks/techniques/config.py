@@ -56,6 +56,11 @@ from hackagent.config import (
     DEFAULT_REMOTE_ATTACKER_IDENTIFIER,
     DEFAULT_REMOTE_JUDGE_IDENTIFIER,
     DEFAULT_REMOTE_ROLE_ENDPOINT,
+    DEFAULT_EMBEDDER_IDENTIFIER,
+    DEFAULT_EMBEDDER_ENDPOINT,
+    DEFAULT_EMBEDDER_AGENT_TYPE,
+    DEFAULT_EMBEDDER_OPENAI_ENDPOINT,
+    DEFAULT_EMBEDDER_OPENAI_API_KEY,
 )
 
 # ---------------------------------------------------------------------------
@@ -247,6 +252,32 @@ def default_category_classifier() -> Dict[str, Any]:
     return CategoryClassifierConfig().model_dump()
 
 
+def default_embedder() -> Dict[str, Any]:
+    """Return a fresh embedder config dict (local ``embeddinggemma`` on Ollama).
+
+    Used by router-based embedder roles such as AutoDAN-Turbo strategy retrieval.
+    """
+    return {
+        "identifier": DEFAULT_EMBEDDER_IDENTIFIER,
+        "endpoint": DEFAULT_EMBEDDER_ENDPOINT,
+        "agent_type": DEFAULT_EMBEDDER_AGENT_TYPE,
+        "api_key": None,
+    }
+
+
+def default_rag_embedder() -> Dict[str, Any]:
+    """Return a fresh RAG embedder config dict (local ``embeddinggemma`` on Ollama).
+
+    The RAG Attack embeds through an OpenAI-compatible client, so the endpoint
+    points at Ollama's ``/v1`` base and a placeholder API key is provided.
+    """
+    return {
+        "identifier": DEFAULT_EMBEDDER_IDENTIFIER,
+        "endpoint": DEFAULT_EMBEDDER_OPENAI_ENDPOINT,
+        "api_key": DEFAULT_EMBEDDER_OPENAI_API_KEY,
+    }
+
+
 def default_judges() -> List[Dict[str, Any]]:
     """Return a fresh default judges list (one HarmBench judge)."""
     return [default_judge()]
@@ -340,6 +371,11 @@ __all__ = [
     "DEFAULT_REMOTE_ATTACKER_IDENTIFIER",
     "DEFAULT_REMOTE_JUDGE_IDENTIFIER",
     "DEFAULT_LOCAL_MODEL",
+    "DEFAULT_EMBEDDER_IDENTIFIER",
+    "DEFAULT_EMBEDDER_ENDPOINT",
+    "DEFAULT_EMBEDDER_AGENT_TYPE",
+    "DEFAULT_EMBEDDER_OPENAI_ENDPOINT",
+    "DEFAULT_EMBEDDER_OPENAI_API_KEY",
     "AttackerConfig",
     "CategoryClassifierConfig",
     "JudgeConfig",
@@ -357,6 +393,8 @@ __all__ = [
     "default_attacker",
     "default_judge",
     "default_category_classifier",
+    "default_embedder",
+    "default_rag_embedder",
     "default_judges",
     "default_judge_eval",
     "default_target",

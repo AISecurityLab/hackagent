@@ -11,10 +11,13 @@ when an API key is available and selected automatically by HackAgent.__init__.
 
 from __future__ import annotations
 
+import atexit
 import logging
+import queue
+import threading
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 from uuid import UUID
 
 from pydantic import AnyUrl
@@ -61,6 +64,14 @@ from hackagent.server.storage.base import (
 )
 
 logger = logging.getLogger("hackagent.server.storage.remote")
+
+# Sentinel pushed onto the write queue to tell the worker to stop.
+_STOP = object()
+
+# Backpressure bound: if the attack loop out-produces the writer by this many
+# pending writes, enqueue() blocks until the worker catches up. Keeps memory
+# bounded without ever dropping a trace.
+_WRITE_QUEUE_MAXSIZE = 1000
 
 
 def _now() -> datetime:
@@ -139,6 +150,79 @@ class RemoteBackend:
     def __init__(self, client: AuthenticatedClient) -> None:
         self._client = client
         self._context: Optional[OrganizationContext] = None  # cached
+
+        # Append-only writes (traces, result-status updates) are persistence
+        # only — never read back during a run — so they are pushed onto a queue
+        # and flushed by a single background worker, overlapping the network
+        # round-trips with the (much slower) LLM calls in the attack loop.
+        # ID-returning creates (attack/run/result) stay synchronous; reads that
+        # could observe a queued write drain the queue first (flush()).
+        self._write_queue: "queue.Queue[Any]" = queue.Queue(
+            maxsize=_WRITE_QUEUE_MAXSIZE
+        )
+        self._writer_failures = 0
+        self._closed = False
+        self._writer = threading.Thread(
+            target=self._writer_loop,
+            name="hackagent-remote-writer",
+            daemon=True,
+        )
+        self._writer.start()
+        # Safety net: flush anything still queued on interpreter exit.
+        atexit.register(self.close)
+
+    # ── Async write queue ─────────────────────────────────────────────────────
+
+    def _writer_loop(self) -> None:
+        while True:
+            item = self._write_queue.get()
+            try:
+                if item is _STOP:
+                    return
+                fn, args, kwargs = item
+                fn(*args, **kwargs)
+            except Exception:  # noqa: BLE001 - one bad write must not stop the stream
+                self._writer_failures += 1
+                logger.warning("RemoteBackend: background write failed", exc_info=True)
+            finally:
+                self._write_queue.task_done()
+
+    def _enqueue(self, fn: Callable[..., Any], *args: Any, **kwargs: Any) -> None:
+        """Queue a write for the background worker (runs inline if closed)."""
+        if self._closed:
+            # Past shutdown (e.g. a late finalize during teardown): never drop
+            # the write — execute it synchronously instead.
+            try:
+                fn(*args, **kwargs)
+            except Exception:  # noqa: BLE001
+                self._writer_failures += 1
+                logger.warning(
+                    "RemoteBackend: synchronous fallback write failed", exc_info=True
+                )
+            return
+        self._write_queue.put((fn, args, kwargs))
+
+    def flush(self) -> None:
+        """Block until every queued write has been processed.
+
+        Called before any read that could observe a deferred write, and at run
+        completion, so callers always see a consistent server state.
+        """
+        if not self._closed:
+            self._write_queue.join()
+
+    def close(self) -> None:
+        """Drain the queue, stop the worker, and report any write failures."""
+        if self._closed:
+            return
+        self._closed = True
+        self._write_queue.put(_STOP)
+        self._writer.join()
+        if self._writer_failures:
+            logger.warning(
+                "RemoteBackend: %d background write(s) failed during this session",
+                self._writer_failures,
+            )
 
     # ── Context ──────────────────────────────────────────────────────────────
 
@@ -583,6 +667,36 @@ class RemoteBackend:
         evaluation_metrics: Optional[Dict[str, Any]] = None,
         agent_specific_data: Optional[Dict[str, Any]] = None,
     ) -> ResultRecord:
+        # Persistence-only: the loop never reads the updated row back (reads
+        # drain the queue first), so defer the PATCH to the background worker.
+        self._enqueue(
+            self._update_result_remote,
+            result_id,
+            evaluation_status,
+            evaluation_notes,
+            agent_specific_data,
+        )
+        return ResultRecord(
+            id=result_id,
+            run_id=UUID("00000000-0000-0000-0000-000000000000"),
+            goal="",
+            goal_index=0,
+            evaluation_status=evaluation_status or "",
+            evaluation_notes=evaluation_notes,
+            evaluation_metrics=evaluation_metrics or {},
+            metadata=agent_specific_data or {},
+            created_at=_now(),
+            updated_at=_now(),
+        )
+
+    def _update_result_remote(
+        self,
+        result_id: UUID,
+        evaluation_status: Optional[str],
+        evaluation_notes: Optional[str],
+        agent_specific_data: Optional[Dict[str, Any]],
+    ) -> None:
+        """Background worker body for update_result: issue the PATCH."""
         kwargs: Dict[str, Any] = {}
         if evaluation_status is not None:
             try:
@@ -601,18 +715,6 @@ class RemoteBackend:
             logger.warning(
                 f"RemoteBackend: update_result {result_id} returned {resp.status_code}"
             )
-        return ResultRecord(
-            id=result_id,
-            run_id=UUID("00000000-0000-0000-0000-000000000000"),
-            goal="",
-            goal_index=0,
-            evaluation_status=evaluation_status or "",
-            evaluation_notes=evaluation_notes,
-            evaluation_metrics=evaluation_metrics or {},
-            metadata=agent_specific_data or {},
-            created_at=_now(),
-            updated_at=_now(),
-        )
 
     def list_results(
         self,
@@ -620,6 +722,7 @@ class RemoteBackend:
         page: int = 1,
         page_size: int = 100,
     ) -> PaginatedResult[ResultRecord]:
+        self.flush()  # observe any queued trace/status writes
         items: List[ResultRecord] = []
         total = 0
         logical_page = max(1, int(page))
@@ -738,6 +841,7 @@ class RemoteBackend:
         return PaginatedResult(items=items, total=total or len(items))
 
     def get_result(self, result_id: UUID) -> ResultRecord:
+        self.flush()  # observe any queued status update for this result
         resp = result_retrieve.sync_detailed(id=result_id, client=self._client)
         if resp.status_code == 200 and resp.parsed:
             r = resp.parsed
@@ -773,6 +877,30 @@ class RemoteBackend:
         step_type: str,
         content: Dict[str, Any],
     ) -> TraceRecord:
+        # Traces are append-only audit data, already buffered in memory by the
+        # Tracker and never read back mid-run, so the POST is deferred to the
+        # background worker. The returned id is synthetic (used only for logging);
+        # list_traces() reads authoritative ids from the server after a flush().
+        self._enqueue(
+            self._create_trace_remote, result_id, sequence, step_type, content
+        )
+        return TraceRecord(
+            id=uuid.uuid5(uuid.NAMESPACE_URL, f"trace:{result_id}:{sequence}"),
+            result_id=result_id,
+            sequence=sequence,
+            step_type=step_type,
+            content=content,
+            created_at=_now(),
+        )
+
+    def _create_trace_remote(
+        self,
+        result_id: UUID,
+        sequence: int,
+        step_type: str,
+        content: Dict[str, Any],
+    ) -> None:
+        """Background worker body for create_trace: issue the POST."""
         try:
             step_type_enum = StepTypeEnum(step_type)
         except ValueError:
@@ -783,31 +911,14 @@ class RemoteBackend:
         resp = result_trace_create.sync_detailed(
             client=self._client, id=result_id, body=body
         )
-        if resp.status_code == 201 and resp.parsed:
-            return TraceRecord(
-                id=_coerce_trace_id(
-                    resp.parsed.id, result_id=result_id, sequence=sequence
-                ),
-                result_id=result_id,
-                sequence=sequence,
-                step_type=step_type,
-                content=content,
-                created_at=_now(),
+        if resp.status_code != 201:
+            logger.warning(
+                f"RemoteBackend: create_trace for result {result_id} "
+                f"returned {resp.status_code}"
             )
-        logger.warning(
-            f"RemoteBackend: create_trace for result {result_id} "
-            f"returned {resp.status_code}"
-        )
-        return TraceRecord(
-            id=uuid.uuid4(),
-            result_id=result_id,
-            sequence=sequence,
-            step_type=step_type,
-            content=content,
-            created_at=_now(),
-        )
 
     def list_traces(self, result_id: UUID) -> List[TraceRecord]:
+        self.flush()  # observe any queued traces for this result
         resp = result_retrieve.sync_detailed(id=result_id, client=self._client)
         if resp.status_code != 200 or not resp.parsed:
             return []
@@ -840,6 +951,7 @@ class RemoteBackend:
 
     def count_result_buckets(self) -> Dict[str, int]:
         """Efficiently count results by evaluation status using filtered API calls."""
+        self.flush()  # counts depend on queued status updates
         from hackagent.server.api.models import ResultListEvaluationStatus
 
         def _count(status: ResultListEvaluationStatus | None = None) -> int:

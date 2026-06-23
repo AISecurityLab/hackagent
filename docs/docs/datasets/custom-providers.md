@@ -117,7 +117,7 @@ def load_goals(self, limit=None, **kwargs):
 ## Example: API Provider
 
 ```python
-import requests
+import httpx
 from hackagent.datasets import DatasetProvider, register_provider
 
 class APIProvider(DatasetProvider):
@@ -133,7 +133,7 @@ class APIProvider(DatasetProvider):
         headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
         params = {"limit": limit} if limit else {}
         
-        response = requests.get(
+        response = httpx.get(
             f"{self.base_url}/goals",
             headers=headers,
             params=params,

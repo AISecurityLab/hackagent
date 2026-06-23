@@ -175,6 +175,11 @@ class DashboardReportsMixin:
             self._render_autodan_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
         elif ha == "mml":
             self._render_mml_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
+        elif ha in ("fc", "tfc"):
+            if ha == "fc":
+                self._render_fc_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
+            else:
+                self._render_tfc_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
         else:
             _req, _resp, _gr_evt = data  # type: ignore[misc]
             self._render_generic_goal_card(

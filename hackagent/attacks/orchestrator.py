@@ -165,11 +165,25 @@ class AttackOrchestrator:
             ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
         ),
-        "indirect_prompt_injection": (
-            ("attacker", ("attacker",), False, None),
-            ("judge", ("judge",), False, None),
-            ("judge", ("judges",), True, None),
+        "rag": (
+            ("attacker", ("attacker",), False, "attacker"),
+            ("judge", ("judge",), False, "judge"),
+            ("judge", ("judges",), True, "judge"),
             ("embedder", ("rag_injection_params", "embedder"), False, None),
+        ),
+        "fc": (
+            ("step_generator", ("step_generator",), False, "attacker"),
+            ("judge", ("judge",), False, "judge"),
+            ("judge", ("judges",), True, "judge"),
+        ),
+        "tfc": (
+            ("step_generator", ("step_generator",), False, "attacker"),
+            ("judge", ("judge",), False, "judge"),
+            ("judge", ("judges",), True, "judge"),
+        ),
+        "mml": (
+            ("judge", ("judge",), False, "judge"),
+            ("judge", ("judges",), True, "judge"),
         ),
     }
 
@@ -1087,9 +1101,80 @@ class AttackOrchestrator:
 
         return None
 
+    @staticmethod
+    def _resolve_probe_api_key(role_config: Dict[str, Any]) -> Optional[str]:
+        """Resolve API key from config value or environment variable name."""
+        raw_value = role_config.get("api_key")
+        if not raw_value:
+            return None
+
+        raw_text = str(raw_value)
+        env_value = os.environ.get(raw_text)
+        return env_value if env_value else raw_text
+
+    def _probe_embedding_target(self, target: Dict[str, Any]) -> Optional[str]:
+        """Probe embedding endpoint using an embeddings request instead of chat."""
+        endpoint = str(target.get("endpoint") or "").strip().rstrip("/")
+        identifier = str(target.get("identifier") or "")
+        role_config = (
+            target.get("config") if isinstance(target.get("config"), dict) else {}
+        )
+
+        if not endpoint:
+            return "missing endpoint for embedding health check"
+        if not identifier:
+            return "missing identifier for embedding health check"
+
+        probe_endpoint = endpoint
+        if not probe_endpoint.lower().endswith("/embeddings"):
+            probe_endpoint = f"{probe_endpoint}/embeddings"
+
+        headers: Dict[str, str] = {
+            "Content-Type": "application/json",
+            "User-Agent": "HackAgent/0.1.0",
+        }
+        api_key = self._resolve_probe_api_key(role_config)
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+
+        payload = {
+            "model": identifier,
+            "input": ["healthcheck"],
+        }
+
+        try:
+            response = httpx.post(
+                probe_endpoint,
+                headers=headers,
+                json=payload,
+                timeout=20.0,
+            )
+        except Exception as exc:
+            return f"embedding health check failed ({type(exc).__name__}): {exc}"
+
+        if response.status_code >= 400:
+            body = response.text.strip()
+            if len(body) > 300:
+                body = f"{body[:297]}..."
+            return (
+                f"embedding endpoint returned {response.status_code}: "
+                f"{body or 'empty response body'}"
+            )
+
+        return None
+
     def _probe_model_target(self, target: Dict[str, Any]) -> Optional[str]:
         """Probe one model target and return an error string on failure."""
         kind = target.get("kind")
+        endpoint = str(target.get("endpoint") or "").strip().rstrip("/")
+        roles = target.get("roles")
+        if isinstance(roles, list):
+            normalized_roles = {str(role).strip().lower() for role in roles if role}
+        else:
+            normalized_roles = {str(target.get("role") or "").strip().lower()}
+        should_use_embedding_probe = (
+            "embedder" in normalized_roles or endpoint.lower().endswith("/embeddings")
+        )
 
         if kind == "existing_router":
             router = target.get("router")
@@ -1099,6 +1184,9 @@ class AttackOrchestrator:
             return self._probe_router_registration(router, registration_key)
 
         if kind == "router_config":
+            if should_use_embedding_probe:
+                return self._probe_embedding_target(target)
+
             from hackagent.attacks.shared.router_factory import create_router
 
             try:
@@ -1785,6 +1873,15 @@ class AttackOrchestrator:
                     error=str(e),
                 )
             raise
+        finally:
+            # Drain any deferred remote writes (traces/status) so the run is
+            # fully persisted before execute() returns. No-op for local mode.
+            flush = getattr(self.hackagent_agent.backend, "flush", None)
+            if callable(flush):
+                try:
+                    flush()
+                except Exception as flush_error:  # noqa: BLE001
+                    logger.warning(f"Failed to flush backend writes: {flush_error}")
 
     # ========================================================================
     # HTTP Response Helpers

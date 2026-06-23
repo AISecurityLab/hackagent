@@ -1,4 +1,4 @@
-import requests
+import httpx
 
 # URL where the custom agent server is running
 API_URL = "http://localhost:8000/v1/chat/completions"
@@ -11,7 +11,7 @@ def ask_agent(question_text):
 
     try:
         print(f"Sending question: {question_text}")
-        response = requests.post(API_URL, json=payload, headers=headers)
+        response = httpx.post(API_URL, json=payload, headers=headers)
 
         if response.status_code == 200:
             data = response.json()

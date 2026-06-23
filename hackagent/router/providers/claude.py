@@ -192,10 +192,10 @@ def _get_claude_code_custom_llm_class():
                 argv.extend(["launch", "claude"])
                 if self.model:
                     argv.extend(["--model", self.model])
-                
+
                 # ollama auto-pull flag and separator for Claude Code arguments
                 argv.extend(["--yes", "--"])
-                
+
                 # arguments passed directly to Claude Code
                 argv.extend(["-p", "--output-format", "json"])
             else:
@@ -211,9 +211,9 @@ def _get_claude_code_custom_llm_class():
                 argv.extend(["--append-system-prompt", self.append_system_prompt])
             if self.max_turns is not None:
                 argv.extend(["--max-turns", str(self.max_turns)])
-            
+
             argv.extend(self.extra_args)
-            
+
             return argv
 
         def _run(self, prompt_text: str) -> Dict[str, Any]:

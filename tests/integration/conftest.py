@@ -36,6 +36,7 @@ import atexit
 import logging
 from typing import Any, Dict, Generator, Optional
 
+import httpx
 import pytest
 
 from hackagent.attacks.techniques.config import (
@@ -197,15 +198,13 @@ def ollama_model() -> str:
 @pytest.fixture(scope="session")
 def ollama_available(ollama_base_url: str, ollama_model: str) -> bool:
     """Check if Ollama is available and the required model is loaded."""
-    import requests
-
     try:
-        response = requests.get(f"{ollama_base_url}/api/tags", timeout=5)
+        response = httpx.get(f"{ollama_base_url}/api/tags", timeout=5)
         if response.status_code != 200:
             return False
         models = response.json().get("models", [])
         return any(m.get("name", "").startswith(ollama_model) for m in models)
-    except requests.exceptions.RequestException:
+    except httpx.RequestError:
         return False
 
 
@@ -408,7 +407,6 @@ def adk_server_with_ollama(
 
     # Wait for server to start
     server_url = f"http://127.0.0.1:{port}"
-    import requests
 
     max_wait = 30  # seconds
     start_time = time.time()
@@ -416,12 +414,12 @@ def adk_server_with_ollama(
 
     while time.time() - start_time < max_wait:
         try:
-            response = requests.get(f"{server_url}/list-apps", timeout=2)
+            response = httpx.get(f"{server_url}/list-apps", timeout=2)
             if response.status_code == 200:
                 server_ready = True
                 logger.info(f"ADK server started successfully on {server_url}")
                 break
-        except requests.exceptions.RequestException:
+        except httpx.RequestError:
             pass
 
         # Check if process has died
@@ -473,13 +471,12 @@ def google_adk_available(google_adk_agent_url: Optional[str]) -> bool:
     """Check if Google ADK agent is available."""
     if not google_adk_agent_url:
         return False
-    import requests
 
     try:
         # Try to reach the ADK endpoint
-        response = requests.get(f"{google_adk_agent_url}", timeout=5)
+        response = httpx.get(f"{google_adk_agent_url}", timeout=5)
         return response.status_code in (200, 404)  # 404 is OK - server is up
-    except requests.exceptions.RequestException:
+    except httpx.RequestError:
         return False
 
 

@@ -44,6 +44,8 @@ from .attack_cards import (
     TapCardMixin,
     GenericCardMixin,
     MmlCardMixin,
+    FCCardMixin,
+    tFCCardMixin,
 )
 
 
@@ -71,6 +73,8 @@ class DashboardPage(
     TapCardMixin,
     GenericCardMixin,
     MmlCardMixin,
+    FCCardMixin,
+    tFCCardMixin,
     DashboardLayoutMixin,
     DashboardReportsMixin,
     DashboardResultDetailMixin,
