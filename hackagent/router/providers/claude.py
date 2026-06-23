@@ -188,23 +188,23 @@ def _get_claude_code_custom_llm_class():
             is_ollama = "ollama" in self.binary.lower()
 
             if is_ollama:
-                # 1. Argomenti per Ollama
+                # ollama arguments
                 argv.extend(["launch", "claude"])
                 if self.model:
                     argv.extend(["--model", self.model])
                 
-                # Flag auto-pull e separatore per gli argomenti di Claude Code
+                # ollama auto-pull flag and separator for Claude Code arguments
                 argv.extend(["--yes", "--"])
                 
-                # 2. Argomenti passati direttamente a Claude Code
+                # arguments passed directly to Claude Code
                 argv.extend(["-p", "--output-format", "json"])
             else:
-                # Comportamento nativo di Claude Code
+                # native Claude Code behavior
                 argv.extend(["-p", "--output-format", "json"])
                 if self.model:
                     argv.extend(["--model", self.model])
 
-            # Argomenti comuni per Claude Code (con Ollama finiscono correttamente dopo il "--")
+            # Common arguments for Claude Code (with Ollama they end correctly after the "--")
             if self.system_prompt:
                 argv.extend(["--system-prompt", self.system_prompt])
             if self.append_system_prompt:

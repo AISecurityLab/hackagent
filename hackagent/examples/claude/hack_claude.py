@@ -17,7 +17,7 @@ Prerequisites
 -------------
 1. Install Claude Code and confirm it runs:  ``claude --version``
 2. Export an Anthropic key for the attacker/judge:  ``export ANTHROPIC_API_KEY=sk-ant-...``
-3. Run:  ``python hack.py``  (or ``hackagent claude`` for the interactive TUI preset)
+3. Run:  ``python hack_claude.py``  (or ``hackagent claude`` for the interactive TUI preset)
 """
 
 from hackagent import HackAgent
