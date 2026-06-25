@@ -285,11 +285,7 @@ class RemoteBackend:
         }
         patch_kwargs["agent_type"] = agent_type
         patch_kwargs["endpoint"] = endpoint
-        if patch_kwargs.get("endpoint") and patch_kwargs.get("agent_type") in [
-            "claude_code",
-            "claude-code",
-        ]:
-            patch_kwargs.pop("endpoint")
+
         body = PatchedAgentRequest(**patch_kwargs)
         resp = agent_partial_update.sync_detailed(
             id=existing.id, client=self._client, body=body

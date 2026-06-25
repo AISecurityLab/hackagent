@@ -31,7 +31,7 @@ TARGET_MODEL = (
 
 agent = HackAgent(
     name="claude-code",
-    endpoint="http://localhost",  # ignored, but remote mode needs it
+    endpoint="",  # ignored, but remote mode needs it
     agent_type="claude-code",
     adapter_operational_config={
         "name": TARGET_MODEL,

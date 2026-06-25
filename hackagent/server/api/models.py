@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from enum import Enum
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from pydantic import (
@@ -285,7 +285,7 @@ class PatchedAgentRequest(BaseModel):
     name: Annotated[
         str | None, Field(max_length=200, min_length=1, title="Agent Name")
     ] = None
-    endpoint: Annotated[AnyUrl | None, Field(title="Endpoint URL")] = None
+    endpoint: Annotated[AnyUrl | None | Literal[""], Field(title="Endpoint URL")] = None
     """
     The primary API endpoint URL for interacting with the agent.
     """
