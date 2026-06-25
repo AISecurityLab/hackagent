@@ -391,7 +391,7 @@ class ClaudeCodeAgent(Agent):
         self._provider_name = f"{_CLAUDE_CODE_PROVIDER_PREFIX}_{id}"
         self.litellm_model = f"{self._provider_name}/{self.name}"
         # Claude Code has no API base/key of its own (the CLI handles auth).
-        self.api_base_url: Optional[str] = None
+        self.api_base_url: Optional[str] = config.get("endpoint", "http://localhost")
         self.actual_api_key: Optional[str] = None
         self.default_thinking = None
         self.default_tools = None

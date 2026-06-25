@@ -22,8 +22,8 @@ from __future__ import annotations
 # ---------------------------------------------------------------------------
 
 # Local Ollama default model. Uncensored so it won't refuse to generate
-# red-team prompts. Pull: ``ollama pull Librellama/gemma4:e2b-Uncensored``.
-DEFAULT_LOCAL_MODEL = "Librellama/gemma4:e2b-Uncensored"
+# red-team prompts. Pull: ``ollama pull huihui_ai/gemma-4-abliterated:12b``.
+DEFAULT_LOCAL_MODEL = "huihui_ai/gemma-4-abliterated:12b"
 
 # LiteLLM provider prefix for talking to a local Ollama chat endpoint.
 OLLAMA_PROVIDER_PREFIX = "ollama_chat"
@@ -52,7 +52,7 @@ DEFAULT_LOCAL_AGENT_TYPE = "OLLAMA"
 # to the same local model (no API key).
 DEFAULT_ATTACKER_IDENTIFIER = DEFAULT_LOCAL_MODEL
 DEFAULT_JUDGE_IDENTIFIER = DEFAULT_LOCAL_MODEL
-DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER = DEFAULT_LOCAL_MODEL
+DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER = "gemma3:4b"
 DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT = DEFAULT_LOCAL_MODEL_ENDPOINT
 DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE = DEFAULT_LOCAL_AGENT_TYPE
 DEFAULT_CATEGORY_CLASSIFIER_MAX_TOKENS = 100
