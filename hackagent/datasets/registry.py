@@ -214,11 +214,13 @@ def _register_builtin_providers():
     """Register the built-in dataset providers."""
     from hackagent.datasets.providers.file import FileDatasetProvider
     from hackagent.datasets.providers.huggingface import HuggingFaceDatasetProvider
+    from hackagent.datasets.providers.url_json import UrlJsonDatasetProvider
 
     register_provider("huggingface", HuggingFaceDatasetProvider)
     register_provider("hf", HuggingFaceDatasetProvider)  # Alias
     register_provider("file", FileDatasetProvider)
     register_provider("local", FileDatasetProvider)  # Alias
+    register_provider("url_json", UrlJsonDatasetProvider)
 
 
 _register_builtin_providers()

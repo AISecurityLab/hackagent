@@ -75,7 +75,7 @@ class TestDatasetProfileIntegrity(unittest.TestCase):
 
     def test_all_presets_have_valid_providers(self):
         """Test that all presets use valid providers."""
-        valid_providers = {"huggingface", "hf", "file", "local"}
+        valid_providers = {"huggingface", "hf", "file", "local", "url_json"}
 
         for name, config in PRESETS.items():
             self.assertIn(
@@ -94,7 +94,7 @@ class TestDatasetDuplicates(unittest.TestCase):
     def _normalize_config(self, config: Dict[str, Any]) -> str:
         """Create a normalized string representation of config for comparison."""
         # Only compare fields that define the actual dataset
-        key_fields = ["provider", "path", "name", "goal_field", "split"]
+        key_fields = ["provider", "path", "name", "goal_field", "split", "url"]
         parts = []
         for field in key_fields:
             value = config.get(field, "")
