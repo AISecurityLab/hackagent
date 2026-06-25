@@ -43,6 +43,15 @@ Custom protocols (gap-fillers that LiteLLM doesn&#x27;t speak natively):
     - **GOOGLE_ADK**: deployed Google ADK agent server
       (POST /run with session + event protocol). Implemented as a
       per-instance ``litellm.CustomLLM`` provider.
+    - **CLAUDE_CODE**: a locally-installed Claude Code CLI, driven in
+      headless mode (``claude -p``). Like ADK, implemented as a
+      per-instance ``litellm.CustomLLM`` provider that shells out to the
+      ``claude`` binary instead of making an HTTP call — no endpoint.
+    - **WEB**: a chatbot on a public website, driven through a real browser
+      (Playwright). Point it at the site URL and it types each prompt into
+      the live chat widget and reads the reply from the page — works on any
+      chat UI regardless of transport (WebSocket/SSE/HTTP). Implemented as a
+      per-instance ``litellm.CustomLLM`` provider.
     - **MCP**: Model Context Protocol endpoint (placeholder).
     - **A2A**: Agent-to-Agent protocol endpoint (placeholder).
 

@@ -33,6 +33,7 @@ dependencies = [
     "faiss-cpu>=1.13.2",
     "datasets>=2.14.0",
     "nicegui>=2.0",
+    "playwright>=1.40",
     "Pillow>=10.0.0",
 ]
 

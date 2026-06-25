@@ -10,6 +10,8 @@ from hackagent.router import tracking_logger as _tracking_logger
 from hackagent.router._chat_registration import _ChatRegistration
 from hackagent.router.agent import Agent
 from hackagent.router.providers.adk import ADKAgent, _get_litellm
+from hackagent.router.providers.claude import ClaudeCodeAgent
+from hackagent.router.providers.web import WebAgent
 from hackagent.router.provider_config import ProviderConfig, get_provider_config
 from hackagent.router.types import AgentTypeEnum
 
@@ -45,6 +47,8 @@ def _extract_prompt_text(request_data: Dict[str, Any]) -> str:
 # CustomLLM registration side-effect).
 AGENT_TYPE_TO_ADAPTER_MAP: Dict[AgentTypeEnum, Type[Agent]] = {
     AgentTypeEnum.GOOGLE_ADK: ADKAgent,
+    AgentTypeEnum.CLAUDE_CODE: ClaudeCodeAgent,
+    AgentTypeEnum.WEB: WebAgent,
 }
 
 

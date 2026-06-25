@@ -88,9 +88,12 @@ class BonCardMixin:
                     else ""
                 )
 
-                response_obj, _g_side, _g_expl, _g_cats = (
-                    AttackCardSharedMixin._extract_guardrail_from_response(response_obj)
-                )
+                (
+                    response_obj,
+                    _g_side,
+                    _g_expl,
+                    _g_cats,
+                ) = AttackCardSharedMixin._extract_guardrail_from_response(response_obj)
 
                 if isinstance(response_obj, dict):
                     response_text = (

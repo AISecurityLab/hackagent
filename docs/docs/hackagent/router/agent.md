@@ -3,20 +3,12 @@ sidebar_label: agent
 title: hackagent.router.agent
 ---
 
-Agent base class + adapter exception types.
+Base classes and common utilities for all agent adapters.
 
-After issue `379` this module is the only piece of the old ``adapters/``
-folder still in use. ``Agent`` is the abstract base that
-:class:`hackagent.router.providers.adk.ADKAgent` inherits from to plug
-non-chat-completion protocols into the router. Chat-completion
-AgentTypes don&#x27;t go through ``Agent`` at all — they&#x27;re driven directly
-from :class:`hackagent.router.router.AgentRouter` via
-``_ChatRegistration``.
-
-The ``AdapterConfigurationError`` / ``AdapterInteractionError`` /
-``AdapterResponseParsingError`` names are kept (rather than renamed to
-``AgentConfigurationError`` etc.) so existing ``except`` clauses in
-attack code keep working.
+This module provides:
+- Common exception classes for adapter errors
+- Abstract base class `Agent` with shared functionality
+- Utility methods for request validation, response building, and API key resolution
 
 ## AdapterConfigurationError Objects
 
@@ -135,4 +127,71 @@ def get_identifier() -> str
 ```
 
 Returns the unique identifier for this agent instance or type.
+
+## ChatCompletionsAgent Objects
+
+```python
+class ChatCompletionsAgent(Agent)
+```
+
+Abstract base class for chat completion-based agents.
+
+This class provides a common implementation for agents that follow the
+chat completions pattern (OpenAI, LiteLLM, Ollama, etc.). It handles:
+- Request validation (prompt or messages)
+- Prompt to messages conversion
+- Parameter extraction with defaults
+- Common handle_request flow with template method pattern
+
+Subclasses must implement:
+- _execute_completion(): The actual API call to generate completions
+
+Subclasses may override:
+- _get_completion_parameters(): To add adapter-specific parameters
+- _extract_response_content(): To handle adapter-specific response formats
+- _get_excluded_request_keys(): To exclude additional keys from kwargs
+
+#### \_\_init\_\_
+
+```python
+def __init__(id: str, config: Dict[str, Any])
+```
+
+Initializes the ChatCompletionsAgent.
+
+**Arguments**:
+
+- `id` - A unique identifier for this agent instance.
+- `config` - Configuration dictionary for this agent.
+
+#### handle\_request
+
+```python
+def handle_request(request_data: Dict[str, Any]) -> Dict[str, Any]
+```
+
+Handles an incoming request using the chat completions pattern.
+
+This method implements the common flow for chat completion agents:
+1. Validate request (requires &#x27;prompt&#x27; or &#x27;messages&#x27;)
+2. Convert prompt to messages if needed
+3. Extract completion parameters
+4. Execute the completion via _execute_completion()
+5. Build and return standardized response
+
+**Arguments**:
+
+- `request_data` - A dictionary containing the request data.
+  Expected keys:
+  - &#x27;prompt&#x27;: Text prompt (converted to messages)
+  - &#x27;messages&#x27;: Pre-formatted messages list (takes precedence)
+  - &#x27;max_tokens&#x27;: Override default max tokens
+  - &#x27;temperature&#x27;: Override default temperature
+  - &#x27;top_p&#x27;: Override default top_p
+  - Additional adapter-specific parameters
+  
+
+**Returns**:
+
+  A dictionary representing the agent&#x27;s response or an error.
 

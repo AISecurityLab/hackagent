@@ -36,30 +36,32 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
-# ---------------------------------------------------------------------------
-# Canonical service defaults
-# ---------------------------------------------------------------------------
-
-DEFAULT_LOCAL_MODEL_ENDPOINT = "http://localhost:11434"
-DEFAULT_LOCAL_AGENT_TYPE = "OLLAMA"
-DEFAULT_ATTACKER_IDENTIFIER = "gemma3:4b"
-DEFAULT_JUDGE_IDENTIFIER = "gemma3:4b"
-DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER = "gemma3:4b"
-DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT = "http://localhost:11434"
-DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE = "OLLAMA"
-DEFAULT_CATEGORY_CLASSIFIER_MAX_TOKENS = 100
-DEFAULT_MAX_OUTPUT_TOKENS = 4096
-
-# Default local embedder served by Ollama (used by any attack that needs an
-# embedder, e.g. the RAG Attack and AutoDAN-Turbo strategy retrieval).
-DEFAULT_EMBEDDER_IDENTIFIER = "embeddinggemma"
-DEFAULT_EMBEDDER_ENDPOINT = "http://localhost:11434"
-DEFAULT_EMBEDDER_AGENT_TYPE = "OLLAMA"
-# OpenAI-compatible base URL exposed by Ollama (used by the RAG Attack, which
-# embeds through an OpenAI-compatible client and posts to ``/v1/embeddings``).
-DEFAULT_EMBEDDER_OPENAI_ENDPOINT = "http://localhost:11434/v1"
-# Ollama ignores the key but the OpenAI client requires a non-empty value.
-DEFAULT_EMBEDDER_OPENAI_API_KEY = "ollama"
+# Canonical scalar service defaults now live in ``hackagent.config`` (the
+# dependency-free leaf module that is the single source of truth). They are
+# re-exported here so existing ``from hackagent.attacks.techniques.config
+# import DEFAULT_*`` callers keep working. Pydantic-model-derived defaults
+# (DEFAULT_TIMEOUT, DEFAULT_BATCH_SIZE, …) stay below, next to their models.
+from hackagent.config import (
+    DEFAULT_ATTACKER_IDENTIFIER,
+    DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE,
+    DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT,
+    DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
+    DEFAULT_CATEGORY_CLASSIFIER_MAX_TOKENS,
+    DEFAULT_JUDGE_IDENTIFIER,
+    DEFAULT_LOCAL_AGENT_TYPE,
+    DEFAULT_LOCAL_MODEL,
+    DEFAULT_LOCAL_MODEL_ENDPOINT,
+    DEFAULT_MAX_OUTPUT_TOKENS,
+    DEFAULT_REMOTE_AGENT_TYPE,
+    DEFAULT_REMOTE_ATTACKER_IDENTIFIER,
+    DEFAULT_REMOTE_JUDGE_IDENTIFIER,
+    DEFAULT_REMOTE_ROLE_ENDPOINT,
+    DEFAULT_EMBEDDER_IDENTIFIER,
+    DEFAULT_EMBEDDER_ENDPOINT,
+    DEFAULT_EMBEDDER_AGENT_TYPE,
+    DEFAULT_EMBEDDER_OPENAI_ENDPOINT,
+    DEFAULT_EMBEDDER_OPENAI_API_KEY,
+)
 
 # ---------------------------------------------------------------------------
 # Pydantic models
@@ -69,7 +71,7 @@ DEFAULT_EMBEDDER_OPENAI_API_KEY = "ollama"
 class AttackerConfig(BaseModel):
     """Configuration for the attacker LLM.
 
-    Defaults to a local Ollama attacker endpoint using gemma3:4b so users
+    Defaults to a local Ollama attacker endpoint using an abliterated 12B model so users
     only need to override what is different for their deployment.
     """
 
@@ -114,7 +116,7 @@ class CategoryClassifierConfig(BaseModel):
 class JudgeConfig(BaseModel):
     """Configuration for one judge evaluator.
 
-    Defaults to a HarmBench judge routed through local Ollama (gemma3:4b).
+    Defaults to a HarmBench judge routed through local Ollama (abliterated 12B).
     """
 
     model_config = ConfigDict(extra="allow", validate_assignment=True)
@@ -364,6 +366,11 @@ __all__ = [
     "DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE",
     "DEFAULT_CATEGORY_CLASSIFIER_MAX_TOKENS",
     "DEFAULT_MAX_OUTPUT_TOKENS",
+    "DEFAULT_REMOTE_ROLE_ENDPOINT",
+    "DEFAULT_REMOTE_AGENT_TYPE",
+    "DEFAULT_REMOTE_ATTACKER_IDENTIFIER",
+    "DEFAULT_REMOTE_JUDGE_IDENTIFIER",
+    "DEFAULT_LOCAL_MODEL",
     "DEFAULT_EMBEDDER_IDENTIFIER",
     "DEFAULT_EMBEDDER_ENDPOINT",
     "DEFAULT_EMBEDDER_AGENT_TYPE",

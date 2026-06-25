@@ -321,12 +321,15 @@ class BaseJudgeEvaluator(ABC):
 
         # Process via judge
         if rows_to_process:
-            results_eval, results_expl, processed_indices, raw_judge_responses = (
-                self._process_rows_with_router(
-                    rows_to_process,
-                    f"[cyan]Evaluating responses ({self.__class__.__name__})...",
-                    include_raw_responses=True,
-                )
+            (
+                results_eval,
+                results_expl,
+                processed_indices,
+                raw_judge_responses,
+            ) = self._process_rows_with_router(
+                rows_to_process,
+                f"[cyan]Evaluating responses ({self.__class__.__name__})...",
+                include_raw_responses=True,
             )
 
             # Map results back by original index
@@ -445,13 +448,15 @@ class BaseJudgeEvaluator(ABC):
             request_data = None
             try:
                 request_data = self._get_request_data_for_row(row)
-                current_eval, current_expl, current_raw_response = (
-                    self._request_with_assertions(
-                        request_data=request_data,
-                        original_index=original_index,
-                        max_retries=max_retries,
-                        include_raw_response=True,
-                    )
+                (
+                    current_eval,
+                    current_expl,
+                    current_raw_response,
+                ) = self._request_with_assertions(
+                    request_data=request_data,
+                    original_index=original_index,
+                    max_retries=max_retries,
+                    include_raw_response=True,
                 )
             except Exception as e:
                 current_expl = (

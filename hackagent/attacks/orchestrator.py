@@ -24,8 +24,8 @@ Technique implementations remain pure algorithms, unaware of server integration.
 
 import json
 import logging
-import copy
 import os
+import copy
 import re
 import shutil
 import subprocess
@@ -46,6 +46,13 @@ from hackagent.attacks.techniques.config import (
     DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE,
     DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT,
     DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
+    DEFAULT_LOCAL_AGENT_TYPE,
+    DEFAULT_LOCAL_MODEL,
+    DEFAULT_LOCAL_MODEL_ENDPOINT,
+    DEFAULT_REMOTE_AGENT_TYPE,
+    DEFAULT_REMOTE_ATTACKER_IDENTIFIER,
+    DEFAULT_REMOTE_JUDGE_IDENTIFIER,
+    DEFAULT_REMOTE_ROLE_ENDPOINT,
 )
 from hackagent.server.storage.enums import StatusEnum
 
@@ -56,14 +63,6 @@ logger = get_logger(__name__)
 if not logger.handlers:
     logger.addHandler(logging.NullHandler())
 logger.propagate = False
-
-_REMOTE_ROLE_ENDPOINT = "https://api.hackagent.dev/v1"
-_REMOTE_ATTACKER_IDENTIFIER = "hackagent-attacker"
-_REMOTE_JUDGE_IDENTIFIER = "hackagent-judge"
-
-_LOCAL_ROLE_ENDPOINT = "http://localhost:11434"
-_LOCAL_ROLE_IDENTIFIER = "gemma3:4b"
-_LOCAL_ROLE_AGENT_TYPE = "OLLAMA"
 
 
 class _BatchContextFilter(logging.Filter):
@@ -262,34 +261,68 @@ class AttackOrchestrator:
         """Build remote role defaults with backend-key fallback semantics."""
         return {
             "attacker": {
-                "identifier": _REMOTE_ATTACKER_IDENTIFIER,
-                "endpoint": _REMOTE_ROLE_ENDPOINT,
-                "agent_type": "OPENAI_SDK",
+                "identifier": DEFAULT_REMOTE_ATTACKER_IDENTIFIER,
+                "endpoint": DEFAULT_REMOTE_ROLE_ENDPOINT,
+                "agent_type": DEFAULT_REMOTE_AGENT_TYPE,
                 "api_key": api_key,
             },
             "judge": {
-                "identifier": _REMOTE_JUDGE_IDENTIFIER,
-                "endpoint": _REMOTE_ROLE_ENDPOINT,
-                "agent_type": "OPENAI_SDK",
+                "identifier": DEFAULT_REMOTE_JUDGE_IDENTIFIER,
+                "endpoint": DEFAULT_REMOTE_ROLE_ENDPOINT,
+                "agent_type": DEFAULT_REMOTE_AGENT_TYPE,
                 "type": "harmbench_variant",
                 "api_key": api_key,
             },
         }
 
     @staticmethod
+    def _remote_classifier_defaults(api_key: str) -> Dict[str, Any]:
+        """Remote (HackAgent API) defaults for the goal category classifier.
+
+        Routes the classifier through the same hosted endpoint as the judge so
+        it never requires a local Ollama model when a HackAgent API key is
+        available. Without a key, the classifier keeps its local default
+        (see techniques.config) — this is only applied in remote mode.
+        """
+        return {
+            "identifier": DEFAULT_REMOTE_JUDGE_IDENTIFIER,
+            "endpoint": DEFAULT_REMOTE_ROLE_ENDPOINT,
+            "agent_type": DEFAULT_REMOTE_AGENT_TYPE,
+            "api_key": api_key,
+        }
+
+    @staticmethod
+    def _enable_remote_reasoning_if_needed(role_cfg: Dict[str, Any]) -> None:
+        """Force reasoning on when a role uses the HackAgent generator endpoint.
+
+        That endpoint is a reasoning model and rejects requests with reasoning
+        disabled. We send it both ways (``thinking`` → ``reasoning_effort`` on the
+        OpenAI path, plus an explicit ``extra_body.reasoning`` for proxies that
+        expect the OpenRouter shape). Keyed on the generator identifier — not the
+        role — so an explicit user-supplied attacker model is never touched.
+        ``setdefault`` keeps any explicit caller values.
+        """
+        if not isinstance(role_cfg, dict):
+            return
+        if role_cfg.get("identifier") != DEFAULT_REMOTE_ATTACKER_IDENTIFIER:
+            return
+        role_cfg.setdefault("thinking", "medium")
+        role_cfg.setdefault("extra_body", {"reasoning": {"effort": "medium"}})
+
+    @staticmethod
     def _local_role_defaults() -> Dict[str, Dict[str, Any]]:
         """Build local role defaults from the attack_roles profile."""
         return {
             "attacker": {
-                "identifier": _LOCAL_ROLE_IDENTIFIER,
-                "endpoint": _LOCAL_ROLE_ENDPOINT,
-                "agent_type": _LOCAL_ROLE_AGENT_TYPE,
+                "identifier": DEFAULT_LOCAL_MODEL,
+                "endpoint": DEFAULT_LOCAL_MODEL_ENDPOINT,
+                "agent_type": DEFAULT_LOCAL_AGENT_TYPE,
                 "api_key": None,
             },
             "judge": {
-                "identifier": _LOCAL_ROLE_IDENTIFIER,
-                "endpoint": _LOCAL_ROLE_ENDPOINT,
-                "agent_type": _LOCAL_ROLE_AGENT_TYPE,
+                "identifier": DEFAULT_LOCAL_MODEL,
+                "endpoint": DEFAULT_LOCAL_MODEL_ENDPOINT,
+                "agent_type": DEFAULT_LOCAL_AGENT_TYPE,
                 # Keep evaluator compatibility when defaults are auto-injected.
                 "type": "harmbench",
                 "api_key": None,
@@ -330,33 +363,46 @@ class AttackOrchestrator:
         )
 
         role_mapping = self._role_defaults_mapping_for_attack(normalized_attack_type)
-        if not role_mapping:
-            return attack_config
 
         resolved = copy.deepcopy(attack_config)
-        defaults_by_family = (
-            self._remote_role_defaults(api_key)
-            if is_remote_mode
-            else self._local_role_defaults()
-        )
 
-        for role_name, role_family in role_mapping.items():
-            role_defaults = dict(defaults_by_family[role_family])
-            role_cfg = resolved.get(role_name)
-            if isinstance(role_cfg, dict):
-                self._merge_missing_keys(role_cfg, role_defaults)
-            else:
-                resolved[role_name] = role_defaults
+        if role_mapping:
+            defaults_by_family = (
+                self._remote_role_defaults(api_key)
+                if is_remote_mode
+                else self._local_role_defaults()
+            )
 
-            # Judge-based attacks usually consume list-style judge configs.
-            if role_name == "judge":
-                judges_cfg = resolved.get("judges")
-                if isinstance(judges_cfg, list) and judges_cfg:
-                    for item in judges_cfg:
-                        if isinstance(item, dict):
-                            self._merge_missing_keys(item, role_defaults)
+            for role_name, role_family in role_mapping.items():
+                role_defaults = dict(defaults_by_family[role_family])
+                role_cfg = resolved.get(role_name)
+                if isinstance(role_cfg, dict):
+                    self._merge_missing_keys(role_cfg, role_defaults)
                 else:
-                    resolved["judges"] = [dict(role_defaults)]
+                    resolved[role_name] = role_defaults
+                    role_cfg = resolved[role_name]
+
+                # Enable reasoning only for a role that actually lands on the
+                # HackAgent generator endpoint (a reasoning model that rejects
+                # requests with reasoning disabled). Tied to the identifier, not
+                # the role, so an explicit --attacker-model is never affected.
+                self._enable_remote_reasoning_if_needed(role_cfg)
+
+                # Judge-based attacks usually consume list-style judge configs.
+                if role_name == "judge":
+                    judges_cfg = resolved.get("judges")
+                    if isinstance(judges_cfg, list) and judges_cfg:
+                        for item in judges_cfg:
+                            if isinstance(item, dict):
+                                self._merge_missing_keys(item, role_defaults)
+                    else:
+                        resolved["judges"] = [dict(role_defaults)]
+
+        # Route the goal category classifier through the HackAgent API too when
+        # a key is available, so it never needs a local Ollama model. In local
+        # mode it is left untouched (keeps its techniques.config default).
+        if is_remote_mode and self._uses_default_category_classifier(resolved):
+            resolved["category_classifier"] = self._remote_classifier_defaults(api_key)
 
         return resolved
 
@@ -512,6 +558,79 @@ class AttackOrchestrator:
                 models.add(model_name)
         return models
 
+    @staticmethod
+    def _auto_pull_enabled(attack_config: Dict[str, Any]) -> bool:
+        """Whether missing local Ollama models are downloaded automatically.
+
+        Enabled by default. Opt out with ``attack_config["auto_pull_models"]
+        = False`` or the ``HACKAGENT_AUTO_PULL_MODELS=0`` environment variable
+        (useful for CI / offline / metered-connection runs).
+        """
+        cfg = attack_config.get("auto_pull_models")
+        if cfg is not None:
+            return bool(cfg)
+        env = os.environ.get("HACKAGENT_AUTO_PULL_MODELS")
+        if env is not None and env.strip().lower() in ("0", "false", "no", "off"):
+            return False
+        return True
+
+    @classmethod
+    def _pull_ollama_model(cls, model: str) -> bool:
+        """Download a local Ollama model via ``ollama pull``. Returns success.
+
+        Inherits stdout/stderr so the user sees Ollama's live download progress
+        instead of a frozen terminal. Returns False (rather than raising) when
+        ollama is absent or the pull fails, so callers can fall back to their
+        existing "model unavailable" handling.
+        """
+        if shutil.which("ollama") is None:
+            return False
+        logger.info("Auto-pulling missing Ollama model '%s' via `ollama pull`", model)
+        print(
+            f"⬇️  Downloading missing Ollama model '{model}' "
+            "(set auto_pull_models=False to disable)...",
+            flush=True,
+        )
+        try:
+            result = subprocess.run(["ollama", "pull", model], check=False)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("Failed to run `ollama pull %s`: %s", model, exc)
+            return False
+        if result.returncode != 0:
+            logger.warning(
+                "`ollama pull %s` exited with code %s", model, result.returncode
+            )
+            return False
+        return True
+
+    def _autopull_missing_ollama_targets(self, targets: List[Dict[str, Any]]) -> None:
+        """Best-effort: download any missing local Ollama models among *targets*.
+
+        Runs before the availability probe so attacker/judge/etc. models served
+        by a local Ollama are fetched on first use. Failures are swallowed — the
+        probe still reports anything genuinely unreachable.
+        """
+        candidates = [
+            str(t.get("identifier"))
+            for t in targets
+            if str(t.get("agent_type") or "").upper() == "OLLAMA"
+            and t.get("identifier")
+        ]
+        if not candidates or shutil.which("ollama") is None:
+            return
+        try:
+            installed = self._get_installed_ollama_models()
+        except Exception:
+            return
+        seen: set[str] = set()
+        for model in candidates:
+            if model in seen:
+                continue
+            seen.add(model)
+            if not self._is_ollama_model_present(model, installed):
+                if self._pull_ollama_model(model):
+                    installed |= self._normalize_ollama_model_aliases(model)
+
     def _validate_default_category_classifier_requirements(
         self, attack_config: Dict[str, Any]
     ) -> None:
@@ -542,12 +661,23 @@ class AttackOrchestrator:
             ) from exc
 
         if not self._is_ollama_model_present(required_model, installed_models):
-            raise ValueError(
-                "Attack aborted: default category_classifier requires local Ollama "
-                f"model '{required_model}', but it is not present. Run "
-                f"`ollama pull {required_model}` or provide `category_classifier` "
-                "explicitly in attack_config."
-            )
+            # Auto-download the model (on by default) before giving up.
+            pulled = False
+            if self._auto_pull_enabled(attack_config) and self._pull_ollama_model(
+                required_model
+            ):
+                try:
+                    installed_models = self._get_installed_ollama_models()
+                except Exception:
+                    installed_models = set()
+                pulled = self._is_ollama_model_present(required_model, installed_models)
+            if not pulled:
+                raise ValueError(
+                    "Attack aborted: default category_classifier requires local "
+                    f"Ollama model '{required_model}', but it is not present. Run "
+                    f"`ollama pull {required_model}` or provide `category_classifier` "
+                    "explicitly in attack_config."
+                )
 
     @staticmethod
     @contextmanager
@@ -917,7 +1047,30 @@ class AttackOrchestrator:
         router: Any,
         registration_key: str,
     ) -> Optional[str]:
-        """Issue a tiny completion request and return error text when unavailable."""
+        """Issue a tiny completion request and return error text when unavailable.
+
+        Adapters that expose ``probe_ready()`` (e.g. the web provider) get a
+        non-generative reachability check instead — so we don't type a junk
+        "healthcheck" message into a live chatbot and pollute its conversation
+        and the recorded transcript.
+        """
+        try:
+            agent = router.get_agent_instance(registration_key)
+        except Exception:
+            agent = None
+        probe_ready = getattr(agent, "probe_ready", None)
+        if callable(probe_ready):
+            try:
+                result = probe_ready()
+            except Exception as exc:
+                return f"request failed ({type(exc).__name__}): {exc}"
+            # None = reachable, str = error. Anything else (e.g. a test mock)
+            # is inconclusive — treat as reachable, mirroring the non-dict
+            # tolerance below.
+            if result is None or isinstance(result, str):
+                return result
+            return None
+
         try:
             response = router.route_request(
                 registration_key=registration_key,
@@ -937,6 +1090,13 @@ class AttackOrchestrator:
 
         error_message = response.get("error_message")
         if error_message:
+            # An empty generation still proves the model is reachable — this
+            # probe checks availability, not output quality. The 1-token budget
+            # yields no visible text for models that emit reasoning tokens
+            # first, so don't treat that as "unavailable". Genuine connectivity
+            # / load failures surface as other error strings and still fail.
+            if "EMPTY_RESPONSE" in str(error_message):
+                return None
             return str(error_message)
 
         return None
@@ -1056,6 +1216,11 @@ class AttackOrchestrator:
         )
         if not targets:
             return None
+
+        # Download any missing local Ollama models before probing, so the
+        # probe sees them as available (on by default; see _auto_pull_enabled).
+        if self._auto_pull_enabled(attack_config):
+            self._autopull_missing_ollama_targets(targets)
 
         probe_optional_roles = bool(
             attack_config.get("_preflight_probe_optional_roles", False)

@@ -46,6 +46,13 @@ class TestPairConfig(unittest.TestCase):
         self.assertIn("{goal}", ATTACKER_SYSTEM_PROMPT)
         self.assertIn("{goal}", JUDGE_SYSTEM_PROMPT)
 
+    def test_attacker_prompt_has_no_language_directive_placeholder(self):
+        # Language is handled by translating the whole prompt (see
+        # the translation module), not by an in-prompt directive.
+        self.assertNotIn("{language_directive}", ATTACKER_SYSTEM_PROMPT)
+        # Formats with only the goal placeholder.
+        self.assertIn("Sure, here is", ATTACKER_SYSTEM_PROMPT.format(goal="x"))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -36,12 +36,12 @@ def _fast_classifier_config(
 ) -> dict[str, object]:
     """Classifier config that reuses the CI's already-pulled small model.
 
-    The implicit default classifier uses ``gemma3:4b`` (see
-    ``DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER``). gemma3:4b is a 4B-param
-    model that runs slowly on CPU-only GitHub runners — 9 judgments
-    blew the 120s pytest-timeout. Integration tests don't care which
-    classifier model is used, only that the attack pipeline routes
-    judgments through one, so we reuse the small target model.
+    The implicit default classifier uses
+    ``DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER``, a large model that runs
+    slowly on CPU-only GitHub runners — 9 judgments blew the 120s
+    pytest-timeout. Integration tests don't care which classifier model
+    is used, only that the attack pipeline routes judgments through one,
+    so we reuse the small target model.
     """
     return {
         "identifier": ollama_model,

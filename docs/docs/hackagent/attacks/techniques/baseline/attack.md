@@ -64,6 +64,20 @@ Initialize baseline attack.
 
 - `ValueError` - If ``client`` or ``agent_router`` is ``None``.
 
+#### get\_effective\_model\_roles
+
+```python
+@classmethod
+def get_effective_model_roles(
+    cls,
+    attack_config: Dict[str, Any],
+    *,
+    goal_labels_by_index: Optional[Dict[int, Dict[str, str]]] = None
+) -> List[Dict[str, Any]]
+```
+
+Return only the model roles needed by the effective baseline evaluator.
+
 #### run
 
 ```python

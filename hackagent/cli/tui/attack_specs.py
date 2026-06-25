@@ -26,7 +26,10 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
-from hackagent.attacks.techniques.config import DEFAULT_ATTACKER_IDENTIFIER
+from hackagent.attacks.techniques.config import (
+    DEFAULT_ATTACKER_IDENTIFIER,
+    DEFAULT_JUDGE_IDENTIFIER,
+)
 
 
 # =====================================================================
@@ -736,7 +739,7 @@ _register(
                 key="attacker.identifier",
                 label="Attacker Model",
                 field_type=FieldType.STRING,
-                default="gemma3:4b",
+                default=DEFAULT_ATTACKER_IDENTIFIER,
                 description="Model identifier for the attacker LLM.",
                 section="Attacker LLM",
             ),
@@ -756,7 +759,7 @@ _register(
                 key="scorer.identifier",
                 label="Scorer Model",
                 field_type=FieldType.STRING,
-                default="gemma3:4b",
+                default=DEFAULT_JUDGE_IDENTIFIER,
                 description="Model identifier for the scorer LLM.",
                 section="Scorer LLM",
             ),

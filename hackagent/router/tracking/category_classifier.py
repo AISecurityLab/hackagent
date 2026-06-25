@@ -283,8 +283,13 @@ class GoalCategoryClassifier:
 
     @staticmethod
     def _resolve_config(config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        # Imported lazily to avoid a router↔attacks import cycle at load time.
+        from hackagent.attacks.techniques.config import (
+            DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
+        )
+
         resolved: Dict[str, Any] = {
-            "identifier": "gemma3:4b",
+            "identifier": DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
             "endpoint": "http://localhost:11434",
             "agent_type": "OLLAMA",
             "api_key": None,

@@ -10,6 +10,10 @@ judge evaluation with early-stopping.  By the time this step executes,
 every result dict already contains ``best_score``, ``success``, and the
 raw judge columns (``eval_hb``, ``eval_jb``, etc.).
 
+In BoN specifically, judges are called inline only on the **best candidate
+of each step** (not on all K candidates). This evaluation step never re-runs
+judge evaluation.
+
 The post-processing step is responsible for:
 - Enriching any items that are still missing scores (e.g. errors).
 - Tracker integration (per-goal evaluation traces).
@@ -27,7 +31,8 @@ class BoNEvaluation(BaseEvaluationStep)
 
 Lightweight post-processing for the Best-of-N (BoN) attack.
 
-Judge evaluation is performed inline during the generation loop.
+Judge evaluation is performed inline during the generation loop on the
+step-best candidate only.
 This step handles server sync, tracker updates, and ASR logging only.
 
 #### execute

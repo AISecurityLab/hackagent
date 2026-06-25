@@ -548,3 +548,15 @@ Compile a decorator program string into a callable.
 - `syntax_version`0 - If ``syntax_version`` is not 1 or 2.
 - `syntax_version`3 - If the program string cannot be compiled.
 
+#### program\_uses\_llm\_assisted\_decorators
+
+```python
+def program_uses_llm_assisted_decorators(program: str,
+                                         syntax_version: int = 2) -> bool
+```
+
+Return whether a program chain contains at least one LLM-assisted decorator.
+
+This helper is used by both preflight role resolution and runtime setup to
+keep decorator-LLM activation semantics consistent.
+

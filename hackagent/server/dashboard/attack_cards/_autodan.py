@@ -91,9 +91,12 @@ class AutodanCardMixin:
 
             raw_resp = content.get("target_response") or content.get("response")
             if raw_resp:
-                raw_resp, _adan_g_side, _adan_g_expl, _adan_g_cats = (
-                    AttackCardSharedMixin._extract_guardrail_from_response(raw_resp)
-                )
+                (
+                    raw_resp,
+                    _adan_g_side,
+                    _adan_g_expl,
+                    _adan_g_cats,
+                ) = AttackCardSharedMixin._extract_guardrail_from_response(raw_resp)
                 if _adan_g_side:
                     step["_guardrail_side"] = _adan_g_side
                     step["_guardrail_explanation"] = _adan_g_expl

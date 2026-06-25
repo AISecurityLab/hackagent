@@ -39,9 +39,12 @@ class PairCardMixin:
                 ]
                 prompt = user_msgs[-1] if user_msgs else ""
             resp = content.get("response")
-            resp, _pair_g_side, _pair_g_expl, _pair_g_cats = (
-                AttackCardSharedMixin._extract_guardrail_from_response(resp)
-            )
+            (
+                resp,
+                _pair_g_side,
+                _pair_g_expl,
+                _pair_g_cats,
+            ) = AttackCardSharedMixin._extract_guardrail_from_response(resp)
             # Fallback: guardrail info in metadata (older traces)
             if not _pair_g_side:
                 _gi = metadata.get("guardrail_info") or {}

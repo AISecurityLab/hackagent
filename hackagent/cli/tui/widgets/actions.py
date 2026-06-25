@@ -124,6 +124,7 @@ class AgentActionsViewer(Container):
         if self.show_controls:
             with Container(classes="actions-controls"):
                 yield Button("Clear Actions", id="clear-actions", variant="default")
+                yield Button("Copy", id="copy-actions", variant="default")
                 yield Static("", id="action-count")
 
         # Actions display area
@@ -145,6 +146,36 @@ class AgentActionsViewer(Container):
         """Handle button press events."""
         if event.button.id == "clear-actions":
             self.clear_actions()
+        elif event.button.id == "copy-actions":
+            ok = self.copy_actions()
+            self.notify(
+                "Actions copied to clipboard!" if ok else "Nothing to copy",
+                title="Copy",
+                severity="information" if ok else "warning",
+            )
+
+    def get_actions_text(self) -> str:
+        """Return the plain text currently shown in the actions log."""
+        from hackagent.cli.tui.widgets.clipboard import richlog_plaintext
+
+        try:
+            log = self.query_one("#actions-display", RichLog)
+        except Exception:
+            return ""
+        return richlog_plaintext(log) or ""
+
+    def copy_actions(self) -> bool:
+        """Copy all currently shown agent actions to the clipboard."""
+        from hackagent.cli.tui.widgets.clipboard import copy_to_clipboard
+
+        text = self.get_actions_text()
+        if not text:
+            return False
+        try:
+            app = self.app
+        except Exception:
+            app = None
+        return copy_to_clipboard(app, text)
 
     def add_info_message(self, message: str) -> None:
         """Add an informational message to the viewer."""

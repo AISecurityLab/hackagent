@@ -96,12 +96,17 @@ a complete attack attempt on a single goal/datapoint.
 #### \_\_init\_\_
 
 ```python
-def __init__(backend: StorageBackend,
-             run_id: str,
-             logger: Optional[logging.Logger] = None,
-             attack_type: Optional[str] = None,
-             category_classifier_config: Optional[Dict[str, Any]] = None,
-             event_bus: Optional[Any] = None)
+def __init__(
+        backend: StorageBackend,
+        run_id: str,
+        logger: Optional[logging.Logger] = None,
+        attack_type: Optional[str] = None,
+        category_classifier_config: Optional[Dict[str, Any]] = None,
+        preclassified_goal_labels_by_index: Optional[Dict[Any,
+                                                          Dict[str,
+                                                               str]]] = None,
+        disable_goal_category_classifier: bool = False,
+        event_bus: Optional[Any] = None)
 ```
 
 Initialize tracker.

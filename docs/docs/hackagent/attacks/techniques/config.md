@@ -38,7 +38,7 @@ class AttackerConfig(BaseModel)
 
 Configuration for the attacker LLM.
 
-Defaults to a local Ollama attacker endpoint using gemma3:4b so users
+Defaults to a local Ollama attacker endpoint using an abliterated 12B model so users
 only need to override what is different for their deployment.
 
 ## CategoryClassifierConfig Objects
@@ -60,7 +60,7 @@ class JudgeConfig(BaseModel)
 
 Configuration for one judge evaluator.
 
-Defaults to a HarmBench judge routed through local Ollama (gemma3:4b).
+Defaults to a HarmBench judge routed through local Ollama (abliterated 12B).
 
 ## JudgeEvalConfig Objects
 

@@ -42,6 +42,20 @@ Initialize AutoDAN-Turbo attack with merged defaults.
 
 - `ValueError` - If ``client`` or ``agent_router`` are missing.
 
+#### get\_effective\_model\_roles
+
+```python
+@classmethod
+def get_effective_model_roles(
+    cls,
+    attack_config: Dict[str, Any],
+    *,
+    goal_labels_by_index: Dict[int, Dict[str, str]] | None = None
+) -> List[Dict[str, Any]]
+```
+
+Resolve AutoDAN-Turbo preflight roles with optional embedder semantics.
+
 #### run
 
 ```python
