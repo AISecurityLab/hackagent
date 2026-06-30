@@ -302,7 +302,7 @@ def _evaluate_row(
         metadata_updates["judge_count"] = judge_count
         metadata_updates["is_multi_judge"] = is_multi_judge
 
-    # Also check generic "success" key (used by baseline)
+    # Also check generic "success" key (used by static_template)
     if "success" in row and not notes_parts:
         success = bool(row["success"])
         notes_parts.append(row.get("evaluation_notes", ""))

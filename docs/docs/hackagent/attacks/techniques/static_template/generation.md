@@ -1,9 +1,9 @@
 ---
 sidebar_label: generation
-title: hackagent.attacks.techniques.baseline.generation
+title: hackagent.attacks.techniques.static_template.generation
 ---
 
-Template generation module for baseline attacks.
+Template generation module for static template attacks.
 
 Generates attack prompts by combining predefined templates with goals.
 

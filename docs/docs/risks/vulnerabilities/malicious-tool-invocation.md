@@ -20,7 +20,7 @@ Tests for risks from untrusted tool execution, data exfiltration through tool in
 - **agentharm** (SECONDARY): Agentic tasks that exercise plugin/tool interactions
 
 **Attack Techniques**:
-- Baseline (PRIMARY): Template-based prompt construction
+- Static Template (PRIMARY): Template-based prompt construction
 
 **Metrics**: asr, judge_score
 

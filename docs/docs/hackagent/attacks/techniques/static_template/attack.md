@@ -1,20 +1,20 @@
 ---
 sidebar_label: attack
-title: hackagent.attacks.techniques.baseline.attack
+title: hackagent.attacks.techniques.static_template.attack
 ---
 
-Baseline attack implementation.
+Static Template attack implementation.
 
 Uses predefined prompt templates to attempt jailbreaks by combining
 templates with harmful goals.
 
-## BaselineAttack Objects
+## StaticTemplateAttack Objects
 
 ```python
-class BaselineAttack(BaseAttack)
+class StaticTemplateAttack(BaseAttack)
 ```
 
-Baseline attack using predefined prompt templates.
+Static Template attack using predefined prompt templates.
 
 Combines a library of prompt templates across several jailbreak
 categories with each goal string to produce attack prompts, sends
@@ -23,24 +23,24 @@ configurable evaluator (pattern-matching, keyword, or LLM judge).
 
 Pipeline stages
 ---------------
-1. **Generation** (:func:`~hackagent.attacks.techniques.baseline.generation.execute`) —
+1. **Generation** (:func:`~hackagent.attacks.techniques.static_template.generation.execute`) —
 selects up to ``templates_per_category`` templates from each
 category in ``template_categories``, injects each goal, and
 collects target-model responses.
-2. **Evaluation** (:func:`~hackagent.attacks.techniques.baseline.evaluation.execute`) —
+2. **Evaluation** (:func:`~hackagent.attacks.techniques.static_template.evaluation.execute`) —
 scores responses for jailbreak success using the configured
 ``evaluator_type`` (``&quot;pattern&quot;``, ``&quot;keyword&quot;``, or ``&quot;llm_judge&quot;``).
 
-This attack is useful as a **sanity-check baseline**: it requires no
+This attack is useful as a **sanity-check**: it requires no
 additional LLM (unlike PAIR/TAP/AdvPrefix) and surfaces naive template
 weaknesses in the target model.
 
 **Attributes**:
 
-- ``4 - Merged baseline configuration dictionary.
+- ``4 - Merged static template configuration dictionary.
 - ``5 - Authenticated HackAgent API client.
 - ``6 - Router for the victim model.
-- ``7 - Hierarchical logger at ``hackagent.attacks.baseline``.
+- ``7 - Hierarchical logger at ``hackagent.attacks.static_template``.
 
 #### \_\_init\_\_
 
@@ -50,12 +50,12 @@ def __init__(config: Optional[Dict[str, Any]] = None,
              agent_router: Optional[AgentRouter] = None)
 ```
 
-Initialize baseline attack.
+Initialize static template attack.
 
 **Arguments**:
 
 - `config` - Configuration override dictionary merged into
-  :data:`~hackagent.attacks.techniques.baseline.config.DEFAULT_TEMPLATE_CONFIG`.
+  :data:`~hackagent.attacks.techniques.static_template.config.DEFAULT_TEMPLATE_CONFIG`.
 - `client` - Authenticated HackAgent API client.
 - `agent_router` - Router for the victim model.
   
@@ -85,7 +85,7 @@ Return only the model roles needed by the effective baseline evaluator.
 def run(goals: List[str]) -> Dict[str, Any]
 ```
 
-Execute baseline attack.
+Execute static template attack.
 
 Uses TrackingCoordinator for unified pipeline and goal tracking.
 

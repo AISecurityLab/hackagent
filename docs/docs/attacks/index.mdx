@@ -15,7 +15,7 @@ graph LR
         B[AutoDAN-Turbo] --> |"Sophisticated"| T
         C[PAIR] --> |"Adaptive"| T
         P[PAP] --> |"Persuasion"| T
-        D[Baseline] --> |"Fast"| T
+        D[Static Template] --> |"Fast"| T
         E[TAP] --> |"Tree Search"| T
         F[FlipAttack] --> |"Obfuscation"| T
         G[BoN] --> |"Augmentation"| T
@@ -44,7 +44,7 @@ graph LR
 | [**MML**](./mml.md) | Multimodal image-encoded jailbreak for Vision-Language Models | ⭐⭐ Medium | Fast |
 | [**FC**](./fc.md) | Auto-generated flowchart images to jailbreak VLMs | ⭐⭐ Medium | Fast |
 | [**tFC**](./fc.md) | Auto-generated flowchart text to jailbreak LLMs | ⭐⭐ Medium | Fast |
-| [**Baseline**](./baseline.md) | Template-based prompt injection | ⭐ Basic | Fast |
+| [**Static Template**](./static-template.md) | Template-based prompt injection | ⭐ Basic | Fast |
 
 :::tip Dataset Support
 All attacks support loading goals from AI safety benchmarks like **AgentHarm**, **StrongREJECT**, and **HarmBench**. See [Dataset Providers](../datasets/) for details.
@@ -244,7 +244,7 @@ attack_config = {
 
 ---
 
-## Baseline — Template-Based Attacks
+## Static Template — Template-Based Attacks
 
 A simpler but effective approach using **predefined prompt templates** combined with harmful goals. Great for quick vulnerability assessments.
 
@@ -256,13 +256,13 @@ Predefined prompt templates (roleplay, encoding, context-switch, etc.) are combi
 
 ```python
 attack_config = {
-    "attack_type": "baseline",
+    "attack_type": "static_template",
     "goals": ["Ignore previous instructions"],
     "template_categories": ["roleplay", "encoding", "context_switch"]
 }
 ```
 
-[**Learn more about Baseline →**](./baseline.md)
+[**Learn more about Static Template →**](./static-template.md)
 
 ---
 
@@ -310,7 +310,7 @@ attack_config = {
 
 **MML** is best when evaluating multimodal safety boundaries: it encodes attack prompts into generated images and tests whether Vision-Language Models follow hidden harmful instructions.
 
-**Baseline** is ideal for a rapid first-pass: template-based prompts sent directly to the target with no setup overhead, good for establishing a vulnerability baseline before running heavier attacks.
+**Static Template** is ideal for a rapid first-pass: template-based prompts sent directly to the target with no setup overhead, good for establishing a vulnerability baseline before running heavier attacks.
 
 **RAG Attack** is the only attack testing **indirect** vectors: it evaluates whether poisoned documents in a knowledge base can manipulate the agent's responses to innocent users. Use it when assessing RAG pipeline security.
 
@@ -339,7 +339,7 @@ graph TD
 ### Components
 
 1. **Orchestrator**: Manages attack lifecycle, configuration, and result handling
-2. **Attack Implementation**: Contains the specific attack logic (AdvPrefix, PAIR, Baseline)
+2. **Attack Implementation**: Contains the specific attack logic (AdvPrefix, PAIR, Static Template)
 3. **Agent Router**: Handles communication with target agents across different frameworks
 4. **Judges**: Evaluate attack success using various criteria (HarmBench, custom objectives)
 5. **Local Storage**: Saves results to the local SQLite database for review via TUI and CLI results commands
@@ -353,4 +353,4 @@ graph TD
 - [TAP Attack Guide](./tap.md) — Tree-search with pruning
 - [FlipAttack Guide](./flipattack.md) — Character-level obfuscation
 - [BoN Guide](./bon.md) — Best-of-N random augmentation
-- [Baseline Templates](./baseline.md) — Template categories and customization
+- [Static Template Templates](./static-template.md) — Template categories and customization

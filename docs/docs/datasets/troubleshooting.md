@@ -72,7 +72,7 @@ Run this minimal pattern to isolate dataset issues:
 
 ```python
 attack_config = {
-    "attack_type": "baseline",
+    "attack_type": "static_template",
     "dataset": {
         "preset": "simplesafetytests",
         "limit": 10,

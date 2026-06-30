@@ -20,7 +20,7 @@ Tests for hardcoded credentials, token leakage, and misconfigured access control
 No standard public datasets are available. Custom goals are required for testing this vulnerability.
 
 **Attack Techniques**:
-- Baseline (PRIMARY): Template-based prompt construction
+- Static Template (PRIMARY): Template-based prompt construction
 
 **Metrics**: asr
 

@@ -35,7 +35,7 @@ from nicegui import ui
 
 from .attack_cards import (
     AttackCardSharedMixin,
-    BaselineCardMixin,
+    StaticTemplateCardMixin,
     BonCardMixin,
     PairCardMixin,
     AutodanCardMixin,
@@ -64,7 +64,7 @@ from ._run_history_results_mixin import DashboardRunHistoryResultsMixin
 
 class DashboardPage(
     AttackCardSharedMixin,
-    BaselineCardMixin,
+    StaticTemplateCardMixin,
     BonCardMixin,
     PairCardMixin,
     AutodanCardMixin,

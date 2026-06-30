@@ -513,11 +513,13 @@ class DashboardTraceAnalysisMixin:
             atk = attack_str.lower()
 
             with container:
-                if atk == "baseline":
-                    detail_data = self._parse_baseline_traces(
+                if atk in ("static_template", "statictemplate"):
+                    detail_data = self._parse_static_template_traces(
                         serialized_traces, str(row.get("goal") or "")
                     )
-                    self._render_baseline_goal_card(row, detail_data, detail_mode=True)
+                    self._render_static_template_goal_card(
+                        row, detail_data, detail_mode=True
+                    )
                 elif atk == "bon":
                     detail_data = self._parse_bon_traces(serialized_traces)
                     self._render_bon_goal_card(row, detail_data, detail_mode=True)

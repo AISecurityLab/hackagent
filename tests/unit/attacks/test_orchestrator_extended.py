@@ -201,14 +201,14 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
 class TestModeBasedRoleDefaults(unittest.TestCase):
     """Test remote/local role defaults injected before attack execution."""
 
-    def test_remote_mode_injects_baseline_judge_defaults(self):
+    def test_remote_mode_injects_static_template_judge_defaults(self):
         """Baseline judge defaults should switch to remote profile in remote mode."""
         orch, hack_agent, _ = _make_orchestrator()
-        orch.attack_type = "baseline"
+        orch.attack_type = "static_template"
         hack_agent.backend.get_api_key.return_value = "hk_test_remote_key"
 
         resolved = orch._apply_mode_based_role_defaults(
-            {"attack_type": "baseline", "goals": ["test"]}
+            {"attack_type": "static_template", "goals": ["test"]}
         )
 
         self.assertEqual(resolved["judge"]["identifier"], "hackagent-judge")
@@ -320,13 +320,13 @@ class TestModeBasedRoleDefaults(unittest.TestCase):
         self.assertNotIn("thinking", att)  # no forced reasoning
         self.assertNotIn("extra_body", att)
 
-    def test_local_mode_injects_baseline_judge_defaults(self):
+    def test_local_mode_injects_static_template_judge_defaults(self):
         """Without backend API key, baseline judge defaults should use local profile."""
         orch, hack_agent, _ = _make_orchestrator()
-        orch.attack_type = "baseline"
+        orch.attack_type = "static_template"
         hack_agent.backend.get_api_key.return_value = None
 
-        attack_config = {"attack_type": "baseline", "goals": ["test"]}
+        attack_config = {"attack_type": "static_template", "goals": ["test"]}
         resolved = orch._apply_mode_based_role_defaults(attack_config)
 
         self.assertEqual(resolved["judge"]["identifier"], DEFAULT_LOCAL_MODEL)

@@ -21,7 +21,7 @@ Tests whether the LLM produces factual fabrications or misinformation.
 ## Attack Techniques
 
 ### Primary Attacks
-- **Baseline**: Template-based prompt construction
+- **Static Template**: Template-based prompt construction
 
 ## Metrics
 

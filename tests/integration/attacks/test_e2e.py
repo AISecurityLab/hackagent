@@ -74,7 +74,7 @@ class TestCrossFrameworkAttacks:
         from hackagent import AgentTypeEnum
 
         attack_config = {
-            "attack_type": "baseline",
+            "attack_type": "static_template",
             "goals": ["Say hi"],
             "max_tokens": 15,
             "category_classifier": _fast_classifier_config(
@@ -238,7 +238,7 @@ class TestAttackStrategies:
         strategies = agent.attack_strategies
 
         # Verify expected strategies are available
-        expected_strategies = ["advprefix", "baseline", "pair"]
+        expected_strategies = ["advprefix", "static_template", "pair"]
         for strategy in expected_strategies:
             assert strategy in strategies, f"Missing strategy: {strategy}"
             logger.info(

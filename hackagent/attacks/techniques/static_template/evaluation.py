@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Evaluation module for baseline attacks.
+Evaluation module for static template attacks.
 
 Evaluates attack success using objectives and shared evaluators.
 
@@ -26,7 +26,7 @@ from hackagent.router.tracking import Tracker
 from hackagent.server.api.result import result_partial_update  # noqa: F401
 
 
-logger = logging.getLogger("hackagent.attacks.baseline.evaluation")
+logger = logging.getLogger("hackagent.attacks.static_template.evaluation")
 
 
 def _is_execution_error_row(row: Dict[str, Any]) -> bool:
@@ -52,7 +52,7 @@ def _get_evaluation_notes(evaluator: PatternEvaluator, completion: str) -> str:
 
 
 def _resolve_llm_judges(config: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Resolve LLM judge configs from baseline settings."""
+    """Resolve LLM judge configs from static template settings."""
     judges = config.get("judges")
     if isinstance(judges, list) and judges:
         return judges
@@ -94,7 +94,7 @@ def evaluate_responses_with_llm_judges(
     evaluator_step: BaseEvaluationStep,
     logger: logging.Logger,
 ) -> List[Dict[str, Any]]:
-    """Evaluate baseline responses with configured LLM judges."""
+    """Evaluate static template responses with configured LLM judges."""
     logger.info(f"Evaluating {len(data)} responses with LLM judges...")
 
     min_length = config.get("min_response_length", 10)
@@ -105,9 +105,9 @@ def evaluate_responses_with_llm_judges(
 
     for idx, row in enumerate(data):
         normalized_row = row.copy()
-        normalized_row["_baseline_eval_idx"] = idx
+        normalized_row["_static_template_eval_idx"] = idx
 
-        # BaseEvaluationStep expects `prefix`; baseline generation uses `attack_prompt`.
+        # BaseEvaluationStep expects `prefix`; static template generation uses `attack_prompt`.
         normalized_row["prefix"] = (
             normalized_row.get("prefix")
             or normalized_row.get("attack_prompt")
@@ -140,7 +140,7 @@ def evaluate_responses_with_llm_judges(
     if not rows_for_judging:
         logger.info("No responses eligible for LLM judging after length filtering")
         for row in prepared_rows:
-            row.pop("_baseline_eval_idx", None)
+            row.pop("_static_template_eval_idx", None)
         return prepared_rows
 
     if not judges:
@@ -150,7 +150,7 @@ def evaluate_responses_with_llm_judges(
                 row["success"] = False
                 row["best_score"] = 0.0
                 row["evaluation_notes"] = "No LLM judges configured"
-            row.pop("_baseline_eval_idx", None)
+            row.pop("_static_template_eval_idx", None)
         return prepared_rows
 
     if evaluator_step.client is None:
@@ -160,7 +160,7 @@ def evaluate_responses_with_llm_judges(
                 row["success"] = False
                 row["best_score"] = 0.0
                 row["evaluation_notes"] = "No evaluation client available for judges"
-            row.pop("_baseline_eval_idx", None)
+            row.pop("_static_template_eval_idx", None)
         return prepared_rows
 
     base_eval_config = evaluator_step._build_base_eval_config()
@@ -172,14 +172,14 @@ def evaluate_responses_with_llm_judges(
     evaluator_step._enrich_items_with_scores(evaluated_subset)
 
     evaluated_by_index = {
-        row.get("_baseline_eval_idx"): row
+        row.get("_static_template_eval_idx"): row
         for row in evaluated_subset
-        if row.get("_baseline_eval_idx") is not None
+        if row.get("_static_template_eval_idx") is not None
     }
 
     merged_results: List[Dict[str, Any]] = []
     for row in prepared_rows:
-        idx = row.get("_baseline_eval_idx")
+        idx = row.get("_static_template_eval_idx")
         judged_row = evaluated_by_index.get(idx)
 
         final_row = judged_row if judged_row is not None else row
@@ -187,7 +187,7 @@ def evaluate_responses_with_llm_judges(
         if not final_row.get("filtered"):
             final_row["evaluation_notes"] = _build_llm_evaluation_notes(final_row)
 
-        final_row.pop("_baseline_eval_idx", None)
+        final_row.pop("_static_template_eval_idx", None)
         merged_results.append(final_row)
 
     success_count = sum(1 for row in merged_results if row.get("success", False))
@@ -469,7 +469,7 @@ def _sync_evaluation_to_server(
     config: Dict[str, Any],
     logger: logging.Logger,
     goal_tracker: Optional[Tracker] = None,
-    evaluator_name: str = "baseline_pattern_evaluator",
+    evaluator_name: str = "static_template_pattern_evaluator",
 ) -> int:
     """
     Sync evaluation results to storage using Tracker (preferred) or direct updates.
@@ -536,7 +536,7 @@ def _finalize_goals_with_tracker(
     evaluated_data: List[Dict[str, Any]],
     goal_tracker: Tracker,
     logger: logging.Logger,
-    evaluator_name: str = "baseline_pattern_evaluator",
+    evaluator_name: str = "static_template_pattern_evaluator",
 ) -> int:
     """
     Finalize goal Results using Tracker.
@@ -676,9 +676,9 @@ def _finalize_goals_with_tracker(
     return finalized_count
 
 
-class BaselineEvaluation(BaseEvaluationStep):
+class StaticTemplateEvaluation(BaseEvaluationStep):
     """
-    Evaluation step for baseline attacks.
+    Evaluation step for static template attacks.
 
     Extends ``BaseEvaluationStep`` to wrap the objective-based pattern/keyword
     evaluation logic into the shared evaluation framework.
@@ -761,11 +761,11 @@ def execute(
         Dictionary with 'evaluated' and 'summary' lists of dicts
 
     Notes:
-        Syncing is performed by ``BaselineEvaluation.execute`` via
+        Syncing is performed by ``StaticTemplateEvaluation.execute`` via
         ``_sync_evaluation_to_server``.
     """
     evaluation_client = client or config.get("_backend") or config.get("_client")
-    return BaselineEvaluation(
+    return StaticTemplateEvaluation(
         config=config,
         logger=logger,
         client=evaluation_client,

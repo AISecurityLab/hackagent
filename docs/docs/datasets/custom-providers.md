@@ -67,7 +67,7 @@ Once registered, use it like any other provider:
 
 ```python
 attack_config = {
-    "attack_type": "baseline",
+    "attack_type": "static_template",
     "dataset": {
         "provider": "my_database",
         "connection_string": "postgresql://localhost/safety_tests",

@@ -57,7 +57,7 @@ The File provider works **without** installing the `datasets` library — it's i
 
 ```python
 attack_config = {
-    "attack_type": "baseline",
+    "attack_type": "static_template",
     "dataset": {
         "provider": "file",
         "path": "./goals.json",
@@ -195,7 +195,7 @@ with open("edge_cases.json", "w") as f:
 
 # Test with HackAgent
 attack_config = {
-    "attack_type": "baseline",
+    "attack_type": "static_template",
     "dataset": {
         "provider": "file",
         "path": "./edge_cases.json",
@@ -219,7 +219,7 @@ with open("round2.txt", "w") as f:
 # Test each round
 for round_num in [1, 2]:
     results = agent.hack(attack_config={
-        "attack_type": "baseline",
+        "attack_type": "static_template",
         "dataset": {
             "provider": "file",
             "path": f"./round{round_num}.txt",
@@ -244,7 +244,7 @@ print(f"Total goals: {len(all_goals)}")
 
 # Use in attack (pass goals directly instead of dataset config)
 attack_config = {
-    "attack_type": "baseline",
+    "attack_type": "static_template",
     "goals": all_goals,  # Direct goals instead of dataset config
 }
 ```

@@ -284,6 +284,8 @@ class DashboardRunsMixin:
                 # ── Build config chips per run & detect differences ──
                 _attack_display_map: dict[str, str] = {
                     "baseline": "Baseline",
+                    "static_template": "StaticTemplate",
+                    "statictemplate": "StaticTemplate",
                     "pair": "PAIR",
                     "tap": "TAP",
                     "bon": "Best-of-N",

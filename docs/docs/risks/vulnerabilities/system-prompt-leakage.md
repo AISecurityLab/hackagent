@@ -21,7 +21,7 @@ Tests whether the LLM reveals sensitive details from its system prompt, such as 
 - **advbench** (SECONDARY): Adversarial goals that may trigger system prompt disclosure
 
 **Attack Techniques**:
-- Baseline (PRIMARY): Template-based prompt injection
+- Static Template (PRIMARY): Template-based prompt injection
 - PAIR (PRIMARY): Iterative refinement for bypass discovery
 - AdvPrefix (SECONDARY): Adversarial prefix optimisation
 

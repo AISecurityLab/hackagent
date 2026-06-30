@@ -100,7 +100,7 @@ print(PROMPT_INJECTION_PROFILE.dataset_presets)
 # ['advbench', 'harmbench_contextual', 'prompt_injections']
 
 print(PROMPT_INJECTION_PROFILE.attack_techniques)
-# ['Baseline', 'PAIR', 'AdvPrefix']
+# ['StaticTemplate', 'PAIR', 'AdvPrefix']
 
 print(PROMPT_INJECTION_PROFILE.objective)   # 'jailbreak'
 print(PROMPT_INJECTION_PROFILE.metrics)     # ['asr', 'judge_score']
@@ -144,14 +144,14 @@ The profiles use standard attack combinations defined in `profile_helpers.py`:
 
 ```python
 from hackagent.risks.profile_helpers import (
-    BASELINE_ATTACKS,    # [Baseline (PRIMARY)]
-    JAILBREAK_ATTACKS,   # [Baseline (PRIMARY), PAIR (PRIMARY), AdvPrefix (SECONDARY)]
-    ALL_ATTACKS,         # [Baseline (PRIMARY), PAIR (PRIMARY), AdvPrefix (PRIMARY)]
+    STATIC_TEMPLATE_ATTACKS,    # [Static Template (PRIMARY)]
+    JAILBREAK_ATTACKS,   # [Static Template (PRIMARY), PAIR (PRIMARY), AdvPrefix (SECONDARY)]
+    ALL_ATTACKS,         # [Static Template (PRIMARY), PAIR (PRIMARY), AdvPrefix (PRIMARY)]
 )
 ```
 
 **Usage:**
-- **BASELINE_ATTACKS** — Simple direct testing, no adversarial optimization
+- **STATIC_TEMPLATE_ATTACKS** — Simple direct testing, no adversarial optimization
 - **JAILBREAK_ATTACKS** — Includes iterative refinement (PAIR) and gradient-based (AdvPrefix)
 - **ALL_ATTACKS** — Full attack suite for comprehensive adversarial testing
 
@@ -260,7 +260,7 @@ For custom vulnerabilities, create your own threat profiles:
 
 ```python
 from hackagent.risks.profile_types import ThreatProfile
-from hackagent.risks.profile_helpers import ds, PRIMARY, SECONDARY, BASELINE_ATTACKS
+from hackagent.risks.profile_helpers import ds, PRIMARY, SECONDARY, STATIC_TEMPLATE_ATTACKS
 from my_project.vulnerabilities import HIPAACompliance
 
 HIPAA_COMPLIANCE_PROFILE = ThreatProfile(
@@ -277,7 +277,7 @@ HIPAA_COMPLIANCE_PROFILE = ThreatProfile(
             "General refusal behavior baseline"
         ),
     ],
-    attacks=BASELINE_ATTACKS,
+    attacks=STATIC_TEMPLATE_ATTACKS,
     objective="policy_violation",
     metrics=["asr", "judge_score", "phi_leak_count"],
     description="Tests HIPAA compliance in healthcare AI systems.",
@@ -378,9 +378,9 @@ from hackagent.risks.profile_helpers import (
     ds,                # Create DatasetRecommendation
     PRIMARY,           # Relevance.PRIMARY
     SECONDARY,         # Relevance.SECONDARY
-    BASELINE_ATTACKS,  # Baseline-only attack list
-    JAILBREAK_ATTACKS, # Baseline + PAIR + AdvPrefix (secondary)
-    ALL_ATTACKS,       # Baseline + PAIR + AdvPrefix (all primary)
+    STATIC_TEMPLATE_ATTACKS,  # Static Template-only attack list
+    JAILBREAK_ATTACKS, # Static Template + PAIR + AdvPrefix (secondary)
+    ALL_ATTACKS,       # Static Template + PAIR + AdvPrefix (all primary)
 )
 
 # Create a dataset recommendation
@@ -410,15 +410,15 @@ profile = ThreatProfile(
 | CraftAdversarialData | `CRAFT_ADVERSARIAL_DATA_PROFILE` | jailbreak | Yes | Jailbreak |
 | PromptInjection | `PROMPT_INJECTION_PROFILE` | jailbreak | Yes | Jailbreak |
 | Jailbreak | `JAILBREAK_PROFILE` | jailbreak | Yes | All |
-| VectorEmbeddingWeaknessesExploit | `VECTOR_EMBEDDING_WEAKNESSES_EXPLOIT_PROFILE` | policy_violation | Custom | Baseline |
+| VectorEmbeddingWeaknessesExploit | `VECTOR_EMBEDDING_WEAKNESSES_EXPLOIT_PROFILE` | policy_violation | Custom | Static Template |
 | SensitiveInformationDisclosure | `SENSITIVE_INFORMATION_DISCLOSURE_PROFILE` | jailbreak | Yes | Jailbreak |
 | SystemPromptLeakage | `SYSTEM_PROMPT_LEAKAGE_PROFILE` | jailbreak | Yes | Jailbreak |
-| ExcessiveAgency | `EXCESSIVE_AGENCY_PROFILE` | policy_violation | Yes | Baseline |
+| ExcessiveAgency | `EXCESSIVE_AGENCY_PROFILE` | policy_violation | Yes | Static Template |
 | InputManipulationAttack | `INPUT_MANIPULATION_ATTACK_PROFILE` | jailbreak | Yes | Jailbreak |
-| PublicFacingApplicationExploitation | `PUBLIC_FACING_APPLICATION_EXPLOITATION_PROFILE` | policy_violation | Custom | Baseline |
-| MaliciousToolInvocation | `MALICIOUS_TOOL_INVOCATION_PROFILE` | policy_violation | Custom | Baseline |
-| CredentialExposure | `CREDENTIAL_EXPOSURE_PROFILE` | policy_violation | Custom | Baseline |
-| Misinformation | `MISINFORMATION_PROFILE` | harmful_behavior | Yes | Baseline |
+| PublicFacingApplicationExploitation | `PUBLIC_FACING_APPLICATION_EXPLOITATION_PROFILE` | policy_violation | Custom | Static Template |
+| MaliciousToolInvocation | `MALICIOUS_TOOL_INVOCATION_PROFILE` | policy_violation | Custom | Static Template |
+| CredentialExposure | `CREDENTIAL_EXPOSURE_PROFILE` | policy_violation | Custom | Static Template |
+| Misinformation | `MISINFORMATION_PROFILE` | harmful_behavior | Yes | Static Template |
 
 ---
 

@@ -62,7 +62,7 @@ This provider does not define a dedicated `token` field in the config, so use `H
 
 ```python
 attack_config = {
-    "attack_type": "baseline",
+    "attack_type": "static_template",
     "dataset": {
         "provider": "huggingface",
         "path": "ai-safety-institute/AgentHarm",
@@ -95,7 +95,7 @@ When the primary `goal_field` doesn't exist, the provider tries `fallback_fields
 
 ```python
 attack_config = {
-    "attack_type": "baseline",
+    "attack_type": "static_template",
     "dataset": {
         "provider": "huggingface",
         "path": "your-org/your-dataset",
@@ -111,7 +111,7 @@ Some datasets require running remote code. Enable with caution:
 
 ```python
 attack_config = {
-    "attack_type": "baseline",
+    "attack_type": "static_template",
     "dataset": {
         "provider": "huggingface",
         "path": "some-org/custom-dataset",
@@ -133,7 +133,7 @@ Only set `trust_remote_code: True` for datasets from **trusted sources**. This a
 ```python
 # Test on public split
 public_results = agent.hack(attack_config={
-    "attack_type": "baseline",
+    "attack_type": "static_template",
     "dataset": {
         "provider": "huggingface",
         "path": "ai-safety-institute/AgentHarm",
@@ -146,7 +146,7 @@ public_results = agent.hack(attack_config={
 
 # Compare with held-out split (if you have access)
 held_out_results = agent.hack(attack_config={
-    "attack_type": "baseline",
+    "attack_type": "static_template",
     "dataset": {
         "provider": "huggingface",
         "path": "ai-safety-institute/AgentHarm",

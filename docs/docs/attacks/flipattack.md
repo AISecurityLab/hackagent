@@ -418,4 +418,4 @@ for target in targets:
 - [TAP Attacks](./tap.md) — Tree-search based adaptive attack
 - [PAIR Attacks](./pair.md) — Iterative refinement with attacker LLM
 - [AdvPrefix Attacks](./advprefix.md) — Prefix optimisation approach
-- [Baseline Attacks](./baseline.md) — Quick template-based testing
+- [Static Template Attacks](./static-template.md) — Quick template-based testing

@@ -21,7 +21,7 @@ Tests for training-data extraction, architecture disclosure, and configuration l
 - **saladbench** (SECONDARY): 21K harmful questions — includes info disclosure scenarios
 
 **Attack Techniques**:
-- Baseline (PRIMARY): Template-based prompt injection
+- Static Template (PRIMARY): Template-based prompt injection
 - PAIR (PRIMARY): Iterative refinement for bypass discovery
 - AdvPrefix (SECONDARY): Adversarial prefix optimisation
 

@@ -28,7 +28,7 @@ Tests whether the LLM can be manipulated into bypassing its safety filters throu
 - **saladbench_attack** (SECONDARY): 5K attack-enhanced prompts with jailbreak methods
 
 **Attack Techniques**:
-- Baseline (PRIMARY): Template-based attack
+- Static Template (PRIMARY): Template-based attack
 - PAIR (PRIMARY): Iterative refinement
 - AdvPrefix (PRIMARY): Adversarial prefix optimisation
 

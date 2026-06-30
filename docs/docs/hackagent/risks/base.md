@@ -78,7 +78,7 @@ Async variant of :pymeth:`assess`.
 def simulate_attacks(purpose: Optional[str] = None) -> List[str]
 ```
 
-Generate baseline attack prompts for each selected sub-type.
+Generate static template attack prompts for each selected sub-type.
 
 Returns a flat list of attack strings.
 

@@ -20,7 +20,7 @@ Tests whether encoding bypasses, format string attacks, or Unicode manipulation 
 - **wmdp_cyber** (SECONDARY): Cybersecurity knowledge covering SQL injection and command injection techniques
 
 **Attack Techniques**:
-- Baseline (PRIMARY): Template-based prompt injection
+- Static Template (PRIMARY): Template-based prompt injection
 - PAIR (PRIMARY): Iterative refinement for bypass discovery
 - AdvPrefix (SECONDARY): Adversarial prefix optimisation
 

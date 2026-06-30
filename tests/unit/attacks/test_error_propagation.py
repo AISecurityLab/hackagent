@@ -24,7 +24,7 @@ from hackagent.server.api.models import EvaluationStatusEnum
 
 
 class TestNormalizeAttackResults(unittest.TestCase):
-    """Test that dict-style results from baseline are normalised to a list."""
+    """Test that dict-style results from static template are normalised to a list."""
 
     def test_list_passthrough(self):
         from hackagent.attacks.orchestrator import AttackOrchestrator
@@ -130,10 +130,12 @@ class TestEvaluationStepErrorDetection(unittest.TestCase):
 
 
 class TestBaselineEvaluateResponsesErrors(unittest.TestCase):
-    """Test that baseline evaluate_responses skips error rows."""
+    """Test that static template evaluate_responses skips error rows."""
 
     def test_error_rows_excluded_from_pattern_eval(self):
-        from hackagent.attacks.techniques.baseline.evaluation import evaluate_responses
+        from hackagent.attacks.techniques.static_template.evaluation import (
+            evaluate_responses,
+        )
 
         data = [
             {
@@ -161,7 +163,9 @@ class TestBaselineEvaluateResponsesErrors(unittest.TestCase):
         self.assertIn("evaluation_notes", result[0])
 
     def test_all_errors_asr_zero(self):
-        from hackagent.attacks.techniques.baseline.evaluation import evaluate_responses
+        from hackagent.attacks.techniques.static_template.evaluation import (
+            evaluate_responses,
+        )
 
         data = [
             {"completion": "", "response_length": 0, "error": "timeout", "goal": "g1"},
@@ -193,11 +197,11 @@ class TestBaselineFinalizeErrors(unittest.TestCase):
             backend=mock_backend,
             run_id=str(uuid4()),
             logger=logging.getLogger("test"),
-            attack_type="baseline",
+            attack_type="static_template",
         )
 
     def test_all_error_goal_gets_error_status(self):
-        from hackagent.attacks.techniques.baseline.evaluation import (
+        from hackagent.attacks.techniques.static_template.evaluation import (
             _finalize_goals_with_tracker,
         )
 
@@ -237,7 +241,7 @@ class TestBaselineFinalizeErrors(unittest.TestCase):
         )
 
     def test_mixed_goal_gets_normal_status(self):
-        from hackagent.attacks.techniques.baseline.evaluation import (
+        from hackagent.attacks.techniques.static_template.evaluation import (
             _finalize_goals_with_tracker,
         )
 
@@ -302,7 +306,7 @@ class TestTrackerFinalizeGoalOverride(unittest.TestCase):
             backend=mock_backend,
             run_id=str(uuid4()),
             logger=logging.getLogger("test"),
-            attack_type="baseline",
+            attack_type="static_template",
         )
 
     def test_override_to_error(self):
@@ -428,10 +432,12 @@ class TestJudgeEvaluatorErrorRows(unittest.TestCase):
 
 
 class TestBaselineGenerationAdapterErrors(unittest.TestCase):
-    """Test that baseline generation detects adapter-level errors."""
+    """Test that static template generation detects adapter-level errors."""
 
     def test_adapter_error_sets_error_field(self):
-        from hackagent.attacks.techniques.baseline.generation import execute_prompts
+        from hackagent.attacks.techniques.static_template.generation import (
+            execute_prompts,
+        )
 
         mock_router = MagicMock()
         mock_router._agent_registry = {"agent-key": MagicMock()}
@@ -464,7 +470,9 @@ class TestBaselineGenerationAdapterErrors(unittest.TestCase):
         self.assertEqual(result[0]["error"], "Ollama connection error: timed out")
 
     def test_successful_response_no_error(self):
-        from hackagent.attacks.techniques.baseline.generation import execute_prompts
+        from hackagent.attacks.techniques.static_template.generation import (
+            execute_prompts,
+        )
 
         mock_router = MagicMock()
         mock_router._agent_registry = {"agent-key": MagicMock()}

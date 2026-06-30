@@ -26,7 +26,7 @@ Tests resistance to multi-turn, roleplay, encoding, and authority-based bypass.
 ## Attack Techniques
 
 ### Primary Attacks
-- **Baseline**: Template-based attack
+- **Static Template**: Template-based attack
 - **PAIR**: Iterative refinement
 - **AdvPrefix**: Adversarial prefix optimisation
 

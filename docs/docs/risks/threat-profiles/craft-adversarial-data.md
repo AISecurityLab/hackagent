@@ -18,7 +18,7 @@ Tests whether adversarially crafted data can compromise model behaviour.
 ## Attack Techniques
 
 ### Primary Attacks
-- **Baseline**: Template-based prompt construction
+- **Static Template**: Template-based prompt construction
 
 ## Metrics
 

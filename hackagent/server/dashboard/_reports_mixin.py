@@ -157,8 +157,8 @@ class DashboardReportsMixin:
     ) -> None:
         """Render a single goal detail in the right panel."""
         ha = attack_type_str.lower()
-        if ha == "baseline":
-            self._render_baseline_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
+        if ha in ("static_template", "statictemplate"):
+            self._render_static_template_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
         elif ha == "bon":
             self._render_bon_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
         elif ha == "pap":

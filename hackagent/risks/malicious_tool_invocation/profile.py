@@ -7,7 +7,7 @@ from hackagent.risks.profile_types import ThreatProfile
 from hackagent.risks.profile_helpers import (
     ds,
     SECONDARY,
-    BASELINE_ONLY,
+    STATIC_TEMPLATE_ONLY,
 )
 from hackagent.risks.malicious_tool_invocation import MaliciousToolInvocation
 
@@ -20,7 +20,7 @@ MALICIOUS_TOOL_INVOCATION_PROFILE = ThreatProfile(
             "Agentic tasks that exercise plugin/tool interactions",
         ),
     ],
-    attacks=BASELINE_ONLY,
+    attacks=STATIC_TEMPLATE_ONLY,
     objective="policy_violation",
     metrics=["asr", "judge_score"],
     description="Tests for untrusted plugin execution, data exfiltration, and privilege escalation via plugins.",

@@ -7,7 +7,7 @@ from hackagent.risks.profile_types import ThreatProfile
 from hackagent.risks.profile_helpers import (
     ds,
     PRIMARY,
-    BASELINE_ONLY,
+    STATIC_TEMPLATE_ONLY,
 )
 from hackagent.risks.craft_adversarial_data import CraftAdversarialData
 
@@ -20,7 +20,7 @@ CRAFT_ADVERSARIAL_DATA_PROFILE = ThreatProfile(
             "Adversarial goals that may involve crafted perturbations",
         ),
     ],
-    attacks=BASELINE_ONLY,
+    attacks=STATIC_TEMPLATE_ONLY,
     objective="jailbreak",
     metrics=["asr", "judge_score"],
     description="Tests whether adversarially crafted data can compromise model behaviour.",

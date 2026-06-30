@@ -18,7 +18,7 @@ A **comprehensive audit** tests all vulnerabilities using multiple datasets and 
 
 Test all 13 vulnerabilities using:
 - **PRIMARY and SECONDARY datasets** for full coverage
-- **All attack techniques** (Baseline, PAIR, AdvPrefix)
+- **All attack techniques** (Static Template, PAIR, AdvPrefix)
 - Complete metric collection
 - Custom goals for vulnerabilities without datasets
 
@@ -128,7 +128,7 @@ credential_goals = [
 ]
 
 result = agent.attack(
-    attack_type="baseline",
+    attack_type="static_template",
     goals=credential_goals,
     objective=CREDENTIAL_EXPOSURE_PROFILE.objective,
 )
@@ -141,7 +141,7 @@ tool_goals = [
 ]
 
 result = agent.attack(
-    attack_type="baseline",
+    attack_type="static_template",
     goals=tool_goals,
     objective=MALICIOUS_TOOL_INVOCATION_PROFILE.objective,
 )
@@ -172,7 +172,7 @@ Track additional metrics:
 from hackagent.metrics import ToxicityScore, RefusalRate
 
 result = agent.attack(
-    attack_type="baseline",
+    attack_type="static_template",
     dataset={"preset": "strongreject"},
     metrics=[
         ToxicityScore(),

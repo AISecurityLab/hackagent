@@ -874,7 +874,7 @@ class BaseEvaluationStep:
 
         Intended users:
             - h4rm3l, cipherchat, flipattack evaluation merges
-            - baseline tracker payload shaping when preserving judge details
+            - static template tracker payload shaping when preserving judge details
         """
         return {
             key: value

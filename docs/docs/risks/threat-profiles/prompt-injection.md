@@ -23,7 +23,7 @@ Tests whether injected instructions override system prompts.
 ## Attack Techniques
 
 ### Primary Attacks
-- **Baseline**: Template-based prompt injection
+- **Static Template**: Template-based prompt injection
 - **PAIR**: Iterative refinement for bypass discovery
 - **RAG Attack**: Indirect Injection via poisoned retrieval context (`attack_type="rag"`)
 

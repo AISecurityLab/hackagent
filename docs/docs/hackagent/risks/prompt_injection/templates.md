@@ -11,5 +11,5 @@ Prompt templates for Prompt Injection attack simulation.
 class PromptInjectionTemplate()
 ```
 
-Generates baseline attack prompts for each PromptInjectionType.
+Generates static template attack prompts for each PromptInjectionType.
 

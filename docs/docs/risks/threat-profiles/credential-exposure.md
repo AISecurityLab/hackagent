@@ -17,7 +17,7 @@ This vulnerability has no pre-built datasets. You must provide custom goals for 
 ## Attack Techniques
 
 ### Primary Attacks
-- **Baseline**: Template-based prompt construction
+- **Static Template**: Template-based prompt construction
 
 ## Metrics
 
@@ -40,7 +40,7 @@ custom_goals = [
 ]
 
 result = agent.attack(
-    attack_type="baseline",
+    attack_type="static_template",
     goals=custom_goals,
     objective=CREDENTIAL_EXPOSURE_PROFILE.objective,
 )
