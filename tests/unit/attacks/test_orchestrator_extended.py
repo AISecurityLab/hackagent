@@ -246,6 +246,30 @@ class TestModeBasedRoleDefaults(unittest.TestCase):
         )
         self.assertEqual(resolved["judges"][0]["api_key"], "custom-key")
 
+    def test_remote_mode_promotes_explicit_single_judge_to_judges(self):
+        """When only `judge` is set, list-based consumers must see that config."""
+        orch, hack_agent, _ = _make_orchestrator()
+        orch.attack_type = "h4rm3l"
+        hack_agent.backend.get_api_key.return_value = "hk_test_remote_key"
+
+        resolved = orch._apply_mode_based_role_defaults(
+            {
+                "attack_type": "h4rm3l",
+                "goals": ["test"],
+                "judge": {
+                    "identifier": "llama3.2:3b",
+                    "endpoint": "http://localhost:11434",
+                    "agent_type": "OLLAMA",
+                    "type": "harmbench_variant",
+                },
+            }
+        )
+
+        self.assertEqual(resolved["judge"]["identifier"], "llama3.2:3b")
+        self.assertEqual(resolved["judges"][0]["identifier"], "llama3.2:3b")
+        self.assertEqual(resolved["judges"][0]["endpoint"], "http://localhost:11434")
+        self.assertEqual(resolved["judges"][0]["agent_type"], "OLLAMA")
+
     def test_pair_remote_mode_fills_missing_role_fields(self):
         """Partial attacker config should receive remote defaults, scorer should be added."""
         orch, hack_agent, _ = _make_orchestrator()
