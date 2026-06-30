@@ -48,6 +48,7 @@ If this succeeds, your Hugging Face access is correctly configured.
 | `split` | string | No | `"test"` | Dataset split to use |
 | `name` | string | No | — | Configuration name (for multi-config datasets) |
 | `fallback_fields` | list | No | `["input", "prompt", "question", "text"]` | Alternative fields if primary not found |
+| `extra_fields` | list | No | `[]` | Additional fields to extract alongside each goal |
 | `trust_remote_code` | bool | No | `false` | Trust remote code execution |
 | `limit` | int | No | — | Maximum number of goals |
 | `shuffle` | bool | No | `false` | Randomize goal selection |
@@ -103,6 +104,33 @@ attack_config = {
         "fallback_fields": ["prompt", "instruction", "query"],  # Tried if "objective" not found
     }
 }
+```
+
+## Extracting Extra Metadata Fields
+
+If you need structured output (goal plus metadata), configure `extra_fields` and
+load with `return_dicts=True` via provider-level access:
+
+```python
+from hackagent.datasets import get_provider
+
+provider = get_provider(
+    "huggingface",
+    {
+        "path": "ai-safety-institute/AgentHarm",
+        "name": "harmful",
+        "goal_field": "prompt",
+        "split": "test_public",
+        "extra_fields": ["target_functions", "grading_function"],
+    },
+)
+
+rows = provider.load_goals(limit=5, return_dicts=True)
+extras = provider.get_extra_data()
+
+print(rows[0])
+# {"goal": "...", "target_functions": [...], "grading_function": "..."}
+print(extras[0])
 ```
 
 ## Remote Code Execution

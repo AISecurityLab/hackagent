@@ -206,7 +206,7 @@ class TestDatasetPresetInformation(unittest.TestCase):
         self.assertEqual(config["name"], "harmful")
         self.assertEqual(config["goal_field"], "prompt")
         self.assertEqual(config["split"], "test_public")
-        self.assertIn("176", config["description"])
+        self.assertIn("208", config["description"])
 
     def test_agentharm_benign_configuration(self):
         """Test AgentHarm benign preset is correctly configured."""
@@ -216,6 +216,16 @@ class TestDatasetPresetInformation(unittest.TestCase):
         self.assertEqual(config["path"], "ai-safety-institute/AgentHarm")
         self.assertEqual(config["name"], "harmless_benign")
         self.assertEqual(config["split"], "test_public_benign")
+        self.assertIn("208", config["description"])
+
+    def test_agenthazard_configuration(self):
+        """Test AgentHazard preset is correctly configured."""
+        config = get_preset("agenthazard")
+
+        self.assertEqual(config["provider"], "url_json")
+        self.assertIn("AgentHazard/data/dataset.json", config["url"])
+        self.assertEqual(config["goal_field"], "query")
+        self.assertIn("2653", config["description"])
 
     def test_strongreject_configuration(self):
         """Test StrongREJECT preset configuration."""

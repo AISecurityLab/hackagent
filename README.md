@@ -71,7 +71,7 @@ HackAgent uses a modular pipeline to test agent robustness end-to-end.
 | **Generator** | LLM role that creates adversarial prompts to test the target agent |
 | **Judge** | LLM role that evaluates whether attacks bypass safety measures |
 | **Target Agent** | Your AI agent under test across supported frameworks |
-| **Datasets** | Pre-built benchmark presets plus custom HuggingFace/file datasets |
+| **Datasets** | Pre-built benchmark presets plus custom HuggingFace/file/URL JSON datasets |
 
 ## Supported Frameworks
 

@@ -460,6 +460,8 @@ class AttackOrchestrator:
         dataset_config = attack_config.get("dataset")
         intents_config = attack_config.get("intents")
         goal_labels_by_index: Optional[Dict[int, Dict[str, str]]] = None
+        goal_extra_fields_by_index: Optional[Dict[int, Dict[str, Any]]] = None
+        goal_extra_fields_by_goal: Optional[Dict[str, Dict[str, Any]]] = None
 
         if goals is not None and dataset_config is not None:
             logger.warning(
@@ -480,7 +482,9 @@ class AttackOrchestrator:
             goals, goal_labels_by_index = self._load_goals_from_intents(intents_config)
         elif dataset_config is not None:
             # Load goals from dataset source
-            goals = self._load_goals_from_dataset(dataset_config)
+            goals, goal_extra_fields_by_index = self._load_goals_from_dataset(
+                dataset_config
+            )
         elif goals is None:
             raise ValueError(
                 f"'{self.attack_type}' requires either 'goals' (list), "
@@ -497,6 +501,25 @@ class AttackOrchestrator:
         params: Dict[str, Any] = {"goals": goals}
         if goal_labels_by_index:
             params["_goal_labels_by_index"] = goal_labels_by_index
+        if goal_extra_fields_by_index:
+            params["_goal_extra_fields_by_index"] = goal_extra_fields_by_index
+            by_goal: Dict[str, Dict[str, Any]] = {}
+            for idx, metadata in goal_extra_fields_by_index.items():
+                if not isinstance(idx, int) or not isinstance(metadata, dict):
+                    continue
+                if idx < 0 or idx >= len(goals):
+                    continue
+                goal_text = goals[idx]
+                if (
+                    isinstance(goal_text, str)
+                    and goal_text
+                    and goal_text not in by_goal
+                ):
+                    by_goal[goal_text] = metadata
+            if by_goal:
+                goal_extra_fields_by_goal = by_goal
+        if goal_extra_fields_by_goal:
+            params["_goal_extra_fields_by_goal"] = goal_extra_fields_by_goal
         return params
 
     @staticmethod
@@ -1263,7 +1286,9 @@ class AttackOrchestrator:
 
         return None
 
-    def _load_goals_from_dataset(self, dataset_config: Dict[str, Any]) -> list:
+    def _load_goals_from_dataset(
+        self, dataset_config: Dict[str, Any]
+    ) -> Tuple[List[str], Dict[int, Dict[str, Any]]]:
         """
         Load goals from a dataset configuration.
 
@@ -1284,20 +1309,24 @@ class AttackOrchestrator:
                 - seed (int, optional): Random seed for shuffling
 
         Returns:
-            List of goal strings
+            Tuple of:
+                - List of goal strings
+                - Per-goal metadata map (index -> metadata dict)
 
         Raises:
             ValueError: If dataset configuration is invalid
             ImportError: If required dependencies are not available
         """
-        from hackagent.datasets import load_goals_from_config
+        from hackagent.datasets import load_goals_and_extra_fields_from_config
 
         logger.info(f"Loading goals from dataset: {dataset_config}")
 
         try:
-            goals = load_goals_from_config(dataset_config)
+            goals, goal_extra_fields_by_index = load_goals_and_extra_fields_from_config(
+                dataset_config
+            )
             logger.info(f"Loaded {len(goals)} goals from dataset")
-            return goals
+            return goals, goal_extra_fields_by_index
         except Exception as e:
             logger.error(f"Failed to load goals from dataset: {e}", exc_info=True)
             raise ValueError(f"Failed to load goals from dataset: {e}") from e
@@ -1637,6 +1666,12 @@ class AttackOrchestrator:
         # 1. Validate parameters
         attack_params = self._prepare_attack_params(attack_config)
         goal_labels_by_index = attack_params.pop("_goal_labels_by_index", None)
+        goal_extra_fields_by_index = attack_params.pop(
+            "_goal_extra_fields_by_index", None
+        )
+        goal_extra_fields_by_goal = attack_params.pop(
+            "_goal_extra_fields_by_goal", None
+        )
 
         # Fail-fast preflight before creating Attack/Run DB records.
         # Skip this when intents already provide explicit category labels.
@@ -1727,6 +1762,17 @@ class AttackOrchestrator:
                 **attack_config,
                 "_goal_labels_by_index": goal_labels_by_index,
                 "_disable_goal_category_classifier": True,
+            }
+
+        if goal_extra_fields_by_index:
+            attack_config = {
+                **attack_config,
+                "_goal_extra_fields_by_index": goal_extra_fields_by_index,
+            }
+        if goal_extra_fields_by_goal:
+            attack_config = {
+                **attack_config,
+                "_goal_extra_fields_by_goal": goal_extra_fields_by_goal,
             }
 
         # Make the event bus available to the technique impl and to the

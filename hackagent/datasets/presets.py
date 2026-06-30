@@ -25,7 +25,7 @@ PRESETS: Dict[str, Dict[str, Any]] = {
         "goal_field": "prompt",
         "split": "test_public",
         "fallback_fields": ["input", "text"],
-        "description": "AgentHarm benchmark - 176+ harmful agentic tasks (public split)",
+        "description": "AgentHarm benchmark - 208 harmful agentic tasks (public split)",
         "extra_fields": [
             "detailed_prompt",
             "hint_included",
@@ -40,7 +40,7 @@ PRESETS: Dict[str, Dict[str, Any]] = {
         "goal_field": "prompt",
         "split": "test_public_benign",
         "fallback_fields": ["input", "text"],
-        "description": "AgentHarm benchmark - benign tasks for comparison",
+        "description": "AgentHarm benchmark - 208 benign tasks for comparison",
     },
     # =========================================================================
     # AgentHazard - In-memory JSON dataset from URL
@@ -56,7 +56,7 @@ PRESETS: Dict[str, Dict[str, Any]] = {
             "decomposed_query",
             "jailbreak_method",
         ],  # Specify any metadata fields to extract
-        "description": "AgentHazard dataset fetched directly into RAM",
+        "description": "AgentHazard dataset - 2653 goals fetched directly into RAM",
     },
     # =========================================================================
     # StrongREJECT - Jailbreak evaluation
