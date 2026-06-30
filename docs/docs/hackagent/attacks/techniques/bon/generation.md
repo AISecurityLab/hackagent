@@ -21,41 +21,6 @@ Text augmentations ported from the original BoN codebase:
 
 Based on: https://arxiv.org/abs/2412.03556
 
-## \_StepJudge Objects
-
-```python
-class _StepJudge()
-```
-
-Lightweight wrapper to call one or more judges on a single candidate.
-
-Instantiated once per :func:`execute` call (not per step) and re-used
-throughout the generation loop to avoid repeated router creation.
-
-#### available
-
-```python
-@property
-def available() -> bool
-```
-
-True if at least one judge was successfully initialised.
-
-#### is\_jailbreak
-
-```python
-def is_jailbreak(goal: str, augmented_prompt: str,
-                 response: str) -> Tuple[bool, float, Dict[str, Any]]
-```
-
-Evaluate a single candidate with all judges.
-
-**Returns**:
-
-  ``(is_success, best_score, judge_columns)`` where
-  *judge_columns* contains the raw eval/explanation columns
-  produced by each judge.
-
 #### apply\_word\_scrambling
 
 ```python

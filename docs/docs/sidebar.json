@@ -8,6 +8,7 @@
               "items": [
                 "reference/hackagent/attacks/evaluator/base",
                 "reference/hackagent/attacks/evaluator/evaluation_step",
+                "reference/hackagent/attacks/evaluator/inline_step_judge",
                 "reference/hackagent/attacks/evaluator/judge_evaluators",
                 "reference/hackagent/attacks/evaluator/metrics",
                 "reference/hackagent/attacks/evaluator/pattern_evaluators",
@@ -32,10 +33,12 @@
             },
             {
               "items": [
+                "reference/hackagent/attacks/shared/guardrail",
                 "reference/hackagent/attacks/shared/progress",
                 "reference/hackagent/attacks/shared/prompt_parser",
                 "reference/hackagent/attacks/shared/response_utils",
                 "reference/hackagent/attacks/shared/router_factory",
+                "reference/hackagent/attacks/shared/translation",
                 "reference/hackagent/attacks/shared/tui",
                 "reference/hackagent/attacks/shared/utils"
               ],
@@ -125,6 +128,18 @@
                 },
                 {
                   "items": [
+                    "reference/hackagent/attacks/techniques/mml/attack",
+                    "reference/hackagent/attacks/techniques/mml/config",
+                    "reference/hackagent/attacks/techniques/mml/evaluation",
+                    "reference/hackagent/attacks/techniques/mml/generation",
+                    "reference/hackagent/attacks/techniques/mml/image_encoder",
+                    "reference/hackagent/attacks/techniques/mml/prompts"
+                  ],
+                  "label": "hackagent.attacks.techniques.mml",
+                  "type": "category"
+                },
+                {
+                  "items": [
                     "reference/hackagent/attacks/techniques/pair/attack",
                     "reference/hackagent/attacks/techniques/pair/config",
                     "reference/hackagent/attacks/techniques/pair/evaluation"
@@ -177,6 +192,7 @@
               "type": "category"
             },
             "reference/hackagent/datasets/base",
+            "reference/hackagent/datasets/intents",
             "reference/hackagent/datasets/presets",
             "reference/hackagent/datasets/registry"
           ],
@@ -185,6 +201,13 @@
         },
         {
           "items": [
+            {
+              "items": [
+                "reference/hackagent/examples/claude/hack"
+              ],
+              "label": "hackagent.examples.claude",
+              "type": "category"
+            },
             {
               "items": [
                 {
@@ -383,7 +406,17 @@
           "items": [
             {
               "items": [
-                "reference/hackagent/router/providers/adk"
+                "reference/hackagent/router/discovery/browser",
+                "reference/hackagent/router/discovery/scanner"
+              ],
+              "label": "hackagent.router.discovery",
+              "type": "category"
+            },
+            {
+              "items": [
+                "reference/hackagent/router/providers/adk",
+                "reference/hackagent/router/providers/claude",
+                "reference/hackagent/router/providers/web"
               ],
               "label": "hackagent.router.providers",
               "type": "category"

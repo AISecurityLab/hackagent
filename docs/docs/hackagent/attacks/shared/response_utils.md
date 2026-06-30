@@ -62,3 +62,27 @@ Handles the following response formats:
   &gt;&gt;&gt; # Plain string
   &gt;&gt;&gt; content = extract_response_content(&quot;Hello!&quot;)
 
+#### is\_guardrail\_response
+
+```python
+def is_guardrail_response(response: Any) -> bool
+```
+
+Return True if *response* is a guardrail-blocked response.
+
+Detection is based on ``adapter_type == &quot;guardrail&quot;`` which the router
+sets on every blocked response.  This is the single canonical check —
+all attack modules should use this instead of ad-hoc key lookups.
+
+#### get\_guardrail\_info
+
+```python
+def get_guardrail_info(response: Dict[str, Any]) -> Dict[str, Any]
+```
+
+Extract guardrail metadata from a blocked response.
+
+Returns a dict with ``side``, ``message``, ``categories``, and
+``reasoning`` when available, or an empty dict if not a guardrail
+response.
+

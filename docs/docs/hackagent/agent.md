@@ -42,7 +42,9 @@ def __init__(endpoint: str,
              metadata: Optional[Dict[str, Any]] = None,
              target_config: Optional[Dict[str, Any]] = None,
              adapter_operational_config: Optional[Dict[str, Any]] = None,
-             thinking: Optional[bool] = None)
+             thinking: Optional[bool] = None,
+             before_guardrail: Optional[Dict[str, Any]] = None,
+             after_guardrail: Optional[Dict[str, Any]] = None)
 ```
 
 Initializes the HackAgent client and prepares it for interaction.

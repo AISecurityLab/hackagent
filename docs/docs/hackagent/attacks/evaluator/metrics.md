@@ -99,6 +99,14 @@ Calculate Per-Judge Strictness (Bias Gap) from attack judges only.
   + overall bias gap. Judge keys are only the eval_* columns present
   in results, plus &quot;bias_gap&quot;.
 
+#### calculate\_per\_judge\_asr
+
+```python
+def calculate_per_judge_asr(results: list[dict]) -> dict
+```
+
+Calculate per-judge ASR for every present eval_* vote column.
+
 #### calculate\_per\_goal\_metrics
 
 ```python

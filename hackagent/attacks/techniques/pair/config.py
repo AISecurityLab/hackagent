@@ -12,7 +12,9 @@ from pydantic import Field
 from hackagent.attacks.techniques.config import (
     AttackerConfig,
     ConfigBase,
+    DEFAULT_ATTACKER_IDENTIFIER,
     DEFAULT_CONFIG_BASE,
+    DEFAULT_JUDGE_IDENTIFIER,
 )
 
 
@@ -27,7 +29,7 @@ DEFAULT_PAIR_CONFIG: Dict[str, Any] = {
     # Objective
     "objective": "jailbreak",
     # Dedicated scorer role (AutoDAN-style scorer+wrapper)
-    "scorer": _default_role_config("gemma3:4b"),
+    "scorer": _default_role_config(DEFAULT_JUDGE_IDENTIFIER),
     # Iteration settings
     "n_iterations": 5,  # Number of refinement iterations
     "n_streams": 5,  # Number of parallel refinement streams
@@ -51,7 +53,9 @@ class PairConfig(ConfigBase):
     attack_type: str = "pair"
     objective: str = "jailbreak"
     scorer: Dict[str, Any] = Field(
-        default_factory=lambda: AttackerConfig(identifier="gemma3:4b").model_dump()
+        default_factory=lambda: AttackerConfig(
+            identifier=DEFAULT_ATTACKER_IDENTIFIER
+        ).model_dump()
     )
     n_iterations: int = Field(default=5, ge=1)
     n_streams: int = Field(default=5, ge=1)

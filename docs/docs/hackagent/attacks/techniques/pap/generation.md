@@ -18,27 +18,6 @@ inside the generation loop.
 
 Based on: https://arxiv.org/abs/2401.06373
 
-## \_StepJudge Objects
-
-```python
-class _StepJudge()
-```
-
-Lightweight wrapper to call judges on a single candidate.
-
-#### is\_jailbreak
-
-```python
-def is_jailbreak(goal: str, persuasive_prompt: str,
-                 response: str) -> Tuple[bool, float, Dict[str, Any]]
-```
-
-Evaluate a single candidate with all judges.
-
-**Returns**:
-
-  ``(is_success, best_score, judge_columns)``
-
 #### execute
 
 ```python

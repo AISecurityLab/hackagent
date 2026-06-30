@@ -4,6 +4,7 @@
 """Additional tests for AttackOrchestrator — covering execute flow and HTTP helpers."""
 
 import json
+import os
 import unittest
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
@@ -11,13 +12,14 @@ from uuid import uuid4
 from hackagent.attacks.orchestrator import AttackOrchestrator
 from hackagent.attacks.techniques.autodan_turbo.attack import AutoDANTurboAttack
 from hackagent.attacks.techniques.base import BaseAttack
-from hackagent.attacks.techniques.static_template.attack import StaticTemplateAttack
+from hackagent.attacks.techniques.baseline.attack import BaselineAttack
 from hackagent.attacks.techniques.h4rm3l.attack import H4rm3lAttack
 from hackagent.attacks.techniques.tap.attack import TAPAttack
 from hackagent.attacks.techniques.config import (
     DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE,
     DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT,
     DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
+    DEFAULT_LOCAL_MODEL,
 )
 from hackagent.errors import HackAgentError
 
@@ -220,12 +222,12 @@ class TestModeBasedRoleDefaults(unittest.TestCase):
     def test_remote_mode_preserves_explicit_judge_overrides(self):
         """Explicit judge fields must not be overwritten by remote defaults."""
         orch, hack_agent, _ = _make_orchestrator()
-        orch.attack_type = "static_template"
+        orch.attack_type = "baseline"
         hack_agent.backend.get_api_key.return_value = "hk_test_remote_key"
 
         resolved = orch._apply_mode_based_role_defaults(
             {
-                "attack_type": "static_template",
+                "attack_type": "baseline",
                 "goals": ["test"],
                 "judges": [
                     {
@@ -268,8 +270,58 @@ class TestModeBasedRoleDefaults(unittest.TestCase):
         self.assertEqual(resolved["scorer"]["identifier"], "hackagent-judge")
         self.assertEqual(resolved["scorer"]["api_key"], "hk_test_remote_key")
 
+    def test_remote_attacker_enables_reasoning(self):
+        """The remote attacker (HackAgent generator endpoint) must keep reasoning
+        on — it maps to reasoning_effort and the endpoint rejects it disabled."""
+        from hackagent.router.provider_config import openai_thinking_translator
+
+        orch, hack_agent, _ = _make_orchestrator()
+        orch.attack_type = "pair"
+        hack_agent.backend.get_api_key.return_value = "hk_test_remote_key"
+
+        resolved = orch._apply_mode_based_role_defaults(
+            {"attack_type": "pair", "goals": ["test"]}
+        )
+        self.assertEqual(resolved["attacker"].get("thinking"), "medium")
+        # Sent both ways: reasoning_effort (OpenAI path) + extra_body.reasoning.
+        self.assertEqual(
+            resolved["attacker"].get("extra_body"), {"reasoning": {"effort": "medium"}}
+        )
+        payload = openai_thinking_translator(
+            resolved["attacker"]["thinking"], model_name="hackagent-attacker"
+        )
+        self.assertEqual(payload, {"reasoning_effort": "medium"})
+        # Judge is intentionally left without forced reasoning (it works as-is).
+        self.assertNotIn("thinking", resolved["scorer"])
+
+    def test_explicit_attacker_override_is_not_polluted_by_remote_defaults(self):
+        """A user-supplied attacker model must not inherit reasoning or the
+        HackAgent api_key from the remote defaults."""
+        orch, hack_agent, _ = _make_orchestrator()
+        orch.attack_type = "pair"
+        hack_agent.backend.get_api_key.return_value = "hk_test_remote_key"
+
+        resolved = orch._apply_mode_based_role_defaults(
+            {
+                "attack_type": "pair",
+                "goals": ["test"],
+                "attacker": {
+                    "identifier": "openai/gpt-4o-mini",
+                    "agent_type": "litellm",
+                    "endpoint": "",
+                    "api_key": None,
+                },
+            }
+        )
+        att = resolved["attacker"]
+        self.assertEqual(att["identifier"], "openai/gpt-4o-mini")
+        self.assertEqual(att["agent_type"], "litellm")
+        self.assertIsNone(att["api_key"])  # not the remote key
+        self.assertNotIn("thinking", att)  # no forced reasoning
+        self.assertNotIn("extra_body", att)
+
     def test_local_mode_injects_static_template_judge_defaults(self):
-        """Without backend API key, static template judge defaults should use local profile."""
+        """Without backend API key, baseline judge defaults should use local profile."""
         orch, hack_agent, _ = _make_orchestrator()
         orch.attack_type = "static_template"
         hack_agent.backend.get_api_key.return_value = None
@@ -277,12 +329,62 @@ class TestModeBasedRoleDefaults(unittest.TestCase):
         attack_config = {"attack_type": "static_template", "goals": ["test"]}
         resolved = orch._apply_mode_based_role_defaults(attack_config)
 
-        self.assertEqual(resolved["judge"]["identifier"], "gemma3:4b")
+        self.assertEqual(resolved["judge"]["identifier"], DEFAULT_LOCAL_MODEL)
         self.assertEqual(resolved["judge"]["endpoint"], "http://localhost:11434")
         self.assertEqual(resolved["judge"]["agent_type"], "OLLAMA")
         self.assertEqual(resolved["judge"]["type"], "harmbench")
         self.assertIsNone(resolved["judge"]["api_key"])
-        self.assertEqual(resolved["judges"][0]["identifier"], "gemma3:4b")
+        self.assertEqual(resolved["judges"][0]["identifier"], DEFAULT_LOCAL_MODEL)
+
+    def test_remote_mode_routes_category_classifier_to_hackagent_api(self):
+        """With a key, the default classifier is routed to the HackAgent API."""
+        orch, hack_agent, _ = _make_orchestrator()
+        orch.attack_type = "baseline"
+        hack_agent.backend.get_api_key.return_value = "hk_test_remote_key"
+
+        resolved = orch._apply_mode_based_role_defaults(
+            {"attack_type": "baseline", "goals": ["test"]}
+        )
+
+        cc = resolved["category_classifier"]
+        self.assertEqual(cc["endpoint"], "https://api.hackagent.dev/v1")
+        self.assertEqual(cc["agent_type"], "OPENAI_SDK")
+        self.assertEqual(cc["api_key"], "hk_test_remote_key")
+
+    def test_local_mode_leaves_category_classifier_untouched(self):
+        """Without a key, the classifier keeps its local default (not injected)."""
+        orch, hack_agent, _ = _make_orchestrator()
+        orch.attack_type = "baseline"
+        hack_agent.backend.get_api_key.return_value = None
+
+        resolved = orch._apply_mode_based_role_defaults(
+            {"attack_type": "baseline", "goals": ["test"]}
+        )
+
+        self.assertNotIn("category_classifier", resolved)
+
+    def test_remote_mode_preserves_explicit_category_classifier(self):
+        """An explicit classifier config is never overwritten by remote routing."""
+        orch, hack_agent, _ = _make_orchestrator()
+        orch.attack_type = "baseline"
+        hack_agent.backend.get_api_key.return_value = "hk_test_remote_key"
+
+        resolved = orch._apply_mode_based_role_defaults(
+            {
+                "attack_type": "baseline",
+                "goals": ["test"],
+                "category_classifier": {
+                    "identifier": "cc-model",
+                    "endpoint": "https://custom/v1",
+                    "agent_type": "OPENAI_SDK",
+                },
+            }
+        )
+
+        self.assertEqual(resolved["category_classifier"]["identifier"], "cc-model")
+        self.assertEqual(
+            resolved["category_classifier"]["endpoint"], "https://custom/v1"
+        )
 
 
 class TestDefaultCategoryClassifierPreflight(unittest.TestCase):
@@ -338,19 +440,32 @@ class TestDefaultCategoryClassifierPreflight(unittest.TestCase):
                 "_get_installed_ollama_models",
                 return_value={"llama3:latest"},
             ):
+                # Auto-pull is on by default; simulate an offline/failed pull so
+                # the run still aborts (and no real `ollama pull` is invoked).
                 with patch.object(
                     AttackOrchestrator,
-                    "_create_server_run_record",
-                    return_value=_VALID_RUN_ID,
-                ) as mock_create_run:
-                    with self.assertRaises(ValueError) as ctx:
-                        orch.execute(
-                            attack_config=attack_config,
-                            run_config_override=None,
-                            fail_on_run_error=False,
-                        )
+                    "_pull_ollama_model",
+                    return_value=False,
+                ) as mock_pull:
+                    with patch.object(
+                        AttackOrchestrator,
+                        "_create_server_run_record",
+                        return_value=_VALID_RUN_ID,
+                    ) as mock_create_run:
+                        with self.assertRaises(ValueError) as ctx:
+                            orch.execute(
+                                attack_config=attack_config,
+                                run_config_override=None,
+                                fail_on_run_error=False,
+                            )
 
-        self.assertIn("gemma3:4b", str(ctx.exception))
+        mock_pull.assert_called_once()
+
+        from hackagent.attacks.techniques.config import (
+            DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
+        )
+
+        self.assertIn(DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER, str(ctx.exception))
         mock_create_run.assert_not_called()
 
     def test_skips_preflight_if_classifier_is_explicitly_configured(self):
@@ -496,12 +611,12 @@ class TestRequiredModelAvailabilityPreflight(unittest.TestCase):
     def test_collect_targets_keeps_classifier_when_intents_are_not_used(self):
         """Category classifier remains preflighted unless explicit goal labels are provided."""
         orch, _, _ = _make_orchestrator()
-        orch.attack_type = "static_template"
-        orch.attack_impl_class = StaticTemplateAttack
+        orch.attack_type = "baseline"
+        orch.attack_impl_class = BaselineAttack
         orch.hackagent_agent.router = None
 
         attack_config = {
-            "attack_type": "static_template",
+            "attack_type": "baseline",
             "evaluator_type": "pattern",
             "category_classifier": {
                 "identifier": "cc-model",
@@ -522,12 +637,12 @@ class TestRequiredModelAvailabilityPreflight(unittest.TestCase):
     def test_collect_targets_uses_default_classifier_when_not_specified(self):
         """When classifier is omitted and intents are not used, default classifier is preflighted."""
         orch, _, _ = _make_orchestrator()
-        orch.attack_type = "static_template"
-        orch.attack_impl_class = StaticTemplateAttack
+        orch.attack_type = "baseline"
+        orch.attack_impl_class = BaselineAttack
         orch.hackagent_agent.router = None
 
         attack_config = {
-            "attack_type": "static_template",
+            "attack_type": "baseline",
             "evaluator_type": "pattern",
         }
 
@@ -609,6 +724,41 @@ class TestRequiredModelAvailabilityPreflight(unittest.TestCase):
         roles = {role for item in targets for role in item.get("roles", [])}
         self.assertNotIn("decorator_llm", roles)
 
+    def test_probe_treats_empty_response_as_reachable(self):
+        """An empty generation proves the model is up — the probe must pass."""
+        router = MagicMock()
+        # Plain agent (no probe_ready) → generic healthcheck-send path.
+        router.get_agent_instance.return_value = object()
+        router.route_request.return_value = {
+            "error_message": (
+                "OllamaAgent generation error: [GENERATION_ERROR: EMPTY_RESPONSE]"
+            )
+        }
+        self.assertIsNone(AttackOrchestrator._probe_router_registration(router, "rk"))
+
+    def test_probe_reports_real_connectivity_errors(self):
+        """Genuine connectivity/load errors must still fail the probe."""
+        router = MagicMock()
+        router.get_agent_instance.return_value = object()
+        router.route_request.return_value = {
+            "error_message": "request failed (APIConnectionError): connection refused"
+        }
+        self.assertIn(
+            "connection refused",
+            AttackOrchestrator._probe_router_registration(router, "rk"),
+        )
+
+    def test_probe_uses_probe_ready_when_available(self):
+        """Adapters exposing probe_ready() (web) get a non-invasive check — no
+        healthcheck message is sent into the live target."""
+        agent = MagicMock()
+        agent.probe_ready.return_value = None  # reachable
+        router = MagicMock()
+        router.get_agent_instance.return_value = agent
+        self.assertIsNone(AttackOrchestrator._probe_router_registration(router, "rk"))
+        agent.probe_ready.assert_called_once()
+        router.route_request.assert_not_called()
+
     def test_validate_required_models_availability_reports_model_and_endpoint(self):
         """Error should include role, identifier, and endpoint for unavailable models."""
         orch, _, _ = _make_orchestrator()
@@ -636,12 +786,16 @@ class TestRequiredModelAvailabilityPreflight(unittest.TestCase):
                 "_probe_model_target",
                 return_value="model not found",
             ):
+                # Disable auto-pull so this test exercises the report path only
+                # (and never shells out to a real `ollama pull`).
                 message = orch._validate_required_models_availability(
-                    attack_config={"goals": ["test"]}
+                    attack_config={"goals": ["test"], "auto_pull_models": False}
                 )
 
         self.assertIsInstance(message, str)
         self.assertIn("required models are unavailable", message)
+        # The model id here comes from this test's mocked role fixture, not the
+        # default, so it stays "gemma3:4b".
         self.assertIn("gemma3:4b", message)
         self.assertIn("http://localhost:11434", message)
 
@@ -770,7 +924,7 @@ class TestRequiredModelAvailabilityPreflight(unittest.TestCase):
         """Run must not start when preflight detects an unavailable model."""
         orch, _, _ = _make_orchestrator()
 
-        attack_config = {"goals": ["test"], "attack_type": "static_template"}
+        attack_config = {"goals": ["test"], "attack_type": "baseline"}
 
         with patch.object(
             AttackOrchestrator,
@@ -965,6 +1119,93 @@ class TestGetAttackImplKwargs(unittest.TestCase):
         self.assertIn("client", kwargs)
         self.assertIn("agent_router", kwargs)
         self.assertIs(kwargs["client"], hack_agent.backend)
+
+
+@unittest.skipUnless(
+    (DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE or "").upper() == "OLLAMA",
+    "default category classifier is not Ollama-based",
+)
+class TestAutoPullOllamaModels(unittest.TestCase):
+    """Auto-download missing local Ollama models instead of aborting."""
+
+    def test_auto_pull_enabled_defaults_and_overrides(self):
+        # On by default.
+        self.assertTrue(AttackOrchestrator._auto_pull_enabled({}))
+        # Explicit config opt-out.
+        self.assertFalse(
+            AttackOrchestrator._auto_pull_enabled({"auto_pull_models": False})
+        )
+        # Env opt-out.
+        with patch.dict(os.environ, {"HACKAGENT_AUTO_PULL_MODELS": "0"}):
+            self.assertFalse(AttackOrchestrator._auto_pull_enabled({}))
+            # Explicit config wins over env.
+            self.assertTrue(
+                AttackOrchestrator._auto_pull_enabled({"auto_pull_models": True})
+            )
+
+    def test_classifier_autopull_success_does_not_raise(self):
+        """Missing default classifier model is pulled, then the run proceeds."""
+        orch, _, _ = _make_orchestrator()
+        with patch(
+            "hackagent.attacks.orchestrator.shutil.which",
+            return_value="/usr/local/bin/ollama",
+        ):
+            # Missing before the pull, present after.
+            with patch.object(
+                AttackOrchestrator,
+                "_get_installed_ollama_models",
+                side_effect=[set(), {DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER}],
+            ):
+                with patch.object(
+                    AttackOrchestrator, "_pull_ollama_model", return_value=True
+                ) as mock_pull:
+                    # Should not raise.
+                    orch._validate_default_category_classifier_requirements(
+                        {"goals": ["x"]}
+                    )
+        mock_pull.assert_called_once_with(DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER)
+
+    def test_classifier_autopull_disabled_raises_without_pulling(self):
+        orch, _, _ = _make_orchestrator()
+        with patch(
+            "hackagent.attacks.orchestrator.shutil.which",
+            return_value="/usr/local/bin/ollama",
+        ):
+            with patch.object(
+                AttackOrchestrator,
+                "_get_installed_ollama_models",
+                return_value={"llama3:latest"},
+            ):
+                with patch.object(
+                    AttackOrchestrator, "_pull_ollama_model"
+                ) as mock_pull:
+                    with self.assertRaises(ValueError):
+                        orch._validate_default_category_classifier_requirements(
+                            {"goals": ["x"], "auto_pull_models": False}
+                        )
+        mock_pull.assert_not_called()
+
+    def test_autopull_missing_ollama_targets_pulls_only_missing(self):
+        orch, _, _ = _make_orchestrator()
+        targets = [
+            {"identifier": "gemma3:4b", "agent_type": "OLLAMA"},  # missing → pull
+            {"identifier": "present:latest", "agent_type": "OLLAMA"},  # present → skip
+            {"identifier": "gpt-4o", "agent_type": "OPENAI_SDK"},  # non-ollama → skip
+        ]
+        with patch(
+            "hackagent.attacks.orchestrator.shutil.which",
+            return_value="/usr/local/bin/ollama",
+        ):
+            with patch.object(
+                AttackOrchestrator,
+                "_get_installed_ollama_models",
+                return_value={"present:latest"},
+            ):
+                with patch.object(
+                    AttackOrchestrator, "_pull_ollama_model", return_value=True
+                ) as mock_pull:
+                    orch._autopull_missing_ollama_targets(targets)
+        mock_pull.assert_called_once_with("gemma3:4b")
 
 
 if __name__ == "__main__":

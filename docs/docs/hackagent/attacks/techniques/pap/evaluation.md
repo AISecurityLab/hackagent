@@ -10,6 +10,9 @@ judge evaluation with early-stopping.  By the time this step executes,
 every result dict already contains ``best_score``, ``success``, and the
 raw judge columns.
 
+In PAP, each persuasion-technique attempt may be judged inline during
+generation. This evaluation step never re-runs judge evaluation.
+
 The post-processing step is responsible for:
 - Enriching any items still missing scores (e.g. errors).
 - Server sync of evaluation data.
@@ -23,7 +26,8 @@ class PAPEvaluation(BaseEvaluationStep)
 
 Lightweight post-processing for the PAP attack.
 
-Judge evaluation is performed inline during the generation loop.
+Judge evaluation is performed inline during the generation loop while
+iterating persuasion techniques.
 This step handles server sync, tracker updates, and ASR logging only.
 
 #### execute

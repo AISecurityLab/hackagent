@@ -37,8 +37,7 @@ def extract_prompt_and_improvement(content: str) -> Optional[Dict[str, str]]:
             return parsed
 
     prompt_match = re.search(
-        r'"prompt"\s*:\s*"((?:[^"\\]|\\.)*)"|'
-        r"'prompt'\s*:\s*'((?:[^'\\]|\\.)*)'",
+        r'"prompt"\s*:\s*"((?:[^"\\]|\\.)*)"|' r"'prompt'\s*:\s*'((?:[^'\\]|\\.)*)'",
         raw,
         re.DOTALL,
     )

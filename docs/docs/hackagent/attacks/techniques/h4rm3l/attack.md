@@ -47,6 +47,20 @@ It can be:
 - `program` - The resolved decorator program string.
 - `syntax_version` - Program syntax version (1 or 2).
 
+#### get\_effective\_model\_roles
+
+```python
+@classmethod
+def get_effective_model_roles(
+    cls,
+    attack_config: Dict[str, Any],
+    *,
+    goal_labels_by_index: Optional[Dict[int, Dict[str, str]]] = None
+) -> List[Dict[str, Any]]
+```
+
+Resolve h4rm3l preflight roles from effective runtime program semantics.
+
 #### run
 
 ```python

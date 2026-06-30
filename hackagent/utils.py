@@ -51,6 +51,12 @@ def resolve_agent_type(agent_type_input: Union[AgentTypeEnum, str]) -> AgentType
         try:
             return AgentTypeEnum[agent_type_input.upper().replace("-", "_")]
         except KeyError:
+            # Fall back to value/alias resolution (AgentTypeEnum._missing_
+            # handles shorthand such as "claude" → CLAUDE_CODE).
+            try:
+                return AgentTypeEnum(agent_type_input)
+            except ValueError:
+                pass
             logger.warning(
                 f"Invalid agent_type string: '{agent_type_input}'. Falling back to UNKNOWN. "
                 f"Valid types are: {[member.name for member in AgentTypeEnum]}"

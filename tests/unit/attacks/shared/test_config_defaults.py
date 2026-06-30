@@ -3,7 +3,11 @@
 
 import unittest
 
-from hackagent.attacks.techniques.config import ConfigBase, default_config_base
+from hackagent.attacks.techniques.config import (
+    DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
+    ConfigBase,
+    default_config_base,
+)
 
 
 class TestSharedConfigDefaults(unittest.TestCase):
@@ -16,7 +20,9 @@ class TestSharedConfigDefaults(unittest.TestCase):
         self.assertEqual(classifier["agent_type"], "OLLAMA")
         self.assertEqual(classifier["endpoint"], "http://localhost:11434")
         self.assertEqual(classifier["max_tokens"], 100)
-        self.assertEqual(classifier["identifier"], "gemma3:4b")
+        self.assertEqual(
+            classifier["identifier"], DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER
+        )
         self.assertIn("intents", cfg)
         self.assertIsNone(cfg["intents"])
 
@@ -25,7 +31,10 @@ class TestSharedConfigDefaults(unittest.TestCase):
         dumped = typed.model_dump()
 
         self.assertIn("category_classifier", dumped)
-        self.assertEqual(dumped["category_classifier"]["identifier"], "gemma3:4b")
+        self.assertEqual(
+            dumped["category_classifier"]["identifier"],
+            DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
+        )
 
 
 if __name__ == "__main__":

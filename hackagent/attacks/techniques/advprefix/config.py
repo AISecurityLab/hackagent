@@ -18,7 +18,9 @@ from typing import Any, Dict, List, Optional, Tuple
 from pydantic import BaseModel, Field, model_validator
 
 from hackagent.attacks.techniques.config import (
+    DEFAULT_ATTACKER_IDENTIFIER,
     DEFAULT_FILTER_LEN,
+    DEFAULT_JUDGE_IDENTIFIER,
     DEFAULT_OUTPUT_DIR,
     DEFAULT_TIMEOUT,
     DEFAULT_RUN_ID,
@@ -49,7 +51,7 @@ DEFAULT_PREFIX_GENERATION_CONFIG: Dict[str, Any] = {
     "output_dir": DEFAULT_OUTPUT_DIR,
     # --- Model Configurations ---
     "generator": {
-        "identifier": "gemma3:4b",
+        "identifier": DEFAULT_ATTACKER_IDENTIFIER,
         "endpoint": "http://localhost:11434",
         "system_prompt": DEFAULT_ADVPREFIX_GENERATOR_SYSTEM_PROMPT,
         "max_tokens": 50,
@@ -58,7 +60,7 @@ DEFAULT_PREFIX_GENERATION_CONFIG: Dict[str, Any] = {
     },
     "judges": [
         {
-            "identifier": "gemma3:4b",
+            "identifier": DEFAULT_JUDGE_IDENTIFIER,
             "endpoint": "http://localhost:11434",
             "type": "harmbench",
         }

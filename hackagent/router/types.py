@@ -42,6 +42,15 @@ class AgentTypeEnum(str, Enum):
         - **GOOGLE_ADK**: deployed Google ADK agent server
           (POST /run with session + event protocol). Implemented as a
           per-instance ``litellm.CustomLLM`` provider.
+        - **CLAUDE_CODE**: a locally-installed Claude Code CLI, driven in
+          headless mode (``claude -p``). Like ADK, implemented as a
+          per-instance ``litellm.CustomLLM`` provider that shells out to the
+          ``claude`` binary instead of making an HTTP call — no endpoint.
+        - **WEB**: a chatbot on a public website, driven through a real browser
+          (Playwright). Point it at the site URL and it types each prompt into
+          the live chat widget and reads the reply from the page — works on any
+          chat UI regardless of transport (WebSocket/SSE/HTTP). Implemented as a
+          per-instance ``litellm.CustomLLM`` provider.
         - **MCP**: Model Context Protocol endpoint (placeholder).
         - **A2A**: Agent-to-Agent protocol endpoint (placeholder).
 
@@ -53,6 +62,8 @@ class AgentTypeEnum(str, Enum):
     """
 
     GOOGLE_ADK = "GOOGLE_ADK"
+    CLAUDE_CODE = "CLAUDE_CODE"
+    WEB = "WEB"
     LITELLM = "LITELLM"
     OPENAI_SDK = "OPENAI_SDK"
     OLLAMA = "OLLAMA"
@@ -92,6 +103,21 @@ _AGENT_TYPE_ALIASES: dict = {
     "OPENAI-SDK": "OPENAI_SDK",
     "GOOGLE": "GOOGLE_ADK",
     "ADK": "GOOGLE_ADK",
+    "CLAUDE": "CLAUDE_CODE",
+    "CLAUDE-CODE": "CLAUDE_CODE",
+    "CLAUDECODE": "CLAUDE_CODE",
+    "CLAUDE_CLI": "CLAUDE_CODE",
+    # The live-browser web agent is now the single web target; accept the old
+    # and adjacent names so existing configs keep resolving.
+    "WEB-AGENT": "WEB",
+    "WEBAGENT": "WEB",
+    "BROWSER": "WEB",
+    "BROWSER-AGENT": "WEB",
+    "WEB-CHATBOT": "WEB",
+    "WEBCHATBOT": "WEB",
+    "WEBCHAT": "WEB",
+    "CHATBOT": "WEB",
+    "WEBSITE": "WEB",
     "LITE_LLM": "LITELLM",
     "LITE-LLM": "LITELLM",
 }

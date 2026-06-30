@@ -39,6 +39,11 @@ from typing import Any, Dict, Generator, Optional
 import httpx
 import pytest
 
+from hackagent.attacks.techniques.config import (
+    DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
+    DEFAULT_LOCAL_MODEL_ENDPOINT,
+)
+
 # Configure logging for tests
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -47,16 +52,15 @@ logger = logging.getLogger(__name__)
 
 
 def _explicit_default_category_classifier(
-    model: str = "gemma3:4b",
-    endpoint: str = "http://localhost:11434",
+    model: str = DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
+    endpoint: str = DEFAULT_LOCAL_MODEL_ENDPOINT,
 ) -> Dict[str, Any]:
     """Return an explicit classifier config equivalent to the implicit default.
 
-    Defaults match the implicit default
-    (``DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER = "gemma3:4b"``), but
-    fixtures can pass in a smaller model (e.g. ``tinyllama``) to keep
-    integration tests within the pytest-timeout budget on CPU-only
-    runners.
+    Defaults track the implicit default
+    (``DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER``), but fixtures can pass in
+    a smaller model (e.g. ``tinyllama``) to keep integration tests within
+    the pytest-timeout budget on CPU-only runners.
     """
     return {
         "identifier": model,
@@ -586,8 +590,9 @@ def basic_attack_config(
 
     The category classifier reuses the small Ollama model already
     pulled for the suite (``tinyllama`` in CI) instead of the implicit
-    default ``gemma3:4b`` — the larger model blows the 120s
-    pytest-timeout when running judgments on CPU.
+    default (``DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER``) — the larger
+    default model blows the 120s pytest-timeout when running judgments
+    on CPU.
     """
     return {
         "attack_type": "static_template",

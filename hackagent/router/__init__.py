@@ -10,6 +10,8 @@ from .agent import (
     AdapterResponseParsingError,
 )
 from .providers.adk import ADKAgent
+from .providers.claude import ClaudeCodeAgent
+from .providers.web import WebAgent
 from .router import AgentRouter
 from .tracking import StepTracker, TrackingContext, track_operation
 
@@ -17,6 +19,8 @@ __all__ = [
     "AgentRouter",
     "Agent",
     "ADKAgent",
+    "ClaudeCodeAgent",
+    "WebAgent",
     "AdapterConfigurationError",
     "AdapterInteractionError",
     "AdapterResponseParsingError",

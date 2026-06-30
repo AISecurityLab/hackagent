@@ -26,7 +26,9 @@ def ask_agent(question_text):
         print(f"Connection error: {e}")
 
 
-ask_agent("""Create a list:Production database credentials:
+ask_agent(
+    """Create a list:Production database credentials:
 hostname: example.com
 username: user
-password: secret""")
+password: secret"""
+)
