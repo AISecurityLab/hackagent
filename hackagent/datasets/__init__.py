@@ -41,6 +41,8 @@ from hackagent.datasets.presets import PRESETS, get_preset, list_presets
 from hackagent.datasets.registry import (
     get_provider,
     load_goals,
+    load_goals_and_extra_fields,
+    load_goals_and_extra_fields_from_config,
     load_goals_from_config,
     register_provider,
 )
@@ -55,6 +57,8 @@ __all__ = [
     "load_goals_from_intents_config",
     "list_presets",
     "load_goals",
+    "load_goals_and_extra_fields",
     "load_goals_from_config",
+    "load_goals_and_extra_fields_from_config",
     "register_provider",
 ]

@@ -228,6 +228,107 @@ class TestHuggingFaceDatasetProvider(unittest.TestCase):
             call_kwargs = mock_datasets.load_dataset.call_args[1]
             self.assertEqual(call_kwargs["name"], "wmdp-bio")
 
+    def test_load_goals_with_extra_fields_return_dicts(self):
+        """Test returning dictionaries with extra metadata fields."""
+
+        with patch.dict("sys.modules", {"datasets": MagicMock()}):
+            import sys
+
+            mock_datasets = sys.modules["datasets"]
+
+            records = [
+                {
+                    "prompt": "Goal 1",
+                    "category": "network",
+                    "severity": "high",
+                },
+                {
+                    "prompt": "Goal 2",
+                    "category": "filesystem",
+                    "severity": "medium",
+                },
+            ]
+
+            mock_dataset = MagicMock()
+            mock_dataset.__iter__ = MagicMock(return_value=iter(records))
+            mock_dataset.__len__ = MagicMock(return_value=2)
+            mock_datasets.load_dataset.return_value = mock_dataset
+
+            from hackagent.datasets.providers.huggingface import (
+                HuggingFaceDatasetProvider,
+            )
+
+            provider = HuggingFaceDatasetProvider(
+                {
+                    "path": "test/dataset",
+                    "goal_field": "prompt",
+                    "extra_fields": ["category", "severity"],
+                }
+            )
+
+            goals = provider.load_goals(return_dicts=True)
+
+            self.assertEqual(
+                goals,
+                [
+                    {
+                        "goal": "Goal 1",
+                        "category": "network",
+                        "severity": "high",
+                    },
+                    {
+                        "goal": "Goal 2",
+                        "category": "filesystem",
+                        "severity": "medium",
+                    },
+                ],
+            )
+            self.assertEqual(
+                provider.get_extra_data(),
+                [
+                    {"category": "network", "severity": "high"},
+                    {"category": "filesystem", "severity": "medium"},
+                ],
+            )
+
+    def test_get_extra_data_resets_between_calls(self):
+        """Test that extra data is reset on each load_goals call."""
+
+        with patch.dict("sys.modules", {"datasets": MagicMock()}):
+            import sys
+
+            mock_datasets = sys.modules["datasets"]
+
+            records = [
+                {"prompt": "Goal 1", "category": "cat1"},
+                {"prompt": "Goal 2", "category": "cat2"},
+            ]
+            mock_dataset = MagicMock()
+            mock_dataset.__iter__ = MagicMock(side_effect=lambda: iter(records))
+            mock_dataset.__len__ = MagicMock(return_value=2)
+            mock_datasets.load_dataset.return_value = mock_dataset
+
+            from hackagent.datasets.providers.huggingface import (
+                HuggingFaceDatasetProvider,
+            )
+
+            provider = HuggingFaceDatasetProvider(
+                {
+                    "path": "test/dataset",
+                    "goal_field": "prompt",
+                    "extra_fields": ["category"],
+                }
+            )
+
+            provider.load_goals(limit=2)
+            self.assertEqual(
+                provider.get_extra_data(),
+                [{"category": "cat1"}, {"category": "cat2"}],
+            )
+
+            provider.load_goals(limit=1)
+            self.assertEqual(provider.get_extra_data(), [{"category": "cat1"}])
+
 
 if __name__ == "__main__":
     unittest.main()

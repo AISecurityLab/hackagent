@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import contextlib
 import html
+import json
 import re
 
 from nicegui import ui
@@ -38,6 +39,67 @@ _ABBR_TO_TYPE = {
 
 class AttackCardSharedMixin:
     """Mixin providing shared attack-card helpers."""
+
+    @staticmethod
+    def _extract_extra_fields_from_row(row: dict) -> dict:
+        """Return normalized extra fields dict from a dashboard row metadata."""
+        metadata = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
+        if not metadata:
+            return {}
+
+        extra_fields = metadata.get("extra_fields")
+        if not isinstance(extra_fields, dict):
+            return {}
+
+        return {
+            str(k): v for k, v in extra_fields.items() if v not in (None, "", [], {})
+        }
+
+    @staticmethod
+    def _format_extra_field_value(value) -> str:
+        """Format extra field values for human-friendly dashboard display."""
+        if isinstance(value, (dict, list)):
+            return json.dumps(value, indent=2, ensure_ascii=False, default=str)
+        return str(value)
+
+    def _render_extra_fields_panel(self, row: dict) -> None:
+        """Render the Extra Fields card in goal detail views."""
+        extra_fields = self._extract_extra_fields_from_row(row)
+        if not extra_fields:
+            return
+
+        with (
+            ui.card()
+            .tight()
+            .classes(
+                "w-full border border-cyan-200 bg-cyan-50 "
+                "dark:border-cyan-700 dark:bg-cyan-900/20"
+            )
+        ):
+            with ui.column().classes("w-full p-3 gap-2"):
+                with ui.row().classes("items-center gap-2"):
+                    ui.icon("data_object", color="primary").classes("text-sm")
+                    ui.label("EXTRA FIELDS").classes(
+                        "text-[10px] font-semibold tracking-widest text-grey-6 uppercase"
+                    )
+
+                for field_name, field_value in extra_fields.items():
+                    formatted = self._format_extra_field_value(field_value)
+                    with (
+                        ui.card()
+                        .tight()
+                        .classes(
+                            "w-full border border-cyan-100 bg-white "
+                            "dark:border-cyan-800 dark:bg-black/10"
+                        )
+                    ):
+                        with ui.column().classes("w-full p-2 gap-1"):
+                            ui.label(field_name).classes(
+                                "text-[11px] font-semibold text-cyan-8 dark:text-cyan-3"
+                            )
+                            ui.label(formatted).classes(
+                                "text-xs whitespace-pre-wrap break-words text-grey-8 dark:text-grey-2"
+                            ).style("overflow-wrap:anywhere;")
 
     @staticmethod
     def _build_judge_verdicts(
@@ -212,6 +274,9 @@ class AttackCardSharedMixin:
                 )
             ui.separator().classes("my-2")
             yield
+            if self._extract_extra_fields_from_row(row):
+                ui.separator().classes("my-2")
+                self._render_extra_fields_panel(row)
         else:
             with ui.card().tight().classes(f"w-full border-l-4 {border_color}"):
                 with ui.column().classes("w-full gap-2 p-3") as col:

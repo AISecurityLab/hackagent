@@ -25,7 +25,13 @@ PRESETS: Dict[str, Dict[str, Any]] = {
         "goal_field": "prompt",
         "split": "test_public",
         "fallback_fields": ["input", "text"],
-        "description": "AgentHarm benchmark - 176+ harmful agentic tasks (public split)",
+        "description": "AgentHarm benchmark - 208 harmful agentic tasks (public split)",
+        "extra_fields": [
+            "detailed_prompt",
+            "hint_included",
+            "target_functions",
+            "grading_function",
+        ],
     },
     "agentharm_benign": {
         "provider": "huggingface",
@@ -34,7 +40,23 @@ PRESETS: Dict[str, Dict[str, Any]] = {
         "goal_field": "prompt",
         "split": "test_public_benign",
         "fallback_fields": ["input", "text"],
-        "description": "AgentHarm benchmark - benign tasks for comparison",
+        "description": "AgentHarm benchmark - 208 benign tasks for comparison",
+    },
+    # =========================================================================
+    # AgentHazard - In-memory JSON dataset from URL
+    # Source: https://yunhao-feng.github.io/AgentHazard
+    # =========================================================================
+    "agenthazard": {
+        "provider": "url_json",
+        "url": "https://yunhao-feng.github.io/AgentHazard/data/dataset.json",
+        "goal_field": "query",  # The AgentHazard JSON uses 'query' as the main prompt
+        "fallback_fields": ["prompt", "input", "text"],
+        "extra_fields": [
+            "category",
+            "decomposed_query",
+            "jailbreak_method",
+        ],  # Specify any metadata fields to extract
+        "description": "AgentHazard dataset - 2653 goals fetched directly into RAM",
     },
     # =========================================================================
     # StrongREJECT - Jailbreak evaluation

@@ -95,6 +95,7 @@ const sidebars: SidebarsConfig = {
         'datasets/selecting-intent-categories',
         'datasets/presets',
         'datasets/huggingface',
+        'datasets/url-json',
         'datasets/file',
         'datasets/custom-providers',
         'datasets/troubleshooting',
@@ -236,6 +237,7 @@ const sidebars: SidebarsConfig = {
             'hackagent/datasets/registry',
             'hackagent/datasets/providers/file',
             'hackagent/datasets/providers/huggingface',
+            'hackagent/datasets/providers/url_json',
           ],
         },
         {

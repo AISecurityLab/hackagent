@@ -12,6 +12,7 @@ Instead of manually specifying `goals`, use the `dataset` parameter to load goal
 
 - 🎯 **Presets** — 30+ ready-to-use AI safety benchmarks (AgentHarm, JailbreakBench, BeaverTails, etc.)
 - 🤗 **HuggingFace Hub** — Any public or private dataset from HuggingFace
+- 🌐 **URL JSON** — Load remote JSON datasets directly from HTTPS URLs
 - 📁 **Local files** — JSON, JSONL, CSV, or TXT files from your filesystem
 - 🧭 **Intent taxonomy selection** — Pick OmniSafeBench categories/subcategories with `intents`
 
@@ -20,6 +21,7 @@ graph LR
     subgraph "Dataset Sources"
         P[🎯 Presets<br/>30+ Benchmarks] --> L[Dataset Loader]
         H[🤗 HuggingFace Hub<br/>Any Dataset] --> L
+        U[🌐 URL JSON<br/>Remote JSON Feeds] --> L
         F[📁 Local Files<br/>JSON/CSV/TXT] --> L
     end
     L --> G[Goals List]
@@ -27,6 +29,7 @@ graph LR
 
     style P fill:#e1f5ff
     style H fill:#fff4e1
+    style U fill:#e1fff4
     style F fill:#f0e1ff
     style L fill:#e8f5e9
 ```
@@ -79,7 +82,8 @@ results = agent.hack(attack_config=attack_config)
 ```
 
 :::tip Popular Presets
-- **`agentharm`** — AI agent safety (176+ tasks)
+- **`agentharm`** — AI agent safety (208 tasks)
+- **`agenthazard`** — tool-use risk prompts loaded from URL JSON
 - **`jailbreakbench`** — Curated jailbreaks (100 behaviors)
 - **`beavertails`** — Multi-category safety (330K+ samples)
 - **`simplesafetytests`** — Quick safety check (100 prompts)
@@ -130,7 +134,28 @@ attack_config = {
 results = agent.hack(attack_config=attack_config)
 ```
 
-### 4. Selecting Intent Categories (OmniSafeBench)
+### 4. Using URL JSON
+
+Load JSON datasets directly from a remote URL (no local file needed):
+
+```python
+attack_config = {
+    "attack_type": "baseline",
+    "dataset": {
+        "provider": "url_json",
+        "url": "https://yunhao-feng.github.io/AgentHazard/data/dataset.json",
+        "goal_field": "query",
+        "fallback_fields": ["prompt", "input", "text"],
+        "limit": 100,
+        "shuffle": True,
+        "seed": 42,
+    }
+}
+
+results = agent.hack(attack_config=attack_config)
+```
+
+### 5. Selecting Intent Categories (OmniSafeBench)
 
 When you want category-balanced goals without manually writing prompts, use
 `intents` to select categories and subcategories directly from the
@@ -192,6 +217,7 @@ When both `shuffle` and `offset` are used, shuffling happens **first**, then off
 |----------|-------------------|---------------|
 | **Presets** | 30+ benchmarks | 500K+ goals |
 | **HuggingFace** | Unlimited | Custom |
+| **URL JSON** | Any reachable JSON endpoint | Custom |
 | **Local Files** | Your data | Custom |
 
 ---
@@ -202,6 +228,7 @@ When both `shuffle` and `offset` are used, shuffling happens **first**, then off
 - 🧭 [**Selecting intent categories**](./selecting-intent-categories.md) — Use taxonomy categories/subcategories with strings, enums, or label codes
 - 🎯 [**Presets**](./presets.md) — All 30+ pre-configured benchmarks
 - 🤗 [**HuggingFace Provider**](./huggingface.md) — Load any HuggingFace dataset
+- 🌐 [**URL JSON Provider**](./url-json.md) — Load JSON datasets from remote URLs
 - 📁 [**File Provider**](./file.md) — Load from local JSON, CSV, or TXT files
 - 🔧 [**Custom Providers**](./custom-providers.md) — Create your own data sources
 - 🩺 [**Troubleshooting**](./troubleshooting.md) — Resolve common dataset loading issues

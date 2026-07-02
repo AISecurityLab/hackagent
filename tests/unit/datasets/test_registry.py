@@ -14,6 +14,8 @@ from hackagent.datasets.registry import (
     _PROVIDERS,
     get_provider,
     load_goals,
+    load_goals_and_extra_fields,
+    load_goals_and_extra_fields_from_config,
     load_goals_from_config,
     register_provider,
 )
@@ -28,6 +30,7 @@ class TestProviderRegistry(unittest.TestCase):
         self.assertIn("hf", _PROVIDERS)  # Alias
         self.assertIn("file", _PROVIDERS)
         self.assertIn("local", _PROVIDERS)  # Alias
+        self.assertIn("url_json", _PROVIDERS)
 
     def test_register_custom_provider(self):
         """Test registering a custom provider."""
@@ -228,6 +231,69 @@ class TestLoadGoalsFromConfig(unittest.TestCase):
 
         mock_get_preset.assert_called_once_with("agentharm")
         self.assertEqual(goals, ["goal"])
+
+
+class TestLoadGoalsWithExtraFields(unittest.TestCase):
+    """Test extra-fields aware dataset loading helpers."""
+
+    @patch("hackagent.datasets.registry.get_provider")
+    @patch("hackagent.datasets.registry.get_preset")
+    def test_load_goals_and_extra_fields_from_preset(
+        self, mock_get_preset, mock_get_provider
+    ):
+        """Helper should return goals and normalized extra fields by index."""
+        mock_get_preset.return_value = {
+            "provider": "huggingface",
+            "path": "test/dataset",
+            "goal_field": "prompt",
+        }
+
+        mock_provider = MagicMock()
+        mock_provider.load_goals.return_value = ["g1", "g2"]
+        mock_provider.get_extra_data.return_value = [
+            {"category": "network", "severity": "high"},
+            {},
+        ]
+        mock_get_provider.return_value = mock_provider
+
+        goals, extras = load_goals_and_extra_fields(preset="agentharm", limit=2)
+
+        self.assertEqual(goals, ["g1", "g2"])
+        self.assertEqual(
+            extras,
+            {0: {"extra_fields": {"category": "network", "severity": "high"}}},
+        )
+
+    @patch("hackagent.datasets.registry.get_provider")
+    def test_load_goals_and_extra_fields_handles_missing_provider_method(
+        self, mock_get_provider
+    ):
+        """Providers without get_extra_data should still work and return empty map."""
+        mock_provider = MagicMock()
+        mock_provider.load_goals.return_value = ["g1"]
+        mock_provider.get_extra_data = None
+        mock_get_provider.return_value = mock_provider
+
+        goals, extras = load_goals_and_extra_fields(
+            provider="file",
+            path="/tmp/goals.json",
+            goal_field="goal",
+        )
+
+        self.assertEqual(goals, ["g1"])
+        self.assertEqual(extras, {})
+
+    @patch("hackagent.datasets.registry.load_goals_and_extra_fields")
+    def test_load_goals_and_extra_fields_from_config_wrapper(self, mock_loader):
+        """Config wrapper should delegate to main helper unchanged."""
+        mock_loader.return_value = (["goal"], {0: {"extra_fields": {"k": "v"}}})
+
+        config = {"preset": "agenthazard", "limit": 1}
+        goals, extras = load_goals_and_extra_fields_from_config(config)
+
+        mock_loader.assert_called_once_with(**config)
+        self.assertEqual(goals, ["goal"])
+        self.assertEqual(extras, {0: {"extra_fields": {"k": "v"}}})
 
 
 if __name__ == "__main__":

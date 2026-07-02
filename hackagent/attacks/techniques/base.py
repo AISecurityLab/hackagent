@@ -246,6 +246,28 @@ class BaseAttack(abc.ABC):
         """
         run_id = self.config.get("_run_id") or self.run_id
         backend = self.config.get("_backend") or self.backend
+
+        # Optional per-goal metadata injected by the orchestrator when dataset
+        # providers expose extra fields (e.g., AgentHazard/AgentHarm metadata).
+        goal_metadata_by_index = self.config.get("_goal_extra_fields_by_index")
+        goal_metadata_by_goal = self.config.get("_goal_extra_fields_by_goal")
+        if (
+            isinstance(goal_metadata_by_index, dict)
+            and goal_metadata_by_index
+            or isinstance(goal_metadata_by_goal, dict)
+            and goal_metadata_by_goal
+        ):
+            merged_initial_metadata = dict(initial_metadata or {})
+            if isinstance(goal_metadata_by_index, dict) and goal_metadata_by_index:
+                merged_initial_metadata["_goal_metadata_by_index"] = (
+                    goal_metadata_by_index
+                )
+            if isinstance(goal_metadata_by_goal, dict) and goal_metadata_by_goal:
+                merged_initial_metadata["_goal_metadata_by_goal"] = (
+                    goal_metadata_by_goal
+                )
+            initial_metadata = merged_initial_metadata
+
         raw_run_start_time = self.config.get("_global_run_start_time")
         run_start_time: Optional[float]
         try:

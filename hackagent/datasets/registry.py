@@ -55,6 +55,59 @@ def get_provider(name: str, config: Dict[str, Any]) -> DatasetProvider:
     return _PROVIDERS[name_lower](config)
 
 
+def _resolve_provider_and_config(
+    # Preset-based loading
+    preset: Optional[str] = None,
+    # Direct provider loading
+    provider: Optional[str] = None,
+    path: Optional[str] = None,
+    goal_field: Optional[str] = None,
+    split: Optional[str] = None,
+    name: Optional[str] = None,
+    # Extra config
+    **kwargs,
+) -> tuple[str, Dict[str, Any]]:
+    """Resolve final provider name and config from preset/direct arguments."""
+    if preset:
+        # Use preset configuration
+        config = get_preset(preset)
+        provider_name = config.pop("provider", "huggingface")
+
+        # Override preset with any explicit arguments
+        if path:
+            config["path"] = path
+        if goal_field:
+            config["goal_field"] = goal_field
+        if split:
+            config["split"] = split
+        if name:
+            config["name"] = name
+
+        # Add any extra kwargs
+        config.update(kwargs)
+
+    elif provider:
+        # Build config from arguments
+        provider_name = provider
+        config = {
+            "path": path,
+            "goal_field": goal_field or "input",
+            **kwargs,
+        }
+        if split:
+            config["split"] = split
+        if name:
+            config["name"] = name
+
+    else:
+        raise ValueError(
+            "Either 'preset' or 'provider' must be specified. "
+            f"Available presets: {', '.join(sorted(PRESETS.keys()))}"
+        )
+
+    return provider_name, config
+
+
 def load_goals(
     # Preset-based loading
     preset: Optional[str] = None,
@@ -118,43 +171,15 @@ def load_goals(
     Raises:
         ValueError: If neither preset nor provider is specified.
     """
-    # Build configuration
-    if preset:
-        # Use preset configuration
-        config = get_preset(preset)
-        provider_name = config.pop("provider", "huggingface")
-
-        # Override preset with any explicit arguments
-        if path:
-            config["path"] = path
-        if goal_field:
-            config["goal_field"] = goal_field
-        if split:
-            config["split"] = split
-        if name:
-            config["name"] = name
-
-        # Add any extra kwargs
-        config.update(kwargs)
-
-    elif provider:
-        # Build config from arguments
-        provider_name = provider
-        config = {
-            "path": path,
-            "goal_field": goal_field or "input",
-            **kwargs,
-        }
-        if split:
-            config["split"] = split
-        if name:
-            config["name"] = name
-
-    else:
-        raise ValueError(
-            "Either 'preset' or 'provider' must be specified. "
-            f"Available presets: {', '.join(sorted(PRESETS.keys()))}"
-        )
+    provider_name, config = _resolve_provider_and_config(
+        preset=preset,
+        provider=provider,
+        path=path,
+        goal_field=goal_field,
+        split=split,
+        name=name,
+        **kwargs,
+    )
 
     # Get provider instance
     provider_instance = get_provider(provider_name, config)
@@ -165,6 +190,64 @@ def load_goals(
         shuffle=shuffle,
         seed=seed,
     )
+
+
+def load_goals_and_extra_fields(
+    # Preset-based loading
+    preset: Optional[str] = None,
+    # Direct provider loading
+    provider: Optional[str] = None,
+    path: Optional[str] = None,
+    goal_field: Optional[str] = None,
+    split: Optional[str] = None,
+    name: Optional[str] = None,
+    # Common options
+    limit: Optional[int] = None,
+    shuffle: bool = False,
+    seed: Optional[int] = None,
+    # Extra config
+    **kwargs,
+) -> tuple[List[str], Dict[int, Dict[str, Any]]]:
+    """Load goals and return per-goal extra fields metadata, when available."""
+    provider_name, config = _resolve_provider_and_config(
+        preset=preset,
+        provider=provider,
+        path=path,
+        goal_field=goal_field,
+        split=split,
+        name=name,
+        **kwargs,
+    )
+
+    provider_instance = get_provider(provider_name, config)
+    goals = provider_instance.load_goals(
+        limit=limit,
+        shuffle=shuffle,
+        seed=seed,
+    )
+
+    extra_by_index: Dict[int, Dict[str, Any]] = {}
+    get_extra_data = getattr(provider_instance, "get_extra_data", None)
+    if callable(get_extra_data):
+        try:
+            raw_extras = get_extra_data() or []
+            if isinstance(raw_extras, list):
+                for idx, extra in enumerate(raw_extras):
+                    if idx >= len(goals):
+                        break
+                    if not isinstance(extra, dict) or not extra:
+                        continue
+
+                    # Drop empty fields for cleaner dashboard rendering.
+                    filtered = {
+                        k: v for k, v in extra.items() if v not in (None, "", [], {})
+                    }
+                    if filtered:
+                        extra_by_index[idx] = {"extra_fields": filtered}
+        except Exception as exc:
+            logger.warning("Failed to collect dataset extra fields metadata: %s", exc)
+
+    return goals, extra_by_index
 
 
 def load_goals_from_config(config: Dict[str, Any]) -> List[str]:
@@ -209,16 +292,25 @@ def load_goals_from_config(config: Dict[str, Any]) -> List[str]:
     return load_goals(**config)
 
 
+def load_goals_and_extra_fields_from_config(
+    config: Dict[str, Any],
+) -> tuple[List[str], Dict[int, Dict[str, Any]]]:
+    """Load goals and extra fields from a dataset configuration dictionary."""
+    return load_goals_and_extra_fields(**config)
+
+
 # Register built-in providers on import
 def _register_builtin_providers():
     """Register the built-in dataset providers."""
     from hackagent.datasets.providers.file import FileDatasetProvider
     from hackagent.datasets.providers.huggingface import HuggingFaceDatasetProvider
+    from hackagent.datasets.providers.url_json import UrlJsonDatasetProvider
 
     register_provider("huggingface", HuggingFaceDatasetProvider)
     register_provider("hf", HuggingFaceDatasetProvider)  # Alias
     register_provider("file", FileDatasetProvider)
     register_provider("local", FileDatasetProvider)  # Alias
+    register_provider("url_json", UrlJsonDatasetProvider)
 
 
 _register_builtin_providers()
@@ -229,7 +321,9 @@ __all__ = [
     "get_provider",
     "register_provider",
     "load_goals",
+    "load_goals_and_extra_fields",
     "load_goals_from_config",
+    "load_goals_and_extra_fields_from_config",
     "get_preset",
     "list_presets",
     "PRESETS",

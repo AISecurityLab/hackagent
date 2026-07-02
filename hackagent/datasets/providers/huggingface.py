@@ -55,6 +55,9 @@ class HuggingFaceDatasetProvider(DatasetProvider):
         )
         self.trust_remote_code = config.get("trust_remote_code", False)
 
+        self.extra_fields = config.get("extra_fields", [])
+        self.last_extracted_extras: List[Dict[str, Any]] = []
+
         self._dataset = None
         self._metadata = {
             "provider": "huggingface",
@@ -99,7 +102,7 @@ class HuggingFaceDatasetProvider(DatasetProvider):
         shuffle: bool = False,
         seed: Optional[int] = None,
         **kwargs,
-    ) -> List[str]:
+    ) -> List[Any]:
         """
         Load goals from the HuggingFace dataset.
 
@@ -121,6 +124,9 @@ class HuggingFaceDatasetProvider(DatasetProvider):
         goals = []
         count = 0
 
+        self.last_extracted_extras = []
+        return_dicts = kwargs.get("return_dicts", False)
+
         for record in dataset:
             if limit and count >= limit:
                 break
@@ -132,7 +138,18 @@ class HuggingFaceDatasetProvider(DatasetProvider):
             )
 
             if goal:
-                goals.append(goal)
+                extra_data = (
+                    {f: record.get(f) for f in self.extra_fields}
+                    if self.extra_fields
+                    else {}
+                )
+                self.last_extracted_extras.append(extra_data)
+
+                if return_dicts and self.extra_fields:
+                    goals.append({"goal": goal, **extra_data})
+                else:
+                    goals.append(goal)
+
                 count += 1
             else:
                 self.logger.warning(
@@ -144,6 +161,10 @@ class HuggingFaceDatasetProvider(DatasetProvider):
         self.logger.info(f"Extracted {len(goals)} goals from dataset")
 
         return goals
+
+    def get_extra_data(self) -> List[Dict[str, Any]]:
+        """Return extra fields extracted during the last load_goals call."""
+        return self.last_extracted_extras
 
     def get_metadata(self) -> Dict[str, Any]:
         """Return metadata about the loaded dataset."""

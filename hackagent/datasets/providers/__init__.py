@@ -5,8 +5,10 @@
 
 from hackagent.datasets.providers.file import FileDatasetProvider
 from hackagent.datasets.providers.huggingface import HuggingFaceDatasetProvider
+from hackagent.datasets.providers.url_json import UrlJsonDatasetProvider
 
 __all__ = [
     "FileDatasetProvider",
     "HuggingFaceDatasetProvider",
+    "UrlJsonDatasetProvider",
 ]
