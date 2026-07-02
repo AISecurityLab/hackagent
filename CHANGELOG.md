@@ -1,3 +1,214 @@
+## v0.11.0 (2026-07-02)
+
+### ✨ Features
+
+- extend to ollama-based claude code
+- **claude-code**: Claude-code integration
+- **claude-code**: Adding claude-code and the autoscan functionality
+- add rag attack
+- add rag attack
+- use harmful datasets also for indirect prompt injection
+- first version of rag atack
+- use remote endpoints as default when using remote mode
+- use remote endpoints as default when using remote mode
+- add guardrails support to router and attack techniques
+- group intents by categories
+- allow different judge models for same judge type and show stats in dashboard
+- allow different judge models for same judge type and show stats in dashboard
+- validate model availability before run execution
+- validate model availability before run execution
+- add guardrails support to router and attack techniques
+- group intents by categories
+- **dashboard**: add run filters, goal filters, and UX improvements
+- dashboard improvements and guardrail visualization
+- add guardrails support to router and attack techniques
+
+### 🐛🚑️ Fixes
+
+- fixed patched agent request bugs
+- fixed bugs for claude code interaction
+- minor fixes
+- fixed unit test
+- fixed default local judge type
+- **merge**: repair botched main merge in MML branch
+- fixed enum for python 3 10
+- fixed enum type for python 310
+- improved multi judge tables on dashboard and fixed recent runs bug
+- optimized preflight check on models
+- fixed google adk integration test
+- set api key in initialization
+- set api key in initialization
+- fixed enum for python 3 10
+- fixed enum type for python 310
+
+### ♻️ Refactorings
+
+- solved merge conflict
+- **minor**: moving example to rag
+- abandon requests in favor of httpx
+- abandon requests in favor of httpx
+- split _page script in multiple shorter scripts divided by functionality
+- split _page script in multiple shorter scripts divided by functionality
+- refactor indirect prompt injection attacks and doc
+- solved merge conflicts between main and fc attack
+
+### ⚡️ Performance
+
+- **tracking**: cache goal categorization across attacks
+- **tracking**: cache goal categorization across attacks
+- **remote**: defer writes to a background queue and batch goal classification
+- **remote**: defer writes to a background queue and batch goal classification
+
+### bump
+
+- **deps**: bump datasets from 4.8.5 to 5.0.0
+- **deps-dev**: bump google-adk from 1.31.0 to 2.1.0
+- **deps-dev**: bump ruff from 0.15.9 to 0.15.15
+- **deps**: bump openai from 2.38.0 to 2.41.0
+- **deps-dev**: bump openapi-python-client from 0.28.3 to 0.28.4
+- **deps**: bump faiss-cpu from 1.13.2 to 1.14.2
+- **deps-dev**: bump transformers from 5.5.4 to 5.9.0
+- **deps**: bump datasets from 4.8.4 to 4.8.5
+- **deps-dev**: bump commitizen from 4.16.0 to 4.16.2
+- **deps**: bump nicegui from 3.9.0 to 3.12.1
+- **deps-dev**: bump mcp from 1.27.0 to 1.27.1
+
+### chore
+
+- **router**: finalise #379 — drop plan doc, add router integration tests
+- **ci**: add dependabot auto-merge workflow
+
+### ci
+
+- drop deleted tests/integration/storage/ from offline job (#388 fix)
+- shard Ollama integration into fast/slow + bump remaining ADK timeouts
+- fold slow integration tests into PR CI, drop nightly cron
+- point integration jobs at tests/integration/router/ (#388 CI fix)
+- **tests**: add nightly workflow for slow integration tests
+
+### docs
+
+- **sidebars**: refresh router section after #379 (#388 CI fix)
+- **examples**: multi-provider LiteLLM demo (#379 Phase F.4)
+
+### feat
+
+- added baseline as naive goals' processing
+- implemented FC and tFC attacks
+- added unit tests on guardrails
+- added documentation, cli and tui support of guardrails
+- guardrail config in run_config
+- **mml**: add mixed encoding mode, VLM check, and result_id sync fix
+- added mml attack
+- added unit tests on guardrails
+- added documentation, cli and tui support of guardrails
+- guardrail config in run_config
+- added documentation, cli and tui support of guardrails
+- download plots in svg format
+- improved comparison visualization
+- added copy to clipboard button
+- **tui**: structured event bus for live attack monitoring
+- **tui**: structured event bus for live attack monitoring
+- **router**: surface response_cost + call_id, unify status_code (#379 Phase F.1)
+- **router**: capture I/O via LiteLLM CustomLogger (#379 Phase D)
+- **router**: unify chat adapters on LiteLLM (#379)
+
+### fix
+
+- fixed some inconsistencies
+- fixed some inconsistencies
+- fixed some inconsistencies
+- added PIL dependency
+- prevent TAP attacker from seeing guardrail internals on block
+- AutoDAN-Turbo trace parsing + dashboard guardrail display
+- return raw guardrail dict from TAP _query_target
+- preserve guardrail info in PAIR/TAP trace recordings
+- cli, tui now support mml-attack
+- visualization working for num_workers>1
+- prevent TAP attacker from seeing guardrail internals on block
+- AutoDAN-Turbo trace parsing + dashboard guardrail display
+- return raw guardrail dict from TAP _query_target
+- preserve guardrail info in PAIR/TAP trace recordings
+- remove guardrails keys from attack config dict
+- prevent TAP attacker from seeing guardrail internals on block
+- consistent Run Details and Comparison panels
+- History tab using the whole panel width
+- removed Report tab
+- advprefix/baseline detail tables always showing mitigated
+- consistent tables between dashboard and history tabs
+- guardrail blocked
+- AutoDAN-Turbo trace parsing + dashboard guardrail display
+- record per-prefix evaluation traces in AdvPrefix
+- add _goal_index_offset to TAP config_keys
+- return raw guardrail dict from TAP _query_target
+- correct goal index offset in TAP generation and evaluation
+- preserve guardrail info in PAIR/TAP trace recordings
+- **router**: stop leaking backend api_key to Ollama + pull gemma3:4b in CI
+- **ci**: remove unused DEFAULT_JUDGE_IDENTIFIER import from attack_specs
+- **ci**: apply ruff formatting to evaluation_step.py
+- prevent orchestrator re-evaluation from zeroing jailbreak counts
+
+### perf
+
+- **tests**: speed up integration tests with xdist, timeouts, and fixture scoping
+
+### refactor
+
+- migrate baseline attack to static_template
+- unify guardrail response detection via adapter_type
+- unify guardrail response detection via adapter_type
+- **dashboard**: extract attack card renderers into per-attack mixin modules
+- unify guardrail response detection via adapter_type
+- **router**: delete adapters/ folder (#379 Phase F.3)
+- **router**: namespace metadata under metadata['hackagent'] (#379 Phase F.2)
+- **router**: delete chat adapter classes (#379 Phase E.2c)
+- **router**: chat AgentTypes use _ChatRegistration (#379 Phase E.2b)
+- **router**: refactor ADKAgent off LiteLLMAgent (#379 Phase E.2a)
+- **router**: move ADK CustomLLM to providers/ (#379 Phase E)
+- **router**: hoist call path into AgentRouter (#379 Phase C)
+- **router**: drive adapters from ProviderConfig (#379 Phase B)
+- **router**: extract envelope helpers (#379 Phase A)
+
+### style
+
+- format router.py with ruff
+
+### test
+
+- delete e2e duplicate, relocate misclassified integration tests
+- route classifier to suite's small model + bump heavy-test timeouts
+
+### ✅🤡🧪 Tests
+
+- **adding-scan**: adding auto scan for websites
+- **api-key**: removing openrouter api-key
+- **helpers**: fixing helpers for tests
+- fixed test_adk_agent increasing the timeout
+- added unit tests
+- **dashboard-tests**: additional tests for the dashboard
+
+### 🎨🏗️ Style & Architecture
+
+- **ruff**: ruff formatting
+- **styling**: github quality bot issues addressed
+- **linter**: ruff linter error
+- **format**: lint formatting
+
+### 💚👷 CI & Build
+
+- fixed uv version for publish ci, docs and publish yml
+- remove need to approve for dependabot pull requests
+- validate commit messages against pr head sha only
+
+### 📝💡 Documentation
+
+- documented grouping of intents by categories
+- documented preflight parameters
+- added security policy
+- added security policy
+- documented grouping of intents by categories
+- **update**: updating docs
+
 ## v0.10.1 (2026-05-22)
 
 ### fix
