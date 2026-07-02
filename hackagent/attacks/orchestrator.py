@@ -396,7 +396,14 @@ class AttackOrchestrator:
                             if isinstance(item, dict):
                                 self._merge_missing_keys(item, role_defaults)
                     else:
-                        resolved["judges"] = [dict(role_defaults)]
+                        # Keep explicit single-judge overrides in sync with
+                        # list-style consumers (e.g. h4rm3l) instead of
+                        # replacing them with baseline defaults.
+                        explicit_single_judge = resolved.get("judge")
+                        if isinstance(explicit_single_judge, dict):
+                            resolved["judges"] = [dict(explicit_single_judge)]
+                        else:
+                            resolved["judges"] = [dict(role_defaults)]
 
         # Route the goal category classifier through the HackAgent API too when
         # a key is available, so it never needs a local Ollama model. In local

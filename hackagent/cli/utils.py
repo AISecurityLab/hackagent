@@ -168,6 +168,7 @@ def get_agent_type_enum(agent_type: str):
         "CLAUDE_CODE": AgentTypeEnum.CLAUDE_CODE,
         "CLAUDE-CODE": AgentTypeEnum.CLAUDE_CODE,
         "CLAUDE": AgentTypeEnum.CLAUDE_CODE,
+        "CODEX": AgentTypeEnum.CODEX,
         "WEB": AgentTypeEnum.WEB,
         "WEB_AGENT": AgentTypeEnum.WEB,
         "WEB-AGENT": AgentTypeEnum.WEB,
