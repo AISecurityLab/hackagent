@@ -120,20 +120,20 @@ class AttackOrchestrator:
     ] = {
         "advprefix": (
             ("generator", ("generator",), False, "attacker"),
-            ("judge", ("judge",), False, "judge"),
+            # ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
         ),
         "static_template": (
-            ("judge", ("judge",), False, "judge"),
+            # ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
         ),
         "flipattack": (
-            ("judge", ("judge",), False, "judge"),
+            # ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
         ),
         "tap": (
             ("attacker", ("attacker",), False, "attacker"),
-            ("judge", ("judge",), False, "judge"),
+            # ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
             ("on_topic_judge", ("on_topic_judge",), False, None),
         ),
@@ -148,11 +148,11 @@ class AttackOrchestrator:
             ("embedder", ("embedder",), False, None),
         ),
         "bon": (
-            ("judge", ("judge",), False, "judge"),
+            # ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
         ),
         "cipherchat": (
-            ("judge", ("judge",), False, "judge"),
+            # ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
         ),
         "h4rm3l": (
@@ -162,27 +162,27 @@ class AttackOrchestrator:
         ),
         "pap": (
             ("attacker", ("attacker",), False, "attacker"),
-            ("judge", ("judge",), False, "judge"),
+            # ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
         ),
         "rag": (
             ("attacker", ("attacker",), False, "attacker"),
-            ("judge", ("judge",), False, "judge"),
+            # ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
             ("embedder", ("rag_injection_params", "embedder"), False, None),
         ),
         "fc": (
             ("step_generator", ("step_generator",), False, "attacker"),
-            ("judge", ("judge",), False, "judge"),
+            # ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
         ),
         "tfc": (
             ("step_generator", ("step_generator",), False, "attacker"),
-            ("judge", ("judge",), False, "judge"),
+            # ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
         ),
         "mml": (
-            ("judge", ("judge",), False, "judge"),
+            # ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
         ),
     }
@@ -1494,7 +1494,13 @@ class AttackOrchestrator:
                         # Global run status is finalized once in execute().
                         attack_impl.config["_suppress_run_status_updates"] = True
                         batch_params = {**attack_params, "goals": batch_goals}
-                        batch_results = attack_impl.run(**batch_params) or []
+                        # attack_impl.run() may return a dict (e.g. baseline's
+                        # {"evaluated": [...], "summary": [...]}) rather than a
+                        # flat row list — normalize before aggregating, otherwise
+                        # extend() below would iterate the dict's *keys*.
+                        batch_results = self._normalize_attack_results(
+                            attack_impl.run(**batch_params)
+                        )
                     else:
                         # Parallel: one thread per goal inside this batch
                         effective_workers = min(goal_batch_workers, n_goals_in_batch)
@@ -1526,7 +1532,11 @@ class AttackOrchestrator:
                             }
                             local_impl = self.attack_impl_class(**local_impl_kwargs)
                             goal_params = {**attack_params, "goals": [goal]}
-                            goal_results = local_impl.run(**goal_params) or []
+                            # Normalize here too — same dict-vs-list return shape
+                            # concern as the sequential path above.
+                            goal_results = self._normalize_attack_results(
+                                local_impl.run(**goal_params)
+                            )
 
                             logger.info(f"Goal done ({len(goal_results)} results)")
                             return goal_idx, goal_results

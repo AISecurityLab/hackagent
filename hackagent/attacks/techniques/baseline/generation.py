@@ -16,7 +16,6 @@ from hackagent.attacks.shared.response_utils import (
     extract_response_content,
     is_guardrail_response,
 )
-from hackagent.attacks.shared.progress import create_progress_bar
 from hackagent.router.router import AgentRouter
 from hackagent.router.tracking import Tracker
 
@@ -107,7 +106,7 @@ def execute(
 
     # Execute goals in parallel
     _lock = threading.Lock()
-    results: List[Optional[Dict[str, Any]]] = [None] * len(goals)
+    results_map: Dict[int, Dict[str, Any]] = {}
 
     def _execute_goal(local_idx: int) -> None:
         goal_idx = goal_index_offset + local_idx
@@ -152,7 +151,7 @@ def execute(
                             "response_length": len(completion),
                         },
                     )
-            results[local_idx] = row
+                results_map[local_idx] = row
 
         except Exception as e:
             logger.warning(f"Error executing goal {goal_idx}: {e}")
@@ -166,23 +165,19 @@ def execute(
                             "goal": goal[:200],
                         },
                     )
-            results[local_idx] = {
-                "goal": goal,
-                "goal_index": goal_idx,
-                "attack_prompt": goal,
-                "completion": "",
-                "response_length": 0,
-                "error": str(e),
-            }
+                results_map[local_idx] = {
+                    "goal": goal,
+                    "goal_index": goal_idx,
+                    "attack_prompt": goal,
+                    "completion": "",
+                    "response_length": 0,
+                    "error": str(e),
+                }
 
-    with create_progress_bar("[cyan]Executing baseline prompts...", len(goals)) as (
-        progress_bar,
-        task,
-    ):
-        workers = min(len(goals), batch_size)
-        with ThreadPoolExecutor(max_workers=workers) as pool:
-            for _ in pool.map(_execute_goal, range(len(goals))):
-                progress_bar.update(task, advance=1)
+    workers = min(len(goals), batch_size)
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        list(pool.map(_execute_goal, range(len(goals))))
 
-    logger.info(f"Baseline execution complete: {len(goals)} goals processed")
-    return [r for r in results if r is not None]
+    results = [results_map[i] for i in range(len(goals))]
+    logger.info(f"Baseline execution complete: {len(results)} goals processed")
+    return results

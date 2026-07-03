@@ -36,7 +36,7 @@ agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 # Use profile recommendations
 for attack in MALICIOUS_TOOL_INVOCATION_PROFILE.primary_attacks:
     for dataset in MALICIOUS_TOOL_INVOCATION_PROFILE.primary_datasets + MALICIOUS_TOOL_INVOCATION_PROFILE.secondary_datasets:
-        result = agent.attack(
+        result = agent.hack(
             attack_type=attack.technique.lower(),
             dataset=dataset.preset,
             objective=MALICIOUS_TOOL_INVOCATION_PROFILE.objective,

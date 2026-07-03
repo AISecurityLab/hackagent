@@ -43,7 +43,7 @@ agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 # Use profile recommendations
 for attack in MODEL_EVASION_PROFILE.primary_attacks:
     for dataset in MODEL_EVASION_PROFILE.primary_datasets:
-        result = agent.attack(
+        result = agent.hack(
             attack_type=attack.technique.lower(),
             dataset=dataset.preset,
             objective=MODEL_EVASION_PROFILE.objective,

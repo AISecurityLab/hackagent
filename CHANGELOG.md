@@ -1,3 +1,9 @@
+## Unreleased
+
+### 🐛🚑️ Fixes
+
+- **agent**: `HackAgent(timeout=...)` now defaults to `120.0` seconds (was `None`/unbounded) so requests to a misbehaving or unreachable HackAgent API backend fail after ~120s instead of hanging indefinitely. Pass `timeout=None` explicitly to restore the previous unbounded-wait behavior.
+
 ## v0.11.0 (2026-07-02)
 
 ### ✨ Features

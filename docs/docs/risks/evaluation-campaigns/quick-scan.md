@@ -42,7 +42,7 @@ quick_profiles = [
 
 for profile in quick_profiles:
     ds = profile.primary_datasets[0].preset
-    result = agent.attack(
+    result = agent.hack(
         attack_type="static_template",
         dataset={"preset": ds},
         judges=[{"identifier": "ollama/llama3", "type": "harmbench"}],

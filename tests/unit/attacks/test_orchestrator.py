@@ -451,6 +451,86 @@ class TestAttackOrchestratorExecution(unittest.TestCase):
         worker_offsets = [v for v in seen_offsets if v is not None]
         self.assertCountEqual(worker_offsets, [0, 1, 2])
 
+    def test_execute_local_attack_normalizes_dict_return_in_parallel_batches(self):
+        """Regression: an attack whose run() returns a dict (e.g. baseline's
+        {"evaluated": [...], "summary": [...]}) must not have that dict's keys
+        ("evaluated", "summary") extended into the aggregated results as if
+        they were row entries.
+        """
+        orchestrator = self.TestOrchestrator(self.mock_hack_agent)
+
+        attack_params = {"goals": ["goal-1", "goal-2"]}
+        attack_config = {
+            "goals": ["goal-1", "goal-2"],
+            "output_dir": "/tmp/test",
+            "goal_batch_size": 10,
+            "goal_batch_workers": 2,
+            "category_classifier": {
+                "identifier": "gpt-4o-mini",
+                "agent_type": "OPENAI",
+                "endpoint": "https://api.openai.com/v1",
+            },
+        }
+
+        def _dict_returning_run(**kwargs):
+            goal = kwargs["goals"][0]
+            return {
+                "evaluated": [{"goal": goal, "completion": "real"}],
+                "summary": [{"goal": goal, "asr": 0.0}],
+            }
+
+        with patch.object(self.TestAttack, "__init__", return_value=None):
+            with patch.object(self.TestAttack, "run", side_effect=_dict_returning_run):
+                results = orchestrator._execute_local_attack(
+                    "attack-123", "run-456", attack_params, attack_config, None
+                )
+
+        # Only the "evaluated" rows should surface — never the bare dict keys.
+        self.assertEqual(len(results), 2)
+        self.assertTrue(all(isinstance(row, dict) for row in results))
+        self.assertCountEqual([r["goal"] for r in results], ["goal-1", "goal-2"])
+        self.assertTrue(all(r["completion"] == "real" for r in results))
+
+    def test_execute_local_attack_normalizes_dict_return_sequential(self):
+        """Same regression as above, for the sequential (goal_batch_workers<=1)
+        batching path.
+        """
+        orchestrator = self.TestOrchestrator(self.mock_hack_agent)
+
+        attack_params = {"goals": ["goal-1", "goal-2"]}
+        attack_config = {
+            "goals": ["goal-1", "goal-2"],
+            "output_dir": "/tmp/test",
+            "goal_batch_size": 10,
+            "goal_batch_workers": 1,
+            "category_classifier": {
+                "identifier": "gpt-4o-mini",
+                "agent_type": "OPENAI",
+                "endpoint": "https://api.openai.com/v1",
+            },
+        }
+
+        dict_return = {
+            "evaluated": [
+                {"goal": "goal-1", "completion": "real"},
+                {"goal": "goal-2", "completion": "real"},
+            ],
+            "summary": [{"asr": 0.0}],
+        }
+
+        def _fake_init(self, **kwargs):
+            self.config = kwargs.get("config", {})
+
+        with patch.object(self.TestAttack, "__init__", _fake_init):
+            with patch.object(self.TestAttack, "run", return_value=dict_return):
+                results = orchestrator._execute_local_attack(
+                    "attack-123", "run-456", attack_params, attack_config, None
+                )
+
+        self.assertEqual(len(results), 2)
+        self.assertTrue(all(isinstance(row, dict) for row in results))
+        self.assertCountEqual([r["goal"] for r in results], ["goal-1", "goal-2"])
+
 
 class TestAttackOrchestratorHTTPHelpers(unittest.TestCase):
     """Test AttackOrchestrator HTTP response helpers."""

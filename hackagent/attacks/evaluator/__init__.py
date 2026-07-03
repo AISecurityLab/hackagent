@@ -38,6 +38,7 @@ Usage:
         calculate_majority_vote_asr,
         calculate_fleiss_kappa,
         calculate_per_judge_strictness,
+        is_successful_result,
         # Server sync
         sync_evaluation_to_server,
         update_single_result,
@@ -60,6 +61,7 @@ from hackagent.attacks.evaluator.metrics import (
     calculate_success_rate,
     generate_summary_report,
     group_by_goal,
+    is_successful_result,
     calculate_majority_vote_asr,
     calculate_fleiss_kappa,
     calculate_per_judge_strictness,
@@ -96,6 +98,7 @@ __all__ = [
     "calculate_per_goal_metrics",
     "generate_summary_report",
     "group_by_goal",
+    "is_successful_result",
     "calculate_majority_vote_asr",
     "calculate_fleiss_kappa",
     "calculate_per_judge_strictness",
