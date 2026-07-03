@@ -1875,7 +1875,7 @@ wheels = [
 
 [[package]]
 name = "hackagent"
-version = "0.10.1"
+version = "0.11.0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
@@ -2372,7 +2372,7 @@ wheels = [
 
 [[package]]
 name = "litellm"
-version = "1.90.1"
+version = "1.90.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -2388,9 +2388,9 @@ dependencies = [
     { name = "tiktoken" },
     { name = "tokenizers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/36/1e/b079ec9b840bac7573c33fa06c075414616c19ac0adde06ec4cb694cbc9f/litellm-1.90.1.tar.gz", hash = "sha256:a0c79d9efa1dbc031371348540466240216c898c68687d4c2de1343ca3ac3dd0", size = 14818439, upload-time = "2026-06-30T01:43:41.558Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fa/c8/18d0c831d97ef6e7a971e1e984aa0a07740adb3f343e4596f21a5e880840/litellm-1.90.3.tar.gz", hash = "sha256:1b15776011745ea4f90259d9bd2f269835a8541cd7948751bec726b1d21647fa", size = 14820738, upload-time = "2026-07-03T19:53:20.112Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d0/86/86063e003e0ca31f8304a5ba808d51d91b959512b33b6cab5e0c55e936e8/litellm-1.90.1-py3-none-any.whl", hash = "sha256:d90482c7f3a7dfa3f4d88b255cb4e1e60793d7452efcc0fe461a719df52c283e", size = 16611651, upload-time = "2026-06-30T01:43:38.154Z" },
+    { url = "https://files.pythonhosted.org/packages/c5/ad/b40e8a29ec9b4564c5fd96829c4b22512c24ca76045304b1b521d6ea68c1/litellm-1.90.3-py3-none-any.whl", hash = "sha256:0ba6844865c0637719b3e76f43cf1089e3bd578a456b7be6a7f64afbbc259472", size = 16613824, upload-time = "2026-07-03T19:53:17.393Z" },
 ]
 
 [[package]]
