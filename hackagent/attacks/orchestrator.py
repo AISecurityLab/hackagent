@@ -139,11 +139,13 @@ class AttackOrchestrator:
         ),
         "pair": (
             ("attacker", ("attacker",), False, "attacker"),
-            ("scorer", ("scorer",), False, "judge"),
+            ("judge", ("judge",), False, "judge"),
+            ("judge", ("scorer",), False, "judge"),
         ),
         "autodan_turbo": (
             ("attacker", ("attacker",), False, "attacker"),
-            ("scorer", ("scorer",), False, "judge"),
+            ("judge", ("judge",), False, "judge"),
+            ("judge", ("scorer",), False, "judge"),
             ("summarizer", ("summarizer",), False, "attacker"),
             ("embedder", ("embedder",), False, None),
         ),
@@ -376,6 +378,16 @@ class AttackOrchestrator:
             for role_name, role_family in role_mapping.items():
                 role_defaults = dict(defaults_by_family[role_family])
                 role_cfg = resolved.get(role_name)
+
+                # Backward compatibility: promote legacy scorer role to judge.
+                if (
+                    role_name == "judge"
+                    and not isinstance(role_cfg, dict)
+                    and isinstance(resolved.get("scorer"), dict)
+                ):
+                    resolved["judge"] = copy.deepcopy(resolved["scorer"])
+                    role_cfg = resolved["judge"]
+
                 if isinstance(role_cfg, dict):
                     self._merge_missing_keys(role_cfg, role_defaults)
                 else:
@@ -1777,9 +1789,7 @@ class AttackOrchestrator:
                         PAIREvaluation,
                     )
 
-                    logger.info(
-                        "Starting PAIR scorer-only evaluation pipeline (no judge fallback)"
-                    )
+                    logger.info("Starting PAIR judge evaluation pipeline")
 
                     evaluator = PAIREvaluation(
                         config=base_eval_config,
@@ -1790,7 +1800,7 @@ class AttackOrchestrator:
                     final_results = evaluator.execute(results)
                     final_results = self._normalize_attack_results(final_results)
                     evaluator.prepare_and_sync(final_results, run_id)
-                    logger.info("PAIR scorer-only evaluation pipeline completed")
+                    logger.info("PAIR judge evaluation pipeline completed")
                 else:
                     from hackagent.attacks.evaluator.evaluation_step import (
                         BaseEvaluationStep,

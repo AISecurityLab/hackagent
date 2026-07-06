@@ -328,7 +328,7 @@ class TestPAIRAttack(unittest.TestCase):
                 PAIRAttack, "_initialize_attacker_router", return_value=dummy_router
             ),
             patch.object(
-                PAIRAttack, "_initialize_scorer_router", return_value=dummy_router
+                PAIRAttack, "_initialize_judge_router", return_value=dummy_router
             ),
         ):
             attack = PAIRAttack(

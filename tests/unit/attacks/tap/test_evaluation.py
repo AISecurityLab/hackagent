@@ -13,7 +13,7 @@ import logging
 import unittest
 from unittest.mock import MagicMock, patch
 
-from hackagent.attacks.techniques.tap.evaluation import (
+from hackagent.attacks.techniques.tap.tap_evaluation import (
     TapEvaluation,
     _resolve_judges_config,
     execute,
@@ -75,15 +75,14 @@ class TestJudgeTypeInference(unittest.TestCase):
         )
 
     def test_inferred_from_identifier(self):
-        # The variant branch matches "harmclassifier" / literal "harmbench_variant";
-        # "HarmBenchVariant" (no underscore) deliberately falls through to harmbench.
+        # Shared inference treats HarmClassifier/HarmBenchVariant as harmbench_variant.
         self.assertEqual(
             TapEvaluation._infer_judge_type({"identifier": "x/HarmClassifier"}),
             "harmbench_variant",
         )
         self.assertEqual(
             TapEvaluation._infer_judge_type({"identifier": "x/HarmBenchVariant"}),
-            "harmbench",
+            "harmbench_variant",
         )
         self.assertEqual(
             TapEvaluation._infer_judge_type({"identifier": "x/HarmBench-7B"}),
@@ -103,9 +102,14 @@ class TestJudgeTypeInference(unittest.TestCase):
     def test_judges_are_binary(self):
         self.assertFalse(TapEvaluation._judges_are_binary([]))
         self.assertTrue(TapEvaluation._judges_are_binary([{"type": "harmbench"}]))
+        # scorer with explicit decimal range is NOT binary
+        self.assertFalse(
+            TapEvaluation._judges_are_binary([{"type": "scorer", "range": "decimal"}])
+        )
+        # mixing binary and decimal is NOT all-binary
         self.assertFalse(
             TapEvaluation._judges_are_binary(
-                [{"type": "harmbench"}, {"type": "nuanced"}]
+                [{"type": "harmbench"}, {"type": "scorer", "range": "decimal"}]
             )
         )
 
@@ -128,7 +132,7 @@ class TestScoreCandidates(unittest.TestCase):
             return_value=[{"best_score": 7}, {"best_score": 3}]
         )
         scores = e.score_candidates(
-            "goal", ["p1", "p2"], ["r1", "r2"], [{"type": "nuanced"}]
+            "goal", ["p1", "p2"], ["r1", "r2"], [{"type": "scorer", "range": "decimal"}]
         )
         self.assertEqual(scores, [7, 3])
 

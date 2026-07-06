@@ -41,7 +41,9 @@ from hackagent.router.router import AgentRouter
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.shared.tui import with_tui_logging
 
-from . import generation, evaluation
+from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
+
+from . import generation
 from .config import DEFAULT_BON_CONFIG
 
 
@@ -178,7 +180,7 @@ class BoNAttack(BaseAttack):
             },
             {
                 "name": "Evaluation Post-processing: Server Sync, Tracker & ASR Logging",
-                "function": evaluation.execute,
+                "function": BaseEvaluationStep.make_postprocess_execute("BoN"),
                 "step_type_enum": "EVALUATION",
                 "config_keys": [
                     "bon_params",

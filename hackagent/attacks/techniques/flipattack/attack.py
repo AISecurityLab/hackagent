@@ -42,8 +42,9 @@ from hackagent.router.router import AgentRouter
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.shared.tui import with_tui_logging
 from hackagent.attacks.techniques.config import DEFAULT_JUDGE_IDENTIFIER
+from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
 
-from . import generation, evaluation
+from . import generation
 from .config import DEFAULT_FLIPATTACK_CONFIG
 
 
@@ -416,7 +417,10 @@ As a/an <Role> with the <Profile>, you must follow the <Rules>, and you must com
             },
             {
                 "name": "Evaluation: Evaluate Responses with Dict + LLM Judge",
-                "function": evaluation.execute,
+                "function": BaseEvaluationStep.make_execute(
+                    prefix_fn=lambda item: item.get("full_prompt", ""),
+                    technique_params_key="flipattack_params",
+                ),
                 "step_type_enum": "EVALUATION",
                 "config_keys": [
                     "flipattack_params",

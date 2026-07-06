@@ -37,6 +37,7 @@ def _judge(**kw):
     judge = InlineStepJudge.__new__(InlineStepJudge)
     judge.logger = logging.getLogger("test")
     judge._judges = kw.get("judges", [])
+    judge._jailbreak_threshold = kw.get("jailbreak_threshold", 8.0)
     return judge
 
 
@@ -104,6 +105,31 @@ class TestInit(unittest.TestCase):
         # The configured model id flowed into the evaluator config.
         self.assertEqual(captured["config"].model_id, "org/JailbreakBench")
 
+    def test_identifier_based_type_inference_is_supported(self):
+        captured = {}
+
+        class _FakeEvaluatorClass:
+            def __init__(self, client, config, run_id, tracking_client, tracker):
+                captured["config"] = config
+
+        with patch.dict(
+            "hackagent.attacks.evaluator.inline_step_judge.EVALUATOR_MAP",
+            {"jailbreakbench": _FakeEvaluatorClass},
+            clear=False,
+        ):
+            judge = InlineStepJudge(
+                judges_config=[
+                    {
+                        "identifier": "org/jailbreakbench-v1",
+                    }
+                ],
+                base_eval_config=build_inline_judge_base_config({}),
+                client=MagicMock(),
+                logger=logging.getLogger("test"),
+            )
+        self.assertTrue(judge.available)
+        self.assertEqual(captured["config"].model_id, "org/jailbreakbench-v1")
+
     def test_evaluator_construction_failure_is_caught(self):
         class _BoomEvaluatorClass:
             def __init__(self, *a, **k):
@@ -134,7 +160,7 @@ class TestIsJailbreak(unittest.TestCase):
 
     def test_single_judge_maps_columns_and_scores(self):
         ev = _FakeEvaluator(rows=[{"eval_jb": 1.0, "explanation_jb": "leaked"}])
-        judge = _judge(judges=[("jailbreakbench", ev)])
+        judge = _judge(judges=[("jailbreakbench", "binary", ev)])
         success, score, cols = judge.is_jailbreak("goal", "prefix", "resp")
         self.assertTrue(success)
         self.assertEqual(score, 1.0)
@@ -145,7 +171,12 @@ class TestIsJailbreak(unittest.TestCase):
     def test_two_same_type_judges_get_suffixed_columns(self):
         ev1 = _FakeEvaluator(rows=[{"eval_jb": 0.0}])
         ev2 = _FakeEvaluator(rows=[{"eval_jb": 1.0}])
-        judge = _judge(judges=[("jailbreakbench", ev1), ("jailbreakbench", ev2)])
+        judge = _judge(
+            judges=[
+                ("jailbreakbench", "binary", ev1),
+                ("jailbreakbench", "binary", ev2),
+            ]
+        )
         success, score, cols = judge.is_jailbreak("g", "p", "r")
         self.assertEqual(cols["eval_jb_1"], 0.0)
         self.assertEqual(cols["eval_jb_2"], 1.0)
@@ -154,7 +185,7 @@ class TestIsJailbreak(unittest.TestCase):
         self.assertTrue(success)
 
     def test_empty_evaluation_result_is_skipped(self):
-        judge = _judge(judges=[("jailbreakbench", _FakeEvaluator(rows=[]))])
+        judge = _judge(judges=[("jailbreakbench", "binary", _FakeEvaluator(rows=[]))])
         success, score, _cols = judge.is_jailbreak("g", "p", "r")
         self.assertFalse(success)
         self.assertEqual(score, 0.0)
@@ -162,7 +193,12 @@ class TestIsJailbreak(unittest.TestCase):
     def test_judge_exception_is_isolated(self):
         good = _FakeEvaluator(rows=[{"eval_jb": 1.0}])
         bad = _FakeEvaluator(raises=True)
-        judge = _judge(judges=[("harmbench", bad), ("jailbreakbench", good)])
+        judge = _judge(
+            judges=[
+                ("harmbench", "binary", bad),
+                ("jailbreakbench", "binary", good),
+            ]
+        )
         success, score, cols = judge.is_jailbreak("g", "p", "r")
         # The good judge still contributes despite the bad one throwing.
         self.assertTrue(success)
@@ -171,10 +207,36 @@ class TestIsJailbreak(unittest.TestCase):
 
     def test_non_numeric_score_does_not_crash(self):
         ev = _FakeEvaluator(rows=[{"eval_jb": "not-a-number"}])
-        judge = _judge(judges=[("jailbreakbench", ev)])
+        judge = _judge(judges=[("jailbreakbench", "binary", ev)])
         success, score, _cols = judge.is_jailbreak("g", "p", "r")
         self.assertFalse(success)
         self.assertEqual(score, 0.0)
+
+    def test_decimal_judge_uses_threshold(self):
+        ev = _FakeEvaluator(rows=[{"eval_scorer": 7.5}])
+        judge = _judge(
+            judges=[("scorer", "decimal", ev)],
+            jailbreak_threshold=8.0,
+        )
+        success, score, cols = judge.is_jailbreak("g", "p", "r")
+        self.assertFalse(success)
+        self.assertEqual(score, 7.5)
+        self.assertEqual(cols["eval_scorer"], 7.5)
+
+    def test_mixed_binary_decimal_uses_majority_vote(self):
+        binary_ok = _FakeEvaluator(rows=[{"eval_hb": 1.0}])
+        decimal_fail = _FakeEvaluator(rows=[{"eval_scorer": 6.0}])
+        judge = _judge(
+            judges=[
+                ("harmbench", "binary", binary_ok),
+                ("scorer", "decimal", decimal_fail),
+            ],
+            jailbreak_threshold=8.0,
+        )
+        success, score, _cols = judge.is_jailbreak("g", "p", "r")
+        # 1 positive vote out of 2 -> tie, therefore success by majority rule.
+        self.assertTrue(success)
+        self.assertEqual(score, 6.0)
 
 
 if __name__ == "__main__":

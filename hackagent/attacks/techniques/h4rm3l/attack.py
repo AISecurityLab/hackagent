@@ -27,7 +27,9 @@ from hackagent.router.router import AgentRouter
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.shared.tui import with_tui_logging
 
-from . import generation, evaluation
+from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
+
+from . import generation
 from .config import DEFAULT_H4RM3L_CONFIG, PRESET_PROGRAMS
 from .decorators import program_uses_llm_assisted_decorators
 
@@ -42,6 +44,45 @@ def _recursive_update(target_dict, source_dict):
             target_dict[key] = source_value
         else:
             target_dict[key] = copy.deepcopy(source_value)
+
+
+def _h4rm3l_decoration_hook(input_data, raw_config):
+    """Emit tracker traces for each h4rm3l decoration step before judge evaluation."""
+    tracker = raw_config.get("_tracker")
+    if not tracker:
+        return
+    for idx, item in enumerate(input_data):
+        goal_text = item.get("goal", "")
+        goal_ctx = (
+            tracker.get_goal_context_by_goal(goal_text)
+            if goal_text
+            else tracker.get_goal_context(idx)
+        )
+        if not goal_ctx:
+            continue
+        for step in item.get("decoration_steps", []) or []:
+            step_index = step.get("step_index")
+            decorator_name = step.get("decorator", "UnknownDecorator")
+            tracker.add_custom_trace(
+                ctx=goal_ctx,
+                step_name=f"Decoration Step {step_index}: {decorator_name}",
+                content={
+                    "step_name": f"Decoration Step {step_index}",
+                    "decorator": decorator_name,
+                    "input_prompt": step.get("input_prompt", ""),
+                    "decoration_applied": decorator_name,
+                    "decorated_prompt": step.get("decorated_prompt", ""),
+                    "input_length": step.get("input_length"),
+                    "output_length": step.get("output_length"),
+                    "length_delta": step.get("length_delta"),
+                    "content_changed": step.get("content_changed"),
+                    "uses_decorator_llm": step.get("uses_decorator_llm", False),
+                    "decorator_llm_identifier": step.get("decorator_llm_identifier"),
+                    "decorator_llm_endpoint": step.get("decorator_llm_endpoint"),
+                    "decorator_llm_prompt": step.get("decorator_llm_prompt"),
+                    "decorator_llm_response": step.get("decorator_llm_response"),
+                },
+            )
 
 
 class H4rm3lAttack(BaseAttack):
@@ -175,7 +216,11 @@ class H4rm3lAttack(BaseAttack):
             },
             {
                 "name": "Evaluation: Multi-Judge Response Evaluation",
-                "function": evaluation.execute,
+                "function": BaseEvaluationStep.make_execute(
+                    prefix_fn=lambda item: item.get("full_prompt", ""),
+                    technique_params_key="h4rm3l_params",
+                    pre_eval_hook=_h4rm3l_decoration_hook,
+                ),
                 "step_type_enum": "EVALUATION",
                 "config_keys": [
                     "h4rm3l_params",

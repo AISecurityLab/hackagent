@@ -127,10 +127,11 @@ def init_routers(config, client, logger):
     att_router, att_key = create_router(
         backend=client, config=att_cfg, logger=logger, router_name="autodan-attacker"
     )
-    sc_cfg = dict(config.get("scorer", {}))
+    # Accept both "judge" (new) and "scorer" (legacy) config keys.
+    sc_cfg = dict(config.get("judge") or config.get("scorer", {}))
     sc_cfg.setdefault("timeout", config.get("timeout", 120))
     sc_router, sc_key = create_router(
-        backend=client, config=sc_cfg, logger=logger, router_name="autodan-scorer"
+        backend=client, config=sc_cfg, logger=logger, router_name="autodan-judge"
     )
 
     sum_cfg = dict(config.get("summarizer", {}))

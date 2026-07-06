@@ -29,7 +29,8 @@ from hackagent.attacks.techniques.config import DEFAULT_JUDGE_IDENTIFIER
 from hackagent.router.router import AgentRouter
 from hackagent.server.client import AuthenticatedClient
 
-from . import evaluation
+from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
+
 from .generation import execute_fc, execute_tfc
 from .config import DEFAULT_FC_CONFIG, DEFAULT_TFC_CONFIG
 
@@ -222,7 +223,12 @@ class FCAttack(BaseAttack):
             },
             {
                 "name": "Evaluation: Evaluate Responses with LLM Judge",
-                "function": evaluation.execute,
+                "function": BaseEvaluationStep.make_execute(
+                    prefix_fn=lambda item: (
+                        item.get("full_prompt") or item.get("text_prompt", "")
+                    ),
+                    technique_params_key="fc_params",
+                ),
                 "step_type_enum": "EVALUATION",
                 "config_keys": [
                     "fc_params",
@@ -393,7 +399,12 @@ class tFCAttack(BaseAttack):
             },
             {
                 "name": "Evaluation: Evaluate Responses with LLM Judge",
-                "function": evaluation.execute,
+                "function": BaseEvaluationStep.make_execute(
+                    prefix_fn=lambda item: (
+                        item.get("full_prompt") or item.get("text_prompt", "")
+                    ),
+                    technique_params_key="tfc_params",
+                ),
                 "step_type_enum": "EVALUATION",
                 "config_keys": [
                     "tfc_params",

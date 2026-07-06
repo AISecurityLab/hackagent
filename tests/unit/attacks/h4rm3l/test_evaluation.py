@@ -1,18 +1,22 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Tests for h4rm3l evaluation module."""
+"""Tests for h4rm3l evaluation logic via BaseEvaluationStep."""
 
 import logging
 import unittest
 from unittest.mock import MagicMock
 
-from hackagent.attacks.techniques.h4rm3l.evaluation import H4rm3lEvaluation
+from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
+
+
+def _prefix_fn(item):
+    return item.get("full_prompt", "")
 
 
 class TestH4rm3lEvaluation(unittest.TestCase):
     def _make_eval(self, config=None):
-        return H4rm3lEvaluation(
+        return BaseEvaluationStep(
             config=config or {"h4rm3l_params": {}, "judges": [], "filter_len": 10},
             logger=logging.getLogger("test"),
             client=MagicMock(),
@@ -20,7 +24,8 @@ class TestH4rm3lEvaluation(unittest.TestCase):
 
     def test_empty_input(self):
         ev = self._make_eval()
-        self.assertEqual(ev.execute([]), [])
+        result = ev.run([], prefix_fn=_prefix_fn, technique_params_key="h4rm3l_params")
+        self.assertEqual(result, [])
 
     def test_error_items_marked_failed(self):
         ev = self._make_eval()
@@ -32,7 +37,9 @@ class TestH4rm3lEvaluation(unittest.TestCase):
                 "full_prompt": None,
             }
         ]
-        result = ev.execute(data)
+        result = ev.run(
+            data, prefix_fn=_prefix_fn, technique_params_key="h4rm3l_params"
+        )
         self.assertFalse(result[0]["success"])
         self.assertEqual(result[0]["best_score"], 0.0)
         self.assertIn("evaluation_notes", result[0])
@@ -48,7 +55,9 @@ class TestH4rm3lEvaluation(unittest.TestCase):
                 "program": "IdentityDecorator()",
             }
         ]
-        result = ev.execute(data)
+        result = ev.run(
+            data, prefix_fn=_prefix_fn, technique_params_key="h4rm3l_params"
+        )
         self.assertEqual(result[0]["goal"], "test goal")
         self.assertEqual(result[0]["program"], "IdentityDecorator()")
 

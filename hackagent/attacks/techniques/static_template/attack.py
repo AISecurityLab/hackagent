@@ -17,7 +17,7 @@ from hackagent.router.router import AgentRouter
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.shared.tui import with_tui_logging
 
-from . import generation, evaluation
+from . import generation, static_eval as evaluation
 from .config import DEFAULT_TEMPLATE_CONFIG
 
 
@@ -28,7 +28,7 @@ class StaticTemplateAttack(BaseAttack):
     Combines a library of prompt templates across several jailbreak
     categories with each goal string to produce attack prompts, sends
     them to the target model, and evaluates responses using a
-    configurable evaluator (pattern-matching, keyword, or LLM judge).
+    LLM judge pipeline.
 
     Pipeline stages
     ---------------
@@ -36,13 +36,11 @@ class StaticTemplateAttack(BaseAttack):
        selects up to ``templates_per_category`` templates from each
        category in ``template_categories``, injects each goal, and
        collects target-model responses.
-    2. **Evaluation** (:func:`~hackagent.attacks.techniques.static_template.evaluation.execute`) —
-       scores responses for jailbreak success using the configured
-       ``evaluator_type`` (``"pattern"``, ``"keyword"``, or ``"llm_judge"``).
+     2. **Evaluation** (:func:`~hackagent.attacks.techniques.static_template.evaluation.execute`) —
+         scores responses for jailbreak success using configured LLM judge(s).
 
-    This attack is useful as a **sanity-check**: it requires no
-    additional LLM (unlike PAIR/TAP/AdvPrefix) and surfaces naive template
-    weaknesses in the target model.
+    This attack is useful as a **sanity-check** with explicit LLM judging,
+    surfacing naive template weaknesses in the target model.
 
     Attributes:
         config: Merged static template configuration dictionary.
@@ -127,16 +125,19 @@ class StaticTemplateAttack(BaseAttack):
         *,
         goal_labels_by_index: Optional[Dict[int, Dict[str, str]]] = None,
     ) -> List[Dict[str, Any]]:
-        """Return only the model roles needed by the effective static template evaluator."""
-        _ = goal_labels_by_index
+        """Return model roles needed by static template evaluation.
 
-        evaluator_type = str(attack_config.get("evaluator_type", "llm_judge")).lower()
-        if evaluator_type != "llm_judge":
-            return []
+        Static template always evaluates with LLM judges.
+        """
+        _ = goal_labels_by_index
 
         judges = attack_config.get("judges")
         if isinstance(judges, list) and judges:
             return [{"role": "judge", "config": judge} for judge in judges]
+
+        judge = attack_config.get("judge")
+        if isinstance(judge, dict):
+            return [{"role": "judge", "config": judge}]
 
         judge_config = attack_config.get("judge_config")
         if isinstance(judge_config, dict):
@@ -156,8 +157,8 @@ class StaticTemplateAttack(BaseAttack):
 
         Stage 2 — **Evaluation**
             (:func:`~hackagent.attacks.techniques.static_template.evaluation.execute`):
-            Scores responses for jailbreak success using the configured
-            ``evaluator_type``.  Short responses (``< min_response_length``
+            Scores responses for jailbreak success using configured LLM
+            judge(s). Short responses (``< min_response_length``
             tokens) are skipped.
 
         Returns:
@@ -190,8 +191,8 @@ class StaticTemplateAttack(BaseAttack):
                 "step_type_enum": "EVALUATION",
                 "config_keys": [
                     "objective",
-                    "evaluator_type",
                     "judges",
+                    "judge",
                     "judge_config",
                     "min_response_length",
                     "batch_size_judge",

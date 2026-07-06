@@ -69,8 +69,8 @@ class StaticTemplateEvaluation(BaseEvaluationStep)
 
 Evaluation step for static template attacks.
 
-Extends ``BaseEvaluationStep`` to wrap the objective-based pattern/keyword
-evaluation logic into the shared evaluation framework.
+Extends ``BaseEvaluationStep`` to wrap static-template aggregation into the
+shared LLM-judge evaluation framework.
 
 #### execute
 

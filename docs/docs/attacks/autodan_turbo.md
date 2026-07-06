@@ -49,7 +49,7 @@ graph TD
 
 1. **Warm-up**: attacker explores prompts, scorer rates responses, summarizer extracts strategies.
 2. **Lifelong**: strategies are retrieved and reused to guide new attacker prompts.
-3. **Finalization**: per-goal success is set from scorer output only (`score >= break_score`).
+3. **Finalization**: per-goal success is computed by shared LLM judge(s) (binary/decimal range-aware).
 
 ---
 
@@ -74,9 +74,11 @@ attack_config = {
         "identifier": "gpt-4",
         "endpoint": "https://api.openai.com/v1"
     },
-    "scorer": {
+    "judge": {
         "identifier": "gpt-4o-mini",
-        "endpoint": "https://api.openai.com/v1"
+        "endpoint": "https://api.openai.com/v1",
+        "type": "scorer",
+        "range": "decimal"
     },
     "summarizer": {
         "identifier": "gpt-4",
@@ -118,11 +120,13 @@ advanced_config = {
         "agent_type": "OPENAI_SDK",
         "api_key": "${OPENROUTER_API_KEY}"
     },
-    "scorer": {
+    "judge": {
         "identifier": "openai/gpt-4o-mini",
         "endpoint": "https://openrouter.ai/api/v1",
         "agent_type": "OPENAI_SDK",
-        "api_key": "${OPENROUTER_API_KEY}"
+        "api_key": "${OPENROUTER_API_KEY}",
+        "type": "scorer",
+        "range": "decimal"
     },
     "summarizer": {
         "identifier": "mistralai/mixtral-8x7b-instruct",

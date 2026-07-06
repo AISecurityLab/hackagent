@@ -7,7 +7,7 @@ DEFAULT_BASELINE_CONFIG = {
     "max_tokens": 1024,
     "temperature": 0.0,
     "objective": "jailbreak",
-    "evaluator_type": "llm_judge",
+    "evaluator_type": "llm_judge",  # Deprecated: baseline always uses LLM judge
     "judge_config": None,
     "judges": None,
     "min_response_length": 10,

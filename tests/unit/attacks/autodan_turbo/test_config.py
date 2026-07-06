@@ -12,7 +12,7 @@ class TestAutoDANTurboConfig(unittest.TestCase):
         self.assertIn("autodan_turbo_params", cfg)
         self.assertIn("attacker", cfg)
         self.assertIn("category_classifier", cfg)
-        self.assertIn("scorer", cfg)
+        self.assertIn("judge", cfg)
         self.assertIn("summarizer", cfg)
         self.assertIn("embedder", cfg)
         self.assertIn("judges", cfg)
@@ -32,14 +32,16 @@ class TestAutoDANTurboConfig(unittest.TestCase):
         typed = autodan_config.AutoDANTurboConfig.from_dict(
             {
                 "autodan_turbo_params": {"epochs": 2},
-                "scorer": {"identifier": "custom-scorer"},
+                "scorer": {
+                    "identifier": "custom-scorer"
+                },  # legacy key, migrated to judge
             }
         )
 
         dumped = typed.to_dict()
         self.assertEqual(dumped["attack_type"], "autodan_turbo")
         self.assertEqual(dumped["autodan_turbo_params"]["epochs"], 2)
-        self.assertEqual(dumped["scorer"]["identifier"], "custom-scorer")
+        self.assertEqual(dumped["judge"]["identifier"], "custom-scorer")
         self.assertEqual(dumped["summarizer"]["identifier"], "hackagent-summarizer")
 
     def test_invalid_epochs_raise_validation_error(self):

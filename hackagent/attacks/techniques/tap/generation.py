@@ -41,7 +41,7 @@ from hackagent.router.router import AgentRouter
 from hackagent.router.tracking import Context, Tracker
 
 from .config import ATTACKER_SYSTEM_PROMPT
-from .evaluation import TapEvaluation
+from .tap_evaluation import TapEvaluation
 
 
 def _random_id(n: int = 16) -> str:

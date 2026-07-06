@@ -247,7 +247,7 @@ class TestModeBasedRoleDefaults(unittest.TestCase):
         self.assertEqual(resolved["judges"][0]["api_key"], "custom-key")
 
     def test_pair_remote_mode_fills_missing_role_fields(self):
-        """Partial attacker config should receive remote defaults, scorer should be added."""
+        """Partial attacker config should receive remote defaults, judge should be added."""
         orch, hack_agent, _ = _make_orchestrator()
         orch.attack_type = "pair"
         hack_agent.backend.get_api_key.return_value = "hk_test_remote_key"
@@ -267,8 +267,29 @@ class TestModeBasedRoleDefaults(unittest.TestCase):
         self.assertEqual(resolved["attacker"]["agent_type"], "OPENAI_SDK")
         self.assertEqual(resolved["attacker"]["api_key"], "hk_test_remote_key")
 
-        self.assertEqual(resolved["scorer"]["identifier"], "hackagent-judge")
-        self.assertEqual(resolved["scorer"]["api_key"], "hk_test_remote_key")
+        self.assertEqual(resolved["judge"]["identifier"], "hackagent-judge")
+        self.assertEqual(resolved["judge"]["api_key"], "hk_test_remote_key")
+
+    def test_pair_remote_mode_promotes_legacy_scorer_to_judge(self):
+        """Legacy scorer config should be reused as judge before filling defaults."""
+        orch, hack_agent, _ = _make_orchestrator()
+        orch.attack_type = "pair"
+        hack_agent.backend.get_api_key.return_value = "hk_test_remote_key"
+
+        resolved = orch._apply_mode_based_role_defaults(
+            {
+                "attack_type": "pair",
+                "goals": ["test"],
+                "scorer": {
+                    "identifier": "legacy-scorer-model",
+                    "agent_type": "OPENAI_SDK",
+                },
+            }
+        )
+
+        self.assertIn("judge", resolved)
+        self.assertEqual(resolved["judge"]["identifier"], "legacy-scorer-model")
+        self.assertEqual(resolved["judge"]["api_key"], "hk_test_remote_key")
 
     def test_remote_attacker_enables_reasoning(self):
         """The remote attacker (HackAgent generator endpoint) must keep reasoning
@@ -292,7 +313,7 @@ class TestModeBasedRoleDefaults(unittest.TestCase):
         )
         self.assertEqual(payload, {"reasoning_effort": "medium"})
         # Judge is intentionally left without forced reasoning (it works as-is).
-        self.assertNotIn("thinking", resolved["scorer"])
+        self.assertNotIn("thinking", resolved["judge"])
 
     def test_explicit_attacker_override_is_not_polluted_by_remote_defaults(self):
         """A user-supplied attacker model must not inherit reasoning or the
@@ -541,7 +562,7 @@ class TestRequiredModelAvailabilityPreflight(unittest.TestCase):
                 "endpoint": "http://localhost:1111",
                 "agent_type": "OPENAI_SDK",
             },
-            "scorer": {
+            "judge": {
                 "identifier": "s-model",
                 "endpoint": "http://localhost:2222",
                 "agent_type": "OPENAI_SDK",
@@ -569,11 +590,11 @@ class TestRequiredModelAvailabilityPreflight(unittest.TestCase):
                 required_by_role[role] = item.get("required", True)
 
         self.assertIn("attacker", required_by_role)
-        self.assertIn("scorer", required_by_role)
+        self.assertIn("judge", required_by_role)
         self.assertIn("summarizer", required_by_role)
         self.assertIn("embedder", required_by_role)
         self.assertTrue(required_by_role["attacker"])
-        self.assertTrue(required_by_role["scorer"])
+        self.assertTrue(required_by_role["judge"])
         self.assertTrue(required_by_role["summarizer"])
         self.assertFalse(required_by_role["embedder"])
 

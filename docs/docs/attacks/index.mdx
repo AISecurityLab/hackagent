@@ -133,7 +133,7 @@ attack_config = {
     "attack_type": "autodan_turbo",
     "goals": ["Bypass content filter"],
     "attacker": {"identifier": "gpt-4", "endpoint": "https://api.openai.com/v1"},
-    "scorer": {"identifier": "gpt-4o-mini", "endpoint": "https://api.openai.com/v1"},
+    "judge": {"identifier": "gpt-4o-mini", "endpoint": "https://api.openai.com/v1", "type": "scorer", "range": "decimal"},
     "summarizer": {"identifier": "gpt-4", "endpoint": "https://api.openai.com/v1"},
     "embedder": {"identifier": "gemma3:4b", "endpoint": "http://localhost:11434", "agent_type": "OLLAMA"},
     "judges": [{"identifier": "gpt-4o-mini", "type": "harmbench"}]

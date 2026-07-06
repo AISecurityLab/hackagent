@@ -152,7 +152,7 @@ class TestH4rm3lAttack(unittest.TestCase):
         self.assertIn("Generation", steps[0]["name"])
         self.assertIn("Evaluation", steps[1]["name"])
 
-    @patch("hackagent.attacks.techniques.h4rm3l.attack.evaluation.execute")
+    @patch("hackagent.attacks.evaluator.evaluation_step.BaseEvaluationStep.run")
     @patch("hackagent.attacks.techniques.h4rm3l.attack.generation.execute")
     def test_run_pipeline(self, mock_gen, mock_eval):
         client = MagicMock()

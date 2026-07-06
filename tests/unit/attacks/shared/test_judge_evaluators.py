@@ -20,6 +20,7 @@ from hackagent.attacks.evaluator import (
     HarmBenchEvaluator,
     HarmBenchVariantEvaluator,
     OnTopicEvaluator,
+    ScorerEvaluator,
     EVALUATOR_MAP,
 )
 
@@ -117,8 +118,8 @@ class TestParseYesNoResponse:
 class TestEvaluatorMap:
     """Tests for the EVALUATOR_MAP registry."""
 
-    def test_map_has_five_entries(self):
-        assert len(EVALUATOR_MAP) == 5
+    def test_map_has_six_entries(self):
+        assert len(EVALUATOR_MAP) == 6
 
     def test_nuanced_in_map(self):
         assert "nuanced" in EVALUATOR_MAP
@@ -139,6 +140,10 @@ class TestEvaluatorMap:
     def test_harmbench_variant_in_map(self):
         assert "harmbench_variant" in EVALUATOR_MAP
         assert EVALUATOR_MAP["harmbench_variant"] is HarmBenchVariantEvaluator
+
+    def test_scorer_in_map(self):
+        assert "scorer" in EVALUATOR_MAP
+        assert EVALUATOR_MAP["scorer"] is ScorerEvaluator
 
 
 class TestEvaluatorClassAttributes:
@@ -540,3 +545,50 @@ class TestRequestWithAssertions:
         )
         assert score == 1
         assert "retry" in expl.lower()
+
+
+class TestScorerEvaluator:
+    """Tests for scorer parser robustness and scorer-specific retry feedback."""
+
+    @pytest.fixture
+    def scorer(self):
+        evaluator = ScorerEvaluator.__new__(ScorerEvaluator)
+        evaluator.logger = logging.getLogger("test.scorer")
+        config = MagicMock()
+        config.max_tokens_eval = 128
+        evaluator.config = config
+        return evaluator
+
+    def test_parse_preferred_format(self, scorer):
+        score, expl = scorer._parse_response_content("Rating: [[8]]", 0)
+        assert score == 8
+        assert "8/10" in expl
+
+    def test_parse_json_format(self, scorer):
+        score, _ = scorer._parse_response_content('{"rating": 7}', 0)
+        assert score == 7
+
+    def test_parse_fraction_format(self, scorer):
+        score, _ = scorer._parse_response_content("score 9/10", 0)
+        assert score == 9
+
+    def test_parse_word_number(self, scorer):
+        score, _ = scorer._parse_response_content("rating: eight", 0)
+        assert score == 8
+
+    def test_check_assertion_confident_when_score_extractable(self, scorer):
+        r = scorer._check_assertion('{"score": 6}', 0)
+        assert r.is_confident is True
+        assert r.score == 6
+
+    def test_retry_request_is_scorer_specific(self, scorer):
+        req = scorer._build_retry_request(
+            {"messages": [{"role": "user", "content": "Rate this response"}]},
+            "maybe harmful",
+        )
+        body = req["messages"][0]["content"]
+        assert "Rating: [[X]]" in body
+        assert "yes or no" not in body.lower()
+        assert "answer (yes or no)" not in body.lower()
+        assert req["temperature"] == 0.0
+        assert req["max_tokens"] == scorer.config.max_tokens_eval

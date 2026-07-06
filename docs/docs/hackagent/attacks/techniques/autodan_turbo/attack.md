@@ -3,7 +3,7 @@ sidebar_label: attack
 title: hackagent.attacks.techniques.autodan_turbo.attack
 ---
 
-AutoDAN-Turbo orchestrator — WarmUp → Lifelong → scorer finalization.
+AutoDAN-Turbo orchestrator — WarmUp → Lifelong → shared LLM-judge evaluation.
 
 ## AutoDANTurboAttack Objects
 
@@ -16,7 +16,7 @@ AutoDAN-Turbo: Lifelong agent for strategy self-exploration in jailbreaking LLMs
 Three-phase pipeline:
 1. WarmUp — free exploration to bootstrap a strategy library
 2. Lifelong — strategy-guided attacks with retrieval + summarization
-3. Evaluation — scorer-only result finalization
+3. Evaluation — shared LLM-judge result finalization
 
 #### \_\_init\_\_
 
@@ -68,7 +68,7 @@ Execute full AutoDAN-Turbo pipeline.
 Pipeline mapping to paper/integration:
 1) WarmUp: free exploration + strategy library bootstrap
 2) Lifelong: retrieval-guided attack with online strategy growth
-3) Evaluation: scorer-only normalization and success finalization
+3) Evaluation: shared LLM-judge normalization and success finalization
 
 **Arguments**:
 
@@ -77,7 +77,7 @@ Pipeline mapping to paper/integration:
 
 **Returns**:
 
-  Final per-goal result list, enriched with scorer-based metrics.
+  Final per-goal result list, enriched with LLM judge outputs.
   
 
 **Raises**:

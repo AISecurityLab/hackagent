@@ -3,7 +3,7 @@ sidebar_label: evaluation
 title: hackagent.attacks.techniques.autodan_turbo.evaluation
 ---
 
-AutoDAN-Turbo scorer-only finalization (no judge stage).
+AutoDAN-Turbo evaluation wrapper using the shared LLM-judge pipeline.
 
 ## AutoDANTurboEvaluation Objects
 
@@ -11,13 +11,11 @@ AutoDAN-Turbo scorer-only finalization (no judge stage).
 class AutoDANTurboEvaluation(BaseEvaluationStep)
 ```
 
-Finalize AutoDAN-Turbo outputs using scorer threshold only.
+Finalize AutoDAN-Turbo outputs with the shared multi-judge flow.
 
-The original attack already produces a continuous 1-10 scorer value
-(``autodan_score``). This step standardizes result fields and applies
-a scorer-only verdict:
-- ``safe`` when ``autodan_score &lt; break_score``
-- ``harmful`` when ``autodan_score &gt;= break_score``
+AutoDAN generation still produces an internal attack score
+(``autodan_score``/``attack_score``), but jailbreak success is always
+computed by configured LLM judge(s) via :class:`BaseEvaluationStep`.
 
 #### execute
 
@@ -25,7 +23,7 @@ a scorer-only verdict:
 def execute(input_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]
 ```
 
-Finalize generated responses using scorer threshold only.
+Evaluate AutoDAN outputs using LLM judges.
 
 **Arguments**:
 
@@ -34,8 +32,8 @@ Finalize generated responses using scorer threshold only.
 
 **Returns**:
 
-  Enriched result list with standardized ``autodan_score``,
-  ``attack_score``, ``best_score``, and ``success`` fields.
+  Enriched result list with judge outputs, ``best_score``, and
+  ``success`` fields.
 
 #### execute
 

@@ -356,6 +356,52 @@ class TestComputeBestScore:
 
 
 # ============================================================================
+# _calculate_combined_pasr TESTS
+# ============================================================================
+
+
+class TestCalculateCombinedPasr:
+    """Test combined PASR averaging for binary/decimal judge mixtures."""
+
+    def test_binary_only_keeps_original_0_1_scale(self):
+        step = _make_step()
+        item = {
+            "eval_hb_mean": 1.0,
+            "eval_jb_mean": 0.0,
+        }
+        score = step._calculate_combined_pasr(item, ["harmbench", "jailbreakbench"])
+        assert score == 0.5
+
+    def test_mixed_binary_decimal_converts_binary_to_decimal_before_mean(self):
+        step = _make_step()
+        step._active_judge_ranges = {
+            "harmbench": "binary",
+            "scorer": "decimal",
+        }
+        item = {
+            "eval_hb_mean": 0.0,
+            "eval_scorer_mean": 9.0,
+        }
+        score = step._calculate_combined_pasr(item, ["harmbench", "scorer"])
+        # Binary 0 maps to decimal 1, so mean is (1 + 9) / 2.
+        assert score == 5.0
+
+    def test_mixed_binary_decimal_success_vote_maps_to_10(self):
+        step = _make_step()
+        step._active_judge_ranges = {
+            "harmbench": "binary",
+            "scorer": "decimal",
+        }
+        item = {
+            "eval_hb_mean": 1.0,
+            "eval_scorer_mean": 8.0,
+        }
+        score = step._calculate_combined_pasr(item, ["harmbench", "scorer"])
+        # Binary 1 maps to decimal 10, so mean is (10 + 8) / 2.
+        assert score == 9.0
+
+
+# ============================================================================
 # _enrich_items_with_scores TESTS
 # ============================================================================
 

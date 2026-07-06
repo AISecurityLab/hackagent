@@ -60,30 +60,27 @@ class TestEvaluationStatusUpdates(unittest.TestCase):
 
     def test_evaluation_code_correctly_uses_bool(self):
         """
-        FIXED: evaluation.py now correctly uses bool return from evaluator.
+        FIXED: pattern/keyword evaluation removed; evaluate_responses is now
+        a lightweight error-detection stub. LLM judge evaluation is the only path.
         """
-        from hackagent.attacks.techniques.static_template import evaluation
+        from hackagent.attacks.techniques.static_template import (
+            static_eval as evaluation,
+        )
         import inspect
 
-        # Get the source code of evaluate_responses
-        source = inspect.getsource(evaluation.evaluate_responses)
+        # Verify the function still exists (backward compat import)
+        self.assertTrue(callable(evaluation.evaluate_responses))
 
-        # Check that the fix is in place - code uses bool directly
-        self.assertIn(
-            'evaluator.evaluate(row.get("completion", ""))',
-            source,
-        )
-        # Should NOT have the old buggy code
+        source = inspect.getsource(evaluation.evaluate_responses)
+        # Old buggy code must not be present
         self.assertNotIn(
             'evaluator.evaluate(row["completion"])["success"]',
             source,
             "Bug fixed: code no longer tries to subscript bool",
         )
-        self.assertNotIn(
-            'evaluator.evaluate(row.get("completion", ""))["success"]',
-            source,
-            "Bug fixed: code no longer tries to subscript bool",
-        )
+        # Pattern/keyword evaluation paths must be gone
+        self.assertNotIn("PatternEvaluator", source)
+        self.assertNotIn("KeywordEvaluator", source)
 
     def test_evaluation_step_should_update_server_results(self):
         """
@@ -154,7 +151,9 @@ class TestEvaluationEndToEnd(unittest.TestCase):
 
         The evaluation step now calls result_partial_update to sync status to server.
         """
-        from hackagent.attacks.techniques.static_template import evaluation
+        from hackagent.attacks.techniques.static_template import (
+            static_eval as evaluation,
+        )
         import inspect
 
         # Check that evaluation.py now calls result_partial_update
@@ -174,7 +173,7 @@ class TestEvaluationEndToEnd(unittest.TestCase):
 
     def test_sync_evaluation_function_exists(self):
         """Test that _sync_evaluation_to_server function exists and is called."""
-        from hackagent.attacks.techniques.static_template.evaluation import (
+        from hackagent.attacks.techniques.static_template.static_eval import (
             _sync_evaluation_to_server,
             execute,
         )
@@ -189,7 +188,7 @@ class TestEvaluationEndToEnd(unittest.TestCase):
 
     def test_update_result_status_function(self):
         """Test that _update_result_status function works correctly."""
-        from hackagent.attacks.techniques.static_template.evaluation import (
+        from hackagent.attacks.techniques.static_template.static_eval import (
             _update_result_status,
         )
 
@@ -272,7 +271,7 @@ class TestStaticTemplateTrackerConsistency(unittest.TestCase):
         )
 
     def test_finalize_goals_marks_missing_prompts_as_failed(self):
-        from hackagent.attacks.techniques.static_template.evaluation import (
+        from hackagent.attacks.techniques.static_template.static_eval import (
             _finalize_goals_with_tracker,
         )
 

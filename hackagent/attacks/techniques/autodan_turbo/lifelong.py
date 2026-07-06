@@ -128,17 +128,28 @@ def execute(
                 or (config.get(role, {}) or {}).get("name")
                 or "unknown-model"
             )
-            for role in ("attacker", "scorer", "summarizer")
+            for role in ("attacker", "summarizer")
         }
         if isinstance(config, dict)
         else {
             "attacker": "unknown-model",
-            "scorer": "unknown-model",
             "summarizer": "unknown-model",
         }
     )
+    # Accept both "judge" (new) and "scorer" (legacy) config keys.
+    _judge_cfg = (
+        (config.get("judge") or config.get("scorer") or {})
+        if isinstance(config, dict)
+        else {}
+    )
+    role_models["judge"] = (
+        _judge_cfg.get("identifier")
+        or _judge_cfg.get("model")
+        or _judge_cfg.get("name")
+        or "unknown-model"
+    )
     attacker_label = f"attacker:{role_models['attacker']}"
-    scorer_label = f"scorer:{role_models['scorer']}"
+    scorer_label = f"judge:{role_models['judge']}"
     summarizer_label = f"summarizer:{role_models['summarizer']}"
 
     backend_agent = getattr(agent_router, "backend_agent", None)
