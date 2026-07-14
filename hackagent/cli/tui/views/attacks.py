@@ -667,7 +667,9 @@ class AttacksTab(Container):
                 continue
             value = flat_values[cfg_field.key]
             if isinstance(widget, Select):
-                widget.value = value
+                # None isn't a legal Select value (only the NoSelection sentinel is) — skip and keep its constructed default.
+                if value is not None:
+                    widget.value = value
             elif isinstance(widget, Switch):
                 widget.value = bool(value)
             elif isinstance(widget, TextArea):
@@ -912,7 +914,8 @@ class AttacksTab(Container):
             if isinstance(widget, Select):
                 raw = widget.value
                 if isinstance(raw, NoSelection):
-                    raw = None
+                    # Fall back to the field's default rather than caching a bare None.
+                    raw = cfg_field.default
             elif isinstance(widget, Switch):
                 raw = widget.value
             elif isinstance(widget, TextArea):
