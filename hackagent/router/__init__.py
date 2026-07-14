@@ -11,6 +11,7 @@ from .agent import (
 )
 from .providers.adk import ADKAgent
 from .providers.claude import ClaudeCodeAgent
+from .providers.codex import CodexAgent
 from .providers.web import WebAgent
 from .router import AgentRouter
 from .tracking import StepTracker, TrackingContext, track_operation
@@ -20,6 +21,7 @@ __all__ = [
     "Agent",
     "ADKAgent",
     "ClaudeCodeAgent",
+    "CodexAgent",
     "WebAgent",
     "AdapterConfigurationError",
     "AdapterInteractionError",

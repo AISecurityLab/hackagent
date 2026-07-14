@@ -136,6 +136,11 @@ const sidebars: SidebarsConfig = {
         },
         {
           type: 'doc',
+          id: 'agents/codex',
+          label: 'Codex',
+        },
+        {
+          type: 'doc',
           id: 'agents/guardrails',
           label: 'Guardrails',
         },
