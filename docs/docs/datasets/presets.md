@@ -34,17 +34,43 @@ Use `agentharm` for agent safety testing, `strongreject` for jailbreak evaluatio
 
 | Preset | Goals | Description |
 |--------|-------|-------------|
-| `agentharm` | 176+ | Harmful agentic tasks (public test split) |
-| `agentharm_benign` | — | Benign tasks for baseline comparison |
+| `agentharm` | 208 | Harmful agentic tasks (public test split) |
+| `agentharm_benign` | 208 | Benign tasks for baseline comparison |
 
 **Source:** [ai-safety-institute/AgentHarm](https://huggingface.co/datasets/ai-safety-institute/AgentHarm)
 **Use case:** Evaluating AI agents for harmful autonomous behaviors
+
+**Extra metadata fields available in preset config:**
+- `detailed_prompt`
+- `hint_included`
+- `target_functions`
+- `grading_function`
 
 ```python
 # Test agent against harmful agentic tasks
 attack_config = {
     "attack_type": "advprefix",
     "dataset": {"preset": "agentharm", "limit": 50},
+}
+```
+
+### AgentHazard
+
+**Tool-use risk prompts fetched from a remote JSON URL**
+
+| Preset | Goals | Description |
+|--------|-------|-------------|
+| `agenthazard` | 2,653 | AgentHazard prompts fetched in-memory from URL JSON |
+
+**Source:** [AgentHazard project page](https://yunhao-feng.github.io/AgentHazard)
+**Dataset URL:** `https://yunhao-feng.github.io/AgentHazard/data/dataset.json`
+**Use case:** Evaluating tool-use and decomposition-related risk patterns
+
+```python
+# Run with the built-in AgentHazard preset
+attack_config = {
+    "attack_type": "baseline",
+    "dataset": {"preset": "agenthazard", "limit": 100, "shuffle": True},
 }
 ```
 

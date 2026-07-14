@@ -80,6 +80,7 @@ class TrackingCoordinator:
         logger: Optional[logging.Logger] = None,
         run_start_time: Optional[float] = None,
         goal_index_start: int = 0,
+        default_initial_metadata: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize coordinator with pre-built trackers.
@@ -99,6 +100,9 @@ class TrackingCoordinator:
         self._goals: List[str] = []
         self._goal_indices: List[int] = []
         self._goal_index_start: int = int(goal_index_start)
+        self._default_initial_metadata: Dict[str, Any] = dict(
+            default_initial_metadata or {}
+        )
         self._run_start_time: float = (
             float(run_start_time)
             if isinstance(run_start_time, (int, float))
@@ -207,6 +211,7 @@ class TrackingCoordinator:
             logger=_logger,
             run_start_time=run_start_time,
             goal_index_start=goal_index_start,
+            default_initial_metadata=initial_metadata,
         )
 
         # Initialize goals if provided
@@ -258,7 +263,7 @@ class TrackingCoordinator:
         self,
         goals: List[str],
         initial_metadata: Optional[Dict[str, Any]] = None,
-        goal_index_start: int = 0,
+        goal_index_start: Optional[int] = None,
     ) -> None:
         """
         Create Result records for all goals upfront.
@@ -269,9 +274,14 @@ class TrackingCoordinator:
         Args:
             goals: List of goal strings
             initial_metadata: Optional metadata to attach to each goal result
-            goal_index_start: Starting index to assign to the first goal
+            goal_index_start: Optional starting index to assign to the first
+                goal. If omitted, preserves the coordinator's current offset.
         """
-        self._goal_index_start = int(goal_index_start)
+        if goal_index_start is None:
+            goal_index_start = self._goal_index_start
+        else:
+            self._goal_index_start = int(goal_index_start)
+            goal_index_start = self._goal_index_start
         self._goals = list(goals)
         self._goal_indices = [goal_index_start + i for i in range(len(goals))]
 
@@ -279,12 +289,40 @@ class TrackingCoordinator:
             self.logger.debug("Goal tracking disabled — skipping goal initialization")
             return
 
+        base_initial_metadata = dict(self._default_initial_metadata)
+        if initial_metadata:
+            base_initial_metadata.update(initial_metadata)
+        goal_metadata_by_index = base_initial_metadata.pop(
+            "_goal_metadata_by_index", {}
+        )
+        goal_metadata_by_goal = base_initial_metadata.pop("_goal_metadata_by_goal", {})
+        if not isinstance(goal_metadata_by_index, dict):
+            goal_metadata_by_index = {}
+        if not isinstance(goal_metadata_by_goal, dict):
+            goal_metadata_by_goal = {}
+
         for i, goal in enumerate(goals):
             goal_index = goal_index_start + i
+
+            per_goal_metadata: Dict[str, Any] = {}
+            goal_specific_meta = goal_metadata_by_index.get(
+                goal_index,
+                goal_metadata_by_index.get(str(goal_index)),
+            )
+            if not isinstance(goal_specific_meta, dict):
+                goal_specific_meta = goal_metadata_by_goal.get(goal)
+            if isinstance(goal_specific_meta, dict):
+                per_goal_metadata = dict(goal_specific_meta)
+
+            effective_initial_metadata = {
+                **base_initial_metadata,
+                **per_goal_metadata,
+            }
+
             self.goal_tracker.create_goal_result(
                 goal=goal,
                 goal_index=goal_index,
-                initial_metadata=initial_metadata or {},
+                initial_metadata=effective_initial_metadata,
             )
 
         self.logger.info(f"Initialized {len(goals)} goal results for tracking")
