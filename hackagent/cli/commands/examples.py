@@ -162,6 +162,12 @@ def _extract_ollama_models_from_demo_cfg(demo_cfg: dict) -> dict[str, str]:
     if judge_model:
         models["judge"] = str(judge_model)
 
+    embedder_cfg = attack_cfg.get("embedder", {})
+    if isinstance(embedder_cfg, dict):
+        embedder_model = embedder_cfg.get("identifier")
+        if embedder_model:
+            models["embedder"] = str(embedder_model)
+
     return models
 
 
@@ -228,7 +234,7 @@ def _ensure_ollama_models(models_by_role: dict[str, str]) -> None:
     console.print("[cyan]🔎 Checking local Ollama model catalog...[/cyan]")
     installed = _get_installed_ollama_models()
 
-    role_order = ["target", "judge", "attacker"]
+    role_order = ["target", "judge", "attacker", "embedder"]
     for role in role_order:
         model_name = models_by_role.get(role)
         if not model_name:
@@ -286,7 +292,7 @@ def _preflight_ollama_requirements(demo_cfg: dict) -> None:
 
     required_models = _extract_ollama_models_from_demo_cfg(demo_cfg)
     console.print("[cyan]🔎 Required models from demo config:[/cyan]")
-    for role in ["target", "judge", "attacker"]:
+    for role in ["target", "judge", "attacker", "embedder"]:
         model_name = required_models.get(role)
         if model_name:
             console.print(f"   - {role}: {model_name}")
@@ -437,34 +443,37 @@ def pc_tool():
 @examples.command(name="rag")
 @handle_errors
 def rag_example():
-    """Run the RAG example: ingest if needed, start server, then run attack."""
-    example_dir = _resolve_example_dir("openai_sdk/rag")
-    ingest_script = example_dir / "ingest.py"
-    server_script = example_dir / "agent_server.py"
-    attack_script = example_dir / "hack.py"
+    """Run the indirect prompt injection RAG example (local Ollama, no API key)."""
+    example_dir = _resolve_example_dir("rag")
+    script = example_dir / "test_indirect_injection.py"
 
-    db_index_dir = example_dir / "db_index"
-    if not db_index_dir.exists() or not db_index_dir.is_dir():
-        console.print("[yellow]📦 db_index not found. Running ingest.py...[/yellow]")
-        _run_python_script(ingest_script)
+    target_endpoint = os.environ.get(
+        "HACKAGENT_TARGET_ENDPOINT", "http://localhost:11434"
+    )
+    target_model = os.environ.get("HACKAGENT_TARGET_MODEL", "gemma3:4b")
+    agent_type = os.environ.get("HACKAGENT_AGENT_TYPE", "ollama")
+    embedder_model = os.environ.get("HACKAGENT_EMBEDDER_MODEL", "nomic-embed-text")
+
+    if agent_type.lower() == "ollama":
+        demo_cfg = {
+            "agent": {
+                "endpoint": target_endpoint,
+                "adapter_operational_config": {"name": target_model},
+            },
+            "attack_config": {
+                "attacker": {"identifier": target_model},
+                "judges": [{"identifier": target_model}],
+                "embedder": {"identifier": embedder_model},
+            },
+        }
+        _preflight_ollama_requirements(demo_cfg)
     else:
         console.print(
-            f"[green]✅ Found existing vector index:[/green] {db_index_dir.name}"
+            f"[yellow]⚠️ HACKAGENT_AGENT_TYPE={agent_type!r} — skipping local Ollama preflight[/yellow]"
         )
 
-    server_process = _start_background_python(server_script, "RAG agent server")
-
-    try:
-        _wait_for_tcp_port(
-            host="127.0.0.1",
-            port=8000,
-            timeout_seconds=45,
-            process=server_process,
-            process_name="RAG agent server",
-        )
-        console.print("[green]✅ RAG server ready at:[/green] http://127.0.0.1:8000/v1")
-
-        _run_python_script(attack_script)
-        console.print("[bold green]✅ rag example completed[/bold green]")
-    finally:
-        _stop_background_process(server_process, "RAG agent server")
+    console.print(
+        "[bold cyan]🚀 Running indirect prompt injection RAG example...[/bold cyan]"
+    )
+    _run_python_script(script)
+    console.print("[bold green]✅ rag example completed[/bold green]")
