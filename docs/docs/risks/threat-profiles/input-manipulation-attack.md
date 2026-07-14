@@ -40,7 +40,7 @@ agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 # Use profile recommendations
 for attack in INPUT_MANIPULATION_ATTACK_PROFILE.primary_attacks:
     for dataset in INPUT_MANIPULATION_ATTACK_PROFILE.primary_datasets + INPUT_MANIPULATION_ATTACK_PROFILE.secondary_datasets:
-        result = agent.attack(
+        result = agent.hack(
             attack_type=attack.technique.lower(),
             dataset=dataset.preset,
             objective=INPUT_MANIPULATION_ATTACK_PROFILE.objective,

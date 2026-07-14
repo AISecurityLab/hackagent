@@ -82,7 +82,7 @@ primary_dataset = JAILBREAK_PROFILE.primary_datasets[0].preset
 for attack in JAILBREAK_PROFILE.primary_attacks:
     attack_type = attack.technique.lower()
 
-    result = agent.attack(
+    result = agent.hack(
         attack_type=attack_type,
         dataset={"preset": primary_dataset, "limit": 25},
         judges=[{"identifier": "ollama/llama3", "type": "harmbench"}],

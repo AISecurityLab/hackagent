@@ -36,7 +36,7 @@ agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 # Use profile recommendations
 for attack in CRAFT_ADVERSARIAL_DATA_PROFILE.primary_attacks:
     for dataset in CRAFT_ADVERSARIAL_DATA_PROFILE.primary_datasets:
-        result = agent.attack(
+        result = agent.hack(
             attack_type=attack.technique.lower(),
             dataset=dataset.preset,
             objective=CRAFT_ADVERSARIAL_DATA_PROFILE.objective,

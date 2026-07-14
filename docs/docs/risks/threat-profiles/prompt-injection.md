@@ -56,7 +56,7 @@ agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 # Use profile recommendations
 for attack in PROMPT_INJECTION_PROFILE.primary_attacks:
     for dataset in PROMPT_INJECTION_PROFILE.primary_datasets:
-        result = agent.attack(
+        result = agent.hack(
             attack_type=attack.technique.lower(),
             dataset=dataset.preset,
             objective=PROMPT_INJECTION_PROFILE.objective,

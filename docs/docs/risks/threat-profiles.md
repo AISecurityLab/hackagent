@@ -195,7 +195,7 @@ for attack in JAILBREAK_PROFILE.primary_attacks:
     for dataset_rec in JAILBREAK_PROFILE.primary_datasets:
         print(f"Running {attack.technique} on {dataset_rec.preset}")
 
-        result = agent.attack(
+        result = agent.hack(
             attack_type=attack.technique.lower(),
             dataset=dataset_rec.preset,
             objective=JAILBREAK_PROFILE.objective,
@@ -219,7 +219,7 @@ agent = HackAgent(
 # Test only with PRIMARY datasets and PRIMARY attacks
 for attack in PROMPT_INJECTION_PROFILE.primary_attacks:
     for dataset in PROMPT_INJECTION_PROFILE.primary_datasets:
-        result = agent.attack(
+        result = agent.hack(
             attack_type=attack.technique.lower(),
             dataset=dataset.preset,
         )
@@ -245,7 +245,7 @@ custom_goals = [
 ]
 
 for attack in EXCESSIVE_AGENCY_PROFILE.primary_attacks:
-    result = agent.attack(
+    result = agent.hack(
         attack_type=attack.technique.lower(),
         goals=custom_goals,
         objective=EXCESSIVE_AGENCY_PROFILE.objective,

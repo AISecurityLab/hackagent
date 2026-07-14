@@ -136,7 +136,7 @@ def run_custom_campaign(agent, config):
         # Test with profile's recommended datasets
         if profile.has_datasets:
             for ds in profile.primary_datasets:
-                result = agent.attack(
+                result = agent.hack(
                     attack_type="static_template",
                     dataset={"preset": ds.preset},
                     objective=profile.objective,
@@ -152,7 +152,7 @@ def run_custom_campaign(agent, config):
         custom_goals = config["custom_goals"].get(vuln_name.replace("_", ""), [])
 
         if custom_goals:
-            result = agent.attack(
+            result = agent.hack(
                 attack_type="static_template",
                 goals=custom_goals,
                 objective=profile.objective,
@@ -185,7 +185,7 @@ def multi_stage_campaign(agent, profile, dataset):
     for stage in stages:
         print(f"Running {stage} attack...")
 
-        result = agent.attack(
+        result = agent.hack(
             attack_type=stage,
             dataset={"preset": dataset},
             objective=profile.objective,
@@ -230,7 +230,7 @@ def scheduled_security_scan():
     from hackagent.risks.prompt_injection import PROMPT_INJECTION_PROFILE
 
     for profile in [JAILBREAK_PROFILE, PROMPT_INJECTION_PROFILE]:
-        result = agent.attack(
+        result = agent.hack(
             attack_type="static_template",
             dataset={"preset": profile.primary_datasets[0].preset},
             objective=profile.objective,
@@ -306,7 +306,7 @@ def run_compliance_campaign(agent, standard):
     passed = True
 
     for profile in config["profiles"]:
-        result = agent.attack(
+        result = agent.hack(
             attack_type="static_template",
             goals=config["custom_goals"],
             objective=profile.objective,

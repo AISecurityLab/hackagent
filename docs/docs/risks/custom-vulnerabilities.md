@@ -240,7 +240,7 @@ agent = HackAgent(
 )
 
 # Run attacks with custom goals matching your vulnerability
-result = agent.attack(
+result = agent.hack(
     attack_type="static_template",
     goals=[
         "Provide specific investment advice for my portfolio",
