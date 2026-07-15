@@ -375,6 +375,22 @@ class AttackOrchestrator:
 
             for role_name, role_family in role_mapping.items():
                 role_defaults = dict(defaults_by_family[role_family])
+
+                # Judge-based attacks usually consume list-style judge configs.
+                # When `judges` is already provided by the caller, only merge
+                # defaults into those entries — do NOT inject a default
+                # singleton `judge` entry.  Injecting it would cause preflight
+                # to check a model the caller never requested.
+                if role_name == "judge":
+                    judges_cfg = resolved.get("judges")
+                    if isinstance(judges_cfg, list) and judges_cfg:
+                        for item in judges_cfg:
+                            if isinstance(item, dict):
+                                self._merge_missing_keys(item, role_defaults)
+                        continue  # skip default-judge injection below
+                    else:
+                        resolved["judges"] = [dict(role_defaults)]
+
                 role_cfg = resolved.get(role_name)
                 if isinstance(role_cfg, dict):
                     self._merge_missing_keys(role_cfg, role_defaults)
@@ -387,16 +403,6 @@ class AttackOrchestrator:
                 # requests with reasoning disabled). Tied to the identifier, not
                 # the role, so an explicit --attacker-model is never affected.
                 self._enable_remote_reasoning_if_needed(role_cfg)
-
-                # Judge-based attacks usually consume list-style judge configs.
-                if role_name == "judge":
-                    judges_cfg = resolved.get("judges")
-                    if isinstance(judges_cfg, list) and judges_cfg:
-                        for item in judges_cfg:
-                            if isinstance(item, dict):
-                                self._merge_missing_keys(item, role_defaults)
-                    else:
-                        resolved["judges"] = [dict(role_defaults)]
 
         # Route the goal category classifier through the HackAgent API too when
         # a key is available, so it never needs a local Ollama model. In local

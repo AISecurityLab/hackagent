@@ -189,17 +189,28 @@ def _looks_like_prompt_echo(candidate: str, prompt: str) -> bool:
     return k >= 60 and c[:k] == p[:k]
 
 
-def _new_reply(before: List[str], after: List[str], prompt: str) -> Optional[str]:
+def _new_reply(
+    before: List[str],
+    after: List[str],
+    prompt: str,
+    sent_prompts: Optional[List[str]] = None,
+) -> Optional[str]:
     """Pick the new assistant message from message-text snapshots.
 
     ``before``/``after`` are the visible message texts before and after sending.
-    The new texts are those in ``after`` not already in ``before``; the user's
-    own echoed prompt is dropped, and the last remaining non-empty text (the
-    freshest assistant turn) is returned. ``None`` if nothing new qualifies.
+    The new texts are those in ``after`` not already in ``before``; any text
+    matching one of the ``sent_prompts`` (all user messages typed so far, not
+    just the current one) is dropped so that in multi-turn conversations a
+    previous user bubble that re-appears in the snapshot is never returned as
+    the bot's reply.  The last remaining non-empty text is the freshest
+    assistant turn.  ``None`` if nothing new qualifies.
     """
     before_counts: Dict[str, int] = {}
     for t in before:
         before_counts[t] = before_counts.get(t, 0) + 1
+
+    # All prompts we've ever sent — current plus any prior turns.
+    all_sent: List[str] = sent_prompts if sent_prompts else [prompt]
 
     new_texts: List[str] = []
     for t in after:
@@ -209,8 +220,8 @@ def _new_reply(before: List[str], after: List[str], prompt: str) -> Optional[str
         stripped = t.strip()
         if not stripped:
             continue
-        # Drop the user's echoed prompt (whitespace-insensitive, incl. truncated).
-        if _looks_like_prompt_echo(stripped, prompt):
+        # Drop any text that is a user prompt (current or from earlier turns).
+        if any(_looks_like_prompt_echo(stripped, p) for p in all_sent):
             continue
         new_texts.append(stripped)
     return new_texts[-1] if new_texts else None
@@ -275,6 +286,10 @@ def _get_web_agent_custom_llm_class():
             # created it. Attacks run goals on thread-pool workers, so we pin
             # ALL browser work to one dedicated thread and marshal calls to it.
             self._executor = None
+            # All prompts typed across turns.  Used by _wait_for_reply so that
+            # in multi-turn conversations previous user bubbles are never
+            # mistaken for the bot's reply.
+            self._sent_prompts: List[str] = []
 
         # ---- single-thread marshalling -----------------------------------
 
@@ -527,7 +542,9 @@ def _get_web_agent_custom_llm_class():
             stable = 0
             for _ in range(deadline_polls + 8):
                 self._page.wait_for_timeout(400)
-                reply = _new_reply(before, self._message_texts(), prompt)
+                reply = _new_reply(
+                    before, self._message_texts(), prompt, self._sent_prompts
+                )
                 if reply and reply == last:
                     stable += 1
                     if stable >= 2:  # unchanged for ~0.8s → streaming settled
@@ -608,13 +625,26 @@ def _get_web_agent_custom_llm_class():
             before = self._message_texts()
             try:
                 _type_into(self._input, prompt)
+                # Read back the text the browser actually accepted — input
+                # fields may strip or transform certain characters (e.g.
+                # non-printable ASCII produced by BoN ascii_perturbation).
+                # Using the sanitised text for echo-detection ensures we never
+                # mistake the echoed user bubble for the bot's reply.
+                try:
+                    typed_prompt = self._input.input_value().strip() or prompt
+                except Exception:
+                    typed_prompt = prompt
+                # Register the prompt BEFORE pressing Enter so that as soon as
+                # the user bubble appears in the DOM it is already in the
+                # sent_prompts filter (multi-turn safety).
+                self._sent_prompts.append(typed_prompt)
                 self._input.press("Enter")
             except Exception as e:
                 raise WebAgentInteractionError(
                     f"Failed to enter the prompt: {e}"
                 ) from e
 
-            reply = self._wait_for_reply(before, prompt)
+            reply = self._wait_for_reply(before, typed_prompt)
             if reply is None:
                 # Try a send button, then poll again.
                 btn = _find_send_button(self._frame)
@@ -623,7 +653,7 @@ def _get_web_agent_custom_llm_class():
                         btn.click()
                     except Exception:
                         pass
-                    reply = self._wait_for_reply(before, prompt)
+                    reply = self._wait_for_reply(before, typed_prompt)
             if reply is None:
                 reply = self._llm_extract_reply(prompt)
             if reply is None:
