@@ -22,6 +22,7 @@ from hackagent.cli.commands import (
     claude as claude_cmd,
     codex as codex_cmd,
     config,
+    datasets as datasets_cmd,
     examples,
     results,
     scan as scan_cmd,
@@ -575,6 +576,7 @@ cli.add_command(attack.eval_cmd)
 cli.add_command(scan_cmd.scan)
 cli.add_command(claude_cmd.claude)
 cli.add_command(codex_cmd.codex)
+cli.add_command(datasets_cmd.datasets)
 cli.add_command(examples.examples)
 cli.add_command(results.results)
 cli.add_command(web_cmd.web)

@@ -157,6 +157,7 @@ const sidebars: SidebarsConfig = {
         'cli/config',
         'cli/attack',
         'cli/results',
+        'cli/datasets',
       ],
     },
     {
