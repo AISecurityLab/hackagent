@@ -62,6 +62,25 @@ class TestNewReply(unittest.TestCase):
         after = ["x" * 90 + "…", "the real bot answer"]  # widget clipped the echo
         self.assertEqual(_new_reply([], after, prompt), "the real bot answer")
 
+    def test_drops_previous_turn_user_echo_with_sent_prompts(self):
+        # In multi-turn chats the page snapshot can re-include older user
+        # prompts. Ensure those are filtered too when sent_prompts is provided.
+        before = ["assistant greeting"]
+        after = [
+            "assistant greeting",
+            "my previous user prompt",
+            "the current assistant reply",
+        ]
+        self.assertEqual(
+            _new_reply(
+                before,
+                after,
+                "latest user prompt",
+                sent_prompts=["my previous user prompt", "latest user prompt"],
+            ),
+            "the current assistant reply",
+        )
+
     def test_last_user_text_from_parts(self):
         msgs = [{"role": "user", "content": [{"type": "text", "text": "hey"}]}]
         self.assertEqual(_last_user_text(msgs), "hey")
