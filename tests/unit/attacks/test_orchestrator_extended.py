@@ -14,6 +14,7 @@ from hackagent.attacks.techniques.autodan_turbo.attack import AutoDANTurboAttack
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.techniques.baseline.attack import BaselineAttack
 from hackagent.attacks.techniques.h4rm3l.attack import H4rm3lAttack
+from hackagent.attacks.techniques.pair.config import PairConfig
 from hackagent.attacks.techniques.tap.attack import TAPAttack
 from hackagent.attacks.techniques.config import (
     DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE,
@@ -197,6 +198,52 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
         )
         self.assertIsNotNone(results)
 
+    @patch.object(
+        AttackOrchestrator, "_create_server_run_record", return_value=_VALID_RUN_ID
+    )
+    @patch.object(
+        AttackOrchestrator, "_create_server_attack_record", return_value=_VALID_ATK_ID
+    )
+    @patch.object(
+        AttackOrchestrator,
+        "_validate_required_models_availability",
+        return_value=None,
+    )
+    @patch(
+        "hackagent.attacks.evaluator.evaluation_step.BaseEvaluationStep.prepare_and_sync",
+        return_value=None,
+    )
+    def test_pair_evaluation_dispatch_normalizes_is_success_to_success(
+        self, mock_sync, mock_validate_models, mock_create_atk, mock_create_run
+    ):
+        """PAIR's evaluation-pipeline branch must not depend on the deleted
+        pair.evaluation module, and must preserve each row's inline
+        `is_success` verdict (not silently flip it via a best_score>0
+        fallback)."""
+        orch, hack_agent, _ = _make_orchestrator()
+        orch.attack_type = "pair"
+
+        pair_results = [
+            {"goal": "g1", "best_score": 3, "is_success": False, "response": "no"},
+            {"goal": "g2", "best_score": 9, "is_success": True, "response": "yes"},
+        ]
+        with patch.object(
+            AttackOrchestrator, "_execute_local_attack", return_value=pair_results
+        ):
+            orch.execute(
+                attack_config={"attack_type": "pair", "goals": ["g1", "g2"]},
+                run_config_override=None,
+                fail_on_run_error=False,
+            )
+
+        # If the deleted-module import regressed, an exception would be
+        # swallowed by the evaluation try/except and prepare_and_sync would
+        # never run.
+        self.assertTrue(mock_sync.called)
+        final_results = mock_sync.call_args[0][0]
+        self.assertEqual(final_results[0]["success"], False)
+        self.assertEqual(final_results[1]["success"], True)
+
 
 class TestModeBasedRoleDefaults(unittest.TestCase):
     """Test remote/local role defaults injected before attack execution."""
@@ -290,6 +337,34 @@ class TestModeBasedRoleDefaults(unittest.TestCase):
         self.assertIn("judge", resolved)
         self.assertEqual(resolved["judge"]["identifier"], "legacy-scorer-model")
         self.assertEqual(resolved["judge"]["api_key"], "hk_test_remote_key")
+        # The legacy key must not survive promotion, or strict (extra="forbid")
+        # technique configs like PairConfig will reject it as an unknown field.
+        self.assertNotIn("scorer", resolved)
+        PairConfig.from_dict(resolved)
+
+    def test_pair_scorer_and_judge_both_present_judge_wins_without_crashing(self):
+        """A config carrying both legacy `scorer` and canonical `judge` must
+        keep `judge` and drop `scorer`, instead of leaving both keys around
+        (which trips PairConfig's extra="forbid")."""
+        orch, hack_agent, _ = _make_orchestrator()
+        orch.attack_type = "pair"
+        hack_agent.backend.get_api_key.return_value = "hk_test_remote_key"
+
+        resolved = orch._apply_mode_based_role_defaults(
+            {
+                "attack_type": "pair",
+                "goals": ["test"],
+                "judge": {"identifier": "explicit-judge-model", "agent_type": "OLLAMA"},
+                "scorer": {
+                    "identifier": "legacy-scorer-model",
+                    "agent_type": "OPENAI_SDK",
+                },
+            }
+        )
+
+        self.assertNotIn("scorer", resolved)
+        self.assertEqual(resolved["judge"]["identifier"], "explicit-judge-model")
+        PairConfig.from_dict(resolved)
 
     def test_remote_attacker_enables_reasoning(self):
         """The remote attacker (HackAgent generator endpoint) must keep reasoning

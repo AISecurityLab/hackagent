@@ -48,6 +48,24 @@ class TestAutoDANTurboConfig(unittest.TestCase):
         with self.assertRaises(ValidationError):
             autodan_config.AutoDANTurboParams(epochs=0)
 
+    def test_default_judge_has_explicit_type_and_range(self):
+        """The default judge identifier isn't recognizable by
+        infer_judge_type(), so the judge role must carry an explicit
+        type/range or evaluation silently skips the judge entirely and
+        falls back to legacy (non-judge) scoring."""
+        from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
+
+        judge_cfg = autodan_config.DEFAULT_AUTODAN_TURBO_CONFIG["judge"]
+        self.assertEqual(judge_cfg.get("type"), "scorer")
+        self.assertEqual(BaseEvaluationStep.get_judge_range(judge_cfg), "decimal")
+
+        # Must survive the AutoDANTurboConfig round-trip attack.py performs.
+        dumped = autodan_config.AutoDANTurboConfig.from_dict(
+            autodan_config.DEFAULT_AUTODAN_TURBO_CONFIG
+        ).to_dict()
+        self.assertEqual(dumped["judge"]["type"], "scorer")
+        self.assertEqual(dumped["judge"]["range"], "decimal")
+
     def test_prompt_templates_expose_expected_placeholders(self):
         self.assertIn("{goal}", autodan_config.WARM_UP_SYSTEM_PROMPT)
         self.assertIn("{goal}", autodan_config.USE_STRATEGY_SYSTEM_PROMPT)

@@ -984,7 +984,7 @@ class BaseEvaluationStep:
         self,
         input_data: List[Dict[str, Any]],
         attack_label: str,
-    ) -> None:
+    ) -> List[Dict[str, Any]]:
         """Finalize rows whose judge pass already happened in generation.
 
         Meaning of "already judged":
@@ -993,12 +993,16 @@ class BaseEvaluationStep:
             - BoN: in each step, only the step best candidate is judged
               (one judge pass for that candidate). Evaluation does not run
               judges again.
+            - PAIR: scoring happens inline during the iterative refinement
+              loop, which sets ``is_success``/``best_score`` (not
+              ``success``) on each row.
 
         This helper only fills missing defaults and performs sync/ASR logging.
 
         Intended users:
             - PAP
             - BoN
+            - PAIR
             - Any attack that evaluates judges inline in generation and only
               needs sync/ASR in evaluation.
         """
@@ -1013,7 +1017,14 @@ class BaseEvaluationStep:
                 item.setdefault("evaluation_notes", f"Execution error: {item['error']}")
             else:
                 item.setdefault("best_score", 0.0)
-                item.setdefault("success", item.get("best_score", 0) > 0)
+                # Some attacks (e.g. PAIR) record their inline verdict under
+                # ``is_success`` rather than ``success`` — prefer it over the
+                # best_score>0 fallback so a correctly-computed failure isn't
+                # silently flipped to success.
+                item.setdefault(
+                    "success",
+                    item.get("is_success", item.get("best_score", 0) > 0),
+                )
 
         self._statistics["evaluated_count"] = len(input_data) - len(error_indices)
 

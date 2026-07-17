@@ -138,8 +138,15 @@ DEFAULT_AUTODAN_TURBO_CONFIG: Dict[str, Any] = {
         # Whether to run only warm-up phase
         "warm_up_only": False,
     },
-    # Judge LLM configuration (evaluates jailbreak success 1-10 or 0/1)
-    "judge": _default_role_config(DEFAULT_JUDGE_IDENTIFIER),
+    # Judge LLM configuration (evaluates jailbreak success 1-10 or 0/1).
+    # Explicit type/range so infer_judge_type() doesn't have to guess it from
+    # the identifier — otherwise an unrecognized default identifier silently
+    # disables the judge and evaluation falls back to legacy scoring.
+    "judge": {
+        **_default_role_config(DEFAULT_JUDGE_IDENTIFIER),
+        "type": "scorer",
+        "range": "decimal",
+    },
     # Summarizer LLM configuration (extracts strategies from prompt pairs)
     "summarizer": _default_role_config("hackagent-summarizer"),
     # Embedder role used by strategy retrieval.

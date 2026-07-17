@@ -50,6 +50,22 @@ class TestPAIRPostProcessing(unittest.TestCase):
         )
         self.assertTrue(rows[0]["success"])
 
+    def test_is_success_field_is_used_when_success_is_absent(self):
+        """PAIR's inline scorer writes `is_success` (threshold-based), not
+        `success`. On PAIR's 1-10 scale, best_score>0 is true almost always,
+        so falling back to that instead of `is_success` would misclassify a
+        below-threshold (failed) row as a success."""
+        step = _eval()
+        rows = step._postprocess_inline_judge_results(
+            [
+                {"goal": "g1", "best_score": 3, "is_success": False},
+                {"goal": "g2", "best_score": 9, "is_success": True},
+            ],
+            attack_label="PAIR",
+        )
+        self.assertFalse(rows[0]["success"])
+        self.assertTrue(rows[1]["success"])
+
 
 if __name__ == "__main__":
     unittest.main()
