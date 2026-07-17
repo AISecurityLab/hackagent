@@ -25,12 +25,14 @@ from textual.widgets import (
     RadioSet,
     RichLog,
     Select,
+    SelectionList,
     Static,
     Switch,
     TabbedContent,
     TabPane,
     TextArea,
 )
+from textual.widgets._select import NoSelection
 
 from hackagent.datasets.presets import PRESETS as _DATASET_PRESETS
 
@@ -84,6 +86,32 @@ _AGENT_TYPE_CHOICES = [
 # Agent types that run locally and therefore have no endpoint URL. For these
 # the endpoint field is legitimately empty and must not block execution.
 _ENDPOINT_OPTIONAL_AGENT_TYPES = {"claude-code"}
+
+
+def _default_campaign_attack_keys() -> List[str]:
+    """Return the default hack_chain/attack-selection keys: the Jailbreak
+    evaluation campaign's primary attacks (h4rm3l → TAP → PAIR), in
+    campaign order, mirroring ``HackAgent.hack_chain``'s default. Filtered
+    to techniques that actually have a registered TUI spec, and falling
+    back to the first registered technique if the campaign isn't
+    resolvable (e.g. specs were pruned in a downstream deployment).
+    """
+    try:
+        from hackagent.risks.jailbreak import JAILBREAK_PROFILE
+
+        available = get_all_attack_specs()
+        keys = [
+            rec.technique.strip().lower() for rec in JAILBREAK_PROFILE.primary_attacks
+        ]
+        keys = [key for key in keys if key in available]
+        if keys:
+            return keys
+    except Exception:
+        pass
+
+    all_specs = get_all_attack_specs()
+    return [next(iter(all_specs))] if all_specs else []
+
 
 # =====================================================================
 # Strategy-specific config field IDs use the prefix ``cfg-`` so we can
@@ -181,6 +209,16 @@ class AttacksTab(Container):
         display: none;
         height: auto;
     }
+
+    AttacksTab #attack-strategies {
+        height: auto;
+        border: solid $primary;
+    }
+
+    AttacksTab #escalate-only-mitigated-help {
+        color: $text-muted;
+        margin-bottom: 1;
+    }
     """
 
     BINDINGS = [
@@ -209,6 +247,17 @@ class AttacksTab(Container):
         self._advanced_hover_preview = False
         self._advanced_focus_preview = False
         self._current_spec: Optional[AttackConfigSpec] = None
+        # Multi-attack (hack_chain) support: values collected for a strategy
+        # are cached here when the user switches to configure a different
+        # one, so switching back and forth doesn't lose edits. The strategy
+        # whose config form is currently rendered is tracked separately from
+        # which strategies are actually selected to run.
+        self._strategy_value_cache: Dict[str, Dict[str, Any]] = {}
+        self._focused_strategy: Optional[str] = None
+        # Last selection applied to the "Configuring" dropdown — lets
+        # `_sync_configuring_options` skip redundant `set_options()` calls
+        # (see that method's docstring for why this matters).
+        self._configuring_options_keys: Optional[List[str]] = None
 
     def compose(self) -> ComposeResult:
         """Compose the attacks layout."""
@@ -217,7 +266,12 @@ class AttacksTab(Container):
         strategy_choices: List[tuple] = [
             (spec.display_name, spec.technique_key) for spec in all_specs.values()
         ]
-        default_strategy = strategy_choices[0][1] if strategy_choices else "advprefix"
+        campaign_keys = _default_campaign_attack_keys()
+        default_strategy = (
+            campaign_keys[0]
+            if campaign_keys
+            else (strategy_choices[0][1] if strategy_choices else "advprefix")
+        )
 
         with Horizontal():
             # ── Left side: Attack configuration form ──
@@ -325,10 +379,44 @@ class AttacksTab(Container):
                 yield Static("")
 
                 # --- Strategy selector ---
+                # A SelectionList (not a single Select) so users can pick more
+                # than one attack. Selection *order* becomes the chain order:
+                # when 2+ are selected, Execute runs `HackAgent.hack_chain`
+                # instead of `HackAgent.hack`, escalating each goal through
+                # the selected attacks in the order they were checked.
+                #
+                # Nothing is pre-selected here via the option tuples: doing
+                # so would select in *option list* order (registration
+                # order in attack_specs.py), not the desired campaign order
+                # (h4rm3l → TAP → PAIR). `on_mount` selects the default
+                # campaign attacks explicitly, in the right order, instead.
                 yield Static("[bold]Attack Strategy[/bold]", classes="section-title")
+                yield Static(
+                    "[dim]Select one attack, or check multiple to chain them "
+                    "Check order sets the chain order. Defaults to the Jailbreak "
+                    "evaluation campaign (h4rm3l → TAP → PAIR).[/dim]"
+                )
+                yield SelectionList(*strategy_choices, id="attack-strategies")
+                yield Static("")
+
+                yield Checkbox(
+                    "Escalate only mitigated goals to the next attack",
+                    id="escalate-only-mitigated",
+                    value=False,
+                )
+                yield Static(
+                    "[dim]Chain mode (2+ attacks checked): a goal moves to "
+                    "the next attack only if the previous one mitigated it; "
+                    "goals that already succeeded are dropped. Uncheck to "
+                    "instead run every checked attack against every goal.[/dim]",
+                    id="escalate-only-mitigated-help",
+                )
+                yield Static("")
+
+                yield Label("Configuring:")
                 yield Select(
                     strategy_choices,
-                    id="attack-strategy",
+                    id="attack-strategy-focus",
                     value=default_strategy,
                 )
                 yield Static("", id="strategy-description")
@@ -389,20 +477,36 @@ class AttacksTab(Container):
 
     def on_mount(self) -> None:
         """Called when the tab is mounted."""
+        # Default to the Jailbreak evaluation campaign's primary attacks
+        # (h4rm3l → TAP → PAIR), matching HackAgent.hack_chain's default,
+        # so Execute runs a chain out of the box. `_prefill_form()` below
+        # overrides this with a single explicit attack when re-running one
+        # specific attack (e.g. from the Results tab).
+        self._select_default_campaign_attacks()
+
         if self.initial_data:
             self._prefill_form()
 
         self.call_after_refresh(self._add_initial_messages)
 
-        # Render config fields for the default strategy
-        strategy_select = self.query_one("#attack-strategy", Select)
-        if strategy_select.value and not isinstance(
-            strategy_select.value, type(Select.BLANK)
-        ):
-            self._render_strategy_config(str(strategy_select.value))
-
         if self.initial_data.get("auto_execute_attack", False):
             self.call_after_refresh(lambda: self._execute_attack(dry_run=False))
+
+    def _select_default_campaign_attacks(self) -> None:
+        """Select the default hack_chain attack set (the Jailbreak
+        evaluation campaign's primary attacks, in campaign order) and
+        render/focus the first one's config form."""
+        keys = _default_campaign_attack_keys()
+        if not keys:
+            return
+
+        strategies = self.query_one("#attack-strategies", SelectionList)
+        strategies.deselect_all()
+        for key in keys:
+            strategies.select(key)
+
+        self._sync_configuring_options(keys)
+        self._sync_chain_mode_visibility(keys)
 
     def _add_initial_messages(self) -> None:
         """Add initial welcome messages to the viewers."""
@@ -450,11 +554,147 @@ class AttacksTab(Container):
                 dataset_container.display = True
 
     def on_select_changed(self, event: Select.Changed) -> None:
-        """React to strategy selector changes."""
-        if event.select.id == "attack-strategy":
+        """React to the 'Configuring' strategy selector changes."""
+        if event.select.id == "attack-strategy-focus":
             value = event.value
-            if value and not isinstance(value, type(Select.BLANK)):
-                self._render_strategy_config(str(value))
+            if value and not isinstance(value, NoSelection):
+                self._switch_focused_strategy(str(value))
+
+    def on_selection_list_selected_changed(
+        self, event: SelectionList.SelectedChanged
+    ) -> None:
+        """React to attack multi-selection changes (which attacks will run)."""
+        if event.selection_list.id != "attack-strategies":
+            return
+        selected = list(event.selection_list.selected)
+        self._sync_configuring_options(selected)
+        self._sync_chain_mode_visibility(selected)
+
+    def _sync_configuring_options(self, selected: List[str]) -> None:
+        """Restrict the 'Configuring' dropdown to only the checked attacks,
+        in check order, so the config form can't be opened for a strategy
+        that isn't actually part of the current run.
+
+        A no-op if *selected* is unchanged since the last call — a single
+        bulk selection change (e.g. selecting the N default campaign
+        attacks in a loop) posts one ``SelectedChanged`` message *per*
+        ``.select()`` call rather than one combined message, so this method
+        can be invoked several times in a row for what is conceptually one
+        update; skipping true no-ops avoids redundantly rebuilding the
+        dropdown's options each time.
+        """
+        if selected == self._configuring_options_keys:
+            return
+        self._configuring_options_keys = list(selected)
+
+        all_specs = get_all_attack_specs()
+        focus_choices = [
+            (all_specs[key].display_name, key) for key in selected if key in all_specs
+        ]
+        focus_select = self.query_one("#attack-strategy-focus", Select)
+
+        if not focus_choices:
+            # Nothing checked — leave the dropdown empty; execute-time
+            # validation already rejects an empty selection.
+            focus_select.set_options([])
+            return
+
+        focus_select.set_options(focus_choices)
+        new_focus = (
+            self._focused_strategy
+            if self._focused_strategy in selected
+            else selected[0]
+        )
+        focus_select.value = new_focus
+        if new_focus != self._focused_strategy:
+            self._switch_focused_strategy(new_focus)
+
+    def _sync_chain_mode_visibility(self, selected: Optional[List[str]] = None) -> None:
+        """Show the hack_chain escalation toggle only when 2+ attacks are checked."""
+        if selected is None:
+            try:
+                selected = list(
+                    self.query_one("#attack-strategies", SelectionList).selected
+                )
+            except Exception:
+                selected = []
+        is_chain = len(selected) > 1
+        try:
+            self.query_one("#escalate-only-mitigated", Checkbox).display = is_chain
+            self.query_one("#escalate-only-mitigated-help", Static).display = is_chain
+        except Exception:
+            pass
+
+    def _switch_focused_strategy(self, technique_key: str) -> None:
+        """Switch which strategy's config form is displayed.
+
+        Caches the currently-displayed strategy's field values first (so
+        switching back to it later, e.g. after adding it to the chain
+        selection, restores prior edits instead of resetting to defaults),
+        then renders *technique_key*'s form, prefilling it from the cache if
+        it was previously configured in this session.
+
+        A no-op if *technique_key* is already focused and rendered — avoids
+        redundantly rebuilding the same config form (e.g. when the
+        "Configuring" Select's own internal blank-reset-then-restore cycle
+        during ``set_options()`` briefly reports the previous value again).
+        """
+        if technique_key == self._focused_strategy and self._current_spec is not None:
+            return
+        if self._focused_strategy and self._focused_strategy != technique_key:
+            self._strategy_value_cache[self._focused_strategy] = (
+                self._collect_strategy_config()
+            )
+        self._focused_strategy = technique_key
+        self._render_strategy_config(technique_key)
+        cached = self._strategy_value_cache.get(technique_key)
+        if cached and self._current_spec:
+            self._apply_values_to_spec_widgets(self._current_spec, cached)
+
+    def _apply_values_to_spec_widgets(
+        self, spec: AttackConfigSpec, flat_values: Dict[str, Any]
+    ) -> None:
+        """Write *flat_values* (dotted-key -> value) into the mounted widgets
+        for *spec*'s fields, skipping any field without a mounted widget
+        (e.g. an advanced field while advanced mode is off)."""
+        for cfg_field in spec.fields:
+            if cfg_field.key not in flat_values:
+                continue
+            widget_id = _field_widget_id(cfg_field)
+            try:
+                widget = self.query_one(f"#{widget_id}")
+            except Exception:
+                continue
+            value = flat_values[cfg_field.key]
+            if isinstance(widget, Select):
+                # None isn't a legal Select value (only the NoSelection sentinel is) — skip and keep its constructed default.
+                if value is not None:
+                    widget.value = value
+            elif isinstance(widget, Switch):
+                widget.value = bool(value)
+            elif isinstance(widget, TextArea):
+                widget.text = "" if value is None else str(value)
+            elif isinstance(widget, Input):
+                widget.value = "" if value is None else str(value)
+
+    def _resolve_config_for_strategy(self, technique_key: str) -> Dict[str, Any]:
+        """Return the flat (dotted-key) config values for *technique_key*.
+
+        If it is the strategy currently displayed in the form, values are
+        read live from the widgets (picking up not-yet-cached edits).
+        Otherwise, the cached values from the last time it was configured
+        are used, falling back to the spec's defaults if it was never
+        opened in this session.
+        """
+        spec = get_attack_config_spec(technique_key)
+        if spec is None:
+            return {}
+        if technique_key == self._focused_strategy and self._current_spec is spec:
+            return self._collect_strategy_config()
+        cached = self._strategy_value_cache.get(technique_key)
+        if cached is not None:
+            return cached
+        return spec.defaults_dict()
 
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
         """React to the advanced toggle."""
@@ -673,8 +913,9 @@ class AttacksTab(Container):
             raw: Any = None
             if isinstance(widget, Select):
                 raw = widget.value
-                if isinstance(raw, type(Select.BLANK)):
-                    raw = None
+                if isinstance(raw, NoSelection):
+                    # Fall back to the field's default rather than caching a bare None.
+                    raw = cfg_field.default
             elif isinstance(widget, Switch):
                 raw = widget.value
             elif isinstance(widget, TextArea):
@@ -751,11 +992,25 @@ class AttacksTab(Container):
             "attack_type"
         ) or self._attack_config_overrides.get("attack_type")
         if strategy_value:
-            strategy_select = self.query_one("#attack-strategy", Select)
-            strategy_select.value = str(strategy_value)
-            self._render_strategy_config(str(strategy_value))
+            strategy_value = str(strategy_value)
+            strategies = self.query_one("#attack-strategies", SelectionList)
+            strategies.deselect_all()
+            strategies.select(strategy_value)
 
-        if self._attack_config_overrides:
+            def _finish_strategy_prefill(key: str = strategy_value) -> None:
+                # Deferred for the same reason as
+                # `_select_default_campaign_attacks`: let the queued
+                # `SelectedChanged` messages from the calls above drain
+                # before touching the "Configuring" dropdown. Field-value
+                # prefill runs in the same deferred step, after it, so
+                # `_current_spec` reflects `key` by the time it runs.
+                self._sync_configuring_options([key])
+                self._sync_chain_mode_visibility([key])
+                if self._attack_config_overrides:
+                    self._prefill_strategy_fields(self._attack_config_overrides)
+
+            self.call_after_refresh(_finish_strategy_prefill)
+        elif self._attack_config_overrides:
             self._prefill_strategy_fields(self._attack_config_overrides)
 
         goals_from_overrides = self._attack_config_overrides.get("goals")
@@ -852,18 +1107,19 @@ class AttacksTab(Container):
             self._render_strategy_config(self._current_spec.technique_key)
 
     def _execute_attack(self, dry_run: bool = False) -> None:
-        """Execute the configured attack.
+        """Execute the configured attack (or attack chain).
 
         Args:
             dry_run: Whether to run in dry-run mode
         """
-        from textual.widgets._select import NoSelection
-
         agent_name = self.query_one("#agent-name", Input).value
         agent_type_raw = self.query_one("#agent-type", Select).value
         endpoint = self.query_one("#endpoint-url", Input).value
-        strategy_raw = self.query_one("#attack-strategy", Select).value
         timeout = self.query_one("#timeout", Input).value
+
+        selected_strategies = [
+            str(v) for v in self.query_one("#attack-strategies", SelectionList).selected
+        ]
 
         # Detect which input source is active (Goals vs Dataset)
         using_dataset = self.query_one("#radio-dataset", RadioButton).value
@@ -891,8 +1147,8 @@ class AttacksTab(Container):
         if not endpoint and agent_type not in _ENDPOINT_OPTIONAL_AGENT_TYPES:
             _reject("Endpoint URL is required for this agent type.")
             return
-        if isinstance(strategy_raw, NoSelection) or not strategy_raw:
-            _reject("Select an attack strategy.")
+        if not selected_strategies:
+            _reject("Check at least one attack strategy.")
             return
         try:
             timeout_int = int(timeout)
@@ -903,62 +1159,125 @@ class AttacksTab(Container):
             _reject("Timeout must be a positive integer.")
             return
 
-        strategy = str(strategy_raw)
+        is_chain = len(selected_strategies) > 1
+        strategy_label = " → ".join(selected_strategies)
 
-        # ── Collect & validate strategy-specific config ──
-        strategy_values = self._collect_strategy_config()
-
-        if self._current_spec:
-            errors = self._current_spec.validate(strategy_values)
+        # ── Collect & validate config for every selected strategy ──
+        for technique_key in selected_strategies:
+            spec = get_attack_config_spec(technique_key)
+            if spec is None:
+                continue
+            resolved = self._resolve_config_for_strategy(technique_key)
+            errors = spec.validate(resolved)
             if errors:
                 errors_widget.update(
-                    "[bold red]Validation errors:[/bold red]\n"
+                    f"[bold red]Validation errors ({spec.display_name}):[/bold red]\n"
                     + "\n".join(f"  • {e}" for e in errors)
                 )
                 return
 
         errors_widget.update("")  # clear previous errors
 
-        # Build the full attack config dict (nested)
-        strategy_config = self._expand_dotted_keys(strategy_values)
-        attack_config: Dict[str, Any] = copy.deepcopy(self._attack_config_overrides)
-        if not isinstance(attack_config, dict):
-            attack_config = {}
-
-        self._deep_merge_dicts(attack_config, strategy_config)
-        attack_config["attack_type"] = strategy
+        # Build one attack_config dict per selected strategy (nested).
+        per_strategy_attack_config: Dict[str, Dict[str, Any]] = {}
+        for technique_key in selected_strategies:
+            flat_values = self._resolve_config_for_strategy(technique_key)
+            expanded = self._expand_dotted_keys(flat_values)
+            step_config: Dict[str, Any] = copy.deepcopy(self._attack_config_overrides)
+            if not isinstance(step_config, dict):
+                step_config = {}
+            self._deep_merge_dicts(step_config, expanded)
+            step_config["attack_type"] = technique_key
+            per_strategy_attack_config[technique_key] = step_config
 
         # ── Populate goals or dataset from form ──
-        if using_dataset:
-            dataset_preset_raw = self.query_one("#dataset-preset", Select).value
-            if (
-                isinstance(dataset_preset_raw, type(Select.BLANK))
-                or not dataset_preset_raw
-            ):
-                _reject("Select a dataset preset.")
-                return
-            dataset_cfg: Dict[str, Any] = {"preset": str(dataset_preset_raw)}
-            try:
-                limit_val = int(self.query_one("#dataset-limit", Input).value)
-                dataset_cfg["limit"] = limit_val
-            except (ValueError, TypeError):
-                pass
-            dataset_cfg["shuffle"] = self.query_one("#dataset-shuffle", Switch).value
-            try:
-                seed_val = int(self.query_one("#dataset-seed", Input).value)
-                dataset_cfg["seed"] = seed_val
-            except (ValueError, TypeError):
-                pass
-            attack_config["dataset"] = dataset_cfg
-            attack_config.pop("goals", None)
-            goals = ""
-        else:
-            goals = self.query_one("#attack-goals", TextArea).text
-            if goals:
-                attack_config["goals"] = [goals]
+        attack_config: Optional[Dict[str, Any]] = None
+        attacks_list: Optional[List[Dict[str, Any]]] = None
+        chain_goals: Optional[List[str]] = None
+
+        if is_chain:
+            attacks_list = [
+                per_strategy_attack_config[key] for key in selected_strategies
+            ]
+            # Only the first step needs a goal source — hack_chain forwards
+            # the surviving goals from each step to the next one itself.
+            for step_config in attacks_list[1:]:
+                step_config.pop("goals", None)
+                step_config.pop("dataset", None)
+                step_config.pop("intents", None)
+
+            if using_dataset:
+                dataset_preset_raw = self.query_one("#dataset-preset", Select).value
+                if (
+                    isinstance(dataset_preset_raw, NoSelection)
+                    or not dataset_preset_raw
+                ):
+                    _reject("Select a dataset preset.")
+                    return
+                dataset_cfg: Dict[str, Any] = {"preset": str(dataset_preset_raw)}
+                try:
+                    limit_val = int(self.query_one("#dataset-limit", Input).value)
+                    dataset_cfg["limit"] = limit_val
+                except (ValueError, TypeError):
+                    pass
+                dataset_cfg["shuffle"] = self.query_one(
+                    "#dataset-shuffle", Switch
+                ).value
+                try:
+                    seed_val = int(self.query_one("#dataset-seed", Input).value)
+                    dataset_cfg["seed"] = seed_val
+                except (ValueError, TypeError):
+                    pass
+                attacks_list[0]["dataset"] = dataset_cfg
+                attacks_list[0].pop("goals", None)
+                goals = ""
             else:
-                _reject("Enter at least one attack goal, or switch to a dataset.")
-                return
+                goals = self.query_one("#attack-goals", TextArea).text
+                if goals:
+                    chain_goals = [goals]
+                else:
+                    _reject("Enter at least one attack goal, or switch to a dataset.")
+                    return
+        else:
+            attack_config = per_strategy_attack_config[selected_strategies[0]]
+            if using_dataset:
+                dataset_preset_raw = self.query_one("#dataset-preset", Select).value
+                if (
+                    isinstance(dataset_preset_raw, NoSelection)
+                    or not dataset_preset_raw
+                ):
+                    _reject("Select a dataset preset.")
+                    return
+                dataset_cfg = {"preset": str(dataset_preset_raw)}
+                try:
+                    limit_val = int(self.query_one("#dataset-limit", Input).value)
+                    dataset_cfg["limit"] = limit_val
+                except (ValueError, TypeError):
+                    pass
+                dataset_cfg["shuffle"] = self.query_one(
+                    "#dataset-shuffle", Switch
+                ).value
+                try:
+                    seed_val = int(self.query_one("#dataset-seed", Input).value)
+                    dataset_cfg["seed"] = seed_val
+                except (ValueError, TypeError):
+                    pass
+                attack_config["dataset"] = dataset_cfg
+                attack_config.pop("goals", None)
+                goals = ""
+            else:
+                goals = self.query_one("#attack-goals", TextArea).text
+                if goals:
+                    attack_config["goals"] = [goals]
+                else:
+                    _reject("Enter at least one attack goal, or switch to a dataset.")
+                    return
+
+        escalate_only_mitigated = True
+        if is_chain:
+            escalate_only_mitigated = self.query_one(
+                "#escalate-only-mitigated", Checkbox
+            ).value
 
         status_widget = self.query_one("#execution-status", Static)
         progress_bar = self.query_one("#attack-progress", ProgressBar)
@@ -967,16 +1286,23 @@ class AttacksTab(Container):
             # Pretty-print the full config for review
             import json
 
-            config_preview = json.dumps(attack_config, indent=2, default=str)
+            config_preview = json.dumps(
+                attacks_list if is_chain else attack_config, indent=2, default=str
+            )
+            chain_note = (
+                f"\n[bold]Escalate Only Mitigated:[/bold] {escalate_only_mitigated}"
+                if is_chain
+                else ""
+            )
             status_widget.update(
                 f"""[bold yellow]Dry Run Mode[/bold yellow]
 
 [bold]Agent:[/bold] {_escape(agent_name)}
 [bold]Type:[/bold] {_escape(agent_type)}
 [bold]Endpoint:[/bold] {_escape(endpoint)}
-[bold]Strategy:[/bold] {_escape(strategy)}
+[bold]Strategy:[/bold] {_escape(strategy_label)}
 [bold]Goals:[/bold] {_escape(goals)}
-[bold]Timeout:[/bold] {timeout}s
+[bold]Timeout:[/bold] {timeout}s{chain_note}
 
 [bold]Full Attack Config:[/bold]
 {_escape(config_preview)}
@@ -991,7 +1317,7 @@ class AttacksTab(Container):
 [bold]Agent:[/bold] {_escape(agent_name)}
 [bold]Type:[/bold] {_escape(agent_type)}
 [bold]Endpoint:[/bold] {_escape(endpoint)}
-[bold]Strategy:[/bold] {_escape(strategy)}
+[bold]Strategy:[/bold] {_escape(strategy_label)}
 [bold]Goals:[/bold] {_escape(goals)}
 [bold]Timeout:[/bold] {timeout}s
 
@@ -1009,6 +1335,10 @@ class AttacksTab(Container):
                         goals,
                         timeout_int,
                         attack_config,
+                        attacks=attacks_list,
+                        chain_goals=chain_goals,
+                        escalate_only_mitigated=escalate_only_mitigated,
+                        strategy_label=strategy_label,
                     ),
                     thread=True,
                     exclusive=True,
@@ -1031,9 +1361,13 @@ class AttacksTab(Container):
         endpoint: str,
         goals: str,
         timeout: int,
-        attack_config: Dict[str, Any],
+        attack_config: Optional[Dict[str, Any]],
+        attacks: Optional[List[Dict[str, Any]]] = None,
+        chain_goals: Optional[List[str]] = None,
+        escalate_only_mitigated: bool = True,
+        strategy_label: str = "",
     ) -> None:
-        """Run attack in background thread with progress updates.
+        """Run attack (or attack chain) in background thread with progress updates.
 
         Args:
             agent_name: Name of the target agent
@@ -1041,7 +1375,18 @@ class AttacksTab(Container):
             endpoint: Agent endpoint URL
             goals: Attack goals
             timeout: Timeout in seconds
-            attack_config: Full attack configuration dict (already built)
+            attack_config: Full attack configuration dict for a single attack
+                (already built). ``None`` when running a chain — use
+                ``attacks`` instead.
+            attacks: Ordered list of per-step attack_config dicts. When
+                provided (2+ strategies checked), ``HackAgent.hack_chain`` is
+                used instead of ``HackAgent.hack``.
+            chain_goals: Explicit goal list forwarded to ``hack_chain`` (goals
+                entered as free text). ``None`` when goals are sourced from a
+                dataset set on ``attacks[0]``.
+            escalate_only_mitigated: Forwarded to ``hack_chain`` — whether a
+                goal only advances to the next attack if mitigated.
+            strategy_label: Human-readable strategy name(s) for status text.
         """
         import io
         import logging
@@ -1218,7 +1563,11 @@ class AttacksTab(Container):
 
             self.app.call_from_thread(progress_bar.update, progress=30)
 
-            strategy_name = attack_config.get("attack_type", "unknown")
+            strategy_name = strategy_label or (
+                attack_config.get("attack_type", "unknown")
+                if attack_config
+                else "unknown"
+            )
             self.app.call_from_thread(progress_bar.update, progress=40)
             self.app.call_from_thread(
                 status_widget.update,
@@ -1310,12 +1659,22 @@ class AttacksTab(Container):
             tui_event_bus.subscribe(_on_bus_event)
 
             try:
-                results = agent.hack(
-                    attack_config=attack_config,
-                    run_config_override={"timeout": timeout},
-                    fail_on_run_error=True,
-                    _tui_event_bus=tui_event_bus,
-                )
+                if attacks is not None:
+                    results = agent.hack_chain(
+                        attacks=attacks,
+                        goals=chain_goals,
+                        run_config_override={"timeout": timeout},
+                        fail_on_run_error=True,
+                        escalate_only_mitigated=escalate_only_mitigated,
+                        _tui_event_bus=tui_event_bus,
+                    )
+                else:
+                    results = agent.hack(
+                        attack_config=attack_config,
+                        run_config_override={"timeout": timeout},
+                        fail_on_run_error=True,
+                        _tui_event_bus=tui_event_bus,
+                    )
             finally:
                 tui_event_bus.unsubscribe(_on_bus_event)
                 sys.stdout = original_stdout
@@ -1410,6 +1769,10 @@ class AttacksTab(Container):
         self.query_one("#dataset-limit", Input).value = "5"
         self.query_one("#dataset-shuffle", Switch).value = True
         self.query_one("#dataset-seed", Input).value = "42"
+
+        # Reset strategy selection back to the default evaluation campaign.
+        self.query_one("#escalate-only-mitigated", Checkbox).value = True
+        self._select_default_campaign_attacks()
 
         status_widget = self.query_one("#execution-status", Static)
         progress_bar = self.query_one("#attack-progress", ProgressBar)

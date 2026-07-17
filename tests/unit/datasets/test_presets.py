@@ -17,14 +17,30 @@ class TestPresets(unittest.TestCase):
 
     def test_all_presets_have_required_fields(self):
         """Test that all presets have required configuration fields."""
-        required_fields = {"provider", "path", "goal_field"}
-
         for name, config in PRESETS.items():
-            for field in required_fields:
+            # Base required fields for all presets
+            self.assertIn(
+                "provider", config, f"Preset '{name}' missing required field 'provider'"
+            )
+            self.assertIn(
+                "goal_field",
+                config,
+                f"Preset '{name}' missing required field 'goal_field'",
+            )
+
+            # Dynamic source field checking based on provider type
+            provider = config.get("provider")
+            if provider in ("huggingface", "hf", "file", "local"):
                 self.assertIn(
-                    field,
+                    "path",
                     config,
-                    f"Preset '{name}' missing required field '{field}'",
+                    f"Preset '{name}' missing required field 'path' for provider '{provider}'",
+                )
+            elif provider == "url_json":
+                self.assertIn(
+                    "url",
+                    config,
+                    f"Preset '{name}' missing required field 'url' for provider '{provider}'",
                 )
 
     def test_get_preset_returns_config(self):
@@ -35,7 +51,11 @@ class TestPresets(unittest.TestCase):
 
         self.assertIsInstance(config, dict)
         self.assertIn("provider", config)
-        self.assertIn("path", config)
+        # Check that it has either a path OR a url
+        has_source = "path" in config or "url" in config
+        self.assertTrue(
+            has_source, f"Preset '{preset_name}' must have either 'path' or 'url'"
+        )
 
     def test_get_preset_returns_copy(self):
         """Test that get_preset returns a copy, not the original."""

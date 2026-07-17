@@ -193,6 +193,12 @@ def _extract_ollama_models_from_demo_cfg(demo_cfg: dict) -> dict[str, str]:
     if judge_model:
         models["judge"] = str(judge_model)
 
+    embedder_cfg = attack_cfg.get("embedder", {})
+    if isinstance(embedder_cfg, dict):
+        embedder_model = embedder_cfg.get("identifier")
+        if embedder_model:
+            models["embedder"] = str(embedder_model)
+
     return models
 
 
@@ -259,7 +265,7 @@ def _ensure_ollama_models(models_by_role: dict[str, str]) -> None:
     console.print("[cyan]🔎 Checking local Ollama model catalog...[/cyan]")
     installed = _get_installed_ollama_models()
 
-    role_order = ["target", "judge", "attacker"]
+    role_order = ["target", "judge", "attacker", "embedder"]
     for role in role_order:
         model_name = models_by_role.get(role)
         if not model_name:
@@ -317,7 +323,7 @@ def _preflight_ollama_requirements(demo_cfg: dict) -> None:
 
     required_models = _extract_ollama_models_from_demo_cfg(demo_cfg)
     console.print("[cyan]🔎 Required models from demo config:[/cyan]")
-    for role in ["target", "judge", "attacker"]:
+    for role in ["target", "judge", "attacker", "embedder"]:
         model_name = required_models.get(role)
         if model_name:
             console.print(f"   - {role}: {model_name}")
@@ -430,6 +436,39 @@ def pc_tool():
         console.print("[bold green]✅ pc-tool completed[/bold green]")
     finally:
         _stop_background_process(agent_process, "PC Tool agent")
+
+
+@examples.command(name="db-tool")
+@handle_errors
+def db_tool():
+    """Run the DB Tool sandbox example: start agent, then launch attack."""
+    example_dir = _resolve_example_dir(
+        "openai_sdk/db_tool_sandbox", required_files=("agent.py", "hack.py")
+    )
+    agent_script = example_dir / "agent.py"
+    attack_script = example_dir / "hack.py"
+
+    port = int(os.environ.get("PORT", "5002"))
+    agent_process = _start_background_python(agent_script, "DB Tool agent")
+
+    try:
+        _wait_for_tcp_port(
+            host="127.0.0.1",
+            port=port,
+            timeout_seconds=30,
+            process=agent_process,
+            process_name="DB Tool agent",
+        )
+        console.print(
+            f"[green]✅ DB Tool agent ready at:[/green] http://127.0.0.1:{port}/v1/chat/completions"
+        )
+
+        attack_env = os.environ.copy()
+        attack_env["HACKAGENT_DB_TOOL_EXTERNAL_AGENT"] = "1"
+        _run_python_script(attack_script, env=attack_env)
+        console.print("[bold green]✅ db-tool completed[/bold green]")
+    finally:
+        _stop_background_process(agent_process, "DB Tool agent")
 
 
 @examples.command(name="rag")

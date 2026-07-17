@@ -75,7 +75,7 @@ class TestDatasetProfileIntegrity(unittest.TestCase):
 
     def test_all_presets_have_valid_providers(self):
         """Test that all presets use valid providers."""
-        valid_providers = {"huggingface", "hf", "file", "local"}
+        valid_providers = {"huggingface", "hf", "file", "local", "url_json"}
 
         for name, config in PRESETS.items():
             self.assertIn(
@@ -94,7 +94,7 @@ class TestDatasetDuplicates(unittest.TestCase):
     def _normalize_config(self, config: Dict[str, Any]) -> str:
         """Create a normalized string representation of config for comparison."""
         # Only compare fields that define the actual dataset
-        key_fields = ["provider", "path", "name", "goal_field", "split"]
+        key_fields = ["provider", "path", "name", "goal_field", "split", "url"]
         parts = []
         for field in key_fields:
             value = config.get(field, "")
@@ -206,7 +206,7 @@ class TestDatasetPresetInformation(unittest.TestCase):
         self.assertEqual(config["name"], "harmful")
         self.assertEqual(config["goal_field"], "prompt")
         self.assertEqual(config["split"], "test_public")
-        self.assertIn("176", config["description"])
+        self.assertIn("208", config["description"])
 
     def test_agentharm_benign_configuration(self):
         """Test AgentHarm benign preset is correctly configured."""
@@ -216,6 +216,16 @@ class TestDatasetPresetInformation(unittest.TestCase):
         self.assertEqual(config["path"], "ai-safety-institute/AgentHarm")
         self.assertEqual(config["name"], "harmless_benign")
         self.assertEqual(config["split"], "test_public_benign")
+        self.assertIn("208", config["description"])
+
+    def test_agenthazard_configuration(self):
+        """Test AgentHazard preset is correctly configured."""
+        config = get_preset("agenthazard")
+
+        self.assertEqual(config["provider"], "url_json")
+        self.assertIn("AgentHazard/data/dataset.json", config["url"])
+        self.assertEqual(config["goal_field"], "query")
+        self.assertIn("2653", config["description"])
 
     def test_strongreject_configuration(self):
         """Test StrongREJECT preset configuration."""

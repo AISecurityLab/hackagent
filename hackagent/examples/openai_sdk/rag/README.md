@@ -20,28 +20,20 @@ pip install langchain-openai langchain-community langchain-classic langchain-tex
 # 2. Export OpenRouter API key
 export OPENROUTER_API_KEY="..."
 
-# 3. Run end-to-end from HackAgent CLI
-hackagent examples rag
-
-# The command does this automatically:
-# - run ingest.py only if db_index/ is missing
-# - start agent_server.py
-# - run hack.py
-```
-
-Manual flow (equivalent):
-
-```bash
-# 1. Build vector index (if missing)
+# 3. Build vector index (if missing)
 cd examples/openai_sdk/rag
 python ingest.py
 
-# 2. Run the OpenAI-compatible RAG server
+# 4. Run the OpenAI-compatible RAG server
 python agent_server.py
 
-# 3. Run attack example
+# 5. Run attack example
 python hack.py
 ```
+
+Note: `hackagent examples rag` runs a different, fully-local example (no API key
+required) — see `hackagent/examples/rag/test_indirect_injection.py`. Run this
+example's scripts manually as shown above.
 
 ## Files
 

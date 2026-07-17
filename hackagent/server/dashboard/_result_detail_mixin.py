@@ -158,6 +158,15 @@ class DashboardResultDetailMixin:
         if fc_graph_text and not fc_image:
             self._render_tfc_result_section(row, metadata)
 
+        # Dataset/provider extra fields (when available) are shown in a
+        # dedicated UX-friendly panel below the response sections.
+        if hasattr(self, "_render_extra_fields_panel") and hasattr(
+            self, "_extract_extra_fields_from_row"
+        ):
+            with contextlib.suppress(Exception):
+                if self._extract_extra_fields_from_row(row):
+                    self._render_extra_fields_panel(row)
+
         # Key-value detail table
         detail_fields = self._build_result_detail_fields(row)
         if detail_fields:
@@ -185,7 +194,7 @@ class DashboardResultDetailMixin:
         # Combine metrics + metadata for display
         combined: dict[str, object] = {}
         # Skip large binary data fields from the detail table
-        _skip_keys = {"image_data_url"}
+        _skip_keys = {"image_data_url", "extra_fields"}
         for src in (metadata, metrics):
             if isinstance(src, dict):
                 for k, v in src.items():

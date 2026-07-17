@@ -23,8 +23,8 @@ CipherChat applies three core steps:
 
 The integrated implementation supports all ciphers from the original code:
 
-- `static_template`
 - `unchange`
+- `baseline`
 - `caesar`
 - `unicode`
 - `morse`

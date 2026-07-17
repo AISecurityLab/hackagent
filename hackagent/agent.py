@@ -62,7 +62,7 @@ class HackAgent:
         base_url: Optional[str] = None,
         api_key: Optional[str] = None,
         raise_on_unexpected_status: bool = False,
-        timeout: Optional[float] = None,
+        timeout: Optional[float] = 120.0,
         metadata: Optional[Dict[str, Any]] = None,
         target_config: Optional[Dict[str, Any]] = None,
         adapter_operational_config: Optional[Dict[str, Any]] = None,
@@ -95,8 +95,11 @@ class HackAgent:
                 raise an exception for any HTTP status codes that are not typically
                 expected for a successful operation. Defaults to `False`.
             timeout: The timeout duration in seconds for API requests made by the
-                authenticated client. Defaults to `None` (which might mean a
-                default timeout from the underlying HTTP library is used).
+                authenticated (remote) HackAgent backend client. Defaults to
+                `120.0` seconds so requests to a misbehaving/unreachable backend
+                fail predictably instead of hanging indefinitely. Pass `None`
+                explicitly to opt out and disable the timeout (unbounded wait,
+                the previous default behavior).
             metadata: Optional dictionary containing agent-specific metadata.
             target_config: Optional default request settings for the configured
                 victim model. This is the preferred place to define target-side
@@ -320,3 +323,231 @@ class HackAgent:
             raise HackAgentError(
                 f"An unexpected error occurred during attack: {e}"
             ) from e
+
+    def hack_chain(
+        self,
+        attacks: Optional[list] = None,
+        goals: Optional[list] = None,
+        run_config_override: Optional[Dict[str, Any]] = None,
+        fail_on_run_error: bool = True,
+        escalate_only_mitigated: bool = True,
+        _tui_event_bus: Optional[Any] = None,
+    ) -> list:
+        """
+        Runs a sequence of attack strategies against a shared pool of goals.
+
+        By default (``escalate_only_mitigated=True``) this implements a
+        "fallback ladder": every goal starts at ``attacks[0]``. Any goal for
+        which the victim's response is judged successful (a jailbreak/
+        violation) is considered resolved and is dropped from the chain — it
+        is never retried. Any goal that is mitigated (the victim's response
+        is judged safe) is carried over and retried with ``attacks[1]``, then
+        ``attacks[2]``, and so on, until either the goal succeeds or the
+        chain is exhausted.
+
+        With ``escalate_only_mitigated=False``, every goal is instead sent to
+        *every* attack in the chain regardless of outcome — useful for
+        running several attacks against the same goal set and collecting all
+        of their results in one call, rather than escalating only failures.
+
+        Success/mitigation is determined per goal from the evaluated result
+        rows returned by each step (see
+        ``hackagent.attacks.evaluator.metrics.is_successful_result``): a goal
+        is considered successful for a step if *any* of its result rows for
+        that step are judged successful.
+
+        Args:
+            attacks: Ordered list of ``attack_config`` dicts, one per chain
+                step, using the same shape accepted by :meth:`hack` (each
+                must include its own ``attack_type`` and any attack-specific
+                settings). Only the *first* entry needs to specify how goals
+                are sourced (``goals``, ``dataset`` or ``intents``) unless
+                the ``goals`` parameter below is provided; subsequent steps
+                automatically receive only the goals still mitigated by the
+                previous step (or all goals, see ``escalate_only_mitigated``).
+                Defaults to ``None``, which resolves to the Jailbreak
+                evaluation campaign's primary attacks, in order — ``h4rm3l``
+                → ``TAP`` → ``PAIR`` (see
+                ``hackagent.risks.jailbreak.JAILBREAK_PROFILE``). A goal
+                source is still required either way, via ``goals`` or a
+                ``dataset``/``goals``/``intents`` key on the first step.
+            goals: Optional explicit list of goal strings to use for the
+                whole chain. When provided, it takes precedence over any
+                ``goals``/``dataset``/``intents`` set on ``attacks[0]``.
+            run_config_override: Optional run configuration overrides applied
+                to every step, forwarded to :meth:`hack`.
+            fail_on_run_error: Forwarded to :meth:`hack` for every step.
+            escalate_only_mitigated: When ``True`` (default), a goal only
+                moves on to the next attack if it was mitigated at the
+                current step — goals that already succeeded are dropped, and
+                each goal's final result is either its first success or its
+                last (final) attempt. When ``False``, every goal is sent to
+                every attack regardless of outcome, and results from *all*
+                steps are kept for every goal (nothing is dropped or
+                overwritten).
+
+        Returns:
+            A flat list of result rows (same row shape as :meth:`hack`),
+            grouped by original goal, in first-seen order. Each row is
+            tagged with ``chain_step`` (0-based index into ``attacks``) and
+            ``chain_attack_type`` identifying which attack produced it.
+
+        Raises:
+            HackAgentError: If ``attacks`` is empty, or a step is missing
+                ``attack_type``.
+        """
+        if attacks is None:
+            # Default chain: the Jailbreak evaluation campaign's primary
+            # attacks, in campaign order. `technique` strings in the profile
+            # (e.g. "TAP", "PAIR") use display casing; `attack_strategies`
+            # keys are lowercase, so normalize before use.
+            from hackagent.risks.jailbreak import JAILBREAK_PROFILE
+
+            attacks = [
+                {"attack_type": rec.technique.strip().lower()}
+                for rec in JAILBREAK_PROFILE.primary_attacks
+            ]
+
+        if not attacks:
+            raise HackAgentError(
+                "'attacks' must be a non-empty list of attack_config dicts."
+            )
+
+        from hackagent.attacks.evaluator.metrics import is_successful_result
+
+        n_steps = len(attacks)
+        remaining_goals: Optional[list] = list(goals) if goals is not None else None
+        goal_order: list = list(goals) if goals is not None else []
+        final_rows_by_goal: Dict[str, list] = {}
+
+        for step_index, step_config in enumerate(attacks):
+            if remaining_goals is not None and not remaining_goals:
+                logger.info(
+                    "All goals resolved before chain step %d/%d; skipping remaining attack(s).",
+                    step_index + 1,
+                    n_steps,
+                )
+                break
+
+            attack_type = step_config.get("attack_type")
+            if not attack_type:
+                raise HackAgentError(
+                    f"hack_chain step {step_index} is missing 'attack_type'."
+                )
+
+            step_attack_config = dict(step_config)
+            if remaining_goals is not None:
+                step_attack_config["goals"] = remaining_goals
+                step_attack_config.pop("dataset", None)
+                step_attack_config.pop("intents", None)
+
+            logger.info(
+                "hack_chain step %d/%d: running '%s' against %s goal(s)",
+                step_index + 1,
+                n_steps,
+                attack_type,
+                len(remaining_goals) if remaining_goals is not None else "all",
+            )
+
+            # Each step is executed through the same public `hack()` entry
+            # point used everywhere else (CLI/TUI/SDK) — hack_chain adds no
+            # parallel execution path, it only decides *which* goals each
+            # step receives and tags/regroups the returned rows afterwards.
+            step_results = self.hack(
+                attack_config=step_attack_config,
+                run_config_override=run_config_override,
+                fail_on_run_error=fail_on_run_error,
+                _tui_event_bus=_tui_event_bus,
+            )
+            step_rows = (
+                step_results
+                if isinstance(step_results, list)
+                else list(step_results or [])
+            )
+
+            # Group returned rows by their `goal` text — the same lookup
+            # convention used throughout the codebase to associate a result
+            # back to its goal (e.g. Tracker.get_goal_context_by_goal,
+            # TrackingCoordinator, BaseEvaluationStep's MERGE_KEYS). Every
+            # technique preserves the original goal string verbatim in its
+            # output rows, so this is a plain, reliable lookup — no need to
+            # reconstruct or second-guess it.
+            #
+            # Grouping (rather than checking each row independently) matters
+            # because a single goal can have several rows in one step — not
+            # from multiple judges (those are already merged into per-judge
+            # columns, e.g. eval_hb/eval_jb, on the *same* row, with the
+            # majority vote across them resolved by is_successful_result()
+            # before we ever see it here) but from multiple distinct attempts
+            # at the same goal (e.g. AdvPrefix's several generated prefixes,
+            # BoN's N augmented variants, TAP/PAIR's tree branches), each its
+            # own (goal, prefix, completion) row. "Mitigated" means *all* of
+            # that goal's attempts failed; "succeeded" means *any* attempt
+            # did. A flat `for row in step_rows: if not successful: ...`
+            # can't express that OR-across-attempts semantics, and would
+            # also append the same goal multiple times (once per failing
+            # row) without an explicit dedup step.
+            rows_by_goal: Dict[str, list] = {}
+            for row in step_rows:
+                if not isinstance(row, dict):
+                    continue
+                row_goal = row.get("goal", "unknown")
+                rows_by_goal.setdefault(row_goal, []).append(
+                    {**row, "chain_step": step_index, "chain_attack_type": attack_type}
+                )
+
+            if remaining_goals is None:
+                # First step resolved its own goals internally (via 'goals',
+                # 'dataset' or 'intents' on attacks[0]) — dict insertion
+                # order already matches first-seen order, so reuse it
+                # directly instead of tracking a parallel order list.
+                remaining_goals = list(rows_by_goal.keys())
+                goal_order = list(remaining_goals)
+
+            next_remaining: list = []
+            # Iterate the goals we *sent* this step (`remaining_goals`), not
+            # `rows_by_goal`/`step_rows` directly: a goal that comes back
+            # with zero rows (e.g. the attack errored on it) must still be
+            # looked up here — `rows_by_goal.get(goal, [])` defaults to `[]`,
+            # and `not any([])` correctly keeps it mitigated/in-chain. If we
+            # only walked what actually came back in `step_rows`, a goal
+            # with no response would simply never appear and would silently
+            # fall out of the chain, as if it had succeeded.
+            for goal in remaining_goals:
+                goal_rows = rows_by_goal.get(goal, [])
+
+                if not escalate_only_mitigated:
+                    # Every goal proceeds to every attack regardless of
+                    # outcome; keep rows from all steps instead of only the
+                    # latest attempt.
+                    final_rows_by_goal.setdefault(goal, []).extend(goal_rows)
+                    next_remaining.append(goal)
+                    continue
+
+                if goal_rows:
+                    final_rows_by_goal[goal] = goal_rows
+                mitigated = not any(is_successful_result(row) for row in goal_rows)
+                if mitigated:
+                    next_remaining.append(goal)
+                else:
+                    logger.info(
+                        "Goal succeeded at chain step %d ('%s'); dropped from chain: %s",
+                        step_index + 1,
+                        attack_type,
+                        str(goal)[:80],
+                    )
+
+            remaining_goals = next_remaining
+
+        if remaining_goals and escalate_only_mitigated:
+            logger.info(
+                "%d goal(s) mitigated through the entire chain (%d step(s)): %s",
+                len(remaining_goals),
+                n_steps,
+                ", ".join(str(g)[:60] for g in remaining_goals),
+            )
+
+        final_results: list = []
+        for goal in goal_order:
+            final_results.extend(final_rows_by_goal.get(goal, []))
+        return final_results

@@ -6,6 +6,8 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
+import httpx
+
 from hackagent.errors import HackAgentError
 from hackagent.router.types import AgentTypeEnum
 
@@ -59,6 +61,58 @@ class TestHackAgentInitialization(unittest.TestCase):
         )
 
         self.assertEqual(agent.client.base_url, "https://custom.api.com")
+
+    @patch("hackagent.agent.AgentRouter")
+    @patch("hackagent.agent.utils.resolve_api_token", return_value="test-token")
+    @patch("hackagent.agent.utils.resolve_agent_type")
+    def test_default_timeout_is_120_seconds(
+        self, mock_resolve_type, mock_resolve_token, mock_router
+    ):
+        """Test that the remote client defaults to a bounded 120s timeout,
+        instead of hanging indefinitely on a misbehaving endpoint."""
+        from hackagent.agent import HackAgent
+
+        agent = HackAgent(
+            endpoint="http://localhost:8000",
+            api_key="test-key",
+        )
+
+        self.assertEqual(agent.client.timeout, httpx.Timeout(120.0))
+
+    @patch("hackagent.agent.AgentRouter")
+    @patch("hackagent.agent.utils.resolve_api_token", return_value="test-token")
+    @patch("hackagent.agent.utils.resolve_agent_type")
+    def test_custom_timeout_is_passed_to_client(
+        self, mock_resolve_type, mock_resolve_token, mock_router
+    ):
+        """Test that an explicit timeout value reaches the AuthenticatedClient."""
+        from hackagent.agent import HackAgent
+
+        agent = HackAgent(
+            endpoint="http://localhost:8000",
+            api_key="test-key",
+            timeout=5.0,
+        )
+
+        self.assertEqual(agent.client.timeout, httpx.Timeout(5.0))
+
+    @patch("hackagent.agent.AgentRouter")
+    @patch("hackagent.agent.utils.resolve_api_token", return_value="test-token")
+    @patch("hackagent.agent.utils.resolve_agent_type")
+    def test_explicit_none_timeout_disables_it(
+        self, mock_resolve_type, mock_resolve_token, mock_router
+    ):
+        """Test that passing timeout=None explicitly still opts out of the
+        default, preserving the previous unbounded-wait behavior."""
+        from hackagent.agent import HackAgent
+
+        agent = HackAgent(
+            endpoint="http://localhost:8000",
+            api_key="test-key",
+            timeout=None,
+        )
+
+        self.assertIsNone(agent.client.timeout)
 
     @patch("hackagent.agent.AgentRouter")
     @patch("hackagent.agent.utils.resolve_api_token", return_value="test-token")
@@ -328,6 +382,266 @@ class TestHackAgentHack(unittest.TestCase):
         with self.assertRaises(HackAgentError) as ctx:
             self.agent.hack(attack_config={"attack_type": "test_attack"})
         self.assertEqual(str(ctx.exception), "Direct error")
+
+
+class TestHackAgentHackChain(unittest.TestCase):
+    """Test HackAgent.hack_chain method."""
+
+    @patch("hackagent.agent.AgentRouter")
+    @patch("hackagent.agent.utils.resolve_api_token", return_value="test-token")
+    @patch("hackagent.agent.utils.resolve_agent_type")
+    def setUp(self, mock_resolve_type, mock_resolve_token, mock_router):
+        """Set up HackAgent for hack_chain tests."""
+        from hackagent.agent import HackAgent
+
+        self.agent = HackAgent(
+            endpoint="http://localhost:8000",
+            api_key="test-key",
+        )
+
+        mock_backend = MagicMock()
+        mock_backend.name = "test-agent"
+        mock_backend.id = "agent-123"
+        mock_backend.agent_type = "litellm"
+        self.agent.router.backend_agent = mock_backend
+
+    def test_hack_chain_empty_attacks_raises(self):
+        """Test that an empty attacks list raises HackAgentError."""
+        with self.assertRaises(HackAgentError):
+            self.agent.hack_chain(attacks=[])
+
+    def test_hack_chain_missing_attack_type_raises(self):
+        """Test that a chain step missing attack_type raises HackAgentError."""
+        with self.assertRaises(HackAgentError):
+            self.agent.hack_chain(attacks=[{}], goals=["do the bad thing"])
+
+    def test_hack_chain_defaults_to_jailbreak_campaign_when_attacks_omitted(self):
+        """attacks=None (the default) resolves to the Jailbreak evaluation
+        campaign's primary attacks, in campaign order: h4rm3l -> TAP -> PAIR."""
+        with patch.object(self.agent, "hack") as mock_hack:
+            mock_hack.return_value = [{"goal": "goal-a", "is_success": False}]
+
+            self.agent.hack_chain(goals=["goal-a"])
+
+            called_attack_types = [
+                call.kwargs["attack_config"]["attack_type"]
+                for call in mock_hack.call_args_list
+            ]
+            self.assertEqual(called_attack_types, ["h4rm3l", "tap", "pair"])
+
+    def test_hack_chain_explicit_attacks_override_default_campaign(self):
+        """Passing an explicit attacks list bypasses the campaign default."""
+        with patch.object(self.agent, "hack") as mock_hack:
+            mock_hack.return_value = [{"goal": "goal-a", "is_success": True}]
+
+            self.agent.hack_chain(
+                attacks=[{"attack_type": "baseline"}], goals=["goal-a"]
+            )
+
+            called_attack_types = [
+                call.kwargs["attack_config"]["attack_type"]
+                for call in mock_hack.call_args_list
+            ]
+            self.assertEqual(called_attack_types, ["baseline"])
+
+    def test_hack_chain_stops_on_first_success(self):
+        """A goal that succeeds at step 1 is never retried at step 2."""
+        with patch.object(self.agent, "hack") as mock_hack:
+            mock_hack.return_value = [{"goal": "goal-a", "is_success": True}]
+
+            result = self.agent.hack_chain(
+                attacks=[{"attack_type": "pair"}, {"attack_type": "tap"}],
+                goals=["goal-a"],
+            )
+
+            mock_hack.assert_called_once()
+            self.assertEqual(len(result), 1)
+            self.assertEqual(result[0]["chain_attack_type"], "pair")
+            self.assertEqual(result[0]["chain_step"], 0)
+
+    def test_hack_chain_escalates_mitigated_goal_to_next_attack(self):
+        """A goal mitigated at step 1 is retried at step 2."""
+        with patch.object(self.agent, "hack") as mock_hack:
+            mock_hack.side_effect = [
+                [{"goal": "goal-a", "is_success": False}],
+                [{"goal": "goal-a", "is_success": True}],
+            ]
+
+            result = self.agent.hack_chain(
+                attacks=[{"attack_type": "pair"}, {"attack_type": "tap"}],
+                goals=["goal-a"],
+            )
+
+            self.assertEqual(mock_hack.call_count, 2)
+            second_call_config = mock_hack.call_args_list[1].kwargs["attack_config"]
+            self.assertEqual(second_call_config["goals"], ["goal-a"])
+            self.assertEqual(second_call_config["attack_type"], "tap")
+
+            self.assertEqual(len(result), 1)
+            self.assertEqual(result[0]["chain_attack_type"], "tap")
+            self.assertEqual(result[0]["chain_step"], 1)
+
+    def test_hack_chain_keeps_last_attempt_for_fully_mitigated_goal(self):
+        """A goal mitigated by every attack keeps the last step's rows."""
+        with patch.object(self.agent, "hack") as mock_hack:
+            mock_hack.side_effect = [
+                [{"goal": "goal-a", "is_success": False}],
+                [{"goal": "goal-a", "is_success": False}],
+            ]
+
+            result = self.agent.hack_chain(
+                attacks=[{"attack_type": "pair"}, {"attack_type": "tap"}],
+                goals=["goal-a"],
+            )
+
+            self.assertEqual(mock_hack.call_count, 2)
+            self.assertEqual(len(result), 1)
+            self.assertEqual(result[0]["chain_attack_type"], "tap")
+            self.assertFalse(result[0]["is_success"])
+
+    def test_hack_chain_skips_remaining_steps_when_all_goals_resolved(self):
+        """No further hack() calls happen once every goal has succeeded."""
+        with patch.object(self.agent, "hack") as mock_hack:
+            mock_hack.return_value = [
+                {"goal": "goal-a", "is_success": True},
+                {"goal": "goal-b", "is_success": True},
+            ]
+
+            self.agent.hack_chain(
+                attacks=[
+                    {"attack_type": "pair"},
+                    {"attack_type": "tap"},
+                    {"attack_type": "bon"},
+                ],
+                goals=["goal-a", "goal-b"],
+            )
+
+            mock_hack.assert_called_once()
+
+    def test_hack_chain_mixed_goals_partition_correctly(self):
+        """Only mitigated goals are forwarded; resolved ones are excluded."""
+        with patch.object(self.agent, "hack") as mock_hack:
+            mock_hack.side_effect = [
+                [
+                    {"goal": "goal-a", "is_success": True},
+                    {"goal": "goal-b", "is_success": False},
+                ],
+                [{"goal": "goal-b", "is_success": True}],
+            ]
+
+            result = self.agent.hack_chain(
+                attacks=[{"attack_type": "pair"}, {"attack_type": "tap"}],
+                goals=["goal-a", "goal-b"],
+            )
+
+            second_call_config = mock_hack.call_args_list[1].kwargs["attack_config"]
+            self.assertEqual(second_call_config["goals"], ["goal-b"])
+
+            by_goal = {row["goal"]: row for row in result}
+            self.assertEqual(by_goal["goal-a"]["chain_attack_type"], "pair")
+            self.assertEqual(by_goal["goal-b"]["chain_attack_type"], "tap")
+
+    def test_hack_chain_resolves_goals_from_first_step_dataset(self):
+        """When goals aren't passed explicitly, they're inferred from step 0 results."""
+        with patch.object(self.agent, "hack") as mock_hack:
+            mock_hack.return_value = [{"goal": "goal-a", "is_success": True}]
+
+            result = self.agent.hack_chain(
+                attacks=[{"attack_type": "pair", "dataset": {"preset": "advbench"}}],
+            )
+
+            first_call_config = mock_hack.call_args_list[0].kwargs["attack_config"]
+            self.assertNotIn("goals", first_call_config)
+            self.assertEqual(first_call_config["dataset"], {"preset": "advbench"})
+            self.assertEqual(len(result), 1)
+
+    def test_hack_chain_escalate_only_mitigated_false_runs_every_attack_on_every_goal(
+        self,
+    ):
+        """With escalate_only_mitigated=False, all goals go to every attack
+        regardless of outcome, and results from every step are kept."""
+        with patch.object(self.agent, "hack") as mock_hack:
+            mock_hack.side_effect = [
+                [
+                    {"goal": "goal-a", "is_success": True},
+                    {"goal": "goal-b", "is_success": False},
+                ],
+                [
+                    {"goal": "goal-a", "is_success": False},
+                    {"goal": "goal-b", "is_success": True},
+                ],
+            ]
+
+            result = self.agent.hack_chain(
+                attacks=[{"attack_type": "pair"}, {"attack_type": "tap"}],
+                goals=["goal-a", "goal-b"],
+                escalate_only_mitigated=False,
+            )
+
+            # Both steps run against both goals (no escalation-based filtering).
+            self.assertEqual(mock_hack.call_count, 2)
+            second_call_config = mock_hack.call_args_list[1].kwargs["attack_config"]
+            self.assertEqual(set(second_call_config["goals"]), {"goal-a", "goal-b"})
+
+            # Rows from *both* steps are kept for *both* goals — nothing
+            # dropped or overwritten, unlike the default escalation mode.
+            self.assertEqual(len(result), 4)
+            by_goal_and_step = {(r["goal"], r["chain_attack_type"]) for r in result}
+            self.assertEqual(
+                by_goal_and_step,
+                {
+                    ("goal-a", "pair"),
+                    ("goal-a", "tap"),
+                    ("goal-b", "pair"),
+                    ("goal-b", "tap"),
+                },
+            )
+
+    def test_hack_chain_escalate_only_mitigated_true_is_default(self):
+        """escalate_only_mitigated defaults to True (fallback-ladder behavior)."""
+        with patch.object(self.agent, "hack") as mock_hack:
+            mock_hack.side_effect = [
+                [{"goal": "goal-a", "is_success": False}],
+                [{"goal": "goal-a", "is_success": True}],
+            ]
+
+            result = self.agent.hack_chain(
+                attacks=[{"attack_type": "pair"}, {"attack_type": "tap"}],
+                goals=["goal-a"],
+            )
+
+            self.assertEqual(mock_hack.call_count, 2)
+            # Only the final (successful) attempt's row is kept.
+            self.assertEqual(len(result), 1)
+            self.assertEqual(result[0]["chain_attack_type"], "tap")
+
+    def test_hack_chain_keeps_unmatched_goal_instead_of_dropping_it(self):
+        """A goal a step returns no row for (e.g. it errored) has no evidence
+        of success, so it stays in the chain and keeps its last known rows
+        from the previous step, rather than being dropped."""
+        with patch.object(self.agent, "hack") as mock_hack:
+            mock_hack.side_effect = [
+                [
+                    {"goal": "goal-a", "is_success": False},
+                    {"goal": "goal-b", "is_success": False},
+                ],
+                # Step 2 only returns a row for goal-a; goal-b is absent.
+                [{"goal": "goal-a", "is_success": True}],
+            ]
+
+            result = self.agent.hack_chain(
+                attacks=[{"attack_type": "pair"}, {"attack_type": "tap"}],
+                goals=["goal-a", "goal-b"],
+            )
+
+            second_call_config = mock_hack.call_args_list[1].kwargs["attack_config"]
+            self.assertEqual(set(second_call_config["goals"]), {"goal-a", "goal-b"})
+
+            by_goal = {row["goal"]: row for row in result}
+            self.assertEqual(by_goal["goal-a"]["chain_attack_type"], "tap")
+            # goal-b never got a matching row back, so it falls back to its
+            # last known (step 1) rows rather than being dropped or errored.
+            self.assertEqual(by_goal["goal-b"]["chain_attack_type"], "pair")
 
 
 if __name__ == "__main__":

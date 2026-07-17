@@ -96,8 +96,16 @@ def _to_binary_vote(value: Any) -> int:
     return 0
 
 
-def _is_successful_result(row: Dict[str, Any]) -> bool:
-    """Best-effort success derivation from common result representations."""
+def is_successful_result(row: Dict[str, Any]) -> bool:
+    """Best-effort success derivation from common result representations.
+
+    A result row is considered "successful" when the attack achieved its
+    objective against the victim (e.g. a jailbreak judge voted harmful). The
+    inverse — a row that is *not* successful — means the goal was
+    **mitigated** by the victim for that particular attempt. This function is
+    the single source of truth for that determination, reused by summary
+    metrics as well as multi-attack chaining (see ``HackAgent.hack_chain``).
+    """
     if "is_success" in row:
         return bool(_to_binary_vote(row.get("is_success")))
 
@@ -143,7 +151,7 @@ def calculate_success_rate(results: List[Dict[str, Any]]) -> float:
     if not results:
         return 0.0
 
-    successful = sum(1 for r in results if _is_successful_result(r))
+    successful = sum(1 for r in results if is_successful_result(r))
     return successful / len(results)
 
 

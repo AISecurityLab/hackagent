@@ -120,20 +120,20 @@ class AttackOrchestrator:
     ] = {
         "advprefix": (
             ("generator", ("generator",), False, "attacker"),
-            ("judge", ("judge",), False, "judge"),
+            # ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
         ),
         "static_template": (
-            ("judge", ("judge",), False, "judge"),
+            # ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
         ),
         "flipattack": (
-            ("judge", ("judge",), False, "judge"),
+            # ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
         ),
         "tap": (
             ("attacker", ("attacker",), False, "attacker"),
-            ("judge", ("judge",), False, "judge"),
+            # ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
             ("on_topic_judge", ("on_topic_judge",), False, None),
         ),
@@ -148,11 +148,11 @@ class AttackOrchestrator:
             ("embedder", ("embedder",), False, None),
         ),
         "bon": (
-            ("judge", ("judge",), False, "judge"),
+            # ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
         ),
         "cipherchat": (
-            ("judge", ("judge",), False, "judge"),
+            # ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
         ),
         "h4rm3l": (
@@ -162,27 +162,27 @@ class AttackOrchestrator:
         ),
         "pap": (
             ("attacker", ("attacker",), False, "attacker"),
-            ("judge", ("judge",), False, "judge"),
+            # ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
         ),
         "rag": (
             ("attacker", ("attacker",), False, "attacker"),
-            ("judge", ("judge",), False, "judge"),
+            # ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
             ("embedder", ("rag_injection_params", "embedder"), False, None),
         ),
         "fc": (
             ("step_generator", ("step_generator",), False, "attacker"),
-            ("judge", ("judge",), False, "judge"),
+            # ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
         ),
         "tfc": (
             ("step_generator", ("step_generator",), False, "attacker"),
-            ("judge", ("judge",), False, "judge"),
+            # ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
         ),
         "mml": (
-            ("judge", ("judge",), False, "judge"),
+            # ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
         ),
     }
@@ -376,20 +376,35 @@ class AttackOrchestrator:
             for role_name, role_family in role_mapping.items():
                 role_defaults = dict(defaults_by_family[role_family])
 
-                # Judge-based attacks usually consume list-style judge configs.
-                # When `judges` is already provided by the caller, only merge
-                # defaults into those entries — do NOT inject a default
-                # singleton `judge` entry.  Injecting it would cause preflight
-                # to check a model the caller never requested.
+                # Judge precedence:
+                # 1) explicit `judges` list
+                # 2) explicit single `judge`
+                # 3) defaults only when neither is provided
                 if role_name == "judge":
                     judges_cfg = resolved.get("judges")
                     if isinstance(judges_cfg, list) and judges_cfg:
                         for item in judges_cfg:
                             if isinstance(item, dict):
                                 self._merge_missing_keys(item, role_defaults)
-                        continue  # skip default-judge injection below
-                    else:
-                        resolved["judges"] = [dict(role_defaults)]
+                        if not isinstance(resolved.get("judge"), dict):
+                            first_judge = next(
+                                (item for item in judges_cfg if isinstance(item, dict)),
+                                None,
+                            )
+                            if isinstance(first_judge, dict):
+                                resolved["judge"] = dict(first_judge)
+                        continue
+
+                    explicit_single_judge = resolved.get("judge")
+                    if isinstance(explicit_single_judge, dict):
+                        self._merge_missing_keys(explicit_single_judge, role_defaults)
+                        resolved["judge"] = explicit_single_judge
+                        resolved["judges"] = [dict(explicit_single_judge)]
+                        continue
+
+                    resolved["judge"] = dict(role_defaults)
+                    resolved["judges"] = [dict(resolved["judge"])]
+                    continue
 
                 role_cfg = resolved.get(role_name)
                 if isinstance(role_cfg, dict):
@@ -466,6 +481,8 @@ class AttackOrchestrator:
         dataset_config = attack_config.get("dataset")
         intents_config = attack_config.get("intents")
         goal_labels_by_index: Optional[Dict[int, Dict[str, str]]] = None
+        goal_extra_fields_by_index: Optional[Dict[int, Dict[str, Any]]] = None
+        goal_extra_fields_by_goal: Optional[Dict[str, Dict[str, Any]]] = None
 
         if goals is not None and dataset_config is not None:
             logger.warning(
@@ -486,7 +503,9 @@ class AttackOrchestrator:
             goals, goal_labels_by_index = self._load_goals_from_intents(intents_config)
         elif dataset_config is not None:
             # Load goals from dataset source
-            goals = self._load_goals_from_dataset(dataset_config)
+            goals, goal_extra_fields_by_index = self._load_goals_from_dataset(
+                dataset_config
+            )
         elif goals is None:
             raise ValueError(
                 f"'{self.attack_type}' requires either 'goals' (list), "
@@ -503,6 +522,25 @@ class AttackOrchestrator:
         params: Dict[str, Any] = {"goals": goals}
         if goal_labels_by_index:
             params["_goal_labels_by_index"] = goal_labels_by_index
+        if goal_extra_fields_by_index:
+            params["_goal_extra_fields_by_index"] = goal_extra_fields_by_index
+            by_goal: Dict[str, Dict[str, Any]] = {}
+            for idx, metadata in goal_extra_fields_by_index.items():
+                if not isinstance(idx, int) or not isinstance(metadata, dict):
+                    continue
+                if idx < 0 or idx >= len(goals):
+                    continue
+                goal_text = goals[idx]
+                if (
+                    isinstance(goal_text, str)
+                    and goal_text
+                    and goal_text not in by_goal
+                ):
+                    by_goal[goal_text] = metadata
+            if by_goal:
+                goal_extra_fields_by_goal = by_goal
+        if goal_extra_fields_by_goal:
+            params["_goal_extra_fields_by_goal"] = goal_extra_fields_by_goal
         return params
 
     @staticmethod
@@ -1269,7 +1307,9 @@ class AttackOrchestrator:
 
         return None
 
-    def _load_goals_from_dataset(self, dataset_config: Dict[str, Any]) -> list:
+    def _load_goals_from_dataset(
+        self, dataset_config: Dict[str, Any]
+    ) -> Tuple[List[str], Dict[int, Dict[str, Any]]]:
         """
         Load goals from a dataset configuration.
 
@@ -1290,20 +1330,24 @@ class AttackOrchestrator:
                 - seed (int, optional): Random seed for shuffling
 
         Returns:
-            List of goal strings
+            Tuple of:
+                - List of goal strings
+                - Per-goal metadata map (index -> metadata dict)
 
         Raises:
             ValueError: If dataset configuration is invalid
             ImportError: If required dependencies are not available
         """
-        from hackagent.datasets import load_goals_from_config
+        from hackagent.datasets import load_goals_and_extra_fields_from_config
 
         logger.info(f"Loading goals from dataset: {dataset_config}")
 
         try:
-            goals = load_goals_from_config(dataset_config)
+            goals, goal_extra_fields_by_index = load_goals_and_extra_fields_from_config(
+                dataset_config
+            )
             logger.info(f"Loaded {len(goals)} goals from dataset")
-            return goals
+            return goals, goal_extra_fields_by_index
         except Exception as e:
             logger.error(f"Failed to load goals from dataset: {e}", exc_info=True)
             raise ValueError(f"Failed to load goals from dataset: {e}") from e
@@ -1500,7 +1544,13 @@ class AttackOrchestrator:
                         # Global run status is finalized once in execute().
                         attack_impl.config["_suppress_run_status_updates"] = True
                         batch_params = {**attack_params, "goals": batch_goals}
-                        batch_results = attack_impl.run(**batch_params) or []
+                        # attack_impl.run() may return a dict (e.g. baseline's
+                        # {"evaluated": [...], "summary": [...]}) rather than a
+                        # flat row list — normalize before aggregating, otherwise
+                        # extend() below would iterate the dict's *keys*.
+                        batch_results = self._normalize_attack_results(
+                            attack_impl.run(**batch_params)
+                        )
                     else:
                         # Parallel: one thread per goal inside this batch
                         effective_workers = min(goal_batch_workers, n_goals_in_batch)
@@ -1532,7 +1582,11 @@ class AttackOrchestrator:
                             }
                             local_impl = self.attack_impl_class(**local_impl_kwargs)
                             goal_params = {**attack_params, "goals": [goal]}
-                            goal_results = local_impl.run(**goal_params) or []
+                            # Normalize here too — same dict-vs-list return shape
+                            # concern as the sequential path above.
+                            goal_results = self._normalize_attack_results(
+                                local_impl.run(**goal_params)
+                            )
 
                             logger.info(f"Goal done ({len(goal_results)} results)")
                             return goal_idx, goal_results
@@ -1643,6 +1697,12 @@ class AttackOrchestrator:
         # 1. Validate parameters
         attack_params = self._prepare_attack_params(attack_config)
         goal_labels_by_index = attack_params.pop("_goal_labels_by_index", None)
+        goal_extra_fields_by_index = attack_params.pop(
+            "_goal_extra_fields_by_index", None
+        )
+        goal_extra_fields_by_goal = attack_params.pop(
+            "_goal_extra_fields_by_goal", None
+        )
 
         # Fail-fast preflight before creating Attack/Run DB records.
         # Skip this when intents already provide explicit category labels.
@@ -1733,6 +1793,17 @@ class AttackOrchestrator:
                 **attack_config,
                 "_goal_labels_by_index": goal_labels_by_index,
                 "_disable_goal_category_classifier": True,
+            }
+
+        if goal_extra_fields_by_index:
+            attack_config = {
+                **attack_config,
+                "_goal_extra_fields_by_index": goal_extra_fields_by_index,
+            }
+        if goal_extra_fields_by_goal:
+            attack_config = {
+                **attack_config,
+                "_goal_extra_fields_by_goal": goal_extra_fields_by_goal,
             }
 
         # Make the event bus available to the technique impl and to the

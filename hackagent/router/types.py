@@ -63,6 +63,7 @@ class AgentTypeEnum(str, Enum):
 
     GOOGLE_ADK = "GOOGLE_ADK"
     CLAUDE_CODE = "CLAUDE_CODE"
+    CODEX = "CODEX"
     WEB = "WEB"
     LITELLM = "LITELLM"
     OPENAI_SDK = "OPENAI_SDK"
@@ -106,6 +107,7 @@ _AGENT_TYPE_ALIASES: dict = {
     "CLAUDE": "CLAUDE_CODE",
     "CLAUDE-CODE": "CLAUDE_CODE",
     "CLAUDECODE": "CLAUDE_CODE",
+    "CODEX": "CODEX",
     "CLAUDE_CLI": "CLAUDE_CODE",
     # The live-browser web agent is now the single web target; accept the old
     # and adjacent names so existing configs keep resolving.

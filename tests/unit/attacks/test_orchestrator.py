@@ -451,6 +451,86 @@ class TestAttackOrchestratorExecution(unittest.TestCase):
         worker_offsets = [v for v in seen_offsets if v is not None]
         self.assertCountEqual(worker_offsets, [0, 1, 2])
 
+    def test_execute_local_attack_normalizes_dict_return_in_parallel_batches(self):
+        """Regression: an attack whose run() returns a dict (e.g. baseline's
+        {"evaluated": [...], "summary": [...]}) must not have that dict's keys
+        ("evaluated", "summary") extended into the aggregated results as if
+        they were row entries.
+        """
+        orchestrator = self.TestOrchestrator(self.mock_hack_agent)
+
+        attack_params = {"goals": ["goal-1", "goal-2"]}
+        attack_config = {
+            "goals": ["goal-1", "goal-2"],
+            "output_dir": "/tmp/test",
+            "goal_batch_size": 10,
+            "goal_batch_workers": 2,
+            "category_classifier": {
+                "identifier": "gpt-4o-mini",
+                "agent_type": "OPENAI",
+                "endpoint": "https://api.openai.com/v1",
+            },
+        }
+
+        def _dict_returning_run(**kwargs):
+            goal = kwargs["goals"][0]
+            return {
+                "evaluated": [{"goal": goal, "completion": "real"}],
+                "summary": [{"goal": goal, "asr": 0.0}],
+            }
+
+        with patch.object(self.TestAttack, "__init__", return_value=None):
+            with patch.object(self.TestAttack, "run", side_effect=_dict_returning_run):
+                results = orchestrator._execute_local_attack(
+                    "attack-123", "run-456", attack_params, attack_config, None
+                )
+
+        # Only the "evaluated" rows should surface — never the bare dict keys.
+        self.assertEqual(len(results), 2)
+        self.assertTrue(all(isinstance(row, dict) for row in results))
+        self.assertCountEqual([r["goal"] for r in results], ["goal-1", "goal-2"])
+        self.assertTrue(all(r["completion"] == "real" for r in results))
+
+    def test_execute_local_attack_normalizes_dict_return_sequential(self):
+        """Same regression as above, for the sequential (goal_batch_workers<=1)
+        batching path.
+        """
+        orchestrator = self.TestOrchestrator(self.mock_hack_agent)
+
+        attack_params = {"goals": ["goal-1", "goal-2"]}
+        attack_config = {
+            "goals": ["goal-1", "goal-2"],
+            "output_dir": "/tmp/test",
+            "goal_batch_size": 10,
+            "goal_batch_workers": 1,
+            "category_classifier": {
+                "identifier": "gpt-4o-mini",
+                "agent_type": "OPENAI",
+                "endpoint": "https://api.openai.com/v1",
+            },
+        }
+
+        dict_return = {
+            "evaluated": [
+                {"goal": "goal-1", "completion": "real"},
+                {"goal": "goal-2", "completion": "real"},
+            ],
+            "summary": [{"asr": 0.0}],
+        }
+
+        def _fake_init(self, **kwargs):
+            self.config = kwargs.get("config", {})
+
+        with patch.object(self.TestAttack, "__init__", _fake_init):
+            with patch.object(self.TestAttack, "run", return_value=dict_return):
+                results = orchestrator._execute_local_attack(
+                    "attack-123", "run-456", attack_params, attack_config, None
+                )
+
+        self.assertEqual(len(results), 2)
+        self.assertTrue(all(isinstance(row, dict) for row in results))
+        self.assertCountEqual([r["goal"] for r in results], ["goal-1", "goal-2"])
+
 
 class TestAttackOrchestratorHTTPHelpers(unittest.TestCase):
     """Test AttackOrchestrator HTTP response helpers."""
@@ -607,7 +687,10 @@ class TestAttackOrchestratorDatasetIntegration(unittest.TestCase):
     @patch("hackagent.attacks.orchestrator.AttackOrchestrator._load_goals_from_dataset")
     def test_prepare_attack_params_loads_from_dataset(self, mock_load):
         """Test that goals are loaded from dataset config when provided."""
-        mock_load.return_value = ["dataset_goal1", "dataset_goal2"]
+        mock_load.return_value = (
+            ["dataset_goal1", "dataset_goal2"],
+            {0: {"extra_fields": {"category": "cat-a"}}},
+        )
 
         attack_config = {
             "dataset": {
@@ -620,6 +703,8 @@ class TestAttackOrchestratorDatasetIntegration(unittest.TestCase):
 
         mock_load.assert_called_once_with(attack_config["dataset"])
         self.assertEqual(params["goals"], ["dataset_goal1", "dataset_goal2"])
+        self.assertIn("_goal_extra_fields_by_index", params)
+        self.assertIn("_goal_extra_fields_by_goal", params)
 
     @patch("hackagent.attacks.orchestrator.AttackOrchestrator._load_goals_from_dataset")
     def test_prepare_attack_params_prefers_direct_goals_over_dataset(self, mock_load):
@@ -710,10 +795,13 @@ class TestAttackOrchestratorDatasetIntegration(unittest.TestCase):
         mock_load_dataset.assert_not_called()
         self.assertEqual(params["goals"], ["intent_goal"])
 
-    @patch("hackagent.datasets.load_goals_from_config")
+    @patch("hackagent.datasets.load_goals_and_extra_fields_from_config")
     def test_load_goals_from_dataset_calls_registry(self, mock_load_goals):
         """Test that _load_goals_from_dataset calls the registry function."""
-        mock_load_goals.return_value = ["loaded_goal"]
+        mock_load_goals.return_value = (
+            ["loaded_goal"],
+            {0: {"extra_fields": {"category": "network"}}},
+        )
 
         dataset_config = {
             "provider": "huggingface",
@@ -721,12 +809,13 @@ class TestAttackOrchestratorDatasetIntegration(unittest.TestCase):
             "goal_field": "prompt",
         }
 
-        goals = self.orchestrator._load_goals_from_dataset(dataset_config)
+        goals, extras = self.orchestrator._load_goals_from_dataset(dataset_config)
 
         mock_load_goals.assert_called_once_with(dataset_config)
         self.assertEqual(goals, ["loaded_goal"])
+        self.assertIn(0, extras)
 
-    @patch("hackagent.datasets.load_goals_from_config")
+    @patch("hackagent.datasets.load_goals_and_extra_fields_from_config")
     def test_load_goals_from_dataset_handles_errors(self, mock_load_goals):
         """Test that dataset loading errors are wrapped in ValueError."""
         mock_load_goals.side_effect = Exception("Dataset not found")
@@ -738,10 +827,13 @@ class TestAttackOrchestratorDatasetIntegration(unittest.TestCase):
 
         self.assertIn("Failed to load goals", str(context.exception))
 
-    @patch("hackagent.datasets.load_goals_from_config")
+    @patch("hackagent.datasets.load_goals_and_extra_fields_from_config")
     def test_load_goals_from_dataset_with_preset(self, mock_load_goals):
         """Test loading goals using a preset configuration."""
-        mock_load_goals.return_value = ["agentharm_goal1", "agentharm_goal2"]
+        mock_load_goals.return_value = (
+            ["agentharm_goal1", "agentharm_goal2"],
+            {},
+        )
 
         dataset_config = {
             "preset": "agentharm",
@@ -749,10 +841,11 @@ class TestAttackOrchestratorDatasetIntegration(unittest.TestCase):
             "shuffle": True,
         }
 
-        goals = self.orchestrator._load_goals_from_dataset(dataset_config)
+        goals, extras = self.orchestrator._load_goals_from_dataset(dataset_config)
 
         mock_load_goals.assert_called_once_with(dataset_config)
         self.assertEqual(len(goals), 2)
+        self.assertEqual(extras, {})
 
 
 if __name__ == "__main__":
