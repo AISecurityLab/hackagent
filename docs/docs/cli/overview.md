@@ -20,6 +20,7 @@ For installation instructions, see the [Installation Guide](../getting-started/i
 | `hackagent eval <attack_name>` | Execute one specific attack strategy | [Eval](./attack.mdx) |
 | `hackagent examples ollama` | Run built-in Ollama demo | [Quick Start (TUI tab)](../getting-started/quick-start.mdx) |
 | `hackagent results` | View and manage results | [Results](./results.md) |
+| `hackagent datasets` | Browse and sample dataset presets | [Datasets](./datasets.md) |
 | `hackagent version` | Show version info | - |
 
 ## Quick Examples
