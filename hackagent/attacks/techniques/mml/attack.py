@@ -30,8 +30,9 @@ from hackagent.attacks.shared.tui import with_tui_logging
 from hackagent.attacks.techniques.config import DEFAULT_JUDGE_IDENTIFIER
 from hackagent.router.router import AgentRouter
 from hackagent.server.client import AuthenticatedClient
+from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
 
-from . import evaluation, generation
+from . import generation
 from .config import DEFAULT_MML_CONFIG
 
 
@@ -253,7 +254,12 @@ class MMLAttack(BaseAttack):
             },
             {
                 "name": "Evaluation: Evaluate Responses with Dict + LLM Judge",
-                "function": evaluation.execute,
+                "function": BaseEvaluationStep.make_execute(
+                    prefix_fn=lambda item: (
+                        item.get("full_prompt") or item.get("text_prompt", "")
+                    ),
+                    technique_params_key="mml_params",
+                ),
                 "step_type_enum": "EVALUATION",
                 "config_keys": [
                     "mml_params",

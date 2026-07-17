@@ -88,7 +88,7 @@ class TestFlipAttack(unittest.TestCase):
         )
         self.assertEqual(attack.run([]), [])
 
-    @patch("hackagent.attacks.techniques.flipattack.attack.evaluation.execute")
+    @patch("hackagent.attacks.evaluator.evaluation_step.BaseEvaluationStep.run")
     @patch("hackagent.attacks.techniques.flipattack.attack.generation.execute")
     def test_run_pipeline(self, mock_generation, mock_evaluation):
         attack = FlipAttack(

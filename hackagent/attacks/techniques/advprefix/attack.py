@@ -25,7 +25,7 @@ from hackagent.attacks.shared.tui import with_tui_logging
 # Import step execution functions from same package
 from . import completions
 from .config import DEFAULT_PREFIX_GENERATION_CONFIG
-from .evaluation import EvaluationPipeline
+from .eval_pipeline import EvaluationPipeline
 from .generate import PrefixGenerationPipeline
 
 

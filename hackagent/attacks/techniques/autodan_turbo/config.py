@@ -15,7 +15,7 @@ Based on: https://arxiv.org/abs/2410.05295
 
 from typing import Any, Dict
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from hackagent.attacks.techniques.config import (
     AttackerConfig,
@@ -68,7 +68,7 @@ class AutoDANTurboConfig(ConfigBase):
 
     attack_type: str = "autodan_turbo"
     autodan_turbo_params: AutoDANTurboParams = Field(default_factory=AutoDANTurboParams)
-    scorer: AttackerConfig = Field(
+    judge: AttackerConfig = Field(
         default_factory=lambda: AttackerConfig(identifier=DEFAULT_ATTACKER_IDENTIFIER)
     )
     summarizer: AttackerConfig = Field(
@@ -76,6 +76,14 @@ class AutoDANTurboConfig(ConfigBase):
     )
     embedder: Dict[str, Any] = Field(default_factory=default_embedder)
     target_request_overrides: Dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_scorer_to_judge(cls, values: Any) -> Any:
+        """Backward compat: accept ``scorer`` key and promote to ``judge``."""
+        if isinstance(values, dict) and "scorer" in values and "judge" not in values:
+            values["judge"] = values.pop("scorer")
+        return values
 
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> "AutoDANTurboConfig":
@@ -130,8 +138,15 @@ DEFAULT_AUTODAN_TURBO_CONFIG: Dict[str, Any] = {
         # Whether to run only warm-up phase
         "warm_up_only": False,
     },
-    # Scorer LLM configuration (evaluates jailbreak success 1-10)
-    "scorer": _default_role_config(DEFAULT_JUDGE_IDENTIFIER),
+    # Judge LLM configuration (evaluates jailbreak success 1-10 or 0/1).
+    # Explicit type/range so infer_judge_type() doesn't have to guess it from
+    # the identifier — otherwise an unrecognized default identifier silently
+    # disables the judge and evaluation falls back to legacy scoring.
+    "judge": {
+        **_default_role_config(DEFAULT_JUDGE_IDENTIFIER),
+        "type": "scorer",
+        "range": "decimal",
+    },
     # Summarizer LLM configuration (extracts strategies from prompt pairs)
     "summarizer": _default_role_config("hackagent-summarizer"),
     # Embedder role used by strategy retrieval.

@@ -7,7 +7,7 @@ Configuration for PAIR attacks.
 
 from typing import Any, Dict
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from hackagent.attacks.techniques.config import (
     AttackerConfig,
@@ -28,8 +28,9 @@ DEFAULT_PAIR_CONFIG: Dict[str, Any] = {
     "attack_type": "pair",
     # Objective
     "objective": "jailbreak",
-    # Dedicated scorer role (AutoDAN-style scorer+wrapper)
-    "scorer": _default_role_config(DEFAULT_JUDGE_IDENTIFIER),
+    # Judge role — supports binary (harmbench/nuanced) and decimal (scorer) judges.
+    # Use "range": "decimal" for a 1-10 scoring judge; "range": "binary" for 0/1.
+    "judge": _default_role_config(DEFAULT_JUDGE_IDENTIFIER),
     # Iteration settings
     "n_iterations": 5,  # Number of refinement iterations
     "n_streams": 5,  # Number of parallel refinement streams
@@ -52,7 +53,7 @@ class PairConfig(ConfigBase):
 
     attack_type: str = "pair"
     objective: str = "jailbreak"
-    scorer: Dict[str, Any] = Field(
+    judge: Dict[str, Any] = Field(
         default_factory=lambda: AttackerConfig(
             identifier=DEFAULT_ATTACKER_IDENTIFIER
         ).model_dump()
@@ -66,6 +67,14 @@ class PairConfig(ConfigBase):
     judge_response_max_chars: int = Field(default=3500, ge=1)
     target_trace_response_max_chars: int = Field(default=2000, ge=1)
     max_parse_retries: int = Field(default=5, ge=0)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_scorer_to_judge(cls, values: Any) -> Any:
+        """Backward compat: accept ``scorer`` key and promote to ``judge``."""
+        if isinstance(values, dict) and "scorer" in values and "judge" not in values:
+            values["judge"] = values.pop("scorer")
+        return values
 
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> "PairConfig":

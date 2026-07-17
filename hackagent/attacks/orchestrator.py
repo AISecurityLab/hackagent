@@ -139,11 +139,13 @@ class AttackOrchestrator:
         ),
         "pair": (
             ("attacker", ("attacker",), False, "attacker"),
-            ("scorer", ("scorer",), False, "judge"),
+            ("judge", ("judge",), False, "judge"),
+            ("judge", ("scorer",), False, "judge"),
         ),
         "autodan_turbo": (
             ("attacker", ("attacker",), False, "attacker"),
-            ("scorer", ("scorer",), False, "judge"),
+            ("judge", ("judge",), False, "judge"),
+            ("judge", ("scorer",), False, "judge"),
             ("summarizer", ("summarizer",), False, "attacker"),
             ("embedder", ("embedder",), False, None),
         ),
@@ -376,6 +378,18 @@ class AttackOrchestrator:
             for role_name, role_family in role_mapping.items():
                 role_defaults = dict(defaults_by_family[role_family])
                 role_cfg = resolved.get(role_name)
+
+                # Backward compatibility: promote legacy scorer role to judge.
+                if role_name == "judge" and isinstance(resolved.get("scorer"), dict):
+                    if not isinstance(role_cfg, dict):
+                        resolved["judge"] = copy.deepcopy(resolved["scorer"])
+                        role_cfg = resolved["judge"]
+                    # `judge` is now canonical (either user-supplied or just
+                    # promoted from `scorer`) — drop `scorer` so it doesn't
+                    # linger as an unrecognized extra key in strict configs
+                    # (e.g. PairConfig/AutoDANTurboConfig use extra="forbid").
+                    del resolved["scorer"]
+
                 if isinstance(role_cfg, dict):
                     self._merge_missing_keys(role_cfg, role_defaults)
                 else:
@@ -1836,24 +1850,28 @@ class AttackOrchestrator:
                     _tui_event_bus.emit("step_started", step_name="Evaluation Pipeline")
 
                 if (self.attack_type or "").lower() == "pair":
-                    from hackagent.attacks.techniques.pair.evaluation import (
-                        PAIREvaluation,
+                    from hackagent.attacks.evaluator.evaluation_step import (
+                        BaseEvaluationStep,
                     )
 
-                    logger.info(
-                        "Starting PAIR scorer-only evaluation pipeline (no judge fallback)"
-                    )
+                    logger.info("Starting PAIR judge evaluation pipeline")
 
-                    evaluator = PAIREvaluation(
+                    evaluator = BaseEvaluationStep(
                         config=base_eval_config,
                         logger=logger,
                         client=self.hackagent_agent.backend,
                     )
 
-                    final_results = evaluator.execute(results)
+                    # PAIR scores responses inline during its refinement loop
+                    # (setting is_success/best_score per row) rather than via
+                    # a separate judge pass, so it only needs the shared
+                    # post-processing (default-filling + sync/ASR logging).
+                    final_results = evaluator._postprocess_inline_judge_results(
+                        normalized_results, attack_label="PAIR"
+                    )
                     final_results = self._normalize_attack_results(final_results)
                     evaluator.prepare_and_sync(final_results, run_id)
-                    logger.info("PAIR scorer-only evaluation pipeline completed")
+                    logger.info("PAIR judge evaluation pipeline completed")
                 else:
                     from hackagent.attacks.evaluator.evaluation_step import (
                         BaseEvaluationStep,

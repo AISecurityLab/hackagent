@@ -19,7 +19,9 @@ from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.server.client import AuthenticatedClient
 from hackagent.router.router import AgentRouter
 
-from . import evaluation, generation
+from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
+
+from . import generation
 from .config import DEFAULT_CIPHERCHAT_CONFIG
 from .encode_experts import encode_expert_dict
 from .prompts_and_demonstrations import demonstration_dict
@@ -130,7 +132,13 @@ class CipherChatAttack(BaseAttack):
             },
             {
                 "name": "Evaluation: Judge Decoded CipherChat Responses",
-                "function": evaluation.execute,
+                "function": BaseEvaluationStep.make_execute(
+                    prefix_fn=lambda item: item.get("full_prompt", ""),
+                    completion_fn=lambda item: (
+                        item.get("decoded_response") or item.get("response", "") or ""
+                    ),
+                    technique_params_key="cipherchat_params",
+                ),
                 "step_type_enum": "EVALUATION",
                 "config_keys": [
                     "cipherchat_params",

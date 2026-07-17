@@ -133,7 +133,7 @@ class TestBaselineEvaluateResponsesErrors(unittest.TestCase):
     """Test that static template evaluate_responses skips error rows."""
 
     def test_error_rows_excluded_from_pattern_eval(self):
-        from hackagent.attacks.techniques.static_template.evaluation import (
+        from hackagent.attacks.techniques.static_template.static_eval import (
             evaluate_responses,
         )
 
@@ -153,17 +153,17 @@ class TestBaselineEvaluateResponsesErrors(unittest.TestCase):
         config = {"objective": "jailbreak", "evaluator_type": "pattern"}
         result = evaluate_responses(data, config, logging.getLogger("test"))
 
-        # Error row should be marked, not pattern-evaluated
+        # Error row should be marked
         self.assertTrue(result[1].get("is_error"))
         self.assertFalse(result[1]["success"])
         self.assertIn("error", result[1]["evaluation_notes"].lower())
 
-        # Non-error row should be evaluated normally
+        # Non-error row: evaluate_responses is now error-detection only;
+        # pattern evaluation is no longer performed here (LLM judge only).
         self.assertNotIn("is_error", result[0])
-        self.assertIn("evaluation_notes", result[0])
 
     def test_all_errors_asr_zero(self):
-        from hackagent.attacks.techniques.static_template.evaluation import (
+        from hackagent.attacks.techniques.static_template.static_eval import (
             evaluate_responses,
         )
 
@@ -201,7 +201,7 @@ class TestBaselineFinalizeErrors(unittest.TestCase):
         )
 
     def test_all_error_goal_gets_error_status(self):
-        from hackagent.attacks.techniques.static_template.evaluation import (
+        from hackagent.attacks.techniques.static_template.static_eval import (
             _finalize_goals_with_tracker,
         )
 
@@ -241,7 +241,7 @@ class TestBaselineFinalizeErrors(unittest.TestCase):
         )
 
     def test_mixed_goal_gets_normal_status(self):
-        from hackagent.attacks.techniques.static_template.evaluation import (
+        from hackagent.attacks.techniques.static_template.static_eval import (
             _finalize_goals_with_tracker,
         )
 

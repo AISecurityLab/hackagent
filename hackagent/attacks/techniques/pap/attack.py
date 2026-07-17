@@ -28,7 +28,9 @@ from hackagent.router.router import AgentRouter
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.shared.tui import with_tui_logging
 
-from . import generation, evaluation
+from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
+
+from . import generation
 from .config import DEFAULT_PAP_CONFIG
 
 
@@ -142,7 +144,7 @@ class PAPAttack(BaseAttack):
             },
             {
                 "name": "Evaluation Post-processing: Server Sync, Tracker & ASR Logging",
-                "function": evaluation.execute,
+                "function": BaseEvaluationStep.make_postprocess_execute("PAP"),
                 "step_type_enum": "EVALUATION",
                 "config_keys": [
                     "pap_params",

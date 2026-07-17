@@ -21,7 +21,7 @@ from . import generation
 from .config import DEFAULT_BASELINE_CONFIG
 
 # Reuse evaluation from static_template (same interface)
-from hackagent.attacks.techniques.static_template import evaluation
+from hackagent.attacks.techniques.static_template import static_eval as evaluation
 
 
 class BaselineAttack(BaseAttack):
@@ -80,16 +80,16 @@ class BaselineAttack(BaseAttack):
         *,
         goal_labels_by_index: Optional[Dict[int, Dict[str, str]]] = None,
     ) -> List[Dict[str, Any]]:
-        """Baseline only needs judge models (if using llm_judge evaluator)."""
+        """Baseline always needs judge models for LLM-judge evaluation."""
         _ = goal_labels_by_index
-
-        evaluator_type = str(attack_config.get("evaluator_type", "llm_judge")).lower()
-        if evaluator_type != "llm_judge":
-            return []
 
         judges = attack_config.get("judges")
         if isinstance(judges, list) and judges:
             return [{"role": "judge", "config": judge} for judge in judges]
+
+        judge = attack_config.get("judge")
+        if isinstance(judge, dict):
+            return [{"role": "judge", "config": judge}]
 
         judge_config = attack_config.get("judge_config")
         if isinstance(judge_config, dict):
@@ -122,8 +122,8 @@ class BaselineAttack(BaseAttack):
                 "step_type_enum": "EVALUATION",
                 "config_keys": [
                     "objective",
-                    "evaluator_type",
                     "judges",
+                    "judge",
                     "judge_config",
                     "min_response_length",
                     "batch_size_judge",

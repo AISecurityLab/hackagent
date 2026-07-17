@@ -1,6 +1,6 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-"""AutoDAN-Turbo orchestrator — WarmUp → Lifelong → scorer finalization."""
+"""AutoDAN-Turbo orchestrator — WarmUp → Lifelong → shared LLM-judge evaluation."""
 
 import copy
 import logging
@@ -10,7 +10,7 @@ from typing import Any, Dict, List
 from hackagent.attacks.shared.tui import with_tui_logging
 from hackagent.attacks.techniques.base import BaseAttack
 
-from . import evaluation, lifelong, warm_up
+from . import autodan_eval as evaluation, lifelong, warm_up
 from .config import DEFAULT_AUTODAN_TURBO_CONFIG, AutoDANTurboConfig
 from .dashboard_tracing import emit_phase_trace
 from .log_styles import format_phase_message, phase_separator
@@ -57,7 +57,7 @@ class AutoDANTurboAttack(BaseAttack):
     Three-phase pipeline:
     1. WarmUp — free exploration to bootstrap a strategy library
     2. Lifelong — strategy-guided attacks with retrieval + summarization
-    3. Evaluation — scorer-only result finalization
+    3. Evaluation — shared LLM-judge result finalization
     """
 
     def __init__(self, config=None, client=None, agent_router=None):
@@ -117,8 +117,11 @@ class AutoDANTurboAttack(BaseAttack):
         _ = goal_labels_by_index
 
         roles: List[Dict[str, Any]] = []
-        for role_name in ("attacker", "scorer", "summarizer"):
-            role_config = attack_config.get(role_name)
+        # Accept both "judge" (new) and "scorer" (legacy) for the judge role.
+        for role_name in ("attacker", "judge", "summarizer"):
+            role_config = attack_config.get(role_name) or (
+                attack_config.get("scorer") if role_name == "judge" else None
+            )
             if isinstance(role_config, dict):
                 roles.append({"role": role_name, "config": role_config})
 
@@ -155,13 +158,13 @@ class AutoDANTurboAttack(BaseAttack):
         Pipeline mapping to paper/integration:
         1) WarmUp: free exploration + strategy library bootstrap
         2) Lifelong: retrieval-guided attack with online strategy growth
-        3) Evaluation: scorer-only normalization and success finalization
+        3) Evaluation: shared LLM-judge normalization and success finalization
 
         Args:
             goals: List of malicious goals to attack.
 
         Returns:
-            Final per-goal result list, enriched with scorer-based metrics.
+            Final per-goal result list, enriched with LLM judge outputs.
 
         Raises:
             Exception: Re-raises any runtime failure after coordinator finalization.
@@ -190,8 +193,16 @@ class AutoDANTurboAttack(BaseAttack):
                 or (self.config.get(role, {}) or {}).get("name")
                 or "unknown-model"
             )
-            for role in ("attacker", "scorer", "summarizer")
+            for role in ("attacker", "summarizer")
         }
+        # Accept both "judge" (new) and "scorer" (legacy).
+        _judge_cfg = self.config.get("judge") or self.config.get("scorer") or {}
+        role_models["judge"] = (
+            _judge_cfg.get("identifier")
+            or _judge_cfg.get("model")
+            or _judge_cfg.get("name")
+            or "unknown-model"
+        )
 
         backend_agent = getattr(self.agent_router, "backend_agent", None)
         registration_key = (
@@ -219,7 +230,7 @@ class AutoDANTurboAttack(BaseAttack):
                 "pipeline",
                 "AutoDAN-Turbo LLM map -> "
                 f"attacker:{role_models['attacker']} | "
-                f"scorer:{role_models['scorer']} | "
+                f"judge:{role_models['judge']} | "
                 f"summarizer:{role_models['summarizer']} | "
                 f"target:{target_model}",
             )
@@ -331,10 +342,10 @@ class AutoDANTurboAttack(BaseAttack):
 
             results = coordinator.enrich_with_result_ids(results)
 
-            # Step 3: Evaluation — scorer-only finalization
+            # Step 3: Evaluation — shared LLM-judge finalization
             self.logger.info(phase_separator("evaluation", "starting phase"))
             with self.tracker.track_step(
-                "Evaluation: Scorer-threshold finalization",
+                "Evaluation: Shared LLM-judge finalization",
                 "EVALUATION",
                 results[:3],
                 {},
@@ -353,7 +364,7 @@ class AutoDANTurboAttack(BaseAttack):
                     )
                 )
 
-            # Finalize using scorer-derived success flag only.
+            # Finalize using shared evaluation success flag.
             coordinator.finalize_all_goals(
                 results,
                 scorer=lambda goal_data: any(

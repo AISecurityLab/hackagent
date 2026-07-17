@@ -53,7 +53,7 @@ from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.server.client import AuthenticatedClient
 from hackagent.router.router import AgentRouter
 
-from . import evaluation, generation
+from . import tap_evaluation as evaluation, generation
 from .config import DEFAULT_TAP_CONFIG
 
 

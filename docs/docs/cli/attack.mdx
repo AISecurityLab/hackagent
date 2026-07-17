@@ -166,9 +166,9 @@ hackagent eval static-template \
 |------------|----------|-------|
 | `goals` or `dataset` | ✅ | No usable default (`goals=[]`, `dataset=None`), must be provided |
 | `output_dir`, `template_categories`, `templates_per_category`, `max_tokens`, `objective` | ❌ | Required at runtime but defaulted in `DEFAULT_TEMPLATE_CONFIG` |
-| `n_samples_per_template`, `evaluator_type`, `judge_config`, `min_response_length`, `deduplicate_responses` | ❌ | Optional baseline settings |
+| `n_samples_per_template`, `judges`/`judge`/`judge_config`, `min_response_length`, `deduplicate_responses` | ❌ | Optional static-template settings (LLM judge is always used) |
 
-### Example `baseline.json`
+### Example `static_template.json`
 
 ```json
 {
@@ -177,7 +177,22 @@ hackagent eval static-template \
   "templates_per_category": 3,
   "n_samples_per_template": 1,
   "objective": "jailbreak",
-  "evaluator_type": "pattern",
+  "judges": [
+    {
+      "identifier": "gemma3:4b",
+      "endpoint": "http://localhost:11434",
+      "agent_type": "OLLAMA",
+      "type": "harmbench",
+      "range": "binary"
+    },
+    {
+      "identifier": "gemma3:4b",
+      "endpoint": "http://localhost:11434",
+      "agent_type": "OLLAMA",
+      "type": "scorer",
+      "range": "decimal"
+    }
+  ],
   "min_response_length": 10,
   "deduplicate_responses": true,
   "max_tokens": 4096
@@ -205,7 +220,7 @@ hackagent eval pair \
 |------------|----------|-------|
 | `goals` or `dataset` | ✅ | No usable default (`goals=[]`, `dataset=None`), must be provided |
 | `objective`, `attacker`, `n_iterations`, `output_dir` | ❌ | Required at runtime but defaulted in `DEFAULT_PAIR_CONFIG` |
-| `scorer`, `n_streams`, `early_stop_on_success`, `jailbreak_threshold` | ❌ | Optional PAIR settings |
+| `judge`, `n_streams`, `early_stop_on_success`, `jailbreak_threshold` | ❌ | Optional PAIR settings (`range: binary|decimal`) |
 
 ### Example `pair.json`
 
@@ -218,10 +233,12 @@ hackagent eval pair \
     "endpoint": "http://localhost:11434",
     "agent_type": "OLLAMA"
   },
-  "scorer": {
+  "judge": {
     "identifier": "gemma3:4b",
     "endpoint": "http://localhost:11434",
-    "agent_type": "OLLAMA"
+    "agent_type": "OLLAMA",
+    "type": "scorer",
+    "range": "decimal"
   },
   "n_iterations": 5,
   "n_streams": 5,
@@ -344,7 +361,7 @@ hackagent eval autodan_turbo \
 | `autodan_turbo_params.epochs` | ❌ | Defaulted in `DEFAULT_AUTODAN_TURBO_CONFIG` |
 | `attacker.identifier` | ❌ | Defaulted in `DEFAULT_AUTODAN_TURBO_CONFIG` (`gemma3:4b`) |
 | `autodan_turbo_params.*` (warm-up/lifelong/threshold/retrieval) | ❌ | Optional algorithm parameters |
-| `scorer`, `summarizer`, `embedder`, `target_request_overrides` | ❌ | Optional extra roles/config |
+| `judge`, `summarizer`, `embedder`, `target_request_overrides` | ❌ | Optional extra roles/config (LLM judge always used in evaluation) |
 
 ### Example `autodan_turbo.json`
 
@@ -356,10 +373,12 @@ hackagent eval autodan_turbo \
     "endpoint": "http://localhost:11434",
     "agent_type": "OLLAMA"
   },
-  "scorer": {
+  "judge": {
     "identifier": "gemma3:4b",
     "endpoint": "http://localhost:11434",
-    "agent_type": "OLLAMA"
+    "agent_type": "OLLAMA",
+    "type": "scorer",
+    "range": "decimal"
   },
   "summarizer": {
     "identifier": "gemma3:4b",

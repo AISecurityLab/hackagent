@@ -34,7 +34,7 @@ import logging
 from unittest.mock import MagicMock, patch
 
 
-from hackagent.attacks.techniques.advprefix.evaluation import (
+from hackagent.attacks.techniques.advprefix.eval_pipeline import (
     EvaluationPipeline,
     GROUP_KEYS,
 )

@@ -7,7 +7,7 @@ import logging
 import unittest
 from unittest.mock import MagicMock
 
-from hackagent.attacks.techniques.advprefix.evaluation import EvaluationPipeline
+from hackagent.attacks.techniques.advprefix.eval_pipeline import EvaluationPipeline
 
 
 class TestAdvPrefixEvaluationPipeline(unittest.TestCase):
