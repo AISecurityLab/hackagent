@@ -231,7 +231,17 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
             AttackOrchestrator, "_execute_local_attack", return_value=pair_results
         ):
             orch.execute(
-                attack_config={"attack_type": "pair", "goals": ["g1", "g2"]},
+                attack_config={
+                    "attack_type": "pair",
+                    "goals": ["g1", "g2"],
+                    # Bypass the default category_classifier's local-Ollama
+                    # requirement, which isn't installed on CI runners.
+                    "category_classifier": {
+                        "identifier": "gemma3:4b",
+                        "agent_type": "OLLAMA",
+                        "endpoint": "http://localhost:11434",
+                    },
+                },
                 run_config_override=None,
                 fail_on_run_error=False,
             )
