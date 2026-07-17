@@ -377,6 +377,37 @@ class AttackOrchestrator:
 
             for role_name, role_family in role_mapping.items():
                 role_defaults = dict(defaults_by_family[role_family])
+
+                # Judge precedence:
+                # 1) explicit `judges` list
+                # 2) explicit single `judge`
+                # 3) defaults only when neither is provided
+                if role_name == "judge":
+                    judges_cfg = resolved.get("judges")
+                    if isinstance(judges_cfg, list) and judges_cfg:
+                        for item in judges_cfg:
+                            if isinstance(item, dict):
+                                self._merge_missing_keys(item, role_defaults)
+                        if not isinstance(resolved.get("judge"), dict):
+                            first_judge = next(
+                                (item for item in judges_cfg if isinstance(item, dict)),
+                                None,
+                            )
+                            if isinstance(first_judge, dict):
+                                resolved["judge"] = dict(first_judge)
+                        continue
+
+                    explicit_single_judge = resolved.get("judge")
+                    if isinstance(explicit_single_judge, dict):
+                        self._merge_missing_keys(explicit_single_judge, role_defaults)
+                        resolved["judge"] = explicit_single_judge
+                        resolved["judges"] = [dict(explicit_single_judge)]
+                        continue
+
+                    resolved["judge"] = dict(role_defaults)
+                    resolved["judges"] = [dict(resolved["judge"])]
+                    continue
+
                 role_cfg = resolved.get(role_name)
 
                 # Backward compatibility: promote legacy scorer role to judge.
@@ -401,23 +432,6 @@ class AttackOrchestrator:
                 # requests with reasoning disabled). Tied to the identifier, not
                 # the role, so an explicit --attacker-model is never affected.
                 self._enable_remote_reasoning_if_needed(role_cfg)
-
-                # Judge-based attacks usually consume list-style judge configs.
-                if role_name == "judge":
-                    judges_cfg = resolved.get("judges")
-                    if isinstance(judges_cfg, list) and judges_cfg:
-                        for item in judges_cfg:
-                            if isinstance(item, dict):
-                                self._merge_missing_keys(item, role_defaults)
-                    else:
-                        # Keep explicit single-judge overrides in sync with
-                        # list-style consumers (e.g. h4rm3l) instead of
-                        # replacing them with baseline defaults.
-                        explicit_single_judge = resolved.get("judge")
-                        if isinstance(explicit_single_judge, dict):
-                            resolved["judges"] = [dict(explicit_single_judge)]
-                        else:
-                            resolved["judges"] = [dict(role_defaults)]
 
         # Route the goal category classifier through the HackAgent API too when
         # a key is available, so it never needs a local Ollama model. In local
