@@ -378,11 +378,23 @@ class AttackOrchestrator:
             for role_name, role_family in role_mapping.items():
                 role_defaults = dict(defaults_by_family[role_family])
 
-                # Judge precedence:
-                # 1) explicit `judges` list
-                # 2) explicit single `judge`
-                # 3) defaults only when neither is provided
                 if role_name == "judge":
+                    # Backward compatibility: promote legacy `scorer` config to
+                    # `judge` when no canonical `judge` is provided; `judge`
+                    # always wins if both are present. Either way, drop
+                    # `scorer` so it doesn't linger as an unrecognized extra
+                    # key in strict configs (e.g. PairConfig/AutoDANTurboConfig
+                    # use extra="forbid").
+                    legacy_scorer_cfg = resolved.pop("scorer", None)
+                    if isinstance(legacy_scorer_cfg, dict) and not isinstance(
+                        resolved.get("judge"), dict
+                    ):
+                        resolved["judge"] = copy.deepcopy(legacy_scorer_cfg)
+
+                    # Judge precedence:
+                    # 1) explicit `judges` list
+                    # 2) explicit single `judge` (or scorer promoted above)
+                    # 3) defaults only when neither is provided
                     judges_cfg = resolved.get("judges")
                     if isinstance(judges_cfg, list) and judges_cfg:
                         for item in judges_cfg:
@@ -409,17 +421,6 @@ class AttackOrchestrator:
                     continue
 
                 role_cfg = resolved.get(role_name)
-
-                # Backward compatibility: promote legacy scorer role to judge.
-                if role_name == "judge" and isinstance(resolved.get("scorer"), dict):
-                    if not isinstance(role_cfg, dict):
-                        resolved["judge"] = copy.deepcopy(resolved["scorer"])
-                        role_cfg = resolved["judge"]
-                    # `judge` is now canonical (either user-supplied or just
-                    # promoted from `scorer`) — drop `scorer` so it doesn't
-                    # linger as an unrecognized extra key in strict configs
-                    # (e.g. PairConfig/AutoDANTurboConfig use extra="forbid").
-                    del resolved["scorer"]
 
                 if isinstance(role_cfg, dict):
                     self._merge_missing_keys(role_cfg, role_defaults)
