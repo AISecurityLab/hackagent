@@ -6,6 +6,10 @@ sidebar_position: 4
 
 Build **custom evaluation campaigns** tailored to your organization's security requirements, compliance needs, and threat model.
 
+:::note
+`result.get('asr', ...)` below is illustrative shorthand — see the [Evaluation Campaigns overview](../evaluation-campaigns) for how to reliably read ASR.
+:::
+
 ## When to Build Custom Campaigns
 
 - Unique threat models not covered by standard profiles
@@ -136,11 +140,12 @@ def run_custom_campaign(agent, config):
         # Test with profile's recommended datasets
         if profile.has_datasets:
             for ds in profile.primary_datasets:
-                result = agent.hack(
-                    attack_type="static_template",
-                    dataset={"preset": ds.preset},
-                    objective=profile.objective,
-                )
+                attack_config = {
+                    "attack_type": "static_template",
+                    "dataset": {"preset": ds.preset},
+                    "objective": profile.objective,
+                }
+                result = agent.hack(attack_config=attack_config)
 
                 key = f"{profile.name}_{ds.preset}"
                 results[key] = result
@@ -152,11 +157,12 @@ def run_custom_campaign(agent, config):
         custom_goals = config["custom_goals"].get(vuln_name.replace("_", ""), [])
 
         if custom_goals:
-            result = agent.hack(
-                attack_type="static_template",
-                goals=custom_goals,
-                objective=profile.objective,
-            )
+            attack_config = {
+                "attack_type": "static_template",
+                "goals": custom_goals,
+                "objective": profile.objective,
+            }
+            result = agent.hack(attack_config=attack_config)
 
             key = f"{profile.name}_custom"
             results[key] = result
@@ -185,11 +191,12 @@ def multi_stage_campaign(agent, profile, dataset):
     for stage in stages:
         print(f"Running {stage} attack...")
 
-        result = agent.hack(
-            attack_type=stage,
-            dataset={"preset": dataset},
-            objective=profile.objective,
-        )
+        attack_config = {
+            "attack_type": stage,
+            "dataset": {"preset": dataset},
+            "objective": profile.objective,
+        }
+        result = agent.hack(attack_config=attack_config)
 
         asr = result.get("asr", 0)
         results[stage] = result
@@ -230,11 +237,12 @@ def scheduled_security_scan():
     from hackagent.risks.prompt_injection import PROMPT_INJECTION_PROFILE
 
     for profile in [JAILBREAK_PROFILE, PROMPT_INJECTION_PROFILE]:
-        result = agent.hack(
-            attack_type="static_template",
-            dataset={"preset": profile.primary_datasets[0].preset},
-            objective=profile.objective,
-        )
+        attack_config = {
+            "attack_type": "static_template",
+            "dataset": {"preset": profile.primary_datasets[0].preset},
+            "objective": profile.objective,
+        }
+        result = agent.hack(attack_config=attack_config)
 
         asr = result.get("asr", 0)
 
@@ -306,11 +314,12 @@ def run_compliance_campaign(agent, standard):
     passed = True
 
     for profile in config["profiles"]:
-        result = agent.hack(
-            attack_type="static_template",
-            goals=config["custom_goals"],
-            objective=profile.objective,
-        )
+        attack_config = {
+            "attack_type": "static_template",
+            "goals": config["custom_goals"],
+            "objective": profile.objective,
+        }
+        result = agent.hack(attack_config=attack_config)
 
         asr = result.get("asr", 0)
         max_asr = config["max_asr"]

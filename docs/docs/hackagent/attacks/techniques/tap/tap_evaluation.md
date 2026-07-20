@@ -1,6 +1,6 @@
 ---
-sidebar_label: evaluation
-title: hackagent.attacks.techniques.tap.evaluation
+sidebar_label: tap_evaluation
+title: hackagent.attacks.techniques.tap.tap_evaluation
 ---
 
 Evaluation helpers for TAP using the shared evaluator framework.

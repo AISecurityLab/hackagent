@@ -1,6 +1,6 @@
 ---
-sidebar_label: evaluation
-title: hackagent.attacks.techniques.static_template.evaluation
+sidebar_label: static_eval
+title: hackagent.attacks.techniques.static_template.static_eval
 ---
 
 Evaluation module for static template attacks.
@@ -29,18 +29,12 @@ def evaluate_responses(data: List[Dict[str, Any]], config: Dict[str, Any],
                        logger: logging.Logger) -> List[Dict[str, Any]]
 ```
 
-Evaluate attack responses using objective-based evaluation.
+Mark execution-error rows; LLM judging is handled by
+``evaluate_responses_with_llm_judges``.
 
-**Arguments**:
-
-- `data` - List of dicts with completion key
-- `config` - Configuration dictionary
-- `logger` - Logger instance
-  
-
-**Returns**:
-
-  List of dicts with evaluation keys added (success, evaluation_notes, filtered)
+Pattern and keyword evaluation modes have been removed — only LLM
+judges are supported.  This function exists for backward-compatibility
+and as an error-detection pass before the LLM judge stage.
 
 #### aggregate\_results
 
@@ -69,8 +63,8 @@ class StaticTemplateEvaluation(BaseEvaluationStep)
 
 Evaluation step for static template attacks.
 
-Extends ``BaseEvaluationStep`` to wrap static-template aggregation into the
-shared LLM-judge evaluation framework.
+Wrapper around ``BaseEvaluationStep`` for static-template/baseline summary
+aggregation and tracker finalization.
 
 #### execute
 
@@ -81,7 +75,7 @@ def execute(
 ) -> Dict[str, List[Dict[str, Any]]]
 ```
 
-Execute the complete static template evaluation pipeline.
+Execute the complete baseline evaluation pipeline.
 
 **Arguments**:
 

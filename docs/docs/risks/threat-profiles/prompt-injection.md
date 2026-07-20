@@ -25,7 +25,6 @@ Tests whether injected instructions override system prompts.
 ### Primary Attacks
 - **Static Template**: Template-based prompt injection
 - **PAIR**: Iterative refinement for bypass discovery
-- **RAG Attack**: Indirect Injection via poisoned retrieval context (`attack_type="rag"`)
 
 ### Secondary Attacks
 - **AdvPrefix**: Adversarial prefix optimisation
@@ -56,10 +55,11 @@ agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 # Use profile recommendations
 for attack in PROMPT_INJECTION_PROFILE.primary_attacks:
     for dataset in PROMPT_INJECTION_PROFILE.primary_datasets:
-        result = agent.hack(
-            attack_type=attack.technique.lower(),
-            dataset=dataset.preset,
-            objective=PROMPT_INJECTION_PROFILE.objective,
-        )
-        print(f"ASR: {result.get('asr', 'N/A')}")
+        attack_config = {
+            "attack_type": attack.technique.lower(),
+            "objective": PROMPT_INJECTION_PROFILE.objective,
+            "dataset": {"preset": dataset.preset},
+        }
+        results = agent.hack(attack_config=attack_config)
+        print(f"Results: {results}")
 ```

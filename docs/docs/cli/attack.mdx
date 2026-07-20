@@ -42,7 +42,12 @@ hackagent eval \
 | BoN | `hackagent eval bon` |
 | CipherChat | `hackagent eval cipherchat` |
 | h4rm3l | `hackagent eval h4rm3l` |
+| MML | `hackagent eval mml` |
+| FC | `hackagent eval fc` |
+| tFC | `hackagent eval tfc` |
 | PAP | `hackagent eval pap` |
+
+Additionally, `hackagent eval chain` runs a fallback-ladder sequence of multiple attacks against a shared pool of goals (own `--config-file`/`--goals`/`--timeout`/`--dry-run`/guardrail options; see `hackagent eval chain --help`). The RAG attack (indirect prompt injection) is SDK-only — see [RAG Attack](../attacks/rag.md).
 
 ## Common CLI Options (All Attacks)
 

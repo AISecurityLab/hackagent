@@ -37,7 +37,7 @@ The current taxonomy includes the following risk macro-categories:
 
 ## Micro-Category Example
 
-- Jailbreak is a risk micro-category under **Cybersecurity**.
+- Jailbreak, Prompt Injection, and System Prompt Leakage are risk micro-categories under **Cybersecurity**.
 - Indirect Injection is documented as a dedicated risk scenario under **Cybersecurity** for RAG systems.
 
 ## What Is a Risk Profile
@@ -51,9 +51,10 @@ The defined categories are not intended to be mutually exclusive, nor to form an
 ## What Is Implemented Today
 
 - **Implemented Risk Macro-Category**: Cybersecurity
-- **Implemented Risk Micro-Category**: Jailbreak (under Cybersecurity)
+- **Implemented Risk Micro-Categories**: 13 built-in vulnerabilities, each with a ready-to-run threat profile — see [Vulnerability Categories](./risk-categories.mdx) for the full map and [Threat Profiles](./threat-profiles.md) for per-category datasets/attacks/metrics.
 - **Documented Dedicated Scenario**: Indirect Injection (RAG context poisoning)
-- Current quick flow: [Evaluation Campaign](/getting-started/quick-security-scan)
+- **Extensible**: define your own vulnerability categories — see [Custom Vulnerabilities](./custom-vulnerabilities.md)
+- Current quick flow: [Evaluation Campaign](./evaluation-campaigns.md)
 
 ## Core Concepts
 
@@ -62,15 +63,17 @@ The defined categories are not intended to be mutually exclusive, nor to form an
 | **Risk Profile** | Defines the scope of the assessment as one or more macro-categories (or micro-categories). |
 | **Evaluation Campaign** | Operationalizes the risk profile into an executable plan: datasets, attacks, objective, and metrics. |
 
-For the currently implemented configuration, see [Jailbreak](/risks/vulnerabilities) and [Indirect Injection](/risks/indirect-prompt-injection).
+For the currently implemented configuration, see [Vulnerability Categories](./risk-categories.mdx), [Threat Profiles](./threat-profiles.md), and [Indirect Injection](./indirect-prompt-injection.md).
 
 ## Documentation Guide
 
 | Page | Description |
 |------|-------------|
-| [Jailbreak](/risks/vulnerabilities) | Cybersecurity risk profile + Jailbreak micro-category reference |
-| [Indirect Injection](/risks/indirect-prompt-injection) | Dedicated risk scenario for poisoned retrieved context in RAG pipelines |
-| [Evaluation Campaign](/getting-started/quick-security-scan) | Run the 3 primary jailbreak attacks in sequence |
+| [Vulnerability Categories](./risk-categories.mdx) | The 13 built-in vulnerability classes, organized by attack surface layer |
+| [Threat Profiles](./threat-profiles.md) | Per-category recommended datasets, attack techniques, objective, and metrics |
+| [Custom Vulnerabilities](./custom-vulnerabilities.md) | Extend `BaseVulnerability` to define your own categories |
+| [Indirect Injection](./indirect-prompt-injection.md) | Dedicated risk scenario for poisoned retrieved context in RAG pipelines |
+| [Evaluation Campaigns](./evaluation-campaigns.md) | Quick scans, comprehensive audits, targeted assessments, and custom campaigns |
 
 ## Related Resources
 

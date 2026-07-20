@@ -38,7 +38,7 @@ def __init__(endpoint: str,
              base_url: Optional[str] = None,
              api_key: Optional[str] = None,
              raise_on_unexpected_status: bool = False,
-             timeout: Optional[float] = None,
+             timeout: Optional[float] = 120.0,
              metadata: Optional[Dict[str, Any]] = None,
              target_config: Optional[Dict[str, Any]] = None,
              adapter_operational_config: Optional[Dict[str, Any]] = None,
@@ -72,17 +72,20 @@ attack strategies.
   raise an exception for any HTTP status codes that are not typically
   expected for a successful operation. Defaults to `False`.
 - `name`0 - The timeout duration in seconds for API requests made by the
-  authenticated client. Defaults to `name`1 (which might mean a
-  default timeout from the underlying HTTP library is used).
-- `name`2 - Optional dictionary containing agent-specific metadata.
-- `name`3 - Optional default request settings for the configured
+  authenticated (remote) HackAgent backend client. Defaults to
+  `name`1 seconds so requests to a misbehaving/unreachable backend
+  fail predictably instead of hanging indefinitely. Pass `name`2
+  explicitly to opt out and disable the timeout (unbounded wait,
+  the previous default behavior).
+- `name`3 - Optional dictionary containing agent-specific metadata.
+- `name`4 - Optional default request settings for the configured
   victim model. This is the preferred place to define target-side
-  generation defaults such as `name`4, `name`5,
+  generation defaults such as `name`5, `name`6,
   and `name`0.
-- `name`7 - Optional configuration for the agent adapter.
-- `name`8 - Optional OLLAMA-only control for reasoning traces.
+- `name`8 - Optional configuration for the agent adapter.
+- `name`9 - Optional OLLAMA-only control for reasoning traces.
   When set to `False`, requests sent through the target OLLAMA adapter
-  include `agent_type`0 to disable thinking output. Ignored for
+  include `agent_type`1 to disable thinking output. Ignored for
   non-OLLAMA target agent types.
 
 #### attack\_strategies
@@ -137,4 +140,82 @@ delegates the execution to the chosen strategy.
   strategy.
 - `self.router`0 - For issues during backend
   agent operations, or other unexpected errors during the attack process.
+
+#### hack\_chain
+
+```python
+def hack_chain(attacks: Optional[list] = None,
+               goals: Optional[list] = None,
+               run_config_override: Optional[Dict[str, Any]] = None,
+               fail_on_run_error: bool = True,
+               escalate_only_mitigated: bool = True,
+               _tui_event_bus: Optional[Any] = None) -> list
+```
+
+Runs a sequence of attack strategies against a shared pool of goals.
+
+By default (``escalate_only_mitigated=True``) this implements a
+&quot;fallback ladder&quot;: every goal starts at ``attacks[0]``. Any goal for
+which the victim&#x27;s response is judged successful (a jailbreak/
+violation) is considered resolved and is dropped from the chain — it
+is never retried. Any goal that is mitigated (the victim&#x27;s response
+is judged safe) is carried over and retried with ``attacks[1]``, then
+``attacks[2]``, and so on, until either the goal succeeds or the
+chain is exhausted.
+
+With ``escalate_only_mitigated=False``, every goal is instead sent to
+*every* attack in the chain regardless of outcome — useful for
+running several attacks against the same goal set and collecting all
+of their results in one call, rather than escalating only failures.
+
+Success/mitigation is determined per goal from the evaluated result
+rows returned by each step (see
+``hackagent.attacks.evaluator.metrics.is_successful_result``): a goal
+is considered successful for a step if *any* of its result rows for
+that step are judged successful.
+
+**Arguments**:
+
+- ``2 - Ordered list of ``attack_config`` dicts, one per chain
+  step, using the same shape accepted by :meth:``5 (each
+  must include its own ``attack_type`` and any attack-specific
+  settings). Only the *first* entry needs to specify how goals
+  are sourced (``goals``, ``dataset`` or ``intents``) unless
+  the ``goals`` parameter below is provided; subsequent steps
+  automatically receive only the goals still mitigated by the
+  previous step (or all goals, see ``escalate_only_mitigated``).
+  Defaults to ``None``, which resolves to the Jailbreak
+  evaluation campaign&#x27;s primary attacks, in order — ``h4rm3l``
+  → ``TAP`` → ``PAIR`` (see
+  ``hackagent.risks.jailbreak.JAILBREAK_PROFILE``). A goal
+  source is still required either way, via ``goals`` or a
+  ``dataset``/``goals``/``intents`` key on the first step.
+- ``6 - Optional explicit list of goal strings to use for the
+  whole chain. When provided, it takes precedence over any
+  ``goals``/``dataset``/``intents`` set on ``attacks[0]``.
+- ``5 - Optional run configuration overrides applied
+  to every step, forwarded to :meth:``5.
+- ``7 - Forwarded to :meth:``5 for every step.
+- ``9 - When ``True`` (default), a goal only
+  moves on to the next attack if it was mitigated at the
+  current step — goals that already succeeded are dropped, and
+  each goal&#x27;s final result is either its first success or its
+  last (final) attempt. When ``False``, every goal is sent to
+  every attack regardless of outcome, and results from *all*
+  steps are kept for every goal (nothing is dropped or
+  overwritten).
+  
+
+**Returns**:
+
+  A flat list of result rows (same row shape as :meth:``5),
+  grouped by original goal, in first-seen order. Each row is
+  tagged with ``chain_step`` (0-based index into ``attacks``) and
+  ``chain_attack_type`` identifying which attack produced it.
+  
+
+**Raises**:
+
+- ``1 - If ``attacks`` is empty, or a step is missing
+  ``attack_type``.
 

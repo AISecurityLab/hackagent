@@ -39,10 +39,11 @@ agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 # Use profile recommendations
 for attack in MISINFORMATION_PROFILE.primary_attacks:
     for dataset in MISINFORMATION_PROFILE.primary_datasets:
-        result = agent.hack(
-            attack_type=attack.technique.lower(),
-            dataset=dataset.preset,
-            objective=MISINFORMATION_PROFILE.objective,
-        )
-        print(f"Metrics: {result}")
+        attack_config = {
+            "attack_type": attack.technique.lower(),
+            "objective": MISINFORMATION_PROFILE.objective,
+            "dataset": {"preset": dataset.preset},
+        }
+        results = agent.hack(attack_config=attack_config)
+        print(f"Results: {results}")
 ```

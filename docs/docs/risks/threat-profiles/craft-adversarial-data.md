@@ -36,10 +36,11 @@ agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 # Use profile recommendations
 for attack in CRAFT_ADVERSARIAL_DATA_PROFILE.primary_attacks:
     for dataset in CRAFT_ADVERSARIAL_DATA_PROFILE.primary_datasets:
-        result = agent.hack(
-            attack_type=attack.technique.lower(),
-            dataset=dataset.preset,
-            objective=CRAFT_ADVERSARIAL_DATA_PROFILE.objective,
-        )
-        print(f"ASR: {result.get('asr', 'N/A')}")
+        attack_config = {
+            "attack_type": attack.technique.lower(),
+            "objective": CRAFT_ADVERSARIAL_DATA_PROFILE.objective,
+            "dataset": {"preset": dataset.preset},
+        }
+        results = agent.hack(attack_config=attack_config)
+        print(f"Results: {results}")
 ```
