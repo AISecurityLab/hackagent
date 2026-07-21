@@ -46,9 +46,9 @@ Hyperparameters controlling the FlipAttack obfuscation strategy.
   FWO decoding instruction).
 - `cot` - When ``True``, adds a chain-of-thought suffix to the decoding
   instruction so the model answers step by step.
-- ``2 - When ``True``, wraps the system prompt in a structured
+- `lang_gpt` - When ``True``, wraps the system prompt in a structured
   LangGPT Role/Profile/Rules template instead of the plain prompt.
-- ``5 - When ``True``, injects two task-oriented decoding
+- `few_shot` - When ``True``, injects two task-oriented decoding
   demonstrations into the prompt.
 
 ## FlipAttackConfig Objects

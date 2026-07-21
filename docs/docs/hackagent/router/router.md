@@ -25,7 +25,7 @@ lightweight ``_ChatRegistration`` (for every chat AgentType).
 - `organization_id` - The UUID of the organization associated with the backend.
 - `user_id_str` - The string user ID associated with the backend context.
 - `backend_agent` - The `AgentRecord` representing this agent in storage.
-- ``0 - Dict mapping agent ID → instantiated adapter ``1 objects.
+- `_agent_registry` - Dict mapping agent ID → instantiated adapter `Agent` objects.
 
 #### \_\_init\_\_
 

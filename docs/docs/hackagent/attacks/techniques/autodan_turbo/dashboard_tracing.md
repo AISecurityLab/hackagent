@@ -30,9 +30,9 @@ by phase/subphase in server traces.
 - `phase` - High-level phase label (e.g. ``WARMUP``, ``LIFELONG``).
 - `subphase` - Finer-grained action label (generation/scoring/etc.).
 - `step_name` - Human-readable trace step title.
-- ``0 - Extra structured fields to attach to trace content.
-- ``1 - Optional goal text used to resolve goal context.
-- ``2 - Optional goal index fallback for context resolution.
+- `payload` - Extra structured fields to attach to trace content.
+- `goal` - Optional goal text used to resolve goal context.
+- `goal_idx` - Optional goal index fallback for context resolution.
   
 
 **Returns**:

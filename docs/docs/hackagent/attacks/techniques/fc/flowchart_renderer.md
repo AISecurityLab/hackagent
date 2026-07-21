@@ -81,8 +81,8 @@ Requires the ``dot`` binary to be available on the system.
 - `goal_text` - The original goal/prompt displayed as the first node.
 - `layout` - One of ``&quot;vertical&quot;``, ``&quot;horizontal&quot;``, ``&quot;tortuous&quot;``
   (or ``&quot;s_shaped&quot;`` as alias).
-- ``3 - Resolution for Graphviz rendering.
-- ``4 - Additional params (ignored, for backwards compat).
+- `dpi` - Resolution for Graphviz rendering.
+- `**kwargs` - Additional params (ignored, for backwards compat).
   
 
 **Returns**:

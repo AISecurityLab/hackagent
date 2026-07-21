@@ -65,11 +65,11 @@ An LLM-chosen attack strategy for a target.
 - `parameters` - Validated, nested strategy parameters (e.g.
 - ```{"tap_params"` - {&quot;depth&quot;: 3}}``) ready to merge into an
   ``attack_config``.
-- ``2 - The model&#x27;s explanation for the choice.
-- ``3 - The model&#x27;s self-reported confidence (0.0–1.0).
-- ``4 - Notes about anything coerced/dropped during validation.
-- ``5 - The raw JSON object the model returned.
-- ``6 - The planner model used.
+- `rationale` - The model&#x27;s explanation for the choice.
+- `confidence` - The model&#x27;s self-reported confidence (0.0–1.0).
+- `warnings` - Notes about anything coerced/dropped during validation.
+- `raw` - The raw JSON object the model returned.
+- `model` - The planner model used.
 
 #### to\_attack\_config
 
@@ -122,19 +122,19 @@ Ask an LLM to choose an attack strategy + parameters for ``target``.
   should include ``url``/``name``.
 - `model` - LiteLLM model string for the planner.
 - `goals` - Optional fixed goals; when omitted the model proposes them.
-- ``0 - Optional explicit API key (else LiteLLM env resolution).
-- ``1 - Planner sampling temperature.
-- ``2 - Planner response cap.
+- `api_key` - Optional explicit API key (else LiteLLM env resolution).
+- `temperature` - Planner sampling temperature.
+- `max_tokens` - Planner response cap.
   
 
 **Returns**:
 
-  A validated :class:``3.
+  A validated :class:`AttackPlan`.
   
 
 **Raises**:
 
-- ``4 - if litellm is unavailable, the call fails, or the model&#x27;s
+- `PlannerError` - if litellm is unavailable, the call fails, or the model&#x27;s
   output can&#x27;t be turned into a valid plan.
 
 ## AutoPlanResult Objects

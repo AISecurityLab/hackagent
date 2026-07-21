@@ -71,21 +71,21 @@ attack strategies.
 - `raise_on_unexpected_status` - If set to `True`, the API client will
   raise an exception for any HTTP status codes that are not typically
   expected for a successful operation. Defaults to `False`.
-- `name`0 - The timeout duration in seconds for API requests made by the
+- `timeout` - The timeout duration in seconds for API requests made by the
   authenticated (remote) HackAgent backend client. Defaults to
-  `name`1 seconds so requests to a misbehaving/unreachable backend
-  fail predictably instead of hanging indefinitely. Pass `name`2
+  `120.0` seconds so requests to a misbehaving/unreachable backend
+  fail predictably instead of hanging indefinitely. Pass `None`
   explicitly to opt out and disable the timeout (unbounded wait,
   the previous default behavior).
-- `name`3 - Optional dictionary containing agent-specific metadata.
-- `name`4 - Optional default request settings for the configured
+- `metadata` - Optional dictionary containing agent-specific metadata.
+- `target_config` - Optional default request settings for the configured
   victim model. This is the preferred place to define target-side
-  generation defaults such as `name`5, `name`6,
-  and `name`0.
-- `name`8 - Optional configuration for the agent adapter.
-- `name`9 - Optional OLLAMA-only control for reasoning traces.
+  generation defaults such as `max_tokens`, `temperature`,
+  and `timeout`.
+- `adapter_operational_config` - Optional configuration for the agent adapter.
+- `thinking` - Optional OLLAMA-only control for reasoning traces.
   When set to `False`, requests sent through the target OLLAMA adapter
-  include `agent_type`1 to disable thinking output. Ignored for
+  include `think: false` to disable thinking output. Ignored for
   non-OLLAMA target agent types.
 
 #### attack\_strategies
@@ -138,7 +138,7 @@ delegates the execution to the chosen strategy.
 - `ValueError` - If the &#x27;attack_type&#x27; is missing from `attack_config` or
   if the specified &#x27;attack_type&#x27; is not a supported/registered
   strategy.
-- `self.router`0 - For issues during backend
+- `HackAgentError` - For issues during backend
   agent operations, or other unexpected errors during the attack process.
 
 #### hack\_chain
@@ -176,8 +176,8 @@ that step are judged successful.
 
 **Arguments**:
 
-- ``2 - Ordered list of ``attack_config`` dicts, one per chain
-  step, using the same shape accepted by :meth:``5 (each
+- `attacks` - Ordered list of ``attack_config`` dicts, one per chain
+  step, using the same shape accepted by :meth:`hack` (each
   must include its own ``attack_type`` and any attack-specific
   settings). Only the *first* entry needs to specify how goals
   are sourced (``goals``, ``dataset`` or ``intents``) unless
@@ -190,13 +190,13 @@ that step are judged successful.
   ``hackagent.risks.jailbreak.JAILBREAK_PROFILE``). A goal
   source is still required either way, via ``goals`` or a
   ``dataset``/``goals``/``intents`` key on the first step.
-- ``6 - Optional explicit list of goal strings to use for the
+- `goals` - Optional explicit list of goal strings to use for the
   whole chain. When provided, it takes precedence over any
   ``goals``/``dataset``/``intents`` set on ``attacks[0]``.
-- ``5 - Optional run configuration overrides applied
-  to every step, forwarded to :meth:``5.
-- ``7 - Forwarded to :meth:``5 for every step.
-- ``9 - When ``True`` (default), a goal only
+- `run_config_override` - Optional run configuration overrides applied
+  to every step, forwarded to :meth:`hack`.
+- `fail_on_run_error` - Forwarded to :meth:`hack` for every step.
+- `escalate_only_mitigated` - When ``True`` (default), a goal only
   moves on to the next attack if it was mitigated at the
   current step — goals that already succeeded are dropped, and
   each goal&#x27;s final result is either its first success or its
@@ -208,7 +208,7 @@ that step are judged successful.
 
 **Returns**:
 
-  A flat list of result rows (same row shape as :meth:``5),
+  A flat list of result rows (same row shape as :meth:`hack`),
   grouped by original goal, in first-seen order. Each row is
   tagged with ``chain_step`` (0-based index into ``attacks``) and
   ``chain_attack_type`` identifying which attack produced it.
@@ -216,6 +216,6 @@ that step are judged successful.
 
 **Raises**:
 
-- ``1 - If ``attacks`` is empty, or a step is missing
+- `HackAgentError` - If ``attacks`` is empty, or a step is missing
   ``attack_type``.
 

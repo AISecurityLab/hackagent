@@ -49,14 +49,14 @@ the AutoDAN-Turbo scorer+wrapper protocol.
 
 **Attributes**:
 
-- ``0 - Merged PAIR configuration dictionary.
-- ``1 - Authenticated HackAgent API client.
-- ``2 - Router for the victim model.
-- ``3 - Router for the attacker LLM.
-- ``4 - Router for the scorer LLM.
-- ``5 - Loaded :class:``6
+- `config` - Merged PAIR configuration dictionary.
+- `client` - Authenticated HackAgent API client.
+- `agent_router` - Router for the victim model.
+- `attacker_router` - Router for the attacker LLM.
+- `scorer_router` - Router for the scorer LLM.
+- `objective` - Loaded :class:`~hackagent.attacks.objectives.base.ObjectiveConfig`
   instance for the configured ``objective`` key.
-- ``9 - Hierarchical logger at ``hackagent.attacks.pair``.
+- `logger` - Hierarchical logger at ``hackagent.attacks.pair``.
 
 #### \_\_init\_\_
 
@@ -81,7 +81,7 @@ Initialize PAIR attack.
 - `ValueError` - If ``client`` or ``agent_router`` is ``None``, if
   the attacker router cannot be initialised, or if the
   configured ``objective`` key is not in
-  :data:`~hackagent.attacks.techniques.pair.config.DEFAULT_PAIR_CONFIG`3.
+  :data:`~hackagent.attacks.objectives.OBJECTIVES`.
 
 #### run
 

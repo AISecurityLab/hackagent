@@ -156,6 +156,55 @@ def check_requirements() -> bool:
         return False
 
 
+# pydoc-markdown 4.8.2 ships a buggy ``escape_except_blockquotes`` (used by the
+# docusaurus renderer with ``escape_html_in_docstring``). It swaps every inline
+# code span for a ``BLOCKQUOTE_TOKEN_{i}`` placeholder, then restores them in
+# ascending order — so restoring token 1 also rewrites the ``_1`` inside token
+# 10, mangling any docstring with 11+ code spans (e.g. ``timeout`` → ``name`0``).
+# This wrapper reruns the CLI with a corrected implementation that uses
+# NUL-delimited, singly-replaced placeholders that cannot prefix-collide.
+_PYDOC_WRAPPER = """
+import html
+import re
+import sys
+
+import pydoc_markdown.util.misc as _misc
+import pydoc_markdown.contrib.renderers.markdown as _md
+
+
+def escape_except_blockquotes(string):
+    single_quote_pattern = r"`[^`]*`"
+    triple_quote_pattern = r"```[\\s\\S]*?```"
+    matches = re.findall(f"({triple_quote_pattern}|{single_quote_pattern})", string)
+    for i, match in enumerate(matches):
+        string = string.replace(match, f"\\x00BQ{i}\\x00", 1)
+    string = html.escape(string)
+    for i, match in enumerate(matches):
+        string = string.replace(f"\\x00BQ{i}\\x00", match, 1)
+    return string
+
+
+_misc.escape_except_blockquotes = escape_except_blockquotes
+_md.escape_except_blockquotes = escape_except_blockquotes
+
+from pydoc_markdown.main import cli
+
+sys.exit(cli())
+"""
+
+
+def create_pydoc_wrapper() -> str:
+    """Write the patched pydoc-markdown entrypoint to a temp file and return its path."""
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        suffix=".py",
+        delete=False,
+        encoding="utf-8",
+    ) as f:
+        f.write(_PYDOC_WRAPPER)
+        return f.name
+
+
 def create_pydoc_config(output_dir: str, modules: list[str]) -> str:
     """Write a pydoc-markdown YAML config to a temp file and return its path."""
     module_lines = "\n".join(f"              - {m}" for m in modules)
@@ -255,9 +304,10 @@ def generate_docs(version: str) -> None:
     print(f"📋 Discovered {len(modules)} modules")
 
     config_file = create_pydoc_config(str(docs_dir.relative_to(project_root)), modules)
+    wrapper_file = create_pydoc_wrapper()
     try:
         run_command(
-            ["uv", "run", "pydoc-markdown", config_file],
+            ["uv", "run", "python", wrapper_file, config_file],
             cwd=project_root,
             description="Generating documentation",
         )
@@ -309,10 +359,11 @@ For practical usage examples, see the [Python SDK Quickstart](./sdk/python-quick
         print(f"✅ Documentation generated in {docs_dir}")
         print("\n🔧 To view: cd docs && npm start")
     finally:
-        try:
-            os.unlink(config_file)
-        except OSError:
-            pass
+        for tmp in (config_file, wrapper_file):
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
 
 
 def main() -> None:

@@ -110,7 +110,7 @@ This is the main entry point for loading goals. It supports three modes:
 
 **Raises**:
 
-- `provider`0 - If neither preset nor provider is specified.
+- `ValueError` - If neither preset nor provider is specified.
 
 #### load\_goals\_and\_extra\_fields
 

@@ -36,8 +36,8 @@ before rendering them as flowcharts.
 - `endpoint` - API endpoint URL.
 - `agent_type` - Agent adapter type (e.g. ``&quot;OPENAI_SDK&quot;``, ``&quot;OLLAMA&quot;``).
 - `api_key` - Optional API key for the model provider.
-- ``0 - Maximum output tokens for step generation.
-- ``1 - Sampling temperature.
+- `max_tokens` - Maximum output tokens for step generation.
+- `temperature` - Sampling temperature.
 
 ## FCParams Objects
 
@@ -52,9 +52,9 @@ Hyperparameters controlling the FC-Attack flowchart image generation.
 - `layout` - Flowchart layout mode. One of ``&quot;vertical&quot;`` (top-to-bottom),
   ``&quot;horizontal&quot;`` (left-to-right), or ``&quot;tortuous&quot;`` (S-shaped).
   ``&quot;s_shaped&quot;`` is accepted as an alias for ``&quot;tortuous&quot;``.
-- ``1 - Resolution (dots-per-inch) for Graphviz rendering.
-- ``2 - Number of steps to decompose the goal into.
-- ``3 - Whether to truncate the last step to induce
+- `dpi` - Resolution (dots-per-inch) for Graphviz rendering.
+- `num_steps` - Number of steps to decompose the goal into.
+- `truncate_last_step` - Whether to truncate the last step to induce
   the target model to complete the harmful content.
 
 ## tFCParams Objects

@@ -76,7 +76,7 @@ evaluation per ``result_id``, then PATCHes the server once per goal.
 - `logger` - Optional logger instance.
 - `judge_keys` - Optional list of dicts mapping judge types to their
   column names, e.g. ``[{&quot;key&quot;: &quot;eval_jb&quot;, &quot;explanation&quot;: &quot;explanation_jb&quot;,
-- ``1 - &quot;JailbreakBench&quot;}]``. If None, auto-detects from
+- `"label"` - &quot;JailbreakBench&quot;}]``. If None, auto-detects from
   known column patterns.
   
 

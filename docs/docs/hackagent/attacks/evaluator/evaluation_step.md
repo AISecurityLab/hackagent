@@ -143,13 +143,13 @@ tracker → sync → ASR logging.
 - `input_data` - Generation output rows.
 - `prefix_fn` - ``(item) -&gt; str`` to build the ``prefix`` eval field.
   Falls back to ``full_prompt``, ``best_prompt``, ``goal``.
-- `prefix_fn`2 - ``(item) -&gt; str`` to build the ``completion`` field.
+- `completion_fn` - ``(item) -&gt; str`` to build the ``completion`` field.
   Falls back to ``response``. Use for attacks like CipherChat that
   store the response in a non-standard key.
-- `prefix_fn`9 - Config key (e.g. ``&#x27;flipattack_params&#x27;``) for
+- `technique_params_key` - Config key (e.g. ``&#x27;flipattack_params&#x27;``) for
   attack-specific judge defaults.
-- ``2 - Label prefix for tracker evaluation traces.
-- ``3 - Optional ``(input_data, raw_config) -&gt; None`` called
+- `evaluator_prefix` - Label prefix for tracker evaluation traces.
+- `pre_eval_hook` - Optional ``(input_data, raw_config) -&gt; None`` called
   before judge evaluation (e.g. to emit decoration traces in h4rm3l).
 
 #### make\_execute

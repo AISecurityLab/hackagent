@@ -124,8 +124,8 @@ Factory method to create a fully-initialized coordinator.
   entirely and rely on provided labels or fallback defaults.
 - `goals` - Optional list of goals to initialize upfront
 - `initial_metadata` - Optional metadata for goal results
-- `run_id`0 - Starting index to assign to the first goal
-- `run_id`1 - Optional perf_counter timestamp used as
+- `goal_index_start` - Starting index to assign to the first goal
+- `run_start_time` - Optional perf_counter timestamp used as
   run start for latency calculations.
   
 

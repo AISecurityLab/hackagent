@@ -98,8 +98,8 @@ classifier prompt shown above.
 
 **Arguments**:
 
-- ``8 - Guardrail model configuration dict.
-- ``9 - ``StorageBackend`` instance (forwarded to ``create_router``).
+- `config` - Guardrail model configuration dict.
+- `backend` - ``StorageBackend`` instance (forwarded to ``create_router``).
 
 #### check
 
