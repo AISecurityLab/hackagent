@@ -40,10 +40,11 @@ agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 # Use profile recommendations
 for attack in SYSTEM_PROMPT_LEAKAGE_PROFILE.primary_attacks:
     for dataset in SYSTEM_PROMPT_LEAKAGE_PROFILE.primary_datasets + SYSTEM_PROMPT_LEAKAGE_PROFILE.secondary_datasets:
-        result = agent.hack(
-            attack_type=attack.technique.lower(),
-            dataset=dataset.preset,
-            objective=SYSTEM_PROMPT_LEAKAGE_PROFILE.objective,
-        )
-        print(f"ASR: {result.get('asr', 'N/A')}")
+        attack_config = {
+            "attack_type": attack.technique.lower(),
+            "objective": SYSTEM_PROMPT_LEAKAGE_PROFILE.objective,
+            "dataset": {"preset": dataset.preset},
+        }
+        results = agent.hack(attack_config=attack_config)
+        print(f"Results: {results}")
 ```

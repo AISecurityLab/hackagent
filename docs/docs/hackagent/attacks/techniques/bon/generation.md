@@ -151,7 +151,7 @@ e. If the judge confirms a jailbreak → **early stop**.
 - `goals` - List of harmful prompt strings.
 - `agent_router` - Router for target model communication.
 - `config` - Configuration dictionary with ``bon_params``, ``judges``, etc.
-- ``3 - Logger instance.
+- `logger` - Logger instance.
   
 
 **Returns**:

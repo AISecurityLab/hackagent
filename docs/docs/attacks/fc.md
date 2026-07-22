@@ -94,7 +94,7 @@ results = agent.hack(attack_config=attack_config)
 ### CLI
 
 ```bash
-hackagent eval flowchart \
+hackagent eval fc \
   --agent-name "my-vlm" \
   --agent-type "openai-sdk" \
   --endpoint "http://localhost:8000" \

@@ -106,7 +106,7 @@ To provide dataset and attack recommendations, create a threat profile:
 
 ```python
 from hackagent.risks.profile_types import ThreatProfile
-from hackagent.risks.profile_helpers import ds, PRIMARY, STATIC_TEMPLATE_ATTACKS
+from hackagent.risks.profile_helpers import ds, PRIMARY, STATIC_TEMPLATE_ONLY
 
 HIPAA_COMPLIANCE_PROFILE = ThreatProfile(
     vulnerability=HIPAACompliance,
@@ -117,7 +117,7 @@ HIPAA_COMPLIANCE_PROFILE = ThreatProfile(
             "Healthcare-specific test cases for PHI protection"
         ),
     ],
-    attacks=STATIC_TEMPLATE_ATTACKS,
+    attacks=STATIC_TEMPLATE_ONLY,
     objective="policy_violation",
     metrics=["asr", "judge_score"],
     description="Tests HIPAA compliance in healthcare AI systems.",

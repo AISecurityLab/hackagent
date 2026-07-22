@@ -5,7 +5,7 @@ title: hackagent.attacks.techniques.static_template.config
 
 Configuration for static template attacks.
 
-Static Template attacks use predefined prompt patterns to attempt jailbreaks,
+Static template attacks use predefined prompt patterns to attempt jailbreaks,
 combining templates with goals to generate attack prompts.
 
 ## TemplateAttackConfig Objects
@@ -15,6 +15,10 @@ class TemplateAttackConfig(ConfigBase)
 ```
 
 Configuration for static template attack pipeline.
+
+#### evaluator\_type
+
+Deprecated compatibility field
 
 #### from\_dict
 

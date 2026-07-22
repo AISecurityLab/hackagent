@@ -52,7 +52,7 @@
                     "reference/hackagent/attacks/techniques/advprefix/attack",
                     "reference/hackagent/attacks/techniques/advprefix/completions",
                     "reference/hackagent/attacks/techniques/advprefix/config",
-                    "reference/hackagent/attacks/techniques/advprefix/evaluation",
+                    "reference/hackagent/attacks/techniques/advprefix/eval_pipeline",
                     "reference/hackagent/attacks/techniques/advprefix/generate",
                     "reference/hackagent/attacks/techniques/advprefix/utils"
                   ],
@@ -62,10 +62,10 @@
                 {
                   "items": [
                     "reference/hackagent/attacks/techniques/autodan_turbo/attack",
+                    "reference/hackagent/attacks/techniques/autodan_turbo/autodan_eval",
                     "reference/hackagent/attacks/techniques/autodan_turbo/config",
                     "reference/hackagent/attacks/techniques/autodan_turbo/core",
                     "reference/hackagent/attacks/techniques/autodan_turbo/dashboard_tracing",
-                    "reference/hackagent/attacks/techniques/autodan_turbo/evaluation",
                     "reference/hackagent/attacks/techniques/autodan_turbo/lifelong",
                     "reference/hackagent/attacks/techniques/autodan_turbo/log_styles",
                     "reference/hackagent/attacks/techniques/autodan_turbo/strategy_library",
@@ -77,10 +77,8 @@
                 },
                 {
                   "items": [
-                    "reference/hackagent/attacks/techniques/static_template/attack",
-                    "reference/hackagent/attacks/techniques/static_template/config",
-                    "reference/hackagent/attacks/techniques/static_template/evaluation",
-                    "reference/hackagent/attacks/techniques/static_template/generation"
+                    "reference/hackagent/attacks/techniques/baseline/attack",
+                    "reference/hackagent/attacks/techniques/baseline/generation"
                   ],
                   "label": "hackagent.attacks.techniques.baseline",
                   "type": "category"
@@ -89,7 +87,6 @@
                   "items": [
                     "reference/hackagent/attacks/techniques/bon/attack",
                     "reference/hackagent/attacks/techniques/bon/config",
-                    "reference/hackagent/attacks/techniques/bon/evaluation",
                     "reference/hackagent/attacks/techniques/bon/generation"
                   ],
                   "label": "hackagent.attacks.techniques.bon",
@@ -99,7 +96,6 @@
                   "items": [
                     "reference/hackagent/attacks/techniques/cipherchat/attack",
                     "reference/hackagent/attacks/techniques/cipherchat/config",
-                    "reference/hackagent/attacks/techniques/cipherchat/evaluation",
                     "reference/hackagent/attacks/techniques/cipherchat/generation"
                   ],
                   "label": "hackagent.attacks.techniques.cipherchat",
@@ -107,9 +103,18 @@
                 },
                 {
                   "items": [
+                    "reference/hackagent/attacks/techniques/fc/attack",
+                    "reference/hackagent/attacks/techniques/fc/config",
+                    "reference/hackagent/attacks/techniques/fc/flowchart_renderer",
+                    "reference/hackagent/attacks/techniques/fc/generation"
+                  ],
+                  "label": "hackagent.attacks.techniques.fc",
+                  "type": "category"
+                },
+                {
+                  "items": [
                     "reference/hackagent/attacks/techniques/flipattack/attack",
                     "reference/hackagent/attacks/techniques/flipattack/config",
-                    "reference/hackagent/attacks/techniques/flipattack/evaluation",
                     "reference/hackagent/attacks/techniques/flipattack/generation"
                   ],
                   "label": "hackagent.attacks.techniques.flipattack",
@@ -120,7 +125,6 @@
                     "reference/hackagent/attacks/techniques/h4rm3l/attack",
                     "reference/hackagent/attacks/techniques/h4rm3l/config",
                     "reference/hackagent/attacks/techniques/h4rm3l/decorators",
-                    "reference/hackagent/attacks/techniques/h4rm3l/evaluation",
                     "reference/hackagent/attacks/techniques/h4rm3l/generation"
                   ],
                   "label": "hackagent.attacks.techniques.h4rm3l",
@@ -128,9 +132,16 @@
                 },
                 {
                   "items": [
+                    "reference/hackagent/attacks/techniques/indirect_prompt_injection/attack",
+                    "reference/hackagent/attacks/techniques/indirect_prompt_injection/config"
+                  ],
+                  "label": "hackagent.attacks.techniques.indirect_prompt_injection",
+                  "type": "category"
+                },
+                {
+                  "items": [
                     "reference/hackagent/attacks/techniques/mml/attack",
                     "reference/hackagent/attacks/techniques/mml/config",
-                    "reference/hackagent/attacks/techniques/mml/evaluation",
                     "reference/hackagent/attacks/techniques/mml/generation",
                     "reference/hackagent/attacks/techniques/mml/image_encoder",
                     "reference/hackagent/attacks/techniques/mml/prompts"
@@ -141,8 +152,7 @@
                 {
                   "items": [
                     "reference/hackagent/attacks/techniques/pair/attack",
-                    "reference/hackagent/attacks/techniques/pair/config",
-                    "reference/hackagent/attacks/techniques/pair/evaluation"
+                    "reference/hackagent/attacks/techniques/pair/config"
                   ],
                   "label": "hackagent.attacks.techniques.pair",
                   "type": "category"
@@ -151,7 +161,6 @@
                   "items": [
                     "reference/hackagent/attacks/techniques/pap/attack",
                     "reference/hackagent/attacks/techniques/pap/config",
-                    "reference/hackagent/attacks/techniques/pap/evaluation",
                     "reference/hackagent/attacks/techniques/pap/generation",
                     "reference/hackagent/attacks/techniques/pap/taxonomy"
                   ],
@@ -160,10 +169,28 @@
                 },
                 {
                   "items": [
+                    "reference/hackagent/attacks/techniques/rag/attack",
+                    "reference/hackagent/attacks/techniques/rag/config"
+                  ],
+                  "label": "hackagent.attacks.techniques.rag",
+                  "type": "category"
+                },
+                {
+                  "items": [
+                    "reference/hackagent/attacks/techniques/static_template/attack",
+                    "reference/hackagent/attacks/techniques/static_template/config",
+                    "reference/hackagent/attacks/techniques/static_template/generation",
+                    "reference/hackagent/attacks/techniques/static_template/static_eval"
+                  ],
+                  "label": "hackagent.attacks.techniques.static_template",
+                  "type": "category"
+                },
+                {
+                  "items": [
                     "reference/hackagent/attacks/techniques/tap/attack",
                     "reference/hackagent/attacks/techniques/tap/config",
-                    "reference/hackagent/attacks/techniques/tap/evaluation",
-                    "reference/hackagent/attacks/techniques/tap/generation"
+                    "reference/hackagent/attacks/techniques/tap/generation",
+                    "reference/hackagent/attacks/techniques/tap/tap_evaluation"
                   ],
                   "label": "hackagent.attacks.techniques.tap",
                   "type": "category"
@@ -186,7 +213,8 @@
             {
               "items": [
                 "reference/hackagent/datasets/providers/file",
-                "reference/hackagent/datasets/providers/huggingface"
+                "reference/hackagent/datasets/providers/huggingface",
+                "reference/hackagent/datasets/providers/url_json"
               ],
               "label": "hackagent.datasets.providers",
               "type": "category"
@@ -203,9 +231,17 @@
           "items": [
             {
               "items": [
-                "reference/hackagent/examples/claude/hack"
+                "reference/hackagent/examples/claude/hack_claude"
               ],
               "label": "hackagent.examples.claude",
+              "type": "category"
+            },
+            {
+              "items": [
+                "reference/hackagent/examples/codex/hack_codex",
+                "reference/hackagent/examples/codex/hack_ollama"
+              ],
+              "label": "hackagent.examples.codex",
               "type": "category"
             },
             {
@@ -257,6 +293,13 @@
             },
             {
               "items": [
+                {
+                  "items": [
+                    "reference/hackagent/examples/openai_sdk/db_tool_sandbox/agent"
+                  ],
+                  "label": "hackagent.examples.openai_sdk.db_tool_sandbox",
+                  "type": "category"
+                },
                 {
                   "items": [
                     "reference/hackagent/examples/openai_sdk/pc_tool_sandbox/agent"
@@ -416,6 +459,7 @@
               "items": [
                 "reference/hackagent/router/providers/adk",
                 "reference/hackagent/router/providers/claude",
+                "reference/hackagent/router/providers/codex",
                 "reference/hackagent/router/providers/web"
               ],
               "label": "hackagent.router.providers",

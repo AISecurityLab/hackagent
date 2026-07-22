@@ -55,12 +55,9 @@ agent = HackAgent(
 
 ### Ollama-Specific Configuration
 
-The adapter supports all Ollama features:
-
 - **Local Models**: Test any model installed via `ollama pull`
 - **Custom Endpoints**: Remote Ollama instances
-- **Chat & Generate APIs**: Both `/api/chat` and `/api/generate` endpoints
-- **Model Discovery**: Automatic listing of available models
+- **Chat API**: Dispatches through LiteLLM's `ollama_chat` provider, which talks to Ollama's `/api/chat` endpoint
 
 ## Running Security Tests
 

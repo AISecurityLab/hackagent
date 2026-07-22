@@ -32,7 +32,7 @@ OpenAI SDK is the official Python library for interacting with OpenAI's API, inc
    ```bash
     python3 -m venv .venv
     source .venv/bin/activate
-    pip install git+https://github.com/AISecurityLab/HackAgent.git
+    pip install hackagent
    ```
 
 5. **(Optional) For Azure OpenAI**, set custom endpoint:
@@ -139,10 +139,11 @@ agent = HackAgent(
     name="azure_openai_agent",
     endpoint="https://your-resource.openai.azure.com",
     agent_type=AgentTypeEnum.OPENAI_SDK,
+    target_config={"api_key": "your-azure-api-key"},
 )
 ```
 
-**Note:** Make sure your `AZURE_OPENAI_API_KEY` environment variable is set. The adapter will use your Azure endpoint configuration.
+**Note:** Once a custom `endpoint` (base URL) is set, HackAgent does **not** fall back to any environment variable for the API key — you must pass it explicitly, either as `target_config={"api_key": ...}` or as the top-level `api_key=` argument to `HackAgent(...)`. (Without a custom endpoint, `OPENAI_SDK` falls back to `OPENAI_API_KEY` by default — not an Azure-specific variable.)
 
 ## Understanding Results
 
@@ -194,7 +195,7 @@ pip install openai
 # or
 python3 -m venv .venv
 source .venv/bin/activate
-pip install git+https://github.com/AISecurityLab/HackAgent.git  # OpenAI SDK is included
+pip install hackagent  # OpenAI SDK is included
 ```
 
 ### Authentication Errors

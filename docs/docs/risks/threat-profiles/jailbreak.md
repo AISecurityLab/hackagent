@@ -46,10 +46,11 @@ agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 # Use profile recommendations
 for attack in JAILBREAK_PROFILE.primary_attacks:
     for dataset in JAILBREAK_PROFILE.primary_datasets:
-        result = agent.hack(
-            attack_type=attack.technique.lower(),
-            dataset=dataset.preset,
-            objective=JAILBREAK_PROFILE.objective,
-        )
-        print(f"ASR: {result.get('asr', 'N/A')}")
+        attack_config = {
+            "attack_type": attack.technique.lower(),
+            "objective": JAILBREAK_PROFILE.objective,
+            "dataset": {"preset": dataset.preset},
+        }
+        results = agent.hack(attack_config=attack_config)
+        print(f"Results: {results}")
 ```

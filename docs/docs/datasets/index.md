@@ -49,7 +49,7 @@ graph LR
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install git+https://github.com/AISecurityLab/HackAgent.git
+pip install hackagent
 ```
 
 ## Quick Start

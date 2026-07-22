@@ -509,8 +509,8 @@ The ``transform_fx`` string must define a function
 
 **Arguments**:
 
-- ``2 - Python source code defining ``transform``.
-- ``5 - Random seed for the internal RandomState.
+- `transform_fx` - Python source code defining ``transform``.
+- `seed` - Random seed for the internal RandomState.
 
 #### compile\_program\_with\_steps
 
@@ -545,8 +545,8 @@ Compile a decorator program string into a callable.
 
 **Raises**:
 
-- `syntax_version`0 - If ``syntax_version`` is not 1 or 2.
-- `syntax_version`3 - If the program string cannot be compiled.
+- `ValueError` - If ``syntax_version`` is not 1 or 2.
+- `SyntaxError` - If the program string cannot be compiled.
 
 #### program\_uses\_llm\_assisted\_decorators
 

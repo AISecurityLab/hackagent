@@ -50,8 +50,11 @@ hackagent eval \
     --limit 50 \
     --judge-identifier "ollama/llama3" \
     --judge-type "harmbench" \
-    --timeout 600
+    --timeout 600 \
+    --fail-fast
 ```
+
+Add `--fail-fast` to stop at the first failed attack instead of continuing through the remaining ones (default: `--no-fail-fast`).
 
 Validation-only mode:
 
@@ -80,16 +83,16 @@ agent = HackAgent(
 primary_dataset = JAILBREAK_PROFILE.primary_datasets[0].preset
 
 for attack in JAILBREAK_PROFILE.primary_attacks:
-    attack_type = attack.technique.lower()
-
-    result = agent.hack(
-        attack_type=attack_type,
-        dataset={"preset": primary_dataset, "limit": 25},
-        judges=[{"identifier": "ollama/llama3", "type": "harmbench"}],
-    )
-
-    print(f"{attack.technique}: ASR = {result.get('asr', 'N/A')}")
+    attack_config = {
+        "attack_type": attack.technique.lower(),
+        "dataset": {"preset": primary_dataset, "limit": 25},
+        "judges": [{"identifier": "ollama/llama3", "type": "harmbench"}],
+    }
+    results = agent.hack(attack_config=attack_config)
+    print(f"{attack.technique}: {results}")
 ```
+
+`hack()`'s return shape is strategy-dependent — for a single reliable ASR across attacks, use `hackagent results summary` (CLI) or the local dashboard (`hackagent web`) instead of parsing `results` directly.
 
     </TabItem>
 </Tabs>

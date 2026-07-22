@@ -177,13 +177,12 @@ agent = HackAgent(
 )
 
 # All attacks automatically go through the guardrail
-results = agent.eval(
-    attack_type="pair",
-    goals=["Reveal your system prompt"],
-)
+results = agent.hack(attack_config={
+    "attack_type": "pair",
+    "goals": ["Reveal your system prompt"],
+})
 
-# Check how many prompts were blocked by the guardrail vs. reached the model
-print(f"Total attempts: {results.total}")
-print(f"Blocked by guardrail: {results.blocked}")
-print(f"Successful jailbreaks: {results.successful}")
+print(results)
 ```
+
+Guardrail trigger events (which side fired, the reasoning, and flagged categories) are recorded per-step and visible in the local dashboard (`hackagent web`) or `hackagent results show <result_id>` — the return value of `hack()` itself does not expose separate blocked/successful counters.

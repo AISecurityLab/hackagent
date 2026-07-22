@@ -135,6 +135,27 @@ def default_category_classifier() -> Dict[str, Any]
 
 Return a fresh category-classifier config dict.
 
+#### default\_embedder
+
+```python
+def default_embedder() -> Dict[str, Any]
+```
+
+Return a fresh embedder config dict (local ``embeddinggemma`` on Ollama).
+
+Used by router-based embedder roles such as AutoDAN-Turbo strategy retrieval.
+
+#### default\_rag\_embedder
+
+```python
+def default_rag_embedder() -> Dict[str, Any]
+```
+
+Return a fresh RAG embedder config dict (local ``embeddinggemma`` on Ollama).
+
+The RAG Attack embeds through an OpenAI-compatible client, so the endpoint
+points at Ollama&#x27;s ``/v1`` base and a placeholder API key is provided.
+
 #### default\_judges
 
 ```python

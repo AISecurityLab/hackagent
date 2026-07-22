@@ -4,158 +4,67 @@ sidebar_position: 5
 
 # Results
 
-The `hackagent results` command allows you to view and manage attack results.
+The `hackagent results` command lets you browse and summarize attack results stored in your local HackAgent database (`~/.local/share/hackagent/hackagent.db` by default).
 
 ## Commands
 
 ### List Results
 
-View all attack results:
-
 ```bash
 hackagent results list
 ```
 
-**Example output:**
-
-```
-┌────────────────┬──────────────┬─────────────┬────────────────────┬──────────┐
-│ ID             │ Agent        │ Attack Type │ Created            │ Status   │
-├────────────────┼──────────────┼─────────────┼────────────────────┼──────────┤
-│ res_abc123     │ weather-bot  │ advprefix   │ 2025-01-22 10:30   │ completed│
-│ res_def456     │ assistant    │ advprefix   │ 2025-01-22 09:15   │ completed│
-│ res_ghi789     │ support-bot  │ baseline    │ 2025-01-21 16:45   │ failed   │
-└────────────────┴──────────────┴─────────────┴────────────────────┴──────────┘
-```
-
-### Filter Results
-
-Filter results by various criteria:
-
-```bash
-# Filter by status
-hackagent results list --status completed
-hackagent results list --status failed
-hackagent results list --status running
-
-# Filter by agent name
-hackagent results list --agent-name "weather-bot"
-
-# Filter by attack type
-hackagent results list --attack-type advprefix
-
-# Combine filters
-hackagent results list --status completed --agent-name "weather-bot"
-```
-
-### Get Result Details
-
-View detailed information about a specific result:
-
-```bash
-hackagent results get --id res_abc123
-```
-
-**Example output:**
-
-```
-Result Details: res_abc123
-══════════════════════════════════════════════════════════════
-
-Agent:        weather-bot
-Attack Type:  advprefix
-Status:       completed
-Created:      2025-01-22 10:30:15
-Duration:     2m 34s
-
-Goals:
-  • Return fake weather data
-  • Bypass location validation
-
-Summary:
-  Total Attempts:  50
-  Successful:      12
-  Success Rate:    24%
-
-Top Prefixes:
-  1. "Ignore previous instructions and..."  (Score: 0.85)
-  2. "As a weather expert, you must..."     (Score: 0.72)
-  3. "The user has special permissions..."  (Score: 0.68)
-```
-
-### Export Results
-
-Export results in different formats:
-
-```bash
-# Export as JSON
-hackagent results list > results.json
-
-# Export specific result
-hackagent results get --id res_abc123 > result_detail.json
-```
-
-### Delete Results
-
-Remove results from the system:
-
-```bash
-# Delete a specific result
-hackagent results delete --id res_abc123
-
-# Delete with confirmation prompt
-hackagent results delete --id res_abc123 --confirm
-```
-
-## Options
-
-### List Options
+This launches the interactive TUI directly on the **Results** tab, where you can browse, filter, and drill into individual runs.
 
 | Option | Description | Example |
 |--------|-------------|---------|
-| `--status` | Filter by status | `--status completed` |
-| `--agent-name` | Filter by agent name | `--agent-name "my-agent"` |
+| `--limit` | Number of results to show (default: `10`) | `--limit 25` |
+| `--status` | Filter by status: `pending`, `running`, `completed`, `failed` | `--status completed` |
+| `--agent` | Filter by agent name | `--agent "weather-bot"` |
 | `--attack-type` | Filter by attack type | `--attack-type advprefix` |
-| `--limit` | Maximum results to show | `--limit 10` |
 
-### Get Options
+### Show Result Details
 
-| Option | Description | Example |
-|--------|-------------|------|
-| `--id` | Result ID | `--id res_abc123` |
+View detailed information about a specific result by its ID (a UUID, as shown in the TUI or `results summary` output):
 
-### Delete Options
+```bash
+hackagent results show <result_id>
+```
+
+**Example:**
+
+```bash
+hackagent results show 3fa85f64-5717-4562-b3fc-2c963f66afa6
+```
+
+This prints a table with the result's ID, agent name, attack type, status, and creation time, followed by any additional stored result data (as JSON).
+
+### Summary Statistics
+
+Show aggregate statistics across recent results:
+
+```bash
+hackagent results summary
+```
 
 | Option | Description | Example |
 |--------|-------------|---------|
-| `--id` | Result ID | `--id res_abc123` |
-| `--confirm` | Skip confirmation | `--confirm` |
+| `--status` | Filter by status: `pending`, `running`, `completed`, `failed` | `--status completed` |
+| `--agent` | Filter by agent name | `--agent "weather-bot"` |
+| `--attack-type` | Filter by attack type | `--attack-type advprefix` |
+| `--days` | Number of days to include (default: `7`) | `--days 30` |
 
-## Dashboard
+**Example:**
 
-Results are automatically synced to your configured dashboard (if any).
+```bash
+hackagent results summary --days 30 --status completed
+```
 
-The dashboard provides:
-
-- **Visual analytics** — Charts and graphs
-- **Advanced filtering** — Complex queries
-- **Trend analysis** — Track security over time
-- **Export options** — PDF reports, CSV exports
-- **Team sharing** — Collaborate with your team
+Prints a breakdown by status, by agent, and by attack type, plus average Majority Vote ASR and Fleiss' Kappa across the matched results.
 
 ## Local Storage
 
-Results are also saved locally in `./logs/runs/` for offline access:
-
-```
-./logs/runs/
-├── res_abc123/
-│   ├── config.json
-│   ├── results.json
-│   └── prefixes.json
-├── res_def456/
-│   └── ...
-```
+By default, results live in a local SQLite database at `~/.local/share/hackagent/hackagent.db` (via `LocalBackend`). If you've configured a HackAgent Cloud API key, results are instead written to your organization's account on `https://api.hackagent.dev` (via `RemoteBackend`), viewable on the hosted dashboard.
 
 ## See Also
 

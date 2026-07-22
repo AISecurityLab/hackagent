@@ -1,6 +1,6 @@
 ---
-sidebar_label: evaluation
-title: hackagent.attacks.techniques.autodan_turbo.evaluation
+sidebar_label: autodan_eval
+title: hackagent.attacks.techniques.autodan_turbo.autodan_eval
 ---
 
 AutoDAN-Turbo evaluation wrapper using the shared LLM-judge pipeline.

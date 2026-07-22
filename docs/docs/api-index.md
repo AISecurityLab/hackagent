@@ -12,7 +12,7 @@ in the HackAgent Python SDK, auto-generated from source-code docstrings.
 - **Core**: `HackAgent` agent class, errors, and utilities
 - **Router**: Adapters for OpenAI, Ollama, LiteLLM, Google ADK, and call tracking
 - **Attack Framework**: Base classes, objectives, evaluators, and techniques
-  (AdvPrefix, PAIR, TAP, BON, FlipAttack, AutoDAN-Turbo, Static Template, RAG Attack)
+  (AdvPrefix, PAIR, TAP, BON, FlipAttack, AutoDAN-Turbo, Baseline)
 - **Datasets**: Built-in providers and dataset registry
 - **Risks**: Risk profiles and vulnerability definitions for all OWASP LLM risk categories
 
@@ -20,4 +20,4 @@ For practical usage examples, see the [Python SDK Quickstart](./sdk/python-quick
 
 ---
 
-*Auto-generated from hackagent v0.10.1.*
+*Auto-generated from hackagent v0.11.0.*

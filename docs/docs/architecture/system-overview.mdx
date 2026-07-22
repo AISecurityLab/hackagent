@@ -4,73 +4,58 @@ sidebar_position: 1
 
 # System Architecture Overview
 
-HackAgent is built as a comprehensive security testing platform with a modern, scalable architecture designed to handle enterprise-grade AI agent vulnerability assessments.
+HackAgent is a **local-first Python SDK and CLI** for red-teaming AI agents. There is no server to deploy and no database to provision to get started — the `hackagent` package runs entirely on your machine, storing results in a local SQLite database, and can optionally sync to HackAgent Cloud when an API key is configured.
 
 ## High-Level Architecture
 
 ```mermaid
 graph TB
-    subgraph "Frontend Layer"
-        UI[React Dashboard]
-        DOCS[Docusaurus Documentation]
+    subgraph "Entry Points"
+        SDK["Python SDK (HackAgent class)"]
+        CLI["CLI (hackagent ...)"]
+        DASH["Local Dashboard (NiceGUI)"]
     end
-    
-    subgraph "API Gateway"
-        API[Django REST Framework]
-        AUTH[Authentication Layer]
-        RATE[Rate Limiting]
-    end
-    
-    subgraph "Core Services"
-        AGENT[Agent Management]
-        ATTACK[Attack Engine]
-        EVAL[Evaluation Service]
-        BILLING[Billing Service]
-    end
-    
-    subgraph "Data Layer"
-        DB[(PostgreSQL)]
-        CACHE[(Redis Cache)]
-        FILES[File Storage]
-        DATASETS[Datasets]
-    end
-    
-    subgraph "External Integrations"
-        ADK[Google ADK]
-        OPENAI[OpenAI SDK]
-        LITELLM[LiteLLM]
-        CUSTOM[Custom Agents]
-    end
-    
-    UI --> API
-    DOCS --> API
-    API --> AUTH
-    API --> RATE
-    API --> AGENT
-    API --> ATTACK
-    API --> EVAL
-    API --> BILLING
-    
-    AGENT --> DB
-    ATTACK --> DB
-    ATTACK --> DATASETS
-    EVAL --> DB
-    BILLING --> DB
-    
-    ATTACK --> CACHE
-    EVAL --> CACHE
-    
-    AGENT --> ADK
-    AGENT --> OPENAI
-    AGENT --> LITELLM
-    AGENT --> CUSTOM
-    
-    EVAL --> FILES
 
-    style ATTACK fill:#ff6b6b,stroke:#c92a2a,color:#fff
+    subgraph "Core Library"
+        ROUTER["Router (AgentRouter)"]
+        ATTACKS["Attack Framework (registry, orchestrator, techniques)"]
+        RISKS["Risk Profiles (OWASP LLM risk categories)"]
+        DATASETS["Datasets (providers, presets, registry)"]
+    end
+
+    subgraph "Storage"
+        LOCAL["LocalBackend (SQLite, ~/.local/share/hackagent/hackagent.db)"]
+        REMOTE["RemoteBackend (HackAgent Cloud API, optional)"]
+    end
+
+    subgraph "Target Agent Adapters"
+        ADK["Google ADK"]
+        CLAUDE["Claude Code"]
+        CODEX["Codex"]
+        WEBP["Web / browser"]
+        CHAT["LiteLLM / OpenAI SDK / Ollama / LangChain (chat-completions)"]
+    end
+
+    SDK --> ROUTER
+    CLI --> SDK
+    DASH --> LOCAL
+
+    ROUTER --> ATTACKS
+    ATTACKS --> RISKS
+    ATTACKS --> DATASETS
+
+    ROUTER --> ADK
+    ROUTER --> CLAUDE
+    ROUTER --> CODEX
+    ROUTER --> WEBP
+    ROUTER --> CHAT
+
+    SDK --> LOCAL
+    SDK --> REMOTE
+
+    style ATTACKS fill:#ff6b6b,stroke:#c92a2a,color:#fff
     style DATASETS fill:#4dabf7,stroke:#1971c2,color:#fff
-    style ADK fill:#69db7c,stroke:#2f9e44,color:#fff
-    style OPENAI fill:#69db7c,stroke:#2f9e44,color:#fff
+    style ROUTER fill:#69db7c,stroke:#2f9e44,color:#fff
 ```
 
 ### Explore Components
@@ -103,261 +88,82 @@ import Link from '@docusaurus/Link';
     </Link>
   </div>
 </div>
-    style ADK fill:#69db7c,stroke:#2f9e44,color:#fff
-    style OPENAI fill:#69db7c,stroke:#2f9e44,color:#fff
-```
 
 ## Core Components
 
-### Frontend Layer
+### Entry Points
 
-**React Dashboard (`/frontend/dashboard/`)**
-- **Technology**: Next.js 15+ with React 19
-- **UI Framework**: TailwindCSS + shadcn/ui components
-- **Authentication**: Privy integration (Web3 + Social login)
-- **State Management**: React hooks with local state
-- **API Client**: Auto-generated TypeScript client from OpenAPI
+**Python SDK (`hackagent.agent.HackAgent`)**
+- The main client class. Construct it with the target agent's `endpoint`/`agent_type`, then call `.hack(attack_config=...)` to run an attack and get results back.
+- Chooses a `LocalBackend` or `RemoteBackend` automatically based on whether an API key is resolved (`HACKAGENT_API_KEY` env var or explicit `api_key=`).
 
-**Docusaurus Documentation (`/frontend/docs/`)**
-- **Purpose**: Comprehensive user and developer documentation
-- **Features**: Search, versioning, mobile-responsive
-- **Integration**: Served alongside the main application
+**CLI (`hackagent/cli/`)**
+- A Click-based CLI (`hackagent init`, `agent`, `eval`, `scan`, `claude`, `codex`, `web`, `datasets`, `results`, `config`, `examples`) that wraps the SDK for interactive and scripted use. See [CLI Reference](../cli/overview.md).
 
-### API Gateway
+**Local Dashboard (`hackagent/server/dashboard/`)**
+- A [NiceGUI](https://nicegui.io/) app (`hackagent web`) that reads directly from the local SQLite database to visualize runs, results, and attack traces — no separate backend process required.
 
-**Django REST Framework**
-- **Routing**: RESTful endpoints with OpenAPI documentation
-- **Serialization**: Automatic data validation and transformation
-- **Pagination**: Consistent pagination across all endpoints
-- **Filtering**: Django-filter integration for complex queries
+### Router
 
-**Authentication Layer**
-- **Privy Authentication**: JWT-based auth with Web3/social login
-- **API Key Authentication**: For programmatic access
-- **Multi-tenant Support**: Organization-based access control
-- **Permission System**: Role-based permissions
+**`hackagent.router.AgentRouter`**
+- Resolves an `AgentTypeEnum` (e.g. `GOOGLE_ADK`, `CLAUDE_CODE`, `CODEX`, `WEB`, `LITELLM`, `OPENAI_SDK`, `OLLAMA`, `LANGCHAIN`) to a provider adapter and dispatches attack prompts to the target agent.
+- `GOOGLE_ADK`, `CLAUDE_CODE`, `CODEX`, and `WEB` use dedicated adapter classes in `hackagent/router/providers/`. The remaining chat-completions-style types are driven generically through `provider_config.py` + `_ChatRegistration`.
+- Tracks per-step traces via `hackagent/router/tracking/` for later inspection in the dashboard.
 
-### Core Services
+### Attack Framework (`hackagent/attacks/`)
 
-**Agent Management Service**
-- **Purpose**: Manage AI agent configurations and connections
-- **Features**: Multi-framework support, health checking, metadata management
-- **Supported Types**: Google ADK, OpenAI SDK, LiteLLM, Custom REST APIs
+- **Registry & orchestrator**: `registry.py` maps attack-technique names to implementations; `orchestrator.py` runs a technique end-to-end against a configured agent.
+- **Techniques** (`attacks/techniques/`): Baseline, StaticTemplate, FlipAttack, BON, CipherChat, H4rm3l, MML, FC/tFC, PAP, PAIR, TAP, AdvPrefix, AutoDAN-Turbo, RAG (indirect prompt injection). See [Attacks](../attacks/index.mdx) for the full catalog.
+- **Evaluator** (`attacks/evaluator/`): shared judge/pattern-based evaluators and metrics used across techniques to score attack success.
 
-**Attack Engine**
-- **Attack Types**: Prompt injection, jailbreaking, goal hijacking
-- **Techniques**: AdvPrefix, indirect injection, filter evasion
-- **Execution**: Async attack orchestration with result aggregation
-- **Extensibility**: Plugin system for custom attack vectors
+### Risk Profiles (`hackagent/risks/`)
 
-**Evaluation Service**
-- **Judge Models**: AI-powered result evaluation
-- **Scoring**: Vulnerability severity assessment
-- **Metrics**: Success rates, confidence scores, risk ratings
-- **Reporting**: Detailed analysis and recommendations
+- One package per OWASP-style LLM risk category (jailbreak, prompt injection, sensitive information disclosure, excessive agency, model evasion, etc.), each defining vulnerability types and a `profile.py` that maps the category to relevant attack techniques. See [AI Risks](../risks/index.mdx).
 
-**Billing Service**
-- **Credit System**: Usage-based billing with real-time tracking
-- **Payment Processing**: Stripe integration for subscriptions
-- **Usage Logging**: Detailed API usage and cost tracking
-- **Limits**: Rate limiting and quota management
+### Datasets (`hackagent/datasets/`)
 
-### Data Layer
+- Pluggable dataset providers (`file`, `huggingface`, `url_json`), curated presets, and an intent-category taxonomy, all resolved through a central `registry.py`. See [Datasets](../datasets/index.md).
 
-**PostgreSQL Database**
-- **Multi-tenancy**: Organization-based data isolation
-- **Models**: Agents, Attacks, Runs, Results, Traces, Users
-- **Relationships**: Complex foreign key relationships with cascade handling
-- **Performance**: Optimized queries with proper indexing
+### Storage
 
-**Redis Cache (Future)**
-- **Session Storage**: User session management
-- **Attack Results**: Temporary result caching
-- **Rate Limiting**: Token bucket implementation
+**`LocalBackend` (default)**
+- SQLite database at `~/.local/share/hackagent/hackagent.db`. No network access or account required — this is what most SDK/CLI usage runs against.
 
-## Data Flow Architecture
+**`RemoteBackend` (optional)**
+- Used automatically once a HackAgent Cloud API key is resolved. Talks to `https://api.hackagent.dev` through the generated OpenAPI client in `hackagent/server/`, enabling team dashboards and hosted result storage.
 
-### Attack Execution Flow
+Both backends implement the same `StorageBackend` protocol (`hackagent/server/storage/base.py`), so the router, attack orchestrator, tracker, and TUI/dashboard code are fully decoupled from where results are actually persisted.
+
+## Attack Execution Flow
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant Dashboard
-    participant API
-    participant AttackEngine
-    participant Agent
+    participant SDK as HackAgent SDK/CLI
+    participant Router as AgentRouter
+    participant Orchestrator as Attack Orchestrator
+    participant Target as Target Agent
     participant Evaluator
-    participant Database
+    participant Storage as Local/Remote Storage
 
-    User->>Dashboard: Configure Attack
-    Dashboard->>API: POST /api/attack
-    API->>Database: Store Attack Config
-    API->>AttackEngine: Execute Attack
-    
-    loop For Each Attack Vector
-        AttackEngine->>Agent: Send Test Prompt
-        Agent->>AttackEngine: Return Response
-        AttackEngine->>Evaluator: Evaluate Response
-        Evaluator->>AttackEngine: Return Assessment
-        AttackEngine->>Database: Store Result
+    User->>SDK: agent.hack(attack_config)
+    SDK->>Storage: Register agent + create Run
+    SDK->>Orchestrator: Execute selected technique
+    loop For each generated prompt
+        Orchestrator->>Router: Dispatch prompt
+        Router->>Target: Send request via provider adapter
+        Target->>Router: Response
+        Router->>Evaluator: Evaluate response
+        Evaluator->>Orchestrator: Verdict + score
+        Orchestrator->>Storage: Persist Result + trace
     end
-    
-    AttackEngine->>API: Attack Complete
-    API->>Dashboard: Results Available
-    Dashboard->>User: Display Results
+    Orchestrator->>SDK: Aggregated results
+    SDK->>User: Return result list (ASR, per-prompt outcomes)
 ```
 
-### Multi-Tenant Data Access
+## Testing
 
-```mermaid
-graph TB
-    subgraph "Organization A"
-        USER_A[User A]
-        AGENT_A[Agents A]
-        ATTACK_A[Attacks A]
-        RUN_A[Runs A]
-    end
-    
-    subgraph "Organization B"
-        USER_B[User B]
-        AGENT_B[Agents B]
-        ATTACK_B[Attacks B]
-        RUN_B[Runs B]
-    end
-    
-    subgraph "Shared Infrastructure"
-        API[API Layer]
-        DB[(Database)]
-    end
-    
-    USER_A --> API
-    USER_B --> API
-    API --> DB
-    
-    DB --> AGENT_A
-    DB --> ATTACK_A
-    DB --> RUN_A
-    
-    DB --> AGENT_B
-    DB --> ATTACK_B
-    DB --> RUN_B
-```
+- **Unit and integration tests** live under `tests/`, run with `pytest` via `uv run pytest` (see `pyproject.toml` / `pytest.ini`).
+- CI (`.github/workflows/`) runs linting (`ruff`), type checks, and the test suite on every pull request; `codecov.yml` tracks patch coverage.
 
-## Security Architecture
-
-### Authentication Flow
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant Frontend
-    participant Privy
-    participant API
-    participant Database
-
-    User->>Frontend: Login Request
-    Frontend->>Privy: Authenticate
-    Privy->>Frontend: JWT Token
-    Frontend->>API: Request with JWT
-    API->>Privy: Validate Token
-    Privy->>API: Token Valid
-    API->>Database: Query User Data
-    Database->>API: User Profile
-    API->>Frontend: Authorized Response
-```
-
-### Data Protection
-
-- **Encryption at Rest**: Database encryption for sensitive data
-- **Encryption in Transit**: TLS 1.3 for all API communications
-- **Access Control**: Row-level security based on organization membership
-- **Audit Logging**: Comprehensive audit trails for all actions
-- **Data Isolation**: Strict tenant data separation
-
-## Scalability Considerations
-
-### Horizontal Scaling
-
-- **Stateless API**: No server-side session storage
-- **Database Optimization**: Read replicas for query scaling
-- **Caching Strategy**: Redis for session and result caching
-- **Load Balancing**: Multiple API server instances
-
-### Performance Optimization
-
-- **Async Processing**: Non-blocking attack execution
-- **Result Streaming**: Real-time result updates via WebSockets
-- **Database Indexing**: Optimized queries for large datasets
-- **CDN Integration**: Static asset delivery optimization
-
-## Testing Architecture
-
-### Test Isolation
-
-```mermaid
-graph TB
-    subgraph "Test Environment"
-        TEST_DB[(Test Database)]
-        MOCK_AGENTS[Mock AI Agents]
-        TEST_API[API Test Server]
-    end
-    
-    subgraph "Testing Tools"
-        PYTEST[Pytest Framework]
-        FACTORY[Factory Boy]
-        FIXTURES[Test Fixtures]
-    end
-    
-    PYTEST --> TEST_API
-    PYTEST --> TEST_DB
-    PYTEST --> MOCK_AGENTS
-    FACTORY --> FIXTURES
-    FIXTURES --> TEST_DB
-```
-
-### Test Categories
-
-- **Unit Tests**: Individual component testing
-- **Integration Tests**: API endpoint testing
-- **End-to-End Tests**: Full user workflow testing
-- **Security Tests**: Vulnerability scanning and penetration testing
-- **Performance Tests**: Load testing and benchmarking
-
-## Deployment Architecture
-
-### Container Strategy
-
-```yaml
-services:
-  web:
-    image: hackagent:latest
-    ports: ["8000:8000"]
-    environment:
-      - DATABASE_URL
-      - REDIS_URL
-      - PRIVY_APP_ID
-    
-  db:
-    image: postgres:15
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    
-  redis:
-    image: redis:7-alpine
-    
-  nginx:
-    image: nginx:alpine
-    ports: ["80:80", "443:443"]
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
-```
-
-### Production Considerations
-
-- **Environment Separation**: Development, staging, production environments
-- **Secret Management**: Environment-based secret injection
-- **Health Checks**: Application and database health monitoring
-- **Backup Strategy**: Automated database backups and restoration
-- **Monitoring**: Application performance monitoring (APM)
-
-This architecture provides a robust, scalable foundation for comprehensive AI agent security testing while maintaining security, performance, and maintainability standards. 
+This local-first design keeps the feedback loop tight: install the package, point it at a target agent, and run an attack — with an optional path to HackAgent Cloud for teams that want shared dashboards and history.
