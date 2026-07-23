@@ -22,6 +22,10 @@ from hackagent.attacks.techniques.fc.flowchart_renderer import (
 
 
 class TestGraphvizBootstrapHelpers(unittest.TestCase):
+    @staticmethod
+    def _tail_parts(path: Path, count: int) -> tuple[str, ...]:
+        return tuple(path.parts[-count:])
+
     def test_env_truthy_defaults(self):
         self.assertTrue(_env_truthy(None, default=True))
         self.assertFalse(_env_truthy(None, default=False))
@@ -127,7 +131,10 @@ class TestGraphvizBootstrapHelpers(unittest.TestCase):
             ),
         ):
             result = _hackagent_data_dir()
-            self.assertTrue(str(result).endswith("/tmp/localappdata/hackagent"))
+            self.assertEqual(
+                self._tail_parts(result, 3),
+                ("tmp", "localappdata", "hackagent"),
+            )
 
     def test_hackagent_data_dir_macos(self):
         with (
@@ -143,8 +150,8 @@ class TestGraphvizBootstrapHelpers(unittest.TestCase):
         ):
             result = _hackagent_data_dir()
             self.assertEqual(
-                str(result),
-                "/Users/test/.local/share/hackagent",
+                self._tail_parts(result, 5),
+                ("Users", "test", ".local", "share", "hackagent"),
             )
 
     def test_hackagent_data_dir_linux_xdg(self):
@@ -156,7 +163,10 @@ class TestGraphvizBootstrapHelpers(unittest.TestCase):
             ),
         ):
             result = _hackagent_data_dir()
-            self.assertTrue(str(result).endswith("/tmp/xdg-data/hackagent"))
+            self.assertEqual(
+                self._tail_parts(result, 3),
+                ("tmp", "xdg-data", "hackagent"),
+            )
 
     def test_repair_macos_dylib_symlink_placeholders(self):
         with tempfile.TemporaryDirectory() as td:
