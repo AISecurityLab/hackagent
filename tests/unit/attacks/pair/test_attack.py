@@ -1,6 +1,8 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import json
+import threading
 import unittest
 from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
@@ -222,6 +224,7 @@ class TestPAIRAttack(unittest.TestCase):
                 config={
                     "output_dir": "./logs/runs",
                     "n_iterations": 5,
+                    "n_streams": 1,
                 },
                 client=MagicMock(),
                 agent_router=MagicMock(),
@@ -258,6 +261,7 @@ class TestPAIRAttack(unittest.TestCase):
                 config={
                     "output_dir": "./logs/runs",
                     "n_iterations": 1,
+                    "n_streams": 1,
                     "jailbreak_threshold": 8,
                 },
                 client=MagicMock(),
@@ -339,11 +343,11 @@ class TestPAIRAttack(unittest.TestCase):
 
         with patch(
             "hackagent.attacks.techniques.pair.attack.score_response",
-            return_value=(8.0, "ok"),
+            return_value=(7.5, "ok"),
         ) as mock_score:
             out = attack._score_response("ORIGINAL GOAL", "target reply")
 
-        self.assertEqual(out, 8)
+        self.assertEqual(out, 7.5)
         self.assertEqual(mock_score.call_args.kwargs["goal"], "ORIGINAL GOAL")
         self.assertEqual(mock_score.call_args.kwargs["target_response"], "target reply")
 
@@ -358,6 +362,7 @@ class TestPAIRAttack(unittest.TestCase):
                 config={
                     "output_dir": "./logs/runs",
                     "n_iterations": 1,
+                    "n_streams": 1,
                     "target_trace_response_max_chars": 20,
                 },
                 client=MagicMock(),
@@ -389,6 +394,119 @@ class TestPAIRAttack(unittest.TestCase):
         self.assertEqual(call_kwargs["metadata"]["response_char_count"], 75)
         self.assertEqual(call_kwargs["metadata"]["response_preview_chars"], 20)
         self.assertTrue(call_kwargs["metadata"]["response_preview_truncated"])
+
+    def test_single_goal_keeps_independent_attacker_histories_per_stream(self):
+        dummy_attacker = MagicMock()
+        dummy_attacker._agent_registry = {"a": object()}
+
+        with patch.object(
+            PAIRAttack, "_initialize_attacker_router", return_value=dummy_attacker
+        ):
+            attack = PAIRAttack(
+                config={
+                    "output_dir": "./logs/runs",
+                    "n_iterations": 2,
+                    "n_streams": 2,
+                    "early_stop_on_success": False,
+                },
+                client=MagicMock(),
+                agent_router=MagicMock(),
+            )
+
+        seen_histories = []
+        generated = iter(
+            [
+                {"prompt": "stream-1-turn-1", "improvement": "first"},
+                {"prompt": "stream-2-turn-1", "improvement": "first"},
+                {"prompt": "stream-1-turn-2", "improvement": "refine"},
+                {"prompt": "stream-2-turn-2", "improvement": "refine"},
+            ]
+        )
+
+        def query_attacker(*_args, conversation, **_kwargs):
+            seen_histories.append([dict(message) for message in conversation])
+            attack_data = next(generated)
+            return {
+                **attack_data,
+                "assistant_content": json.dumps(attack_data),
+            }
+
+        with (
+            patch.object(attack, "_query_attacker", side_effect=query_attacker),
+            patch.object(
+                attack,
+                "_query_target_simple",
+                side_effect=["response-1", "response-2", "response-3", "response-4"],
+            ),
+            patch.object(attack, "_judge_response", side_effect=[1, 2, 3, 4]),
+        ):
+            result = attack._run_single_goal(
+                goal="immutable goal",
+                goal_index=0,
+                goal_tracker=None,
+                goal_ctx=None,
+                progress_bar=None,
+                task=None,
+            )
+
+        self.assertEqual(result["best_score"], 4)
+        self.assertEqual(result["n_streams"], 2)
+        self.assertEqual(len(seen_histories), 4)
+
+        # Turn two of stream one includes its own first attacker JSON and its
+        # own immediate feedback, never the other stream's attempt.
+        second_turn_stream_one = seen_histories[2]
+        self.assertEqual(
+            [message["role"] for message in second_turn_stream_one],
+            ["system", "user", "assistant", "user"],
+        )
+        self.assertIn("stream-1-turn-1", second_turn_stream_one[2]["content"])
+        self.assertIn("response-1", second_turn_stream_one[3]["content"])
+        self.assertIn("SCORE: 1", second_turn_stream_one[3]["content"])
+        self.assertNotIn("stream-2-turn-1", second_turn_stream_one[2]["content"])
+
+    def test_batch_size_runs_pair_streams_in_parallel(self):
+        dummy_attacker = MagicMock()
+        dummy_attacker._agent_registry = {"a": object()}
+
+        with patch.object(
+            PAIRAttack, "_initialize_attacker_router", return_value=dummy_attacker
+        ):
+            attack = PAIRAttack(
+                config={
+                    "output_dir": "./logs/runs",
+                    "n_iterations": 1,
+                    "n_streams": 2,
+                    "batch_size": 2,
+                    "early_stop_on_success": False,
+                },
+                client=MagicMock(),
+                agent_router=MagicMock(),
+            )
+
+        barrier = threading.Barrier(2)
+        worker_ids = set()
+
+        def query_attacker(*_args, **_kwargs):
+            worker_ids.add(threading.get_ident())
+            barrier.wait(timeout=2)
+            return "adv"
+
+        with (
+            patch.object(attack, "_query_attacker", side_effect=query_attacker),
+            patch.object(attack, "_query_target_simple", return_value="response"),
+            patch.object(attack, "_judge_response", return_value=1),
+        ):
+            attack._run_single_goal(
+                goal="g",
+                goal_index=0,
+                goal_tracker=None,
+                goal_ctx=None,
+                progress_bar=None,
+                task=None,
+            )
+
+        self.assertEqual(len(worker_ids), 2)
 
     def test_run_suppresses_pipeline_status_updates_in_sub_run(self):
         class _DummyStepTracker:
