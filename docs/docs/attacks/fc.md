@@ -147,4 +147,27 @@ FC-Attack implements a two-stage pipeline:
 ## Requirements
 
 - Target model must be a **Vision-Language Model** (VLM) that supports image inputs (e.g., GPT-4o, Qwen2-VL, LLaVA, Claude 3).
-- The `Graphviz` system binary (`dot`) is required for flowchart image rendering (e.g. `apt install graphviz` or `brew install graphviz`).
+- `Graphviz` binary (`dot`) is required for flowchart image rendering.
+
+### Graphviz Without Admin Permissions
+
+If `dot` is not available in your system `PATH`, HackAgent now tries this fallback automatically:
+
+1. Detect current OS (`Linux`/`macOS`/`Windows`).
+2. Query the **latest** official Graphviz release from GitLab.
+3. Download a portable archive into HackAgent's OS-specific persistent data directory:
+    - Linux: `~/.local/share/hackagent/graphviz` (or `$XDG_DATA_HOME/hackagent/graphviz`)
+    - macOS: `~/.local/share/hackagent/graphviz` (or `$XDG_DATA_HOME/hackagent/graphviz`)
+    - Windows: `%LOCALAPPDATA%\\hackagent\\graphviz`
+4. Use that local `dot` binary for rendering.
+
+Environment variables:
+
+- `HACKAGENT_GRAPHVIZ_DOT`: absolute path to a custom local `dot` binary (highest priority).
+- `HACKAGENT_GRAPHVIZ_AUTO_DOWNLOAD`: set to `0` to disable automatic download fallback.
+
+Notes:
+
+- If Graphviz is already installed (`dot` in `PATH`), that system binary is used first.
+- During `hackagent init`, HackAgent also checks for Graphviz and can prefetch portable binaries after explicit user confirmation.
+- On unsupported platforms, set `HACKAGENT_GRAPHVIZ_DOT` explicitly or install Graphviz manually.

@@ -12,24 +12,550 @@ Language Models via Auto-Generated Flowcharts" (EMNLP 2025 Findings)
 """
 
 import base64
+import json
 import logging
+import os
+import platform
+import re
 import shutil
+import stat
 import subprocess
 import tempfile
 import textwrap
+import zipfile
+from pathlib import Path
 from typing import Any, Dict, List
+from urllib.request import Request, urlopen
 
 logger = logging.getLogger(__name__)
 
 _GRAPHVIZ_AVAILABLE: bool | None = None
+_GRAPHVIZ_DOT_BIN: str | None = None
+
+_GRAPHVIZ_LATEST_RELEASE_API = (
+    "https://gitlab.com/api/v4/projects/4207231/releases/permalink/latest"
+)
+
+
+def _env_truthy(value: str | None, *, default: bool = True) -> bool:
+    """Interpret boolean-ish environment variables."""
+    if value is None:
+        return default
+    return value.strip().lower() not in {"", "0", "false", "no", "off"}
+
+
+def _hackagent_data_dir() -> Path:
+    """Return the OS-specific persistent HackAgent data directory."""
+    system = platform.system().lower()
+
+    if system == "windows":
+        base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+        if base:
+            return (Path(base) / "hackagent").resolve()
+        return (Path.home() / "AppData" / "Local" / "hackagent").resolve()
+
+    xdg_data_home = os.environ.get("XDG_DATA_HOME")
+    if xdg_data_home:
+        return (Path(xdg_data_home).expanduser().resolve() / "hackagent").resolve()
+    return (Path.home() / ".local" / "share" / "hackagent").resolve()
+
+
+def _graphviz_storage_dir() -> Path:
+    """Return the persistent directory used for Graphviz portable binaries."""
+    return _hackagent_data_dir() / "graphviz"
+
+
+def _is_executable_file(path: Path) -> bool:
+    """Return True when *path* points to an executable file."""
+    return path.is_file() and os.access(path, os.X_OK)
+
+
+def _find_dot_binary(root: Path) -> Path | None:
+    """Locate the ``dot`` binary under a directory tree."""
+    if not root.exists():
+        return None
+
+    pattern = "dot.exe" if platform.system().lower() == "windows" else "dot"
+    candidates: List[Path] = []
+    for path in root.rglob(pattern):
+        if path.is_file():
+            candidates.append(path)
+
+    if not candidates:
+        return None
+
+    def _candidate_rank(path: Path) -> tuple[int, int]:
+        parts_lower = {part.lower() for part in path.parts}
+        has_bin = 0 if "bin" in parts_lower else 1
+        return (has_bin, len(path.parts))
+
+    candidates.sort(key=_candidate_rank)
+    return candidates[0]
+
+
+def _pick_latest_graphviz_asset(
+    links: List[Dict[str, Any]],
+    system_name: str,
+) -> Dict[str, str] | None:
+    """Choose the best Graphviz archive for the current OS from release links."""
+    os_name = system_name.lower()
+
+    if os_name == "darwin":
+        patterns = [
+            r"^Darwin_.*_graphviz-.*-(arm64|x86_64)\.pkg$",
+            r"^Darwin_.*_Graphviz-.*-Darwin\.zip$",
+            r"Graphviz-.*-Darwin\.zip$",
+        ]
+    elif os_name == "windows":
+        patterns = [
+            r"^windows_.*_Release_Graphviz-.*-win64\.zip$",
+            r"Graphviz-.*-win64\.zip$",
+        ]
+    else:
+        return None
+
+    for pattern in patterns:
+        rx = re.compile(pattern)
+        for link in links:
+            name = str(link.get("name") or "")
+            if not name or name.endswith(".sha256"):
+                continue
+            if not rx.search(name):
+                continue
+            url = str(link.get("direct_asset_url") or link.get("url") or "")
+            if url:
+                return {"name": name, "url": url}
+    return None
+
+
+def _fetch_graphviz_latest_release() -> Dict[str, Any]:
+    """Fetch metadata for the latest Graphviz release from GitLab."""
+    req = Request(
+        _GRAPHVIZ_LATEST_RELEASE_API,
+        headers={"User-Agent": "hackagent-graphviz-bootstrap/1.0"},
+    )
+    with urlopen(req, timeout=20) as response:
+        payload = response.read().decode("utf-8")
+    return json.loads(payload)
+
+
+def _download_file(url: str, destination: Path) -> None:
+    """Download *url* to *destination* using streaming IO."""
+    req = Request(url, headers={"User-Agent": "hackagent-graphviz-bootstrap/1.0"})
+    with urlopen(req, timeout=60) as response, open(destination, "wb") as out:
+        shutil.copyfileobj(response, out)
+
+
+def _safe_join(base_dir: Path, relative_path: str) -> Path:
+    """Safely join a ZIP member path to *base_dir* (zip-slip protection)."""
+    base_resolved = base_dir.resolve()
+    candidate = (base_dir / relative_path).resolve()
+    if candidate != base_resolved and base_resolved not in candidate.parents:
+        raise ValueError(f"Unsafe archive entry path: {relative_path}")
+    return candidate
+
+
+def _extract_zip_preserving_symlinks(zip_path: Path, destination: Path) -> None:
+    """Extract ZIP preserving Unix symlinks when present in archive metadata."""
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        for info in zf.infolist():
+            out_path = _safe_join(destination, info.filename)
+
+            if info.is_dir():
+                out_path.mkdir(parents=True, exist_ok=True)
+                continue
+
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+
+            mode = (info.external_attr >> 16) & 0xFFFF
+            is_symlink = stat.S_ISLNK(mode)
+
+            if is_symlink:
+                link_target = zf.read(info).decode("utf-8").strip()
+                if out_path.exists() or out_path.is_symlink():
+                    out_path.unlink()
+                try:
+                    os.symlink(link_target, out_path)
+                except OSError:
+                    # Fallback: keep the placeholder file if symlink creation fails.
+                    out_path.write_text(link_target, encoding="utf-8")
+                continue
+
+            with zf.open(info, "r") as src, open(out_path, "wb") as dst:
+                shutil.copyfileobj(src, dst)
+
+            if mode:
+                try:
+                    out_path.chmod(mode)
+                except OSError:
+                    logger.debug("Could not chmod extracted file %s", out_path)
+
+
+def _repair_macos_dylib_symlinks(root: Path) -> int:
+    """Repair dylib alias files extracted as plain text instead of symlinks."""
+    if platform.system().lower() != "darwin" or not root.exists():
+        return 0
+
+    repaired = 0
+    for alias_file in root.rglob("*.dylib"):
+        if alias_file.is_symlink() or not alias_file.is_file():
+            continue
+
+        try:
+            size = alias_file.stat().st_size
+        except OSError:
+            continue
+
+        # Symlink placeholders from zip extraction are tiny text files.
+        if size == 0 or size > 256:
+            continue
+
+        try:
+            target_name = alias_file.read_text(encoding="utf-8").strip()
+        except (OSError, UnicodeDecodeError):
+            continue
+
+        if not target_name or "/" in target_name or "\\" in target_name:
+            continue
+        if not target_name.endswith(".dylib"):
+            continue
+
+        target_path = alias_file.parent / target_name
+        if not target_path.exists() or target_path == alias_file:
+            continue
+
+        try:
+            alias_file.unlink()
+            os.symlink(target_name, alias_file)
+            repaired += 1
+        except OSError:
+            logger.debug("Could not repair dylib symlink for %s", alias_file)
+
+    if repaired:
+        logger.info("Repaired %d Graphviz dylib symlink(s) under %s", repaired, root)
+    return repaired
+
+
+def _extract_macos_pkg_payload(pkg_path: Path, destination: Path) -> None:
+    """Extract Graphviz macOS .pkg payload into *destination* without system install."""
+    expanded_dir = destination / "_pkg_expanded"
+    if expanded_dir.exists():
+        shutil.rmtree(expanded_dir)
+
+    result = subprocess.run(
+        ["pkgutil", "--expand-full", str(pkg_path), str(expanded_dir)],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            "pkgutil failed while extracting Graphviz package: "
+            f"{(result.stderr or result.stdout).strip()[:300]}"
+        )
+
+    payload_candidates = list(expanded_dir.rglob("Payload/bin/dot"))
+    if not payload_candidates:
+        raise RuntimeError("Could not locate Graphviz dot binary inside macOS pkg")
+
+    payload_root = payload_candidates[0].parent.parent
+    shutil.copytree(payload_root, destination, dirs_exist_ok=True, symlinks=True)
+
+    shutil.rmtree(expanded_dir, ignore_errors=True)
+
+
+def _build_graphviz_runtime_env(dot_binary: str) -> Dict[str, str]:
+    """Build environment variables required to run a local Graphviz binary."""
+    env = os.environ.copy()
+    dot_path = Path(dot_binary).expanduser().resolve()
+
+    bin_dir = str(dot_path.parent)
+    env["PATH"] = (
+        f"{bin_dir}{os.pathsep}{env.get('PATH', '')}" if env.get("PATH") else bin_dir
+    )
+
+    lib_candidates = [
+        dot_path.parent.parent / "lib",
+        dot_path.parent.parent / "lib" / "graphviz",
+    ]
+    lib_dirs = [str(p) for p in lib_candidates if p.exists() and p.is_dir()]
+
+    if lib_dirs:
+        lib_prefix = os.pathsep.join(lib_dirs)
+        system = platform.system().lower()
+        if system == "darwin":
+            env["DYLD_LIBRARY_PATH"] = (
+                f"{lib_prefix}{os.pathsep}{env.get('DYLD_LIBRARY_PATH', '')}"
+                if env.get("DYLD_LIBRARY_PATH")
+                else lib_prefix
+            )
+            env["DYLD_FALLBACK_LIBRARY_PATH"] = (
+                f"{lib_prefix}{os.pathsep}{env.get('DYLD_FALLBACK_LIBRARY_PATH', '')}"
+                if env.get("DYLD_FALLBACK_LIBRARY_PATH")
+                else lib_prefix
+            )
+        elif system == "linux":
+            env["LD_LIBRARY_PATH"] = (
+                f"{lib_prefix}{os.pathsep}{env.get('LD_LIBRARY_PATH', '')}"
+                if env.get("LD_LIBRARY_PATH")
+                else lib_prefix
+            )
+
+    return env
+
+
+def _patch_macos_install_names(bundle_root: Path) -> None:
+    """Patch macOS Graphviz binaries to use local bundle library paths."""
+    if platform.system().lower() != "darwin":
+        return
+
+    lib_root = bundle_root / "lib"
+    if not lib_root.exists():
+        return
+
+    old_prefixes = (
+        "/usr/local/graphviz/lib/",
+        "/opt/homebrew/opt/libtool/lib/",
+    )
+
+    candidates: List[Path] = []
+    candidates.extend([p for p in (bundle_root / "bin").glob("*") if p.is_file()])
+    candidates.extend([p for p in lib_root.glob("*.dylib") if p.is_file()])
+    candidates.extend(
+        [p for p in (lib_root / "graphviz").glob("*.dylib") if p.is_file()]
+    )
+
+    for file_path in candidates:
+        try:
+            out = subprocess.run(
+                ["otool", "-L", str(file_path)],
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+        except Exception:
+            continue
+        if out.returncode != 0:
+            continue
+
+        dep_lines = [line.strip() for line in out.stdout.splitlines()[1:]]
+        for line in dep_lines:
+            dep = line.split(" ", 1)[0].strip()
+            replacement: Path | None = None
+            for prefix in old_prefixes:
+                if dep.startswith(prefix):
+                    replacement = lib_root / dep.split(prefix, 1)[1]
+                    break
+
+            if not replacement or not replacement.exists():
+                continue
+
+            if str(replacement) == dep:
+                continue
+
+            subprocess.run(
+                [
+                    "install_name_tool",
+                    "-change",
+                    dep,
+                    str(replacement),
+                    str(file_path),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+
+        if file_path.suffix == ".dylib":
+            id_out = subprocess.run(
+                ["otool", "-D", str(file_path)],
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+            if id_out.returncode != 0:
+                continue
+            ids = [
+                line.strip() for line in id_out.stdout.splitlines()[1:] if line.strip()
+            ]
+            if not ids:
+                continue
+
+            old_id = ids[0]
+            new_id: Path | None = None
+            for prefix in old_prefixes:
+                if old_id.startswith(prefix):
+                    candidate = lib_root / old_id.split(prefix, 1)[1]
+                    if candidate.exists():
+                        new_id = candidate
+                    break
+
+            if not new_id or str(new_id) == old_id:
+                continue
+
+            subprocess.run(
+                ["install_name_tool", "-id", str(new_id), str(file_path)],
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+
+
+def _initialize_graphviz_plugins(dot_binary: str) -> None:
+    """Run ``dot -c`` to generate/refresh plugin configuration for local bundles."""
+    dot_path = Path(dot_binary).expanduser().resolve()
+    try:
+        storage_root = _graphviz_storage_dir().resolve()
+        dot_path.relative_to(storage_root)
+    except Exception:
+        return
+
+    env = _build_graphviz_runtime_env(dot_binary)
+    subprocess.run(
+        [dot_binary, "-c"],
+        capture_output=True,
+        text=True,
+        timeout=40,
+        env=env,
+    )
+
+
+def _resolve_dot_binary(allow_download: bool | None = None) -> str | None:
+    """Resolve a usable Graphviz ``dot`` binary path.
+
+    Args:
+        allow_download: Controls whether portable binary download is allowed.
+            - ``True``: explicitly allow download fallback.
+            - ``False``: disable download fallback.
+            - ``None``: follow ``HACKAGENT_GRAPHVIZ_AUTO_DOWNLOAD`` (default).
+    """
+    global _GRAPHVIZ_DOT_BIN
+    if _GRAPHVIZ_DOT_BIN:
+        return _GRAPHVIZ_DOT_BIN
+
+    dot_from_env = os.getenv("HACKAGENT_GRAPHVIZ_DOT")
+    if dot_from_env:
+        path = Path(dot_from_env).expanduser().resolve()
+        if path.exists() and (
+            platform.system().lower() == "windows" or _is_executable_file(path)
+        ):
+            _GRAPHVIZ_DOT_BIN = str(path)
+            return _GRAPHVIZ_DOT_BIN
+        logger.warning(
+            "Ignoring HACKAGENT_GRAPHVIZ_DOT=%s (file not found or not executable)",
+            dot_from_env,
+        )
+
+    dot_on_path = shutil.which("dot")
+    if dot_on_path:
+        _GRAPHVIZ_DOT_BIN = dot_on_path
+        return _GRAPHVIZ_DOT_BIN
+
+    if allow_download is None:
+        should_download = _env_truthy(
+            os.getenv("HACKAGENT_GRAPHVIZ_AUTO_DOWNLOAD"), default=True
+        )
+    else:
+        should_download = allow_download
+
+    if not should_download:
+        return None
+
+    try:
+        release = _fetch_graphviz_latest_release()
+        links = release.get("assets", {}).get("links", [])
+        if not isinstance(links, list):
+            logger.warning("Invalid Graphviz release payload: missing assets.links")
+            return None
+
+        asset = _pick_latest_graphviz_asset(links, platform.system())
+        if not asset:
+            logger.warning(
+                "No portable Graphviz archive found for OS '%s'. "
+                "Set HACKAGENT_GRAPHVIZ_DOT to a local dot binary.",
+                platform.system(),
+            )
+            return None
+
+        version = str(release.get("tag_name") or "latest")
+        asset_name = asset["name"]
+        asset_url = asset["url"]
+        install_root = _graphviz_storage_dir() / version / Path(asset_name).stem
+        install_root.mkdir(parents=True, exist_ok=True)
+
+        _repair_macos_dylib_symlinks(install_root)
+
+        existing = _find_dot_binary(install_root)
+        if existing:
+            _patch_macos_install_names(install_root)
+            _initialize_graphviz_plugins(str(existing))
+            _GRAPHVIZ_DOT_BIN = str(existing)
+            return _GRAPHVIZ_DOT_BIN
+
+        archive_path = install_root / asset_name
+        logger.info("Downloading Graphviz archive: %s", asset_name)
+        _download_file(asset_url, archive_path)
+
+        archive_name = archive_path.name.lower()
+        if archive_name.endswith(".zip"):
+            _extract_zip_preserving_symlinks(archive_path, install_root)
+        elif archive_name.endswith(".pkg") and platform.system().lower() == "darwin":
+            _extract_macos_pkg_payload(archive_path, install_root)
+        else:
+            logger.warning(
+                "Unsupported Graphviz archive type '%s'",
+                archive_path.name,
+            )
+            return None
+
+        _repair_macos_dylib_symlinks(install_root)
+        _patch_macos_install_names(install_root)
+
+        extracted_dot = _find_dot_binary(install_root)
+        if not extracted_dot:
+            logger.warning(
+                "Graphviz archive extracted but dot binary was not found in %s",
+                install_root,
+            )
+            return None
+
+        if platform.system().lower() != "windows":
+            try:
+                current_mode = extracted_dot.stat().st_mode
+                extracted_dot.chmod(current_mode | 0o111)
+            except OSError:
+                logger.debug("Could not chmod +x %s", extracted_dot, exc_info=True)
+
+            _initialize_graphviz_plugins(str(extracted_dot))
+
+        _GRAPHVIZ_DOT_BIN = str(extracted_dot)
+        return _GRAPHVIZ_DOT_BIN
+    except Exception as exc:  # pragma: no cover - network/runtime dependent
+        logger.warning("Graphviz auto-download failed: %s", exc)
+        return None
 
 
 def _check_graphviz() -> bool:
     """Check if the ``dot`` binary is available on the system."""
     global _GRAPHVIZ_AVAILABLE
     if _GRAPHVIZ_AVAILABLE is None:
-        _GRAPHVIZ_AVAILABLE = shutil.which("dot") is not None
+        _GRAPHVIZ_AVAILABLE = _resolve_dot_binary() is not None
     return _GRAPHVIZ_AVAILABLE
+
+
+def ensure_graphviz_dot_available(allow_download: bool | None = None) -> str | None:
+    """Ensure Graphviz ``dot`` is available and return its resolved path.
+
+    This function is safe to call during setup flows (e.g. ``hackagent init``).
+    It may trigger automatic local binary download when enabled.
+
+    Args:
+        allow_download: See ``_resolve_dot_binary``.
+    """
+    global _GRAPHVIZ_AVAILABLE
+    dot_binary = _resolve_dot_binary(allow_download=allow_download)
+    _GRAPHVIZ_AVAILABLE = dot_binary is not None
+    return dot_binary
 
 
 # ─── DOT text helpers ─────────────────────────────────────────────────────────
@@ -612,22 +1138,39 @@ def _generate_dot_tortuous(
 
 
 def _render_dot_to_png_bytes(dot_content: str) -> bytes:
-    """Render DOT content to PNG bytes using the system Graphviz binary."""
+    """Render DOT content to PNG bytes using the resolved Graphviz binary."""
+    dot_binary = _resolve_dot_binary()
+    if not dot_binary:
+        raise RuntimeError("Graphviz 'dot' binary is not available.")
+
     with tempfile.NamedTemporaryFile(suffix=".dot", mode="w", delete=True) as dot_file:
         dot_file.write(dot_content)
         dot_file.flush()
 
-        result = subprocess.run(
-            ["dot", "-Tpng", dot_file.name],
-            capture_output=True,
-            timeout=30,
-        )
-        if result.returncode != 0:
-            raise RuntimeError(
-                f"Graphviz dot failed (exit {result.returncode}): "
-                f"{result.stderr.decode(errors='replace')[:200]}"
+        env = _build_graphviz_runtime_env(dot_binary)
+
+        system = platform.system().lower()
+        format_flags = ["-Tpng:quartz", "-Tpng"] if system == "darwin" else ["-Tpng"]
+
+        last_result: subprocess.CompletedProcess[bytes] | None = None
+        for fmt in format_flags:
+            result = subprocess.run(
+                [dot_binary, fmt, dot_file.name],
+                capture_output=True,
+                timeout=30,
+                env=env,
             )
-        return result.stdout
+            if result.returncode == 0:
+                return result.stdout
+            last_result = result
+
+        if last_result is None:
+            raise RuntimeError("Graphviz dot failed: no render attempts were executed")
+
+        raise RuntimeError(
+            f"Graphviz dot failed (exit {last_result.returncode}): "
+            f"{last_result.stderr.decode(errors='replace')[:200]}"
+        )
 
 
 # ─── Public API ───────────────────────────────────────────────────────────────
@@ -643,7 +1186,9 @@ def render_flowchart(
     """
     Render steps as a flowchart image using Graphviz.
 
-    Requires the ``dot`` binary to be available on the system.
+    Tries the system ``dot`` first. If unavailable, it can auto-download
+    portable Graphviz binaries (macOS/Windows) from the latest official
+    release unless ``HACKAGENT_GRAPHVIZ_AUTO_DOWNLOAD=0`` is set.
 
     Args:
         steps: List of step description strings.
@@ -665,7 +1210,9 @@ def render_flowchart(
 
     if not _check_graphviz():
         raise RuntimeError(
-            "Graphviz 'dot' binary not found. Install Graphviz to use FC-Attack "
+            "Graphviz 'dot' binary not found. FC-Attack looked in PATH and "
+            "tried local auto-download. You can set HACKAGENT_GRAPHVIZ_DOT to "
+            "a local binary path, or install Graphviz manually "
             "(e.g. 'apt install graphviz' or 'brew install graphviz'). "
             "Alternatively, use tFC-Attack which does not require image rendering."
         )
