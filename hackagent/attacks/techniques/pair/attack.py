@@ -922,6 +922,13 @@ class PAIRAttack(BaseAttack):
         # Best-result selection is shared across streams; model calls and
         # histories are not.  Only protect that tiny shared critical section.
         best_result_lock = threading.Lock()
+        progress_update_lock = threading.Lock()
+
+        def _advance_progress(amount: int = 1) -> None:
+            """Advance the shared progress bar safely across stream workers."""
+            if progress_bar and task is not None:
+                with progress_update_lock:
+                    progress_bar.update(task, advance=amount)
 
         for iteration in range(n_iterations):
             iterations_completed = iteration + 1
@@ -986,8 +993,7 @@ class PAIRAttack(BaseAttack):
                                 "current_best_score": best_score,
                             },
                         )
-                    if progress_bar and task is not None:
-                        progress_bar.update(task, advance=1)
+                    _advance_progress()
                     return False
 
                 messages.append({"role": "assistant", "content": assistant_content})
@@ -1038,8 +1044,7 @@ class PAIRAttack(BaseAttack):
                             step_name=_fail_step,
                             metadata=_fail_meta,
                         )
-                    if progress_bar and task is not None:
-                        progress_bar.update(task, advance=1)
+                    _advance_progress()
                     return False
 
                 _scorer_t0 = time.perf_counter()
@@ -1133,8 +1138,7 @@ class PAIRAttack(BaseAttack):
                         },
                     )
 
-                if progress_bar and task is not None:
-                    progress_bar.update(task, advance=1)
+                _advance_progress()
                 return score >= jailbreak_threshold
 
             stream_items = list(enumerate(stream_states))
@@ -1164,8 +1168,8 @@ class PAIRAttack(BaseAttack):
                         },
                     )
                 remaining = (n_iterations - iteration - 1) * n_streams
-                if progress_bar and task is not None and remaining > 0:
-                    progress_bar.update(task, advance=remaining)
+                if remaining > 0:
+                    _advance_progress(remaining)
                 break
 
         return {

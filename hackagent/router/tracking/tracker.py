@@ -20,6 +20,7 @@ use the StepTracker class from step.py instead.
 """
 
 import logging
+import threading
 import time
 from hackagent.logger import get_logger
 from contextlib import contextmanager
@@ -52,6 +53,12 @@ class Context:
     final_success: Optional[bool] = None
     _start_time: float = field(default_factory=time.perf_counter)
     _end_time: Optional[float] = None
+    _trace_lock: threading.RLock = field(
+        default_factory=threading.RLock,
+        init=False,
+        repr=False,
+        compare=False,
+    )
 
     def increment_sequence(self) -> int:
         """Atomically increment and return the next sequence number."""
@@ -446,60 +453,63 @@ class Tracker:
 
         sanitized_content = sanitize_for_json(content)
 
-        # Always track locally
-        seq = ctx.increment_sequence()
-        trace_record = {
-            "sequence": seq,
-            "step_name": step_name,
-            "step_type": (
-                step_type.value if hasattr(step_type, "value") else str(step_type)
-            ),
-            "content": sanitized_content,
-            "timestamp": time.time(),
-            "elapsed_s": round(ctx.elapsed_s, 3),
-        }
-        ctx.traces.append(trace_record)
+        # A PAIR goal may emit traces from parallel stream workers. Keep the
+        # sequence assignment, local append, event emission, and persistence in
+        # one critical section so sequence order remains stable everywhere.
+        with ctx._trace_lock:
+            seq = ctx.increment_sequence()
+            trace_record = {
+                "sequence": seq,
+                "step_name": step_name,
+                "step_type": (
+                    step_type.value if hasattr(step_type, "value") else str(step_type)
+                ),
+                "content": sanitized_content,
+                "timestamp": time.time(),
+                "elapsed_s": round(ctx.elapsed_s, 3),
+            }
+            ctx.traces.append(trace_record)
 
-        # Surface the trace as a structured TUI event. Subscribers translate
-        # the step_type / step_name into "tool_call", "evaluation", etc.
-        self._emit(
-            "trace_added",
-            goal_index=ctx.goal_index,
-            sequence=seq,
-            step_name=step_name,
-            step_type=trace_record["step_type"],
-            content=sanitized_content,
-            elapsed_s=trace_record["elapsed_s"],
-        )
-
-        # Send to backend if enabled and we have a result_id
-        if not self.is_enabled or not ctx.result_id:
-            return None
-
-        try:
-            result_uuid = UUID(ctx.result_id)
-            step_type_str = (
-                step_type.value if hasattr(step_type, "value") else str(step_type)
-            )
-            trace_record = self.backend.create_trace(
-                result_uuid,
+            # Surface the trace as a structured TUI event. Subscribers translate
+            # the step_type / step_name into "tool_call", "evaluation", etc.
+            self._emit(
+                "trace_added",
+                goal_index=ctx.goal_index,
                 sequence=seq,
-                step_type=step_type_str,
+                step_name=step_name,
+                step_type=trace_record["step_type"],
                 content=sanitized_content,
-            )
-            trace_id = str(trace_record.id)
-            self.logger.debug(
-                f"Created trace {seq} for goal {ctx.goal_index}: {trace_id}"
-            )
-            return trace_id
-
-        except Exception as e:
-            self.logger.error(
-                f"Exception creating trace for goal {ctx.goal_index}: {e}",
-                exc_info=True,
+                elapsed_s=trace_record["elapsed_s"],
             )
 
-        return None
+            # Send to backend if enabled and we have a result_id
+            if not self.is_enabled or not ctx.result_id:
+                return None
+
+            try:
+                result_uuid = UUID(ctx.result_id)
+                step_type_str = (
+                    step_type.value if hasattr(step_type, "value") else str(step_type)
+                )
+                persisted_trace = self.backend.create_trace(
+                    result_uuid,
+                    sequence=seq,
+                    step_type=step_type_str,
+                    content=sanitized_content,
+                )
+                trace_id = str(persisted_trace.id)
+                self.logger.debug(
+                    f"Created trace {seq} for goal {ctx.goal_index}: {trace_id}"
+                )
+                return trace_id
+
+            except Exception as e:
+                self.logger.error(
+                    f"Exception creating trace for goal {ctx.goal_index}: {e}",
+                    exc_info=True,
+                )
+
+            return None
 
     def finalize_goal(
         self,

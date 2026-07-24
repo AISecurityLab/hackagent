@@ -3,6 +3,7 @@
 
 import json
 import threading
+import time
 import unittest
 from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
@@ -507,6 +508,64 @@ class TestPAIRAttack(unittest.TestCase):
             )
 
         self.assertEqual(len(worker_ids), 2)
+
+    def test_parallel_streams_serialize_progress_updates(self):
+        class _Progress:
+            def __init__(self):
+                self._lock = threading.Lock()
+                self.active_updates = 0
+                self.overlapping_updates = False
+                self.calls = 0
+
+            def update(self, *_args, **_kwargs):
+                with self._lock:
+                    self.active_updates += 1
+                    self.overlapping_updates |= self.active_updates > 1
+                    self.calls += 1
+                time.sleep(0.02)
+                with self._lock:
+                    self.active_updates -= 1
+
+        dummy_attacker = MagicMock()
+        dummy_attacker._agent_registry = {"a": object()}
+        with patch.object(
+            PAIRAttack, "_initialize_attacker_router", return_value=dummy_attacker
+        ):
+            attack = PAIRAttack(
+                config={
+                    "output_dir": "./logs/runs",
+                    "n_iterations": 1,
+                    "n_streams": 2,
+                    "batch_size": 2,
+                    "early_stop_on_success": False,
+                },
+                client=MagicMock(),
+                agent_router=MagicMock(),
+            )
+
+        barrier = threading.Barrier(2)
+
+        def query_attacker(*_args, **_kwargs):
+            barrier.wait(timeout=2)
+            return "adv"
+
+        progress = _Progress()
+        with (
+            patch.object(attack, "_query_attacker", side_effect=query_attacker),
+            patch.object(attack, "_query_target_simple", return_value="response"),
+            patch.object(attack, "_judge_response", return_value=1),
+        ):
+            attack._run_single_goal(
+                goal="g",
+                goal_index=0,
+                goal_tracker=None,
+                goal_ctx=None,
+                progress_bar=progress,
+                task=object(),
+            )
+
+        self.assertEqual(progress.calls, 2)
+        self.assertFalse(progress.overlapping_updates)
 
     def test_run_suppresses_pipeline_status_updates_in_sub_run(self):
         class _DummyStepTracker:
