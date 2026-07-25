@@ -24,6 +24,7 @@ from hackagent.server.storage.enums import (
 )
 
 from .context import TrackingContext
+from .audit import AuditPersistenceError, record_run_audit_failure
 from .utils import deep_clean, sanitize_for_json
 
 
@@ -67,6 +68,30 @@ class StepTracker:
         """
         self.context = context
         self.logger = context.logger
+
+    def record_failure(self, step_name: str, error: BaseException) -> Dict[str, str]:
+        """Record a structured tracking failure on the parent run."""
+        if not self.context.is_enabled:
+            self.logger.error(
+                "Tracking failure in '%s' could not be persisted because tracking "
+                "is disabled: %s",
+                step_name,
+                error,
+                exc_info=True,
+            )
+            return {
+                "step": step_name,
+                "status": "failed",
+                "error": f"{type(error).__name__}: {error}"[:1000],
+            }
+
+        return record_run_audit_failure(
+            backend=self.context.backend,
+            run_id=str(self.context.run_id),
+            step=step_name,
+            error=error,
+            logger=self.logger,
+        )
 
     @contextmanager
     def track_step(
@@ -182,9 +207,15 @@ class StepTracker:
                 except Exception:
                     self.logger.debug("StepTracker event emit failed", exc_info=True)
 
+        except AuditPersistenceError:
+            # The original tracking failure was already logged, and its
+            # fallback run-record write also failed. Do not recursively try to
+            # audit the audit-persistence error.
+            raise
         except Exception as e:
             # Handle step failure
             self.logger.error(f"Step '{step_name}' failed: {e}", exc_info=True)
+            self.record_failure(step_name, e)
             self._handle_step_error(step_name, str(e))
             self._create_summary_trace(
                 step_name=step_name,
@@ -275,6 +306,7 @@ class StepTracker:
             self.logger.error(
                 f"Exception creating trace for '{step_name}': {e}", exc_info=True
             )
+            self.record_failure(f"{step_name}: create trace", e)
 
         return None
 
@@ -356,6 +388,7 @@ class StepTracker:
                 f"Exception creating summary trace for '{step_name}': {e}",
                 exc_info=True,
             )
+            self.record_failure(f"{step_name}: create summary trace", e)
 
         return None
 
@@ -384,6 +417,7 @@ class StepTracker:
 
         except Exception as e:
             self.logger.error(f"Failed to update error status: {e}", exc_info=True)
+            self.record_failure(f"{step_name}: update error status", e)
 
     def update_run_status(self, status: StatusEnum) -> bool:
         """
@@ -412,7 +446,7 @@ class StepTracker:
             return True
         except Exception as e:
             self.logger.error(f"Exception updating run status: {e}", exc_info=True)
-            return False
+            raise
 
     def update_result_status(
         self,
@@ -454,6 +488,7 @@ class StepTracker:
             return True
         except Exception as e:
             self.logger.error(f"Exception updating result status: {e}", exc_info=True)
+            self.record_failure("Update result status", e)
             return False
 
     def add_step_metadata(self, key: str, value: Any) -> None:

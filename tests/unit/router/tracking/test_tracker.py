@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import MagicMock
 
 from hackagent.server.api.models import EvaluationStatusEnum, StatusEnum
+from hackagent.router.tracking.audit import AuditPersistenceError
 from hackagent.router.tracking.context import TrackingContext
 from hackagent.router.tracking.step import StepTracker
 from hackagent.router.tracking.utils import sanitize_for_json
@@ -80,7 +81,58 @@ class TestStepTrackerTrackStep(unittest.TestCase):
 
         # Should have attempted to update error status
         mock_backend.update_result.assert_called()
+        audit_call = mock_backend.update_run.call_args
+        audit_failure = json.loads(audit_call.kwargs["run_notes"])["audit_failure"]
+        self.assertEqual(audit_call.kwargs["status"], StatusEnum.FAILED.value)
+        self.assertEqual(audit_failure["step"], "Test Step")
+        self.assertEqual(audit_failure["status"], "failed")
+        self.assertIn("Test error", audit_failure["error"])
         self.assertGreaterEqual(mock_backend.create_trace.call_count, 1)
+
+    def test_tracking_side_exception_is_visible_in_run_record(self):
+        """A trace persistence failure must not produce a trustworthy run."""
+        mock_backend = MagicMock()
+        context = TrackingContext(
+            backend=mock_backend,
+            run_id="12345678-1234-1234-1234-123456789abc",
+            parent_result_id="87654321-4321-4321-4321-cba987654321",
+        )
+        tracker = StepTracker(context)
+        mock_backend.create_trace.side_effect = [
+            RuntimeError("trace store unavailable"),
+            MagicMock(id="summary-trace-id"),
+        ]
+
+        with tracker.track_step("Audit Step", "AUDIT_STEP"):
+            pass
+
+        audit_call = mock_backend.update_run.call_args
+        audit_failure = json.loads(audit_call.kwargs["run_notes"])["audit_failure"]
+        self.assertEqual(audit_call.kwargs["status"], StatusEnum.FAILED.value)
+        self.assertEqual(
+            audit_failure,
+            {
+                "step": "Audit Step: create trace",
+                "status": "failed",
+                "error": "RuntimeError: trace store unavailable",
+            },
+        )
+
+    def test_tracking_failure_is_raised_if_run_record_cannot_be_updated(self):
+        """Losing both a trace and its failure record must stop the run."""
+        mock_backend = MagicMock()
+        context = TrackingContext(
+            backend=mock_backend,
+            run_id="12345678-1234-1234-1234-123456789abc",
+            parent_result_id="87654321-4321-4321-4321-cba987654321",
+        )
+        tracker = StepTracker(context)
+        mock_backend.create_trace.side_effect = RuntimeError("trace write failed")
+        mock_backend.update_run.side_effect = RuntimeError("run write failed")
+
+        with self.assertRaises(AuditPersistenceError):
+            with tracker.track_step("Audit Step", "AUDIT_STEP"):
+                pass
 
     def test_track_step_records_metadata_and_progress(self):
         """Test that step metadata/progress logs are recorded in summary trace."""
@@ -210,11 +262,10 @@ class TestStepTrackerUpdateRunStatus(unittest.TestCase):
         )
         tracker = StepTracker(context)
 
-        mock_backend.update_run.side_effect = Exception("Server error")
+        mock_backend.update_run.side_effect = RuntimeError("Server error")
 
-        result = tracker.update_run_status(StatusEnum.COMPLETED)
-
-        self.assertFalse(result)
+        with self.assertRaises(RuntimeError):
+            tracker.update_run_status(StatusEnum.COMPLETED)
 
 
 class TestStepTrackerUpdateResultStatus(unittest.TestCase):

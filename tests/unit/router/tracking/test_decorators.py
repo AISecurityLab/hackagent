@@ -3,6 +3,7 @@
 
 """Tests for tracking decorators."""
 
+import json
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -117,6 +118,11 @@ class TestTrackOperation(unittest.TestCase):
         # Should not raise, just log warning
         result = my_function(5, tracker=tracker)
         self.assertEqual(result, 10)
+        audit_call = mock_backend.update_run.call_args
+        audit_failure = json.loads(audit_call.kwargs["run_notes"])["audit_failure"]
+        self.assertEqual(audit_failure["step"], "Test Step: extract input")
+        self.assertEqual(audit_failure["status"], "failed")
+        self.assertIn("Extractor error", audit_failure["error"])
 
 
 class TestDefaultExtractInput(unittest.TestCase):
