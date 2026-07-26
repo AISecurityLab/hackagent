@@ -14,12 +14,19 @@ import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from hackagent.attacks.generator import AttackTemplates
+from hackagent.attacks.shared.response_utils import extract_response_content
 from hackagent.attacks.techniques.bon.generation import augment_text
 from hackagent.attacks.techniques.cipherchat.encode_experts import encode_expert_dict
 from hackagent.attacks.techniques.h4rm3l.config import PRESET_PROGRAMS
 from hackagent.attacks.techniques.h4rm3l.decorators import (
     compile_program,
     program_uses_llm_assisted_decorators,
+)
+from hackagent.attacks.techniques.pap.config import ALL_TECHNIQUES, TOP_5_TECHNIQUES
+from hackagent.attacks.techniques.pap.taxonomy import (
+    build_mutation_prompt,
+    extract_mutated_text,
+    get_technique_names,
 )
 from hackagent.router.router import AgentRouter
 
@@ -29,6 +36,7 @@ SUPPORTED_JAILBREAK_TECHNIQUES = (
     "flipattack",
     "cipherchat",
     "bon",
+    "pap",
 )
 
 DEFAULT_JAILBREAK_CONFIG: Dict[str, Any] = {
@@ -46,7 +54,14 @@ DEFAULT_JAILBREAK_CONFIG: Dict[str, Any] = {
     # bon options
     "sigma": 0.4,
     "seed": 0,
+    # pap options (LLM-assisted — uses the RAG attack's own attacker LLM)
+    "pap_techniques": "top5",
 }
+
+# Hardcoded attacker-LLM call params for LLM-assisted techniques (pap, fc).
+# Not exposed as config — keeps the jailbreak config surface thin.
+_PAP_ATTACKER_MAX_TOKENS = 300
+_PAP_ATTACKER_TEMPERATURE = 1.0
 
 
 class JailbreakFramer:
@@ -236,12 +251,70 @@ def _build_bon_framer(
     return JailbreakFramer("bon", _transform)
 
 
+def _resolve_pap_techniques(config: Dict[str, Any]) -> List[str]:
+    raw = config.get("pap_techniques", "top5")
+    if isinstance(raw, list):
+        techniques = [str(t) for t in raw]
+    elif raw == "all":
+        techniques = list(ALL_TECHNIQUES)
+    else:
+        techniques = list(TOP_5_TECHNIQUES)
+
+    valid = set(get_technique_names())
+    for technique in techniques:
+        if technique not in valid:
+            raise ValueError(
+                f"Unknown PAP persuasion technique '{technique}'. "
+                f"Supported: {sorted(valid)}"
+            )
+    return techniques
+
+
+def _build_pap_framer(
+    config: Dict[str, Any],
+    logger: Optional[logging.Logger] = None,
+    attacker_router: Optional[AgentRouter] = None,
+    attacker_reg_key: Optional[str] = None,
+) -> JailbreakFramer:
+    if attacker_router is None or attacker_reg_key is None:
+        raise ValueError(
+            "The 'pap' jailbreak technique requires an attacker LLM router; "
+            "none was provided."
+        )
+    techniques = _resolve_pap_techniques(config)
+
+    def _transform(goal: str, variant_index: int) -> Tuple[str, Dict[str, Any]]:
+        technique = techniques[variant_index % len(techniques)]
+        prompt = build_mutation_prompt(goal, technique)
+        try:
+            response = attacker_router.route_request(
+                registration_key=attacker_reg_key,
+                request_data={
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": _PAP_ATTACKER_MAX_TOKENS,
+                    "temperature": _PAP_ATTACKER_TEMPERATURE,
+                },
+            )
+            mutated = extract_mutated_text(extract_response_content(response) or "")
+        except Exception as e:
+            if logger is not None:
+                logger.warning(f"pap jailbreak attacker LLM failed: {e}")
+            mutated = ""
+
+        if not mutated.strip():
+            return goal, {"technique_name": technique, "pap_fallback": True}
+        return mutated, {"technique_name": technique, "pap_fallback": False}
+
+    return JailbreakFramer("pap", _transform)
+
+
 _TECHNIQUE_BUILDERS: Dict[str, Callable[..., JailbreakFramer]] = {
     "static_template": _build_static_template_framer,
     "h4rm3l": _build_h4rm3l_framer,
     "flipattack": _build_flipattack_framer,
     "cipherchat": _build_cipherchat_framer,
     "bon": _build_bon_framer,
+    "pap": _build_pap_framer,
 }
 
 
