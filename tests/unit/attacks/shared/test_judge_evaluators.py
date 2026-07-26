@@ -592,3 +592,80 @@ class TestScorerEvaluator:
         assert "answer (yes or no)" not in body.lower()
         assert req["temperature"] == 0.0
         assert req["max_tokens"] == scorer.config.max_tokens_eval
+
+
+class TestCustomJudgeSystemPrompt:
+    """Judges honour a user-defined ``system_prompt`` from EvaluatorConfig."""
+
+    @staticmethod
+    def _make(evaluator_class, system_prompt):
+        evaluator = evaluator_class.__new__(evaluator_class)
+        evaluator.logger = logging.getLogger("test.system_prompt")
+        config = MagicMock()
+        config.max_tokens_eval = 128
+        config.temperature = 0.0
+        config.system_prompt = system_prompt
+        evaluator.config = config
+        return evaluator
+
+    @pytest.mark.parametrize(
+        "evaluator_class",
+        [
+            NuancedEvaluator,
+            JailbreakBenchEvaluator,
+            HarmBenchEvaluator,
+            HarmBenchVariantEvaluator,
+            OnTopicEvaluator,
+            ScorerEvaluator,
+        ],
+    )
+    def test_system_prompt_prepended(self, evaluator_class):
+        evaluator = self._make(evaluator_class, "You are a strict judge.")
+        request = evaluator._get_request_data_for_row(
+            {"goal": "goal", "completion": "completion"}
+        )
+        assert request["messages"][0] == {
+            "role": "system",
+            "content": "You are a strict judge.",
+        }
+        assert request["messages"][1]["role"] == "user"
+
+    @pytest.mark.parametrize(
+        "evaluator_class",
+        [
+            NuancedEvaluator,
+            JailbreakBenchEvaluator,
+            HarmBenchEvaluator,
+            HarmBenchVariantEvaluator,
+            OnTopicEvaluator,
+            ScorerEvaluator,
+        ],
+    )
+    def test_no_system_message_without_config(self, evaluator_class):
+        evaluator = self._make(evaluator_class, None)
+        request = evaluator._get_request_data_for_row(
+            {"goal": "goal", "completion": "completion"}
+        )
+        assert len(request["messages"]) == 1
+        assert request["messages"][0]["role"] == "user"
+
+    def test_evaluator_config_accepts_system_prompt(self):
+        from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
+
+        config = EvaluatorConfig(
+            agent_name="judge",
+            agent_type="OPENAI_SDK",
+            model_id="test-model",
+            system_prompt="You are a strict judge.",
+        )
+        assert config.system_prompt == "You are a strict judge."
+
+    def test_evaluator_config_system_prompt_defaults_to_none(self):
+        from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
+
+        config = EvaluatorConfig(
+            agent_name="judge",
+            agent_type="OPENAI_SDK",
+            model_id="test-model",
+        )
+        assert config.system_prompt is None

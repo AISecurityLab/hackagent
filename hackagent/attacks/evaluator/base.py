@@ -186,6 +186,19 @@ class BaseJudgeEvaluator(ABC):
             f"Registration key: {self.agent_registration_key}"
         )
 
+    def _build_messages(self, user_content: str) -> List[Dict[str, str]]:
+        """Build the judge chat messages, honouring a user-defined system prompt.
+
+        ``EvaluatorConfig.system_prompt`` lets users prepend their own system
+        message (e.g. a custom rubric or persona) to every judge request.
+        """
+        messages: List[Dict[str, str]] = []
+        system_prompt = getattr(self.config, "system_prompt", None)
+        if isinstance(system_prompt, str) and system_prompt.strip():
+            messages.append({"role": "system", "content": system_prompt.strip()})
+        messages.append({"role": "user", "content": user_content})
+        return messages
+
     def _verify_keys(self, data: list[dict], required_keys: list) -> None:
         """Verify that all required keys exist in each dict."""
         if not data:
@@ -853,7 +866,7 @@ Answer (yes or no):"""
         )
 
         return {
-            "messages": [{"role": "user", "content": feedback_prompt}],
+            "messages": self._build_messages(feedback_prompt),
             "max_tokens": self.config.max_tokens_eval,
             "temperature": 0.0,  # Deterministic for retry
         }

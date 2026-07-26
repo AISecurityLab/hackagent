@@ -126,6 +126,8 @@ class JudgeConfig(BaseModel):
     agent_type: str = DEFAULT_LOCAL_AGENT_TYPE
     type: str = "harmbench"
     api_key: Optional[str] = None
+    # Optional user-defined system prompt prepended to every judge request.
+    system_prompt: Optional[str] = None
     top_p: Optional[float] = None
     frequency_penalty: Optional[float] = None
     presence_penalty: Optional[float] = None

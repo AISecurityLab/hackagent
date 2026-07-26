@@ -1,0 +1,197 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+"""AdvPrefix attack configuration spec."""
+
+from __future__ import annotations
+
+from hackagent.cli.tui.attack_specs.types import (
+    AttackConfigSpec,
+    ConfigField,
+    FieldType,
+)
+
+SPEC = AttackConfigSpec(
+    technique_key="advprefix",
+    display_name="AdvPrefix",
+    description=(
+        "Generates adversarial prefixes using an uncensored surrogate "
+        "model, then evaluates them with judge LLMs to find effective "
+        "jailbreak prefixes."
+    ),
+    fields=[
+        # --- Generation ---
+        ConfigField(
+            key="batch_size",
+            label="Batch Size",
+            field_type=FieldType.INTEGER,
+            default=2,
+            description="Number of prefixes to generate per batch.",
+            min_value=1,
+            max_value=64,
+            section="Generation",
+        ),
+        ConfigField(
+            key="max_tokens",
+            label="Max New Tokens",
+            field_type=FieldType.INTEGER,
+            default=512,
+            description="Maximum tokens per generated prefix.",
+            min_value=16,
+            max_value=2048,
+            section="Generation",
+        ),
+        ConfigField(
+            key="temperature",
+            label="Temperature",
+            field_type=FieldType.FLOAT,
+            default=0.7,
+            description="Sampling temperature for prefix generation.",
+            min_value=0.0,
+            max_value=2.0,
+            step=0.1,
+            section="Generation",
+        ),
+        ConfigField(
+            key="guided_topk",
+            label="Top-K",
+            field_type=FieldType.INTEGER,
+            default=50,
+            description="Top-K tokens to consider during generation.",
+            min_value=1,
+            max_value=200,
+            section="Generation",
+            advanced=True,
+        ),
+        ConfigField(
+            key="meta_prefix_samples",
+            label="Meta-Prefix Samples",
+            field_type=FieldType.INTEGER,
+            default=2,
+            description="Number of meta-prefix variations to try per goal.",
+            min_value=1,
+            max_value=10,
+            section="Generation",
+            advanced=True,
+        ),
+        ConfigField(
+            key="n_candidates_per_goal",
+            label="Candidates per Goal",
+            field_type=FieldType.INTEGER,
+            default=5,
+            description="Prefix candidates to keep per goal after filtering.",
+            min_value=1,
+            max_value=50,
+            section="Generation",
+        ),
+        # --- Execution ---
+        ConfigField(
+            key="max_tokens_completion",
+            label="Max Completion Tokens",
+            field_type=FieldType.INTEGER,
+            default=512,
+            description="Max tokens for target model completions.",
+            min_value=16,
+            max_value=2048,
+            section="Execution",
+        ),
+        ConfigField(
+            key="n_samples",
+            label="Samples per Prefix",
+            field_type=FieldType.INTEGER,
+            default=1,
+            description="Number of completions to request per prefix.",
+            min_value=1,
+            max_value=10,
+            section="Execution",
+        ),
+        ConfigField(
+            key="timeout",
+            label="Request Timeout (s)",
+            field_type=FieldType.INTEGER,
+            default=120,
+            description="Timeout in seconds for individual API requests.",
+            min_value=10,
+            max_value=600,
+            section="Execution",
+        ),
+        # --- Evaluation ---
+        ConfigField(
+            key="n_prefixes_per_goal",
+            label="Prefixes per Goal",
+            field_type=FieldType.INTEGER,
+            default=2,
+            description="Best prefixes to select per goal after evaluation.",
+            min_value=1,
+            max_value=20,
+            section="Evaluation",
+        ),
+        ConfigField(
+            key="batch_size_judge",
+            label="Judge Batch Size",
+            field_type=FieldType.INTEGER,
+            default=1,
+            description="Batch size for judge evaluation requests.",
+            min_value=1,
+            max_value=16,
+            section="Evaluation",
+            advanced=True,
+        ),
+        ConfigField(
+            key="max_tokens_eval",
+            label="Max Judge Tokens",
+            field_type=FieldType.INTEGER,
+            default=512,
+            description="Max tokens for judge evaluation responses.",
+            min_value=16,
+            max_value=2048,
+            section="Evaluation",
+            advanced=True,
+        ),
+        # --- Filtering ---
+        ConfigField(
+            key="max_ce",
+            label="Max Cross-Entropy",
+            field_type=FieldType.FLOAT,
+            default=0.9,
+            description="Max cross-entropy threshold for prefix filtering.",
+            min_value=0.0,
+            max_value=5.0,
+            step=0.1,
+            section="Filtering",
+            advanced=True,
+        ),
+        ConfigField(
+            key="min_char_length",
+            label="Min Char Length",
+            field_type=FieldType.INTEGER,
+            default=10,
+            description="Minimum character length for generated prefixes.",
+            min_value=1,
+            max_value=500,
+            section="Filtering",
+            advanced=True,
+        ),
+        ConfigField(
+            key="filter_len",
+            label="Min Response Length",
+            field_type=FieldType.INTEGER,
+            default=10,
+            description="Minimum response length to consider for evaluation.",
+            min_value=1,
+            max_value=500,
+            section="Filtering",
+            advanced=True,
+        ),
+        # --- Output ---
+        ConfigField(
+            key="output_dir",
+            label="Output Directory",
+            field_type=FieldType.STRING,
+            default="./logs/runs",
+            description="Directory for saving run artifacts.",
+            section="Output",
+            advanced=True,
+        ),
+    ],
+)
