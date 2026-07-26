@@ -322,6 +322,14 @@ class TestRemoteBackendRun(unittest.TestCase):
         self.assertEqual(rec.status, "RUNNING")
         mock_patch.sync_detailed.assert_called_once()
 
+    def test_update_run_raises_on_error(self):
+        run_id = _uid()
+
+        with patch("hackagent.server.storage.remote.run_partial_update") as mock_patch:
+            mock_patch.sync_detailed.return_value = _mock_response(500)
+            with self.assertRaisesRegex(RuntimeError, "update_run"):
+                self.backend.update_run(run_id, status="FAILED")
+
     def test_list_runs_success(self):
         run_m = MagicMock()
         run_m.id = _uid()
@@ -564,6 +572,25 @@ class TestRemoteBackendResult(unittest.TestCase):
 
         self.assertIsInstance(rec, ResultRecord)
 
+    def test_update_result_failure_surfaces_at_flush(self):
+        result_id = _uid()
+
+        with (
+            patch(
+                "hackagent.server.storage.remote.result_partial_update"
+            ) as mock_patch,
+            patch("hackagent.server.storage.remote.logger"),
+        ):
+            mock_patch.sync_detailed.return_value = _mock_response(500)
+            self.backend.update_result(
+                result_id,
+                evaluation_status="ERROR_TEST_FRAMEWORK",
+                evaluation_notes="audit failure",
+            )
+            with self.assertRaisesRegex(RuntimeError, "audit write"):
+                self.backend.flush()
+            self.backend.close()
+
     def test_create_trace_success(self):
         result_id = _uid()
         trace_id = _uid()
@@ -589,6 +616,24 @@ class TestRemoteBackendResult(unittest.TestCase):
         self.assertIsInstance(rec, TraceRecord)
         self.assertEqual(rec.result_id, result_id)
         self.assertEqual(rec.sequence, 1)
+
+    def test_create_trace_failure_surfaces_at_flush(self):
+        result_id = _uid()
+
+        with (
+            patch("hackagent.server.storage.remote.result_trace_create") as mock_create,
+            patch("hackagent.server.storage.remote.logger"),
+        ):
+            mock_create.sync_detailed.return_value = _mock_response(500)
+            self.backend.create_trace(
+                result_id=result_id,
+                sequence=1,
+                step_type="OTHER",
+                content={"msg": "lost audit trace"},
+            )
+            with self.assertRaisesRegex(RuntimeError, "audit write"):
+                self.backend.flush()
+            self.backend.close()
 
     def test_create_trace_success_with_integer_id(self):
         result_id = _uid()
