@@ -19,6 +19,7 @@ from textual.app import App
 from textual.widgets import Checkbox, Input, Select, SelectionList, Static
 
 from hackagent.cli.config import CLIConfig
+from hackagent.cli.tui.theme import css_variables
 from hackagent.cli.tui.views.attacks import AttacksTab, _default_campaign_attack_keys
 
 
@@ -28,6 +29,22 @@ def cli_config():
     config.api_key = "test-api-key-12345"
     config.base_url = "https://api.test.hackagent.dev"
     return config
+
+
+class AttacksHostApp(App):
+    """Mounts AttacksTab standalone, mirroring HackAgentTUI's brand palette
+    so AttacksTab's CSS (which references $brand-* variables) resolves the
+    same way it does under the real app."""
+
+    def get_css_variables(self) -> dict[str, str]:
+        return {**super().get_css_variables(), **css_variables()}
+
+    def __init__(self, cli_config):
+        super().__init__()
+        self._cli_config = cli_config
+
+    def compose(self):
+        yield AttacksTab(self._cli_config)
 
 
 def _fill_required_fields(tab: AttacksTab) -> None:
@@ -46,11 +63,7 @@ def _select_only(tab: AttacksTab, keys) -> None:
 class TestStrategySelectionDefaults:
     @pytest.mark.asyncio
     async def test_defaults_to_jailbreak_campaign_in_order(self, cli_config):
-        class TestApp(App):
-            def compose(self):
-                yield AttacksTab(cli_config)
-
-        app = TestApp()
+        app = AttacksHostApp(cli_config)
         async with app.run_test() as pilot:
             tab = app.query_one(AttacksTab)
             await pilot.pause()
@@ -63,11 +76,7 @@ class TestStrategySelectionDefaults:
         """The campaign default has 3 attacks selected, so the escalate
         toggle (only relevant for 2+ attacks) is visible out of the box."""
 
-        class TestApp(App):
-            def compose(self):
-                yield AttacksTab(cli_config)
-
-        app = TestApp()
+        app = AttacksHostApp(cli_config)
         async with app.run_test() as pilot:
             tab = app.query_one(AttacksTab)
             await pilot.pause()
@@ -81,11 +90,7 @@ class TestStrategySelectionDefaults:
         """The initial checkbox state matches the library default and the
         state ``_clear_form`` resets to."""
 
-        class TestApp(App):
-            def compose(self):
-                yield AttacksTab(cli_config)
-
-        app = TestApp()
+        app = AttacksHostApp(cli_config)
         async with app.run_test() as pilot:
             tab = app.query_one(AttacksTab)
             await pilot.pause()
@@ -93,11 +98,7 @@ class TestStrategySelectionDefaults:
 
     @pytest.mark.asyncio
     async def test_escalate_toggle_hidden_with_single_selection(self, cli_config):
-        class TestApp(App):
-            def compose(self):
-                yield AttacksTab(cli_config)
-
-        app = TestApp()
+        app = AttacksHostApp(cli_config)
         async with app.run_test() as pilot:
             tab = app.query_one(AttacksTab)
             await pilot.pause()
@@ -111,11 +112,7 @@ class TestStrategySelectionDefaults:
 
     @pytest.mark.asyncio
     async def test_clear_form_resets_to_default_campaign(self, cli_config):
-        class TestApp(App):
-            def compose(self):
-                yield AttacksTab(cli_config)
-
-        app = TestApp()
+        app = AttacksHostApp(cli_config)
         async with app.run_test() as pilot:
             tab = app.query_one(AttacksTab)
             await pilot.pause()
@@ -137,11 +134,7 @@ class TestConfiguringDropdownRestrictedToSelection:
 
     @pytest.mark.asyncio
     async def test_dropdown_lists_only_checked_strategies_by_default(self, cli_config):
-        class TestApp(App):
-            def compose(self):
-                yield AttacksTab(cli_config)
-
-        app = TestApp()
+        app = AttacksHostApp(cli_config)
         async with app.run_test() as pilot:
             tab = app.query_one(AttacksTab)
             await pilot.pause()
@@ -153,11 +146,7 @@ class TestConfiguringDropdownRestrictedToSelection:
 
     @pytest.mark.asyncio
     async def test_dropdown_shrinks_when_selection_shrinks(self, cli_config):
-        class TestApp(App):
-            def compose(self):
-                yield AttacksTab(cli_config)
-
-        app = TestApp()
+        app = AttacksHostApp(cli_config)
         async with app.run_test() as pilot:
             tab = app.query_one(AttacksTab)
             await pilot.pause()
@@ -175,11 +164,7 @@ class TestConfiguringDropdownRestrictedToSelection:
     async def test_focus_switches_away_when_focused_strategy_is_unchecked(
         self, cli_config
     ):
-        class TestApp(App):
-            def compose(self):
-                yield AttacksTab(cli_config)
-
-        app = TestApp()
+        app = AttacksHostApp(cli_config)
         async with app.run_test() as pilot:
             tab = app.query_one(AttacksTab)
             await pilot.pause()
@@ -213,11 +198,7 @@ class TestConfiguringDropdownRestrictedToSelection:
         through `on_select_changed`, triggering a spurious extra re-render.
         """
 
-        class TestApp(App):
-            def compose(self):
-                yield AttacksTab(cli_config)
-
-        app = TestApp()
+        app = AttacksHostApp(cli_config)
         async with app.run_test() as pilot:
             tab = app.query_one(AttacksTab)
             await pilot.pause()
@@ -240,11 +221,7 @@ class TestConfiguringDropdownRestrictedToSelection:
 class TestFocusedStrategyValueCaching:
     @pytest.mark.asyncio
     async def test_switching_focus_away_and_back_preserves_values(self, cli_config):
-        class TestApp(App):
-            def compose(self):
-                yield AttacksTab(cli_config)
-
-        app = TestApp()
+        app = AttacksHostApp(cli_config)
         async with app.run_test() as pilot:
             tab = app.query_one(AttacksTab)
             await pilot.pause()
@@ -274,11 +251,7 @@ class TestExecuteAttackChainBuilding:
     async def test_dry_run_single_strategy_uses_singular_attack_config(
         self, cli_config
     ):
-        class TestApp(App):
-            def compose(self):
-                yield AttacksTab(cli_config)
-
-        app = TestApp()
+        app = AttacksHostApp(cli_config)
         async with app.run_test() as pilot:
             tab = app.query_one(AttacksTab)
             await pilot.pause()
@@ -294,11 +267,7 @@ class TestExecuteAttackChainBuilding:
 
     @pytest.mark.asyncio
     async def test_dry_run_default_campaign_builds_chain_preview(self, cli_config):
-        class TestApp(App):
-            def compose(self):
-                yield AttacksTab(cli_config)
-
-        app = TestApp()
+        app = AttacksHostApp(cli_config)
         async with app.run_test() as pilot:
             tab = app.query_one(AttacksTab)
             await pilot.pause()
@@ -319,11 +288,7 @@ class TestExecuteAttackDispatch:
 
     @pytest.mark.asyncio
     async def test_single_strategy_calls_hack_not_hack_chain(self, cli_config):
-        class TestApp(App):
-            def compose(self):
-                yield AttacksTab(cli_config)
-
-        app = TestApp()
+        app = AttacksHostApp(cli_config)
         async with app.run_test() as pilot:
             tab = app.query_one(AttacksTab)
             await pilot.pause()
@@ -347,11 +312,7 @@ class TestExecuteAttackDispatch:
 
     @pytest.mark.asyncio
     async def test_default_campaign_calls_hack_chain_not_hack(self, cli_config):
-        class TestApp(App):
-            def compose(self):
-                yield AttacksTab(cli_config)
-
-        app = TestApp()
+        app = AttacksHostApp(cli_config)
         async with app.run_test() as pilot:
             tab = app.query_one(AttacksTab)
             await pilot.pause()
