@@ -21,7 +21,7 @@ from hackagent.attacks.techniques.h4rm3l.decorators import (
 )
 from hackagent.router.router import AgentRouter
 
-SUPPORTED_JAILBREAK_TECHNIQUES = ("static_template", "h4rm3l")
+SUPPORTED_JAILBREAK_TECHNIQUES = ("static_template", "h4rm3l", "flipattack")
 
 DEFAULT_JAILBREAK_CONFIG: Dict[str, Any] = {
     "enabled": False,
@@ -31,6 +31,8 @@ DEFAULT_JAILBREAK_CONFIG: Dict[str, Any] = {
     # h4rm3l options
     "program": "refusal_suppression",
     "syntax_version": 2,
+    # flipattack options
+    "flip_mode": "FCS",
 }
 
 
@@ -126,9 +128,53 @@ def _build_h4rm3l_framer(
     return JailbreakFramer("h4rm3l", _transform)
 
 
+def _flip_word_order(text: str) -> str:
+    return " ".join(text.split()[::-1])
+
+
+def _flip_char_in_word(text: str) -> str:
+    return " ".join(word[::-1] for word in text.split())
+
+
+def _flip_char_in_sentence(text: str) -> str:
+    return text[::-1]
+
+
+_FLIPATTACK_MODES: Dict[str, Callable[[str], str]] = {
+    "FWO": _flip_word_order,
+    "FCW": _flip_char_in_word,
+    "FCS": _flip_char_in_sentence,
+}
+
+
+def _build_flipattack_framer(
+    config: Dict[str, Any],
+    logger: Optional[logging.Logger] = None,
+    attacker_router: Optional[AgentRouter] = None,
+    attacker_reg_key: Optional[str] = None,
+) -> JailbreakFramer:
+    raw_modes = config.get("flip_modes") or [config.get("flip_mode", "FCS")]
+    if isinstance(raw_modes, str):
+        raw_modes = [raw_modes]
+    modes = [str(m).strip().upper() for m in raw_modes]
+    for mode in modes:
+        if mode not in _FLIPATTACK_MODES:
+            raise ValueError(
+                f"Unsupported flipattack flip_mode '{mode}'. "
+                f"Supported: {sorted(_FLIPATTACK_MODES)}"
+            )
+
+    def _transform(goal: str, variant_index: int) -> Tuple[str, Dict[str, Any]]:
+        mode = modes[variant_index % len(modes)]
+        return _FLIPATTACK_MODES[mode](goal), {"flip_mode": mode}
+
+    return JailbreakFramer("flipattack", _transform)
+
+
 _TECHNIQUE_BUILDERS: Dict[str, Callable[..., JailbreakFramer]] = {
     "static_template": _build_static_template_framer,
     "h4rm3l": _build_h4rm3l_framer,
+    "flipattack": _build_flipattack_framer,
 }
 
 

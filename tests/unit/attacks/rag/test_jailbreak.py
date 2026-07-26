@@ -102,5 +102,54 @@ class TestH4rm3lFramer(unittest.TestCase):
             )
 
 
+class TestFlipattackFramer(unittest.TestCase):
+    def test_default_mode_reverses_sentence(self):
+        framer = build_jailbreak_framer(
+            {"enabled": True, "technique": "flipattack"}, LOGGER
+        )
+        framed, metadata = framer.apply("do the bad thing")
+        self.assertEqual(framed, "do the bad thing"[::-1])
+        self.assertEqual(metadata["technique"], "flipattack")
+        self.assertEqual(metadata["flip_mode"], "FCS")
+
+    def test_word_order_mode(self):
+        framer = build_jailbreak_framer(
+            {"enabled": True, "technique": "flipattack", "flip_mode": "FWO"},
+            LOGGER,
+        )
+        framed, _ = framer.apply("do the bad thing")
+        self.assertEqual(framed, "thing bad the do")
+
+    def test_char_in_word_mode(self):
+        framer = build_jailbreak_framer(
+            {"enabled": True, "technique": "flipattack", "flip_mode": "FCW"},
+            LOGGER,
+        )
+        framed, _ = framer.apply("do bad")
+        self.assertEqual(framed, "od dab")
+
+    def test_variant_index_rotates_modes(self):
+        framer = build_jailbreak_framer(
+            {
+                "enabled": True,
+                "technique": "flipattack",
+                "flip_modes": ["FWO", "FCS"],
+            },
+            LOGGER,
+        )
+        first, meta_first = framer.apply("do the bad thing", 0)
+        second, meta_second = framer.apply("do the bad thing", 1)
+        self.assertNotEqual(first, second)
+        self.assertEqual(meta_first["flip_mode"], "FWO")
+        self.assertEqual(meta_second["flip_mode"], "FCS")
+
+    def test_unsupported_mode_raises(self):
+        with self.assertRaises(ValueError):
+            build_jailbreak_framer(
+                {"enabled": True, "technique": "flipattack", "flip_mode": "NOPE"},
+                LOGGER,
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
