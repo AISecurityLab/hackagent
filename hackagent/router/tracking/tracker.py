@@ -495,7 +495,6 @@ class Tracker:
                 content=sanitized_content,
                 elapsed_s=trace_record["elapsed_s"],
             )
-            self._record_failure(f"Goal {ctx.goal_index}: create trace", e)
 
             # Send to backend if enabled and we have a result_id
             if not self.is_enabled or not ctx.result_id:
@@ -523,6 +522,7 @@ class Tracker:
                     f"Exception creating trace for goal {ctx.goal_index}: {e}",
                     exc_info=True,
                 )
+                self._record_failure(f"Goal {ctx.goal_index}: create trace", e)
 
             return None
 
