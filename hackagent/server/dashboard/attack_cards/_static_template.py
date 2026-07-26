@@ -9,7 +9,7 @@ import json
 
 from nicegui import ui
 
-from ._shared import AttackCardSharedMixin
+from ._shared import JUDGE_VERDICTS_VUE_SNIPPET, AttackCardSharedMixin
 
 
 class StaticTemplateCardMixin:
@@ -319,18 +319,9 @@ class StaticTemplateCardMixin:
         <div class="text-caption text-weight-bold text-uppercase q-mb-xs" style="color:#616161">&#x1f6e1; GUARDRAIL &#x2014; BLOCKED</div>
         <pre style="font-size:11px;padding:10px;background:#f5f5f5;border:2px solid #9e9e9e;border-radius:4px;white-space:pre-wrap;word-break:break-word;margin:0"><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="font-weight:700;color:#616161">Categories: </span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length" style="color:#374151">{{ props.row._guardrail_categories.join(', ') }}</span><span v-if="props.row._guardrail_categories && props.row._guardrail_categories.length">&#10;&#10;</span><span style="font-weight:700;color:#616161">Explanation: </span><span style="color:#6b7280">{{ props.row._guardrail_explanation }}</span></pre>
       </div>
-      <div v-if="props.row._judge_verdicts && props.row._judge_verdicts.length > 0" style="margin-top:10px">
-        <div class="text-caption text-weight-bold text-uppercase q-mb-xs text-grey-6">JUDGE VERDICTS</div>
-        <div style="display:flex;flex-direction:column;gap:4px">
-          <div v-for="jv in props.row._judge_verdicts" style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:4px" :style="jv.vote > 0 ? 'background:#fef2f2' : 'background:#f0fdf4'">
-            <q-icon :name="jv.vote > 0 ? 'dangerous' : 'verified_user'" :color="jv.vote > 0 ? 'red-5' : 'green-6'" size="18px" />
-                        <span style="font-size:11px;color:#616161;width:28px;text-align:center">{{ jv.id }}</span>
-                        <span style="font-size:12px;font-weight:600;width:180px">{{ jv.name }}</span>
-            <span style="font-size:10px;color:#9e9e9e;width:120px">{{ jv.type }}</span>
-            <q-badge :color="jv.vote > 0 ? 'negative' : 'positive'" class="text-xs">{{ jv.vote > 0 ? 'JAILBREAK' : 'MITIGATED' }}</q-badge>
-          </div>
-        </div>
-      </div>
+"""
+                        + JUDGE_VERDICTS_VUE_SNIPPET
+                        + r"""
     </div>
   </q-td>
 </q-tr>

@@ -3,9 +3,46 @@
 
 """Unit tests for DashboardPage static helper methods."""
 
+import asyncio
 import unittest
+from unittest.mock import MagicMock, patch
 
+from hackagent.server.dashboard import _page
 from hackagent.server.dashboard._page import DashboardPage
+
+
+class TestDashboardPageInitAndBuild(unittest.TestCase):
+    """The page skeleton dropped the top bar in favour of the sidebar."""
+
+    def test_init_has_no_page_title_and_seeds_history_side_panel_state(self):
+        page = DashboardPage(backend=MagicMock())
+
+        self.assertFalse(hasattr(page, "page_title"))
+        self.assertIsNone(page._runs_left_col)
+        self.assertIsNone(page._runs_side_panel)
+        self.assertIsNone(page._runs_bottom_panel)
+
+    def test_build_wires_the_sidebar_without_a_separate_header(self):
+        page = DashboardPage(backend=MagicMock())
+        for name in (
+            "_build_result_modal_dialog",
+            "_build_sidebar",
+            "_build_panels",
+            "_build_run_dialog",
+            "_build_history_run_dialog",
+            "_build_attack_dialog",
+            "_highlight_nav",
+        ):
+            setattr(page, name, MagicMock())
+
+        with (
+            patch.object(_page, "ui", MagicMock()),
+            patch.object(_page, "_fastapi_app", MagicMock()),
+        ):
+            asyncio.run(page.build())
+
+        page._build_sidebar.assert_called_once_with()
+        self.assertFalse(hasattr(page, "_build_header"))
 
 
 class TestDashboardPageStaticMethods(unittest.TestCase):

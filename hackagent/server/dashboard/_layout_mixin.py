@@ -5,7 +5,7 @@
 
 Provides ``DashboardLayoutMixin``, one of the mixins composed into
 ``DashboardPage``. It owns the *static skeleton* of the page: the drawers,
-sidebar, header, the per-view panels (dashboard/agents/attacks/runs/reports)
+sidebar, the per-view panels (dashboard/agents/attacks/runs/reports)
 and the modal dialogs. It also handles theme toggling and switching between
 views.
 
@@ -16,7 +16,7 @@ on the attributes created in ``DashboardPage.__init__`` (e.g. ``self.backend``,
 ``self.all_panels``).
 
 Key entry points:
-    _build_sidebar / _build_header / _build_panels: assemble the chrome.
+    _build_sidebar / _build_panels: assemble the chrome.
     _build_*_panel: build each view's content area.
     navigate / _highlight_nav / _toggle_dark: navigation and theme state.
 """
@@ -30,9 +30,6 @@ from nicegui import ui
 
 
 from ._components import make_run_table
-from ._constants import (
-    _VIEW_LABELS,
-)
 
 
 class DashboardLayoutMixin:
@@ -86,6 +83,10 @@ class DashboardLayoutMixin:
                 ):
                     ui.icon("security", color="white").classes("text-base")
                 ui.label("HackAgent").classes("font-semibold text-base")
+                ui.space()
+                ui.button(icon="menu_open", on_click=lambda: sidebar.hide()).props(
+                    "flat round dense"
+                ).tooltip("Collapse sidebar")
 
             ui.separator().classes("mb-1")
 
@@ -118,33 +119,32 @@ class DashboardLayoutMixin:
             ui.space()
             ui.separator()
 
-            with ui.row().classes("px-3 py-3 gap-2 items-center"):
-                ui.icon("circle", size="xs").classes("text-positive text-xs")
-                ui.label("local mode").classes("text-xs text-grey-6")
-        return sidebar
-
-    def _build_header(self, sidebar: ui.left_drawer) -> None:
-        with ui.header(elevated=True).classes(
-            "items-center justify-between px-4 py-2 bg-primary"
-        ):
-            with ui.row().classes("items-center gap-3"):
-                ui.button(icon="menu", on_click=sidebar.toggle).props(
-                    "flat round dense color=white"
-                )
-                self.page_title = ui.label("Home").classes(
-                    "text-white font-semibold text-lg"
-                )
-            with ui.row().classes("items-center gap-1"):
-                self.loading_spinner = ui.spinner("dots", size="1.2em", color="white")
-                self.loading_spinner.set_visibility(False)
+            # Actions previously hosted in the (now removed) top bar.
+            with ui.row().classes("items-center gap-1 px-3 py-2"):
                 self.dark_btn = ui.button(
                     icon="dark_mode" if not self.dark.value else "light_mode",
                     on_click=self._toggle_dark,
-                ).props("flat round dense color=white")
+                ).props("flat round dense")
                 ui.button(
                     icon="refresh",
                     on_click=lambda: ui.timer(0, self.refresh_view, once=True),
-                ).props("flat round dense color=white")
+                ).props("flat round dense")
+                self.loading_spinner = ui.spinner("dots", size="1.2em")
+                self.loading_spinner.set_visibility(False)
+
+            ui.separator()
+
+            with ui.row().classes("px-3 py-3 gap-2 items-center"):
+                ui.icon("circle", size="xs").classes("text-positive text-xs")
+                ui.label("local mode").classes("text-xs text-grey-6")
+
+        # The removed top bar used to host the drawer toggle; keep a floating one
+        # so the collapsed sidebar can be re-opened. It sits below the drawer, so
+        # it is only reachable while the drawer is hidden.
+        ui.button(icon="menu", on_click=lambda: sidebar.show()).props(
+            "flat round dense"
+        ).classes("fixed top-2 left-2 z-50")
+        return sidebar
 
     def _build_panels(self) -> None:
         with ui.column().classes("w-full p-5 gap-6"):
@@ -506,137 +506,148 @@ class DashboardLayoutMixin:
                 self.attacks_table.on("selection", _on_attack_select)
 
     def _build_runs_panel(self, panel: ui.column) -> None:
-        with panel.classes("w-full h-[calc(100vh-160px)] min-h-0"):
-            # ── Filter bar ────────────────────────────────────────────
-            with ui.row().classes("items-center w-full gap-2 px-2 flex-wrap shrink-0"):
-                ui.input(
-                    placeholder="Search runs…",
-                ).props("dense outlined clearable").classes(
-                    "min-w-[100px] max-w-[180px] flex-1"
-                ).on(
-                    "update:model-value",
-                    lambda e: self._on_runs_search_change(
-                        e.args if isinstance(e.args, str) else (e.args or "")
-                    ),
+        with panel.classes("w-full h-[calc(100vh-60px)] min-h-0"):
+            # The History view is split vertically: the run list on the left and
+            # the run detail / compare panels on the right.
+            with ui.row().classes(
+                "w-full h-full flex-1 min-h-0 gap-0 items-stretch overflow-hidden"
+            ):
+                self._runs_left_col = ui.column().classes(
+                    "w-full h-full min-h-0 gap-2 transition-all duration-300"
                 )
-                self._runs_agent_select = (
-                    ui.select(
-                        options={"": "All agents"},
-                        value="",
-                        on_change=lambda e: self._on_runs_filter_change(
-                            "agent", e.value
-                        ),
+                with self._runs_left_col:
+                    self._build_runs_list()
+
+                self._runs_side_panel = (
+                    ui.column()
+                    .classes("h-full min-h-0 gap-0 border-l shrink-0")
+                    .style(
+                        "width: 0; min-width: 0; overflow: hidden; "
+                        "transition: all 0.3s ease;"
                     )
-                    .props("dense outlined")
-                    .classes("min-w-[140px]")
                 )
-                self._runs_attack_select = (
-                    ui.select(
-                        options={"": "All attacks"},
-                        value="",
-                        on_change=lambda e: self._on_runs_filter_change(
-                            "attack", e.value
-                        ),
+                with self._runs_side_panel:
+                    # ── Run detail panel (hidden by default) ──────────
+                    self._runs_bottom_panel = ui.card().classes(
+                        "w-full h-full gap-0 hidden"
                     )
-                    .props("dense outlined")
-                    .classes("min-w-[140px]")
-                )
-                ui.space()
-                self._runs_compare_btn = (
-                    ui.button(
-                        "Compare",
-                        icon="compare_arrows",
-                        on_click=lambda: ui.timer(
-                            0,
-                            self._compare_selected_runs,
-                            once=True,
-                        ),
+                    # ── Compare panel (hidden by default) ─────────────
+                    self._compare_bottom_panel = ui.card().classes(
+                        "w-full h-full gap-0 hidden"
                     )
-                    .props("flat dense no-caps color=primary")
-                    .classes("opacity-30 pointer-events-none")
+
+    def _build_runs_list(self) -> None:
+        """Build the History filter bar and the paginated run list."""
+        # ── Filter bar ────────────────────────────────────────────
+        with ui.row().classes("items-center w-full gap-2 px-2 flex-wrap shrink-0"):
+            ui.input(
+                placeholder="Search runs…",
+            ).props("dense outlined clearable").classes(
+                "min-w-[100px] max-w-[180px] flex-1"
+            ).on(
+                "update:model-value",
+                lambda e: self._on_runs_search_change(
+                    e.args if isinstance(e.args, str) else (e.args or "")
+                ),
+            )
+            self._runs_agent_select = (
+                ui.select(
+                    options={"": "All agents"},
+                    value="",
+                    on_change=lambda e: self._on_runs_filter_change("agent", e.value),
                 )
-                self._runs_export_btn = (
-                    ui.button(
-                        "Export",
-                        icon="download",
-                        on_click=lambda: ui.timer(
-                            0,
-                            self._export_selected_runs,
-                            once=True,
-                        ),
-                    )
-                    .props("flat dense no-caps color=secondary")
-                    .classes("opacity-30 pointer-events-none")
+                .props("dense outlined")
+                .classes("min-w-[140px]")
+            )
+            self._runs_attack_select = (
+                ui.select(
+                    options={"": "All attacks"},
+                    value="",
+                    on_change=lambda e: self._on_runs_filter_change("attack", e.value),
                 )
-                self._runs_delete_btn = (
-                    ui.button(
-                        "Delete",
-                        icon="delete",
-                        on_click=lambda: ui.timer(
-                            0,
-                            self._delete_selected_runs,
-                            once=True,
-                        ),
-                    )
-                    .props("flat dense no-caps color=negative")
-                    .classes("opacity-30 pointer-events-none")
-                )
-            # ── Scrollable run list ────────────────────────────────────
-            with ui.scroll_area().classes("w-full flex-1 min-h-0"):
-                self.runs_table = make_run_table(
-                    on_row_click=lambda run: ui.timer(
+                .props("dense outlined")
+                .classes("min-w-[140px]")
+            )
+            ui.space()
+            self._runs_compare_btn = (
+                ui.button(
+                    "Compare",
+                    icon="compare_arrows",
+                    on_click=lambda: ui.timer(
                         0,
-                        lambda r=run: asyncio.create_task(
-                            self._open_run_history_results(r)
-                        ),
+                        self._compare_selected_runs,
                         once=True,
                     ),
-                    include_agent=True,
-                    include_progressive_run=True,
-                    include_results=False,
-                    include_goal_latency_avg=True,
-                    include_asr=True,
-                    pagination={"rowsPerPage": 15},
-                    selection="multiple",
-                    on_select=lambda e: self._on_runs_table_select(e),
                 )
-                # Move pagination bar to top via flex order
-                self.runs_table.classes("runs-table-top-pagination")
-                ui.add_css("""
-                    .runs-table-top-pagination .q-table__container {
-                        display: flex;
-                        flex-direction: column;
-                    }
-                    .runs-table-top-pagination .q-table__bottom {
-                        order: -1;
-                        border-bottom: 1px solid #e0e0e0;
-                        border-top: none;
-                    }
-                """)
-                self._runs_load_more_btn = (
-                    ui.button(
-                        "Load more",
-                        icon="expand_more",
-                        on_click=lambda: ui.timer(0, self._load_more_runs, once=True),
-                    )
-                    .props("flat no-caps color=primary")
-                    .classes("self-center my-2 hidden")
-                )
-
-            # ── Bottom panel for run details (hidden by default) ───────
-            # Built here but reparented to the active view on open so it can be
-            # shown both from History and from the Home "Recent Runs" panel.
-            self._runs_bottom_panel = (
-                ui.card()
-                .classes("w-full shrink-0 gap-0 hidden")
-                .style("height: 70vh; min-height: 300px;")
+                .props("flat dense no-caps color=primary")
+                .classes("opacity-30 pointer-events-none")
             )
-
-            # ── Bottom panel for compare (hidden by default) ──────────
-            self._compare_bottom_panel = (
-                ui.card()
-                .classes("w-full shrink-0 gap-0 hidden")
-                .style("height: 70%; min-height: 300px;")
+            self._runs_export_btn = (
+                ui.button(
+                    "Export",
+                    icon="download",
+                    on_click=lambda: ui.timer(
+                        0,
+                        self._export_selected_runs,
+                        once=True,
+                    ),
+                )
+                .props("flat dense no-caps color=secondary")
+                .classes("opacity-30 pointer-events-none")
+            )
+            self._runs_delete_btn = (
+                ui.button(
+                    "Delete",
+                    icon="delete",
+                    on_click=lambda: ui.timer(
+                        0,
+                        self._delete_selected_runs,
+                        once=True,
+                    ),
+                )
+                .props("flat dense no-caps color=negative")
+                .classes("opacity-30 pointer-events-none")
+            )
+        # ── Scrollable run list ────────────────────────────────────
+        with ui.scroll_area().classes("w-full flex-1 min-h-0"):
+            self.runs_table = make_run_table(
+                on_row_click=lambda run: ui.timer(
+                    0,
+                    lambda r=run: asyncio.create_task(
+                        self._open_run_history_results(r)
+                    ),
+                    once=True,
+                ),
+                include_agent=True,
+                include_progressive_run=True,
+                include_results=False,
+                include_goal_latency_avg=True,
+                include_asr=True,
+                pagination={"rowsPerPage": 15},
+                selection="multiple",
+                on_select=lambda e: self._on_runs_table_select(e),
+            )
+            # Move pagination bar to top via flex order
+            self.runs_table.classes("runs-table-top-pagination")
+            ui.add_css("""
+                .runs-table-top-pagination .q-table__container {
+                    display: flex;
+                    flex-direction: column;
+                }
+                .runs-table-top-pagination .q-table__bottom {
+                    order: -1;
+                    border-bottom: 1px solid #e0e0e0;
+                    border-top: none;
+                }
+            """)
+            self._runs_load_more_btn = (
+                ui.button(
+                    "Load more",
+                    icon="expand_more",
+                    on_click=lambda: ui.timer(0, self._load_more_runs, once=True),
+                )
+                .props("flat no-caps color=primary")
+                .classes("self-center my-2 hidden")
             )
 
     def _build_reports_panel(self, panel: ui.column) -> None:
@@ -830,7 +841,6 @@ class DashboardLayoutMixin:
         self.current_view["value"] = view
         for v, panel in self.all_panels.items():
             panel.set_visibility(v == view)
-        self.page_title.text = _VIEW_LABELS.get(view, "Home")
         self._highlight_nav(view)
         if schedule_refresh:
             asyncio.create_task(self.refresh_view())

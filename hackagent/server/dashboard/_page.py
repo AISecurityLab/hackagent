@@ -109,7 +109,6 @@ class DashboardPage(
         self.current_view: dict[str, str] = {"value": "dashboard"}
         self.nav_buttons: dict[str, ui.button] = {}
         self.all_panels: dict[str, ui.column] = {}
-        self.page_title: ui.label | None = None
         self.loading_spinner: ui.spinner | None = None
 
         # Right drawer — result detail
@@ -192,7 +191,9 @@ class DashboardPage(
         self._history_current_run_results: list[dict] = []
         self._history_visible_run_ids: list[str] = []
 
-        # Bottom panel for run details (inline in runs panel)
+        # History side panel for run details (vertical split in runs panel)
+        self._runs_left_col: ui.column | None = None
+        self._runs_side_panel: ui.column | None = None
         self._runs_bottom_panel: ui.column | None = None
 
         # Attack detail dialog
@@ -264,8 +265,7 @@ function hackAgentCopyFallback(text) {
         )
 
         self._build_result_modal_dialog()
-        sidebar = self._build_sidebar()
-        self._build_header(sidebar)
+        self._build_sidebar()
         self._build_panels()
         self._build_run_dialog()
         self._build_history_run_dialog()

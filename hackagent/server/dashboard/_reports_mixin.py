@@ -201,28 +201,46 @@ class DashboardReportsMixin:
         self._report_current_run_results = []
 
     def _open_runs_bottom_panel(self) -> None:
-        """Show the inline bottom panel for run details.
+        """Show the History side panel with the run detail.
 
-        The panel is reparented to the currently active view so the run detail
-        opens in place — both from the History view and from the Home
-        "Recent Runs" panel — without navigating away.
+        Run details always live in the History view, so opening a run from the
+        Home "Recent Runs" table navigates there first.
         """
+        if self.current_view.get("value") != "runs":
+            self.navigate("runs")
         if self._compare_bottom_panel is not None:
             self._compare_bottom_panel.classes(add="hidden")
         if self._runs_bottom_panel is not None:
-            target_view = self.current_view.get("value", "dashboard")
-            target_panel = self.all_panels.get(target_view) or self.all_panels.get(
-                "runs"
-            )
-            if target_panel is not None:
-                with contextlib.suppress(Exception):
-                    self._runs_bottom_panel.move(target_panel)
             self._runs_bottom_panel.classes(remove="hidden")
+        self._expand_runs_side_panel()
+
+    def _expand_runs_side_panel(self) -> None:
+        """Grow the History side panel and shrink the run list next to it."""
+        if self._runs_side_panel is not None:
+            self._runs_side_panel.style(
+                "width: 68%; min-width: 420px; overflow: hidden; "
+                "transition: all 0.3s ease;"
+            )
+        if self._runs_left_col is not None:
+            self._runs_left_col.classes(remove="w-full", add="w-[32%]")
+
+    def _collapse_runs_side_panel(self) -> None:
+        """Collapse the History side panel and restore the full-width run list."""
+        if self._runs_side_panel is not None:
+            self._runs_side_panel.style(
+                "width: 0; min-width: 0; overflow: hidden; transition: all 0.3s ease;"
+            )
+        if self._runs_left_col is not None:
+            self._runs_left_col.classes(remove="w-[32%]", add="w-full")
 
     def _close_runs_bottom_panel(self) -> None:
-        """Hide the inline bottom panel."""
+        """Hide the run detail side panel."""
         if self._runs_bottom_panel is not None:
             self._runs_bottom_panel.classes(add="hidden")
+        if self._compare_bottom_panel is None or "hidden" in (
+            self._compare_bottom_panel.classes
+        ):
+            self._collapse_runs_side_panel()
 
     def _close_report_goal_detail(self) -> None:
         """Close report goal detail panel inside the run report view."""
