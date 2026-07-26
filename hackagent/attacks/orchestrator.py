@@ -383,7 +383,20 @@ class AttackOrchestrator:
                 # 2) explicit single `judge`
                 # 3) defaults only when neither is provided
                 if role_name == "judge":
+                    # Backward compatibility: promote the legacy `scorer` role
+                    # to `judge`. Explicit `judge`/`judges` win when both are
+                    # present, and `scorer` is always dropped so it doesn't
+                    # linger as an unrecognized extra key in strict configs
+                    # (e.g. PairConfig/AutoDANTurboConfig use extra="forbid").
+                    legacy_scorer = resolved.pop("scorer", None)
                     judges_cfg = resolved.get("judges")
+                    if (
+                        isinstance(legacy_scorer, dict)
+                        and not isinstance(resolved.get("judge"), dict)
+                        and not (isinstance(judges_cfg, list) and judges_cfg)
+                    ):
+                        resolved["judge"] = copy.deepcopy(legacy_scorer)
+
                     if isinstance(judges_cfg, list) and judges_cfg:
                         for item in judges_cfg:
                             if isinstance(item, dict):
@@ -409,17 +422,6 @@ class AttackOrchestrator:
                     continue
 
                 role_cfg = resolved.get(role_name)
-
-                # Backward compatibility: promote legacy scorer role to judge.
-                if role_name == "judge" and isinstance(resolved.get("scorer"), dict):
-                    if not isinstance(role_cfg, dict):
-                        resolved["judge"] = copy.deepcopy(resolved["scorer"])
-                        role_cfg = resolved["judge"]
-                    # `judge` is now canonical (either user-supplied or just
-                    # promoted from `scorer`) — drop `scorer` so it doesn't
-                    # linger as an unrecognized extra key in strict configs
-                    # (e.g. PairConfig/AutoDANTurboConfig use extra="forbid").
-                    del resolved["scorer"]
 
                 if isinstance(role_cfg, dict):
                     self._merge_missing_keys(role_cfg, role_defaults)
