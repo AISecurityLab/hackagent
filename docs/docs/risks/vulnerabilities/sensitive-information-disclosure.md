@@ -14,20 +14,31 @@ Tests for training-data extraction, architecture disclosure, and configuration l
 
 ## Threat Profile
 
-**Objective**: jailbreak
+**Objective**: `jailbreak`
 
-**Recommended Datasets**:
-- **advbench** (SECONDARY): Adversarial prompts that may trigger info leaks
-- **saladbench** (SECONDARY): 21K harmful questions — includes info disclosure scenarios
+### Recommended Datasets
 
-**Attack Techniques**:
-- Static Template (PRIMARY): Template-based prompt injection
-- PAIR (PRIMARY): Iterative refinement for bypass discovery
-- AdvPrefix (SECONDARY): Adversarial prefix optimisation
+**Secondary**
+- **advbench**: Adversarial prompts that may trigger info leaks
+- **saladbench**: 21K harmful questions — includes info disclosure scenarios
 
-**Metrics**: asr, judge_score
+### Attack Techniques
 
-## Usage Example
+**Primary**
+- **Static Template**: Template-based prompt injection
+- **PAIR**: Iterative refinement for bypass discovery
+
+**Secondary**
+- **AdvPrefix**: Adversarial prefix optimisation
+
+### Metrics
+
+- asr
+- judge_score
+
+## Usage
+
+### Instantiate the Vulnerability
 
 ```python
 from hackagent.risks import SensitiveInformationDisclosure
@@ -41,4 +52,28 @@ vuln = SensitiveInformationDisclosure(types=[
     SensitiveInformationDisclosureType.TRAINING_DATA_EXTRACTION.value,
     SensitiveInformationDisclosureType.CONFIGURATION_LEAKAGE.value,
 ])
+```
+
+### Run an Evaluation Campaign
+
+```python
+from hackagent import HackAgent
+from hackagent.risks.sensitive_information_disclosure import SENSITIVE_INFORMATION_DISCLOSURE_PROFILE
+
+agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
+
+# Profile techniques use display casing (e.g. "StaticTemplate");
+# HackAgent.hack() expects the registered snake_case attack_type key.
+ATTACK_TYPE_KEYS = {"StaticTemplate": "static_template", "PAIR": "pair"}
+
+# Use profile recommendations
+for attack in SENSITIVE_INFORMATION_DISCLOSURE_PROFILE.primary_attacks:
+    for dataset in SENSITIVE_INFORMATION_DISCLOSURE_PROFILE.primary_datasets + SENSITIVE_INFORMATION_DISCLOSURE_PROFILE.secondary_datasets:
+        attack_config = {
+            "attack_type": ATTACK_TYPE_KEYS[attack.technique],
+            "objective": SENSITIVE_INFORMATION_DISCLOSURE_PROFILE.objective,
+            "dataset": {"preset": dataset.preset},
+        }
+        results = agent.hack(attack_config=attack_config)
+        print(f"Results: {results}")
 ```

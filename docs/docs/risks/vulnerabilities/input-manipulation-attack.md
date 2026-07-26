@@ -14,19 +14,30 @@ Tests whether encoding bypasses, format string attacks, or Unicode manipulation 
 
 ## Threat Profile
 
-**Objective**: jailbreak
+**Objective**: `jailbreak`
 
-**Recommended Datasets**:
-- **wmdp_cyber** (SECONDARY): Cybersecurity knowledge covering SQL injection and command injection techniques
+### Recommended Datasets
 
-**Attack Techniques**:
-- Static Template (PRIMARY): Template-based prompt injection
-- PAIR (PRIMARY): Iterative refinement for bypass discovery
-- AdvPrefix (SECONDARY): Adversarial prefix optimisation
+**Secondary**
+- **wmdp_cyber**: Cybersecurity knowledge covering SQL injection and command injection techniques
 
-**Metrics**: asr, judge_score
+### Attack Techniques
 
-## Usage Example
+**Primary**
+- **Static Template**: Template-based prompt injection
+- **PAIR**: Iterative refinement for bypass discovery
+
+**Secondary**
+- **AdvPrefix**: Adversarial prefix optimisation
+
+### Metrics
+
+- asr
+- judge_score
+
+## Usage
+
+### Instantiate the Vulnerability
 
 ```python
 from hackagent.risks import InputManipulationAttack
@@ -40,4 +51,28 @@ vuln = InputManipulationAttack(types=[
     InputManipulationAttackType.ENCODING_BYPASS.value,
     InputManipulationAttackType.UNICODE_MANIPULATION.value,
 ])
+```
+
+### Run an Evaluation Campaign
+
+```python
+from hackagent import HackAgent
+from hackagent.risks.input_manipulation_attack import INPUT_MANIPULATION_ATTACK_PROFILE
+
+agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
+
+# Profile techniques use display casing (e.g. "StaticTemplate");
+# HackAgent.hack() expects the registered snake_case attack_type key.
+ATTACK_TYPE_KEYS = {"StaticTemplate": "static_template", "PAIR": "pair"}
+
+# Use profile recommendations
+for attack in INPUT_MANIPULATION_ATTACK_PROFILE.primary_attacks:
+    for dataset in INPUT_MANIPULATION_ATTACK_PROFILE.primary_datasets + INPUT_MANIPULATION_ATTACK_PROFILE.secondary_datasets:
+        attack_config = {
+            "attack_type": ATTACK_TYPE_KEYS[attack.technique],
+            "objective": INPUT_MANIPULATION_ATTACK_PROFILE.objective,
+            "dataset": {"preset": dataset.preset},
+        }
+        results = agent.hack(attack_config=attack_config)
+        print(f"Results: {results}")
 ```

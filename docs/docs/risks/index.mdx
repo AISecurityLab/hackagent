@@ -51,7 +51,7 @@ The defined categories are not intended to be mutually exclusive, nor to form an
 ## What Is Implemented Today
 
 - **Implemented Risk Macro-Category**: Cybersecurity
-- **Implemented Risk Micro-Categories**: 13 built-in vulnerabilities, each with a ready-to-run threat profile — see [Vulnerability Categories](./risk-categories.mdx) for the full map and [Threat Profiles](./threat-profiles.md) for per-category datasets/attacks/metrics.
+- **Implemented Risk Micro-Categories**: 13 built-in vulnerabilities, each with a ready-to-run threat profile — see [Vulnerabilities](./vulnerabilities.md) for the full reference and per-category datasets/attacks/metrics.
 - **Documented Dedicated Scenario**: Indirect Injection (RAG context poisoning)
 - **Extensible**: define your own vulnerability categories — see [Custom Vulnerabilities](./custom-vulnerabilities.md)
 - Current quick flow: [Evaluation Campaign](./evaluation-campaigns.md)
@@ -63,14 +63,13 @@ The defined categories are not intended to be mutually exclusive, nor to form an
 | **Risk Profile** | Defines the scope of the assessment as one or more macro-categories (or micro-categories). |
 | **Evaluation Campaign** | Operationalizes the risk profile into an executable plan: datasets, attacks, objective, and metrics. |
 
-For the currently implemented configuration, see [Vulnerability Categories](./risk-categories.mdx), [Threat Profiles](./threat-profiles.md), and [Indirect Injection](./indirect-prompt-injection.md).
+For the currently implemented configuration, see [Vulnerabilities](./vulnerabilities.md) and [Indirect Injection](./indirect-prompt-injection.md).
 
 ## Documentation Guide
 
 | Page | Description |
 |------|-------------|
-| [Vulnerability Categories](./risk-categories.mdx) | The 13 built-in vulnerability classes, organized by attack surface layer |
-| [Threat Profiles](./threat-profiles.md) | Per-category recommended datasets, attack techniques, objective, and metrics |
+| [Vulnerabilities](./vulnerabilities.md) | Per-vulnerability reference, each with its threat profile — recommended datasets, attack techniques, objective, and metrics |
 | [Custom Vulnerabilities](./custom-vulnerabilities.md) | Extend `BaseVulnerability` to define your own categories |
 | [Indirect Injection](./indirect-prompt-injection.md) | Dedicated risk scenario for poisoned retrieved context in RAG pipelines |
 | [Evaluation Campaigns](./evaluation-campaigns.md) | Quick scans, comprehensive audits, targeted assessments, and custom campaigns |
