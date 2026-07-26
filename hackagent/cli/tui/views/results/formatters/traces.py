@@ -55,7 +55,7 @@ def _format_config_dict(config: dict, indent: str = "  ") -> str:
 
 
 def _format_trace_block(
-    step_num: int, seq: Any, step_type: str, content: dict, ts_str: str
+    step_num: int, step_type: str, content: dict, ts_str: str
 ) -> str:
     """Render one trace step block with semantic detection.
 

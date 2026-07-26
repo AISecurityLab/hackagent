@@ -238,7 +238,6 @@ def _format_result_full_details(
             if hasattr(getattr(trace, "step_type", None), "value"):
                 step_type = trace.step_type.value
             content = getattr(trace, "content", {}) or {}
-            seq = getattr(trace, "sequence", i)
 
             ts = getattr(trace, "timestamp", None) or getattr(trace, "created_at", None)
             ts_str = ""
@@ -253,7 +252,7 @@ def _format_result_full_details(
                 except Exception:
                     pass
 
-            details += _format_trace_block(i, seq, step_type, content, ts_str)
+            details += _format_trace_block(i, step_type, content, ts_str)
 
         if total_traces > max_traces:
             details += f"\n  [dim]… {total_traces - max_traces} more steps (use export for full trace)[/dim]\n"

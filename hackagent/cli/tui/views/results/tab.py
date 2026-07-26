@@ -291,9 +291,6 @@ class ResultsTab(
                 except (ValueError, TypeError):
                     limit = 25
 
-            # Validate configuration
-            pass
-
             backend = self.create_backend()
 
             # Fetch runs via backend

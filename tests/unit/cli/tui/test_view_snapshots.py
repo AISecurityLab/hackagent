@@ -16,8 +16,9 @@ import pytest
 
 _APPS = Path(__file__).parent / "snapshot_apps"
 
-# The Attacks tab renders its full strategy form; give it a tall terminal so
-# the snapshot covers the whole configuration panel, not just the top rows.
+# Both tabs render tall panels (the Attacks strategy form, the Results detail
+# pane); use a large terminal so the snapshots cover them rather than just the
+# top few rows.
 _LARGE_TERMINAL = (140, 50)
 
 
