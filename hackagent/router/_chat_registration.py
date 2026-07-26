@@ -23,6 +23,7 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, Optional
 
+from hackagent.config import resolve_ollama_base_url
 from hackagent.logger import get_logger
 from hackagent.router import envelope as _envelope
 from hackagent.router.provider_config import ProviderConfig
@@ -35,12 +36,10 @@ logger = get_logger(__name__)
 # These helpers cover the small adapter-class quirks that used to live
 # in ``OpenAIAgent.__init__`` and ``OllamaAgent.__init__``.
 
-_OLLAMA_DEFAULT_ENDPOINT = "http://localhost:11434"
-
 
 def _normalise_ollama_endpoint(endpoint: Optional[str]) -> str:
     """Resolve & normalise the Ollama endpoint URL the way OllamaAgent did."""
-    resolved = endpoint or os.environ.get("OLLAMA_BASE_URL", _OLLAMA_DEFAULT_ENDPOINT)
+    resolved = endpoint or resolve_ollama_base_url()
     resolved = resolved.rstrip("/")
     for suffix in ("/api/generate", "/api/chat", "/api/tags", "/api/show", "/api"):
         if resolved.endswith(suffix):

@@ -18,7 +18,6 @@ This module also exposes the reusable ``run_quick_scan`` helper that backs the
 
 from __future__ import annotations
 
-import os
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -36,6 +35,7 @@ from hackagent.cli.utils import (
     handle_errors,
     load_config_file,
 )
+from hackagent.config import resolve_ollama_base_url
 from hackagent.router.discovery.scanner import (
     DEFAULT_PLANNER_MODEL,
     PlannerError,
@@ -88,9 +88,10 @@ def _provider_endpoint(model: str) -> str:
     """Return the api_base URL for a LiteLLM ``model`` id (by provider prefix)."""
     m = (model or "").strip()
     prefix = m.split("/", 1)[0].lower() if "/" in m else ""
-    if prefix in ("ollama", "ollama_chat") or not prefix:
-        return os.environ.get("OLLAMA_API_BASE") or "http://localhost:11434"
-    return _PROVIDER_ENDPOINTS.get(prefix, "http://localhost:11434")
+    endpoint = _PROVIDER_ENDPOINTS.get(prefix)
+    if prefix in ("ollama", "ollama_chat") or endpoint is None:
+        return resolve_ollama_base_url()
+    return endpoint
 
 
 def _extract_asr(results: Any) -> Optional[float]:
