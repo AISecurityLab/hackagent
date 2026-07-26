@@ -957,19 +957,6 @@ wheels = [
 ]
 
 [[package]]
-name = "cz-conventional-gitmoji"
-version = "0.7.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "attrs" },
-    { name = "commitizen" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/b8/80/5402e92d019860c88772e5d7bcdd812f1e0c7f24b51fdbb503bdb55e64f2/cz_conventional_gitmoji-0.7.0.tar.gz", hash = "sha256:d1a672d570911147cc27a17ba15877e5ef279b91c51a8da9a89523f27325a261", size = 13958, upload-time = "2025-04-01T22:04:16.607Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/60/47/3d7d559850a8146bb08adb01486156339d49271aff38e11729707ab996ee/cz_conventional_gitmoji-0.7.0-py3-none-any.whl", hash = "sha256:278b817d306efa5b446db8d078288c42534cfff56662a344da0053c24b50701b", size = 15157, upload-time = "2025-04-01T22:04:15.393Z" },
-]
-
-[[package]]
 name = "databind"
 version = "4.5.5"
 source = { registry = "https://pypi.org/simple" }
@@ -1908,7 +1895,6 @@ dependencies = [
 dev = [
     { name = "anyio" },
     { name = "commitizen" },
-    { name = "cz-conventional-gitmoji" },
     { name = "datamodel-code-generator", extra = ["http", "ruff"] },
     { name = "google-adk" },
     { name = "mcp" },
@@ -1957,7 +1943,6 @@ requires-dist = [
 dev = [
     { name = "anyio", specifier = ">=4.3.0" },
     { name = "commitizen", specifier = ">=4.7.1" },
-    { name = "cz-conventional-gitmoji", specifier = ">=0.7.0" },
     { name = "datamodel-code-generator", extras = ["http", "ruff"], specifier = ">=0.54.0" },
     { name = "google-adk", specifier = ">=1.4.2" },
     { name = "mcp", specifier = ">=1.21.2" },

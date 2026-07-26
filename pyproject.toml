@@ -47,7 +47,6 @@ dev = [
     "pytest>=8.3.5",
     "pre-commit>=4.2.0",
     "commitizen>=4.7.1",
-    "cz-conventional-gitmoji>=0.7.0",
     "pytest-cov>=6.1.1",
     "pytest-rerunfailures>=14.0",
     "pytest-xdist>=3.0",
@@ -73,7 +72,7 @@ packaging = [
 hackagent = "hackagent.cli.main:cli"
 
 [tool.commitizen]
-name = "cz_gitmoji"
+name = "cz_conventional_commits"
 tag_format = "v$version"
 version_scheme = "pep440"
 version_provider = "pep621"
