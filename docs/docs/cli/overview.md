@@ -13,14 +13,20 @@ For installation instructions, see the [Installation Guide](../getting-started/i
 
 | Command | Description | Documentation |
 |---------|-------------|---------------|
-| `hackagent` | Launch TUI interface | [Quick Start](../getting-started/quick-start.mdx) |
+| `hackagent` / `hackagent tui` | Launch the full-screen Terminal User Interface | [Quick Start](../getting-started/quick-start.mdx) |
 | `hackagent init` | Interactive setup wizard | [Initialization](./initialization.md) |
 | `hackagent config` | Manage configuration | [Config](./config.md) |
+| `hackagent agent` | Manage registered agents | [Agent](./agent.md) |
 | `hackagent eval` | Run quick 3-attack security scan | [Evaluation Campaign](../getting-started/quick-security-scan.mdx) |
 | `hackagent eval <attack_name>` | Execute one specific attack strategy | [Eval](./attack.mdx) |
+| `hackagent scan <url>` | Browser-driven red-teaming of a website's chat widget | [Scan](./scan.md) |
+| `hackagent claude` | Red-team a Claude Code agent | [Claude Code](../agents/claude-code.mdx) |
+| `hackagent codex` | Red-team a Codex agent | [Codex](../agents/codex.mdx) |
 | `hackagent examples ollama` | Run built-in Ollama demo | [Quick Start (TUI tab)](../getting-started/quick-start.mdx) |
 | `hackagent results` | View and manage results | [Results](./results.md) |
 | `hackagent datasets` | Browse and sample dataset presets | [Datasets](./datasets.md) |
+| `hackagent web` | Launch the local dashboard | [Web](./web.md) |
+| `hackagent doctor` | Diagnose common configuration issues | - |
 | `hackagent version` | Show version info | - |
 
 ## Quick Examples

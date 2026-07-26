@@ -83,7 +83,7 @@ examples/scores/embeddings instead of duplicating entries.
 
 - `strategy` - Dictionary with keys such as ``Strategy``, ``Definition``,
   ``Example``, ``Score``, ``Embeddings``.
-- ``1 - Whether to emit informational log upon update.
+- `notify` - Whether to emit informational log upon update.
   
 
 **Returns**:

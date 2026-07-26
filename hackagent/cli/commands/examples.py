@@ -27,6 +27,7 @@ from rich.console import Console
 
 from hackagent.cli.config import CLIConfig
 from hackagent.cli.utils import handle_errors
+from hackagent.config import resolve_ollama_base_url
 
 console = Console()
 
@@ -309,7 +310,7 @@ def _preflight_ollama_requirements(demo_cfg: dict) -> None:
         )
         raise click.ClickException("Ollama is not installed")
 
-    endpoint = demo_cfg.get("agent", {}).get("endpoint") or "http://localhost:11434"
+    endpoint = demo_cfg.get("agent", {}).get("endpoint") or resolve_ollama_base_url()
     console.print(f"[cyan]🔎 Checking Ollama server at:[/cyan] {endpoint}")
 
     if not _is_ollama_running(str(endpoint)):
@@ -504,7 +505,7 @@ def web_example():
                 "identifier": "gemma3:4b",
                 "type": "harmbench_variant",
                 "agent_type": "ollama",
-                "endpoint": "http://localhost:11434",
+                "endpoint": resolve_ollama_base_url(),
             }
         ],
     }

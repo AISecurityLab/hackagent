@@ -42,6 +42,31 @@ hackagent config set --api-key YOUR_HACKAGENT_API_KEY
 hackagent config set --base-url https://api.hackagent.dev
 ```
 
+### Validate Configuration
+
+Check the current configuration and test the API connection (remote mode):
+
+```bash
+hackagent config validate
+```
+
+### Reset Configuration
+
+Delete the local config file and revert to defaults:
+
+```bash
+hackagent config reset
+hackagent config reset --confirm   # skip the confirmation prompt
+```
+
+### Import Configuration
+
+Load `api_key`/`base_url`/`verbose` values from a JSON/YAML file and save them to your config file:
+
+```bash
+hackagent config import-config ./my-config.json
+```
+
 ## Storage and Backends
 
 HackAgent supports two backend modes:

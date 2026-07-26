@@ -100,29 +100,74 @@ print(vuln.get_types())  # [<HIPAAComplianceType.PHI_DISCLOSURE>, ...]
 print(vuln.get_values())  # ['phi_disclosure', 'unauthorized_access']
 ```
 
-## Creating a Threat Profile (Optional)
+## Creating a Threat Profile
 
-To provide dataset and attack recommendations, create a threat profile:
+A threat profile is optional, but it's what lets an evaluation campaign auto-select datasets, attacks, objective, and metrics for your custom vulnerability instead of you wiring them up by hand each time — see [How Threat Profiles Work](./vulnerabilities.md#how-threat-profiles-work) for the shared `ThreatProfile` anatomy.
 
 ```python
 from hackagent.risks.profile_types import ThreatProfile
-from hackagent.risks.profile_helpers import ds, PRIMARY, STATIC_TEMPLATE_ATTACKS
+from hackagent.risks.profile_helpers import ds, PRIMARY, SECONDARY, STATIC_TEMPLATE_ONLY
 
 HIPAA_COMPLIANCE_PROFILE = ThreatProfile(
     vulnerability=HIPAACompliance,
     datasets=[
         ds(
-            "custom_hipaa_dataset",
+            "custom_hipaa_test_set",
             PRIMARY,
-            "Healthcare-specific test cases for PHI protection"
+            "Healthcare-specific scenarios testing PHI protection"
+        ),
+        ds(
+            "donotanswer",
+            SECONDARY,
+            "General refusal behavior baseline"
         ),
     ],
-    attacks=STATIC_TEMPLATE_ATTACKS,
+    attacks=STATIC_TEMPLATE_ONLY,
     objective="policy_violation",
-    metrics=["asr", "judge_score"],
+    metrics=["asr", "judge_score", "phi_leak_count"],
     description="Tests HIPAA compliance in healthcare AI systems.",
 )
+
+# Use it
+print(HIPAA_COMPLIANCE_PROFILE.name)  # "HIPAA Compliance"
+print(HIPAA_COMPLIANCE_PROFILE.dataset_presets)  # ['custom_hipaa_test_set', 'donotanswer']
 ```
+
+### Profile Helpers
+
+The `profile_helpers` module provides utilities for building profiles:
+
+```python
+from hackagent.risks.profile_helpers import (
+    ds,                # Create DatasetRecommendation
+    PRIMARY,           # Relevance.PRIMARY
+    SECONDARY,         # Relevance.SECONDARY
+    STATIC_TEMPLATE_ONLY,  # Static Template-only attack list
+    JAILBREAK_ATTACKS, # Static Template + PAIR + AdvPrefix (secondary)
+    ALL_ATTACKS,       # Static Template + PAIR + AdvPrefix (all primary)
+)
+
+# Create a dataset recommendation
+dataset_rec = ds(
+    "advbench",
+    PRIMARY,
+    "Direct harmful behavior test cases"
+)
+
+# Use pre-built attack lists
+profile = ThreatProfile(
+    vulnerability=MyVuln,
+    datasets=[dataset_rec],
+    attacks=JAILBREAK_ATTACKS,
+    objective="jailbreak",
+    metrics=["asr"],
+)
+```
+
+**Usage:**
+- **STATIC_TEMPLATE_ONLY** — Simple direct testing, no adversarial optimization
+- **JAILBREAK_ATTACKS** — Includes iterative refinement (PAIR) and gradient-based (AdvPrefix)
+- **ALL_ATTACKS** — Full attack suite for comprehensive adversarial testing
 
 ## BaseVulnerability Requirements
 
@@ -364,6 +409,5 @@ If your custom vulnerability addresses a common threat, consider contributing it
 
 ## Learn More
 
-- **[Vulnerabilities](./vulnerabilities)** — Study the 13 built-in vulnerability implementations
-- **[Threat Profiles](./threat-profiles)** — Learn how to create threat profiles
+- **[Vulnerabilities](./vulnerabilities)** — Study the 13 built-in vulnerability implementations and their threat profiles
 - **[BaseVulnerability API](../hackagent/agent)** — Full API reference

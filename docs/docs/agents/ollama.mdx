@@ -55,12 +55,9 @@ agent = HackAgent(
 
 ### Ollama-Specific Configuration
 
-The adapter supports all Ollama features:
-
 - **Local Models**: Test any model installed via `ollama pull`
 - **Custom Endpoints**: Remote Ollama instances
-- **Chat & Generate APIs**: Both `/api/chat` and `/api/generate` endpoints
-- **Model Discovery**: Automatic listing of available models
+- **Chat API**: Dispatches through LiteLLM's `ollama_chat` provider, which talks to Ollama's `/api/chat` endpoint
 
 ## Running Security Tests
 
@@ -221,6 +218,20 @@ agent = HackAgent(
 	agent_type="ollama",
 )
 ```
+
+### Non-Default Port
+
+If your Ollama server does not listen on the default port `11434`, set one of
+`OLLAMA_BASE_URL`, `OLLAMA_API_BASE` or `OLLAMA_HOST` (checked in that order).
+HackAgent reads them when building the default endpoint for attacker, judge,
+classifier and embedder models, so you don't have to override each one:
+
+```bash
+export OLLAMA_HOST="127.0.0.1:11435"
+```
+
+A value without a scheme defaults to `http://`, and a value without a port
+falls back to `11434`.
 
 ## Further Reading
 

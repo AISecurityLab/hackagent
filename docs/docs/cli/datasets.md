@@ -46,11 +46,29 @@ hackagent datasets sample strongreject --limit 5 --json
 
 ## Use With Evals
 
-Once you pick a preset, pass it to `hackagent eval`:
+`--dataset`/`--limit` are options on the bare `hackagent eval` group (quick campaign mode, no technique subcommand) — they run the default jailbreak campaign against a preset:
+
+```bash
+hackagent eval \
+  --agent-name "my-agent" \
+  --agent-type "openai-sdk" \
+  --endpoint "http://localhost:8000/v1" \
+  --dataset strongreject \
+  --limit 25
+```
+
+To use a preset with a **specific** technique subcommand (e.g. `hackagent eval advprefix`), pass it via `--config-file` instead — those subcommands take `--goals`/`--config-file`, not `--dataset`/`--limit` directly:
+
+```json title="config.json"
+{
+  "dataset": { "preset": "strongreject", "limit": 25 }
+}
+```
 
 ```bash
 hackagent eval advprefix \
   --agent-name "my-agent" \
-  --dataset strongreject \
-  --limit 25
+  --agent-type "openai-sdk" \
+  --endpoint "http://localhost:8000/v1" \
+  --config-file config.json
 ```

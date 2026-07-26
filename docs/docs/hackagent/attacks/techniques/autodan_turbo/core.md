@@ -64,7 +64,7 @@ messages.
 - `temp` - Sampling temperature for attacker generation.
 - `top_p` - Nucleus sampling parameter.
 - `max_tokens` - Maximum tokens for attacker response.
-- ``0 - Human-readable role label used in logs.
+- `role_label` - Human-readable role label used in logs.
   
 
 **Returns**:

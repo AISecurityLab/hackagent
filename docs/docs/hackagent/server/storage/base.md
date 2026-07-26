@@ -54,6 +54,22 @@ def get_api_key() -> Optional[str]
 
 Return the API key used by this backend, or None (local mode).
 
+#### flush
+
+```python
+def flush() -> None
+```
+
+Block until all deferred writes are persisted (no-op if synchronous).
+
+#### close
+
+```python
+def close() -> None
+```
+
+Release resources / stop background workers. Idempotent.
+
 #### create\_or\_update\_agent
 
 ```python

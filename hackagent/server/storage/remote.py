@@ -196,9 +196,10 @@ class RemoteBackend:
                 fn(*args, **kwargs)
             except Exception:  # noqa: BLE001
                 self._writer_failures += 1
-                logger.warning(
+                logger.error(
                     "RemoteBackend: synchronous fallback write failed", exc_info=True
                 )
+                raise
             return
         self._write_queue.put((fn, args, kwargs))
 
@@ -210,6 +211,11 @@ class RemoteBackend:
         """
         if not self._closed:
             self._write_queue.join()
+        if self._writer_failures:
+            raise RuntimeError(
+                "RemoteBackend: "
+                f"{self._writer_failures} background audit write(s) failed"
+            )
 
     def close(self) -> None:
         """Drain the queue, stop the worker, and report any write failures."""
@@ -510,18 +516,8 @@ class RemoteBackend:
                 created_at=_now(),
                 updated_at=_now(),
             )
-        logger.warning(
+        raise RuntimeError(
             f"RemoteBackend: update_run {run_id} returned {resp.status_code}"
-        )
-        return RunRecord(
-            id=run_id,
-            attack_id=UUID("00000000-0000-0000-0000-000000000000"),
-            agent_id=UUID("00000000-0000-0000-0000-000000000000"),
-            run_config=run_config or {},
-            status=status or "",
-            run_notes=run_notes,
-            created_at=_now(),
-            updated_at=_now(),
         )
 
     def list_runs(
@@ -606,6 +602,7 @@ class RemoteBackend:
         return PaginatedResult(items=items, total=total or len(items))
 
     def get_run(self, run_id: UUID) -> RunRecord:
+        self.flush()
         resp = run_retrieve.sync_detailed(id=run_id, client=self._client)
         if resp.status_code == 200 and resp.parsed:
             r = resp.parsed
@@ -712,7 +709,7 @@ class RemoteBackend:
             id=result_id, client=self._client, body=body
         )
         if resp.status_code >= 300:
-            logger.warning(
+            raise RuntimeError(
                 f"RemoteBackend: update_result {result_id} returned {resp.status_code}"
             )
 
@@ -912,7 +909,7 @@ class RemoteBackend:
             client=self._client, id=result_id, body=body
         )
         if resp.status_code != 201:
-            logger.warning(
+            raise RuntimeError(
                 f"RemoteBackend: create_trace for result {result_id} "
                 f"returned {resp.status_code}"
             )

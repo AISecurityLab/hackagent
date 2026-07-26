@@ -58,7 +58,7 @@ Applies the following rules recursively:
 
 **Arguments**:
 
-- ``2 - Any object to sanitize.
+- `obj` - Any object to sanitize.
   
 
 **Returns**:

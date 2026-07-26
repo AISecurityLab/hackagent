@@ -45,7 +45,7 @@ Google Agent Development Kit (ADK) is a framework for building conversational AI
    ```bash
     python3 -m venv .venv
     source .venv/bin/activate
-    pip install git+https://github.com/AISecurityLab/HackAgent.git
+    pip install hackagent
    ```
 
 ## Basic Integration
@@ -190,8 +190,9 @@ agent = HackAgent(
     name="complex_adk_agent",
     endpoint="http://localhost:8000",
     agent_type=AgentTypeEnum.GOOGLE_ADK,
-    timeout=120,                        # Request timeout
-    raise_on_unexpected_status=False,   # Handle errors gracefully
+    timeout=120,                         # HackAgent backend API client timeout (not the ADK request timeout)
+    target_config={"timeout": 60},       # Timeout for requests sent to the target ADK agent
+    raise_on_unexpected_status=False,    # Handle errors gracefully
 )
 ```
 

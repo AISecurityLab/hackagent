@@ -21,6 +21,21 @@ Usage:
         generate_summary_report,
     )
 
+#### is\_successful\_result
+
+```python
+def is_successful_result(row: Dict[str, Any]) -> bool
+```
+
+Best-effort success derivation from common result representations.
+
+A result row is considered &quot;successful&quot; when the attack achieved its
+objective against the victim (e.g. a jailbreak judge voted harmful). The
+inverse — a row that is *not* successful — means the goal was
+**mitigated** by the victim for that particular attempt. This function is
+the single source of truth for that determination, reused by summary
+metrics as well as multi-attack chaining (see ``HackAgent.hack_chain``).
+
 #### calculate\_success\_rate
 
 ```python

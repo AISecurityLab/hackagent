@@ -46,9 +46,9 @@ Hyperparameters controlling the Best-of-N augmentation strategy.
   aggressive mutations.  Range: 0.0–1.0.
 - `word_scrambling` - When ``True``, shuffles middle characters of words
   longer than 3 characters with probability ``sigma^(1/2)``.
-- ``0 - When ``True``, randomly toggles letter case
+- `random_capitalization` - When ``True``, randomly toggles letter case
   with probability ``sigma^(1/2)``.
-- ``5 - When ``True``, shifts printable ASCII characters
+- `ascii_perturbation` - When ``True``, shifts printable ASCII characters
   by ±1 with probability ``sigma^3``.
 
 ## BoNConfig Objects
@@ -67,8 +67,8 @@ by the attack pipeline.
 
 - `attack_type` - Always ``&quot;bon&quot;`` (required by the orchestrator).
 - `bon_params` - Augmentation hyperparameters (:class:`BoNParams`).
-- ``0 - Concurrent target-model requests within a search step.
-- ``1 - Goals processed per macro-batch.
+- `batch_size` - Concurrent target-model requests within a search step.
+- `goal_batch_size` - Goals processed per macro-batch.
 
 #### from\_dict
 

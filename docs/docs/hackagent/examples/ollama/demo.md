@@ -3,15 +3,15 @@ sidebar_label: demo
 title: hackagent.examples.ollama.demo
 ---
 
-Minimal FlipAttack demo for an Ollama target model.
+Minimal h4rm3l demo for an Ollama target model.
 
-Target:
-    gemma3:12b running on Ollama (http://localhost:11434)
+Target / Judge:
+    gemma3:4b running on Ollama (http://localhost:11434)
 
 Prerequisites:
 1. Install Ollama: https://ollama.ai
 2. Pull required models:
-     ollama pull gemma3:12b
+     ollama pull gemma3:4b
 3. Start Ollama:
      ollama serve
 

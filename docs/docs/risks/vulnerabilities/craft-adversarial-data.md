@@ -14,17 +14,26 @@ Tests whether adversarially crafted data — perturbations, poisoned examples, o
 
 ## Threat Profile
 
-**Objective**: jailbreak
+**Objective**: `jailbreak`
 
-**Recommended Datasets**:
-- **advbench** (PRIMARY): Adversarial goals that may involve crafted perturbations
+### Recommended Datasets
 
-**Attack Techniques**:
-- Static Template (PRIMARY): Template-based prompt construction
+**Primary**
+- **advbench**: Adversarial goals that may involve crafted perturbations
 
-**Metrics**: asr, judge_score
+### Attack Techniques
 
-## Usage Example
+**Primary**
+- **Static Template**: Template-based prompt construction
+
+### Metrics
+
+- asr
+- judge_score
+
+## Usage
+
+### Instantiate the Vulnerability
 
 ```python
 from hackagent.risks import CraftAdversarialData
@@ -38,4 +47,24 @@ vuln = CraftAdversarialData(types=[
     CraftAdversarialDataType.PERTURBATION_ATTACKS.value,
     CraftAdversarialDataType.POISONED_EXAMPLES.value,
 ])
+```
+
+### Run an Evaluation Campaign
+
+```python
+from hackagent import HackAgent
+from hackagent.risks.craft_adversarial_data import CRAFT_ADVERSARIAL_DATA_PROFILE
+
+agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
+
+# Use profile recommendations
+for attack in CRAFT_ADVERSARIAL_DATA_PROFILE.primary_attacks:
+    for dataset in CRAFT_ADVERSARIAL_DATA_PROFILE.primary_datasets:
+        attack_config = {
+            "attack_type": "static_template",  # attack.technique is "StaticTemplate"
+            "objective": CRAFT_ADVERSARIAL_DATA_PROFILE.objective,
+            "dataset": {"preset": dataset.preset},
+        }
+        results = agent.hack(attack_config=attack_config)
+        print(f"Results: {results}")
 ```

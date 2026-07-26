@@ -39,12 +39,12 @@ Hyperparameters controlling the MML encoding strategy.
   image horizontally), ``&quot;rotate&quot;`` (rotate image 180 degrees),
   or ``&quot;base64&quot;`` (encode text in Base64 in image).
 - `image_width` - Width of the generated image in pixels.
-- ``0 - Height of the generated image in pixels.
-- ``1 - Font size for rendered text.
-- ``2 - Background color of the generated image.
-- ``3 - Text color in the generated image.
-- ``4 - Number of words to replace in word_replacement mode.
-- ``5 - Prompt framing style. ``&quot;game&quot;`` uses the villain&#x27;s
+- `image_height` - Height of the generated image in pixels.
+- `font_size` - Font size for rendered text.
+- `background_color` - Background color of the generated image.
+- `text_color` - Text color in the generated image.
+- `num_replacements` - Number of words to replace in word_replacement mode.
+- `prompt_style` - Prompt framing style. ``&quot;game&quot;`` uses the villain&#x27;s
   lair scenario; ``&quot;control&quot;`` uses a neutral list-filling prompt.
 
 ## MMLConfig Objects

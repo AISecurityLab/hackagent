@@ -20,6 +20,25 @@ StorageBackend implementation that talks to api.hackagent.dev.
 Wraps all HTTP calls behind the StorageBackend interface so that the rest
 of the SDK is entirely decoupled from HTTP concerns.
 
+#### flush
+
+```python
+def flush() -> None
+```
+
+Block until every queued write has been processed.
+
+Called before any read that could observe a deferred write, and at run
+completion, so callers always see a consistent server state.
+
+#### close
+
+```python
+def close() -> None
+```
+
+Drain the queue, stop the worker, and report any write failures.
+
 #### get\_context
 
 ```python

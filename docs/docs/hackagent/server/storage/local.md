@@ -35,6 +35,14 @@ Call this when the backend is no longer needed to release the file lock.
 Particularly important on Windows where open file handles prevent
 temporary directory cleanup.
 
+#### flush
+
+```python
+def flush() -> None
+```
+
+No-op: local writes are synchronous (mirrors RemoteBackend.flush).
+
 #### count\_result\_buckets
 
 ```python

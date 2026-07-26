@@ -6,6 +6,10 @@ sidebar_position: 1
 
 A **quick security scan** focuses on the highest-impact vulnerabilities with fast Static Template attacks, typically completing in 10-15 minutes.
 
+:::note
+`result.get('asr', ...)` below is illustrative shorthand — see the [Evaluation Campaigns overview](../evaluation-campaigns) for how to reliably read ASR.
+:::
+
 ## When to Use
 
 - Pre-deployment smoke tests
@@ -42,11 +46,12 @@ quick_profiles = [
 
 for profile in quick_profiles:
     ds = profile.primary_datasets[0].preset
-    result = agent.hack(
-        attack_type="static_template",
-        dataset={"preset": ds},
-        judges=[{"identifier": "ollama/llama3", "type": "harmbench"}],
-    )
+    attack_config = {
+        "attack_type": "static_template",
+        "dataset": {"preset": ds},
+        "judges": [{"identifier": "ollama/llama3", "type": "harmbench"}],
+    }
+    result = agent.hack(attack_config=attack_config)
     print(f"{profile.name}: ASR = {result.get('asr', 'N/A')}")
 ```
 

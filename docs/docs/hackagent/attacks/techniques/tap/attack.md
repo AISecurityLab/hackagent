@@ -70,18 +70,18 @@ separate evaluator that checks whether a prompt stays on-topic.
 When ``None``, the configured judge is reused with the on-topic
 evaluation type.
 
-The :meth:`~hackagent.attacks.techniques.tap.evaluation`4 method manages the full pipeline via
-:class:`~hackagent.attacks.techniques.tap.evaluation`5:
-a coordinator handles per-goal :class:`~hackagent.attacks.techniques.tap.evaluation`6
-lifecycle and pipeline-level :class:`~hackagent.attacks.techniques.tap.evaluation`7
+The :meth:`run` method manages the full pipeline via
+:class:`~hackagent.router.tracking.TrackingCoordinator`:
+a coordinator handles per-goal :class:`~hackagent.router.tracking.Tracker`
+lifecycle and pipeline-level :class:`~hackagent.router.tracking.StepTracker`
 checkpointing.
 
 **Attributes**:
 
-- `~hackagent.attacks.techniques.tap.evaluation`8 - Merged TAP configuration dictionary.
-- `~hackagent.attacks.techniques.tap.evaluation`9 - Authenticated HackAgent API client.
-- ``0 - Router for the victim model.
-- ``1 - Hierarchical logger at ``hackagent.attacks.tap``.
+- `config` - Merged TAP configuration dictionary.
+- `client` - Authenticated HackAgent API client.
+- `agent_router` - Router for the victim model.
+- `logger` - Hierarchical logger at ``hackagent.attacks.tap``.
 
 #### \_\_init\_\_
 

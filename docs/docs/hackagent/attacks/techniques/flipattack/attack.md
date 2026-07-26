@@ -52,12 +52,12 @@ few_shot Injects two task-specific decoding demonstrations.
 
 **Attributes**:
 
-- ``2 - Active obfuscation mode, read from config.
-- ``3 - Whether chain-of-thought is enabled.
-- ``4 - Whether LangGPT template is enabled.
-- ``5 - Whether few-shot demonstrations are injected.
-- ``6 - Template system prompt built once during setup.
-- ``7 - LangGPT step instructions (only when lang_gpt=True).
+- `flip_mode` - Active obfuscation mode, read from config.
+- `cot` - Whether chain-of-thought is enabled.
+- `lang_gpt` - Whether LangGPT template is enabled.
+- `few_shot` - Whether few-shot demonstrations are injected.
+- `_base_system_prompt` - Template system prompt built once during setup.
+- `_lang_gpt_prompt` - LangGPT step instructions (only when lang_gpt=True).
 
 #### \_\_init\_\_
 
@@ -210,7 +210,7 @@ method is safe to call for multiple goals in sequence.
 
 **Raises**:
 
-- ``1 - If ``self.flip_mode`` is not a recognised mode.
+- `TypeError` - If ``self.flip_mode`` is not a recognised mode.
 
 #### run
 

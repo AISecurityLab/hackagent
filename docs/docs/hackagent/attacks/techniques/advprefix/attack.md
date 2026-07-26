@@ -41,20 +41,20 @@ filtering.
 * :mod:`~hackagent.attacks.techniques.advprefix.completions` for
 step 2.
 * :mod:`~hackagent.attacks.techniques.advprefix.evaluation`
-(:class:``0) for step 3.
+(:class:`EvaluationPipeline`) for step 3.
 
 Tracking is managed by
-:class:``1; goal
-:class:``2 instances and a pipeline
-:class:``3 are created upfront so
+:class:`~hackagent.router.tracking.TrackingCoordinator`; goal
+:class:`~hackagent.router.tracking.Tracker` instances and a pipeline
+:class:`~hackagent.router.tracking.StepTracker` are created upfront so
 the dashboard shows all goals from the moment the run starts.
 
 **Attributes**:
 
-- ``4 - Merged AdvPrefix configuration dictionary.
-- ``5 - Authenticated HackAgent API client.
-- ``6 - Router for the victim model.
-- ``7 - Hierarchical logger at ``hackagent.attacks.advprefix``.
+- `config` - Merged AdvPrefix configuration dictionary.
+- `client` - Authenticated HackAgent API client.
+- `agent_router` - Router for the victim model.
+- `logger` - Hierarchical logger at ``hackagent.attacks.advprefix``.
 
 #### \_\_init\_\_
 

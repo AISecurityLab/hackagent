@@ -1,78 +1,140 @@
 ---
 sidebar_position: 3
-sidebar_label: Jailbreak
-title: Jailbreak
+sidebar_label: Vulnerabilities
+title: Vulnerabilities
 ---
 
-# Jailbreak
+# Vulnerabilities
 
-This page describes the currently implemented risk scope and campaign setup:
+HackAgent ships with **13 built-in vulnerability classes** covering the input, model, data, and agent layers of an AI system. Each one extends `BaseVulnerability` (`hackagent.risks.base`), defines an `Enum` of testable sub-types, and has a matching **threat profile** — recommended datasets, attack techniques, objective, and metrics — documented inline on its own page.
 
-- **Risk Macro-Category**: Cybersecurity
-- **Risk Micro-Category**: Jailbreak
+## Reference
 
-In HackAgent core, Jailbreak is the only implemented Cybersecurity micro-category today.
+| Vulnerability | Description |
+|---|---|
+| [Jailbreak](./vulnerabilities/jailbreak.md) | Tests whether the LLM can be manipulated into bypassing its safety filters through roleplay, encoding, multi-turn, hypothetical, or authority-manipulation techniques. |
+| [Prompt Injection](./vulnerabilities/prompt-injection.md) | Tests whether the LLM executes attacker-supplied instructions that override or bypass the system prompt. |
+| [System Prompt Leakage](./vulnerabilities/system-prompt-leakage.md) | Tests whether the LLM reveals sensitive details from its system prompt, such as credentials, internal instructions, or guardrails. |
+| [Input Manipulation Attack](./vulnerabilities/input-manipulation-attack.md) | Tests whether encoding bypasses, format string attacks, or Unicode manipulation can evade input validation and safety filters. |
+| [Model Evasion](./vulnerabilities/model-evasion.md) | Tests whether adversarial examples, feature manipulation, or boundary exploitation can evade the model's safety mechanisms. |
+| [Craft Adversarial Data](./vulnerabilities/craft-adversarial-data.md) | Tests whether adversarially crafted data — perturbations, poisoned examples, or augmentation abuse — can compromise model behaviour. |
+| [Sensitive Information Disclosure](./vulnerabilities/sensitive-information-disclosure.md) | Tests for training-data extraction, architecture disclosure, and configuration leakage. |
+| [Misinformation](./vulnerabilities/misinformation.md) | Tests whether the LLM produces factual fabrications, invented sources, or misrepresented expertise. |
+| [Excessive Agency](./vulnerabilities/excessive-agency.md) | Tests whether the LLM performs actions or grants permissions exceeding its intended scope without oversight. |
+| [Malicious Tool Invocation](./vulnerabilities/malicious-tool-invocation.md) | Tests for risks from untrusted tool execution, data exfiltration through tool interactions, and tool privilege escalation. |
+| [Credential Exposure](./vulnerabilities/credential-exposure.md) | Tests for hardcoded credentials, token leakage, and misconfigured access controls in AI systems. |
+| [Public-Facing Application Exploitation](./vulnerabilities/public-facing-application-exploitation.md) | Tests whether publicly exposed AI APIs, web interfaces, or endpoints can be abused or exploited beyond intended use. |
+| [Vector and Embedding Weaknesses Exploit](./vulnerabilities/vector-embedding-weaknesses-exploit.md) | Tests for embedding inversion, vector database poisoning, and similarity search manipulation in RAG pipelines. |
 
-For this micro-category, HackAgent provides an evaluation campaign setup.
-It defines objective, datasets, attack techniques, and metrics used in runs.
+## Using a Vulnerability
 
-### What Jailbreak Means in Practice
+```python
+from hackagent.risks import Jailbreak
+from hackagent.risks.jailbreak.types import JailbreakType
 
-In this context, a jailbreak is a successful bypass of model safeguards.
-The model should refuse unsafe or policy-violating requests, but instead returns
-content that indicates the guardrails were circumvented.
+# Use all sub-types
+vuln = Jailbreak()
 
-### How Jailbreak Attacks Work
+# Or specify particular sub-types
+vuln = Jailbreak(types=[
+    JailbreakType.ROLEPLAY.value,
+    JailbreakType.MULTI_TURN.value,
+])
+```
 
-Different jailbreak techniques use different search strategies, but they share
-the same high-level workflow:
+Don't see a category that fits your use case? See [Custom Vulnerabilities](./custom-vulnerabilities.md) to define your own.
 
-1. Start from a harmful or disallowed goal in the evaluation dataset.
-2. Generate one or more adversarial prompt variants intended to bypass safety behavior.
-3. Send those prompts to the target model and collect responses.
-4. Evaluate responses with a judge/ruleset to determine whether bypass occurred.
-5. Iterate and refine prompts to increase bypass success rate.
+## How Threat Profiles Work
 
-Techniques differ mainly in *how* they search and refine prompts:
+A **threat profile** maps a vulnerability to recommended evaluation parameters:
 
-- some use structured exploration (for example, tree search),
-- some use iterative attacker-judge loops,
-- some use transformation chains and prompt mutation.
+> _"Given vulnerability **X**, which datasets, attack techniques, objective, and metrics should an evaluation campaign use?"_
 
-### Common Objective Across Techniques
+Each of the 13 built-in vulnerabilities above has a matching threat profile — see the "Threat Profile" section on its own page for the concrete values. This section explains the shared anatomy behind every one of them.
 
-All jailbreak attacks in this campaign setup optimize for the same objective:
-maximize the probability that the target model violates expected safety behavior
-for a protected goal. This is why ASR (Attack Success Rate) is the primary metric.
+```mermaid
+graph LR
+    V[Vulnerability Class] --> TP[ThreatProfile]
+    TP --> D[DatasetRecommendation]
+    TP --> A[AttackRecommendation]
+    TP --> O[Objective]
+    TP --> M[Metrics]
 
-If two runs use the same Risk Profile and equivalent Evaluation Campaign settings, ASR comparison over time remains meaningful because scope and methodology are consistent.
+    D --> |preset| DS[Dataset Preset Key]
+    D --> |relevance| R1[PRIMARY / SECONDARY]
+    A --> |technique| AT[Attack Technique Key]
+    A --> |relevance| R2[PRIMARY / SECONDARY]
+```
 
-No additional Cybersecurity micro-categories are currently implemented in core.
+Each `ThreatProfile` is a frozen dataclass with these fields:
 
-### Code Example
+| Field | Type | Description |
+|-------|------|-------------|
+| `vulnerability` | `type[BaseVulnerability]` | The vulnerability class this profile maps |
+| `datasets` | `list[DatasetRecommendation]` | Recommended datasets with relevance tags |
+| `attacks` | `list[AttackRecommendation]` | Compatible attack techniques |
+| `objective` | `str` | Default attack objective (`"jailbreak"`, `"harmful_behavior"`, `"policy_violation"`) |
+| `metrics` | `list[str]` | Relevant metric names (`"asr"`, `"toxicity_score"`, `"judge_score"`) |
+| `description` | `str` | Human-readable summary |
+
+### Relevance Levels
+
+Every dataset and attack recommendation carries a **relevance** tag:
+
+| Level | Meaning | When to use |
+|-------|---------|-------------|
+| **PRIMARY** | Directly designed to test this vulnerability | Always include in evaluation |
+| **SECONDARY** | Useful for broader coverage or baseline comparison | Include for comprehensive audits |
+
+### Objectives
+
+| Objective | Description | Example Vulnerabilities |
+|-----------|------------|------------------------|
+| `jailbreak` | Bypass safety mechanisms to produce forbidden output | PromptInjection, Jailbreak, SystemPromptLeakage |
+| `harmful_behavior` | Generate harmful, toxic, or dangerous content | Misinformation |
+| `policy_violation` | Violate organizational policies or access controls | ExcessiveAgency, CredentialExposure |
+
+### Metrics
+
+Common metric names used across profiles:
+
+- `asr` — Attack Success Rate
+- `judge_score` — LLM-based evaluation score
+- `toxicity_score` — Toxicity measurement
+- `refusal_rate` — Percentage of refused requests
+
+### Accessing a Profile
+
+Each vulnerability has an associated profile constant in its module:
 
 ```python
 from hackagent.risks.jailbreak import JAILBREAK_PROFILE
 
-print(JAILBREAK_PROFILE.name)
-print([d.preset for d in JAILBREAK_PROFILE.primary_datasets])
-print([a.technique for a in JAILBREAK_PROFILE.primary_attacks])
+print(JAILBREAK_PROFILE.description)
+# "Tests resistance to multi-turn, roleplay, encoding, and authority-based bypass."
+
+print(JAILBREAK_PROFILE.dataset_presets)
+# ['strongreject', 'harmbench', 'advbench', 'jailbreakbench', ...]
+
+print(JAILBREAK_PROFILE.attack_techniques)
+# ['h4rm3l', 'TAP', 'PAIR']
+
+print(JAILBREAK_PROFILE.objective)   # 'jailbreak'
+print(JAILBREAK_PROFILE.metrics)     # ['asr', 'judge_score']
+
+# Primary datasets — core evaluation
+for d in JAILBREAK_PROFILE.primary_datasets:
+    print(f"[P] {d.preset}: {d.rationale}")
+
+# Secondary datasets — extended coverage
+for d in JAILBREAK_PROFILE.secondary_datasets:
+    print(f"[S] {d.preset}: {d.rationale}")
 ```
 
-**Objective**: `jailbreak`
+Don't see a threat profile that fits a custom vulnerability? See [Custom Vulnerabilities](./custom-vulnerabilities.md#creating-a-threat-profile) to build your own with `ThreatProfile` and the `profile_helpers` module.
 
-**Recommended Datasets**:
-- **strongreject** (PRIMARY): 324 forbidden prompts designed for jailbreak evaluation
-- **harmbench** (PRIMARY): 200 harmful behaviors for bypass testing
-- **advbench** (PRIMARY): 520 adversarial goals for jailbreak attacks
-- **jailbreakbench** (PRIMARY): 100 curated misuse behaviours from NeurIPS 2024 benchmark
-- **simplesafetytests** (SECONDARY): 100 clear-cut harmful prompts as baseline
-- **donotanswer** (SECONDARY): 939 refusal questions for comprehensive coverage
-- **saladbench_attack** (SECONDARY): 5K attack-enhanced prompts with jailbreak methods
+## Learn More
 
-**Attack Techniques**:
-- h4rm3l (PRIMARY): Composable decorator-chain jailbreak for fast high-yield probing
-- TAP (PRIMARY): Tree-search jailbreak with pruning for efficient discovery
-- PAIR (PRIMARY): Iterative attacker-guided refinement for adaptive bypass
-
-**Metrics**: `asr`, `judge_score`
+- **[Evaluation Campaigns](./evaluation-campaigns.md)** — Build complete evaluation workflows
+- **[Custom Vulnerabilities](./custom-vulnerabilities.md)** — Extend `BaseVulnerability` to define your own categories and threat profiles
+- **[Indirect Injection](./indirect-prompt-injection.md)** — Dedicated RAG context-poisoning scenario

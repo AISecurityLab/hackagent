@@ -110,7 +110,25 @@ This is the main entry point for loading goals. It supports three modes:
 
 **Raises**:
 
-- `provider`0 - If neither preset nor provider is specified.
+- `ValueError` - If neither preset nor provider is specified.
+
+#### load\_goals\_and\_extra\_fields
+
+```python
+def load_goals_and_extra_fields(
+        preset: Optional[str] = None,
+        provider: Optional[str] = None,
+        path: Optional[str] = None,
+        goal_field: Optional[str] = None,
+        split: Optional[str] = None,
+        name: Optional[str] = None,
+        limit: Optional[int] = None,
+        shuffle: bool = False,
+        seed: Optional[int] = None,
+        **kwargs) -> tuple[List[str], Dict[int, Dict[str, Any]]]
+```
+
+Load goals and return per-goal extra fields metadata, when available.
 
 #### load\_goals\_from\_config
 
@@ -157,4 +175,13 @@ when a &#x27;dataset&#x27; key is present in the attack configuration.
 - `"split"` - &quot;test_public&quot;,
 - `"limit"` - 50
   }
+
+#### load\_goals\_and\_extra\_fields\_from\_config
+
+```python
+def load_goals_and_extra_fields_from_config(
+        config: Dict[str, Any]) -> tuple[List[str], Dict[int, Dict[str, Any]]]
+```
+
+Load goals and extra fields from a dataset configuration dictionary.
 

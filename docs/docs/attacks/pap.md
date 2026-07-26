@@ -92,7 +92,7 @@ results = agent.hack(attack_config=attack_config)
 | `techniques` | str \| list | `"top5"` | Which persuasion techniques to use. `"top5"` uses the 5 most effective from the paper, `"all"` uses all 40, or provide an explicit list of technique names. |
 | `max_techniques_per_goal` | int | `0` | Maximum techniques to try per goal. `0` means try all selected techniques. |
 | `attacker_temperature` | float | `1.0` | Temperature for the attacker LLM's paraphrasing. |
-| `attacker_max_tokens` | int | `1024` | Max tokens for the attacker LLM response. |
+| `attacker_max_tokens` | int | `4096` | Max tokens for the attacker LLM response. |
 
 ### Top-Level Parameters
 

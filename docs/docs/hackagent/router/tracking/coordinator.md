@@ -71,7 +71,8 @@ def __init__(step_tracker: StepTracker,
              goal_tracker: Optional[Tracker],
              logger: Optional[logging.Logger] = None,
              run_start_time: Optional[float] = None,
-             goal_index_start: int = 0)
+             goal_index_start: int = 0,
+             default_initial_metadata: Optional[Dict[str, Any]] = None)
 ```
 
 Initialize coordinator with pre-built trackers.
@@ -123,8 +124,8 @@ Factory method to create a fully-initialized coordinator.
   entirely and rely on provided labels or fallback defaults.
 - `goals` - Optional list of goals to initialize upfront
 - `initial_metadata` - Optional metadata for goal results
-- `run_id`0 - Starting index to assign to the first goal
-- `run_id`1 - Optional perf_counter timestamp used as
+- `goal_index_start` - Starting index to assign to the first goal
+- `run_start_time` - Optional perf_counter timestamp used as
   run start for latency calculations.
   
 
@@ -172,7 +173,7 @@ Whether per-goal tracking is available.
 ```python
 def initialize_goals(goals: List[str],
                      initial_metadata: Optional[Dict[str, Any]] = None,
-                     goal_index_start: int = 0) -> None
+                     goal_index_start: Optional[int] = None) -> None
 ```
 
 Create Result records for all goals upfront.
@@ -184,7 +185,8 @@ any pipeline steps execute.
 
 - `goals` - List of goal strings
 - `initial_metadata` - Optional metadata to attach to each goal result
-- `goal_index_start` - Starting index to assign to the first goal
+- `goal_index_start` - Optional starting index to assign to the first
+  goal. If omitted, preserves the coordinator&#x27;s current offset.
 
 #### initialize\_goals\_from\_pipeline\_data
 

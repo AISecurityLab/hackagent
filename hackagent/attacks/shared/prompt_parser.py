@@ -19,7 +19,9 @@ import re
 from typing import Dict, Optional
 
 
-def extract_prompt_and_improvement(content: str) -> Optional[Dict[str, str]]:
+def extract_prompt_and_improvement(
+    content: str, *, allow_plaintext: bool = True
+) -> Optional[Dict[str, str]]:
     """
     Extract a prompt (+ optional improvement) from attacker output.
 
@@ -57,15 +59,20 @@ def extract_prompt_and_improvement(content: str) -> Optional[Dict[str, str]]:
                 improvement = _unescape_text(improvement_value)
         return {"prompt": prompt, "improvement": improvement}
 
-    if not raw.startswith("{") and not raw.startswith("[") and len(raw) > 20:
+    if (
+        allow_plaintext
+        and not raw.startswith("{")
+        and not raw.startswith("[")
+        and len(raw) > 20
+    ):
         return {"prompt": raw, "improvement": ""}
 
     return None
 
 
-def extract_prompt(content: str) -> Optional[str]:
+def extract_prompt(content: str, *, allow_plaintext: bool = True) -> Optional[str]:
     """Extract just the prompt string from attacker output."""
-    parsed = extract_prompt_and_improvement(content)
+    parsed = extract_prompt_and_improvement(content, allow_plaintext=allow_plaintext)
     if not parsed:
         return None
     return parsed.get("prompt") or None

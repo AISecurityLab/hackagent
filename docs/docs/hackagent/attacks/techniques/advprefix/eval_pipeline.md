@@ -1,6 +1,6 @@
 ---
-sidebar_label: evaluation
-title: hackagent.attacks.techniques.advprefix.evaluation
+sidebar_label: eval_pipeline
+title: hackagent.attacks.techniques.advprefix.eval_pipeline
 ---
 
 Evaluation stage module for AdvPrefix attacks.

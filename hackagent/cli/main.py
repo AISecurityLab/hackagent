@@ -329,6 +329,52 @@ def init(ctx):
         cli_config.save()
         console.print("\n[bold green]✅ Configuration saved[/bold green]")
 
+        console.print("\n[cyan]🧩 FC-Attack Graphviz Setup[/cyan]")
+        console.print(
+            "[dim]Graphviz is needed only for FC-Attack image rendering. "
+            "tFC-Attack does not require it.[/dim]"
+        )
+
+        try:
+            from hackagent.attacks.techniques.fc.flowchart_renderer import (
+                ensure_graphviz_dot_available,
+            )
+
+            existing_dot = ensure_graphviz_dot_available(allow_download=False)
+            if existing_dot:
+                console.print(
+                    f"[green]✅ Graphviz detected:[/green] [dim]{existing_dot}[/dim]"
+                )
+            else:
+                should_prefetch = click.confirm(
+                    "Graphviz not found. Download portable binaries now for FC-Attack?",
+                    default=True,
+                )
+
+                if should_prefetch:
+                    dot_path = ensure_graphviz_dot_available(allow_download=True)
+                    if dot_path:
+                        console.print(
+                            f"[green]✅ Graphviz ready:[/green] [dim]{dot_path}[/dim]"
+                        )
+                    else:
+                        console.print(
+                            "[yellow]⚠️ Could not prepare Graphviz automatically. "
+                            "You can still use tFC-Attack or set "
+                            "HACKAGENT_GRAPHVIZ_DOT later.[/yellow]"
+                        )
+                else:
+                    console.print(
+                        "[dim]Skipped Graphviz prefetch. "
+                        "You can run FC-Attack setup later via HACKAGENT_GRAPHVIZ_DOT "
+                        "or by re-running init.[/dim]"
+                    )
+        except Exception as graphviz_exc:
+            console.print(
+                "[yellow]⚠️ Graphviz setup check failed during init:[/yellow] "
+                f"[dim]{graphviz_exc}[/dim]"
+            )
+
         if cli_config.api_key:
             console.print(
                 "[bold green]✅ Setup complete![/bold green] "

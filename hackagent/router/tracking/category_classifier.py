@@ -286,11 +286,12 @@ class GoalCategoryClassifier:
         # Imported lazily to avoid a router↔attacks import cycle at load time.
         from hackagent.attacks.techniques.config import (
             DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
+            DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT,
         )
 
         resolved: Dict[str, Any] = {
             "identifier": DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
-            "endpoint": "http://localhost:11434",
+            "endpoint": DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT,
             "agent_type": "OLLAMA",
             "api_key": None,
             "max_tokens": 100,

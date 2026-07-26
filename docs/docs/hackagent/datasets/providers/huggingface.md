@@ -50,7 +50,7 @@ Initialize the HuggingFace dataset provider.
 def load_goals(limit: Optional[int] = None,
                shuffle: bool = False,
                seed: Optional[int] = None,
-               **kwargs) -> List[str]
+               **kwargs) -> List[Any]
 ```
 
 Load goals from the HuggingFace dataset.
@@ -66,6 +66,14 @@ Load goals from the HuggingFace dataset.
 **Returns**:
 
   List of goal strings.
+
+#### get\_extra\_data
+
+```python
+def get_extra_data() -> List[Dict[str, Any]]
+```
+
+Return extra fields extracted during the last load_goals call.
 
 #### get\_metadata
 

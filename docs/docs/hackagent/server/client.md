@@ -31,7 +31,7 @@ but can be set to False for testing purposes.
 
 **Attributes**:
 
-- ``8 - Whether or not to raise an errors.UnexpectedStatus if the API returns a
+- `raise_on_unexpected_status` - Whether or not to raise an errors.UnexpectedStatus if the API returns a
   status code that was not documented in the source OpenAPI document. Can also be provided as a keyword
   argument to the constructor.
 
@@ -156,12 +156,12 @@ but can be set to False for testing purposes.
 
 **Attributes**:
 
-- ``8 - Whether or not to raise an errors.UnexpectedStatus if the API returns a
+- `raise_on_unexpected_status` - Whether or not to raise an errors.UnexpectedStatus if the API returns a
   status code that was not documented in the source OpenAPI document. Can also be provided as a keyword
   argument to the constructor.
-- ``9 - The token to use for authentication
-- ``0 - The prefix to use for the Authorization header
-- ``1 - The name of the Authorization header
+- `token` - The token to use for authentication
+- `prefix` - The prefix to use for the Authorization header
+- `auth_header_name` - The name of the Authorization header
 
 #### with\_headers
 
