@@ -151,5 +151,42 @@ class TestFlipattackFramer(unittest.TestCase):
             )
 
 
+class TestCipherchatFramer(unittest.TestCase):
+    def test_default_method_is_caesar(self):
+        framer = build_jailbreak_framer(
+            {"enabled": True, "technique": "cipherchat"}, LOGGER
+        )
+        framed, metadata = framer.apply("do the bad thing")
+        self.assertNotEqual(framed, "do the bad thing")
+        self.assertEqual(metadata["technique"], "cipherchat")
+        self.assertEqual(metadata["encode_method"], "caesar")
+
+    def test_variant_index_rotates_methods(self):
+        framer = build_jailbreak_framer(
+            {
+                "enabled": True,
+                "technique": "cipherchat",
+                "encode_methods": ["caesar", "atbash"],
+            },
+            LOGGER,
+        )
+        first, meta_first = framer.apply("do the bad thing", 0)
+        second, meta_second = framer.apply("do the bad thing", 1)
+        self.assertNotEqual(first, second)
+        self.assertEqual(meta_first["encode_method"], "caesar")
+        self.assertEqual(meta_second["encode_method"], "atbash")
+
+    def test_unsupported_method_raises(self):
+        with self.assertRaises(ValueError):
+            build_jailbreak_framer(
+                {
+                    "enabled": True,
+                    "technique": "cipherchat",
+                    "encode_method": "does_not_exist",
+                },
+                LOGGER,
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -14,6 +14,7 @@ import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from hackagent.attacks.generator import AttackTemplates
+from hackagent.attacks.techniques.cipherchat.encode_experts import encode_expert_dict
 from hackagent.attacks.techniques.h4rm3l.config import PRESET_PROGRAMS
 from hackagent.attacks.techniques.h4rm3l.decorators import (
     compile_program,
@@ -21,7 +22,12 @@ from hackagent.attacks.techniques.h4rm3l.decorators import (
 )
 from hackagent.router.router import AgentRouter
 
-SUPPORTED_JAILBREAK_TECHNIQUES = ("static_template", "h4rm3l", "flipattack")
+SUPPORTED_JAILBREAK_TECHNIQUES = (
+    "static_template",
+    "h4rm3l",
+    "flipattack",
+    "cipherchat",
+)
 
 DEFAULT_JAILBREAK_CONFIG: Dict[str, Any] = {
     "enabled": False,
@@ -33,6 +39,8 @@ DEFAULT_JAILBREAK_CONFIG: Dict[str, Any] = {
     "syntax_version": 2,
     # flipattack options
     "flip_mode": "FCS",
+    # cipherchat options
+    "encode_method": "caesar",
 }
 
 
@@ -171,10 +179,37 @@ def _build_flipattack_framer(
     return JailbreakFramer("flipattack", _transform)
 
 
+def _build_cipherchat_framer(
+    config: Dict[str, Any],
+    logger: Optional[logging.Logger] = None,
+    attacker_router: Optional[AgentRouter] = None,
+    attacker_reg_key: Optional[str] = None,
+) -> JailbreakFramer:
+    raw_methods = config.get("encode_methods") or [
+        config.get("encode_method", "caesar")
+    ]
+    if isinstance(raw_methods, str):
+        raw_methods = [raw_methods]
+    methods = [str(m).strip().lower() for m in raw_methods]
+    for method in methods:
+        if method not in encode_expert_dict:
+            raise ValueError(
+                f"Unsupported cipherchat encode_method '{method}'. "
+                f"Supported: {sorted(encode_expert_dict)}"
+            )
+
+    def _transform(goal: str, variant_index: int) -> Tuple[str, Dict[str, Any]]:
+        method = methods[variant_index % len(methods)]
+        return encode_expert_dict[method].encode(goal), {"encode_method": method}
+
+    return JailbreakFramer("cipherchat", _transform)
+
+
 _TECHNIQUE_BUILDERS: Dict[str, Callable[..., JailbreakFramer]] = {
     "static_template": _build_static_template_framer,
     "h4rm3l": _build_h4rm3l_framer,
     "flipattack": _build_flipattack_framer,
+    "cipherchat": _build_cipherchat_framer,
 }
 
 
