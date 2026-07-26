@@ -510,9 +510,7 @@ class TestResultsRunSummary:
     """
 
     @pytest.mark.asyncio
-    async def test_show_result_summary_includes_multi_judge_metrics(
-        self, cli_config
-    ):
+    async def test_show_result_summary_includes_multi_judge_metrics(self, cli_config):
         """
         Test that _show_result_summary renders multi-judge metrics.
 
