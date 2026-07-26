@@ -55,15 +55,18 @@ graph TD
 
 ### Per-Iteration Cost
 
-Each PAIR iteration performs **3 sequential model calls**:
+Each PAIR iteration performs **3 model calls per stream**:
 
 1. **Attacker** call (generate/refine prompt)
 2. **Target** call (execute candidate jailbreak)
 3. **Judge** call (score response)
 
-So expected wall time is approximately:
+With `n_streams` independent conversations, the query budget per goal is
+approximately `n_iterations * n_streams`. `batch_size` controls the number of
+stream workers: `1` is serial, while a value above `1` executes up to that many
+streams concurrently. Expected wall time is approximately:
 
-`iterations * (t_attacker + t_target + t_judge)`
+`iterations * ceil(streams / batch_size) * (t_attacker + t_target + t_judge)`
 
 If any provider call is slow, iteration latency increases accordingly.
 
@@ -140,7 +143,10 @@ advanced_config = {
     },
     
     # Attack parameters
-    "n_iterations": 20,          # Max iterations per goal
+    "n_iterations": 20,          # Max refinement rounds per goal
+    "n_streams": 5,              # Independent attacker conversations per goal
+    "keep_last_n": 4,            # Latest attacker/feedback turn pairs retained per stream
+    "target_str": "Sure, here is", # Expected prefix of a successful response
     "objective": "jailbreak",    # Evaluation objective
     "jailbreak_threshold": 8,    # Stop goal as soon as score >= threshold
     "early_stop_on_success": True,
@@ -165,6 +171,9 @@ advanced_config = {
 | Parameter | Description | Default | Range |
 |-----------|-------------|---------|-------|
 | `n_iterations` | Maximum iterations per goal | 20 | 1-100 |
+| `n_streams` | Independent PAIR attacker conversations explored per goal | 5 | 1+ |
+| `keep_last_n` | Latest attacker/feedback turn pairs retained in each stream history | 4 | 1+ |
+| `target_str` | Expected prefix of a successful target response | `"Sure, here is"` | String |
 | `temperature` | Attacker creativity (higher = more varied) | 1.0 | 0.0-2.0 |
 | `max_tokens` | Max tokens for attacker response | 500 | 100-2000 |
 | `objective` | Evaluation criteria | `"jailbreak"` | See objectives |
