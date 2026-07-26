@@ -1862,8 +1862,10 @@ class AttackOrchestrator:
                     # (setting is_success/best_score per row) rather than via
                     # a separate judge pass, so it only needs the shared
                     # post-processing (default-filling + sync/ASR logging).
-                    final_results = evaluator._postprocess_inline_judge_results(
-                        normalized_results, attack_label="PAIR"
+                    final_results = flatten_run_result(
+                        evaluator._postprocess_inline_judge_results(
+                            normalized_results, attack_label="PAIR"
+                        )
                     )
                     evaluator.prepare_and_sync(final_results, run_id)
                     logger.info("PAIR judge evaluation pipeline completed")
@@ -1881,7 +1883,9 @@ class AttackOrchestrator:
                     )
 
                     # Run evaluation pipeline
-                    final_results = evaluator.run_full_evaluation(normalized_results)
+                    final_results = flatten_run_result(
+                        evaluator.run_full_evaluation(normalized_results)
+                    )
 
                     # Sync metrics to backend
                     evaluator.prepare_and_sync(final_results, run_id)

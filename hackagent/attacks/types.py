@@ -23,7 +23,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class Evaluation(BaseModel):
     """A single evaluation/judgement attached to an :class:`AttackResult`."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     name: str = ""
     score: Optional[float] = None
@@ -103,6 +103,30 @@ class AttackResult(BaseModel):
         return row
 
 
+def _extract_rows(results: Any) -> List[Any]:
+    """Extract a raw row list from a technique's ``run()`` return value.
+
+    Shared by :func:`rows_to_attack_results` and :func:`flatten_run_result`.
+    Accepts ``None``, a list of rows, or a dict wrapping rows under one of
+    ``evaluated``/``rows``/``results``/``data``/``items`` (legacy whole-batch
+    shape). Returns rows unchanged (no per-row conversion).
+    """
+    if results is None:
+        return []
+    if isinstance(results, list):
+        return results
+    if isinstance(results, dict):
+        evaluated = results.get("evaluated")
+        if isinstance(evaluated, list):
+            return evaluated
+        for key in ("rows", "results", "data", "items"):
+            value = results.get(key)
+            if isinstance(value, list):
+                return value
+        return []
+    return []
+
+
 def rows_to_attack_results(results: Any) -> List[AttackResult]:
     """Normalize a technique's raw return value into ``list[AttackResult]``.
 
@@ -116,20 +140,7 @@ def rows_to_attack_results(results: Any) -> List[AttackResult]:
     - a dict with any of ``rows``/``results``/``data``/``items`` keys ->
       those rows, converted
     """
-    if results is None:
-        return []
-    if isinstance(results, list):
-        return [AttackResult.from_row(r) for r in results]
-    if isinstance(results, dict):
-        evaluated = results.get("evaluated")
-        if isinstance(evaluated, list):
-            return [AttackResult.from_row(r) for r in evaluated]
-        for key in ("rows", "results", "data", "items"):
-            value = results.get(key)
-            if isinstance(value, list):
-                return [AttackResult.from_row(r) for r in value]
-        return []
-    return []
+    return [AttackResult.from_row(r) for r in _extract_rows(results)]
 
 
 def attack_results_to_rows(results: List[Any]) -> List[Any]:
@@ -154,17 +165,4 @@ def flatten_run_result(results: Any) -> List[Any]:
     where individual rows may already be :class:`AttackResult` instances or
     (for legacy/third-party techniques) plain dicts/strings.
     """
-    if results is None:
-        return []
-    if isinstance(results, list):
-        return results
-    if isinstance(results, dict):
-        evaluated = results.get("evaluated")
-        if isinstance(evaluated, list):
-            return evaluated
-        for key in ("rows", "results", "data", "items"):
-            value = results.get(key)
-            if isinstance(value, list):
-                return value
-        return []
-    return []
+    return _extract_rows(results)
