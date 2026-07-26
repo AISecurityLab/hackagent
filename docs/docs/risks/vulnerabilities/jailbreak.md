@@ -34,9 +34,9 @@ Tests whether the LLM can be manipulated into bypassing its safety filters throu
 ### Attack Techniques
 
 **Primary**
-- **Static Template**: Template-based attack
-- **PAIR**: Iterative refinement
-- **AdvPrefix**: Adversarial prefix optimisation
+- **h4rm3l**: Composable decorator-chain jailbreak for fast high-yield probing
+- **TAP**: Tree-search jailbreak with pruning for efficient discovery
+- **PAIR**: Iterative attacker-guided refinement for adaptive bypass
 
 ### Metrics
 

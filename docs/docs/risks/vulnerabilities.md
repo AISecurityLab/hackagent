@@ -8,8 +8,6 @@ title: Vulnerabilities
 
 HackAgent ships with **13 built-in vulnerability classes** covering the input, model, data, and agent layers of an AI system. Each one extends `BaseVulnerability` (`hackagent.risks.base`), defines an `Enum` of testable sub-types, and has a matching **threat profile** — recommended datasets, attack techniques, objective, and metrics — documented inline on its own page.
 
-See [Vulnerability Categories](./risk-categories.mdx) for how these 13 classes map onto attack-surface layers.
-
 ## Reference
 
 | Vulnerability | Description |

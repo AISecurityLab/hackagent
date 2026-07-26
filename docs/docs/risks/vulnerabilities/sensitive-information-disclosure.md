@@ -62,11 +62,15 @@ from hackagent.risks.sensitive_information_disclosure import SENSITIVE_INFORMATI
 
 agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 
+# Profile techniques use display casing (e.g. "StaticTemplate");
+# HackAgent.hack() expects the registered snake_case attack_type key.
+ATTACK_TYPE_KEYS = {"StaticTemplate": "static_template", "PAIR": "pair"}
+
 # Use profile recommendations
 for attack in SENSITIVE_INFORMATION_DISCLOSURE_PROFILE.primary_attacks:
     for dataset in SENSITIVE_INFORMATION_DISCLOSURE_PROFILE.primary_datasets + SENSITIVE_INFORMATION_DISCLOSURE_PROFILE.secondary_datasets:
         attack_config = {
-            "attack_type": attack.technique.lower(),
+            "attack_type": ATTACK_TYPE_KEYS[attack.technique],
             "objective": SENSITIVE_INFORMATION_DISCLOSURE_PROFILE.objective,
             "dataset": {"preset": dataset.preset},
         }

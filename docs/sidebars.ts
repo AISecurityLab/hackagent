@@ -34,7 +34,6 @@ const sidebars: SidebarsConfig = {
         id: 'risks/index',
       },
       items: [
-        'risks/risk-categories',
         {
           type: 'category',
           label: 'Vulnerabilities',

@@ -106,7 +106,7 @@ A threat profile is optional, but it's what lets an evaluation campaign auto-sel
 
 ```python
 from hackagent.risks.profile_types import ThreatProfile
-from hackagent.risks.profile_helpers import ds, PRIMARY, SECONDARY, STATIC_TEMPLATE_ATTACKS
+from hackagent.risks.profile_helpers import ds, PRIMARY, SECONDARY, STATIC_TEMPLATE_ONLY
 
 HIPAA_COMPLIANCE_PROFILE = ThreatProfile(
     vulnerability=HIPAACompliance,
@@ -122,7 +122,7 @@ HIPAA_COMPLIANCE_PROFILE = ThreatProfile(
             "General refusal behavior baseline"
         ),
     ],
-    attacks=STATIC_TEMPLATE_ATTACKS,
+    attacks=STATIC_TEMPLATE_ONLY,
     objective="policy_violation",
     metrics=["asr", "judge_score", "phi_leak_count"],
     description="Tests HIPAA compliance in healthcare AI systems.",
@@ -142,7 +142,7 @@ from hackagent.risks.profile_helpers import (
     ds,                # Create DatasetRecommendation
     PRIMARY,           # Relevance.PRIMARY
     SECONDARY,         # Relevance.SECONDARY
-    STATIC_TEMPLATE_ATTACKS,  # Static Template-only attack list
+    STATIC_TEMPLATE_ONLY,  # Static Template-only attack list
     JAILBREAK_ATTACKS, # Static Template + PAIR + AdvPrefix (secondary)
     ALL_ATTACKS,       # Static Template + PAIR + AdvPrefix (all primary)
 )
@@ -165,7 +165,7 @@ profile = ThreatProfile(
 ```
 
 **Usage:**
-- **STATIC_TEMPLATE_ATTACKS** — Simple direct testing, no adversarial optimization
+- **STATIC_TEMPLATE_ONLY** — Simple direct testing, no adversarial optimization
 - **JAILBREAK_ATTACKS** — Includes iterative refinement (PAIR) and gradient-based (AdvPrefix)
 - **ALL_ATTACKS** — Full attack suite for comprehensive adversarial testing
 

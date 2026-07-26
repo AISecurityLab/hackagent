@@ -61,7 +61,7 @@ agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 for attack in MALICIOUS_TOOL_INVOCATION_PROFILE.primary_attacks:
     for dataset in MALICIOUS_TOOL_INVOCATION_PROFILE.primary_datasets + MALICIOUS_TOOL_INVOCATION_PROFILE.secondary_datasets:
         attack_config = {
-            "attack_type": attack.technique.lower(),
+            "attack_type": "static_template",  # attack.technique is "StaticTemplate"
             "objective": MALICIOUS_TOOL_INVOCATION_PROFILE.objective,
             "dataset": {"preset": dataset.preset},
         }

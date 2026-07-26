@@ -83,11 +83,15 @@ from hackagent.risks.prompt_injection import PROMPT_INJECTION_PROFILE
 
 agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 
+# Profile techniques use display casing (e.g. "StaticTemplate");
+# HackAgent.hack() expects the registered snake_case attack_type key.
+ATTACK_TYPE_KEYS = {"StaticTemplate": "static_template", "PAIR": "pair"}
+
 # Use profile recommendations
 for attack in PROMPT_INJECTION_PROFILE.primary_attacks:
     for dataset in PROMPT_INJECTION_PROFILE.primary_datasets:
         attack_config = {
-            "attack_type": attack.technique.lower(),
+            "attack_type": ATTACK_TYPE_KEYS[attack.technique],
             "objective": PROMPT_INJECTION_PROFILE.objective,
             "dataset": {"preset": dataset.preset},
         }

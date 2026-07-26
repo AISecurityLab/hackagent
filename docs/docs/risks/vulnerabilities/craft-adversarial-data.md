@@ -61,7 +61,7 @@ agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 for attack in CRAFT_ADVERSARIAL_DATA_PROFILE.primary_attacks:
     for dataset in CRAFT_ADVERSARIAL_DATA_PROFILE.primary_datasets:
         attack_config = {
-            "attack_type": attack.technique.lower(),
+            "attack_type": "static_template",  # attack.technique is "StaticTemplate"
             "objective": CRAFT_ADVERSARIAL_DATA_PROFILE.objective,
             "dataset": {"preset": dataset.preset},
         }

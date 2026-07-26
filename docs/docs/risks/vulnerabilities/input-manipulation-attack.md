@@ -61,11 +61,15 @@ from hackagent.risks.input_manipulation_attack import INPUT_MANIPULATION_ATTACK_
 
 agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 
+# Profile techniques use display casing (e.g. "StaticTemplate");
+# HackAgent.hack() expects the registered snake_case attack_type key.
+ATTACK_TYPE_KEYS = {"StaticTemplate": "static_template", "PAIR": "pair"}
+
 # Use profile recommendations
 for attack in INPUT_MANIPULATION_ATTACK_PROFILE.primary_attacks:
     for dataset in INPUT_MANIPULATION_ATTACK_PROFILE.primary_datasets + INPUT_MANIPULATION_ATTACK_PROFILE.secondary_datasets:
         attack_config = {
-            "attack_type": attack.technique.lower(),
+            "attack_type": ATTACK_TYPE_KEYS[attack.technique],
             "objective": INPUT_MANIPULATION_ATTACK_PROFILE.objective,
             "dataset": {"preset": dataset.preset},
         }
