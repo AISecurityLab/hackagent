@@ -195,7 +195,7 @@ class BaseJudgeEvaluator(ABC):
         messages: List[Dict[str, str]] = []
         system_prompt = getattr(self.config, "system_prompt", None)
         if isinstance(system_prompt, str) and system_prompt.strip():
-            messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "system", "content": system_prompt.strip()})
         messages.append({"role": "user", "content": user_content})
         return messages
 
