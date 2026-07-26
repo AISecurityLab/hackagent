@@ -245,7 +245,7 @@ class DashboardAttackBuilderMixin:
         if self._builder_log is None:
             return
         while self._builder_event_queue:
-            self._builder_log.push(self._builder_event_queue.pop(0))
+            self._builder_log.push(self._builder_event_queue.popleft())
 
     # ── Canvas mutation ───────────────────────────────────────────────────────
 
@@ -390,12 +390,27 @@ class DashboardAttackBuilderMixin:
             value=self._builder_draft_id,
         )
 
-    async def _builder_load_draft(self) -> None:
+    def _builder_selected_draft_id(self) -> Optional[str]:
+        """Selected draft id, or None after notifying why there is none."""
+        if not self._builder_backend_supports_drafts():
+            ui.notify("This backend cannot store attack drafts.", type="warning")
+            return None
         draft_id = self._builder_drafts_select and self._builder_drafts_select.value
         if not draft_id:
             ui.notify("Select a saved draft first.", type="warning")
+            return None
+        return draft_id
+
+    async def _builder_load_draft(self) -> None:
+        draft_id = self._builder_selected_draft_id()
+        if not draft_id:
             return
-        draft = await asyncio.to_thread(self.backend.get_builder_draft, draft_id)
+        try:
+            draft = await asyncio.to_thread(self.backend.get_builder_draft, draft_id)
+        except Exception as exc:
+            logger.error("Failed to open builder draft", exc_info=True)
+            ui.notify(f"Could not open draft: {exc}", type="negative")
+            return
         if not draft:
             ui.notify("That draft no longer exists.", type="warning")
             return
@@ -405,11 +420,15 @@ class DashboardAttackBuilderMixin:
         ui.notify(f"Opened draft '{draft['name']}'.", type="positive")
 
     async def _builder_delete_draft(self) -> None:
-        draft_id = self._builder_drafts_select and self._builder_drafts_select.value
+        draft_id = self._builder_selected_draft_id()
         if not draft_id:
-            ui.notify("Select a saved draft first.", type="warning")
             return
-        await asyncio.to_thread(self.backend.delete_builder_draft, draft_id)
+        try:
+            await asyncio.to_thread(self.backend.delete_builder_draft, draft_id)
+        except Exception as exc:
+            logger.error("Failed to delete builder draft", exc_info=True)
+            ui.notify(f"Could not delete draft: {exc}", type="negative")
+            return
         if self._builder_draft_id == draft_id:
             self._builder_draft_id = None
         await self._builder_refresh_drafts()

@@ -251,7 +251,10 @@ def build_run_payload(canvas: Dict[str, Any]) -> Dict[str, Any]:
         first.update(goal_section)
         payload["mode"] = "chain"
         payload["attacks"] = [first] + [dict(step) for step in steps[1:]]
-        payload["goals"] = goal_section.get("goals")
+        if "goals" in goal_section:
+            # In dataset mode the goal source stays on the first step only, so
+            # there is no explicit goal pool to hand to ``hack_chain()``.
+            payload["goals"] = goal_section["goals"]
 
     return payload
 

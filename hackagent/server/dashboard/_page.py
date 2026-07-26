@@ -29,6 +29,7 @@ here, so adding a method to any mixin makes it available as ``self.<method>``.
 
 from __future__ import annotations
 
+from collections import deque
 
 from nicegui import app as _fastapi_app
 from nicegui import ui
@@ -213,7 +214,8 @@ class DashboardPage(
         self._builder_draft_id: str | None = None
         self._builder_drag_type: str | None = None
         self._builder_running: bool = False
-        self._builder_event_queue: list[str] = []
+        # Filled from the attack worker thread, drained on the event loop.
+        self._builder_event_queue: deque[str] = deque()
         self._builder_name_input: ui.input | None = None
         self._builder_drafts_select: ui.select | None = None
         self._builder_goals_text: ui.textarea | None = None

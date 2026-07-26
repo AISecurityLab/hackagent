@@ -69,6 +69,20 @@ class TestBuildRunPayload(unittest.TestCase):
         self.assertEqual(payload["attacks"][1]["branching_factor"], 2)
         self.assertEqual(payload["goals"], ["do bad thing"])
 
+    def test_chained_dataset_mode_omits_goal_pool(self):
+        canvas = _canvas(
+            goals={
+                "mode": "dataset",
+                "goals": [],
+                "dataset": {"preset": "advbench"},
+            },
+            attacks=[{"attack_type": "pair"}, {"attack_type": "tap"}],
+        )
+        payload = build_run_payload(canvas)
+        self.assertEqual(payload["attacks"][0]["dataset"], {"preset": "advbench"})
+        self.assertNotIn("dataset", payload["attacks"][1])
+        self.assertNotIn("goals", payload)
+
     def test_params_cannot_override_block_attack_type(self):
         canvas = _canvas(
             attacks=[{"attack_type": "pair", "params": '{"attack_type": "tap"}'}]
