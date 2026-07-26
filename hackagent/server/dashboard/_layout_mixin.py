@@ -5,7 +5,7 @@
 
 Provides ``DashboardLayoutMixin``, one of the mixins composed into
 ``DashboardPage``. It owns the *static skeleton* of the page: the drawers,
-sidebar, header, the per-view panels (dashboard/agents/attacks/runs/reports)
+sidebar, the per-view panels (dashboard/agents/attacks/runs/reports)
 and the modal dialogs. It also handles theme toggling and switching between
 views.
 
@@ -16,7 +16,7 @@ on the attributes created in ``DashboardPage.__init__`` (e.g. ``self.backend``,
 ``self.all_panels``).
 
 Key entry points:
-    _build_sidebar / _build_header / _build_panels: assemble the chrome.
+    _build_sidebar / _build_panels: assemble the chrome.
     _build_*_panel: build each view's content area.
     navigate / _highlight_nav / _toggle_dark: navigation and theme state.
 """
@@ -83,6 +83,10 @@ class DashboardLayoutMixin:
                 ):
                     ui.icon("security", color="white").classes("text-base")
                 ui.label("HackAgent").classes("font-semibold text-base")
+                ui.space()
+                ui.button(icon="menu_open", on_click=lambda: sidebar.hide()).props(
+                    "flat round dense"
+                ).tooltip("Collapse sidebar")
 
             ui.separator().classes("mb-1")
 
@@ -132,6 +136,13 @@ class DashboardLayoutMixin:
             with ui.row().classes("px-3 py-3 gap-2 items-center"):
                 ui.icon("circle", size="xs").classes("text-positive text-xs")
                 ui.label("local mode").classes("text-xs text-grey-6")
+
+        # The removed top bar used to host the drawer toggle; keep a floating one
+        # so the collapsed sidebar can be re-opened. It sits below the drawer, so
+        # it is only reachable while the drawer is hidden.
+        ui.button(icon="menu", on_click=lambda: sidebar.show()).props(
+            "flat round dense"
+        ).classes("fixed top-2 left-2 z-50")
         return sidebar
 
     def _build_panels(self) -> None:
