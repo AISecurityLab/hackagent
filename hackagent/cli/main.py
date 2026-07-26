@@ -13,176 +13,34 @@ import os
 
 import click
 from rich.console import Console
-from rich.panel import Panel
 from rich.traceback import install
 
 from hackagent.cli.commands import (
-    agent,
     attack,
     claude as claude_cmd,
     codex as codex_cmd,
-    config,
     datasets as datasets_cmd,
     examples,
     results,
     scan as scan_cmd,
     web as web_cmd,
 )
+from hackagent.cli.commands import (
+    agent,
+    config,
+)
+from hackagent.cli.bootstrap import (
+    _launch_tui_default,
+    _patch_textual_terminal_queries,
+)
 from hackagent.cli.config import CLIConfig
+from hackagent.cli.help_page import _help_option_callback
 from hackagent.cli.utils import display_info, handle_errors
 
 # Install rich traceback handler for better error display
 install(show_locals=True)
 
 console = Console()
-
-
-def _patch_textual_terminal_queries() -> None:
-    """Apply compatibility patch for terminals that leak '\x1b[?2048$p' as a visible 'p'."""
-    try:
-        from textual.drivers.linux_driver import LinuxDriver
-
-        LinuxDriver._query_in_band_window_resize = lambda self: None
-    except Exception:
-        pass
-
-    try:
-        from textual.drivers.linux_inline_driver import LinuxInlineDriver
-
-        LinuxInlineDriver._query_in_band_window_resize = lambda self: None
-    except Exception:
-        pass
-
-
-def _render_rich_help(ctx: click.Context) -> None:
-    """Print the Rich-formatted help page for the main CLI group."""
-    from rich.rule import Rule
-    from rich.syntax import Syntax
-    from rich.table import Table
-    from rich.text import Text
-
-    from hackagent.utils import HACKAGENT_BANNER
-
-    c = Console()
-    version = importlib.metadata.version("hackagent")
-
-    # ── Logo ──────────────────────────────────────────────────────────────────
-    c.print(
-        Panel(
-            Text(HACKAGENT_BANNER, style="bold dark_red"),
-            border_style="red",
-            padding=(0, 2),
-            expand=False,
-        )
-    )
-    c.print(
-        f"  [bold white]HackAgent CLI[/bold white] [dim]v{version}[/dim]"
-        f"  [dim]·[/dim]  [italic cyan]AI Agent Security Testing Toolkit[/italic cyan]\n"
-    )
-
-    # ── Quick Start ───────────────────────────────────────────────────────────
-    c.print(Rule("[bold]Quick Start[/bold]", style="dim"))
-    qs_code = (
-        "# 1. Interactive first-time setup\n"
-        "hackagent init\n\n"
-        "# 2. Register a target agent\n"
-        'hackagent agent create --name "my-bot" --type google-adk \\\n'
-        "    --endpoint http://localhost:8000\n\n"
-        "# 3. Run an adversarial attack\n"
-        'hackagent eval advprefix --agent-name "my-bot" \\\n'
-        '    --goals "Ignore safety rules"\n\n'
-        "# 4. Review findings\n"
-        "hackagent results summary"
-    )
-    c.print(
-        Panel(
-            Syntax(qs_code, "bash", theme="monokai", background_color="default"),
-            border_style="dim",
-            padding=(0, 1),
-        )
-    )
-    c.print()
-
-    # ── Commands ──────────────────────────────────────────────────────────────
-    c.print(Rule("[bold]Commands[/bold]", style="dim"))
-    cmd_table = Table.grid(padding=(0, 3))
-    cmd_table.add_column(style="bold cyan", no_wrap=True, min_width=12)
-    cmd_table.add_column()
-    group: click.Group = ctx.command  # type: ignore[assignment]
-    for name in group.list_commands(ctx):
-        cmd = group.get_command(ctx, name)
-        if cmd is None:
-            continue
-        cmd_table.add_row(f"  {name}", cmd.get_short_help_str(limit=60) or "")
-    c.print(cmd_table)
-    c.print()
-
-    # ── Options ───────────────────────────────────────────────────────────────
-    c.print(Rule("[bold]Options[/bold]", style="dim"))
-    opt_table = Table.grid(padding=(0, 3))
-    opt_table.add_column(style="bold yellow", no_wrap=True, min_width=36)
-    opt_table.add_column(style="dim")
-    for param in ctx.command.params:
-        if not isinstance(param, click.Option):
-            continue
-        decls = ", ".join(param.opts)
-        if param.is_flag or param.count:  # type: ignore[union-attr]
-            meta = ""
-        elif param.metavar:
-            meta = f" {param.metavar}"
-        elif param.type is not None:
-            meta = f" {param.type.name.upper()}"
-        else:
-            meta = ""
-        opt_table.add_row(f"  {decls}{meta}", param.help or "")
-    c.print(opt_table)
-    c.print()
-
-    # ── Environment Variables ─────────────────────────────────────────────────
-    c.print(Rule("[bold]Environment Variables[/bold]", style="dim"))
-    env_table = Table.grid(padding=(0, 3))
-    env_table.add_column(style="bold magenta", no_wrap=True, min_width=24)
-    env_table.add_column(style="dim")
-    env_table.add_row("  HACKAGENT_API_KEY", "API key (overrides config file value)")
-    env_table.add_row(
-        "  HACKAGENT_BASE_URL", "API base URL (default: https://api.hackagent.dev)"
-    )
-    env_table.add_row(
-        "  HACKAGENT_DEBUG", "Enable debug output (set to any non-empty value)"
-    )
-    c.print(env_table)
-    c.print()
-
-    # ── Operating Modes ───────────────────────────────────────────────────────
-    c.print(Rule("[bold]Operating Modes[/bold]", style="dim"))
-    mode_table = Table.grid(padding=(0, 3))
-    mode_table.add_column(no_wrap=True, min_width=10)
-    mode_table.add_column(style="dim")
-    mode_table.add_row(
-        "  [bold green]Local[/bold green]",
-        "No API key needed — results stored in local SQLite database",
-    )
-    mode_table.add_row(
-        "  [bold cyan]Cloud[/bold cyan]",
-        "With HACKAGENT_API_KEY — results synced to HackAgent cloud",
-    )
-    c.print(mode_table)
-    c.print()
-
-    # ── Footer ────────────────────────────────────────────────────────────────
-    c.print(Rule(style="dim"))
-    c.print(
-        "  [dim]Docs[/dim]  [link=https://docs.hackagent.dev]https://docs.hackagent.dev[/link]"
-        "    [dim]API Keys[/dim]  [link=https://app.hackagent.dev]https://app.hackagent.dev[/link]\n"
-    )
-
-
-def _help_option_callback(
-    ctx: click.Context, param: click.Parameter, value: bool
-) -> None:
-    if value and not ctx.resilient_parsing:
-        _render_rich_help(ctx)
-        ctx.exit()
 
 
 @click.group(invoke_without_command=True, add_help_option=False)
@@ -547,77 +405,6 @@ def doctor(ctx):
         console.print("  hackagent --help        # Show all commands")
 
 
-def _launch_tui_default(ctx):
-    """Launch TUI by default when no subcommand is provided"""
-    cli_config: CLIConfig = ctx.obj["config"]
-
-    try:
-        # Try to validate configuration
-        cli_config.validate()
-    except ValueError:
-        # If validation fails, show welcome message instead
-        console.print("[yellow]⚠️ Configuration not complete.[/yellow]")
-        console.print()
-        _display_welcome()
-        console.print()
-        console.print(
-            "[cyan]Run '[bold]hackagent init[/bold]' to get started, or '[bold]hackagent --help[/bold]' for more options.[/cyan]"
-        )
-        return
-
-    try:
-        from hackagent.cli.tui import HackAgentTUI
-
-        # Launch TUI
-        _patch_textual_terminal_queries()
-        app = HackAgentTUI(cli_config)
-        app.run()
-
-    except ImportError:
-        console.print("[bold red]❌ TUI dependencies not installed[/bold red]")
-        console.print("\n[cyan]💡 Install with:[/cyan]")
-        console.print("  uv add textual")
-        console.print("  # or")
-        console.print("  pip install textual")
-        ctx.exit(1)
-    except Exception as e:
-        console.print(f"[bold red]❌ TUI failed to start: {e}[/bold red]")
-        console.print("\n[cyan]You can still use CLI commands:[/cyan]")
-        console.print("  hackagent --help")
-        ctx.exit(1)
-
-
-def _display_welcome():
-    """Display welcome message and basic usage info"""
-
-    # Display HackAgent splash
-    from hackagent.utils import display_hackagent_splash
-
-    display_hackagent_splash()
-
-    welcome_text = """[bold cyan]Welcome to HackAgent CLI![/bold cyan] 🔍
-
-[green]A powerful toolkit for testing AI agent security through automated attacks.[/green]
-
-[bold yellow]🚀 Getting Started:[/bold yellow]
-  1. Configure preferences:    [cyan]hackagent init[/cyan]
-  2. Launch full-screen TUI:   [cyan]hackagent[/cyan] (default) or [cyan]hackagent tui[/cyan]
-  3. List available agents:    [cyan]hackagent agent list[/cyan]
-    4. Run security tests:       [cyan]hackagent eval advprefix --help[/cyan]
-  5. View results:             [cyan]hackagent results list[/cyan]
-  6. Open web dashboard:       [cyan]hackagent web[/cyan]
-
-[bold blue]💡 Need help?[/bold blue] Use '[cyan]hackagent --help[/cyan]' or '[cyan]hackagent COMMAND --help[/cyan]'"""
-
-    panel = Panel(
-        welcome_text, title="🔍 HackAgent CLI", border_style="red", padding=(1, 2)
-    )
-    console.print(panel)
-
-
-# Add command groups
-cli.add_command(config.config)
-cli.add_command(agent.agent)
 cli.add_command(attack.eval_cmd)
 cli.add_command(scan_cmd.scan)
 cli.add_command(claude_cmd.claude)
@@ -630,3 +417,8 @@ cli.add_command(web_cmd.web)
 
 if __name__ == "__main__":
     cli()
+
+
+# Add command groups
+cli.add_command(config.config)
+cli.add_command(agent.agent)
