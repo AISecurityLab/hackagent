@@ -77,6 +77,21 @@ class TestStrategySelectionDefaults:
             )
 
     @pytest.mark.asyncio
+    async def test_escalate_toggle_defaults_to_enabled(self, cli_config):
+        """The initial checkbox state matches the library default and the
+        state ``_clear_form`` resets to."""
+
+        class TestApp(App):
+            def compose(self):
+                yield AttacksTab(cli_config)
+
+        app = TestApp()
+        async with app.run_test() as pilot:
+            tab = app.query_one(AttacksTab)
+            await pilot.pause()
+            assert tab.query_one("#escalate-only-mitigated", Checkbox).value is True
+
+    @pytest.mark.asyncio
     async def test_escalate_toggle_hidden_with_single_selection(self, cli_config):
         class TestApp(App):
             def compose(self):
