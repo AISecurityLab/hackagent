@@ -55,7 +55,7 @@ class TestStaticTemplateAttack(unittest.TestCase):
             client=MagicMock(),
             agent_router=MagicMock(),
         )
-        self.assertEqual(attack.run([]), {"evaluated": [], "summary": []})
+        self.assertEqual(attack.run([]), [])
 
     @patch("hackagent.attacks.techniques.static_template.attack.evaluation.execute")
     @patch("hackagent.attacks.techniques.static_template.attack.generation.execute")
@@ -83,8 +83,9 @@ class TestStaticTemplateAttack(unittest.TestCase):
         with patch.object(attack, "_initialize_coordinator", side_effect=_init_coord):
             out = attack.run(["g1"])
 
-        self.assertIn("evaluated", out)
-        self.assertIn("summary", out)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0].goal, "g1")
+        self.assertTrue(out[0].metadata.get("success"))
         mock_generation.assert_called_once()
         mock_evaluation.assert_called_once()
 

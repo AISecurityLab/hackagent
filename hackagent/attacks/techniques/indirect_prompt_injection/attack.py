@@ -27,6 +27,7 @@ import faiss
 import numpy as np
 
 from hackagent.attacks.techniques.base import BaseAttack
+from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.attacks.shared.router_factory import create_router
 from hackagent.attacks.shared.response_utils import extract_response_content
 from hackagent.router.router import AgentRouter
@@ -359,7 +360,7 @@ class IndirectPromptInjectionAttack(BaseAttack):
         params = self.config.get("rag_injection_params", {})
         return params if isinstance(params, dict) else {}
 
-    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[Dict[str, Any]]:
+    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
         """
         Execute the indirect prompt injection attack.
 
@@ -459,7 +460,7 @@ class IndirectPromptInjectionAttack(BaseAttack):
         if not self.config.get("_suppress_run_status_updates", False):
             coordinator.finalize_pipeline(all_results)
 
-        return all_results
+        return rows_to_attack_results(all_results)
 
     def _run_single_goal(
         self,

@@ -24,6 +24,7 @@ from contextlib import nullcontext
 from typing import Any, Dict, List, Optional
 
 from hackagent.attacks.techniques.base import BaseAttack
+from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.attacks.techniques.autodan_turbo.core import score_response
 from hackagent.attacks.techniques.config import (
     DEFAULT_ATTACKER_IDENTIFIER,
@@ -1186,7 +1187,7 @@ class PAIRAttack(BaseAttack):
         }
 
     @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
-    def run(self, goals: List[str]) -> List[Dict[str, Any]]:
+    def run(self, goals: List[str]) -> List[AttackResult]:
         """
         Execute PAIR attack on goals.
 
@@ -1327,7 +1328,7 @@ class PAIRAttack(BaseAttack):
             # Log summary via coordinator
             coordinator.log_summary()
 
-            return results
+            return rows_to_attack_results(results)
 
         except Exception as e:
             self.logger.error(f"PAIR attack failed: {e}", exc_info=True)

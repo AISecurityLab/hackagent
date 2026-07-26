@@ -9,6 +9,7 @@ from typing import Any, Dict, List
 
 from hackagent.attacks.shared.tui import with_tui_logging
 from hackagent.attacks.techniques.base import BaseAttack
+from hackagent.attacks.types import AttackResult, rows_to_attack_results
 
 from . import autodan_eval as evaluation, lifelong, warm_up
 from .config import DEFAULT_AUTODAN_TURBO_CONFIG, AutoDANTurboConfig
@@ -152,7 +153,7 @@ class AutoDANTurboAttack(BaseAttack):
         return []  # Managed manually in run() (like PAIR)
 
     @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
-    def run(self, goals: List[str]) -> List[Dict[str, Any]]:
+    def run(self, goals: List[str]) -> List[AttackResult]:
         """Execute full AutoDAN-Turbo pipeline.
 
         Pipeline mapping to paper/integration:
@@ -379,7 +380,7 @@ class AutoDANTurboAttack(BaseAttack):
             os.makedirs(output_dir, exist_ok=True)
             strategy_lib.save(f"{output_dir}/strategy_library")
 
-            return results
+            return rows_to_attack_results(results)
 
         except Exception:
             coordinator.finalize_on_error("AutoDAN-Turbo failed")

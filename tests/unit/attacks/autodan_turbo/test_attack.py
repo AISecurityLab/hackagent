@@ -134,6 +134,10 @@ class TestAutoDANTurboAttack(unittest.TestCase):
         out = attack.run(["g"])
 
         self.assertEqual(len(out), 1)
+        from hackagent.attacks.types import AttackResult
+
+        self.assertIsInstance(out[0], AttackResult)
+        self.assertEqual(out[0].goal, "g")
         self.assertEqual(mock_warm_up.call_count, 1)
         self.assertEqual(mock_lifelong.call_count, 1)
         self.assertEqual(mock_eval.call_count, 1)

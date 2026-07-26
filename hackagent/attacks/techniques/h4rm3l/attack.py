@@ -25,6 +25,7 @@ from typing import Any, Dict, List, Optional
 from hackagent.server.client import AuthenticatedClient
 from hackagent.router.router import AgentRouter
 from hackagent.attacks.techniques.base import BaseAttack
+from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.attacks.shared.tui import with_tui_logging
 
 from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
@@ -242,7 +243,7 @@ class H4rm3lAttack(BaseAttack):
         ]
 
     @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
-    def run(self, goals: List[str]) -> List[Dict]:
+    def run(self, goals: List[str]) -> List[AttackResult]:
         """
         Execute the full h4rm3l attack pipeline.
 
@@ -301,7 +302,7 @@ class H4rm3lAttack(BaseAttack):
             coordinator.log_summary()
             coordinator.finalize_pipeline(results)
 
-            return results if results is not None else []
+            return rows_to_attack_results(results)
 
         except Exception:
             coordinator.finalize_on_error("h4rm3l pipeline failed with exception")

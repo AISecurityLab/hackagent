@@ -55,6 +55,11 @@ from hackagent.attacks.techniques.config import (
     DEFAULT_REMOTE_ROLE_ENDPOINT,
 )
 from hackagent.server.storage.enums import StatusEnum
+from hackagent.attacks.types import (
+    AttackResult,
+    attack_results_to_rows,
+    flatten_run_result,
+)
 
 if TYPE_CHECKING:
     from hackagent.agent import HackAgent
@@ -1431,24 +1436,6 @@ class AttackOrchestrator:
             "agent_router": agent_router,
         }
 
-    @staticmethod
-    def _normalize_attack_results(results: Any) -> List[Dict[str, Any]]:
-        """Normalize heterogeneous attack outputs into a list of row dicts."""
-        if results is None:
-            return []
-        if isinstance(results, list):
-            return results
-        if isinstance(results, dict):
-            evaluated = results.get("evaluated")
-            if isinstance(evaluated, list):
-                return evaluated
-            for key in ("rows", "results", "data", "items"):
-                value = results.get(key)
-                if isinstance(value, list):
-                    return value
-            return []
-        return []
-
     def _execute_local_attack(
         self,
         attack_id: str,
@@ -1456,7 +1443,7 @@ class AttackOrchestrator:
         attack_params: Dict[str, Any],
         attack_config: Dict[str, Any],
         run_config_override: Optional[Dict[str, Any]],
-    ) -> Any:
+    ) -> List[AttackResult]:
         """
         Execute attack locally using technique implementation.
 
@@ -1543,7 +1530,7 @@ class AttackOrchestrator:
                     f"goal_batch_workers={goal_batch_workers} (parallel goals per batch)"
                 )
 
-                all_results: List[Dict[str, Any]] = []
+                all_results: List[AttackResult] = []
                 batch_timings: List[float] = []
 
                 for batch_idx, (batch_start_idx, batch_goals) in enumerate(batches):
@@ -1559,11 +1546,7 @@ class AttackOrchestrator:
                         # Global run status is finalized once in execute().
                         attack_impl.config["_suppress_run_status_updates"] = True
                         batch_params = {**attack_params, "goals": batch_goals}
-                        # attack_impl.run() may return a dict (e.g. baseline's
-                        # {"evaluated": [...], "summary": [...]}) rather than a
-                        # flat row list — normalize before aggregating, otherwise
-                        # extend() below would iterate the dict's *keys*.
-                        batch_results = self._normalize_attack_results(
+                        batch_results = flatten_run_result(
                             attack_impl.run(**batch_params)
                         )
                     else:
@@ -1574,7 +1557,7 @@ class AttackOrchestrator:
                             goal_idx_goal: Tuple[int, str],
                             _batch_label: str = batch_label,
                             _batch_start_idx: int = batch_start_idx,
-                        ) -> Tuple[int, List[Dict[str, Any]]]:
+                        ) -> Tuple[int, List[AttackResult]]:
                             goal_idx, goal = goal_idx_goal
 
                             # Label thread for _BatchContextFilter
@@ -1597,16 +1580,14 @@ class AttackOrchestrator:
                             }
                             local_impl = self.attack_impl_class(**local_impl_kwargs)
                             goal_params = {**attack_params, "goals": [goal]}
-                            # Normalize here too — same dict-vs-list return shape
-                            # concern as the sequential path above.
-                            goal_results = self._normalize_attack_results(
+                            goal_results = flatten_run_result(
                                 local_impl.run(**goal_params)
                             )
 
                             logger.info(f"Goal done ({len(goal_results)} results)")
                             return goal_idx, goal_results
 
-                        per_goal_results: Dict[int, List[Dict[str, Any]]] = {}
+                        per_goal_results: Dict[int, List[AttackResult]] = {}
 
                         # Install a LogRecordFactory so *all* log records,
                         # regardless of logger/handler routing, get the batch
@@ -1660,7 +1641,7 @@ class AttackOrchestrator:
                 )
                 return all_results
 
-            results = attack_impl.run(**attack_params)
+            results = flatten_run_result(attack_impl.run(**attack_params))
             logger.info(f"{self.attack_type} attack completed")
             return results
         finally:
@@ -1848,7 +1829,7 @@ class AttackOrchestrator:
                 attack_config=attack_config,
                 run_config_override=effective_run_config,
             )
-            normalized_results = self._normalize_attack_results(results)
+            normalized_results = attack_results_to_rows(results)
 
             # =========================
             # RUN EVALUATION PIPELINE
@@ -1884,7 +1865,6 @@ class AttackOrchestrator:
                     final_results = evaluator._postprocess_inline_judge_results(
                         normalized_results, attack_label="PAIR"
                     )
-                    final_results = self._normalize_attack_results(final_results)
                     evaluator.prepare_and_sync(final_results, run_id)
                     logger.info("PAIR judge evaluation pipeline completed")
                 else:
@@ -1902,7 +1882,6 @@ class AttackOrchestrator:
 
                     # Run evaluation pipeline
                     final_results = evaluator.run_full_evaluation(normalized_results)
-                    final_results = self._normalize_attack_results(final_results)
 
                     # Sync metrics to backend
                     evaluator.prepare_and_sync(final_results, run_id)
@@ -1911,7 +1890,7 @@ class AttackOrchestrator:
 
             except Exception as e:
                 logger.warning(f"Evaluation failed: {e}", exc_info=True)
-                final_results = results  # fallback
+                final_results = normalized_results  # fallback
                 if _tui_event_bus is not None:
                     _tui_event_bus.emit(
                         "step_ended",

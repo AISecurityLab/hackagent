@@ -276,18 +276,18 @@ class TestRagAttackEndToEnd(unittest.TestCase):
     def test_run_inline_context_override(self):
         results = self._run_with_strategy("inline_context_override")
         self.assertEqual(len(results), 1)
-        self.assertIn("metrics", results[0])
-        self.assertIn("asr", results[0]["metrics"])
+        self.assertIn("metrics", results[0].metadata)
+        self.assertIn("asr", results[0].metadata["metrics"])
 
     def test_run_append_hidden_directive(self):
         results = self._run_with_strategy("append_hidden_directive")
         self.assertEqual(len(results), 1)
-        self.assertGreaterEqual(results[0]["documents_poisoned"], 1)
+        self.assertGreaterEqual(results[0].metadata["documents_poisoned"], 1)
 
     def test_run_maximize_retrieval(self):
         results = self._run_with_strategy("maximize_retrieval")
         self.assertEqual(len(results), 1)
-        self.assertTrue(results[0]["evaluations"])
+        self.assertTrue(results[0].evaluations)
 
     def test_run_manual_queries_vulnerable_mode(self):
         results = self._run_with_strategy(

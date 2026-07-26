@@ -19,7 +19,7 @@ from hackagent.server.api.models import EvaluationStatusEnum
 
 
 # ============================================================================
-# 1. Orchestrator: _normalize_attack_results
+# 1. attacks.types: rows_to_attack_results / attack_results_to_rows
 # ============================================================================
 
 
@@ -27,31 +27,48 @@ class TestNormalizeAttackResults(unittest.TestCase):
     """Test that dict-style results from static template are normalised to a list."""
 
     def test_list_passthrough(self):
-        from hackagent.attacks.orchestrator import AttackOrchestrator
+        from hackagent.attacks.types import rows_to_attack_results
 
         data = [{"goal": "g1", "completion": "c1"}]
-        self.assertIs(AttackOrchestrator._normalize_attack_results(data), data)
+        result = rows_to_attack_results(data)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].goal, "g1")
+        self.assertEqual(result[0].response, "c1")
 
     def test_dict_extracts_evaluated(self):
-        from hackagent.attacks.orchestrator import AttackOrchestrator
+        from hackagent.attacks.types import rows_to_attack_results
 
         evaluated = [{"goal": "g1", "completion": "c1"}]
-        result = AttackOrchestrator._normalize_attack_results(
+        result = rows_to_attack_results(
             {"evaluated": evaluated, "summary": [{"rate": 0.5}]}
         )
-        self.assertIs(result, evaluated)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].goal, "g1")
 
     def test_none_returns_empty(self):
-        from hackagent.attacks.orchestrator import AttackOrchestrator
+        from hackagent.attacks.types import rows_to_attack_results
 
-        self.assertEqual(AttackOrchestrator._normalize_attack_results(None), [])
+        self.assertEqual(rows_to_attack_results(None), [])
 
     def test_dict_without_evaluated_falls_back(self):
-        from hackagent.attacks.orchestrator import AttackOrchestrator
+        from hackagent.attacks.types import rows_to_attack_results
 
         rows = [{"goal": "g1"}]
-        result = AttackOrchestrator._normalize_attack_results({"rows": rows})
-        self.assertEqual(result, rows)
+        result = rows_to_attack_results({"rows": rows})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].goal, "g1")
+
+    def test_round_trip_to_row(self):
+        from hackagent.attacks.types import (
+            attack_results_to_rows,
+            rows_to_attack_results,
+        )
+
+        rows = [{"goal": "g1", "completion": "c1", "extra": "x"}]
+        results = rows_to_attack_results(rows)
+        round_tripped = attack_results_to_rows(results)
+        self.assertEqual(round_tripped[0]["goal"], "g1")
+        self.assertEqual(round_tripped[0]["extra"], "x")
 
 
 # ============================================================================

@@ -24,6 +24,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from hackagent.attacks.techniques.base import BaseAttack
+from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.attacks.shared.tui import with_tui_logging
 from hackagent.attacks.techniques.config import DEFAULT_JUDGE_IDENTIFIER
 from hackagent.router.router import AgentRouter
@@ -250,7 +251,7 @@ class FCAttack(BaseAttack):
         ]
 
     @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
-    def run(self, goals: List[str]) -> List[Dict]:
+    def run(self, goals: List[str]) -> List[AttackResult]:
         """
         Execute the full FC-Attack pipeline.
 
@@ -292,7 +293,7 @@ class FCAttack(BaseAttack):
             coordinator.log_summary()
             coordinator.finalize_pipeline(results)
 
-            return results if results is not None else []
+            return rows_to_attack_results(results)
 
         except Exception:
             coordinator.finalize_on_error("FC-Attack pipeline failed with exception")
@@ -426,7 +427,7 @@ class tFCAttack(BaseAttack):
         ]
 
     @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
-    def run(self, goals: List[str]) -> List[Dict]:
+    def run(self, goals: List[str]) -> List[AttackResult]:
         """
         Execute the full text-only flowchart attack pipeline.
 
@@ -469,7 +470,7 @@ class tFCAttack(BaseAttack):
             coordinator.log_summary()
             coordinator.finalize_pipeline(results)
 
-            return results if results is not None else []
+            return rows_to_attack_results(results)
 
         except Exception:
             coordinator.finalize_on_error("tFC pipeline failed with exception")
