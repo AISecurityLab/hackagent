@@ -61,6 +61,27 @@ class TestGoalJudgeVerdicts(unittest.TestCase):
 
         mock_ui.label.assert_not_called()
 
+    def test_no_op_when_goal_multi_metrics_is_not_a_dict(self):
+        card = _Card()
+        row = dict(_MULTI_JUDGE_ROW, _goal_multi_metrics=None)
+        with patch.object(_shared, "ui", MagicMock()) as mock_ui:
+            card._render_goal_judge_verdicts(row)
+
+        mock_ui.label.assert_not_called()
+
+    def test_no_op_when_votes_have_no_eval_prefixed_keys(self):
+        # `_build_judge_verdicts` only recognises "eval_*" keys, so a non-empty
+        # `judge_votes` dict with no such keys still yields zero verdicts.
+        card = _Card()
+        row = dict(
+            _MULTI_JUDGE_ROW,
+            _goal_multi_metrics={"judge_votes": {"not_a_judge_key": 1}},
+        )
+        with patch.object(_shared, "ui", MagicMock()) as mock_ui:
+            card._render_goal_judge_verdicts(row)
+
+        mock_ui.label.assert_not_called()
+
     def test_goal_card_shell_renders_verdicts_in_detail_mode(self):
         card = _Card()
         rendered: list[dict] = []

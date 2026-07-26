@@ -6,6 +6,7 @@
 import unittest
 
 from hackagent.server.dashboard._reports_mixin import DashboardReportsMixin
+from hackagent.server.dashboard._runs_mixin import DashboardRunsMixin
 
 
 class _FakeClasses(list):
@@ -29,7 +30,7 @@ class _FakeElement:
         return self
 
 
-class _FakePage(DashboardReportsMixin):
+class _FakePage(DashboardRunsMixin, DashboardReportsMixin):
     def __init__(self) -> None:
         self.current_view = {"value": "dashboard"}
         self.navigated: list[str] = []
@@ -90,3 +91,23 @@ class TestRunsSidePanel(unittest.TestCase):
 
         self.assertIn("width: 68%", page._runs_side_panel.style_value)
         self.assertIn("w-[32%]", page._runs_left_col.classes)
+
+    def test_close_compare_panel_collapses_side_panel_when_runs_panel_hidden(self):
+        page = _FakePage()
+        page._compare_bottom_panel.classes(remove="hidden")
+
+        page._close_compare_panel()
+
+        self.assertIn("hidden", page._compare_bottom_panel.classes)
+        self.assertIn("width: 0", page._runs_side_panel.style_value)
+        self.assertIn("w-full", page._runs_left_col.classes)
+
+    def test_close_compare_panel_keeps_side_panel_open_while_runs_panel_visible(self):
+        page = _FakePage()
+        page._compare_bottom_panel.classes(remove="hidden")
+        page._runs_bottom_panel.classes(remove="hidden")
+
+        page._close_compare_panel()
+
+        self.assertIn("hidden", page._compare_bottom_panel.classes)
+        self.assertNotIn("width: 0", page._runs_side_panel.style_value)
