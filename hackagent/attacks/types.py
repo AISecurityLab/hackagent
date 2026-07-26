@@ -32,6 +32,28 @@ class Evaluation(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
+def _evaluation_to_row(evaluation: Evaluation) -> Dict[str, Any]:
+    """Convert an :class:`Evaluation` back into a plain dict.
+
+    If the evaluation only carries opaque ``metadata`` (all other fields at
+    their defaults) -- as produced by :meth:`AttackResult.from_row` for
+    legacy/technique-specific evaluation shapes that don't match the
+    ``Evaluation`` schema (e.g. ``{"classification": "SUCCESS"}``) -- the
+    original metadata dict is returned as-is so round-tripping through
+    :meth:`AttackResult.to_row` doesn't nest the original keys under a
+    ``"metadata"`` key.
+    """
+    if (
+        evaluation.name == ""
+        and evaluation.score is None
+        and evaluation.success is None
+        and evaluation.notes == ""
+        and evaluation.metadata
+    ):
+        return dict(evaluation.metadata)
+    return evaluation.model_dump()
+
+
 class AttackResult(BaseModel):
     """Typed, immutable representation of a single attack technique output row.
 
@@ -99,7 +121,7 @@ class AttackResult(BaseModel):
         row["prompt"] = self.prompt
         row["response"] = self.response
         if self.evaluations:
-            row["evaluations"] = [e.model_dump() for e in self.evaluations]
+            row["evaluations"] = [_evaluation_to_row(e) for e in self.evaluations]
         return row
 
 

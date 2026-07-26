@@ -70,6 +70,30 @@ class TestNormalizeAttackResults(unittest.TestCase):
         self.assertEqual(round_tripped[0]["goal"], "g1")
         self.assertEqual(round_tripped[0]["extra"], "x")
 
+    def test_round_trip_opaque_evaluation_shape(self):
+        """Legacy evaluation shapes (e.g. RAG/indirect-prompt-injection's
+        ``{"classification": "SUCCESS"}``) that don't match the ``Evaluation``
+        schema must round-trip back to their original flat shape rather than
+        being nested under a ``"metadata"`` key.
+        """
+        from hackagent.attacks.types import (
+            attack_results_to_rows,
+            rows_to_attack_results,
+        )
+
+        rows = [
+            {
+                "goal": "g1",
+                "evaluations": [{"classification": "SUCCESS", "rationale": "ok"}],
+            }
+        ]
+        results = rows_to_attack_results(rows)
+        round_tripped = attack_results_to_rows(results)
+        self.assertEqual(
+            round_tripped[0]["evaluations"][0]["classification"], "SUCCESS"
+        )
+        self.assertEqual(round_tripped[0]["evaluations"][0]["rationale"], "ok")
+
 
 # ============================================================================
 # 2. BaseEvaluationStep: error-row detection
