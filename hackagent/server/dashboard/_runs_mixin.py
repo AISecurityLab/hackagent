@@ -955,6 +955,7 @@ class DashboardRunsMixin:
                             ).classes("text-xs text-grey-5 italic")
 
         self._compare_bottom_panel.classes(remove="hidden")
+        self._expand_runs_side_panel()
 
     async def _download_echart_svg(self, chart, filename: str) -> None:
         """Download an EChart as SVG via run_chart_method."""
@@ -980,6 +981,11 @@ class DashboardRunsMixin:
             ui.notify(f"Export failed: {exc}", type="negative")
 
     def _close_compare_panel(self) -> None:
-        """Hide the compare bottom panel."""
+        """Hide the compare side panel."""
         if self._compare_bottom_panel is not None:
             self._compare_bottom_panel.classes(add="hidden")
+        if (
+            self._runs_bottom_panel is None
+            or "hidden" in self._runs_bottom_panel.classes
+        ):
+            self._collapse_runs_side_panel()

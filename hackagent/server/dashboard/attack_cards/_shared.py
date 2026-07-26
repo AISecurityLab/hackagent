@@ -208,6 +208,57 @@ class AttackCardSharedMixin:
             )
         return verdicts
 
+    def _render_goal_judge_verdicts(self, row: dict) -> None:
+        """Render the per-goal JUDGE VERDICTS block for multi-judge runs.
+
+        Shared by every attack card so multi-judge results are visualised the
+        same way regardless of the attack technique. No-op when the run is not
+        multi-judge or no per-judge votes were recorded for the goal.
+        """
+        if not row.get("_is_multi_judge"):
+            return
+        goal_metrics = row.get("_goal_multi_metrics")
+        if not isinstance(goal_metrics, dict):
+            return
+        judge_votes = goal_metrics.get("judge_votes")
+        if not isinstance(judge_votes, dict) or not judge_votes:
+            return
+        judge_meta = goal_metrics.get("judge_meta") or getattr(
+            self, "_history_last_judge_meta", {}
+        )
+        verdicts = self._build_judge_verdicts(judge_votes, judge_meta)
+        if not verdicts:
+            return
+
+        ui.separator().classes("my-2")
+        ui.label("JUDGE VERDICTS").classes(
+            "text-[10px] text-grey-6 font-semibold uppercase tracking-wide"
+        )
+        with ui.column().classes("w-full gap-1 mt-1"):
+            for verdict in verdicts:
+                vote = int(verdict.get("vote") or 0)
+                with (
+                    ui.row()
+                    .classes("items-center gap-2 px-2 py-1 rounded")
+                    .style("background:#fef2f2" if vote > 0 else "background:#f0fdf4")
+                ):
+                    ui.icon(
+                        "dangerous" if vote > 0 else "verified_user", size="sm"
+                    ).classes("text-red-5" if vote > 0 else "text-green-6")
+                    ui.label(str(int(verdict.get("id") or 0))).classes(
+                        "text-[11px] text-grey-7 w-[28px] text-center"
+                    )
+                    ui.label(str(verdict.get("name") or "—")).classes(
+                        "text-xs font-medium w-[180px]"
+                    )
+                    ui.label(str(verdict.get("type") or "—")).classes(
+                        "text-[10px] text-grey-5 w-[120px]"
+                    )
+                    ui.badge(
+                        "JAILBREAK" if vote > 0 else "MITIGATED",
+                        color="red-4" if vote > 0 else "green-4",
+                    ).classes("text-xs")
+
     @staticmethod
     def _border_color_for_bucket(bucket: str) -> str:
         if bucket == "jailbreak":
@@ -274,6 +325,7 @@ class AttackCardSharedMixin:
                 )
             ui.separator().classes("my-2")
             yield
+            self._render_goal_judge_verdicts(row)
             if self._extract_extra_fields_from_row(row):
                 ui.separator().classes("my-2")
                 self._render_extra_fields_panel(row)
