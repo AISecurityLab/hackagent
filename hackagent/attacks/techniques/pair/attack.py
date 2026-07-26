@@ -29,6 +29,7 @@ from hackagent.attacks.techniques.autodan_turbo.core import score_response
 from hackagent.attacks.techniques.config import (
     DEFAULT_ATTACKER_IDENTIFIER,
     DEFAULT_JUDGE_IDENTIFIER,
+    DEFAULT_LOCAL_MODEL_ENDPOINT,
 )
 from hackagent.attacks.objectives import OBJECTIVES
 from hackagent.attacks.shared.progress import create_progress_bar
@@ -286,7 +287,9 @@ class PAIRAttack(BaseAttack):
                 "identifier": attacker_config.get(
                     "identifier", DEFAULT_ATTACKER_IDENTIFIER
                 ),
-                "endpoint": attacker_config.get("endpoint", "http://localhost:11434"),
+                "endpoint": attacker_config.get(
+                    "endpoint", DEFAULT_LOCAL_MODEL_ENDPOINT
+                ),
                 "agent_type": attacker_config.get("agent_type", "OLLAMA"),
                 "thinking": attacker_config.get("thinking"),
                 "max_tokens": attacker_config.get("max_tokens", 500),
@@ -335,7 +338,7 @@ class PAIRAttack(BaseAttack):
 
             router_config = {
                 "identifier": judge_config.get("identifier", DEFAULT_JUDGE_IDENTIFIER),
-                "endpoint": judge_config.get("endpoint", "http://localhost:11434"),
+                "endpoint": judge_config.get("endpoint", DEFAULT_LOCAL_MODEL_ENDPOINT),
                 "agent_type": judge_config.get("agent_type", "OLLAMA"),
                 "thinking": judge_config.get("thinking"),
                 "max_tokens": judge_config.get("max_tokens", 4096),

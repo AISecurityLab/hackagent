@@ -81,11 +81,20 @@ def track_operation(
                     input_data = extract_input(args, kwargs)
                 except Exception as e:
                     tracker.logger.warning(
-                        f"Failed to extract input data for '{step_name}': {e}"
+                        f"Failed to extract input data for '{step_name}': {e}",
+                        exc_info=True,
                     )
+                    tracker.record_failure(f"{step_name}: extract input", e)
             else:
                 # Default extraction: look for common parameter names
-                input_data = _default_extract_input(args, kwargs)
+                try:
+                    input_data = _default_extract_input(args, kwargs)
+                except Exception as e:
+                    tracker.logger.warning(
+                        f"Failed to extract input data for '{step_name}': {e}",
+                        exc_info=True,
+                    )
+                    tracker.record_failure(f"{step_name}: extract input", e)
 
             # Extract config if extractor provided
             config = None
@@ -94,8 +103,10 @@ def track_operation(
                     config = extract_config(args, kwargs)
                 except Exception as e:
                     tracker.logger.warning(
-                        f"Failed to extract config for '{step_name}': {e}"
+                        f"Failed to extract config for '{step_name}': {e}",
+                        exc_info=True,
                     )
+                    tracker.record_failure(f"{step_name}: extract config", e)
             else:
                 # Default extraction: look for 'config' parameter
                 config = kwargs.get("config")
@@ -136,10 +147,7 @@ def _default_extract_input(args: tuple, kwargs: dict) -> Optional[Dict[str, Any]
             value = kwargs[key]
             if hasattr(value, "head"):
                 # It's a DataFrame-like object
-                try:
-                    return {"input_sample": value.head().to_dict()}
-                except Exception:
-                    pass
+                return {"input_sample": value.head().to_dict()}
 
     # Try to get list inputs
     for key in ["goals", "targets", "inputs"]:
@@ -152,10 +160,7 @@ def _default_extract_input(args: tuple, kwargs: dict) -> Optional[Dict[str, Any]
 
     # Try first positional argument if it's a DataFrame
     if args and hasattr(args[0], "head"):
-        try:
-            return {"input_sample": args[0].head().to_dict()}
-        except Exception:
-            pass
+        return {"input_sample": args[0].head().to_dict()}
 
     return None
 
@@ -272,7 +277,15 @@ def track_method(step_name: str, step_type: str):
                 return func(self, *args, **kwargs)
 
             # Extract input data
-            input_data = _default_extract_input(args, kwargs)
+            try:
+                input_data = _default_extract_input(args, kwargs)
+            except Exception as e:
+                tracker.logger.warning(
+                    f"Failed to extract input data for '{step_name}': {e}",
+                    exc_info=True,
+                )
+                tracker.record_failure(f"{step_name}: extract input", e)
+                input_data = None
 
             # Extract config (might be in kwargs or self.config)
             config = kwargs.get("config") or getattr(self, "config", None)

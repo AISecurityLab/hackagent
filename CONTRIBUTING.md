@@ -146,6 +146,22 @@ We follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0
 
 Commit messages should be structured as follows:
 
+### Python Styleguide
+
+Audit-bearing code must never silently swallow an exception. This includes
+run/result/trace persistence, router dispatch, orchestration, and evaluator
+code that contributes to a security report.
+
+When handling an exception in these paths, use one of the following patterns:
+
+* Catch the specific exception type and recover without losing audit data.
+* Log the exception with `exc_info=True` and re-raise it.
+* Persist a structured failure containing at least
+  `{"step": ..., "status": "failed", "error": ...}` on the run or result.
+
+Do not add `except Exception: pass`, and do not turn a partially tracked or
+partially evaluated run into a successful "no findings" result.
+
 ## License
 
 By contributing to HackAgent, you agree that your contributions will be licensed under its [Apache License 2.0](LICENSE).

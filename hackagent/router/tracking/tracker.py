@@ -36,6 +36,7 @@ from .category_classifier import (
     UNKNOWN_CATEGORY,
     UNKNOWN_SUBCATEGORY,
 )
+from .audit import record_run_audit_failure
 from .utils import deep_clean, sanitize_for_json
 
 
@@ -173,6 +174,16 @@ class Tracker:
             )
         self._goal_contexts: Dict[int, Context] = {}
 
+    def _record_failure(self, step: str, error: BaseException) -> Dict[str, str]:
+        """Make a goal-tracking failure visible on the run record."""
+        return record_run_audit_failure(
+            backend=self.backend,
+            run_id=self.run_id,
+            step=step,
+            error=error,
+            logger=self.logger,
+        )
+
     def _emit(self, event_type: str, **payload: Any) -> None:
         """Emit on ``event_bus`` if present; swallow any error."""
         bus = self.event_bus
@@ -287,6 +298,7 @@ class Tracker:
             self.logger.error(
                 f"Exception creating result for goal {goal_index}: {e}", exc_info=True
             )
+            self._record_failure(f"Goal {goal_index}: create result", e)
 
         self._goal_contexts[goal_index] = ctx
         self._emit(
@@ -330,7 +342,9 @@ class Tracker:
                 "Goal classification failed for goal %s: %s",
                 goal[:80],
                 e,
+                exc_info=True,
             )
+            self._record_failure(f"Goal {goal_index}: classify", e)
 
         return fallback
 
@@ -508,6 +522,7 @@ class Tracker:
                     f"Exception creating trace for goal {ctx.goal_index}: {e}",
                     exc_info=True,
                 )
+                self._record_failure(f"Goal {ctx.goal_index}: create trace", e)
 
             return None
 
@@ -558,7 +573,11 @@ class Tracker:
             except Exception as e:
                 self.logger.debug(
                     "Could not check existing evaluation status for goal "
-                    f"{ctx.goal_index}: {e}"
+                    f"{ctx.goal_index}: {e}",
+                    exc_info=True,
+                )
+                self._record_failure(
+                    f"Goal {ctx.goal_index}: read evaluation status", e
                 )
 
         ctx.is_finalized = True
@@ -640,6 +659,7 @@ class Tracker:
             self.logger.error(
                 f"Exception finalizing goal {ctx.goal_index}: {e}", exc_info=True
             )
+            self._record_failure(f"Goal {ctx.goal_index}: finalize", e)
             return False
 
     def get_goal_context(self, goal_index: int) -> Optional[Context]:

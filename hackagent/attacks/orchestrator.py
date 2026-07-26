@@ -42,6 +42,7 @@ from uuid import UUID
 import httpx
 
 from hackagent.errors import HackAgentError
+from hackagent.router.tracking.audit import record_run_audit_failure
 from hackagent.attacks.techniques.config import (
     DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE,
     DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT,
@@ -257,6 +258,7 @@ class AttackOrchestrator:
         try:
             api_key = getter()
         except Exception:
+            logger.debug("Configured API-key getter failed", exc_info=True)
             return None
 
         if isinstance(api_key, str) and api_key.strip():
@@ -461,7 +463,7 @@ class AttackOrchestrator:
             def safe_uuid(val: str) -> UUID:
                 try:
                     return UUID(val)
-                except Exception:
+                except (AttributeError, TypeError, ValueError):
                     # Log warning and fallback to a new UUID
                     logger.warning(f"Invalid UUID '{val}', generating fallback UUID")
                     return uuid4()
@@ -685,6 +687,7 @@ class AttackOrchestrator:
         try:
             installed = self._get_installed_ollama_models()
         except Exception:
+            logger.debug("Unable to inspect installed Ollama models", exc_info=True)
             return
         seen: set[str] = set()
         for model in candidates:
@@ -733,6 +736,10 @@ class AttackOrchestrator:
                 try:
                     installed_models = self._get_installed_ollama_models()
                 except Exception:
+                    logger.warning(
+                        "Unable to verify the pulled Ollama model",
+                        exc_info=True,
+                    )
                     installed_models = set()
                 pulled = self._is_ollama_model_present(required_model, installed_models)
             if not pulled:
@@ -1003,6 +1010,10 @@ class AttackOrchestrator:
                 try:
                     agent_instance = router_obj.get_agent_instance(registration_key)
                 except Exception:
+                    logger.debug(
+                        "Unable to resolve registered agent for preflight",
+                        exc_info=True,
+                    )
                     agent_instance = None
 
             model_name = (
@@ -1121,6 +1132,10 @@ class AttackOrchestrator:
         try:
             agent = router.get_agent_instance(registration_key)
         except Exception:
+            logger.debug(
+                "Unable to resolve registered agent during health check",
+                exc_info=True,
+            )
             agent = None
         probe_ready = getattr(agent, "probe_ready", None)
         if callable(probe_ready):
@@ -1491,7 +1506,9 @@ class AttackOrchestrator:
                     )
             except Exception as e:
                 logger.warning(
-                    "Failed to apply max_tokens override to target adapter: %s", e
+                    "Failed to apply max_tokens override to target adapter: %s",
+                    e,
+                    exc_info=True,
                 )
 
         # One monotonic start timestamp shared by all sub-runs/workers so
@@ -1782,7 +1799,12 @@ class AttackOrchestrator:
                 status=StatusEnum.RUNNING.value,
             )
         except Exception as e:
-            logger.warning(f"Failed to update run status to RUNNING: {e}")
+            logger.error(
+                f"Failed to update run status to RUNNING: {e}",
+                exc_info=True,
+            )
+            if fail_on_run_error:
+                raise HackAgentError(f"Failed to start audit run {run_id}: {e}") from e
 
         if goal_labels_by_index:
             attack_config = {
@@ -1834,6 +1856,7 @@ class AttackOrchestrator:
             # =========================
             # RUN EVALUATION PIPELINE
             # =========================
+            evaluation_error: Optional[Exception] = None
             try:
                 base_eval_config = {
                     **attack_config,
@@ -1893,7 +1916,15 @@ class AttackOrchestrator:
                     logger.info("Evaluation pipeline completed")
 
             except Exception as e:
-                logger.warning(f"Evaluation failed: {e}", exc_info=True)
+                evaluation_error = e
+                logger.error(f"Evaluation failed: {e}", exc_info=True)
+                record_run_audit_failure(
+                    backend=self.hackagent_agent.backend,
+                    run_id=run_id,
+                    step="Evaluation Pipeline",
+                    error=e,
+                    logger=logger,
+                )
                 final_results = normalized_results  # fallback
                 if _tui_event_bus is not None:
                     _tui_event_bus.emit(
@@ -1913,23 +1944,83 @@ class AttackOrchestrator:
             # ⏱ timing AFTER evaluation
             _total_elapsed = round(time.perf_counter() - _total_t0, 3)
             logger.info(f"Total run time: {_total_elapsed:.1f}s")
+
+            # A tracking failure may already have marked the run FAILED while
+            # the attack logic continued. Reading the run also flushes queued
+            # remote audit writes, so COMPLETED is only possible after all
+            # audit artifacts have been persisted successfully.
+            final_status = (
+                StatusEnum.FAILED
+                if evaluation_error is not None
+                else StatusEnum.COMPLETED
+            )
+            if final_status is StatusEnum.COMPLETED:
+                try:
+                    run_uuid = UUID(run_id)
+                except (AttributeError, TypeError, ValueError):
+                    # Some custom/test backends use opaque run identifiers.
+                    # Their update_run implementation remains authoritative.
+                    logger.debug(
+                        "Skipping final audit-status read for non-UUID run id %r",
+                        run_id,
+                    )
+                    run_uuid = None
+                try:
+                    if run_uuid is not None:
+                        persisted_run = self.hackagent_agent.backend.get_run(run_uuid)
+                        persisted_status = str(
+                            getattr(persisted_run, "status", "") or ""
+                        ).upper()
+                        if persisted_status == StatusEnum.FAILED.value:
+                            final_status = StatusEnum.FAILED
+                except Exception as status_error:
+                    logger.error(
+                        "Failed to verify final audit status for run %s: %s",
+                        run_id,
+                        status_error,
+                        exc_info=True,
+                    )
+                    record_run_audit_failure(
+                        backend=self.hackagent_agent.backend,
+                        run_id=run_id,
+                        step="Verify final audit status",
+                        error=status_error,
+                        logger=logger,
+                    )
+                    final_status = StatusEnum.FAILED
+
             if _tui_event_bus is not None:
                 _tui_event_bus.emit(
                     "step_ended",
                     step_name="Attack Execution",
-                    success=True,
+                    success=final_status is StatusEnum.COMPLETED,
                     elapsed_s=_total_elapsed,
+                    error=(
+                        str(evaluation_error) if evaluation_error is not None else None
+                    ),
                 )
 
-            # ✅ Update run status to COMPLETED
+            # Only trustworthy, fully evaluated runs may be marked completed.
             try:
-                logger.info(f"Updating run {run_id} status to COMPLETED")
+                logger.info(
+                    "Updating run %s status to %s",
+                    run_id,
+                    final_status.value,
+                )
                 self.hackagent_agent.backend.update_run(
                     UUID(run_id),
-                    status=StatusEnum.COMPLETED.value,
+                    status=final_status.value,
                 )
             except Exception as e:
-                logger.warning(f"Failed to update run status to COMPLETED: {e}")
+                logger.error(
+                    "Failed to update run %s status to %s: %s",
+                    run_id,
+                    final_status.value,
+                    e,
+                    exc_info=True,
+                )
+                if fail_on_run_error:
+                    raise
 
             return final_results
 
@@ -1943,7 +2034,10 @@ class AttackOrchestrator:
                     run_notes=f"Execution failed: {str(e)}",
                 )
             except Exception as update_error:
-                logger.warning(f"Failed to update run status to FAILED: {update_error}")
+                logger.critical(
+                    f"Failed to update run status to FAILED: {update_error}",
+                    exc_info=True,
+                )
             if _tui_event_bus is not None:
                 _tui_event_bus.emit(
                     "step_ended",
@@ -1960,7 +2054,17 @@ class AttackOrchestrator:
                 try:
                     flush()
                 except Exception as flush_error:  # noqa: BLE001
-                    logger.warning(f"Failed to flush backend writes: {flush_error}")
+                    logger.error(
+                        f"Failed to flush backend writes: {flush_error}",
+                        exc_info=True,
+                    )
+                    record_run_audit_failure(
+                        backend=self.hackagent_agent.backend,
+                        run_id=run_id,
+                        step="Flush audit writes",
+                        error=flush_error,
+                        logger=logger,
+                    )
 
     # ========================================================================
     # HTTP Response Helpers

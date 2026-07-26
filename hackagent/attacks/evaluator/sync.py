@@ -139,6 +139,11 @@ def update_single_result(
                 )
                 merged_metadata = {**base, **metadata_updates}
             except Exception:
+                log.warning(
+                    "Could not read existing result metadata for %s",
+                    result_id,
+                    exc_info=True,
+                )
                 merged_metadata = dict(metadata_updates)
 
         backend.update_result(
@@ -151,7 +156,7 @@ def update_single_result(
         return True
 
     except Exception as e:
-        log.error(f"Exception updating result {result_id}: {e}")
+        log.error(f"Exception updating result {result_id}: {e}", exc_info=True)
         return False
 
 

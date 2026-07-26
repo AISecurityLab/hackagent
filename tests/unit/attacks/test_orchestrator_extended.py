@@ -136,6 +136,44 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
         "_validate_required_models_availability",
         return_value=None,
     )
+    @patch.object(AttackOrchestrator, "_execute_local_attack", return_value=["result"])
+    def test_execute_preserves_preexisting_tracking_failure(
+        self, mock_exec, mock_validate_models, mock_create_atk, mock_create_run
+    ):
+        """A tracking failure must not be overwritten by final completion."""
+        orch, hack_agent, _ = _make_orchestrator()
+        hack_agent.backend.get_run.return_value.status = "FAILED"
+        attack_config = {
+            "goals": ["test"],
+            "category_classifier": {
+                "identifier": "gpt-4o-mini",
+                "agent_type": "OPENAI",
+                "endpoint": "https://api.openai.com/v1",
+            },
+        }
+
+        orch.execute(
+            attack_config=attack_config,
+            run_config_override=None,
+            fail_on_run_error=False,
+        )
+
+        self.assertEqual(
+            hack_agent.backend.update_run.call_args.kwargs["status"],
+            "FAILED",
+        )
+
+    @patch.object(
+        AttackOrchestrator, "_create_server_run_record", return_value=_VALID_RUN_ID
+    )
+    @patch.object(
+        AttackOrchestrator, "_create_server_attack_record", return_value=_VALID_ATK_ID
+    )
+    @patch.object(
+        AttackOrchestrator,
+        "_validate_required_models_availability",
+        return_value=None,
+    )
     @patch.object(
         AttackOrchestrator, "_execute_local_attack", side_effect=RuntimeError("Boom")
     )
@@ -197,6 +235,63 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
             fail_on_run_error=False,
         )
         self.assertIsNotNone(results)
+
+    @patch.object(
+        AttackOrchestrator, "_create_server_run_record", return_value=_VALID_RUN_ID
+    )
+    @patch.object(
+        AttackOrchestrator, "_create_server_attack_record", return_value=_VALID_ATK_ID
+    )
+    @patch.object(
+        AttackOrchestrator,
+        "_validate_required_models_availability",
+        return_value=None,
+    )
+    @patch.object(AttackOrchestrator, "_execute_local_attack", return_value=["result"])
+    @patch(
+        "hackagent.attacks.evaluator.evaluation_step.BaseEvaluationStep.run_full_evaluation",
+        side_effect=RuntimeError("judge unavailable"),
+    )
+    def test_evaluation_failure_is_recorded_and_run_stays_failed(
+        self,
+        mock_evaluate,
+        mock_exec,
+        mock_validate_models,
+        mock_create_atk,
+        mock_create_run,
+    ):
+        """A fallback result must not hide a failed evaluation pipeline."""
+        orch, hack_agent, _ = _make_orchestrator()
+        attack_config = {
+            "goals": ["test"],
+            "category_classifier": {
+                "identifier": "gpt-4o-mini",
+                "agent_type": "OPENAI",
+                "endpoint": "https://api.openai.com/v1",
+            },
+        }
+
+        results = orch.execute(
+            attack_config=attack_config,
+            run_config_override=None,
+            fail_on_run_error=False,
+        )
+
+        self.assertEqual(results, ["result"])
+        audit_calls = [
+            call
+            for call in hack_agent.backend.update_run.call_args_list
+            if call.kwargs.get("run_notes")
+        ]
+        self.assertEqual(len(audit_calls), 1)
+        audit_failure = json.loads(audit_calls[0].kwargs["run_notes"])["audit_failure"]
+        self.assertEqual(audit_failure["step"], "Evaluation Pipeline")
+        self.assertEqual(audit_failure["status"], "failed")
+        self.assertIn("judge unavailable", audit_failure["error"])
+        self.assertEqual(
+            hack_agent.backend.update_run.call_args.kwargs["status"],
+            "FAILED",
+        )
 
     @patch.object(
         AttackOrchestrator, "_create_server_run_record", return_value=_VALID_RUN_ID

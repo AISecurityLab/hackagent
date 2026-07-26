@@ -10,6 +10,7 @@ from typing import Any, Dict
 from pydantic import Field
 
 from hackagent.attacks.techniques.config import ConfigBase, DEFAULT_CONFIG_BASE
+from hackagent.config import DEFAULT_EMBEDDER_OPENAI_ENDPOINT
 
 
 DEFAULT_INDIRECT_PROMPT_INJECTION_CONFIG: Dict[str, Any] = {
@@ -39,7 +40,7 @@ DEFAULT_INDIRECT_PROMPT_INJECTION_CONFIG: Dict[str, Any] = {
         },
         "embedder": {
             "identifier": "nomic-embed-text",
-            "endpoint": "http://localhost:11434/v1",
+            "endpoint": DEFAULT_EMBEDDER_OPENAI_ENDPOINT,
             "api_key": None,
         },
     },
