@@ -1,0 +1,145 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+"""
+Jailbreak framing for the RAG poisoning pipeline.
+
+Reuses existing jailbreak techniques (static templates and h4rm3l decorator
+programs) to reframe the attacker goal before the poisoner LLM turns it into a
+document payload. The reframed goal is what gets embedded in poisoned
+documents; judging still uses the original goal.
+"""
+
+import logging
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+from hackagent.attacks.generator import AttackTemplates
+from hackagent.attacks.techniques.h4rm3l.config import PRESET_PROGRAMS
+from hackagent.attacks.techniques.h4rm3l.decorators import (
+    compile_program,
+    program_uses_llm_assisted_decorators,
+)
+
+SUPPORTED_JAILBREAK_TECHNIQUES = ("static_template", "h4rm3l")
+
+DEFAULT_JAILBREAK_CONFIG: Dict[str, Any] = {
+    "enabled": False,
+    "technique": "static_template",
+    # static_template options
+    "template_categories": ["role_play"],
+    # h4rm3l options
+    "program": "refusal_suppression",
+    "syntax_version": 2,
+}
+
+
+class JailbreakFramer:
+    """Applies a jailbreak transformation to a goal string.
+
+    Args:
+        technique: Name of the jailbreak technique used.
+        transform: Callable ``(goal, variant_index) -> (framed_goal, details)``.
+    """
+
+    def __init__(
+        self,
+        technique: str,
+        transform: Callable[[str, int], Tuple[str, Dict[str, Any]]],
+    ):
+        self.technique = technique
+        self._transform = transform
+
+    def apply(self, goal: str, variant_index: int = 0) -> Tuple[str, Dict[str, Any]]:
+        """Return the jailbreak-framed goal and its metadata."""
+        framed, details = self._transform(goal, variant_index)
+        metadata = {"technique": self.technique, **details}
+        return framed, metadata
+
+
+def _collect_static_templates(categories: List[str]) -> List[Tuple[str, str]]:
+    """Return ``(category, template)`` pairs usable with a plain ``{goal}``."""
+    templates: List[Tuple[str, str]] = []
+    for category in categories:
+        for template in AttackTemplates.get_by_category(str(category)):
+            if "{goal}" in template:
+                templates.append((str(category), template))
+    return templates
+
+
+def _build_static_template_framer(config: Dict[str, Any]) -> JailbreakFramer:
+    raw_categories = config.get("template_categories") or ["role_play"]
+    if isinstance(raw_categories, str):
+        raw_categories = [raw_categories]
+    categories = [str(c) for c in raw_categories]
+
+    templates = _collect_static_templates(categories)
+    if not templates:
+        raise ValueError(
+            "No usable static jailbreak templates found for categories "
+            f"{categories}. Available categories: "
+            f"{AttackTemplates.get_all_categories()}"
+        )
+
+    def _transform(goal: str, variant_index: int) -> Tuple[str, Dict[str, Any]]:
+        category, template = templates[variant_index % len(templates)]
+        return (
+            AttackTemplates.apply_template(template, goal),
+            {"template_category": category, "template": template},
+        )
+
+    return JailbreakFramer("static_template", _transform)
+
+
+def _build_h4rm3l_framer(config: Dict[str, Any]) -> JailbreakFramer:
+    program_name = str(config.get("program", "refusal_suppression"))
+    program = PRESET_PROGRAMS.get(program_name, program_name)
+
+    raw_syntax_version = config.get("syntax_version", 2)
+    try:
+        syntax_version = int(raw_syntax_version)
+    except (TypeError, ValueError):
+        syntax_version = 2
+
+    if program_uses_llm_assisted_decorators(program, syntax_version):
+        raise ValueError(
+            f"h4rm3l program '{program_name}' uses LLM-assisted decorators, which "
+            "are not supported inside the RAG poisoning pipeline. Choose a "
+            "purely syntactic program instead."
+        )
+
+    decorate = compile_program(program, syntax_version)
+
+    def _transform(goal: str, variant_index: int) -> Tuple[str, Dict[str, Any]]:
+        return decorate(goal), {"program": program_name}
+
+    return JailbreakFramer("h4rm3l", _transform)
+
+
+def build_jailbreak_framer(
+    config: Optional[Dict[str, Any]],
+    logger: logging.Logger,
+) -> Optional[JailbreakFramer]:
+    """Build a :class:`JailbreakFramer` from a ``poisoning.jailbreak`` config.
+
+    Returns ``None`` when jailbreak framing is disabled or unconfigured.
+
+    Raises:
+        ValueError: If the configuration requests an unsupported technique or
+            an unusable template/program.
+    """
+    if not isinstance(config, dict) or not config.get("enabled", False):
+        return None
+
+    technique = str(config.get("technique", "static_template")).strip().lower()
+    if technique == "static_template":
+        framer = _build_static_template_framer(config)
+    elif technique == "h4rm3l":
+        framer = _build_h4rm3l_framer(config)
+    else:
+        raise ValueError(
+            f"Unsupported jailbreak technique '{technique}'. "
+            f"Supported: {list(SUPPORTED_JAILBREAK_TECHNIQUES)}"
+        )
+
+    logger.info(f"Jailbreak framing enabled for RAG poisoning: {technique}")
+    return framer
