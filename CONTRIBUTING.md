@@ -135,14 +135,14 @@ To set up your environment for local development:
 4. (Optional but Recommended) Install pre-commit hooks:
 
     ```bash
-    uv run pre-commit install --hook-type commit-msg --hook-type pre-commit
+    uv run pre-commit install
     ```
 
 ## Styleguides
 
 ### Git Commit Messages
 
-We follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification. This is enforced locally via pre-commit hooks (if installed) and in our CI pipeline.
+We follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification.
 
 Commit messages should be structured as follows:
 

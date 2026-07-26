@@ -10,33 +10,6 @@ env:
   UV_VERSION: "0.10.11"
 
 jobs:
-  commit-check:
-    name: Commit Messages
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - name: Check out code with full history
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0 # Needed for commit range check
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: uv sync --group dev
-
-      - name: Check commit messages in PR
-        run: uv run cz check --rev-range ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}
-
   python-checks:
     name: Linting and Formatting
     runs-on: ubuntu-latest
