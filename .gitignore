@@ -7,6 +7,7 @@ reports/
 slurm/
 tools/
 docs/docs/attacks/walkthroughs/
+.worktrees/
 
 # Editors
 .vscode/
