@@ -31,6 +31,7 @@ import logging
 from hackagent.logger import get_logger
 from typing import Any, Dict, List, Optional
 
+from hackagent.attacks.types import AttackResult
 from hackagent.router.tracking import StepTracker, TrackingCoordinator
 
 logger = get_logger(__name__)
@@ -451,7 +452,7 @@ class BaseAttack(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def run(self, **kwargs) -> Any:
+    def run(self, **kwargs) -> List[AttackResult]:
         """
         Execute the attack technique.
 
@@ -460,12 +461,12 @@ class BaseAttack(abc.ABC):
         2. Define pipeline with self._get_pipeline_steps()
         3. Execute pipeline with self._execute_pipeline()
         4. Finalize with coordinator.finalize_all_goals() and coordinator.finalize_pipeline()
-        5. Return results
+        5. Return results as ``list[AttackResult]``
 
         Args:
             **kwargs: Technique-specific parameters (e.g., goals, prompts)
 
         Returns:
-            Attack results (format varies by implementation)
+            A list of :class:`~hackagent.attacks.types.AttackResult` instances.
         """
         pass

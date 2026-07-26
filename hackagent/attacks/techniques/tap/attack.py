@@ -50,6 +50,7 @@ from typing import Any, Dict, List, Optional
 
 from hackagent.attacks.shared.tui import with_tui_logging
 from hackagent.attacks.techniques.base import BaseAttack
+from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.server.client import AuthenticatedClient
 from hackagent.router.router import AgentRouter
 
@@ -279,7 +280,7 @@ class TAPAttack(BaseAttack):
         ]
 
     @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
-    def run(self, goals: List[str]) -> List[Dict[str, Any]]:
+    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
         """
         Run TAP end-to-end with unified tracking and pipeline steps.
 
@@ -289,6 +290,7 @@ class TAPAttack(BaseAttack):
         Returns:
             List of per-goal result dicts produced by the pipeline.
         """
+        goals = goals or []
         if not goals:
             return []
 
@@ -327,7 +329,7 @@ class TAPAttack(BaseAttack):
             coordinator.log_summary()
             coordinator.finalize_pipeline(results)
 
-            return results if results is not None else []
+            return rows_to_attack_results(results)
 
         except Exception as exc:
             self.logger.error(f"TAP attack failed: {exc}", exc_info=True)

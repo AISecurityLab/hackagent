@@ -39,6 +39,7 @@ from typing import Any, Dict, List, Optional
 from hackagent.server.client import AuthenticatedClient
 from hackagent.router.router import AgentRouter
 from hackagent.attacks.techniques.base import BaseAttack
+from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.attacks.shared.tui import with_tui_logging
 
 from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
@@ -206,7 +207,7 @@ class BoNAttack(BaseAttack):
     # ------------------------------------------------------------------
 
     @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
-    def run(self, goals: List[str]) -> List[Dict]:
+    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
         """Execute the full BoN attack pipeline.
 
         The generation step performs the multi-step BoN search **and** inline
@@ -220,6 +221,7 @@ class BoNAttack(BaseAttack):
         Returns:
             List of result dictionaries, or empty list if no goals provided.
         """
+        goals = goals or []
         if not goals:
             return []
 
@@ -273,7 +275,7 @@ class BoNAttack(BaseAttack):
             coordinator.log_summary()
             coordinator.finalize_pipeline(results)
 
-            return results if results is not None else []
+            return rows_to_attack_results(results)
 
         except Exception:
             coordinator.finalize_on_error("BoN pipeline failed with exception")

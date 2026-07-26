@@ -16,6 +16,7 @@ from hackagent.server.client import AuthenticatedClient
 from hackagent.router.router import AgentRouter
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.shared.tui import with_tui_logging
+from hackagent.attacks.types import AttackResult, rows_to_attack_results
 
 from . import generation
 from .config import DEFAULT_BASELINE_CONFIG
@@ -159,7 +160,7 @@ class BaselineAttack(BaseAttack):
         return args
 
     @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
-    def run(self, goals: List[str]) -> Dict[str, Any]:
+    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
         """
         Execute baseline attack (direct goal submission).
 
@@ -167,10 +168,11 @@ class BaselineAttack(BaseAttack):
             goals: List of goal strings to send directly.
 
         Returns:
-            Dictionary with 'evaluated' and 'summary' DataFrames.
+            A list of :class:`~hackagent.attacks.types.AttackResult` instances.
         """
+        goals = goals or []
         if not goals:
-            return {"evaluated": [], "summary": []}
+            return []
 
         coordinator = self._initialize_coordinator(
             attack_type="Baseline",
@@ -187,7 +189,9 @@ class BaselineAttack(BaseAttack):
                 return output and isinstance(output, dict)
 
             coordinator.finalize_pipeline(results, success_check)
-            return results if results else {"evaluated": [], "summary": []}
+            return rows_to_attack_results(
+                results if results else {"evaluated": [], "summary": []}
+            )
 
         except Exception as e:
             self.logger.error(f"Pipeline failed: {e}", exc_info=True)

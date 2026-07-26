@@ -213,6 +213,10 @@ class TestPAIRAttack(unittest.TestCase):
         self.assertEqual(len(results), 1)
         fake_coordinator.get_goal_context.assert_called_once_with(5)
         self.assertEqual(run_goal_mock.call_args.kwargs["goal_index"], 5)
+        from hackagent.attacks.types import AttackResult
+
+        self.assertIsInstance(results[0], AttackResult)
+        self.assertEqual(results[0].goal, "g")
 
     def test_single_goal_stops_immediately_on_jailbreak_score(self):
         dummy_attacker = MagicMock()

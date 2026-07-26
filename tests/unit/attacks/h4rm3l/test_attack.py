@@ -195,6 +195,10 @@ class TestH4rm3lAttack(unittest.TestCase):
         mock_gen.assert_called_once()
         mock_eval.assert_called_once()
         self.assertEqual(len(results), 1)
+        from hackagent.attacks.types import AttackResult
+
+        self.assertIsInstance(results[0], AttackResult)
+        self.assertEqual(results[0].goal, "test")
 
 
 if __name__ == "__main__":
