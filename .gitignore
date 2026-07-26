@@ -139,3 +139,6 @@ dmypy.json
 tests/e2e/attacks/
 
 .tmp
+
+# pytest-textual-snapshot report artifact
+snapshot_report.html

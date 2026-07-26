@@ -10,11 +10,14 @@ from dateutil import tz
 from textual.containers import Vertical
 from textual.widgets import Collapsible, Static
 
+from hackagent.cli.tui.theme import (
+    classify_evaluation_status,
+    classify_run_status,
+)
 from hackagent.cli.tui.views.results.formatters import (
     _escape,
     _format_local_datetime,
     _format_result_full_details,
-    _get_result_status_info,
 )
 from hackagent.cli.tui.views.results.formatters.run_report import (
     build_run_report_header,
@@ -184,21 +187,10 @@ class ResultsDetailsMixin:
             else:
                 status_display = str(status_val)
 
-        # Status color and icon based on status
-        status_color = "yellow"
-        status_icon = "🔄"
-        if status_display.upper() == "COMPLETED":
-            status_color = "green"
-            status_icon = "✅"
-        elif status_display.upper() == "FAILED":
-            status_color = "red"
-            status_icon = "❌"
-        elif status_display.upper() == "RUNNING":
-            status_color = "cyan"
-            status_icon = "⚡"
-        elif status_display.upper() == "PENDING":
-            status_color = "yellow"
-            status_icon = "⏳"
+        # Status colour and icon from the shared run-state vocabulary
+        run_state = classify_run_status(getattr(run, "status", None))
+        status_color = run_state.color
+        status_icon = run_state.icon
 
         # Attack config from attack record
         attack_config = {}
@@ -272,48 +264,18 @@ class ResultsDetailsMixin:
 
             # Create collapsible for each result
             for idx, result in enumerate(run_results, 1):
-                # Get status info for CSS class
-                eval_status, status_color, _ = _get_result_status_info(result)
-
-                # Determine CSS class for status coloring
-                css_class = "result-collapsible"
-                if (
-                    "SUCCESSFUL" in eval_status.upper()
-                    and "JAILBREAK" in eval_status.upper()
-                ):
-                    css_class += " -success"
-                elif (
-                    "FAILED" in eval_status.upper()
-                    and "JAILBREAK" in eval_status.upper()
-                ):
-                    css_class += " -failed"
-                elif "ERROR" in eval_status.upper():
-                    css_class += " -failed"
-                else:
-                    css_class += " -pending"
+                outcome = classify_evaluation_status(
+                    getattr(result, "evaluation_status", None)
+                )
+                css_class = f"result-collapsible {outcome.css_class}"
 
                 # Resolve traces — embedded or pre-fetched
                 result_traces = _traces_by_result.get(str(result.id)) or []
 
-                # Create the title
-                eval_status_short = ""
-                if (
-                    "SUCCESSFUL" in eval_status.upper()
-                    and "JAILBREAK" in eval_status.upper()
-                ):
-                    eval_status_short = "[red]Vulnerable[/red]"
-                elif (
-                    "FAILED" in eval_status.upper()
-                    and "JAILBREAK" in eval_status.upper()
-                ):
-                    eval_status_short = "[green]Safe[/green]"
-                elif "ERROR" in eval_status.upper():
-                    eval_status_short = "[yellow]Error[/yellow]"
-                else:
-                    eval_status_short = f"[dim]{_escape(eval_status)}[/dim]"
-
-                trace_count_str = f" 🔍 {len(result_traces)}" if result_traces else ""
-                title = f"Test #{idx}{trace_count_str}    {eval_status_short}"
+                trace_count_str = (
+                    f" \U0001f50d {len(result_traces)}" if result_traces else ""
+                )
+                title = f"Result #{idx}{trace_count_str}    {outcome.render()}"
 
                 # Create collapsible with full details inside
                 collapsible = Collapsible(

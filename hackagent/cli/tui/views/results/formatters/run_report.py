@@ -5,6 +5,13 @@
 
 from typing import Any
 
+from hackagent.cli.tui.theme import (
+    ERRORED,
+    MITIGATED,
+    NOT_EVALUATED,
+    VULNERABLE,
+    classify_evaluation_status,
+)
 from hackagent.cli.tui.views.results.formatters.text import _escape
 
 
@@ -40,34 +47,13 @@ def build_run_report_header(
     """
     results_count = len(run_results)
 
-    # Count evaluation statuses
+    # Count outcomes using the shared vocabulary
     eval_summary = {
-        "SUCCESSFUL_JAILBREAK": 0,
-        "FAILED_JAILBREAK": 0,
-        "NOT_EVALUATED": 0,
-        "ERROR": 0,
-        "OTHER": 0,
+        outcome.key: 0 for outcome in (VULNERABLE, MITIGATED, ERRORED, NOT_EVALUATED)
     }
     for result in run_results:
-        if hasattr(result, "evaluation_status"):
-            eval_status = (
-                result.evaluation_status.value
-                if hasattr(result.evaluation_status, "value")
-                else str(result.evaluation_status)
-            )
-            if (
-                "SUCCESSFUL" in eval_status.upper()
-                and "JAILBREAK" in eval_status.upper()
-            ):
-                eval_summary["SUCCESSFUL_JAILBREAK"] += 1
-            elif "FAILED" in eval_status.upper() and "JAILBREAK" in eval_status.upper():
-                eval_summary["FAILED_JAILBREAK"] += 1
-            elif "NOT_EVALUATED" in eval_status.upper():
-                eval_summary["NOT_EVALUATED"] += 1
-            elif "ERROR" in eval_status.upper():
-                eval_summary["ERROR"] += 1
-            else:
-                eval_summary["OTHER"] += 1
+        outcome = classify_evaluation_status(getattr(result, "evaluation_status", None))
+        eval_summary[outcome.key] += 1
 
     header = f"""[bold cyan]╔{"═" * 50}╗[/bold cyan]
 [bold cyan]║[/bold cyan] [bold bright_white]📊 Report Details[/bold bright_white]{" " * 33}[bold cyan]║[/bold cyan]
@@ -75,14 +61,14 @@ def build_run_report_header(
 
 """
     # ── Summary Stats Bar ───────────────────────────────────────────
-    vuln_count = eval_summary["SUCCESSFUL_JAILBREAK"]
-    mitigated_count = eval_summary["FAILED_JAILBREAK"]
-    error_count = eval_summary["ERROR"]
+    vuln_count = eval_summary[VULNERABLE.key]
+    mitigated_count = eval_summary[MITIGATED.key]
+    error_count = eval_summary[ERRORED.key]
     header += (
-        f"  [bold bright_cyan]{results_count}[/bold bright_cyan] [dim]Total Tests[/dim]"
-        f"    [bold red]{vuln_count}[/bold red] [dim]Vulnerabilities[/dim]"
-        f"    [bold green]{mitigated_count}[/bold green] [dim]Mitigated[/dim]"
-        f"    [bold yellow]{error_count}[/bold yellow] [dim]Errors[/dim]\n"
+        f"  [bold bright_cyan]{results_count}[/bold bright_cyan] [dim]Total Results[/dim]"
+        f"    [bold {VULNERABLE.color}]{vuln_count}[/bold {VULNERABLE.color}] [dim]{VULNERABLE.label}[/dim]"
+        f"    [bold {MITIGATED.color}]{mitigated_count}[/bold {MITIGATED.color}] [dim]{MITIGATED.label}[/dim]"
+        f"    [bold {ERRORED.color}]{error_count}[/bold {ERRORED.color}] [dim]{ERRORED.label}[/dim]\n"
     )
     header += f"  [dim]{'─' * 50}[/dim]\n\n"
 
@@ -177,7 +163,7 @@ def build_run_report_header(
     header += f"  🤖 [bold]Agent:[/bold]     [bright_cyan]{_escape(agent_display)}[/bright_cyan]\n"
     header += f"  🏢 [bold]Org:[/bold]       [bright_cyan]{_escape(org_display)}[/bright_cyan]\n"
     header += f"  📅 [bold]Time:[/bold]      {_escape(created)}\n"
-    header += f"  {status_icon} [bold]Status:[/bold]    [bright_{status_color}]{_escape(status_display)}[/bright_{status_color}]\n"
+    header += f"  {status_icon} [bold]Status:[/bold]    [{status_color}]{_escape(status_display)}[/{status_color}]\n"
 
     if attack_type_display:
         header += f"  ⚔️  [bold]Attack:[/bold]   [bright_yellow]{_escape(str(attack_type_display).upper())}[/bright_yellow]\n"

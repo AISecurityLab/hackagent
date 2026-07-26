@@ -177,9 +177,9 @@ class AttacksLayoutMixin:
                 # order in attack_specs.py), not the desired campaign order
                 # (h4rm3l → TAP → PAIR). `on_mount` selects the default
                 # campaign attacks explicitly, in the right order, instead.
-                yield Static("[bold]Attack Strategy[/bold]", classes="section-title")
+                yield Static("[bold]Attacks[/bold]", classes="section-title")
                 yield Static(
-                    "[dim]Select one attack, or check multiple to chain them "
+                    "[dim]Select one attack, or check multiple to chain them. "
                     "Check order sets the chain order. Defaults to the Jailbreak "
                     "evaluation campaign (h4rm3l → TAP → PAIR).[/dim]"
                 )
@@ -189,18 +189,18 @@ class AttacksLayoutMixin:
                 yield Checkbox(
                     "Escalate only mitigated goals to the next attack",
                     id="escalate-only-mitigated",
-                    value=False,
+                    value=True,
                 )
                 yield Static(
                     "[dim]Chain mode (2+ attacks checked): a goal moves to "
                     "the next attack only if the previous one mitigated it; "
-                    "goals that already succeeded are dropped. Uncheck to "
+                    "goals that are already vulnerable are dropped. Uncheck to "
                     "instead run every checked attack against every goal.[/dim]",
                     id="escalate-only-mitigated-help",
                 )
                 yield Static("")
 
-                yield Label("Configuring:")
+                yield Label("Configuring attack:")
                 yield Select(
                     strategy_choices,
                     id="attack-strategy-focus",

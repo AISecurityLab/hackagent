@@ -28,7 +28,7 @@ class HackAgentHeader(Container):
     }
 
     HackAgentHeader Static {
-        color: #ff0000;
+        color: $brand;
         text-style: bold;
         width: 100%;
         content-align: center middle;

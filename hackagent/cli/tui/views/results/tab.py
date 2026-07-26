@@ -20,6 +20,11 @@ from textual.widgets import Button, DataTable, Label, Select, Static
 
 from hackagent.cli.config import CLIConfig
 from hackagent.cli.tui.base import BaseTab
+from hackagent.cli.tui.theme import (
+    MITIGATED,
+    VULNERABLE,
+    classify_evaluation_status,
+)
 from hackagent.cli.tui.views.results.details import ResultsDetailsMixin
 from hackagent.cli.tui.views.results.export import ResultsExportMixin
 from hackagent.cli.tui.views.results.formatters import _escape
@@ -72,18 +77,23 @@ class ResultsTab(
         background: $surface;
     }
     
-    ResultsTab .result-collapsible.-success > CollapsibleTitle {
-        background: $success-darken-3;
-        color: $text;
-    }
-    
-    ResultsTab .result-collapsible.-failed > CollapsibleTitle {
+    ResultsTab .result-collapsible.-vulnerable > CollapsibleTitle {
         background: $error-darken-3;
         color: $text;
     }
-    
-    ResultsTab .result-collapsible.-pending > CollapsibleTitle {
+
+    ResultsTab .result-collapsible.-mitigated > CollapsibleTitle {
+        background: $success-darken-3;
+        color: $text;
+    }
+
+    ResultsTab .result-collapsible.-errored > CollapsibleTitle {
         background: $warning-darken-3;
+        color: $text;
+    }
+
+    ResultsTab .result-collapsible.-not-evaluated > CollapsibleTitle {
+        background: $surface-darken-1;
         color: $text;
     }
     
@@ -210,7 +220,14 @@ class ResultsTab(
         try:
             table = self.query_one("#results-table", DataTable)
             table.clear(columns=True)
-            table.add_columns("#", "⚡", "Agent", "Attack", "✅/❌", "Created")
+            table.add_columns(
+                "#",
+                "State",
+                "Agent",
+                "Attack",
+                f"{VULNERABLE.icon}/{MITIGATED.icon}",
+                "Created",
+            )
         except Exception as e:
             self.app.notify(f"Failed to initialize table: {str(e)}", severity="error")
 
@@ -325,25 +342,15 @@ class ResultsTab(
                         res_page = backend.list_results(
                             run_id=rid, page=1, page_size=500
                         )
-                        success = sum(
-                            1
+                        outcomes = [
+                            classify_evaluation_status(
+                                getattr(r, "evaluation_status", None)
+                            )
                             for r in res_page.items
-                            if "SUCCESSFUL"
-                            in str(getattr(r, "evaluation_status", "")).upper()
-                            and "JAILBREAK"
-                            in str(getattr(r, "evaluation_status", "")).upper()
-                        )
-                        fail = sum(
-                            1
-                            for r in res_page.items
-                            if "FAILED"
-                            in str(getattr(r, "evaluation_status", "")).upper()
-                            and "JAILBREAK"
-                            in str(getattr(r, "evaluation_status", "")).upper()
-                        )
+                        ]
                         self._result_counts[str(run.id)] = (
-                            success,
-                            fail,
+                            sum(1 for o in outcomes if o is VULNERABLE),
+                            sum(1 for o in outcomes if o is MITIGATED),
                             len(res_page.items),
                         )
                     except Exception:

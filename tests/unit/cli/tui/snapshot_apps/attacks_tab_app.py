@@ -13,6 +13,7 @@ from unittest.mock import MagicMock
 from textual.app import App, ComposeResult
 
 from hackagent.cli.config import CLIConfig
+from hackagent.cli.tui.theme import css_variables
 from hackagent.cli.tui.views.attacks import AttacksTab
 
 
@@ -25,6 +26,10 @@ def _stub_config() -> CLIConfig:
 
 class AttacksTabApp(App):
     """Minimal host app rendering only the Attacks tab."""
+
+    def get_css_variables(self) -> dict[str, str]:
+        """Mirror ``HackAgentTUI``'s brand palette so ``$brand-*`` resolve."""
+        return {**super().get_css_variables(), **css_variables()}
 
     def compose(self) -> ComposeResult:
         yield AttacksTab(_stub_config())

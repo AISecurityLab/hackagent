@@ -6,6 +6,7 @@
 import json
 from typing import Any
 
+from hackagent.cli.tui.theme import MITIGATED, VULNERABLE
 from hackagent.cli.tui.views.results.formatters.text import _escape
 
 
@@ -141,11 +142,7 @@ def _format_trace_block(
         num_results = result_inner.get("num_results", "?")
         best_score = result_inner.get("best_score", 0.0)
         is_success = result_inner.get("is_success", False)
-        jb_icon = (
-            "[bright_green]✓ JAILBREAK[/bright_green]"
-            if is_success
-            else "[red]✗ REFUSED[/red]"
-        )
+        jb_icon = VULNERABLE.render() if is_success else MITIGATED.render()
         score_color = "bright_green" if best_score > 0 else "dim"
         header = f"  [bold green]{_step_num_circle(step_num)} 📋 SUMMARY[/bold green]{ts_str}"
         body = (

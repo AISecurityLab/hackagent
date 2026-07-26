@@ -15,6 +15,8 @@ from textual.app import ComposeResult
 from textual.containers import Container
 from textual.widgets import Button, RichLog, Static
 
+from hackagent.cli.tui.theme import MITIGATED, VULNERABLE
+
 
 def _escape(value: Any) -> str:
     """Escape a value for safe Rich markup rendering.
@@ -432,11 +434,7 @@ class AgentActionsViewer(Container):
         elif et == "goal_finalized":
             success = bool(payload.get("success"))
             actions_widget = self.query_one("#actions-display", RichLog)
-            icon = (
-                "[bright_green]✓ JAILBREAK[/bright_green]"
-                if success
-                else "[red]✗ REFUSED[/red]"
-            )
+            outcome_markup = VULNERABLE.render() if success else MITIGATED.render()
             elapsed = payload.get("elapsed_s")
             elapsed_s = (
                 f"  [dim]({elapsed:.1f}s)[/dim]"
@@ -444,7 +442,7 @@ class AgentActionsViewer(Container):
                 else ""
             )
             actions_widget.write(
-                f"[dim]── Goal #{payload.get('goal_index', '?') + 1 if isinstance(payload.get('goal_index'), int) else '?'} {icon}{elapsed_s} ──[/dim]"
+                f"[dim]── Goal #{payload.get('goal_index', '?') + 1 if isinstance(payload.get('goal_index'), int) else '?'} {outcome_markup}{elapsed_s} ──[/dim]"
             )
 
         elif et == "trace_added":

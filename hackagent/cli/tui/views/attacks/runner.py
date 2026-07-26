@@ -231,7 +231,7 @@ class AttacksRunnerMixin:
 [bold]Agent:[/bold] {_escape(agent_name)}
 [bold]Type:[/bold] {_escape(agent_type)}
 [bold]Endpoint:[/bold] {_escape(endpoint)}
-[bold]Strategy:[/bold] {_escape(strategy_label)}
+[bold]Attacks:[/bold] {_escape(strategy_label)}
 [bold]Goals:[/bold] {_escape(goals)}
 [bold]Timeout:[/bold] {timeout}s{chain_note}
 
@@ -248,7 +248,7 @@ class AttacksRunnerMixin:
 [bold]Agent:[/bold] {_escape(agent_name)}
 [bold]Type:[/bold] {_escape(agent_type)}
 [bold]Endpoint:[/bold] {_escape(endpoint)}
-[bold]Strategy:[/bold] {_escape(strategy_label)}
+[bold]Attacks:[/bold] {_escape(strategy_label)}
 [bold]Goals:[/bold] {_escape(goals)}
 [bold]Timeout:[/bold] {timeout}s
 

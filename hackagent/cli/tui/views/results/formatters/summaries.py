@@ -6,6 +6,7 @@
 from datetime import datetime
 from typing import Any
 
+from hackagent.cli.tui.theme import classify_evaluation_status
 from hackagent.cli.tui.views.results.formatters.text import _escape
 from hackagent.cli.tui.views.results.formatters.traces import _format_trace_block
 
@@ -13,35 +14,18 @@ from hackagent.cli.tui.views.results.formatters.traces import _format_trace_bloc
 def _get_result_status_info(result: Any) -> tuple[str, str, str]:
     """Get status display info for a result.
 
+    The label, colour and icon come from the shared defender-polarity
+    vocabulary in :mod:`hackagent.cli.tui.theme`: a jailbreak that got through
+    is a red ``Vulnerable`` result, not a green success.
+
     Args:
         result: Result object with evaluation_status
 
     Returns:
-        Tuple of (eval_status, status_color, status_icon)
+        Tuple of (status_label, status_color, status_icon)
     """
-    eval_status = "N/A"
-    if hasattr(result, "evaluation_status"):
-        eval_status = (
-            result.evaluation_status.value
-            if hasattr(result.evaluation_status, "value")
-            else str(result.evaluation_status)
-        )
-
-    # Determine color and icon based on status
-    if "SUCCESSFUL" in eval_status.upper() and "JAILBREAK" in eval_status.upper():
-        status_color = "green"
-        status_icon = "✅"
-    elif "FAILED" in eval_status.upper() and "JAILBREAK" in eval_status.upper():
-        status_color = "red"
-        status_icon = "❌"
-    elif "ERROR" in eval_status.upper():
-        status_color = "red"
-        status_icon = "⚠️"
-    else:
-        status_color = "yellow"
-        status_icon = "ℹ️"
-
-    return eval_status, status_color, status_icon
+    outcome = classify_evaluation_status(getattr(result, "evaluation_status", None))
+    return outcome.label, outcome.color, outcome.icon
 
 
 def _format_result_summary(result: Any, index: int) -> str:
@@ -54,7 +38,7 @@ def _format_result_summary(result: Any, index: int) -> str:
     Returns:
         Formatted summary string for the collapsible title
     """
-    eval_status, status_color, status_icon = _get_result_status_info(result)
+    status_label, status_color, status_icon = _get_result_status_info(result)
 
     # Goal text — prefer result.goal, fall back to metadata
     goal_text = ""
@@ -85,7 +69,7 @@ def _format_result_summary(result: Any, index: int) -> str:
         except (TypeError, ValueError):
             score_str = ""
 
-    return f"{status_icon} [bold]#{index}[/bold] [{status_color}]{_escape(eval_status)}[/]{goal_text}{timing}{score_str}"
+    return f"{status_icon} [bold]#{index}[/bold] [{status_color}]{_escape(status_label)}[/]{goal_text}{timing}{score_str}"
 
 
 def _format_result_full_details(
@@ -104,7 +88,7 @@ def _format_result_full_details(
     Returns:
         Formatted details string
     """
-    eval_status, status_color, status_icon = _get_result_status_info(result)
+    status_label, status_color, status_icon = _get_result_status_info(result)
     meta: dict = getattr(result, "metadata", None) or {}
 
     details = ""
@@ -115,7 +99,7 @@ def _format_result_full_details(
     details += "[bold bright_cyan]┌─ 📋 Result ──────────────────────────────────┐[/bold bright_cyan]\n\n"
 
     # Status + timing
-    details += f"  {status_icon} [bold {status_color}]{_escape(eval_status)}[/bold {status_color}]"
+    details += f"  {status_icon} [bold {status_color}]{_escape(status_label)}[/bold {status_color}]"
     elapsed = meta.get("elapsed_s")
     if elapsed is not None:
         try:
