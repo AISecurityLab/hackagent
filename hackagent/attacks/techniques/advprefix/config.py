@@ -244,6 +244,8 @@ class EvaluatorConfig(BaseModel):
     timeout: int = DEFAULT_TIMEOUT
     temperature: float = 0.0
     max_judge_retries: int = 1
+    # Optional user-defined system prompt prepended to every judge request.
+    system_prompt: Optional[str] = None
 
     @model_validator(mode="before")
     @classmethod

@@ -76,7 +76,7 @@ Based on these criteria, please provide your classification. You should first br
             request=row["goal"], response=row["completion"]
         )
         return {
-            "messages": [{"role": "user", "content": prompt_content}],
+            "messages": self._build_messages(prompt_content),
             "max_tokens": self.config.max_tokens_eval,
             "temperature": self.config.temperature,
         }
@@ -174,7 +174,7 @@ Please answer with only "yes" or "no"."""
         """Format evaluation request using JailbreakBench prompting."""
         prompt_content = self.PROMPT.format(generation=row["completion"])
         return {
-            "messages": [{"role": "user", "content": prompt_content}],
+            "messages": self._build_messages(prompt_content),
             "max_tokens": self.config.max_tokens_eval,
             "temperature": self.config.temperature,
         }
@@ -237,7 +237,7 @@ Answer with only "yes" or "no"."""
             generation = generation[: self._MAX_GENERATION_CHARS] + "...[truncated]"
         prompt_content = self.PROMPT.format(behavior=row["goal"], generation=generation)
         return {
-            "messages": [{"role": "user", "content": prompt_content}],
+            "messages": self._build_messages(prompt_content),
             "max_tokens": self.config.max_tokens_eval,
             "temperature": self.config.temperature,
         }
@@ -294,7 +294,7 @@ Answer with either 'Yes' or 'No', and nothing else."""
             model_res=model_res,
         )
         return {
-            "messages": [{"role": "user", "content": prompt_content}],
+            "messages": self._build_messages(prompt_content),
             "max_tokens": self.config.max_tokens_eval,
             "temperature": self.config.temperature,
         }
@@ -344,7 +344,7 @@ for the same information as the TASK. Respond with only "yes" or "no".
             prompt=row.get("completion", ""),
         )
         return {
-            "messages": [{"role": "user", "content": prompt_content}],
+            "messages": self._build_messages(prompt_content),
             "max_tokens": self.config.max_tokens_eval,
             "temperature": self.config.temperature,
         }
@@ -422,7 +422,7 @@ Do not output any other text.
             response=row.get("completion", ""),
         )
         return {
-            "messages": [{"role": "user", "content": content}],
+            "messages": self._build_messages(content),
             "max_tokens": self.config.max_tokens_eval,
             "temperature": self.config.temperature,
         }
@@ -543,7 +543,7 @@ Do not output any other text.
         )
 
         return {
-            "messages": [{"role": "user", "content": feedback_prompt}],
+            "messages": self._build_messages(feedback_prompt),
             "max_tokens": self.config.max_tokens_eval,
             "temperature": 0.0,
         }

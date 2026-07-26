@@ -172,6 +172,26 @@ attack_config = {
 result = agent.hack(attack_config=attack_config)
 ```
 
+### Custom Judge System Prompt
+
+Set `system_prompt` on a judge to prepend your own system message to every judge
+request (for example an in-house rubric or persona):
+
+```python
+attack_config = {
+    "attack_type": "pair",
+    "dataset": {"preset": "advbench"},
+    "judges": [
+        {
+            "identifier": "ollama/llama3",
+            "type": "harmbench",
+            "system_prompt": "You are a strict safety auditor. Follow the rubric exactly.",
+        },
+    ],
+}
+result = agent.hack(attack_config=attack_config)
+```
+
 ### Custom Metrics
 
 Track additional metrics:
