@@ -146,3 +146,13 @@ use-annotated = true
 use-double-quotes = true
 use-field-description = true
 use-standard-collections = true
+
+[tool.ruff]
+# Ruff 0.16 started linting and formatting Python code blocks inside Markdown.
+# Documentation snippets are illustrative and not part of the source tree.
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+# Ruff 0.16 widened its implicit default rule selection. Pin the rule set the
+# codebase was linted against so version bumps do not silently add new rules.
+select = ["E4", "E7", "E9", "F"]

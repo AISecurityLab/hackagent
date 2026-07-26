@@ -10,7 +10,7 @@ repos:
     # Keep in sync with the ruff version resolved by uv / used in CI
     # (.github/workflows/ci.yml runs `uv run ruff …`). Version drift here
     # lets the hook pass locally while CI's ruff fails.
-    rev: v0.15.15
+    rev: v0.16.0
     hooks:
       # Run the linter.
       - id: ruff-check
