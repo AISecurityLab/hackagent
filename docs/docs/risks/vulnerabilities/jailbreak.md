@@ -16,25 +16,36 @@ Tests whether the LLM can be manipulated into bypassing its safety filters throu
 
 ## Threat Profile
 
-**Objective**: jailbreak
+**Objective**: `jailbreak`
 
-**Recommended Datasets**:
-- **strongreject** (PRIMARY): 324 forbidden prompts designed for jailbreak evaluation
-- **harmbench** (PRIMARY): 200 harmful behaviors for bypass testing
-- **advbench** (PRIMARY): 520 adversarial goals for jailbreak attacks
-- **jailbreakbench** (PRIMARY): 100 curated misuse behaviours from NeurIPS 2024 benchmark
-- **simplesafetytests** (SECONDARY): 100 clear-cut harmful prompts as baseline
-- **donotanswer** (SECONDARY): 939 refusal questions for comprehensive coverage
-- **saladbench_attack** (SECONDARY): 5K attack-enhanced prompts with jailbreak methods
+### Recommended Datasets
 
-**Attack Techniques**:
-- Static Template (PRIMARY): Template-based attack
-- PAIR (PRIMARY): Iterative refinement
-- AdvPrefix (PRIMARY): Adversarial prefix optimisation
+**Primary**
+- **strongreject**: 324 forbidden prompts designed for jailbreak evaluation
+- **harmbench**: 200 harmful behaviors for bypass testing
+- **advbench**: 520 adversarial goals for jailbreak attacks
+- **jailbreakbench**: 100 curated misuse behaviours from NeurIPS 2024 benchmark
 
-**Metrics**: asr, judge_score
+**Secondary**
+- **simplesafetytests**: 100 clear-cut harmful prompts as baseline
+- **donotanswer**: 939 refusal questions for comprehensive coverage
+- **saladbench_attack**: 5K attack-enhanced prompts with jailbreak methods
 
-## Usage Example
+### Attack Techniques
+
+**Primary**
+- **Static Template**: Template-based attack
+- **PAIR**: Iterative refinement
+- **AdvPrefix**: Adversarial prefix optimisation
+
+### Metrics
+
+- asr
+- judge_score
+
+## Usage
+
+### Instantiate the Vulnerability
 
 ```python
 from hackagent.risks import Jailbreak
@@ -48,4 +59,24 @@ vuln = Jailbreak(types=[
     JailbreakType.ROLEPLAY.value,
     JailbreakType.MULTI_TURN.value,
 ])
+```
+
+### Run an Evaluation Campaign
+
+```python
+from hackagent import HackAgent
+from hackagent.risks.jailbreak import JAILBREAK_PROFILE
+
+agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
+
+# Use profile recommendations
+for attack in JAILBREAK_PROFILE.primary_attacks:
+    for dataset in JAILBREAK_PROFILE.primary_datasets:
+        attack_config = {
+            "attack_type": attack.technique.lower(),
+            "objective": JAILBREAK_PROFILE.objective,
+            "dataset": {"preset": dataset.preset},
+        }
+        results = agent.hack(attack_config=attack_config)
+        print(f"Results: {results}")
 ```

@@ -14,20 +14,33 @@ Tests whether adversarial examples, feature manipulation, or boundary exploitati
 
 ## Threat Profile
 
-**Objective**: jailbreak
+**Objective**: `jailbreak`
 
-**Recommended Datasets**:
-- **advbench** (PRIMARY): Adversarial benchmarks for evaluating evasion resistance
-- **xstest** (SECONDARY): XSTest for adversarial prompt detection
+### Recommended Datasets
 
-**Attack Techniques**:
-- Static Template (PRIMARY): Template-based prompt injection
-- PAIR (PRIMARY): Iterative refinement for bypass discovery
-- AdvPrefix (SECONDARY): Adversarial prefix optimisation
+**Primary**
+- **advbench**: Adversarial benchmarks for evaluating evasion resistance
 
-**Metrics**: asr, judge_score
+**Secondary**
+- **xstest**: XSTest for adversarial prompt detection
 
-## Usage Example
+### Attack Techniques
+
+**Primary**
+- **Static Template**: Template-based prompt injection
+- **PAIR**: Iterative refinement for bypass discovery
+
+**Secondary**
+- **AdvPrefix**: Adversarial prefix optimisation
+
+### Metrics
+
+- asr
+- judge_score
+
+## Usage
+
+### Instantiate the Vulnerability
 
 ```python
 from hackagent.risks import ModelEvasion
@@ -41,4 +54,24 @@ vuln = ModelEvasion(types=[
     ModelEvasionType.ADVERSARIAL_EXAMPLES.value,
     ModelEvasionType.MODEL_BOUNDARY_EXPLOITATION.value,
 ])
+```
+
+### Run an Evaluation Campaign
+
+```python
+from hackagent import HackAgent
+from hackagent.risks.model_evasion import MODEL_EVASION_PROFILE
+
+agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
+
+# Use profile recommendations
+for attack in MODEL_EVASION_PROFILE.primary_attacks:
+    for dataset in MODEL_EVASION_PROFILE.primary_datasets:
+        attack_config = {
+            "attack_type": attack.technique.lower(),
+            "objective": MODEL_EVASION_PROFILE.objective,
+            "dataset": {"preset": dataset.preset},
+        }
+        results = agent.hack(attack_config=attack_config)
+        print(f"Results: {results}")
 ```

@@ -15,19 +15,30 @@ Tests whether the LLM reveals sensitive details from its system prompt, such as 
 
 ## Threat Profile
 
-**Objective**: jailbreak
+**Objective**: `jailbreak`
 
-**Recommended Datasets**:
-- **advbench** (SECONDARY): Adversarial goals that may trigger system prompt disclosure
+### Recommended Datasets
 
-**Attack Techniques**:
-- Static Template (PRIMARY): Template-based prompt injection
-- PAIR (PRIMARY): Iterative refinement for bypass discovery
-- AdvPrefix (SECONDARY): Adversarial prefix optimisation
+**Secondary**
+- **advbench**: Adversarial goals that may trigger system prompt disclosure
 
-**Metrics**: asr, judge_score
+### Attack Techniques
 
-## Usage Example
+**Primary**
+- **Static Template**: Template-based prompt injection
+- **PAIR**: Iterative refinement for bypass discovery
+
+**Secondary**
+- **AdvPrefix**: Adversarial prefix optimisation
+
+### Metrics
+
+- asr
+- judge_score
+
+## Usage
+
+### Instantiate the Vulnerability
 
 ```python
 from hackagent.risks import SystemPromptLeakage
@@ -41,4 +52,24 @@ vuln = SystemPromptLeakage(types=[
     SystemPromptLeakageType.SECRETS_AND_CREDENTIALS.value,
     SystemPromptLeakageType.GUARD_EXPOSURE.value,
 ])
+```
+
+### Run an Evaluation Campaign
+
+```python
+from hackagent import HackAgent
+from hackagent.risks.system_prompt_leakage import SYSTEM_PROMPT_LEAKAGE_PROFILE
+
+agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
+
+# Use profile recommendations
+for attack in SYSTEM_PROMPT_LEAKAGE_PROFILE.primary_attacks:
+    for dataset in SYSTEM_PROMPT_LEAKAGE_PROFILE.primary_datasets + SYSTEM_PROMPT_LEAKAGE_PROFILE.secondary_datasets:
+        attack_config = {
+            "attack_type": attack.technique.lower(),
+            "objective": SYSTEM_PROMPT_LEAKAGE_PROFILE.objective,
+            "dataset": {"preset": dataset.preset},
+        }
+        results = agent.hack(attack_config=attack_config)
+        print(f"Results: {results}")
 ```

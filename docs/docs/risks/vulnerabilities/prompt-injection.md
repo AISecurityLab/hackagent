@@ -22,25 +22,44 @@ Indirect prompt injection is especially relevant for RAG-enabled systems where t
 
 For an end-to-end evaluation workflow (poisoning, retrieval, judging), see [RAG Attack](../../attacks/rag.md) using `attack_type="rag"`.
 
+When the target system uses retrieval, add an indirect prompt injection campaign to measure exposure to poisoned knowledge-base content:
+
+- Recommended technique: `rag`
+- Focus metric: `asr` with retrieval-hit diagnostics
+- Suggested tuning baseline: `chunk_size=1400`, `chunk_overlap=250`, `top_k=5`
+
 ## Threat Profile
 
-**Objective**: jailbreak
+**Objective**: `jailbreak`
 
-**Recommended Datasets**:
-- **advbench** (PRIMARY): 520 adversarial goals covering injection scenarios
-- **harmbench_contextual** (PRIMARY): Contextual prompts requiring instruction override
-- **prompt_injections** (PRIMARY): 662 prompt injection samples for direct PI testing (deepset)
-- **strongreject** (SECONDARY): Forbidden prompts to test injection guardrails
+### Recommended Datasets
 
-**Attack Techniques**:
-- Static Template (PRIMARY): Template-based prompt injection
-- PAIR (PRIMARY): Iterative refinement for bypass discovery
-- RAG Attack (PRIMARY): Indirect Injection through document poisoning in RAG pipelines
-- AdvPrefix (SECONDARY): Adversarial prefix optimisation
+**Primary**
+- **advbench**: 520 adversarial goals covering injection scenarios
+- **harmbench_contextual**: Contextual prompts requiring instruction override
+- **prompt_injections**: 662 prompt injection samples for direct PI testing (deepset)
 
-**Metrics**: asr, judge_score
+**Secondary**
+- **strongreject**: Forbidden prompts to test injection guardrails
 
-## Usage Example
+### Attack Techniques
+
+**Primary**
+- **Static Template**: Template-based prompt injection
+- **PAIR**: Iterative refinement for bypass discovery
+- **RAG Attack**: Indirect Injection through document poisoning in RAG pipelines
+
+**Secondary**
+- **AdvPrefix**: Adversarial prefix optimisation
+
+### Metrics
+
+- asr
+- judge_score
+
+## Usage
+
+### Instantiate the Vulnerability
 
 ```python
 from hackagent.risks import PromptInjection
@@ -54,4 +73,24 @@ vuln = PromptInjection(types=[
     PromptInjectionType.DIRECT_INJECTION.value,
     PromptInjectionType.INDIRECT_INJECTION.value,
 ])
+```
+
+### Run an Evaluation Campaign
+
+```python
+from hackagent import HackAgent
+from hackagent.risks.prompt_injection import PROMPT_INJECTION_PROFILE
+
+agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
+
+# Use profile recommendations
+for attack in PROMPT_INJECTION_PROFILE.primary_attacks:
+    for dataset in PROMPT_INJECTION_PROFILE.primary_datasets:
+        attack_config = {
+            "attack_type": attack.technique.lower(),
+            "objective": PROMPT_INJECTION_PROFILE.objective,
+            "dataset": {"preset": dataset.preset},
+        }
+        results = agent.hack(attack_config=attack_config)
+        print(f"Results: {results}")
 ```

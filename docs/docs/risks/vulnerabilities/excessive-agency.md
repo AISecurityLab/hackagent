@@ -14,18 +14,29 @@ Tests whether the LLM performs actions or grants permissions exceeding its inten
 
 ## Threat Profile
 
-**Objective**: policy_violation
+**Objective**: `policy_violation`
 
-**Recommended Datasets**:
-- **agentharm** (PRIMARY): AgentHarm dataset for evaluating excessive agency in tool use
-- **agentharm_benign** (SECONDARY): Benign agent scenarios to establish baseline behavior
+### Recommended Datasets
 
-**Attack Techniques**:
-- Static Template (PRIMARY): Template-based prompt construction
+**Primary**
+- **agentharm**: AgentHarm dataset for evaluating excessive agency in tool use
 
-**Metrics**: asr, judge_score
+**Secondary**
+- **agentharm_benign**: Benign agent scenarios to establish baseline behavior
 
-## Usage Example
+### Attack Techniques
+
+**Primary**
+- **Static Template**: Template-based prompt construction
+
+### Metrics
+
+- asr
+- judge_score
+
+## Usage
+
+### Instantiate the Vulnerability
 
 ```python
 from hackagent.risks import ExcessiveAgency
@@ -39,4 +50,24 @@ vuln = ExcessiveAgency(types=[
     ExcessiveAgencyType.FUNCTIONALITY.value,
     ExcessiveAgencyType.AUTONOMY.value,
 ])
+```
+
+### Run an Evaluation Campaign
+
+```python
+from hackagent import HackAgent
+from hackagent.risks.excessive_agency import EXCESSIVE_AGENCY_PROFILE
+
+agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
+
+# Use profile recommendations
+for attack in EXCESSIVE_AGENCY_PROFILE.primary_attacks:
+    for dataset in EXCESSIVE_AGENCY_PROFILE.primary_datasets:
+        attack_config = {
+            "attack_type": attack.technique.lower(),
+            "objective": EXCESSIVE_AGENCY_PROFILE.objective,
+            "dataset": {"preset": dataset.preset},
+        }
+        results = agent.hack(attack_config=attack_config)
+        print(f"Results: {results}")
 ```

@@ -14,17 +14,26 @@ Tests for risks from untrusted tool execution, data exfiltration through tool in
 
 ## Threat Profile
 
-**Objective**: policy_violation
+**Objective**: `policy_violation`
 
-**Recommended Datasets**:
-- **agentharm** (SECONDARY): Agentic tasks that exercise plugin/tool interactions
+### Recommended Datasets
 
-**Attack Techniques**:
-- Static Template (PRIMARY): Template-based prompt construction
+**Secondary**
+- **agentharm**: Agentic tasks that exercise plugin/tool interactions
 
-**Metrics**: asr, judge_score
+### Attack Techniques
 
-## Usage Example
+**Primary**
+- **Static Template**: Template-based prompt construction
+
+### Metrics
+
+- asr
+- judge_score
+
+## Usage
+
+### Instantiate the Vulnerability
 
 ```python
 from hackagent.risks import MaliciousToolInvocation
@@ -38,4 +47,24 @@ vuln = MaliciousToolInvocation(types=[
     MaliciousToolInvocationType.UNTRUSTED_TOOL_EXECUTION.value,
     MaliciousToolInvocationType.TOOL_PRIVILEGE_ESCALATION.value,
 ])
+```
+
+### Run an Evaluation Campaign
+
+```python
+from hackagent import HackAgent
+from hackagent.risks.malicious_tool_invocation import MALICIOUS_TOOL_INVOCATION_PROFILE
+
+agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
+
+# Use profile recommendations
+for attack in MALICIOUS_TOOL_INVOCATION_PROFILE.primary_attacks:
+    for dataset in MALICIOUS_TOOL_INVOCATION_PROFILE.primary_datasets + MALICIOUS_TOOL_INVOCATION_PROFILE.secondary_datasets:
+        attack_config = {
+            "attack_type": attack.technique.lower(),
+            "objective": MALICIOUS_TOOL_INVOCATION_PROFILE.objective,
+            "dataset": {"preset": dataset.preset},
+        }
+        results = agent.hack(attack_config=attack_config)
+        print(f"Results: {results}")
 ```

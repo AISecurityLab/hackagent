@@ -583,7 +583,6 @@ for profile in rag_profiles:
 
 ## Learn More
 
-- **[Vulnerabilities](./vulnerabilities)** — Complete reference for all 13 vulnerability classes
-- **[Threat Profiles](./threat-profiles)** — Detailed profile documentation
+- **[Vulnerabilities](./vulnerabilities)** — Complete reference for all 13 vulnerability classes, each with its threat profile
 - **[Datasets](/datasets)** — Available dataset presets
 - **[Attacks](/attacks)** — Attack techniques and configuration

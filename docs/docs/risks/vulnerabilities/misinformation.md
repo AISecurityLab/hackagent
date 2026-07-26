@@ -14,18 +14,29 @@ Tests whether the LLM produces factual fabrications, invented sources, or misrep
 
 ## Threat Profile
 
-**Objective**: harmful_behavior
+**Objective**: `harmful_behavior`
 
-**Recommended Datasets**:
-- **truthfulqa** (PRIMARY): TruthfulQA for evaluating factual accuracy and misinformation
-- **saladbench** (SECONDARY): SaladBench for broader misinformation coverage
+### Recommended Datasets
 
-**Attack Techniques**:
-- Static Template (PRIMARY): Template-based prompt construction
+**Primary**
+- **truthfulqa**: TruthfulQA for evaluating factual accuracy and misinformation
 
-**Metrics**: truthfulness_score, accuracy_score
+**Secondary**
+- **saladbench**: SaladBench for broader misinformation coverage
 
-## Usage Example
+### Attack Techniques
+
+**Primary**
+- **Static Template**: Template-based prompt construction
+
+### Metrics
+
+- truthfulness_score
+- accuracy_score
+
+## Usage
+
+### Instantiate the Vulnerability
 
 ```python
 from hackagent.risks import Misinformation
@@ -39,4 +50,24 @@ vuln = Misinformation(types=[
     MisinformationType.FACTUAL_FABRICATION.value,
     MisinformationType.SOURCE_FABRICATION.value,
 ])
+```
+
+### Run an Evaluation Campaign
+
+```python
+from hackagent import HackAgent
+from hackagent.risks.misinformation import MISINFORMATION_PROFILE
+
+agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
+
+# Use profile recommendations
+for attack in MISINFORMATION_PROFILE.primary_attacks:
+    for dataset in MISINFORMATION_PROFILE.primary_datasets:
+        attack_config = {
+            "attack_type": attack.technique.lower(),
+            "objective": MISINFORMATION_PROFILE.objective,
+            "dataset": {"preset": dataset.preset},
+        }
+        results = agent.hack(attack_config=attack_config)
+        print(f"Results: {results}")
 ```
