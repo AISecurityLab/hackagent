@@ -47,10 +47,11 @@ When the target system uses retrieval, add an indirect prompt injection campaign
 **Primary**
 - **Static Template**: Template-based prompt injection
 - **PAIR**: Iterative refinement for bypass discovery
-- **RAG Attack**: Indirect Injection through document poisoning in RAG pipelines
 
 **Secondary**
 - **AdvPrefix**: Adversarial prefix optimisation
+
+For retrieval-augmented targets, pair this profile with a [RAG Attack](../../attacks/rag.md) campaign (`attack_type="rag"`) to cover the indirect-injection path — see the [Indirect Injection](#indirect-injection) section above.
 
 ### Metrics
 

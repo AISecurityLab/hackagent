@@ -117,7 +117,7 @@ print(JAILBREAK_PROFILE.dataset_presets)
 # ['strongreject', 'harmbench', 'advbench', 'jailbreakbench', ...]
 
 print(JAILBREAK_PROFILE.attack_techniques)
-# ['StaticTemplate', 'PAIR', 'AdvPrefix']
+# ['h4rm3l', 'TAP', 'PAIR']
 
 print(JAILBREAK_PROFILE.objective)   # 'jailbreak'
 print(JAILBREAK_PROFILE.metrics)     # ['asr', 'judge_score']
