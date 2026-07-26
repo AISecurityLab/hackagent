@@ -174,7 +174,7 @@ class AttacksTab(Container):
     }
 
     AttacksTab RadioButton.-on > .toggle--label {
-        color: #ffffff;
+        color: $brand-text;
     }
 
     AttacksTab RadioButton:hover > .toggle--label,

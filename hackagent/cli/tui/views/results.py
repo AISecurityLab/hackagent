@@ -20,6 +20,14 @@ from textual.widgets import Button, Collapsible, DataTable, Label, Select, Stati
 
 from hackagent.cli.config import CLIConfig
 from hackagent.cli.tui.base import BaseTab
+from hackagent.cli.tui.theme import (
+    ERRORED,
+    MITIGATED,
+    NOT_EVALUATED,
+    VULNERABLE,
+    classify_evaluation_status,
+    classify_run_status,
+)
 
 
 def _escape(value: Any) -> str:
@@ -640,11 +648,7 @@ def _format_trace_block(
         num_results = result_inner.get("num_results", "?")
         best_score = result_inner.get("best_score", 0.0)
         is_success = result_inner.get("is_success", False)
-        jb_icon = (
-            "[bright_green]✓ JAILBREAK[/bright_green]"
-            if is_success
-            else "[red]✗ REFUSED[/red]"
-        )
+        jb_icon = VULNERABLE.render() if is_success else MITIGATED.render()
         score_color = "bright_green" if best_score > 0 else "dim"
         header = f"  [bold green]{_step_num_circle(step_num)} 📋 SUMMARY[/bold green]{ts_str}"
         body = (
@@ -856,35 +860,18 @@ def _format_trace_content(content: Any, step_type: str, step_color: str) -> str:
 def _get_result_status_info(result: Any) -> tuple[str, str, str]:
     """Get status display info for a result.
 
+    The label, colour and icon come from the shared defender-polarity
+    vocabulary in :mod:`hackagent.cli.tui.theme`: a jailbreak that got through
+    is a red ``Vulnerable`` result, not a green success.
+
     Args:
         result: Result object with evaluation_status
 
     Returns:
-        Tuple of (eval_status, status_color, status_icon)
+        Tuple of (status_label, status_color, status_icon)
     """
-    eval_status = "N/A"
-    if hasattr(result, "evaluation_status"):
-        eval_status = (
-            result.evaluation_status.value
-            if hasattr(result.evaluation_status, "value")
-            else str(result.evaluation_status)
-        )
-
-    # Determine color and icon based on status
-    if "SUCCESSFUL" in eval_status.upper() and "JAILBREAK" in eval_status.upper():
-        status_color = "green"
-        status_icon = "✅"
-    elif "FAILED" in eval_status.upper() and "JAILBREAK" in eval_status.upper():
-        status_color = "red"
-        status_icon = "❌"
-    elif "ERROR" in eval_status.upper():
-        status_color = "red"
-        status_icon = "⚠️"
-    else:
-        status_color = "yellow"
-        status_icon = "ℹ️"
-
-    return eval_status, status_color, status_icon
+    outcome = classify_evaluation_status(getattr(result, "evaluation_status", None))
+    return outcome.label, outcome.color, outcome.icon
 
 
 def _format_result_summary(result: Any, index: int) -> str:
@@ -897,7 +884,7 @@ def _format_result_summary(result: Any, index: int) -> str:
     Returns:
         Formatted summary string for the collapsible title
     """
-    eval_status, status_color, status_icon = _get_result_status_info(result)
+    status_label, status_color, status_icon = _get_result_status_info(result)
 
     # Goal text — prefer result.goal, fall back to metadata
     goal_text = ""
@@ -928,7 +915,7 @@ def _format_result_summary(result: Any, index: int) -> str:
         except (TypeError, ValueError):
             score_str = ""
 
-    return f"{status_icon} [bold]#{index}[/bold] [{status_color}]{_escape(eval_status)}[/]{goal_text}{timing}{score_str}"
+    return f"{status_icon} [bold]#{index}[/bold] [{status_color}]{_escape(status_label)}[/]{goal_text}{timing}{score_str}"
 
 
 def _format_result_full_details(
@@ -947,7 +934,7 @@ def _format_result_full_details(
     Returns:
         Formatted details string
     """
-    eval_status, status_color, status_icon = _get_result_status_info(result)
+    status_label, status_color, status_icon = _get_result_status_info(result)
     meta: dict = getattr(result, "metadata", None) or {}
 
     details = ""
@@ -958,7 +945,7 @@ def _format_result_full_details(
     details += "[bold bright_cyan]┌─ 📋 Result ──────────────────────────────────┐[/bold bright_cyan]\n\n"
 
     # Status + timing
-    details += f"  {status_icon} [bold {status_color}]{_escape(eval_status)}[/bold {status_color}]"
+    details += f"  {status_icon} [bold {status_color}]{_escape(status_label)}[/bold {status_color}]"
     elapsed = meta.get("elapsed_s")
     if elapsed is not None:
         try:
@@ -1198,18 +1185,23 @@ class ResultsTab(BaseTab):
         background: $surface;
     }
     
-    ResultsTab .result-collapsible.-success > CollapsibleTitle {
-        background: $success-darken-3;
-        color: $text;
-    }
-    
-    ResultsTab .result-collapsible.-failed > CollapsibleTitle {
+    ResultsTab .result-collapsible.-vulnerable > CollapsibleTitle {
         background: $error-darken-3;
         color: $text;
     }
-    
-    ResultsTab .result-collapsible.-pending > CollapsibleTitle {
+
+    ResultsTab .result-collapsible.-mitigated > CollapsibleTitle {
+        background: $success-darken-3;
+        color: $text;
+    }
+
+    ResultsTab .result-collapsible.-errored > CollapsibleTitle {
         background: $warning-darken-3;
+        color: $text;
+    }
+
+    ResultsTab .result-collapsible.-not-evaluated > CollapsibleTitle {
+        background: $surface-darken-1;
         color: $text;
     }
     
@@ -1336,7 +1328,14 @@ class ResultsTab(BaseTab):
         try:
             table = self.query_one("#results-table", DataTable)
             table.clear(columns=True)
-            table.add_columns("#", "⚡", "Agent", "Attack", "✅/❌", "Created")
+            table.add_columns(
+                "#",
+                "State",
+                "Agent",
+                "Attack",
+                f"{VULNERABLE.icon}/{MITIGATED.icon}",
+                "Created",
+            )
         except Exception as e:
             self.app.notify(f"Failed to initialize table: {str(e)}", severity="error")
 
@@ -1543,25 +1542,15 @@ class ResultsTab(BaseTab):
                         res_page = backend.list_results(
                             run_id=rid, page=1, page_size=500
                         )
-                        success = sum(
-                            1
+                        outcomes = [
+                            classify_evaluation_status(
+                                getattr(r, "evaluation_status", None)
+                            )
                             for r in res_page.items
-                            if "SUCCESSFUL"
-                            in str(getattr(r, "evaluation_status", "")).upper()
-                            and "JAILBREAK"
-                            in str(getattr(r, "evaluation_status", "")).upper()
-                        )
-                        fail = sum(
-                            1
-                            for r in res_page.items
-                            if "FAILED"
-                            in str(getattr(r, "evaluation_status", "")).upper()
-                            and "JAILBREAK"
-                            in str(getattr(r, "evaluation_status", "")).upper()
-                        )
+                        ]
                         self._result_counts[str(run.id)] = (
-                            success,
-                            fail,
+                            sum(1 for o in outcomes if o is VULNERABLE),
+                            sum(1 for o in outcomes if o is MITIGATED),
                             len(res_page.items),
                         )
                     except Exception:
@@ -1633,27 +1622,10 @@ class ResultsTab(BaseTab):
             numbered_runs = list(enumerate(sorted_runs, start=1))
 
             for idx, run in numbered_runs:
-                # Get status with color coding from Run.status
-                status_display = "Unknown"
-                if hasattr(run, "status"):
-                    status_val = run.status
-                    if hasattr(status_val, "value"):
-                        status_display = status_val.value
-                    else:
-                        status_display = str(status_val)
-
-                    # Color code based on status - show only emoji
-                    status_upper = status_display.upper()
-                    if status_upper == "COMPLETED":
-                        status_display = "[green]✅[/green]"
-                    elif status_upper == "RUNNING":
-                        status_display = "[cyan]🔄[/cyan]"
-                    elif status_upper == "FAILED":
-                        status_display = "[red]❌[/red]"
-                    elif status_upper == "PENDING":
-                        status_display = "[yellow]⏳[/yellow]"
-                    else:
-                        status_display = "[dim]❓[/dim]"
+                # Run state icon, colour-coded from the shared vocabulary
+                status_display = classify_run_status(
+                    getattr(run, "status", None)
+                ).render_icon()
 
                 # Get agent name — prefer explicit name, otherwise resolve agent_id
                 if hasattr(run, "agent_name") and run.agent_name:
@@ -1692,33 +1664,29 @@ class ResultsTab(BaseTab):
                         ts, fmt="%m/%d %H:%M", fallback=str(ts)[:10]
                     )
 
-                # Calculate success/failure ratio — prefer nested results, fall back to cache
+                # Vulnerable/mitigated ratio — prefer nested results, fall back to cache
                 if hasattr(run, "results") and run.results:
                     total_results = len(run.results)
-                    success_count = sum(
-                        1
+                    outcomes = [
+                        classify_evaluation_status(
+                            getattr(r, "evaluation_status", None)
+                        )
                         for r in run.results
-                        if "SUCCESSFUL"
-                        in str(getattr(r, "evaluation_status", "")).upper()
-                        and "JAILBREAK"
-                        in str(getattr(r, "evaluation_status", "")).upper()
-                    )
-                    fail_count = sum(
-                        1
-                        for r in run.results
-                        if "FAILED" in str(getattr(r, "evaluation_status", "")).upper()
-                        and "JAILBREAK"
-                        in str(getattr(r, "evaluation_status", "")).upper()
-                    )
+                    ]
+                    vulnerable_count = sum(1 for o in outcomes if o is VULNERABLE)
+                    mitigated_count = sum(1 for o in outcomes if o is MITIGATED)
                 else:
-                    success_count, fail_count, total_results = self._result_counts.get(
-                        str(run.id), (0, 0, 0)
-                    )
+                    (
+                        vulnerable_count,
+                        mitigated_count,
+                        total_results,
+                    ) = self._result_counts.get(str(run.id), (0, 0, 0))
 
-                # Format results as success/fail ratio with colors
+                # Format as vulnerable/mitigated ratio with matching colours
                 if total_results > 0:
                     results_display = (
-                        f"[green]{success_count}[/green]/[red]{fail_count}[/red]"
+                        f"[{VULNERABLE.color}]{vulnerable_count}[/{VULNERABLE.color}]"
+                        f"/[{MITIGATED.color}]{mitigated_count}[/{MITIGATED.color}]"
                     )
                 else:
                     results_display = "[dim]0/0[/dim]"
@@ -1729,7 +1697,7 @@ class ResultsTab(BaseTab):
                 # Store in mapping for later lookup
                 self._run_id_map[run_id_str] = run
 
-                # Add row with columns: #, Status, Agent, Success/Fail, Created
+                # Columns: #, State, Agent, Attack, Vulnerable/Mitigated, Created
                 # Use the full run ID string as the row key for stable selection
                 table.add_row(
                     str(idx),
@@ -1742,55 +1710,53 @@ class ResultsTab(BaseTab):
                 )
 
             # Calculate overall statistics — use cached counts when results are not embedded
-            total_success = 0
-            total_failed = 0
-            total_pending = 0
+            total_vulnerable = 0
+            total_mitigated = 0
+            total_unevaluated = 0
             for run in self.results_data:
                 if hasattr(run, "results") and run.results:
                     for result in run.results:
-                        eval_status = str(getattr(result, "evaluation_status", ""))
-                        if hasattr(getattr(result, "evaluation_status", None), "value"):
-                            eval_status = result.evaluation_status.value
-                        if (
-                            "SUCCESSFUL" in eval_status.upper()
-                            and "JAILBREAK" in eval_status.upper()
-                        ):
-                            total_success += 1
-                        elif (
-                            "FAILED" in eval_status.upper()
-                            and "JAILBREAK" in eval_status.upper()
-                        ):
-                            total_failed += 1
+                        outcome = classify_evaluation_status(
+                            getattr(result, "evaluation_status", None)
+                        )
+                        if outcome is VULNERABLE:
+                            total_vulnerable += 1
+                        elif outcome is MITIGATED:
+                            total_mitigated += 1
                         else:
-                            total_pending += 1
+                            total_unevaluated += 1
                 else:
-                    s, f, t = self._result_counts.get(str(run.id), (0, 0, 0))
-                    total_success += s
-                    total_failed += f
-                    total_pending += max(0, t - s - f)
+                    v, m, t = self._result_counts.get(str(run.id), (0, 0, 0))
+                    total_vulnerable += v
+                    total_mitigated += m
+                    total_unevaluated += max(0, t - v - m)
 
-            total_results = total_success + total_failed + total_pending
-            success_rate = (
-                (total_success / total_results * 100) if total_results > 0 else 0
+            total_results = total_vulnerable + total_mitigated + total_unevaluated
+            robustness = (
+                (total_mitigated / total_results * 100) if total_results > 0 else 0
             )
 
-            # Show enhanced summary with visual success bar
+            # Show enhanced summary with a visual outcome bar
             header_widget = self.query_one("#run-header-static", Static)
 
-            # Create visual progress bar
+            # Create visual outcome bar
             bar_width = 30
-            success_blocks = int(
-                (total_success / total_results * bar_width) if total_results > 0 else 0
+            vulnerable_blocks = int(
+                (total_vulnerable / total_results * bar_width)
+                if total_results > 0
+                else 0
             )
-            failed_blocks = int(
-                (total_failed / total_results * bar_width) if total_results > 0 else 0
+            mitigated_blocks = int(
+                (total_mitigated / total_results * bar_width)
+                if total_results > 0
+                else 0
             )
-            pending_blocks = bar_width - success_blocks - failed_blocks
+            unevaluated_blocks = bar_width - vulnerable_blocks - mitigated_blocks
 
-            progress_bar = (
-                f"[green]{'█' * success_blocks}[/green]"
-                f"[red]{'█' * failed_blocks}[/red]"
-                f"[yellow]{'░' * pending_blocks}[/yellow]"
+            outcome_bar = (
+                f"[{VULNERABLE.color}]{'█' * vulnerable_blocks}[/{VULNERABLE.color}]"
+                f"[{MITIGATED.color}]{'█' * mitigated_blocks}[/{MITIGATED.color}]"
+                f"[{NOT_EVALUATED.color}]{'░' * unevaluated_blocks}[/{NOT_EVALUATED.color}]"
             )
 
             header_widget.update(
@@ -1798,11 +1764,11 @@ class ResultsTab(BaseTab):
                 f"[dim]{'─' * 40}[/dim]\n\n"
                 f"  [bold]Runs:[/bold] [bright_white]{len(self.results_data)}[/bright_white]    "
                 f"[bold]Total Results:[/bold] [bright_white]{total_results}[/bright_white]\n\n"
-                f"  {progress_bar}\n"
-                f"  [green]✅ {total_success}[/green] successful   "
-                f"[red]❌ {total_failed}[/red] failed   "
-                f"[yellow]⏳ {total_pending}[/yellow] pending\n\n"
-                f"  [bold]Success Rate:[/bold] [{'green' if success_rate >= 50 else 'yellow' if success_rate >= 25 else 'red'}]{success_rate:.1f}%[/]\n\n"
+                f"  {outcome_bar}\n"
+                f"  [{VULNERABLE.color}]{VULNERABLE.icon} {total_vulnerable}[/{VULNERABLE.color}] {VULNERABLE.label.lower()}   "
+                f"[{MITIGATED.color}]{MITIGATED.icon} {total_mitigated}[/{MITIGATED.color}] {MITIGATED.label.lower()}   "
+                f"[{NOT_EVALUATED.color}]{NOT_EVALUATED.icon} {total_unevaluated} not evaluated[/{NOT_EVALUATED.color}]\n\n"
+                f"  [bold]Robustness:[/bold] [{'green' if robustness >= 75 else 'yellow' if robustness >= 50 else 'red'}]{robustness:.1f}%[/]\n\n"
                 f"[dim]💡 Click a row to view detailed results[/dim]"
             )
 
@@ -1969,56 +1935,22 @@ class ResultsTab(BaseTab):
             else:
                 status_display = str(status_val)
 
-        # Status color and icon based on status
-        status_color = "yellow"
-        status_icon = "🔄"
-        if status_display.upper() == "COMPLETED":
-            status_color = "green"
-            status_icon = "✅"
-        elif status_display.upper() == "FAILED":
-            status_color = "red"
-            status_icon = "❌"
-        elif status_display.upper() == "RUNNING":
-            status_color = "cyan"
-            status_icon = "⚡"
-        elif status_display.upper() == "PENDING":
-            status_color = "yellow"
-            status_icon = "⏳"
+        # Status colour and icon from the shared run-state vocabulary
+        run_state = classify_run_status(getattr(run, "status", None))
+        status_color = run_state.color
+        status_icon = run_state.icon
 
         # Get results count and evaluation summary
         results_count = len(run_results)
 
-        # Count evaluation statuses
-        eval_summary = {
-            "SUCCESSFUL_JAILBREAK": 0,
-            "FAILED_JAILBREAK": 0,
-            "NOT_EVALUATED": 0,
-            "ERROR": 0,
-            "OTHER": 0,
-        }
+        # Count outcomes using the shared vocabulary
+        eval_summary = {outcome.key: 0 for outcome in (VULNERABLE, MITIGATED, ERRORED)}
+        eval_summary[NOT_EVALUATED.key] = 0
         for result in run_results:
-            if hasattr(result, "evaluation_status"):
-                eval_status = (
-                    result.evaluation_status.value
-                    if hasattr(result.evaluation_status, "value")
-                    else str(result.evaluation_status)
-                )
-                if (
-                    "SUCCESSFUL" in eval_status.upper()
-                    and "JAILBREAK" in eval_status.upper()
-                ):
-                    eval_summary["SUCCESSFUL_JAILBREAK"] += 1
-                elif (
-                    "FAILED" in eval_status.upper()
-                    and "JAILBREAK" in eval_status.upper()
-                ):
-                    eval_summary["FAILED_JAILBREAK"] += 1
-                elif "NOT_EVALUATED" in eval_status.upper():
-                    eval_summary["NOT_EVALUATED"] += 1
-                elif "ERROR" in eval_status.upper():
-                    eval_summary["ERROR"] += 1
-                else:
-                    eval_summary["OTHER"] += 1
+            outcome = classify_evaluation_status(
+                getattr(result, "evaluation_status", None)
+            )
+            eval_summary[outcome.key] += 1
 
         header = f"""[bold cyan]╔{"═" * 50}╗[/bold cyan]
 [bold cyan]║[/bold cyan] [bold bright_white]📊 Report Details[/bold bright_white]{" " * 33}[bold cyan]║[/bold cyan]
@@ -2026,14 +1958,14 @@ class ResultsTab(BaseTab):
 
 """
         # ── Summary Stats Bar ───────────────────────────────────────────
-        vuln_count = eval_summary["SUCCESSFUL_JAILBREAK"]
-        mitigated_count = eval_summary["FAILED_JAILBREAK"]
-        error_count = eval_summary["ERROR"]
+        vuln_count = eval_summary[VULNERABLE.key]
+        mitigated_count = eval_summary[MITIGATED.key]
+        error_count = eval_summary[ERRORED.key]
         header += (
-            f"  [bold bright_cyan]{results_count}[/bold bright_cyan] [dim]Total Tests[/dim]"
-            f"    [bold red]{vuln_count}[/bold red] [dim]Vulnerabilities[/dim]"
-            f"    [bold green]{mitigated_count}[/bold green] [dim]Mitigated[/dim]"
-            f"    [bold yellow]{error_count}[/bold yellow] [dim]Errors[/dim]\n"
+            f"  [bold bright_cyan]{results_count}[/bold bright_cyan] [dim]Total Results[/dim]"
+            f"    [bold {VULNERABLE.color}]{vuln_count}[/bold {VULNERABLE.color}] [dim]{VULNERABLE.label}[/dim]"
+            f"    [bold {MITIGATED.color}]{mitigated_count}[/bold {MITIGATED.color}] [dim]{MITIGATED.label}[/dim]"
+            f"    [bold {ERRORED.color}]{error_count}[/bold {ERRORED.color}] [dim]{ERRORED.label}[/dim]\n"
         )
         header += f"  [dim]{'─' * 50}[/dim]\n\n"
 
@@ -2132,7 +2064,7 @@ class ResultsTab(BaseTab):
         header += f"  🤖 [bold]Agent:[/bold]     [bright_cyan]{_escape(agent_display)}[/bright_cyan]\n"
         header += f"  🏢 [bold]Org:[/bold]       [bright_cyan]{_escape(org_display)}[/bright_cyan]\n"
         header += f"  📅 [bold]Time:[/bold]      {_escape(created)}\n"
-        header += f"  {status_icon} [bold]Status:[/bold]    [bright_{status_color}]{_escape(status_display)}[/bright_{status_color}]\n"
+        header += f"  {status_icon} [bold]Status:[/bold]    [{status_color}]{_escape(status_display)}[/{status_color}]\n"
 
         # Attack config from attack record
         attack_config = {}
@@ -2208,48 +2140,16 @@ class ResultsTab(BaseTab):
 
             # Create collapsible for each result
             for idx, result in enumerate(run_results, 1):
-                # Get status info for CSS class
-                eval_status, status_color, _ = _get_result_status_info(result)
-
-                # Determine CSS class for status coloring
-                css_class = "result-collapsible"
-                if (
-                    "SUCCESSFUL" in eval_status.upper()
-                    and "JAILBREAK" in eval_status.upper()
-                ):
-                    css_class += " -success"
-                elif (
-                    "FAILED" in eval_status.upper()
-                    and "JAILBREAK" in eval_status.upper()
-                ):
-                    css_class += " -failed"
-                elif "ERROR" in eval_status.upper():
-                    css_class += " -failed"
-                else:
-                    css_class += " -pending"
+                outcome = classify_evaluation_status(
+                    getattr(result, "evaluation_status", None)
+                )
+                css_class = f"result-collapsible {outcome.css_class}"
 
                 # Resolve traces — embedded or pre-fetched
                 result_traces = _traces_by_result.get(str(result.id)) or []
 
-                # Create the title
-                eval_status_short = ""
-                if (
-                    "SUCCESSFUL" in eval_status.upper()
-                    and "JAILBREAK" in eval_status.upper()
-                ):
-                    eval_status_short = "[red]Vulnerable[/red]"
-                elif (
-                    "FAILED" in eval_status.upper()
-                    and "JAILBREAK" in eval_status.upper()
-                ):
-                    eval_status_short = "[green]Safe[/green]"
-                elif "ERROR" in eval_status.upper():
-                    eval_status_short = "[yellow]Error[/yellow]"
-                else:
-                    eval_status_short = f"[dim]{_escape(eval_status)}[/dim]"
-
                 trace_count_str = f" 🔍 {len(result_traces)}" if result_traces else ""
-                title = f"Test #{idx}{trace_count_str}    {eval_status_short}"
+                title = f"Result #{idx}{trace_count_str}    {outcome.render()}"
 
                 # Create collapsible with full details inside
                 collapsible = Collapsible(
