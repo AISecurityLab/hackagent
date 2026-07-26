@@ -645,5 +645,58 @@ class TestLocalBackendThreadSafety(unittest.TestCase):
                 backend.close()
 
 
+class TestLocalBackendBuilderDrafts(unittest.TestCase):
+    """Test attack-builder draft persistence."""
+
+    def test_save_list_get_delete_roundtrip(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            backend = _make_backend(tmp)
+            try:
+                canvas = {"target": {"agent_name": "victim"}, "attacks": [{"a": 1}]}
+                draft = backend.save_builder_draft("my draft", canvas)
+                self.assertEqual(draft["name"], "my draft")
+                self.assertEqual(draft["canvas"], canvas)
+
+                self.assertEqual(len(backend.list_builder_drafts()), 1)
+                fetched = backend.get_builder_draft(draft["id"])
+                self.assertEqual(fetched["canvas"], canvas)
+
+                backend.delete_builder_draft(draft["id"])
+                self.assertEqual(backend.list_builder_drafts(), [])
+                self.assertIsNone(backend.get_builder_draft(draft["id"]))
+            finally:
+                backend.close()
+
+    def test_save_with_existing_id_updates_in_place(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            backend = _make_backend(tmp)
+            try:
+                first = backend.save_builder_draft("v1", {"attacks": []})
+                second = backend.save_builder_draft(
+                    "v2", {"attacks": [{"attack_type": "pair"}]}, first["id"]
+                )
+                self.assertEqual(second["id"], first["id"])
+                self.assertEqual(second["created_at"], first["created_at"])
+                drafts = backend.list_builder_drafts()
+                self.assertEqual(len(drafts), 1)
+                self.assertEqual(drafts[0]["name"], "v2")
+            finally:
+                backend.close()
+
+    def test_drafts_persist_across_instances(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "test.db")
+            b1 = LocalBackend(db_path=path)
+            b1.save_builder_draft("kept", {"attacks": []})
+            b1.close()
+            b2 = LocalBackend(db_path=path)
+            try:
+                self.assertEqual(
+                    [d["name"] for d in b2.list_builder_drafts()], ["kept"]
+                )
+            finally:
+                b2.close()
+
+
 if __name__ == "__main__":
     unittest.main()
