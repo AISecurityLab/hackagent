@@ -17,6 +17,12 @@ from hackagent.attacks.generator import AttackTemplates
 from hackagent.attacks.shared.response_utils import extract_response_content
 from hackagent.attacks.techniques.bon.generation import augment_text
 from hackagent.attacks.techniques.cipherchat.encode_experts import encode_expert_dict
+from hackagent.attacks.techniques.fc.flowchart_renderer import TEXT_FORMAT_SERIALIZERS
+from hackagent.attacks.techniques.fc.generation import (
+    _decompose_goal_to_steps,
+    _parse_steps_from_response,
+)
+from hackagent.attacks.techniques.fc.prompts import FEW_SHOT_STEP_DECOMPOSITION
 from hackagent.attacks.techniques.h4rm3l.config import PRESET_PROGRAMS
 from hackagent.attacks.techniques.h4rm3l.decorators import (
     compile_program,
@@ -37,6 +43,7 @@ SUPPORTED_JAILBREAK_TECHNIQUES = (
     "cipherchat",
     "bon",
     "pap",
+    "fc",
 )
 
 DEFAULT_JAILBREAK_CONFIG: Dict[str, Any] = {
@@ -56,12 +63,17 @@ DEFAULT_JAILBREAK_CONFIG: Dict[str, Any] = {
     "seed": 0,
     # pap options (LLM-assisted — uses the RAG attack's own attacker LLM)
     "pap_techniques": "top5",
+    # fc options (LLM-assisted, falls back to heuristic decomposition)
+    "fc_num_steps": 6,
+    "fc_text_format": "ascii",
 }
 
 # Hardcoded attacker-LLM call params for LLM-assisted techniques (pap, fc).
 # Not exposed as config — keeps the jailbreak config surface thin.
 _PAP_ATTACKER_MAX_TOKENS = 300
 _PAP_ATTACKER_TEMPERATURE = 1.0
+_FC_ATTACKER_MAX_TOKENS = 300
+_FC_ATTACKER_TEMPERATURE = 0.3
 
 
 class JailbreakFramer:
@@ -308,6 +320,75 @@ def _build_pap_framer(
     return JailbreakFramer("pap", _transform)
 
 
+def _generate_fc_steps_via_llm(
+    goal: str,
+    num_steps: int,
+    attacker_router: AgentRouter,
+    attacker_reg_key: str,
+    logger: Optional[logging.Logger],
+) -> Optional[List[str]]:
+    try:
+        prompt = FEW_SHOT_STEP_DECOMPOSITION.format(goal=goal)
+        response = attacker_router.route_request(
+            registration_key=attacker_reg_key,
+            request_data={
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": _FC_ATTACKER_MAX_TOKENS,
+                "temperature": _FC_ATTACKER_TEMPERATURE,
+            },
+        )
+        generated_text = extract_response_content(response) or ""
+        if generated_text:
+            return _parse_steps_from_response(generated_text, num_steps)
+    except Exception as e:
+        if logger is not None:
+            logger.warning(f"fc jailbreak step generator failed, using fallback: {e}")
+    return None
+
+
+def _build_fc_framer(
+    config: Dict[str, Any],
+    logger: Optional[logging.Logger] = None,
+    attacker_router: Optional[AgentRouter] = None,
+    attacker_reg_key: Optional[str] = None,
+) -> JailbreakFramer:
+    if attacker_router is None or attacker_reg_key is None:
+        raise ValueError(
+            "The 'fc' jailbreak technique requires an attacker LLM router; "
+            "none was provided."
+        )
+
+    raw_num_steps = config.get("fc_num_steps", 6)
+    try:
+        num_steps = max(2, int(raw_num_steps))
+    except (TypeError, ValueError):
+        num_steps = 6
+
+    text_format = str(config.get("fc_text_format", "ascii")).strip().lower()
+    serializer = TEXT_FORMAT_SERIALIZERS.get(text_format)
+    if serializer is None:
+        raise ValueError(
+            f"Unsupported fc text_format '{text_format}'. "
+            f"Supported: {sorted(TEXT_FORMAT_SERIALIZERS)}"
+        )
+
+    def _transform(goal: str, variant_index: int) -> Tuple[str, Dict[str, Any]]:
+        steps = _generate_fc_steps_via_llm(
+            goal, num_steps, attacker_router, attacker_reg_key, logger
+        )
+        used_llm = steps is not None
+        if not steps:
+            steps = _decompose_goal_to_steps(goal, num_steps)
+        framed = serializer(goal, steps)
+        return framed, {
+            "text_format": text_format,
+            "num_steps": len(steps),
+            "llm_assisted": used_llm,
+        }
+
+    return JailbreakFramer("fc", _transform)
+
+
 _TECHNIQUE_BUILDERS: Dict[str, Callable[..., JailbreakFramer]] = {
     "static_template": _build_static_template_framer,
     "h4rm3l": _build_h4rm3l_framer,
@@ -315,6 +396,7 @@ _TECHNIQUE_BUILDERS: Dict[str, Callable[..., JailbreakFramer]] = {
     "cipherchat": _build_cipherchat_framer,
     "bon": _build_bon_framer,
     "pap": _build_pap_framer,
+    "fc": _build_fc_framer,
 }
 
 

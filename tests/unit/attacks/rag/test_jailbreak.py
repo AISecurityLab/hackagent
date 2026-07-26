@@ -303,5 +303,74 @@ class TestPapFramer(unittest.TestCase):
         self.assertTrue(metadata["pap_fallback"])
 
 
+class TestFcFramer(unittest.TestCase):
+    def test_requires_attacker_router(self):
+        with self.assertRaises(ValueError):
+            build_jailbreak_framer({"enabled": True, "technique": "fc"}, LOGGER)
+
+    def test_frames_goal_with_llm_steps(self):
+        router = MagicMock()
+        router.route_request.return_value = {
+            "generated_text": "1. Step one.\n2. Step two.\n3. Step three."
+        }
+        framer = build_jailbreak_framer(
+            {"enabled": True, "technique": "fc", "fc_num_steps": 3},
+            LOGGER,
+            attacker_router=router,
+            attacker_reg_key="attacker",
+        )
+        framed, metadata = framer.apply("do the bad thing")
+        self.assertIn("Step one", framed)
+        self.assertEqual(metadata["technique"], "fc")
+        self.assertEqual(metadata["text_format"], "ascii")
+        self.assertTrue(metadata["llm_assisted"])
+
+    def test_attacker_failure_falls_back_to_heuristic_steps(self):
+        router = MagicMock()
+        router.route_request.side_effect = RuntimeError("boom")
+        framer = build_jailbreak_framer(
+            {"enabled": True, "technique": "fc", "fc_num_steps": 3},
+            LOGGER,
+            attacker_router=router,
+            attacker_reg_key="attacker",
+        )
+        framed, metadata = framer.apply("do the bad thing")
+        self.assertTrue(framed)
+        self.assertFalse(metadata["llm_assisted"])
+
+    def test_unsupported_text_format_raises(self):
+        with self.assertRaises(ValueError):
+            build_jailbreak_framer(
+                {
+                    "enabled": True,
+                    "technique": "fc",
+                    "fc_text_format": "does_not_exist",
+                },
+                LOGGER,
+                attacker_router=MagicMock(),
+                attacker_reg_key="attacker",
+            )
+
+    def test_mermaid_text_format(self):
+        router = MagicMock()
+        router.route_request.return_value = {
+            "generated_text": "1. Step one.\n2. Step two."
+        }
+        framer = build_jailbreak_framer(
+            {
+                "enabled": True,
+                "technique": "fc",
+                "fc_num_steps": 2,
+                "fc_text_format": "mermaid",
+            },
+            LOGGER,
+            attacker_router=router,
+            attacker_reg_key="attacker",
+        )
+        framed, metadata = framer.apply("do the bad thing")
+        self.assertEqual(metadata["text_format"], "mermaid")
+        self.assertIn("Step one", framed)
+
+
 if __name__ == "__main__":
     unittest.main()
