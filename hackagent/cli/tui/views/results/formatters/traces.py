@@ -40,7 +40,7 @@ def _format_config_dict(config: dict, indent: str = "  ") -> str:
             if len(value) <= 5:
                 items = [_escape(str(v)[:50]) for v in value]
                 output += (
-                    f"{indent}• [bold]{_escape(key)}:[/bold] [{', '.join(items)}]\n"
+                    f"{indent}• [bold]{_escape(key)}:[/bold] \\[{', '.join(items)}]\n"
                 )
             else:
                 output += f"{indent}• [bold]{_escape(key)}:[/bold] [dim]({len(value)} items)[/dim]\n"
