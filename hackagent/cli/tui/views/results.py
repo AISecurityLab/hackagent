@@ -1444,19 +1444,20 @@ class ResultsTab(BaseTab):
                             parts.append(f"{judge_name}: [bold]{val:.3f}[/bold]")
                         except (TypeError, ValueError):
                             continue
-                    bias_gap = strictness.get("bias_gap")
-                    bias_gap_str = ""
-                    if bias_gap is not None:
-                        try:
-                            bias_gap_str = (
-                                f"  Bias gap: [bold]{float(bias_gap):.3f}[/bold]"
-                            )
-                        except (TypeError, ValueError):
-                            pass
-                    summary += (
-                        f"  [dim]Strictness — {'  '.join(parts)}[/dim]"
-                        f"{bias_gap_str}\n"
-                    )
+                    if parts:
+                        bias_gap = strictness.get("bias_gap")
+                        bias_gap_str = ""
+                        if bias_gap is not None:
+                            try:
+                                bias_gap_str = (
+                                    f"  Bias gap: [bold]{float(bias_gap):.3f}[/bold]"
+                                )
+                            except (TypeError, ValueError):
+                                pass
+                        summary += (
+                            f"  [dim]Strictness — {'  '.join(parts)}[/dim]"
+                            f"{bias_gap_str}\n"
+                        )
         else:
             summary += "\n[dim]No evaluation summary synced yet for this run.[/dim]\n"
 
