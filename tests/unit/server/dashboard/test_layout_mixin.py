@@ -89,13 +89,16 @@ class TestBuildSidebar(unittest.TestCase):
     def test_nav_buttons_are_registered_for_every_view(self):
         page, mock_ui, _ = self._build()
 
-        self.assertEqual(set(page.nav_buttons), {"dashboard", "agents", "runs"})
+        self.assertEqual(
+            set(page.nav_buttons), {"dashboard", "agents", "runs", "builder"}
+        )
         nav_calls = {
             call.args[0]: call.kwargs["on_click"]
             for call in mock_ui.button.call_args_list
-            if call.args and call.args[0] in ("Home", "Targets", "History")
+            if call.args
+            and call.args[0] in ("Home", "Targets", "History", "Attack Builder")
         }
-        self.assertEqual(len(nav_calls), 3)
+        self.assertEqual(len(nav_calls), 4)
         nav_calls["Home"]()
         page.navigate.assert_called_once_with("dashboard")
 

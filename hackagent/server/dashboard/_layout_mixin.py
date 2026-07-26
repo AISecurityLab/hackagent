@@ -94,6 +94,7 @@ class DashboardLayoutMixin:
                 ("dashboard", "Home", "dashboard"),
                 ("agents", "Targets", "smart_toy"),
                 ("runs", "History", "assignment"),
+                ("builder", "Attack Builder", "build"),
             ]
             for view_id, label, icon_name in nav_items:
                 btn = (
@@ -150,11 +151,13 @@ class DashboardLayoutMixin:
             dashboard_panel = ui.column().classes("w-full gap-6")
             agents_panel = ui.column().classes("w-full gap-4")
             runs_panel = ui.column().classes("w-full gap-4")
+            builder_panel = ui.column().classes("w-full gap-4")
 
             self.all_panels = {
                 "dashboard": dashboard_panel,
                 "agents": agents_panel,
                 "runs": runs_panel,
+                "builder": builder_panel,
             }
             for panel in self.all_panels.values():
                 panel.set_visibility(False)
@@ -163,6 +166,7 @@ class DashboardLayoutMixin:
             self._build_dashboard_panel(dashboard_panel)
             self._build_agents_panel(agents_panel)
             self._build_runs_panel(runs_panel)
+            self._build_builder_panel(builder_panel)
 
     def _build_dashboard_panel(self, panel: ui.column) -> None:
         with panel:
