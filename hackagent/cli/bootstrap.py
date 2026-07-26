@@ -54,8 +54,8 @@ def _launch_tui_default(ctx):
         app = HackAgentTUI(cli_config)
         app.run()
 
-    except ImportError:
-        console.print("[bold red]❌ TUI dependencies not installed[/bold red]")
+    except ImportError as e:
+        console.print(f"[bold red]❌ TUI dependencies not installed: {e}[/bold red]")
         console.print("\n[cyan]💡 Install with:[/cyan]")
         console.print("  uv add textual")
         console.print("  # or")
