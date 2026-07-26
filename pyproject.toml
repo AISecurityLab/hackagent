@@ -64,7 +64,7 @@ docs = [
     "toml>=0.10.2",
     "packaging>=24,<27",
 ]
-packaging = [
+binaries = [
     "pyinstaller>=6.0",
 ]
 

@@ -3,11 +3,11 @@
 
 """Rich-formatted ``hackagent --help`` page for the top-level CLI group."""
 
-import importlib.metadata
-
 import click
 from rich.console import Console
 from rich.panel import Panel
+
+from hackagent._version import get_version
 
 console = Console()
 
@@ -22,7 +22,7 @@ def _render_rich_help(ctx: click.Context) -> None:
     from hackagent.utils import HACKAGENT_BANNER
 
     c = Console()
-    version = importlib.metadata.version("hackagent")
+    version = get_version()
 
     # ── Logo ──────────────────────────────────────────────────────────────────
     c.print(

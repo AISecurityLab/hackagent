@@ -1892,6 +1892,9 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
+binaries = [
+    { name = "pyinstaller" },
+]
 dev = [
     { name = "anyio" },
     { name = "commitizen" },
@@ -1916,9 +1919,6 @@ docs = [
     { name = "pydoc-markdown" },
     { name = "toml" },
 ]
-packaging = [
-    { name = "pyinstaller" },
-]
 
 [package.metadata]
 requires-dist = [
@@ -1940,6 +1940,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
+binaries = [{ name = "pyinstaller", specifier = ">=6.0" }]
 dev = [
     { name = "anyio", specifier = ">=4.3.0" },
     { name = "commitizen", specifier = ">=4.7.1" },
@@ -1964,7 +1965,6 @@ docs = [
     { name = "pydoc-markdown", specifier = ">=4.8.2" },
     { name = "toml", specifier = ">=0.10.2" },
 ]
-packaging = [{ name = "pyinstaller", specifier = ">=6.0" }]
 
 [[package]]
 name = "hf-xet"

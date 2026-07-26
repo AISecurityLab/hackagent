@@ -37,12 +37,116 @@ jobs:
         run: uv publish
 
       - name: Create GitHub Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          release_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
           body_path: CHANGELOG.md
           draft: false
-          prerelease: false 
+          prerelease: false
+
+  build-binaries:
+    name: Build binary (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x86_64
+            archive: tar.gz
+          - os: macos-latest
+            target: macos-arm64
+            archive: tar.gz
+          - os: macos-13
+            target: macos-x86_64
+            archive: tar.gz
+          - os: windows-latest
+            target: windows-x86_64
+            archive: zip
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - name: Install build dependencies
+        run: uv sync --no-default-groups --group binaries
+
+      - name: Build binary
+        env:
+          HACKAGENT_BUILD_VERSION: ${{ github.ref_name }}
+        run: uv run --no-sync pyinstaller --noconfirm packaging/hackagent.spec
+
+      - name: Smoke test binary (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          ./dist/hackagent/hackagent --version
+          ./dist/hackagent/hackagent version
+          ./dist/hackagent/hackagent scan --help
+
+      - name: Smoke test binary (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          .\dist\hackagent\hackagent.exe --version
+          .\dist\hackagent\hackagent.exe version
+          .\dist\hackagent\hackagent.exe scan --help
+
+      - name: Smoke test TUI launch (Unix)
+        if: runner.os != 'Windows'
+        env:
+          TERM: xterm-256color
+        run: |
+          # No subcommand launches the Textual TUI. Start it, let it settle,
+          # then kill it: still running after the wait means it came up cleanly.
+          ./dist/hackagent/hackagent < /dev/null > tui.log 2>&1 &
+          pid=$!
+          sleep 20
+          if kill -0 "$pid" 2>/dev/null; then
+            kill "$pid" 2>/dev/null || true
+            wait "$pid" 2>/dev/null || true
+            cat tui.log
+          else
+            set +e
+            wait "$pid"
+            status=$?
+            set -e
+            cat tui.log
+            if [ "$status" -ne 0 ]; then
+              echo "TUI failed to launch (exit $status)"
+              exit 1
+            fi
+          fi
+
+      - name: Package archive (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          NAME="hackagent-${VERSION}-${{ matrix.target }}"
+          mv dist/hackagent "dist/${NAME}"
+          tar -czf "${NAME}.tar.gz" -C dist "${NAME}"
+
+      - name: Package archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = "${env:GITHUB_REF_NAME}" -replace '^v', ''
+          $name = "hackagent-$version-${{ matrix.target }}"
+          Move-Item dist/hackagent "dist/$name"
+          Compress-Archive -Path "dist/$name" -DestinationPath "$name.zip"
+
+      - name: Attach archive to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: hackagent-*.${{ matrix.archive }}

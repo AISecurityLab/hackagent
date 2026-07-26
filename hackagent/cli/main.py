@@ -7,7 +7,6 @@ HackAgent CLI Main Entry Point
 Main command-line interface for HackAgent security testing toolkit.
 """
 
-import importlib.metadata
 import importlib.util
 import os
 
@@ -15,6 +14,7 @@ import click
 from rich.console import Console
 from rich.traceback import install
 
+from hackagent._version import get_version
 from hackagent.cli.commands import (
     attack,
     claude as claude_cmd,
@@ -68,9 +68,7 @@ console = Console()
     help="HackAgent API base URL",
 )
 @click.option("--verbose", "-v", count=True, help="Increase verbosity (-v, -vv, -vvv)")
-@click.version_option(
-    version=importlib.metadata.version("hackagent"), prog_name="hackagent"
-)
+@click.version_option(version=get_version(), prog_name="hackagent")
 @click.pass_context
 def cli(ctx, config_file, api_key, base_url, verbose):
     ctx.ensure_object(dict)
@@ -264,9 +262,7 @@ def version(ctx):
 
     display_hackagent_splash()
 
-    console.print(
-        f"[bold cyan]HackAgent CLI v{importlib.metadata.version('hackagent')}[/bold cyan]"
-    )
+    console.print(f"[bold cyan]HackAgent CLI v{get_version()}[/bold cyan]")
     console.print(
         "[bold green]Python Security Testing Toolkit for AI Agents[/bold green]"
     )
