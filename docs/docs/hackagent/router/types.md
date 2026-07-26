@@ -47,6 +47,12 @@ Custom protocols (gap-fillers that LiteLLM doesn&#x27;t speak natively):
       headless mode (``claude -p``). Like ADK, implemented as a
       per-instance ``litellm.CustomLLM`` provider that shells out to the
       ``claude`` binary instead of making an HTTP call — no endpoint.
+    - **HERMES**: a locally-installed Hermes Agent CLI (Nous Research),
+      driven in one-shot headless mode (``hermes -z``). Same shape as
+      ``CLAUDE_CODE``: a per-instance ``litellm.CustomLLM`` provider that
+      shells out to the ``hermes`` binary. Because Hermes is stateful
+      (persistent memory, skill curator, resumable sessions) the adapter
+      forces an isolated, non-resumed session on every turn.
     - **WEB**: a chatbot on a public website, driven through a real browser
       (Playwright). Point it at the site URL and it types each prompt into
       the live chat widget and reads the reply from the page — works on any

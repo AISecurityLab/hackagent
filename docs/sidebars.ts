@@ -175,6 +175,11 @@ const sidebars: SidebarsConfig = {
         },
         {
           type: 'doc',
+          id: 'agents/hermes',
+          label: 'Hermes Agent',
+        },
+        {
+          type: 'doc',
           id: 'agents/guardrails',
           label: 'Guardrails',
         },
@@ -226,6 +231,7 @@ const sidebars: SidebarsConfig = {
                 'hackagent/router/providers/adk',
                 'hackagent/router/providers/claude',
                 'hackagent/router/providers/codex',
+                'hackagent/router/providers/hermes',
                 'hackagent/router/providers/web',
               ],
             },
