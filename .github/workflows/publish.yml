@@ -47,6 +47,9 @@ jobs:
 
   build-binaries:
     name: Build binary (${{ matrix.target }})
+    # Wait for the release to exist so the asset uploads attach to it instead of
+    # racing the publish job to create it (which would drop the changelog body).
+    needs: publish
     strategy:
       fail-fast: false
       matrix:

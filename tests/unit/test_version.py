@@ -8,8 +8,11 @@ from importlib.metadata import PackageNotFoundError
 from hackagent import _version
 
 
-def test_get_version_uses_distribution_metadata():
-    assert _version.get_version() == _version._distribution_version("hackagent")
+def test_get_version_prefers_distribution_metadata(monkeypatch):
+    monkeypatch.setattr(_version, "_distribution_version", lambda _name: "9.9.9")
+    monkeypatch.setenv("HACKAGENT_BUILD_VERSION", "1.2.3")
+
+    assert _version.get_version() == "9.9.9"
 
 
 def test_get_version_falls_back_to_build_version(monkeypatch):
