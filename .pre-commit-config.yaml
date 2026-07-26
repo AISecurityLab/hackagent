@@ -1,11 +1,4 @@
 repos:
-  - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.8.3
-    hooks:
-      - id: commitizen
-        stages: [commit-msg]
-        additional_dependencies: [cz-conventional-gitmoji==0.7.0]
-
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Keep in sync with the ruff version resolved by uv / used in CI
     # (.github/workflows/ci.yml runs `uv run ruff …`). Version drift here
