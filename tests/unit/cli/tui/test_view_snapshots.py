@@ -30,6 +30,7 @@ _NARROW_TERMINAL = (80, 24)
         ("results_tab_app.py", _LARGE_TERMINAL),
         ("attacks_tab_app.py", _NARROW_TERMINAL),
     ],
+    ids=["attacks-large", "results-large", "attacks-narrow"],
 )
 def test_view_renders(snap_compare, app_file, terminal_size):
     assert snap_compare(_APPS / app_file, terminal_size=terminal_size)

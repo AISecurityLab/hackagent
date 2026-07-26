@@ -11,6 +11,7 @@ mixins (``table.py``, ``details.py``, ``export.py``) that this router composes.
 """
 
 from typing import Any
+from uuid import UUID
 
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -320,11 +321,7 @@ class ResultsTab(
             for run in all_runs:
                 if not hasattr(run, "results") or run.results is None:
                     try:
-                        from uuid import UUID as _UUID
-
-                        rid = (
-                            run.id if isinstance(run.id, _UUID) else _UUID(str(run.id))
-                        )
+                        rid = run.id if isinstance(run.id, UUID) else UUID(str(run.id))
                         res_page = backend.list_results(
                             run_id=rid, page=1, page_size=500
                         )
