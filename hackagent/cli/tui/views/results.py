@@ -1435,6 +1435,10 @@ class ResultsTab(BaseTab):
                 judge_keys = [k for k in strictness.keys() if k != "bias_gap"]
                 if judge_keys:
                     parts = []
+                    # Judge columns follow the "eval_<judge_name>" naming
+                    # convention (see _is_canonical_eval_vote_column in
+                    # hackagent/attacks/evaluator/metrics.py); sorted for a
+                    # stable, deterministic display order.
                     for jk in sorted(judge_keys):
                         try:
                             val = float(strictness.get(jk, 0.0) or 0.0)
