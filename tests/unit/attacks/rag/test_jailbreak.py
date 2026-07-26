@@ -188,5 +188,31 @@ class TestCipherchatFramer(unittest.TestCase):
             )
 
 
+class TestBonFramer(unittest.TestCase):
+    def test_frames_goal(self):
+        framer = build_jailbreak_framer({"enabled": True, "technique": "bon"}, LOGGER)
+        framed, metadata = framer.apply("do the bad thing")
+        self.assertNotEqual(framed, "do the bad thing")
+        self.assertEqual(metadata["technique"], "bon")
+        self.assertEqual(metadata["seed"], 0)
+
+    def test_same_seed_is_deterministic(self):
+        framer = build_jailbreak_framer(
+            {"enabled": True, "technique": "bon", "seed": 7}, LOGGER
+        )
+        first, _ = framer.apply("do the bad thing", 0)
+        second, _ = framer.apply("do the bad thing", 0)
+        self.assertEqual(first, second)
+
+    def test_variant_index_changes_seed(self):
+        framer = build_jailbreak_framer(
+            {"enabled": True, "technique": "bon", "seed": 0}, LOGGER
+        )
+        _, meta_first = framer.apply("do the bad thing", 0)
+        _, meta_second = framer.apply("do the bad thing", 1)
+        self.assertEqual(meta_first["seed"], 0)
+        self.assertEqual(meta_second["seed"], 1)
+
+
 if __name__ == "__main__":
     unittest.main()

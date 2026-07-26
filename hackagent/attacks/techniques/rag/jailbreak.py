@@ -14,6 +14,7 @@ import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from hackagent.attacks.generator import AttackTemplates
+from hackagent.attacks.techniques.bon.generation import augment_text
 from hackagent.attacks.techniques.cipherchat.encode_experts import encode_expert_dict
 from hackagent.attacks.techniques.h4rm3l.config import PRESET_PROGRAMS
 from hackagent.attacks.techniques.h4rm3l.decorators import (
@@ -27,6 +28,7 @@ SUPPORTED_JAILBREAK_TECHNIQUES = (
     "h4rm3l",
     "flipattack",
     "cipherchat",
+    "bon",
 )
 
 DEFAULT_JAILBREAK_CONFIG: Dict[str, Any] = {
@@ -41,6 +43,9 @@ DEFAULT_JAILBREAK_CONFIG: Dict[str, Any] = {
     "flip_mode": "FCS",
     # cipherchat options
     "encode_method": "caesar",
+    # bon options
+    "sigma": 0.4,
+    "seed": 0,
 }
 
 
@@ -205,11 +210,38 @@ def _build_cipherchat_framer(
     return JailbreakFramer("cipherchat", _transform)
 
 
+def _build_bon_framer(
+    config: Dict[str, Any],
+    logger: Optional[logging.Logger] = None,
+    attacker_router: Optional[AgentRouter] = None,
+    attacker_reg_key: Optional[str] = None,
+) -> JailbreakFramer:
+    raw_sigma = config.get("sigma", 0.4)
+    try:
+        sigma = float(raw_sigma)
+    except (TypeError, ValueError):
+        sigma = 0.4
+
+    raw_seed = config.get("seed", 0)
+    try:
+        base_seed = int(raw_seed)
+    except (TypeError, ValueError):
+        base_seed = 0
+
+    def _transform(goal: str, variant_index: int) -> Tuple[str, Dict[str, Any]]:
+        seed = base_seed + variant_index
+        framed = augment_text(goal, sigma, seed)
+        return framed, {"sigma": sigma, "seed": seed}
+
+    return JailbreakFramer("bon", _transform)
+
+
 _TECHNIQUE_BUILDERS: Dict[str, Callable[..., JailbreakFramer]] = {
     "static_template": _build_static_template_framer,
     "h4rm3l": _build_h4rm3l_framer,
     "flipattack": _build_flipattack_framer,
     "cipherchat": _build_cipherchat_framer,
+    "bon": _build_bon_framer,
 }
 
 
