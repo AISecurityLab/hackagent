@@ -4,10 +4,10 @@
 """
 Jailbreak framing for the RAG poisoning pipeline.
 
-Reuses existing jailbreak techniques (static templates and h4rm3l decorator
-programs) to reframe the attacker goal before the poisoner LLM turns it into a
-document payload. The reframed goal is what gets embedded in poisoned
-documents; judging still uses the original goal.
+Reuses existing jailbreak techniques (static templates, h4rm3l decorator
+programs, and others) to reframe the attacker goal before the poisoner LLM
+turns it into a document payload. The reframed goal is what gets embedded in
+poisoned documents; judging still uses the original goal.
 """
 
 import logging
@@ -19,6 +19,7 @@ from hackagent.attacks.techniques.h4rm3l.decorators import (
     compile_program,
     program_uses_llm_assisted_decorators,
 )
+from hackagent.router.router import AgentRouter
 
 SUPPORTED_JAILBREAK_TECHNIQUES = ("static_template", "h4rm3l")
 
@@ -66,7 +67,12 @@ def _collect_static_templates(categories: List[str]) -> List[Tuple[str, str]]:
     return templates
 
 
-def _build_static_template_framer(config: Dict[str, Any]) -> JailbreakFramer:
+def _build_static_template_framer(
+    config: Dict[str, Any],
+    logger: Optional[logging.Logger] = None,
+    attacker_router: Optional[AgentRouter] = None,
+    attacker_reg_key: Optional[str] = None,
+) -> JailbreakFramer:
     raw_categories = config.get("template_categories") or ["role_play"]
     if isinstance(raw_categories, str):
         raw_categories = [raw_categories]
@@ -90,7 +96,12 @@ def _build_static_template_framer(config: Dict[str, Any]) -> JailbreakFramer:
     return JailbreakFramer("static_template", _transform)
 
 
-def _build_h4rm3l_framer(config: Dict[str, Any]) -> JailbreakFramer:
+def _build_h4rm3l_framer(
+    config: Dict[str, Any],
+    logger: Optional[logging.Logger] = None,
+    attacker_router: Optional[AgentRouter] = None,
+    attacker_reg_key: Optional[str] = None,
+) -> JailbreakFramer:
     program_name = str(config.get("program", "refusal_suppression"))
     program = PRESET_PROGRAMS.get(program_name, program_name)
 
@@ -115,31 +126,46 @@ def _build_h4rm3l_framer(config: Dict[str, Any]) -> JailbreakFramer:
     return JailbreakFramer("h4rm3l", _transform)
 
 
+_TECHNIQUE_BUILDERS: Dict[str, Callable[..., JailbreakFramer]] = {
+    "static_template": _build_static_template_framer,
+    "h4rm3l": _build_h4rm3l_framer,
+}
+
+
 def build_jailbreak_framer(
     config: Optional[Dict[str, Any]],
     logger: logging.Logger,
+    attacker_router: Optional[AgentRouter] = None,
+    attacker_reg_key: Optional[str] = None,
 ) -> Optional[JailbreakFramer]:
     """Build a :class:`JailbreakFramer` from a ``poisoning.jailbreak`` config.
 
     Returns ``None`` when jailbreak framing is disabled or unconfigured.
 
+    Args:
+        config: The ``poisoning.jailbreak`` config dict.
+        logger: Logger for status/warning messages.
+        attacker_router: Attacker LLM router, required by LLM-assisted
+            techniques (``pap``, ``fc``). Ignored by purely syntactic ones.
+        attacker_reg_key: Registration key for ``attacker_router``.
+
     Raises:
-        ValueError: If the configuration requests an unsupported technique or
-            an unusable template/program.
+        ValueError: If the configuration requests an unsupported technique,
+            an unusable template/program, or an LLM-assisted technique
+            without an attacker router.
     """
     if not isinstance(config, dict) or not config.get("enabled", False):
         return None
 
     technique = str(config.get("technique", "static_template")).strip().lower()
-    if technique == "static_template":
-        framer = _build_static_template_framer(config)
-    elif technique == "h4rm3l":
-        framer = _build_h4rm3l_framer(config)
-    else:
+    builder = _TECHNIQUE_BUILDERS.get(technique)
+    if builder is None:
         raise ValueError(
             f"Unsupported jailbreak technique '{technique}'. "
             f"Supported: {list(SUPPORTED_JAILBREAK_TECHNIQUES)}"
         )
+
+    framer = builder(config, logger, attacker_router, attacker_reg_key)
 
     logger.info(f"Jailbreak framing enabled for RAG poisoning: {technique}")
     return framer
