@@ -44,7 +44,7 @@ TEXT_MUTED = "#cccccc"
 """Foreground colour for de-emphasised text on dark backgrounds."""
 
 
-def css_variables() -> dict:
+def css_variables() -> dict[str, str]:
     """Return the brand palette as Textual CSS variables.
 
     The returned names are usable in stylesheets as ``$brand``,
