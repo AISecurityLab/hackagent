@@ -325,7 +325,10 @@ class DashboardAttackBuilderMixin:
     def _builder_collect_canvas(self) -> Dict[str, Any]:
         """Return the canvas with widget-only values folded back in."""
         canvas = self._builder_canvas
-        canvas["name"] = (self._builder_name_input.value or "Untitled attack").strip()
+        if self._builder_name_input is not None:
+            canvas["name"] = (
+                self._builder_name_input.value or "Untitled attack"
+            ).strip()
         if self._builder_goals_text is not None:
             canvas["goals"]["goals"] = [
                 line.strip()

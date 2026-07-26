@@ -120,8 +120,10 @@ def _build_dataset(block: Dict[str, Any]) -> Dict[str, Any]:
     if limit not in (None, ""):
         try:
             dataset["limit"] = int(limit)
-        except (TypeError, ValueError):
-            raise CanvasValidationError("Dataset limit must be a whole number.")
+        except (TypeError, ValueError) as exc:
+            raise CanvasValidationError(
+                "Dataset limit must be a whole number."
+            ) from exc
     return dataset
 
 
@@ -228,8 +230,10 @@ def build_run_payload(canvas: Dict[str, Any]) -> Dict[str, Any]:
     timeout = canvas.get("timeout") or DEFAULT_TIMEOUT
     try:
         timeout = int(timeout)
-    except (TypeError, ValueError):
-        raise CanvasValidationError("Timeout must be a whole number of seconds.")
+    except (TypeError, ValueError) as exc:
+        raise CanvasValidationError(
+            "Timeout must be a whole number of seconds."
+        ) from exc
 
     payload: Dict[str, Any] = {
         "target": target,
@@ -251,9 +255,9 @@ def build_run_payload(canvas: Dict[str, Any]) -> Dict[str, Any]:
         first.update(goal_section)
         payload["mode"] = "chain"
         payload["attacks"] = [first] + [dict(step) for step in steps[1:]]
+        # Only goal-list mode has an explicit pool to hand to ``hack_chain()``;
+        # in dataset mode the goal source stays on the first step.
         if "goals" in goal_section:
-            # In dataset mode the goal source stays on the first step only, so
-            # there is no explicit goal pool to hand to ``hack_chain()``.
             payload["goals"] = goal_section["goals"]
 
     return payload
