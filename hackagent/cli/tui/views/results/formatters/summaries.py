@@ -121,7 +121,7 @@ def _format_result_full_details(
         try:
             details += f"  [dim]⏱ {float(elapsed):.1f}s[/dim]"
         except (TypeError, ValueError):
-            details += ""
+            pass
     attack_type = meta.get("attack_type", "")
     if not attack_type:
         rp = getattr(result, "request_payload", None) or {}

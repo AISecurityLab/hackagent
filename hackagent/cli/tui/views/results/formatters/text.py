@@ -85,7 +85,7 @@ def _format_chat_message(message: dict, indent: str = "     ") -> str:
     if isinstance(content, str):
         # Split long content into readable lines
         content_lines = content.split("\n")
-        for i, line in enumerate(content_lines[:10]):  # Limit lines
+        for line in content_lines[:10]:  # Limit lines
             if line.strip():
                 output += f"{indent}  [dim]│[/dim] {_escape(line[:200])}\n"
         if len(content_lines) > 10:
@@ -103,7 +103,10 @@ def _format_chat_message(message: dict, indent: str = "     ") -> str:
                 elif part_type == "image_url":
                     output += f"{indent}  [dim]│[/dim] [bright_yellow]📷 <image>[/bright_yellow]\n"
                 else:
-                    output += f"{indent}  [dim]│[/dim] [{part_type}]\n"
+                    output += (
+                        f"{indent}  [dim]│[/dim] "
+                        f"[dim]{_escape(f'<{part_type}>')}[/dim]\n"
+                    )
     else:
         output += f"{indent}  [dim]│[/dim] {_escape(str(content)[:200])}\n"
 
