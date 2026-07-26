@@ -10,7 +10,7 @@ import the same source of truth.
 
 Exposed values:
     _VIEW_LABELS: Maps an internal navigation key (``"dashboard"``, ``"agents"``,
-        ``"runs"``) to the human-facing title shown in the header.
+        ``"runs"``, ``"builder"``) to the human-facing title shown in the header.
     _RESULTS_FETCH_LIMIT: Page size used when fetching per-run results.
     _DASHBOARD_RUN_SCAN_LIMIT: How many recent runs the home dashboard scans to
         build its summary widgets.
@@ -23,6 +23,7 @@ _VIEW_LABELS = {
     "dashboard": "Home",
     "agents": "Targets",
     "runs": "History",
+    "builder": "Attack Builder",
 }
 
 _RESULTS_FETCH_LIMIT = 20

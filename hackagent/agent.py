@@ -69,6 +69,7 @@ class HackAgent:
         thinking: Optional[bool] = None,
         before_guardrail: Optional[Dict[str, Any]] = None,
         after_guardrail: Optional[Dict[str, Any]] = None,
+        backend: Optional[Any] = None,
     ):
         """
         Initializes the HackAgent client and prepares it for interaction.
@@ -110,11 +111,21 @@ class HackAgent:
                 When set to `False`, requests sent through the target OLLAMA adapter
                 include `think: false` to disable thinking output. Ignored for
                 non-OLLAMA target agent types.
+            backend: Optional pre-built ``StorageBackend`` to persist runs and
+                results through. When omitted, a backend is selected from the
+                resolved API key (remote) or a default local SQLite database.
+                Supplying one lets an embedding host — e.g. the local dashboard
+                — reuse its own already-open backend.
         """
 
         resolved_auth_token = utils.resolve_api_token(direct_api_key_param=api_key)
 
-        if resolved_auth_token:
+        if backend is not None:
+            self.backend = backend
+            logger.info(
+                "HackAgent using caller-provided backend %s", type(backend).__name__
+            )
+        elif resolved_auth_token:
             from hackagent.server.client import AuthenticatedClient
             from hackagent.server.storage.remote import RemoteBackend
 

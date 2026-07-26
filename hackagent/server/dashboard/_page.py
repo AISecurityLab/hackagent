@@ -16,6 +16,7 @@ Mixin layers, roughly in dependency order:
     - DashboardReportsMixin — History/Reports views and goal rows.
     - DashboardResultDetailMixin — single-result detail tabs.
     - DashboardRunsMixin — run selection, compare, export, delete.
+    - DashboardAttackBuilderMixin — canvas attack builder and run submission.
     - DashboardAnalysisDataMixin — widget-free aggregation and metrics.
     - DashboardTraceAnalysisMixin — trace classification/synthesis.
     - DashboardTraceRenderMixin / DashboardTapTraceMixin — trace rendering.
@@ -49,11 +50,13 @@ from .attack_cards import (
 )
 
 
+from ._builder_config import new_canvas as _new_canvas
 from ._layout_mixin import DashboardLayoutMixin
 from ._reports_mixin import DashboardReportsMixin
 from ._result_detail_mixin import DashboardResultDetailMixin
 from ._data_mixin import DashboardDataMixin
 from ._runs_mixin import DashboardRunsMixin
+from ._attack_builder_mixin import DashboardAttackBuilderMixin
 from ._analysis_data_mixin import DashboardAnalysisDataMixin
 from ._trace_analysis_mixin import DashboardTraceAnalysisMixin
 from ._trace_render_mixin import DashboardTraceRenderMixin
@@ -80,6 +83,7 @@ class DashboardPage(
     DashboardResultDetailMixin,
     DashboardDataMixin,
     DashboardRunsMixin,
+    DashboardAttackBuilderMixin,
     DashboardAnalysisDataMixin,
     DashboardTraceAnalysisMixin,
     DashboardTraceRenderMixin,
@@ -203,6 +207,21 @@ class DashboardPage(
         self._runs_compare_btn: ui.button | None = None
         self._runs_export_btn: ui.button | None = None
         self._attacks_delete_btn: ui.button | None = None
+
+        # Attack builder panel
+        self._builder_canvas: dict = _new_canvas()
+        self._builder_draft_id: str | None = None
+        self._builder_drag_type: str | None = None
+        self._builder_running: bool = False
+        self._builder_event_queue: list[str] = []
+        self._builder_name_input: ui.input | None = None
+        self._builder_drafts_select: ui.select | None = None
+        self._builder_goals_text: ui.textarea | None = None
+        self._builder_chain_area: ui.column | None = None
+        self._builder_status_label: ui.label | None = None
+        self._builder_spinner: ui.spinner | None = None
+        self._builder_run_btn: ui.button | None = None
+        self._builder_log: ui.log | None = None
 
         # Comparison dialog
         self._compare_dialog: ui.dialog | None = None
