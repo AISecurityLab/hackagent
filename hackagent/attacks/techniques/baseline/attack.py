@@ -160,7 +160,7 @@ class BaselineAttack(BaseAttack):
         return args
 
     @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
-    def run(self, goals: List[str]) -> List[AttackResult]:
+    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
         """
         Execute baseline attack (direct goal submission).
 
@@ -170,6 +170,7 @@ class BaselineAttack(BaseAttack):
         Returns:
             A list of :class:`~hackagent.attacks.types.AttackResult` instances.
         """
+        goals = goals or []
         if not goals:
             return []
 

@@ -5,7 +5,7 @@
 import copy
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from hackagent.attacks.shared.tui import with_tui_logging
 from hackagent.attacks.techniques.base import BaseAttack
@@ -153,7 +153,7 @@ class AutoDANTurboAttack(BaseAttack):
         return []  # Managed manually in run() (like PAIR)
 
     @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
-    def run(self, goals: List[str]) -> List[AttackResult]:
+    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
         """Execute full AutoDAN-Turbo pipeline.
 
         Pipeline mapping to paper/integration:
@@ -170,6 +170,7 @@ class AutoDANTurboAttack(BaseAttack):
         Raises:
             Exception: Re-raises any runtime failure after coordinator finalization.
         """
+        goals = goals or []
         if not goals:
             return []
 

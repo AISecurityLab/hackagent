@@ -251,7 +251,7 @@ class FCAttack(BaseAttack):
         ]
 
     @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
-    def run(self, goals: List[str]) -> List[AttackResult]:
+    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
         """
         Execute the full FC-Attack pipeline.
 
@@ -262,6 +262,7 @@ class FCAttack(BaseAttack):
             List of dictionaries containing evaluation results,
             or empty list if no goals provided.
         """
+        goals = goals or []
         if not goals:
             return []
 
@@ -427,7 +428,7 @@ class tFCAttack(BaseAttack):
         ]
 
     @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
-    def run(self, goals: List[str]) -> List[AttackResult]:
+    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
         """
         Execute the full text-only flowchart attack pipeline.
 
@@ -438,6 +439,7 @@ class tFCAttack(BaseAttack):
             List of dictionaries containing evaluation results,
             or empty list if no goals provided.
         """
+        goals = goals or []
         if not goals:
             return []
 

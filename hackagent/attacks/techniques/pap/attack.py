@@ -171,7 +171,7 @@ class PAPAttack(BaseAttack):
     # ------------------------------------------------------------------
 
     @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
-    def run(self, goals: List[str]) -> List[AttackResult]:
+    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
         """Execute the full PAP attack pipeline.
 
         Args:
@@ -180,6 +180,7 @@ class PAPAttack(BaseAttack):
         Returns:
             List of result dictionaries.
         """
+        goals = goals or []
         if not goals:
             return []
 

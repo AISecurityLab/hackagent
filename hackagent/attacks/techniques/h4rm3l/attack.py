@@ -243,7 +243,7 @@ class H4rm3lAttack(BaseAttack):
         ]
 
     @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
-    def run(self, goals: List[str]) -> List[AttackResult]:
+    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
         """
         Execute the full h4rm3l attack pipeline.
 
@@ -254,6 +254,7 @@ class H4rm3lAttack(BaseAttack):
             List of result dicts with evaluation scores, or ``[]`` if
             no goals provided.
         """
+        goals = goals or []
         if not goals:
             return []
 

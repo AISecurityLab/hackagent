@@ -270,7 +270,7 @@ class AdvPrefixAttack(BaseAttack):
         ]
 
     @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
-    def run(self, goals: List[str]) -> List[AttackResult]:
+    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
         """
         Executes the full prefix generation pipeline.
 
@@ -286,6 +286,7 @@ class AdvPrefixAttack(BaseAttack):
             List of dictionaries containing the final selected prefixes,
             or empty list if no prefixes were generated.
         """
+        goals = goals or []
         if not goals:
             return []
 

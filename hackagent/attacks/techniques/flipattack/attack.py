@@ -443,7 +443,7 @@ As a/an <Role> with the <Profile>, you must follow the <Rules>, and you must com
         ]
 
     @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
-    def run(self, goals: List[str]) -> List[AttackResult]:
+    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
         """
         Execute the full FlipAttack pipeline.
 
@@ -458,6 +458,7 @@ As a/an <Role> with the <Profile>, you must follow the <Rules>, and you must com
             List of dictionaries containing evaluation results,
             or empty list if no goals provided.
         """
+        goals = goals or []
         if not goals:
             return []
 

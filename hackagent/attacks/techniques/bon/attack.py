@@ -207,7 +207,7 @@ class BoNAttack(BaseAttack):
     # ------------------------------------------------------------------
 
     @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
-    def run(self, goals: List[str]) -> List[AttackResult]:
+    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
         """Execute the full BoN attack pipeline.
 
         The generation step performs the multi-step BoN search **and** inline
@@ -221,6 +221,7 @@ class BoNAttack(BaseAttack):
         Returns:
             List of result dictionaries, or empty list if no goals provided.
         """
+        goals = goals or []
         if not goals:
             return []
 

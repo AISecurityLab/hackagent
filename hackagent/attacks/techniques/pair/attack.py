@@ -1187,7 +1187,7 @@ class PAIRAttack(BaseAttack):
         }
 
     @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
-    def run(self, goals: List[str]) -> List[AttackResult]:
+    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
         """
         Execute PAIR attack on goals.
 
@@ -1200,6 +1200,7 @@ class PAIRAttack(BaseAttack):
         Returns:
             List of attack results with scores
         """
+        goals = goals or []
         if not goals:
             return []
 

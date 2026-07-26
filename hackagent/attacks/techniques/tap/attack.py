@@ -280,7 +280,7 @@ class TAPAttack(BaseAttack):
         ]
 
     @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
-    def run(self, goals: List[str]) -> List[AttackResult]:
+    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
         """
         Run TAP end-to-end with unified tracking and pipeline steps.
 
@@ -290,6 +290,7 @@ class TAPAttack(BaseAttack):
         Returns:
             List of per-goal result dicts produced by the pipeline.
         """
+        goals = goals or []
         if not goals:
             return []
 
