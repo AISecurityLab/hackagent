@@ -1408,6 +1408,8 @@ class ResultsTab(BaseTab):
         asr = float(eval_summary.get("overall_success_rate", 0.0) or 0.0) * 100.0
         mv_asr = float(eval_summary.get("majority_vote_asr", 0.0) or 0.0) * 100.0
         fleiss = eval_summary.get("fleiss_kappa")
+        strictness = eval_summary.get("per_judge_strictness")
+        is_multi_judge = bool(eval_summary.get("is_multi_judge"))
 
         summary = (
             f"[bold cyan]▌ Selected Run[/bold cyan]\n"
@@ -1428,6 +1430,33 @@ class ResultsTab(BaseTab):
                 except (TypeError, ValueError):
                     summary += f"  Fleiss κ: [bold]{_escape(str(fleiss))}[/bold]"
             summary += "\n"
+
+            if is_multi_judge and isinstance(strictness, dict):
+                judge_keys = [k for k in strictness.keys() if k != "bias_gap"]
+                if judge_keys:
+                    parts = []
+                    for jk in sorted(judge_keys):
+                        try:
+                            val = float(strictness.get(jk, 0.0) or 0.0)
+                            judge_name = _escape(
+                                jk.replace("eval_", "").replace("_", " ")
+                            )
+                            parts.append(f"{judge_name}: [bold]{val:.3f}[/bold]")
+                        except (TypeError, ValueError):
+                            continue
+                    bias_gap = strictness.get("bias_gap")
+                    bias_gap_str = ""
+                    if bias_gap is not None:
+                        try:
+                            bias_gap_str = (
+                                f"  Bias gap: [bold]{float(bias_gap):.3f}[/bold]"
+                            )
+                        except (TypeError, ValueError):
+                            pass
+                    summary += (
+                        f"  [dim]Strictness — {'  '.join(parts)}[/dim]"
+                        f"{bias_gap_str}\n"
+                    )
         else:
             summary += "\n[dim]No evaluation summary synced yet for this run.[/dim]\n"
 

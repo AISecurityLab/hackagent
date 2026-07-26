@@ -503,6 +503,108 @@ class TestResultsEmptyStates:
             assert len(container.children) == 0
 
 
+class TestResultsRunSummary:
+    """
+    Test suite for the run summary header panel, including multi-judge
+    metrics (Majority ASR, Fleiss Kappa, per-judge strictness, bias gap).
+    """
+
+    @pytest.mark.asyncio
+    async def test_show_result_summary_includes_multi_judge_metrics(
+        self, cli_config
+    ):
+        """
+        Test that _show_result_summary renders multi-judge metrics.
+
+        When the run's evaluation_summary indicates multiple judges were
+        used, the header should display Majority ASR, Fleiss Kappa,
+        per-judge strictness values, and the bias gap.
+        """
+
+        class TestApp(App):
+            def compose(self):
+                yield ResultsTab(cli_config)
+
+        app = TestApp()
+        async with app.run_test() as _:
+            tab = app.query_one(ResultsTab)
+
+            run = Mock()
+            run.id = uuid4()
+            run.status = Mock(value="COMPLETED")
+            run.timestamp = datetime(2026, 1, 19, 11, 0, 0)
+            run.run_config = {
+                "evaluation_summary": {
+                    "total_attacks": 10,
+                    "overall_success_rate": 0.5,
+                    "majority_vote_asr": 0.4,
+                    "fleiss_kappa": 0.75,
+                    "is_multi_judge": True,
+                    "per_judge_strictness": {
+                        "eval_judge_a": 0.2,
+                        "eval_judge_b": 0.6,
+                        "bias_gap": 0.4,
+                    },
+                }
+            }
+
+            tab._show_result_summary(run)
+
+            header = tab.query_one("#run-header-static", Static)
+            rendered = str(header.render())
+
+            assert "Majority ASR" in rendered
+            assert "40.0%" in rendered
+            assert "Fleiss" in rendered
+            assert "0.750" in rendered
+            assert "Strictness" in rendered
+            assert "judge a" in rendered
+            assert "judge b" in rendered
+            assert "Bias gap" in rendered
+            assert "0.400" in rendered
+
+    @pytest.mark.asyncio
+    async def test_show_result_summary_hides_strictness_for_single_judge(
+        self, cli_config
+    ):
+        """
+        Test that per-judge strictness/bias gap are omitted when only a
+        single judge is present (is_multi_judge is False).
+        """
+
+        class TestApp(App):
+            def compose(self):
+                yield ResultsTab(cli_config)
+
+        app = TestApp()
+        async with app.run_test() as _:
+            tab = app.query_one(ResultsTab)
+
+            run = Mock()
+            run.id = uuid4()
+            run.status = Mock(value="COMPLETED")
+            run.timestamp = datetime(2026, 1, 19, 11, 0, 0)
+            run.run_config = {
+                "evaluation_summary": {
+                    "total_attacks": 5,
+                    "overall_success_rate": 0.2,
+                    "majority_vote_asr": 0.2,
+                    "fleiss_kappa": 1.0,
+                    "is_multi_judge": False,
+                    "per_judge_strictness": {"bias_gap": 0.0},
+                }
+            }
+
+            tab._show_result_summary(run)
+
+            header = tab.query_one("#run-header-static", Static)
+            rendered = str(header.render())
+
+            assert "Majority ASR" in rendered
+            assert "Strictness" not in rendered
+            assert "Bias gap" not in rendered
+
+
 class TestResultsPagination:
     """
     Test suite for pagination functionality.
