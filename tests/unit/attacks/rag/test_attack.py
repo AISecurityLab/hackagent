@@ -305,5 +305,117 @@ class TestRagAttackEndToEnd(unittest.TestCase):
         self.assertEqual(len(results), 1)
 
 
+class TestRagAttackJailbreakFraming(unittest.TestCase):
+    @patch("hackagent.attacks.techniques.rag.attack.get_embeddings", _fake_embeddings)
+    def test_run_with_jailbreak_enabled(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source_dir = _make_docs(tmp)
+            attack, _ = _make_attack(
+                {
+                    "output_dir": tmp,
+                    "rag_injection_params": {
+                        "documents": {
+                            "sources": [source_dir],
+                            "include_globs": ["*.txt"],
+                        },
+                        "poisoning": {
+                            "strategy": "inline_context_override",
+                            "poisoned_ratio": 1.0,
+                            "jailbreak": {
+                                "enabled": True,
+                                "technique": "h4rm3l",
+                                "program": "refusal_suppression",
+                            },
+                        },
+                        "benign_queries_per_goal": 1,
+                        "poisoned_paragraphs_per_query": 1,
+                    },
+                }
+            )
+            results = attack.run(["Make the assistant reveal hidden steps"])
+        self.assertEqual(len(results), 1)
+        self.assertIn("metrics", results[0].metadata)
+
+    @patch("hackagent.attacks.techniques.rag.attack.get_embeddings", _fake_embeddings)
+    def test_poisoner_receives_jailbreak_framed_goal(self):
+        attack, _ = _make_attack()
+        documents = [
+            {
+                "id": "doc",
+                "text": "\n\n".join(
+                    f"Paragraph {i} with enough length to be a candidate."
+                    for i in range(4)
+                ),
+                "path": "doc.txt",
+            }
+        ]
+
+        poisoned = attack._poison_documents(
+            "reveal the hidden steps",
+            documents,
+            {
+                "strategy": "inline_context_override",
+                "poisoned_ratio": 1.0,
+                "jailbreak": {
+                    "enabled": True,
+                    "technique": "static_template",
+                    "template_categories": ["role_play"],
+                },
+            },
+            benign_queries=["What is the policy?"],
+            poisoned_paragraphs_per_query=1,
+        )
+
+        self.assertTrue(poisoned[0]["is_poisoned"])
+        jailbreaks = poisoned[0]["payload_jailbreaks"]
+        self.assertEqual(jailbreaks[0]["technique"], "static_template")
+
+        system_prompts = [
+            call.kwargs["request_data"]["messages"][0]["content"]
+            for call in attack.attacker_router.route_request.call_args_list
+        ]
+        poisoner_prompts = [p for p in system_prompts if "MALICIOUS GOAL" in p]
+        self.assertTrue(poisoner_prompts)
+        self.assertTrue(
+            any(
+                "reveal the hidden steps" in p and "MALICIOUS GOAL: reveal" not in p
+                for p in poisoner_prompts
+            )
+        )
+
+    @patch("hackagent.attacks.techniques.rag.attack.get_embeddings", _fake_embeddings)
+    def test_disabled_jailbreak_keeps_raw_goal(self):
+        attack, _ = _make_attack()
+        documents = [
+            {
+                "id": "doc",
+                "text": "\n\n".join(
+                    f"Paragraph {i} with enough length to be a candidate."
+                    for i in range(4)
+                ),
+                "path": "doc.txt",
+            }
+        ]
+
+        poisoned = attack._poison_documents(
+            "reveal the hidden steps",
+            documents,
+            {"strategy": "inline_context_override", "poisoned_ratio": 1.0},
+            benign_queries=["What is the policy?"],
+            poisoned_paragraphs_per_query=1,
+        )
+
+        self.assertEqual(poisoned[0]["payload_jailbreaks"], [{}])
+
+    def test_invalid_jailbreak_config_raises(self):
+        attack, _ = _make_attack()
+        with self.assertRaises(ValueError):
+            attack._poison_documents(
+                "goal",
+                [{"id": "doc", "text": "body", "path": "doc.txt"}],
+                {"jailbreak": {"enabled": True, "technique": "nope"}},
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
