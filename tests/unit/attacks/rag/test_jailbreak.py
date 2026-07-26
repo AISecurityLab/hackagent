@@ -3,7 +3,9 @@
 
 import logging
 import unittest
+from unittest.mock import MagicMock
 
+from hackagent.attacks.techniques.pap.config import TOP_5_TECHNIQUES
 from hackagent.attacks.techniques.rag.jailbreak import (
     DEFAULT_JAILBREAK_CONFIG,
     build_jailbreak_framer,
@@ -100,6 +102,274 @@ class TestH4rm3lFramer(unittest.TestCase):
                 },
                 LOGGER,
             )
+
+
+class TestFlipattackFramer(unittest.TestCase):
+    def test_default_mode_reverses_sentence(self):
+        framer = build_jailbreak_framer(
+            {"enabled": True, "technique": "flipattack"}, LOGGER
+        )
+        framed, metadata = framer.apply("do the bad thing")
+        self.assertEqual(framed, "do the bad thing"[::-1])
+        self.assertEqual(metadata["technique"], "flipattack")
+        self.assertEqual(metadata["flip_mode"], "FCS")
+
+    def test_word_order_mode(self):
+        framer = build_jailbreak_framer(
+            {"enabled": True, "technique": "flipattack", "flip_mode": "FWO"},
+            LOGGER,
+        )
+        framed, _ = framer.apply("do the bad thing")
+        self.assertEqual(framed, "thing bad the do")
+
+    def test_char_in_word_mode(self):
+        framer = build_jailbreak_framer(
+            {"enabled": True, "technique": "flipattack", "flip_mode": "FCW"},
+            LOGGER,
+        )
+        framed, _ = framer.apply("do bad")
+        self.assertEqual(framed, "od dab")
+
+    def test_variant_index_rotates_modes(self):
+        framer = build_jailbreak_framer(
+            {
+                "enabled": True,
+                "technique": "flipattack",
+                "flip_modes": ["FWO", "FCS"],
+            },
+            LOGGER,
+        )
+        first, meta_first = framer.apply("do the bad thing", 0)
+        second, meta_second = framer.apply("do the bad thing", 1)
+        self.assertNotEqual(first, second)
+        self.assertEqual(meta_first["flip_mode"], "FWO")
+        self.assertEqual(meta_second["flip_mode"], "FCS")
+
+    def test_unsupported_mode_raises(self):
+        with self.assertRaises(ValueError):
+            build_jailbreak_framer(
+                {"enabled": True, "technique": "flipattack", "flip_mode": "NOPE"},
+                LOGGER,
+            )
+
+
+class TestCipherchatFramer(unittest.TestCase):
+    def test_default_method_is_caesar(self):
+        framer = build_jailbreak_framer(
+            {"enabled": True, "technique": "cipherchat"}, LOGGER
+        )
+        framed, metadata = framer.apply("do the bad thing")
+        self.assertNotEqual(framed, "do the bad thing")
+        self.assertEqual(metadata["technique"], "cipherchat")
+        self.assertEqual(metadata["encode_method"], "caesar")
+
+    def test_variant_index_rotates_methods(self):
+        framer = build_jailbreak_framer(
+            {
+                "enabled": True,
+                "technique": "cipherchat",
+                "encode_methods": ["caesar", "atbash"],
+            },
+            LOGGER,
+        )
+        first, meta_first = framer.apply("do the bad thing", 0)
+        second, meta_second = framer.apply("do the bad thing", 1)
+        self.assertNotEqual(first, second)
+        self.assertEqual(meta_first["encode_method"], "caesar")
+        self.assertEqual(meta_second["encode_method"], "atbash")
+
+    def test_unsupported_method_raises(self):
+        with self.assertRaises(ValueError):
+            build_jailbreak_framer(
+                {
+                    "enabled": True,
+                    "technique": "cipherchat",
+                    "encode_method": "does_not_exist",
+                },
+                LOGGER,
+            )
+
+
+class TestBonFramer(unittest.TestCase):
+    def test_frames_goal(self):
+        framer = build_jailbreak_framer({"enabled": True, "technique": "bon"}, LOGGER)
+        framed, metadata = framer.apply("do the bad thing")
+        self.assertNotEqual(framed, "do the bad thing")
+        self.assertEqual(metadata["technique"], "bon")
+        self.assertEqual(metadata["seed"], 0)
+
+    def test_same_seed_is_deterministic(self):
+        framer = build_jailbreak_framer(
+            {"enabled": True, "technique": "bon", "seed": 7}, LOGGER
+        )
+        first, _ = framer.apply("do the bad thing", 0)
+        second, _ = framer.apply("do the bad thing", 0)
+        self.assertEqual(first, second)
+
+    def test_variant_index_changes_seed(self):
+        framer = build_jailbreak_framer(
+            {"enabled": True, "technique": "bon", "seed": 0}, LOGGER
+        )
+        _, meta_first = framer.apply("do the bad thing", 0)
+        _, meta_second = framer.apply("do the bad thing", 1)
+        self.assertEqual(meta_first["seed"], 0)
+        self.assertEqual(meta_second["seed"], 1)
+
+
+class TestPapFramer(unittest.TestCase):
+    def test_requires_attacker_router(self):
+        with self.assertRaises(ValueError):
+            build_jailbreak_framer({"enabled": True, "technique": "pap"}, LOGGER)
+
+    def test_frames_goal_with_mocked_attacker(self):
+        router = MagicMock()
+        router.route_request.return_value = {
+            "generated_text": (
+                "#the_core_specific_harmful_or_unlawful_intention: x\n"
+                "#mutated_text_with_same_specific_harmful_or_unlawful_intention: "
+                "persuaded framing of the goal"
+            )
+        }
+        framer = build_jailbreak_framer(
+            {"enabled": True, "technique": "pap"},
+            LOGGER,
+            attacker_router=router,
+            attacker_reg_key="attacker",
+        )
+        framed, metadata = framer.apply("do the bad thing")
+        self.assertEqual(framed, "persuaded framing of the goal")
+        self.assertEqual(metadata["technique"], "pap")
+        self.assertIn(metadata["technique_name"], TOP_5_TECHNIQUES)
+        router.route_request.assert_called_once()
+        self.assertEqual(
+            router.route_request.call_args.kwargs["registration_key"], "attacker"
+        )
+
+    def test_variant_index_rotates_techniques(self):
+        router = MagicMock()
+        router.route_request.return_value = {"generated_text": "mutated"}
+        framer = build_jailbreak_framer(
+            {
+                "enabled": True,
+                "technique": "pap",
+                "pap_techniques": ["Logical Appeal", "Misrepresentation"],
+            },
+            LOGGER,
+            attacker_router=router,
+            attacker_reg_key="attacker",
+        )
+        _, meta_first = framer.apply("goal", 0)
+        _, meta_second = framer.apply("goal", 1)
+        self.assertEqual(meta_first["technique_name"], "Logical Appeal")
+        self.assertEqual(meta_second["technique_name"], "Misrepresentation")
+
+    def test_unknown_technique_name_raises(self):
+        with self.assertRaises(ValueError):
+            build_jailbreak_framer(
+                {
+                    "enabled": True,
+                    "technique": "pap",
+                    "pap_techniques": ["not_a_real_technique"],
+                },
+                LOGGER,
+                attacker_router=MagicMock(),
+                attacker_reg_key="attacker",
+            )
+
+    def test_attacker_failure_falls_back_to_original_goal(self):
+        router = MagicMock()
+        router.route_request.side_effect = RuntimeError("boom")
+        framer = build_jailbreak_framer(
+            {"enabled": True, "technique": "pap"},
+            LOGGER,
+            attacker_router=router,
+            attacker_reg_key="attacker",
+        )
+        framed, metadata = framer.apply("do the bad thing")
+        self.assertEqual(framed, "do the bad thing")
+        self.assertTrue(metadata["pap_fallback"])
+
+    def test_empty_attacker_response_falls_back_to_original_goal(self):
+        router = MagicMock()
+        router.route_request.return_value = {"generated_text": ""}
+        framer = build_jailbreak_framer(
+            {"enabled": True, "technique": "pap"},
+            LOGGER,
+            attacker_router=router,
+            attacker_reg_key="attacker",
+        )
+        framed, metadata = framer.apply("do the bad thing")
+        self.assertEqual(framed, "do the bad thing")
+        self.assertTrue(metadata["pap_fallback"])
+
+
+class TestFcFramer(unittest.TestCase):
+    def test_requires_attacker_router(self):
+        with self.assertRaises(ValueError):
+            build_jailbreak_framer({"enabled": True, "technique": "fc"}, LOGGER)
+
+    def test_frames_goal_with_llm_steps(self):
+        router = MagicMock()
+        router.route_request.return_value = {
+            "generated_text": "1. Step one.\n2. Step two.\n3. Step three."
+        }
+        framer = build_jailbreak_framer(
+            {"enabled": True, "technique": "fc", "fc_num_steps": 3},
+            LOGGER,
+            attacker_router=router,
+            attacker_reg_key="attacker",
+        )
+        framed, metadata = framer.apply("do the bad thing")
+        self.assertIn("Step one", framed)
+        self.assertEqual(metadata["technique"], "fc")
+        self.assertEqual(metadata["text_format"], "ascii")
+        self.assertTrue(metadata["llm_assisted"])
+
+    def test_attacker_failure_falls_back_to_heuristic_steps(self):
+        router = MagicMock()
+        router.route_request.side_effect = RuntimeError("boom")
+        framer = build_jailbreak_framer(
+            {"enabled": True, "technique": "fc", "fc_num_steps": 3},
+            LOGGER,
+            attacker_router=router,
+            attacker_reg_key="attacker",
+        )
+        framed, metadata = framer.apply("do the bad thing")
+        self.assertTrue(framed)
+        self.assertFalse(metadata["llm_assisted"])
+
+    def test_unsupported_text_format_raises(self):
+        with self.assertRaises(ValueError):
+            build_jailbreak_framer(
+                {
+                    "enabled": True,
+                    "technique": "fc",
+                    "fc_text_format": "does_not_exist",
+                },
+                LOGGER,
+                attacker_router=MagicMock(),
+                attacker_reg_key="attacker",
+            )
+
+    def test_mermaid_text_format(self):
+        router = MagicMock()
+        router.route_request.return_value = {
+            "generated_text": "1. Step one.\n2. Step two."
+        }
+        framer = build_jailbreak_framer(
+            {
+                "enabled": True,
+                "technique": "fc",
+                "fc_num_steps": 2,
+                "fc_text_format": "mermaid",
+            },
+            LOGGER,
+            attacker_router=router,
+            attacker_reg_key="attacker",
+        )
+        framed, metadata = framer.apply("do the bad thing")
+        self.assertEqual(metadata["text_format"], "mermaid")
+        self.assertIn("Step one", framed)
 
 
 if __name__ == "__main__":

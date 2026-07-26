@@ -1000,7 +1000,10 @@ class RagAttack(BaseAttack):
         )
 
         jailbreak_framer = build_jailbreak_framer(
-            poisoning_config.get("jailbreak"), self.logger
+            poisoning_config.get("jailbreak"),
+            self.logger,
+            attacker_router=self.attacker_router,
+            attacker_reg_key=self.attacker_reg_key,
         )
         payload_variant_index = 0
 
