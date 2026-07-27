@@ -21,6 +21,7 @@ from hackagent.attacks.techniques.config import (
     DEFAULT_ATTACKER_IDENTIFIER,
     DEFAULT_FILTER_LEN,
     DEFAULT_JUDGE_IDENTIFIER,
+    DEFAULT_LOCAL_MODEL_ENDPOINT,
     DEFAULT_OUTPUT_DIR,
     DEFAULT_TIMEOUT,
     DEFAULT_RUN_ID,
@@ -52,7 +53,7 @@ DEFAULT_PREFIX_GENERATION_CONFIG: Dict[str, Any] = {
     # --- Model Configurations ---
     "generator": {
         "identifier": DEFAULT_ATTACKER_IDENTIFIER,
-        "endpoint": "http://localhost:11434",
+        "endpoint": DEFAULT_LOCAL_MODEL_ENDPOINT,
         "system_prompt": DEFAULT_ADVPREFIX_GENERATOR_SYSTEM_PROMPT,
         "max_tokens": 50,
         "guided_topk": 50,
@@ -61,7 +62,7 @@ DEFAULT_PREFIX_GENERATION_CONFIG: Dict[str, Any] = {
     "judges": [
         {
             "identifier": DEFAULT_JUDGE_IDENTIFIER,
-            "endpoint": "http://localhost:11434",
+            "endpoint": DEFAULT_LOCAL_MODEL_ENDPOINT,
             "type": "harmbench",
         }
     ],
@@ -244,6 +245,8 @@ class EvaluatorConfig(BaseModel):
     timeout: int = DEFAULT_TIMEOUT
     temperature: float = 0.0
     max_judge_retries: int = 1
+    # Optional user-defined system prompt prepended to every judge request.
+    system_prompt: Optional[str] = None
 
     @model_validator(mode="before")
     @classmethod

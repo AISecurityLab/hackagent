@@ -32,6 +32,7 @@ graph TB
         ADK["Google ADK"]
         CLAUDE["Claude Code"]
         CODEX["Codex"]
+        HERMES["Hermes Agent"]
         WEBP["Web / browser"]
         CHAT["LiteLLM / OpenAI SDK / Ollama / LangChain (chat-completions)"]
     end
@@ -106,8 +107,8 @@ import Link from '@docusaurus/Link';
 ### Router
 
 **`hackagent.router.AgentRouter`**
-- Resolves an `AgentTypeEnum` (e.g. `GOOGLE_ADK`, `CLAUDE_CODE`, `CODEX`, `WEB`, `LITELLM`, `OPENAI_SDK`, `OLLAMA`, `LANGCHAIN`) to a provider adapter and dispatches attack prompts to the target agent.
-- `GOOGLE_ADK`, `CLAUDE_CODE`, `CODEX`, and `WEB` use dedicated adapter classes in `hackagent/router/providers/`. The remaining chat-completions-style types are driven generically through `provider_config.py` + `_ChatRegistration`.
+- Resolves an `AgentTypeEnum` (e.g. `GOOGLE_ADK`, `CLAUDE_CODE`, `CODEX`, `HERMES`, `WEB`, `LITELLM`, `OPENAI_SDK`, `OLLAMA`, `LANGCHAIN`) to a provider adapter and dispatches attack prompts to the target agent.
+- `GOOGLE_ADK`, `CLAUDE_CODE`, `CODEX`, `HERMES`, and `WEB` use dedicated adapter classes in `hackagent/router/providers/`. The remaining chat-completions-style types are driven generically through `provider_config.py` + `_ChatRegistration`.
 - Tracks per-step traces via `hackagent/router/tracking/` for later inspection in the dashboard.
 
 ### Attack Framework (`hackagent/attacks/`)

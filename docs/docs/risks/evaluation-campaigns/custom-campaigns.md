@@ -467,4 +467,4 @@ def send_slack_alert(campaign_name, results):
 - **[Quick Scan](./quick-scan)** - Fast vulnerability scanning
 - **[Comprehensive Audit](./comprehensive-audit)** - Full security assessment
 - **[Targeted Assessment](./targeted-assessment)** - Focus on specific attack surfaces
-- **[Threat Profiles](../threat-profiles)** - Pre-built vulnerability profiles
+- **[Vulnerabilities](../vulnerabilities)** - Pre-built vulnerability profiles

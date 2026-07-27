@@ -117,7 +117,10 @@ class InlineStepJudge:
                 )
                 self._judges.append((judge_type, judge_range, evaluator))
             except Exception as exc:
-                logger.warning(f"Could not initialise judge '{judge_type}': {exc}")
+                logger.warning(
+                    f"Could not initialise judge '{judge_type}': {exc}",
+                    exc_info=True,
+                )
 
         if not self._judges:
             logger.warning("No valid judges initialised for inline evaluation")
@@ -188,7 +191,10 @@ class InlineStepJudge:
                         except (TypeError, ValueError):
                             pass
             except Exception as exc:
-                self.logger.warning(f"Judge '{judge_type}' failed on candidate: {exc}")
+                self.logger.warning(
+                    f"Judge '{judge_type}' failed on candidate: {exc}",
+                    exc_info=True,
+                )
 
         if not success_votes:
             return False, best_score, judge_cols

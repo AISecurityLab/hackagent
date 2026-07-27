@@ -217,6 +217,8 @@ class DashboardDataMixin:
                 await self._load_agents()
             elif _v == "runs":
                 await self._load_runs()
+            elif _v == "builder":
+                await self._builder_refresh_drafts()
         except Exception as exc:
             ui.notify(f"Failed to load data: {exc}", type="negative")
         finally:

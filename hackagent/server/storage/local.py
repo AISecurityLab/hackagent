@@ -101,6 +101,14 @@ CREATE TABLE IF NOT EXISTS traces (
     created_at   TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS attack_builder_drafts (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    canvas_json TEXT NOT NULL DEFAULT '{}',
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_attacks_agent   ON attacks(agent_id);
 CREATE INDEX IF NOT EXISTS idx_runs_attack     ON runs(attack_id);
 CREATE INDEX IF NOT EXISTS idx_results_run     ON results(run_id);
@@ -718,3 +726,88 @@ class LocalBackend:
             )
             for r in rows
         ]
+
+    # ── Attack builder drafts ─────────────────────────────────────────────────
+
+    def save_builder_draft(
+        self,
+        name: str,
+        canvas: Dict[str, Any],
+        draft_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Insert or update a dashboard attack-builder draft canvas.
+
+        Args:
+            name: User-facing draft name.
+            canvas: Canvas dict (node layout plus the underlying config).
+            draft_id: Existing draft id to overwrite; a new one is created
+                when omitted or unknown.
+
+        Returns:
+            The stored draft as ``{id, name, canvas, created_at, updated_at}``.
+        """
+        now = _now_str()
+        canvas_json = json.dumps(canvas)
+        with self._lock:
+            row = None
+            if draft_id:
+                row = self._conn.execute(
+                    "SELECT created_at FROM attack_builder_drafts WHERE id=? LIMIT 1",
+                    (draft_id,),
+                ).fetchone()
+            if row:
+                created_at = row["created_at"]
+                self._conn.execute(
+                    "UPDATE attack_builder_drafts SET name=?, canvas_json=?, updated_at=? WHERE id=?",
+                    (name, canvas_json, now, draft_id),
+                )
+            else:
+                draft_id = draft_id or str(uuid.uuid4())
+                created_at = now
+                self._conn.execute(
+                    "INSERT INTO attack_builder_drafts (id, name, canvas_json, created_at, updated_at) VALUES (?,?,?,?,?)",
+                    (draft_id, name, canvas_json, now, now),
+                )
+            self._conn.commit()
+        return {
+            "id": draft_id,
+            "name": name,
+            "canvas": canvas,
+            "created_at": created_at,
+            "updated_at": now,
+        }
+
+    def list_builder_drafts(self) -> List[Dict[str, Any]]:
+        """Return all saved builder drafts, most recently updated first."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM attack_builder_drafts ORDER BY updated_at DESC"
+            ).fetchall()
+        return [self._row_to_draft(r) for r in rows]
+
+    def get_builder_draft(self, draft_id: str) -> Optional[Dict[str, Any]]:
+        """Return one draft by id, or None if it does not exist."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM attack_builder_drafts WHERE id=? LIMIT 1",
+                (draft_id,),
+            ).fetchone()
+        return self._row_to_draft(row) if row else None
+
+    def delete_builder_draft(self, draft_id: str) -> None:
+        """Delete a draft by id. No-op if it does not exist."""
+        with self._lock:
+            self._conn.execute(
+                "DELETE FROM attack_builder_drafts WHERE id=?", (draft_id,)
+            )
+            self._conn.commit()
+
+    @staticmethod
+    def _row_to_draft(row) -> Dict[str, Any]:
+        return {
+            "id": row["id"],
+            "name": row["name"],
+            "canvas": json.loads(row["canvas_json"] or "{}"),
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        }

@@ -14,6 +14,7 @@ from textual.binding import Binding
 from textual.widgets import Footer, TabbedContent, TabPane
 
 from hackagent.cli.config import CLIConfig
+from hackagent.cli.tui.theme import css_variables
 from hackagent.cli.tui.views.agents import AgentsTab
 from hackagent.cli.tui.views.attacks import AttacksTab
 from hackagent.cli.tui.views.config import ConfigTab
@@ -29,19 +30,19 @@ class HackAgentTUI(App):
     }
 
     Header {
-        background: #8b0000;  /* dark red - HackAgent brand color */
-        color: #ffffff;
+        background: $brand-dark;  /* dark red - HackAgent brand color */
+        color: $brand-text;
         height: 3;
     }
 
     Footer {
-        background: #2b0000;  /* darker red */
-        color: #ffffff;
+        background: $brand-darker;  /* darker red */
+        color: $brand-text;
     }
 
     TabbedContent {
         height: 100%;
-        border: solid #ff0000;  /* red - HackAgent brand color */
+        border: solid $brand;  /* red - HackAgent brand color */
     }
 
     TabPane {
@@ -53,35 +54,35 @@ class HackAgentTUI(App):
     }
 
     Tabs {
-        background: #2b0000;
+        background: $brand-darker;
     }
 
     Tab {
-        color: #cccccc;
-        background: #2b0000;
+        color: $brand-text-muted;
+        background: $brand-darker;
     }
 
     Tab.-active {
-        color: #ffffff;
-        background: #8b0000;  /* dark red when active */
+        color: $brand-text;
+        background: $brand-dark;  /* dark red when active */
         text-style: bold;
     }
 
     Tab:hover {
-        background: #5b0000;
+        background: $brand-hover;
     }
 
     .title-bar {
         dock: top;
         width: 100%;
-        background: #8b0000;
-        color: #ffffff;
+        background: $brand-dark;
+        color: $brand-text;
         height: 3;
         content-align: center middle;
     }
 
     .section {
-        border: solid #ff0000;
+        border: solid $brand;
         padding: 1;
         margin: 1;
         height: auto;
@@ -89,7 +90,7 @@ class HackAgentTUI(App):
 
     .info-box {
         background: $panel;
-        border: solid #ff0000;
+        border: solid $brand;
         padding: 1;
         margin: 1;
     }
@@ -99,12 +100,12 @@ class HackAgentTUI(App):
     }
 
     Button.-primary {
-        background: #8b0000;
-        color: #ffffff;
+        background: $brand-dark;
+        color: $brand-text;
     }
 
     Button.-primary:hover {
-        background: #ff0000;
+        background: $brand;
     }
 
     DataTable {
@@ -112,18 +113,18 @@ class HackAgentTUI(App):
     }
 
     DataTable > .datatable--header {
-        background: #8b0000;
-        color: #ffffff;
+        background: $brand-dark;
+        color: $brand-text;
         text-style: bold;
     }
 
     DataTable > .datatable--cursor {
-        background: #5b0000;
+        background: $brand-hover;
     }
 
     /* Results tab specific styles - horizontal split 20-80 */
     ResultsTab #results-left-panel {
-        border-right: solid #ff0000;
+        border-right: solid $brand;
         background: $panel;
     }
 
@@ -135,8 +136,8 @@ class HackAgentTUI(App):
         height: 3;
         width: 100%;
         text-align: center;
-        background: #8b0000;
-        color: #ffffff;
+        background: $brand-dark;
+        color: $brand-text;
         padding: 1;
     }
 
@@ -144,8 +145,8 @@ class HackAgentTUI(App):
         height: 3;
         width: 100%;
         text-align: center;
-        background: #8b0000;
-        color: #ffffff;
+        background: $brand-dark;
+        color: $brand-text;
         padding: 1;
     }
 
@@ -187,6 +188,10 @@ class HackAgentTUI(App):
         self.initial_tab = initial_tab
         self.initial_data = initial_data or {}
         self.dark = True  # Use dark theme by default
+
+    def get_css_variables(self) -> dict[str, str]:
+        """Expose the HackAgent brand palette as CSS variables."""
+        return {**super().get_css_variables(), **css_variables()}
 
     def compose(self) -> ComposeResult:
         """Compose the UI layout."""

@@ -135,16 +135,32 @@ To set up your environment for local development:
 4. (Optional but Recommended) Install pre-commit hooks:
 
     ```bash
-    uv run pre-commit install --hook-type commit-msg --hook-type pre-commit
+    uv run pre-commit install
     ```
 
 ## Styleguides
 
 ### Git Commit Messages
 
-We follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification. This is enforced locally via pre-commit hooks (if installed) and in our CI pipeline.
+We follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification.
 
 Commit messages should be structured as follows:
+
+### Python Styleguide
+
+Audit-bearing code must never silently swallow an exception. This includes
+run/result/trace persistence, router dispatch, orchestration, and evaluator
+code that contributes to a security report.
+
+When handling an exception in these paths, use one of the following patterns:
+
+* Catch the specific exception type and recover without losing audit data.
+* Log the exception with `exc_info=True` and re-raise it.
+* Persist a structured failure containing at least
+  `{"step": ..., "status": "failed", "error": ...}` on the run or result.
+
+Do not add `except Exception: pass`, and do not turn a partially tracked or
+partially evaluated run into a successful "no findings" result.
 
 ## License
 

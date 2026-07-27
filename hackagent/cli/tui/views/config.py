@@ -7,13 +7,12 @@ Config Tab
 Manage HackAgent configuration settings.
 """
 
-import importlib.metadata
-
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Button, Static
 
+from hackagent._version import get_version
 from hackagent.cli.config import CLIConfig
 
 
@@ -75,7 +74,7 @@ class ConfigTab(VerticalScroll):
 
             yield Static(
                 f"""[dim]Python Version:[/dim] {self._get_python_version()}
-[dim]CLI Version:[/dim] {importlib.metadata.version("hackagent")}
+[dim]CLI Version:[/dim] {get_version()}
 [dim]Dependencies:[/dim] {self._check_dependencies()}
 [dim]Local DB:[/dim] ~/.local/share/hackagent/hackagent.db""",
                 classes="info-box",

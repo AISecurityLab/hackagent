@@ -5,6 +5,7 @@
 Configuration for the RAG Attack (indirect prompt injection via RAG poisoning).
 """
 
+import copy
 from typing import Any, Dict
 
 from pydantic import Field
@@ -14,6 +15,7 @@ from hackagent.attacks.techniques.config import (
     DEFAULT_CONFIG_BASE,
     default_rag_embedder,
 )
+from hackagent.attacks.techniques.rag.jailbreak import DEFAULT_JAILBREAK_CONFIG
 
 
 DEFAULT_RAG_CONFIG: Dict[str, Any] = {
@@ -31,6 +33,7 @@ DEFAULT_RAG_CONFIG: Dict[str, Any] = {
         "poisoning": {
             "strategy": "inline_context_override",
             "poisoned_ratio": 0.5,
+            "jailbreak": copy.deepcopy(DEFAULT_JAILBREAK_CONFIG),
         },
         "benign_queries": [],
         "benign_queries_per_goal": 5,
@@ -188,6 +191,7 @@ class RagConfig(ConfigBase):
                 "strategy": "inline_context_override",
                 "poisoned_ratio": 0.5,
                 "poisoner_max_tokens": 320,
+                "jailbreak": copy.deepcopy(DEFAULT_JAILBREAK_CONFIG),
             },
             "benign_queries": [],
             "benign_queries_per_goal": 5,

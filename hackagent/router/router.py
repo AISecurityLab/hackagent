@@ -13,6 +13,7 @@ from hackagent.router.agent import Agent
 from hackagent.router.providers.adk import ADKAgent, _get_litellm
 from hackagent.router.providers.claude import ClaudeCodeAgent
 from hackagent.router.providers.codex import CodexAgent
+from hackagent.router.providers.hermes import HermesAgent
 from hackagent.router.providers.web import WebAgent
 from hackagent.router.provider_config import ProviderConfig, get_provider_config
 from hackagent.router.types import AgentTypeEnum
@@ -51,6 +52,7 @@ AGENT_TYPE_TO_ADAPTER_MAP: Dict[AgentTypeEnum, Type[Agent]] = {
     AgentTypeEnum.GOOGLE_ADK: ADKAgent,
     AgentTypeEnum.CLAUDE_CODE: ClaudeCodeAgent,
     AgentTypeEnum.CODEX: CodexAgent,
+    AgentTypeEnum.HERMES: HermesAgent,
     AgentTypeEnum.WEB: WebAgent,
 }
 

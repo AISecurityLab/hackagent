@@ -325,6 +325,7 @@ class BaseEvaluationStep:
                     self.logger.warning(
                         "Failed to recompute summary from persisted results: %s",
                         e,
+                        exc_info=True,
                     )
 
                 merged_run_config: Dict[str, Any] = {}
@@ -333,6 +334,10 @@ class BaseEvaluationStep:
                     if isinstance(existing_run.run_config, dict):
                         merged_run_config = dict(existing_run.run_config)
                 except Exception:
+                    self.logger.warning(
+                        "Failed to read existing run config before metrics sync",
+                        exc_info=True,
+                    )
                     merged_run_config = {}
 
                 merged_run_config["evaluation_summary"] = summary_to_store
@@ -346,7 +351,10 @@ class BaseEvaluationStep:
                 self.logger.warning("No tracking client available; cannot sync metrics")
 
         except Exception as e:
-            self.logger.warning(f"Failed to sync structured metrics: {e}")
+            self.logger.warning(
+                f"Failed to sync structured metrics: {e}",
+                exc_info=True,
+            )
 
     def resolve_agent_type(self, agent_type_value: Any) -> AgentTypeEnum:
         """Convert a string, enum, or ``None`` into an ``AgentTypeEnum``."""

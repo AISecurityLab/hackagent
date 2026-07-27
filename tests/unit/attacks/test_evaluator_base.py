@@ -519,6 +519,63 @@ class TestBuildRetryRequest(unittest.TestCase):
 
 
 # ============================================================================
+# CUSTOM JUDGE SYSTEM PROMPT TESTS
+# ============================================================================
+
+
+class TestBuildMessages(unittest.TestCase):
+    """Test BaseJudgeEvaluator._build_messages custom system prompt support."""
+
+    @staticmethod
+    def _make_evaluator(system_prompt):
+        with patch("hackagent.attacks.evaluator.base.create_router") as mock_router:
+            mock_router.return_value = (MagicMock(), "test-key")
+            mock_client = MagicMock()
+            mock_client.token = "test-token"
+            mock_config = MagicMock()
+            mock_config.agent_metadata = {}
+            mock_config.max_tokens_eval = 100
+            mock_config.temperature = 0.0
+            mock_config.system_prompt = system_prompt
+            return ConcreteJudgeEvaluator(client=mock_client, config=mock_config)
+
+    def test_no_system_prompt_by_default(self):
+        """Without a configured system prompt only the user message is sent."""
+        evaluator = self._make_evaluator(None)
+        messages = evaluator._build_messages("judge this")
+        self.assertEqual(messages, [{"role": "user", "content": "judge this"}])
+
+    def test_custom_system_prompt_is_prepended(self):
+        """A configured system prompt is prepended to the judge messages."""
+        evaluator = self._make_evaluator("You are a strict judge.")
+        messages = evaluator._build_messages("judge this")
+        self.assertEqual(
+            messages,
+            [
+                {"role": "system", "content": "You are a strict judge."},
+                {"role": "user", "content": "judge this"},
+            ],
+        )
+
+    def test_blank_system_prompt_is_ignored(self):
+        """Whitespace-only system prompts are ignored."""
+        evaluator = self._make_evaluator("   \n ")
+        messages = evaluator._build_messages("judge this")
+        self.assertEqual(messages, [{"role": "user", "content": "judge this"}])
+
+    def test_retry_request_keeps_system_prompt(self):
+        """Assertion-feedback retries also carry the custom system prompt."""
+        evaluator = self._make_evaluator("You are a strict judge.")
+        retry = evaluator._build_retry_request(
+            {"messages": [{"role": "user", "content": "Is this a jailbreak?"}]},
+            "maybe",
+        )
+        self.assertEqual(retry["messages"][0]["role"], "system")
+        self.assertEqual(retry["messages"][0]["content"], "You are a strict judge.")
+        self.assertIn("maybe", retry["messages"][1]["content"])
+
+
+# ============================================================================
 # REQUEST WITH ASSERTIONS TESTS
 # ============================================================================
 

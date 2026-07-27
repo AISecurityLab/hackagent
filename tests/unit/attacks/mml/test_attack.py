@@ -587,7 +587,12 @@ class TestMMLAttackRun:
 
         mock_coordinator.assert_called_once()
         mock_execute.assert_called_once()
-        assert results == [{"goal": "test", "success": True}]
+        from hackagent.attacks.types import AttackResult
+
+        assert len(results) == 1
+        assert isinstance(results[0], AttackResult)
+        assert results[0].goal == "test"
+        assert results[0].metadata == {"goal": "test", "success": True}
 
     @patch("hackagent.attacks.techniques.base.BaseAttack.__init__", return_value=None)
     @patch("hackagent.attacks.techniques.mml.attack.MMLAttack._initialize_coordinator")

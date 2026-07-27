@@ -118,6 +118,10 @@ class TestFlipAttack(unittest.TestCase):
         self.assertEqual(len(out), 1)
         mock_generation.assert_called_once()
         mock_evaluation.assert_called_once()
+        from hackagent.attacks.types import AttackResult
+
+        self.assertIsInstance(out[0], AttackResult)
+        self.assertEqual(out[0].goal, "g1")
 
 
 if __name__ == "__main__":

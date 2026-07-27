@@ -1,3 +1,24 @@
+## v0.12.0 (2026-07-27)
+
+### Fix
+
+- **tui**: isolate ResultsTab snapshot test from real local backend
+- re-drop gitmoji commitizen config accidentally reintroduced by version bump
+
+## v0.11.1 (2026-07-26)
+
+### Feat
+
+- **cli**: add datasets list/show/sample commands
+- point hackagent examples rag at the local Ollama indirect-injection demo
+- Add support for multiple attack selection
+
+### Fix
+
+- **tracking**: restore trace failure handling
+- **audit**: surface tracking and evaluation failures
+- prevent Select crash from stale None cached values in Attacks tab
+
 ## v0.11.0 (2026-07-02)
 
 ### ✨ Features

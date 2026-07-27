@@ -27,6 +27,7 @@ import faiss
 import numpy as np
 
 from hackagent.attacks.techniques.base import BaseAttack
+from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.attacks.shared.router_factory import create_router
 from hackagent.attacks.shared.response_utils import extract_response_content
 from hackagent.router.router import AgentRouter
@@ -45,6 +46,7 @@ from .config import (
     STRATEGY_DESCRIPTIONS,
     RagConfig,
 )
+from .jailbreak import build_jailbreak_framer
 
 
 def _deep_update(target: Dict[str, Any], source: Dict[str, Any]) -> None:
@@ -357,7 +359,7 @@ class RagAttack(BaseAttack):
         params = self.config.get("rag_injection_params", {})
         return params if isinstance(params, dict) else {}
 
-    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[Dict[str, Any]]:
+    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
         """
         Execute the RAG Attack (indirect prompt injection).
 
@@ -378,12 +380,21 @@ class RagAttack(BaseAttack):
         if not isinstance(poisoning_cfg, dict):
             poisoning_cfg = {}
 
+        jailbreak_cfg = poisoning_cfg.get("jailbreak")
+        if not isinstance(jailbreak_cfg, dict):
+            jailbreak_cfg = {}
+
         # Initialize tracking coordinator for dashboard integration
         coordinator = self._initialize_coordinator(
             attack_type="rag",
             goals=goals,
             initial_metadata={
-                "strategy": poisoning_cfg.get("strategy", "inline_context_override")
+                "strategy": poisoning_cfg.get("strategy", "inline_context_override"),
+                "jailbreak_technique": (
+                    jailbreak_cfg.get("technique")
+                    if jailbreak_cfg.get("enabled")
+                    else None
+                ),
             },
         )
         goal_tracker = coordinator.goal_tracker
@@ -455,7 +466,7 @@ class RagAttack(BaseAttack):
         if not self.config.get("_suppress_run_status_updates", False):
             coordinator.finalize_pipeline(all_results)
 
-        return all_results
+        return rows_to_attack_results(all_results)
 
     def _run_single_goal(
         self,
@@ -554,6 +565,10 @@ class RagAttack(BaseAttack):
                 if not isinstance(query_anchors, list) or not query_anchors:
                     query_anchors = [""] * len(payloads)
 
+                payload_jailbreaks = doc.get("payload_jailbreaks")
+                if not isinstance(payload_jailbreaks, list):
+                    payload_jailbreaks = []
+
                 n_payloads = min(len(payloads), len(insertion_indices))
                 for payload_idx in range(n_payloads):
                     payload_text = str(payloads[payload_idx] or "")
@@ -566,6 +581,12 @@ class RagAttack(BaseAttack):
                     query_anchor = ""
                     if payload_idx < len(query_anchors):
                         query_anchor = str(query_anchors[payload_idx] or "")
+
+                    jailbreak_metadata: Dict[str, Any] = {}
+                    if payload_idx < len(payload_jailbreaks):
+                        candidate = payload_jailbreaks[payload_idx]
+                        if isinstance(candidate, dict):
+                            jailbreak_metadata = candidate
 
                     before_text = ""
                     after_text = ""
@@ -597,6 +618,7 @@ class RagAttack(BaseAttack):
                             "insertion_paragraph_index": insert_idx,
                             "injection_index": payload_idx + 1,
                             "query_anchor": query_anchor,
+                            "jailbreak": jailbreak_metadata,
                             "context_before": preview_before_tail,
                             "injected_payload": payload_text,
                             "poisoned_paragraphs_count": doc.get(
@@ -977,6 +999,14 @@ class RagAttack(BaseAttack):
             strategy, STRATEGY_DESCRIPTIONS["inline_context_override"]
         )
 
+        jailbreak_framer = build_jailbreak_framer(
+            poisoning_config.get("jailbreak"),
+            self.logger,
+            attacker_router=self.attacker_router,
+            attacker_reg_key=self.attacker_reg_key,
+        )
+        payload_variant_index = 0
+
         n_to_poison = max(1, math.ceil(len(documents) * poisoned_ratio))
         docs_to_poison = documents[:n_to_poison]
 
@@ -1027,9 +1057,17 @@ class RagAttack(BaseAttack):
                     )
                     context_snippet = f"{context_before}\n[...PAYLOAD WILL BE INSERTED HERE...]\n{context_after}"
 
+                    payload_goal = goal
+                    jailbreak_metadata: Dict[str, Any] = {}
+                    if jailbreak_framer is not None:
+                        payload_goal, jailbreak_metadata = jailbreak_framer.apply(
+                            goal, payload_variant_index
+                        )
+                        payload_variant_index += 1
+
                     if strategy == "maximize_retrieval":
                         payload = self._generate_maximize_retrieval_payload(
-                            goal=goal,
+                            goal=payload_goal,
                             retrieval_anchor_query=query_anchor,
                             max_tokens=poisoner_max_tokens,
                         )
@@ -1037,14 +1075,14 @@ class RagAttack(BaseAttack):
                         if strategy == "append_hidden_directive":
                             system_prompt = (
                                 APPEND_HIDDEN_DIRECTIVE_POISONER_SYSTEM_PROMPT.format(
-                                    goal=goal,
+                                    goal=payload_goal,
                                     context_snippet=context_snippet,
                                 )
                             )
                         else:
                             system_prompt = POISONER_SYSTEM_PROMPT.format(
                                 strategy_description=strategy_desc,
-                                goal=goal,
+                                goal=payload_goal,
                                 context_snippet=context_snippet,
                             )
 
@@ -1092,6 +1130,7 @@ class RagAttack(BaseAttack):
                             "payload": payload,
                             "insertion_index": insert_idx + 1,
                             "query_anchor": query_anchor,
+                            "jailbreak": jailbreak_metadata,
                         }
                     )
 
@@ -1114,6 +1153,7 @@ class RagAttack(BaseAttack):
             payload_query_anchors = [
                 record["query_anchor"] for record in payload_records
             ]
+            payload_jailbreaks = [record["jailbreak"] for record in payload_records]
 
             self.logger.info(
                 f"  Doc '{doc['id']}': inserted {len(payload_records)} payload paragraph(s)"
@@ -1130,6 +1170,7 @@ class RagAttack(BaseAttack):
                     "insertion_index": insertion_indices[0],  # backward compatibility
                     "payload_insertion_indices": insertion_indices,
                     "payload_query_anchors": payload_query_anchors,
+                    "payload_jailbreaks": payload_jailbreaks,
                     "poisoned_paragraphs_count": len(payload_records),
                     "original_length": len(doc["text"]),
                     "poisoned_length": len(poisoned_text),

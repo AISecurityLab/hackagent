@@ -2,7 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import abc
-from typing import Any, Dict
+from typing import Any, Dict, List
+
+from hackagent.attacks.types import AttackResult
 
 
 class BaseAttack(abc.ABC):
@@ -64,7 +66,7 @@ class BaseAttack(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def run(self, **kwargs: Any) -> Any:
+    def run(self, **kwargs: Any) -> List[AttackResult]:
         """
         Executes the attack logic.
 
@@ -80,12 +82,7 @@ class BaseAttack(abc.ABC):
                 - target_model: The model to attack
 
         Returns:
-            Attack-specific results. The format varies by implementation but
-            typically includes:
-            - adversarial_examples: Generated adversarial inputs
-            - success_metrics: Attack success rates and statistics
-            - detailed_results: Comprehensive result data (e.g., pandas DataFrame)
-            - attack_report: Summary of attack performance
+            A list of :class:`~hackagent.attacks.types.AttackResult` instances.
 
         Raises:
             NotImplementedError: If the method is not implemented by a subclass.

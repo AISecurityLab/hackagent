@@ -27,8 +27,10 @@ import faiss
 import numpy as np
 
 from hackagent.attacks.techniques.base import BaseAttack
+from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.attacks.shared.router_factory import create_router
 from hackagent.attacks.shared.response_utils import extract_response_content
+from hackagent.config import DEFAULT_EMBEDDER_OPENAI_ENDPOINT
 from hackagent.router.router import AgentRouter
 from hackagent.router.tracking.tracker import Tracker
 from hackagent.server.client import AuthenticatedClient
@@ -229,7 +231,7 @@ def get_embeddings(
     # Fall back to a placeholder so keyless local backends (e.g. Ollama) work:
     # the OpenAI client requires a non-empty api_key, but local servers ignore it.
     api_key = config.get("api_key") or os.environ.get("OPENAI_API_KEY") or "not-needed"
-    raw_endpoint = str(config.get("endpoint", "http://localhost:11434/v1")).strip()
+    raw_endpoint = str(config.get("endpoint", DEFAULT_EMBEDDER_OPENAI_ENDPOINT)).strip()
     endpoint = raw_endpoint.rstrip("/")
     if endpoint.lower().endswith("/embeddings"):
         # OpenAI client expects API base and appends '/embeddings' internally.
@@ -359,7 +361,7 @@ class IndirectPromptInjectionAttack(BaseAttack):
         params = self.config.get("rag_injection_params", {})
         return params if isinstance(params, dict) else {}
 
-    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[Dict[str, Any]]:
+    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
         """
         Execute the indirect prompt injection attack.
 
@@ -459,7 +461,7 @@ class IndirectPromptInjectionAttack(BaseAttack):
         if not self.config.get("_suppress_run_status_updates", False):
             coordinator.finalize_pipeline(all_results)
 
-        return all_results
+        return rows_to_attack_results(all_results)
 
     def _run_single_goal(
         self,

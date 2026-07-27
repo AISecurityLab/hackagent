@@ -42,8 +42,21 @@ class TestPairConfig(unittest.TestCase):
         self.assertEqual(dumped["attacker"]["identifier"], "pair-attacker")
         self.assertEqual(dumped["objective"], "jailbreak")
 
+    def test_typed_config_accepts_pair_history_controls(self):
+        config = PairConfig.from_dict(
+            {
+                "keep_last_n": 2,
+                "target_str": "Sure, here is the requested answer",
+                "translate_prompts": False,
+            }
+        )
+        self.assertEqual(config.keep_last_n, 2)
+        self.assertEqual(config.target_str, "Sure, here is the requested answer")
+        self.assertFalse(config.translate_prompts)
+
     def test_prompts_keep_goal_placeholder(self):
         self.assertIn("{goal}", ATTACKER_SYSTEM_PROMPT)
+        self.assertIn("{target_str}", ATTACKER_SYSTEM_PROMPT)
         self.assertIn("{goal}", JUDGE_SYSTEM_PROMPT)
 
     def test_attacker_prompt_has_no_language_directive_placeholder(self):
@@ -51,7 +64,10 @@ class TestPairConfig(unittest.TestCase):
         # the translation module), not by an in-prompt directive.
         self.assertNotIn("{language_directive}", ATTACKER_SYSTEM_PROMPT)
         # Formats with only the goal placeholder.
-        self.assertIn("Sure, here is", ATTACKER_SYSTEM_PROMPT.format(goal="x"))
+        self.assertIn(
+            "Sure, here is",
+            ATTACKER_SYSTEM_PROMPT.format(goal="x", target_str="Sure, here is"),
+        )
 
 
 if __name__ == "__main__":

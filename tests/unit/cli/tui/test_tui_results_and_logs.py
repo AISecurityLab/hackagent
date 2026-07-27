@@ -1034,8 +1034,8 @@ class TestFormatTraceContent:
 class TestGetResultStatusInfo:
     """Tests for _get_result_status_info helper function."""
 
-    def test_successful_jailbreak_status(self) -> None:
-        """Test SUCCESSFUL_JAILBREAK returns green and check icon."""
+    def test_successful_jailbreak_is_vulnerable(self) -> None:
+        """A jailbreak that got through is reported as a red vulnerability."""
         from hackagent.cli.tui.views.results import _get_result_status_info
         from unittest.mock import MagicMock
 
@@ -1043,14 +1043,14 @@ class TestGetResultStatusInfo:
         result.evaluation_status = MagicMock()
         result.evaluation_status.value = "SUCCESSFUL_JAILBREAK"
 
-        status, color, icon = _get_result_status_info(result)
+        label, color, icon = _get_result_status_info(result)
 
-        assert "SUCCESSFUL" in status.upper()
-        assert color == "green"
-        assert icon == "✅"
+        assert label == "Vulnerable"
+        assert color == "red"
+        assert icon == "\U0001f513"
 
-    def test_failed_jailbreak_status(self) -> None:
-        """Test FAILED_JAILBREAK returns red and cross icon."""
+    def test_failed_jailbreak_is_mitigated(self) -> None:
+        """A refused jailbreak is reported as a green mitigation."""
         from hackagent.cli.tui.views.results import _get_result_status_info
         from unittest.mock import MagicMock
 
@@ -1058,14 +1058,14 @@ class TestGetResultStatusInfo:
         result.evaluation_status = MagicMock()
         result.evaluation_status.value = "FAILED_JAILBREAK"
 
-        status, color, icon = _get_result_status_info(result)
+        label, color, icon = _get_result_status_info(result)
 
-        assert "FAILED" in status.upper()
-        assert color == "red"
-        assert icon == "❌"
+        assert label == "Mitigated"
+        assert color == "green"
+        assert icon == "\U0001f6e1"
 
     def test_error_status(self) -> None:
-        """Test ERROR status returns red."""
+        """Test ERROR status is reported as a yellow error."""
         from hackagent.cli.tui.views.results import _get_result_status_info
         from unittest.mock import MagicMock
 
@@ -1073,23 +1073,22 @@ class TestGetResultStatusInfo:
         result.evaluation_status = MagicMock()
         result.evaluation_status.value = "ERROR"
 
-        status, color, icon = _get_result_status_info(result)
+        label, color, icon = _get_result_status_info(result)
 
-        assert color == "red"
-        assert icon == "⚠️"
+        assert label == "Error"
+        assert color == "yellow"
 
     def test_no_evaluation_status(self) -> None:
-        """Test result without evaluation_status returns N/A."""
+        """Test result without evaluation_status is reported as unevaluated."""
         from hackagent.cli.tui.views.results import _get_result_status_info
         from unittest.mock import MagicMock
 
         result = MagicMock(spec=[])  # No evaluation_status attribute
 
-        status, color, icon = _get_result_status_info(result)
+        label, color, icon = _get_result_status_info(result)
 
-        assert status == "N/A"
-        assert color == "yellow"
-        assert icon == "ℹ️"
+        assert label == "Not Evaluated"
+        assert color == "dim"
 
 
 class TestFormatResultSummary:
@@ -1115,7 +1114,7 @@ class TestFormatResultSummary:
         summary = _format_result_summary(result, 1)
 
         assert "#1" in summary  # Compact format uses #1 instead of Result #1
-        assert "SUCCESSFUL_JAILBREAK" in summary
+        assert "Vulnerable" in summary
         console.print(summary)
 
     def test_summary_without_optional_fields(self, console: Console) -> None:
@@ -1130,7 +1129,7 @@ class TestFormatResultSummary:
         summary = _format_result_summary(result, 3)
 
         assert "#3" in summary  # Compact format now uses #3 instead of Result #3
-        assert "NOT_EVALUATED" in summary
+        assert "Not Evaluated" in summary
         console.print(summary)
 
 
@@ -1162,7 +1161,7 @@ class TestFormatResultFullDetails:
 
         details = _format_result_full_details(result, 1)
 
-        assert "SUCCESSFUL_JAILBREAK" in details
+        assert "Vulnerable" in details
         assert "Attack succeeded" in details
         console.print(details)
 
@@ -1178,7 +1177,7 @@ class TestFormatResultFullDetails:
 
         details = _format_result_full_details(result, 5)
 
-        assert "NOT_EVALUATED" in details
+        assert "Not Evaluated" in details
         console.print(details)
 
 

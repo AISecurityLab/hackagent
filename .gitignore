@@ -7,6 +7,7 @@ reports/
 slurm/
 tools/
 docs/docs/attacks/walkthroughs/
+.worktrees/
 
 # Editors
 .vscode/
@@ -54,6 +55,8 @@ MANIFEST
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
+# The release build spec is checked in, unlike generated ones.
+!packaging/hackagent.spec
 
 # Installer logs
 pip-log.txt
@@ -139,3 +142,6 @@ dmypy.json
 tests/e2e/attacks/
 
 .tmp
+
+# pytest-textual-snapshot report artifact
+snapshot_report.html

@@ -58,6 +58,27 @@ pip install hackagent
 
 No API key required: HackAgent works locally out of the box.
 
+### Standalone binary (no Python required)
+
+Every [GitHub Release](https://github.com/AISecurityLab/hackagent/releases) ships a
+self-contained archive per platform:
+
+| Platform | Asset |
+|----------|-------|
+| Linux x86_64 | `hackagent-<version>-linux-x86_64.tar.gz` |
+| macOS arm64 | `hackagent-<version>-macos-arm64.tar.gz` |
+| macOS x86_64 | `hackagent-<version>-macos-x86_64.tar.gz` |
+| Windows x86_64 | `hackagent-<version>-windows-x86_64.zip` |
+
+Extract the archive and run the `hackagent` launcher inside it — no Python, `pip`
+or `uv` install needed. Keep the extracted folder intact; the launcher loads the
+libraries next to it.
+
+> **Note:** the `WEB` provider drives a real browser through Playwright, whose
+> browser binaries cannot be embedded in the archive (or in the PyPI package).
+> Before using `hackagent web`-based targets, install them once with
+> `playwright install`.
+
 
 Questions? Join [community discussions](https://github.com/AISecurityLab/hackagent/discussions) or email ais@ai4i.it.
 

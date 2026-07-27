@@ -9,8 +9,6 @@ them here avoids circular imports between the page mixins and lets every module
 import the same source of truth.
 
 Exposed values:
-    _VIEW_LABELS: Maps an internal navigation key (``"dashboard"``, ``"agents"``,
-        ``"runs"``) to the human-facing title shown in the header.
     _RESULTS_FETCH_LIMIT: Page size used when fetching per-run results.
     _DASHBOARD_RUN_SCAN_LIMIT: How many recent runs the home dashboard scans to
         build its summary widgets.
@@ -18,12 +16,6 @@ Exposed values:
 """
 
 from __future__ import annotations
-
-_VIEW_LABELS = {
-    "dashboard": "Home",
-    "agents": "Targets",
-    "runs": "History",
-}
 
 _RESULTS_FETCH_LIMIT = 20
 _DASHBOARD_RUN_SCAN_LIMIT = 10

@@ -4,13 +4,14 @@
 """Unit tests for FCAttack and tFCAttack classes."""
 
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from hackagent.attacks.techniques.fc.attack import (
     FCAttack,
     tFCAttack,
     _recursive_update,
 )
+from hackagent.attacks.types import AttackResult
 
 
 class TestRecursiveUpdate(unittest.TestCase):
@@ -85,6 +86,26 @@ class TestFCAttack(unittest.TestCase):
         )
         self.assertEqual(attack.run([]), [])
 
+    def test_run_returns_list_of_attack_result(self):
+        attack = FCAttack(
+            config={"output_dir": "./logs/runs"},
+            client=MagicMock(),
+            agent_router=MagicMock(),
+        )
+        with (
+            patch.object(attack, "_initialize_coordinator", return_value=MagicMock()),
+            patch.object(
+                attack,
+                "_execute_pipeline",
+                return_value=[{"goal": "g1", "response": "r1"}],
+            ),
+        ):
+            results = attack.run(["g1"])
+
+        self.assertEqual(len(results), 1)
+        self.assertIsInstance(results[0], AttackResult)
+        self.assertEqual(results[0].goal, "g1")
+
     def test_get_pipeline_steps_returns_two_stages(self):
         attack = FCAttack(
             config={"output_dir": "./logs/runs"},
@@ -151,6 +172,26 @@ class TesttFCAttack(unittest.TestCase):
             agent_router=MagicMock(),
         )
         self.assertEqual(attack.run([]), [])
+
+    def test_run_returns_list_of_attack_result(self):
+        attack = tFCAttack(
+            config={"output_dir": "./logs/runs"},
+            client=MagicMock(),
+            agent_router=MagicMock(),
+        )
+        with (
+            patch.object(attack, "_initialize_coordinator", return_value=MagicMock()),
+            patch.object(
+                attack,
+                "_execute_pipeline",
+                return_value=[{"goal": "g1", "response": "r1"}],
+            ),
+        ):
+            results = attack.run(["g1"])
+
+        self.assertEqual(len(results), 1)
+        self.assertIsInstance(results[0], AttackResult)
+        self.assertEqual(results[0].goal, "g1")
 
     def test_get_pipeline_steps_returns_two_stages(self):
         attack = tFCAttack(
