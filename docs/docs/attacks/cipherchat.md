@@ -92,7 +92,7 @@ results = agent.hack(attack_config=attack_config)
 | `cipherchat_params.num_demonstrations` | Number of demonstrations to include | `3` |
 | `cipherchat_params.decode_response` | Decode model output before evaluation | `True` |
 | `batch_size` | Concurrent target requests | `1` |
-| `batch_size_judge` | Concurrent judge requests | `1` |
+| `judge_concurrency` | Concurrent judge requests | `1` |
 
 ## Shared Goal Category Classifier
 

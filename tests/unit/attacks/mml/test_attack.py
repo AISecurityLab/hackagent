@@ -509,7 +509,7 @@ class TestMMLAttackPipelineSteps:
 
         assert "mml_params" in eval_config_keys
         assert "judges" in eval_config_keys
-        assert "batch_size_judge" in eval_config_keys
+        assert "judge_concurrency" in eval_config_keys
         assert "max_tokens_eval" in eval_config_keys
 
     @patch("hackagent.attacks.techniques.base.BaseAttack.__init__", return_value=None)

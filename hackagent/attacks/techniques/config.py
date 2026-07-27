@@ -143,7 +143,7 @@ class JudgeEvalConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
-    batch_size_judge: int = Field(default=1, ge=1)
+    judge_concurrency: int = Field(default=1, ge=1)
     max_tokens_eval: int = Field(default=DEFAULT_MAX_OUTPUT_TOKENS, ge=1)
     filter_len: int = Field(default=10, ge=0)
     judge_timeout: int = Field(default=120, ge=1)
@@ -345,7 +345,9 @@ DEFAULT_STANDARD_TARGET_TEMPERATURE: float = TargetConfig.model_fields[
     "temperature"
 ].default
 
-DEFAULT_BATCH_SIZE_JUDGE: int = JudgeEvalConfig.model_fields["batch_size_judge"].default
+DEFAULT_JUDGE_CONCURRENCY: int = JudgeEvalConfig.model_fields[
+    "judge_concurrency"
+].default
 DEFAULT_MAX_TOKENS_EVAL: int = JudgeEvalConfig.model_fields["max_tokens_eval"].default
 DEFAULT_FILTER_LEN: int = JudgeEvalConfig.model_fields["filter_len"].default
 DEFAULT_JUDGE_TIMEOUT: int = JudgeEvalConfig.model_fields["judge_timeout"].default
@@ -417,7 +419,7 @@ __all__ = [
     "DEFAULT_TIMEOUT",
     "DEFAULT_STANDARD_TARGET_MAX_TOKENS",
     "DEFAULT_STANDARD_TARGET_TEMPERATURE",
-    "DEFAULT_BATCH_SIZE_JUDGE",
+    "DEFAULT_JUDGE_CONCURRENCY",
     "DEFAULT_MAX_TOKENS_EVAL",
     "DEFAULT_FILTER_LEN",
     "DEFAULT_JUDGE_TIMEOUT",

@@ -23,7 +23,7 @@ class TestDefaultConfig(unittest.TestCase):
             "attack_type",
             "h4rm3l_params",
             "judges",
-            "batch_size_judge",
+            "judge_concurrency",
             "goal_batch_size",
             "goal_batch_workers",
             "max_tokens_eval",

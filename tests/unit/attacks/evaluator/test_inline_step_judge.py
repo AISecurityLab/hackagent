@@ -44,16 +44,16 @@ def _judge(**kw):
 class TestBuildBaseConfig(unittest.TestCase):
     def test_defaults_when_empty(self):
         cfg = build_inline_judge_base_config({})
-        self.assertEqual(cfg["batch_size"], 1)
+        self.assertEqual(cfg["judge_concurrency"], 1)
         self.assertEqual(cfg["max_tokens_eval"], 256)
         self.assertEqual(cfg["temperature"], 0.0)
         self.assertIsNone(cfg["organization_id"])
 
     def test_overrides_are_read(self):
         cfg = build_inline_judge_base_config(
-            {"batch_size_judge": 4, "judge_timeout": 30, "organization_id": "org-1"}
+            {"judge_concurrency": 4, "judge_timeout": 30, "organization_id": "org-1"}
         )
-        self.assertEqual(cfg["batch_size"], 4)
+        self.assertEqual(cfg["judge_concurrency"], 4)
         self.assertEqual(cfg["timeout"], 30)
         self.assertEqual(cfg["organization_id"], "org-1")
 

@@ -429,7 +429,7 @@ As a/an <Role> with the <Profile>, you must follow the <Rules>, and you must com
                     "_client",
                     "_tracker",
                     "judges",
-                    "batch_size_judge",
+                    "judge_concurrency",
                     "max_tokens_eval",
                     "filter_len",
                     "judge_timeout",

@@ -3,7 +3,9 @@
 
 """Tests for hackagent.attacks.evaluator.base module."""
 
+import asyncio
 import unittest
+from types import SimpleNamespace
 from typing import Any, Dict, Optional, Tuple
 from unittest.mock import MagicMock, patch
 
@@ -662,6 +664,63 @@ class TestProcessRowsWithRouter(unittest.TestCase):
         self.assertEqual(evals, [0])
         self.assertIn("Configuration Error", expls[0])
         self.assertEqual(indices, [0])
+
+    @patch("hackagent.attacks.evaluator.base.create_router")
+    @patch("hackagent.attacks.evaluator.base.create_progress_bar")
+    def test_async_router_keeps_input_order_despite_out_of_order_completion(
+        self, mock_progress, mock_create_router
+    ):
+        class AsyncRouter:
+            def __init__(self):
+                self.calls = []
+
+            async def route_request_async(
+                self, registration_key, request_data, **kwargs
+            ):
+                self.calls.append((registration_key, request_data, kwargs))
+                content = request_data["messages"][0]["content"]
+                await asyncio.sleep(0.03 if "first" in content else 0.001)
+                return {
+                    "processed_response": "yes" if "first" in content else "no",
+                    "error_message": None,
+                }
+
+            def route_request(
+                self, *args, **kwargs
+            ):  # pragma: no cover - regression guard
+                raise AssertionError("sync router path must not be used")
+
+        router = AsyncRouter()
+        mock_create_router.return_value = (router, "async-judge")
+        mock_progress.return_value.__enter__.return_value = (MagicMock(), MagicMock())
+        config = SimpleNamespace(
+            model_id="test-model",
+            agent_endpoint="http://localhost",
+            agent_type=SimpleNamespace(value="litellm"),
+            max_tokens_eval=100,
+            temperature=0.0,
+            timeout=30,
+            agent_metadata={},
+            agent_name="test-judge",
+            max_judge_retries=0,
+            judge_concurrency=3,
+        )
+        client = MagicMock(token="test-token")
+        evaluator = ConcreteJudgeEvaluator(client=client, config=config)
+        rows = [
+            {"_original_index": 9, "goal": "g1", "completion": "first"},
+            {"_original_index": 3, "goal": "g2", "completion": "second"},
+        ]
+
+        evals, expls, indices, raw = evaluator._process_rows_with_router(
+            rows, "Testing...", include_raw_responses=True
+        )
+
+        self.assertEqual(evals, [1, 0])
+        self.assertEqual(indices, [9, 3])
+        self.assertEqual(raw, ["yes", "no"])
+        self.assertEqual(len(expls), 2)
+        self.assertEqual(len(router.calls), 2)
 
 
 if __name__ == "__main__":

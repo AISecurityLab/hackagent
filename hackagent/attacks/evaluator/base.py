@@ -24,14 +24,15 @@ Usage:
     )
 """
 
+import asyncio
+import inspect
 import logging
 import re
-import threading
 from abc import ABC, abstractmethod
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
+from hackagent.async_utils import run_coroutine_blocking
 from hackagent.attacks.shared.progress import create_progress_bar
 from hackagent.attacks.shared.router_factory import create_router
 from hackagent.server.client import AuthenticatedClient
@@ -430,13 +431,16 @@ class BaseJudgeEvaluator(ABC):
         )
 
         # ── Parallel judge evaluation ──────────────────────────────────────
-        # Each HTTP judge call is independent; fire batch_size rows at once.
-        _bs = getattr(self.config, "batch_size", 1)
-        batch_size = max(1, int(_bs) if isinstance(_bs, (int, float)) else 1)
-        _tracker_lock = threading.Lock()
+        # Judge requests are independent, so use lightweight cooperative tasks
+        # rather than one OS thread per in-flight request.
+        raw_concurrency = getattr(self.config, "judge_concurrency", 10)
+        try:
+            judge_concurrency = max(1, int(raw_concurrency))
+        except (TypeError, ValueError):
+            judge_concurrency = 10
         results_map: Dict[int, tuple] = {}
 
-        def _process_row(idx_row: tuple) -> tuple:
+        async def _process_row_async(idx_row: tuple) -> tuple:
             idx, row = idx_row
             import time as _time
 
@@ -452,7 +456,7 @@ class BaseJudgeEvaluator(ABC):
                     current_eval,
                     current_expl,
                     current_raw_response,
-                ) = self._request_with_assertions(
+                ) = await self._request_with_assertions_async(
                     request_data=request_data,
                     original_index=original_index,
                     max_retries=max_retries,
@@ -468,58 +472,69 @@ class BaseJudgeEvaluator(ABC):
                 )
             finally:
                 _eval_elapsed = round(_time.perf_counter() - _t0, 3)
-                with _tracker_lock:
-                    if self._tracker and request_data is not None:
-                        goal = row.get("goal", "")
-                        if goal:
-                            goal_ctx = self._tracker.get_goal_context_by_goal(goal)
-                            if goal_ctx:
-                                self._tracker.add_evaluation_trace(
-                                    ctx=goal_ctx,
-                                    evaluation_result={
-                                        "score": current_eval,
-                                        "explanation": current_expl,
-                                    },
-                                    score=(
-                                        float(current_eval)
-                                        if isinstance(current_eval, (int, float))
-                                        else 0.0
+                if self._tracker and request_data is not None:
+                    goal = row.get("goal", "")
+                    if goal:
+                        goal_ctx = self._tracker.get_goal_context_by_goal(goal)
+                        if goal_ctx:
+                            self._tracker.add_evaluation_trace(
+                                ctx=goal_ctx,
+                                evaluation_result={
+                                    "score": current_eval,
+                                    "explanation": current_expl,
+                                },
+                                score=(
+                                    float(current_eval)
+                                    if isinstance(current_eval, (int, float))
+                                    else 0.0
+                                ),
+                                explanation=current_expl,
+                                evaluator_name=self.__class__.__name__,
+                                metadata={
+                                    "prefix": row.get("prefix", ""),
+                                    "completion": (
+                                        row.get("completion", "")
+                                        if row.get("completion")
+                                        else None
                                     ),
-                                    explanation=current_expl,
-                                    evaluator_name=self.__class__.__name__,
-                                    metadata={
-                                        "prefix": row.get("prefix", ""),
-                                        "completion": (
-                                            row.get("completion", "")
-                                            if row.get("completion")
-                                            else None
-                                        ),
-                                        "judge_model": self.config.model_id,
-                                        "elapsed_s": _eval_elapsed,
-                                    },
-                                )
+                                    "judge_model": self.config.model_id,
+                                    "elapsed_s": _eval_elapsed,
+                                },
+                            )
             return idx, original_index, current_eval, current_expl, current_raw_response
 
         with create_progress_bar(task_desc, total=len(rows_to_process)) as (
             progress_bar,
             task,
         ):
-            with ThreadPoolExecutor(max_workers=batch_size) as pool:
-                for (
-                    idx,
+
+            async def _fan_out() -> List[tuple]:
+                semaphore = asyncio.Semaphore(judge_concurrency)
+
+                async def _fan_out_one(idx_row: tuple) -> tuple:
+                    async with semaphore:
+                        row_result = await _process_row_async(idx_row)
+                        progress_bar.update(task, advance=1)
+                        progress_bar.refresh()
+                        return row_result
+
+                return await asyncio.gather(
+                    *(_fan_out_one(idx_row) for idx_row in enumerate(rows_to_process))
+                )
+
+            for (
+                idx,
+                original_index,
+                current_eval,
+                current_expl,
+                current_raw_response,
+            ) in run_coroutine_blocking(_fan_out):
+                results_map[idx] = (
                     original_index,
                     current_eval,
                     current_expl,
                     current_raw_response,
-                ) in pool.map(_process_row, enumerate(rows_to_process)):
-                    results_map[idx] = (
-                        original_index,
-                        current_eval,
-                        current_expl,
-                        current_raw_response,
-                    )
-                    progress_bar.update(task, advance=1)
-                    progress_bar.refresh()
+                )
 
         self.logger.info(
             f"{self.config.agent_name}: {self.__class__.__name__} progress {total_rows}/{total_rows}"
@@ -642,6 +657,89 @@ class BaseJudgeEvaluator(ABC):
             response_content = retry_content
 
         # All retries exhausted — use last parse result
+        final = self._check_assertion(response_content, original_index)
+        if include_raw_response:
+            return (
+                final.score,
+                final.explanation + " (retries exhausted)",
+                response_content,
+            )
+        return final.score, final.explanation + " (retries exhausted)"
+
+    async def _route_request_async(
+        self, registration_key: str, request_data: Dict[str, Any], **kwargs: Any
+    ) -> Dict[str, Any]:
+        """Use the router's async twin when available, otherwise offload sync I/O."""
+        fn = getattr(self.agent_router, "route_request_async", None)
+        if fn is not None and inspect.iscoroutinefunction(fn):
+            return await fn(registration_key, request_data, **kwargs)
+        return await asyncio.to_thread(
+            self.agent_router.route_request, registration_key, request_data, **kwargs
+        )
+
+    async def _request_with_assertions_async(
+        self,
+        request_data: Dict[str, Any],
+        original_index: Any,
+        max_retries: int = 1,
+        include_raw_response: bool = False,
+    ) -> Tuple[Any, Optional[str]] | Tuple[Any, Optional[str], Optional[str]]:
+        """Async equivalent of :meth:`_request_with_assertions`."""
+        response = await self._route_request_async(
+            registration_key=self.agent_registration_key,
+            request_data=request_data,
+        )
+        error_msg = response.get("error_message")
+        response_content = response.get("processed_response")
+        if error_msg:
+            if include_raw_response:
+                return 0, f"{self.__class__.__name__}: {error_msg}", None
+            return 0, f"{self.__class__.__name__}: {error_msg}"
+        if response_content is None:
+            if include_raw_response:
+                return 0, f"{self.__class__.__name__}: No content from router", None
+            return 0, f"{self.__class__.__name__}: No content from router"
+
+        current_eval, current_expl = self._parse_response_content(
+            response_content, original_index
+        )
+        assertion = self._check_assertion(response_content, original_index)
+        if assertion.is_confident or max_retries <= 0:
+            if include_raw_response:
+                return current_eval, current_expl, response_content
+            return current_eval, current_expl
+
+        for retry in range(max_retries):
+            self.logger.debug(
+                f"Assertion retry {retry + 1}/{max_retries} for index {original_index} "
+                f"(response was: '{response_content[:50]}...')"
+            )
+            retry_response = await self._route_request_async(
+                registration_key=self.agent_registration_key,
+                request_data=self._build_retry_request(request_data, response_content),
+            )
+            retry_error = retry_response.get("error_message")
+            retry_content = retry_response.get("processed_response")
+            if retry_error or retry_content is None:
+                self.logger.debug(
+                    f"Retry {retry + 1} failed: {retry_error or 'no content'}"
+                )
+                continue
+            retry_assertion = self._check_assertion(retry_content, original_index)
+            if retry_assertion.is_confident:
+                self.logger.info(
+                    f"✅ Assertion retry {retry + 1} succeeded for index "
+                    f"{original_index}: score={retry_assertion.score}"
+                )
+                if include_raw_response:
+                    return (
+                        retry_assertion.score,
+                        retry_assertion.explanation + " (retry)",
+                        retry_content,
+                    )
+                return retry_assertion.score, retry_assertion.explanation + " (retry)"
+            response_content = retry_content
+
         final = self._check_assertion(response_content, original_index)
         if include_raw_response:
             return (

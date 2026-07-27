@@ -96,7 +96,7 @@ DEFAULT_PREFIX_GENERATION_CONFIG: Dict[str, Any] = {
     "max_tokens_completion": 512,
     "n_samples": 1,  # Completions per prefix
     # --- Evaluation Stage Params ---
-    "batch_size_judge": 1,
+    "judge_concurrency": 1,
     "max_tokens_eval": 512,
     "filter_len": DEFAULT_FILTER_LEN,
     "n_prefixes_per_goal": 2,
@@ -200,7 +200,7 @@ class EvaluationPipelineConfig(BaseModel):
 
     # Judge evaluation settings
     judges: List[Dict[str, Any]] = Field(default_factory=list)
-    batch_size_judge: Optional[int] = 1
+    judge_concurrency: Optional[int] = 1
     max_tokens_eval: Optional[int] = 60
     filter_len: Optional[int] = DEFAULT_FILTER_LEN
     judge_timeout: int = DEFAULT_TIMEOUT
@@ -238,6 +238,7 @@ class EvaluatorConfig(BaseModel):
     organization_id: Optional[int] = None
     agent_metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
     batch_size: int = 1
+    judge_concurrency: int = 10
     max_tokens_eval: int = 512
     filter_len: int = 500
     timeout: int = DEFAULT_TIMEOUT

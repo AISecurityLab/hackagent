@@ -1,6 +1,7 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import asyncio
 import logging
 from typing import Any, Dict, List, Optional, Tuple, Type
 
@@ -558,6 +559,155 @@ class AgentRouter:
 
         return response
 
+    async def route_request_async(
+        self,
+        registration_key: str,
+        request_data: Dict[str, Any],
+        raise_on_error: bool = False,
+    ) -> Dict[str, Any]:
+        """Asynchronously route a request while preserving ``route_request`` semantics."""
+        logger.debug(
+            "Routing async request for agent key: %s. Request data keys: %s",
+            registration_key,
+            list(request_data.keys()),
+        )
+        agent_instance = self.get_agent_instance(registration_key)
+        if not agent_instance:
+            error_msg = f"Agent not found for key: {registration_key}"
+            logger.error(error_msg)
+            if raise_on_error:
+                raise ValueError(error_msg)
+            return self._build_error_response(
+                error_message=error_msg,
+                error_category="AgentNotFound",
+                status_code=404,
+                raw_request=request_data,
+                registration_key=registration_key,
+            )
+
+        agent_type = self._agent_types.get(registration_key)
+        provider_config = (
+            get_provider_config(agent_type) if agent_type is not None else None
+        )
+
+        # Keep guardrail behavior byte-for-byte compatible with the synchronous path.
+        if self.before_guardrail is not None:
+            prompt = _extract_prompt_text(request_data)
+            if not prompt.strip():
+                logger.debug(
+                    "before_guardrail: empty prompt text for agent %s, skipping check.",
+                    registration_key,
+                )
+            else:
+                guardrail_result = self.before_guardrail.check(prompt)
+                if not guardrail_result.is_safe:
+                    logger.warning(
+                        "before_guardrail blocked prompt for agent %s: %s",
+                        registration_key,
+                        guardrail_result.explanation,
+                    )
+                    return self._build_guardrail_response(
+                        request_data,
+                        registration_key,
+                        "before_guardrail_blocked",
+                        "before",
+                        "Request blocked: flagged as unsafe by guardrail.",
+                        guardrail_result,
+                    )
+
+        try:
+            if provider_config is not None:
+                response = await self._dispatch_via_litellm_async(
+                    registration_key=registration_key,
+                    agent_instance=agent_instance,
+                    provider_config=provider_config,
+                    request_data=request_data,
+                )
+            else:
+                response = await asyncio.to_thread(
+                    agent_instance.handle_request, request_data
+                )
+            logger.debug(
+                "Successfully routed request for agent key: %s", registration_key
+            )
+        except Exception as e:
+            error_msg = f"Agent {registration_key} failed to handle request: {e}"
+            logger.error(
+                "Error handling request for agent %s: %s",
+                registration_key,
+                e,
+                exc_info=True,
+            )
+            if raise_on_error:
+                raise RuntimeError(error_msg) from e
+            return self._build_error_response(
+                error_message=error_msg,
+                error_category="AdapterException",
+                status_code=500,
+                raw_request=request_data,
+                registration_key=registration_key,
+            )
+
+        if self.after_guardrail is not None:
+            response_text = (
+                response.get("processed_response")
+                or response.get("generated_text")
+                or ""
+            )
+            response_text = str(response_text).strip()
+            if not response_text:
+                logger.debug(
+                    "after_guardrail: empty response text for agent %s, skipping check.",
+                    registration_key,
+                )
+            else:
+                guardrail_result = self.after_guardrail.check(response_text)
+                if not guardrail_result.is_safe:
+                    logger.warning(
+                        "after_guardrail blocked response for agent %s: %s",
+                        registration_key,
+                        guardrail_result.explanation,
+                    )
+                    return self._build_guardrail_response(
+                        request_data,
+                        registration_key,
+                        "after_guardrail_censored",
+                        "after",
+                        "Response censored: flagged as unsafe by guardrail.",
+                        guardrail_result,
+                    )
+        return response
+
+    @staticmethod
+    def _build_guardrail_response(
+        request_data: Dict[str, Any],
+        registration_key: str,
+        guardrail: str,
+        side: str,
+        message: str,
+        guardrail_result: Any,
+    ) -> Dict[str, Any]:
+        """Build the legacy guardrail envelope shared by sync and async callers."""
+        return {
+            "raw_request": request_data,
+            "processed_response": None,
+            "generated_text": None,
+            "raw_response_status": 200,
+            "raw_response_headers": None,
+            "raw_response_body": None,
+            "agent_specific_data": {
+                "guardrail": guardrail,
+                "side": side,
+                "message": message,
+                "categories": getattr(guardrail_result, "categories", []),
+                "reasoning": guardrail_result.explanation,
+            },
+            "error_message": None,
+            "error_category": None,
+            "agent_id": registration_key,
+            "adapter_type": "guardrail",
+        }
+
     # ------------------------------------------------------------------ #
     # Phase C: LiteLLM dispatch path
     # ------------------------------------------------------------------ #
@@ -578,7 +728,197 @@ class AgentRouter:
             "Request data must include either 'messages' or 'prompt' field.",
         )
 
-    def _dispatch_via_litellm(
+    def _prepare_litellm_dispatch(
+        self,
+        *,
+        registration_key: str,
+        agent_instance: Agent,
+        provider_config: ProviderConfig,
+        request_data: Dict[str, Any],
+    ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+        """Build LiteLLM kwargs and the context needed to shape its response."""
+        adapter_label = provider_config.adapter_label or agent_instance.ADAPTER_TYPE
+        model_name = getattr(agent_instance, "litellm_model", None) or getattr(
+            agent_instance, "model_name", None
+        )
+        if model_name is None:
+            return None, _envelope.build_error_envelope(
+                agent_id=registration_key,
+                adapter_type=adapter_label,
+                error_message=(
+                    f"Adapter for '{registration_key}' has no model name; "
+                    "cannot dispatch via LiteLLM."
+                ),
+                status_code=500,
+                raw_request=request_data,
+            )
+        messages, validation_error = self._extract_messages(request_data)
+        if validation_error:
+            return None, _envelope.build_error_envelope(
+                agent_id=registration_key,
+                adapter_type=adapter_label,
+                error_message=validation_error,
+                status_code=400,
+                raw_request=request_data,
+            )
+        max_tokens = request_data.get(
+            "max_tokens", getattr(agent_instance, "default_max_tokens", 100)
+        )
+        temperature = request_data.get(
+            "temperature", getattr(agent_instance, "default_temperature", 0.8)
+        )
+        top_p = request_data.get(
+            "top_p", getattr(agent_instance, "default_top_p", 0.95)
+        )
+        thinking = request_data.get(
+            "thinking", getattr(agent_instance, "default_thinking", None)
+        )
+        tools = request_data.get(
+            "tools", getattr(agent_instance, "default_tools", None)
+        )
+        tool_choice = request_data.get(
+            "tool_choice", getattr(agent_instance, "default_tool_choice", None)
+        )
+        extra_body = request_data.get(
+            "extra_body", getattr(agent_instance, "default_extra_body", None)
+        )
+        excluded_keys = {
+            "prompt",
+            "messages",
+            "max_tokens",
+            "temperature",
+            "top_p",
+            "tools",
+            "tool_choice",
+            "thinking",
+            "extra_body",
+            "metadata",
+        }
+        extra_kwargs: Dict[str, Any] = {
+            key: value
+            for key, value in request_data.items()
+            if key not in excluded_keys
+        }
+        for key in provider_config.extra_passthrough_keys:
+            if key not in request_data and key not in extra_kwargs:
+                default = getattr(agent_instance, f"default_{key}", None)
+                if default is not None:
+                    extra_kwargs[key] = default
+        caller_metadata = request_data.get("metadata")
+        hackagent_block: Dict[str, Any] = {
+            "id": registration_key,
+            "adapter_type": adapter_label,
+        }
+        caller_hackagent = (
+            caller_metadata.get(_tracking_logger.HACKAGENT_METADATA_KEY)
+            if isinstance(caller_metadata, dict)
+            else None
+        )
+        if isinstance(caller_hackagent, dict):
+            hackagent_block.update(caller_hackagent)
+        merged_metadata = (
+            dict(caller_metadata) if isinstance(caller_metadata, dict) else {}
+        )
+        merged_metadata[_tracking_logger.HACKAGENT_METADATA_KEY] = hackagent_block
+        extra_kwargs["metadata"] = merged_metadata
+        kwargs = _envelope.build_litellm_kwargs(
+            model=model_name,
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            top_p=top_p,
+            api_base=getattr(agent_instance, "api_base_url", None),
+            api_key=getattr(agent_instance, "actual_api_key", None),
+            tools=tools,
+            tool_choice=tool_choice,
+            extra_body=extra_body,
+            thinking_payload=provider_config.thinking_translator(
+                thinking, model_name=model_name
+            ),
+            extra_kwargs=extra_kwargs,
+        )
+        return {
+            "kwargs": kwargs,
+            "registration_key": registration_key,
+            "adapter_label": adapter_label,
+            "model_name": model_name,
+            "request_data": request_data,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "top_p": top_p,
+            "tools": tools,
+            "tool_choice": tool_choice,
+            "extra_kwargs": extra_kwargs,
+        }, None
+
+    def _finalize_litellm_dispatch(
+        self, response: Any, prep: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Shape a synchronous or asynchronous LiteLLM response into an envelope."""
+        text = _envelope.extract_text_from_response(
+            response, model_name=prep["model_name"]
+        )
+        if isinstance(text, str) and text.startswith("[GENERATION_ERROR:"):
+            return _envelope.build_error_envelope(
+                agent_id=prep["registration_key"],
+                adapter_type=prep["adapter_label"],
+                error_message=f"{prep['adapter_label']} generation error: {text}",
+                status_code=500,
+                raw_request=prep["request_data"],
+                model_name=prep["model_name"],
+            )
+        invoked_parameters: Dict[str, Any] = {
+            "max_tokens": prep["max_tokens"],
+            "temperature": prep["temperature"],
+            "top_p": prep["top_p"],
+            **prep["extra_kwargs"],
+        }
+        if prep["tools"] is not None:
+            invoked_parameters["tools"] = prep["tools"]
+        if prep["tool_choice"] is not None:
+            invoked_parameters["tool_choice"] = prep["tool_choice"]
+        completion_result: Dict[str, Any] = {
+            "success": True,
+            "content": text,
+            "raw_response": response,
+        }
+        tool_calls = _envelope.extract_tool_calls(response)
+        if tool_calls is not None:
+            completion_result["tool_calls"] = tool_calls
+        try:
+            completion_result["finish_reason"] = response.choices[0].finish_reason
+        except (AttributeError, IndexError, TypeError):
+            pass
+        try:
+            if response.usage is not None:
+                completion_result["usage"] = response.usage.model_dump()
+        except AttributeError:
+            pass
+        try:
+            completion_result["provider_model"] = response.model
+        except AttributeError:
+            pass
+        response_cost = _envelope.extract_response_cost(response)
+        if response_cost is not None:
+            completion_result["response_cost"] = response_cost
+        call_id = _envelope.extract_litellm_call_id(response)
+        if call_id is not None:
+            completion_result["litellm_call_id"] = call_id
+        return _envelope.build_success_envelope(
+            agent_id=prep["registration_key"],
+            adapter_type=prep["adapter_label"],
+            processed_response=text,
+            raw_request=prep["request_data"],
+            raw_response_body=response,
+            agent_specific_data=_envelope.build_agent_specific_data(
+                model_name=prep["model_name"],
+                invoked_parameters=invoked_parameters,
+                completion_result=completion_result,
+            ),
+            model_name=prep["model_name"],
+        )
+
+    def _dispatch_via_litellm_legacy(
         self,
         *,
         registration_key: str,
@@ -814,3 +1154,101 @@ class AgentRouter:
             agent_specific_data=agent_specific_data,
             model_name=model_name,
         )
+
+    async def _dispatch_via_litellm_async(
+        self,
+        *,
+        registration_key: str,
+        agent_instance: Agent,
+        provider_config: ProviderConfig,
+        request_data: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Route a chat-completion request through ``litellm.acompletion``."""
+        prep, error = self._prepare_litellm_dispatch(
+            registration_key=registration_key,
+            agent_instance=agent_instance,
+            provider_config=provider_config,
+            request_data=request_data,
+        )
+        if error is not None:
+            return error
+        assert prep is not None
+        litellm, available = _get_litellm()
+        if not available:
+            return _envelope.build_error_envelope(
+                agent_id=prep["registration_key"],
+                adapter_type=prep["adapter_label"],
+                error_message="litellm is not installed",
+                status_code=500,
+                raw_request=prep["request_data"],
+                model_name=prep["model_name"],
+            )
+        try:
+            response = await litellm.acompletion(**prep["kwargs"])
+        except Exception as exc:
+            logger.exception(
+                "LiteLLM async dispatch failed for agent %s (model=%s): %s",
+                registration_key,
+                prep["model_name"],
+                exc,
+            )
+            return _envelope.build_error_envelope(
+                agent_id=prep["registration_key"],
+                adapter_type=prep["adapter_label"],
+                error_message=(
+                    f"{prep['adapter_label']} error ({type(exc).__name__}): {exc}"
+                ),
+                status_code=500,
+                raw_request=prep["request_data"],
+                model_name=prep["model_name"],
+            )
+        return self._finalize_litellm_dispatch(response, prep)
+
+    def _dispatch_via_litellm(
+        self,
+        *,
+        registration_key: str,
+        agent_instance: Agent,
+        provider_config: ProviderConfig,
+        request_data: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Route a chat-completion request through ``litellm.completion``."""
+        prep, error = self._prepare_litellm_dispatch(
+            registration_key=registration_key,
+            agent_instance=agent_instance,
+            provider_config=provider_config,
+            request_data=request_data,
+        )
+        if error is not None:
+            return error
+        assert prep is not None
+        litellm, available = _get_litellm()
+        if not available:
+            return _envelope.build_error_envelope(
+                agent_id=prep["registration_key"],
+                adapter_type=prep["adapter_label"],
+                error_message="litellm is not installed",
+                status_code=500,
+                raw_request=prep["request_data"],
+                model_name=prep["model_name"],
+            )
+        try:
+            response = litellm.completion(**prep["kwargs"])
+        except Exception as exc:
+            logger.exception(
+                "LiteLLM dispatch failed for agent %s (model=%s): %s",
+                registration_key,
+                prep["model_name"],
+                exc,
+            )
+            return _envelope.build_error_envelope(
+                agent_id=prep["registration_key"],
+                adapter_type=prep["adapter_label"],
+                error_message=(
+                    f"{prep['adapter_label']} error ({type(exc).__name__}): {exc}"
+                ),
+                status_code=500,
+                raw_request=prep["request_data"],
+                model_name=prep["model_name"],
+            )
+        return self._finalize_litellm_dispatch(response, prep)

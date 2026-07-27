@@ -268,7 +268,7 @@ class MMLAttack(BaseAttack):
                     "_client",
                     "_tracker",
                     "judges",
-                    "batch_size_judge",
+                    "judge_concurrency",
                     "max_tokens_eval",
                     "filter_len",
                     "judge_timeout",

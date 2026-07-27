@@ -41,8 +41,10 @@ Usage:
     coordinator.finalize_on_error("Pipeline failed")
 """
 
+import asyncio
 import logging
 import time
+from hackagent.async_utils import run_coroutine_blocking
 from hackagent.logger import get_logger
 from typing import Any, Callable, Dict, List, Optional
 
@@ -52,6 +54,11 @@ from .category_classifier import GoalCategoryClassifier
 from .context import TrackingContext
 from .step import StepTracker
 from .tracker import Context, Tracker
+
+# Bound on concurrent create_goal_result() calls during initialize_goals().
+# Each call is one network round trip (or locked SQLite write for the local
+# backend); this only limits fan-out, not correctness.
+_GOAL_INIT_CONCURRENCY = 8
 
 
 class TrackingCoordinator:
@@ -301,6 +308,7 @@ class TrackingCoordinator:
         if not isinstance(goal_metadata_by_goal, dict):
             goal_metadata_by_goal = {}
 
+        per_goal_kwargs: List[Dict[str, Any]] = []
         for i, goal in enumerate(goals):
             goal_index = goal_index_start + i
 
@@ -319,11 +327,31 @@ class TrackingCoordinator:
                 **per_goal_metadata,
             }
 
-            self.goal_tracker.create_goal_result(
-                goal=goal,
-                goal_index=goal_index,
-                initial_metadata=effective_initial_metadata,
+            per_goal_kwargs.append(
+                {
+                    "goal": goal,
+                    "goal_index": goal_index,
+                    "initial_metadata": effective_initial_metadata,
+                }
             )
+
+        # Each Result record is created via an independent network round trip
+        # (or, for the local backend, an independent locked SQLite write), so
+        # fan them out concurrently instead of blocking on one goal at a time.
+        _init_concurrency = min(_GOAL_INIT_CONCURRENCY, len(per_goal_kwargs))
+
+        async def _fan_out() -> None:
+            semaphore = asyncio.Semaphore(max(1, _init_concurrency))
+
+            async def _create_one(kwargs: Dict[str, Any]) -> None:
+                async with semaphore:
+                    await asyncio.to_thread(
+                        self.goal_tracker.create_goal_result, **kwargs
+                    )
+
+            await asyncio.gather(*(_create_one(kwargs) for kwargs in per_goal_kwargs))
+
+        run_coroutine_blocking(_fan_out)
 
         self.logger.info(f"Initialized {len(goals)} goal results for tracking")
 

@@ -345,7 +345,7 @@ advanced_config = {
     # Batching / parallelization
     "goal_batch_size": 1,      # Goals per macro-batch
     "goal_batch_workers": 4,   # Parallel workers within each goal batch
-    "batch_size_judge": 1,     # Concurrent judge evaluations
+    "judge_concurrency": 1,   # Concurrent judge evaluations
 
     # Judge configuration
     "judges": [
@@ -399,7 +399,7 @@ advanced_config = {
 |-----------|------|---------|-------------|
 | `goal_batch_size` | int | `1` | Goals processed per macro-batch |
 | `goal_batch_workers` | int | `1` | Parallel goal workers inside each macro-batch |
-| `batch_size_judge` | int | `1` | Concurrent judge evaluation requests |
+| `judge_concurrency` | int | `1` | Concurrent judge evaluation requests |
 | `judges` | list | `[...]` | Judge configurations (at least one required) |
 | `max_tokens` | int | `4096` | Max tokens for target model response |
 | `temperature` | float | `0.6` | Sampling temperature for target model |

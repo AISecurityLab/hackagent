@@ -63,7 +63,7 @@ def _make_pipeline_config(**overrides):
                 "agent_type": "OPENAI_SDK",
             }
         ],
-        "batch_size_judge": 1,
+        "judge_concurrency": 1,
         "max_tokens_eval": 256,
         "filter_len": 10,
         "judge_timeout": 120,

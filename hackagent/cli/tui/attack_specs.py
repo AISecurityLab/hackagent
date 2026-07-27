@@ -323,11 +323,11 @@ _register(
                 section="Evaluation",
             ),
             ConfigField(
-                key="batch_size_judge",
-                label="Judge Batch Size",
+                key="judge_concurrency",
+                label="Judge Concurrency",
                 field_type=FieldType.INTEGER,
                 default=1,
-                description="Batch size for judge evaluation requests.",
+                description="Concurrency for judge evaluation requests.",
                 min_value=1,
                 max_value=16,
                 section="Evaluation",
@@ -1414,8 +1414,8 @@ _register(
             ),
             # --- Evaluation ---
             ConfigField(
-                key="batch_size_judge",
-                label="Judge Batch Size",
+                key="judge_concurrency",
+                label="Judge Concurrency",
                 field_type=FieldType.INTEGER,
                 default=1,
                 description="Parallelism for judge evaluation requests.",
@@ -1665,8 +1665,8 @@ _register(
                 section="Execution",
             ),
             ConfigField(
-                key="batch_size_judge",
-                label="Judge Batch Size",
+                key="judge_concurrency",
+                label="Judge Concurrency",
                 field_type=FieldType.INTEGER,
                 default=1,
                 description="Parallelism for judge evaluation requests.",

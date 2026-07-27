@@ -146,7 +146,7 @@ advanced_config = {
     # Batching / parallelization
     "batch_size": 5,           # Concurrent requests to target per step
     "goal_batch_size": 10,     # Goals per macro-batch
-    "batch_size_judge": 2,     # Concurrent judge evaluations
+    "judge_concurrency": 2,   # Concurrent judge evaluations
 
     # Judge configuration
     "judges": [
@@ -192,7 +192,7 @@ advanced_config = {
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `batch_size` | int | 1 | Concurrent target-model requests within a step |
-| `batch_size_judge` | int | 1 | Concurrent judge evaluation requests |
+| `judge_concurrency` | int | 1 | Concurrent judge evaluation requests |
 | `goal_batch_size` | int | 1 | Goals processed per macro-batch |
 | `judges` | list | [...] | Judge configurations (at least one required) |
 | `max_tokens` | int | 4096 | Max tokens for target model response |
