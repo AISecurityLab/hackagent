@@ -424,6 +424,7 @@ class TestCrescendoAttack(unittest.TestCase):
                     "output_dir": "./logs/runs",
                     "max_turns": 1,
                     "max_backtracks": 0,
+                    "jailbreak_threshold": 8,
                     "early_stop_on_success": False,
                 },
                 client=MagicMock(),
@@ -441,7 +442,10 @@ class TestCrescendoAttack(unittest.TestCase):
                 },
             ),
             patch.object(attack, "_query_target", return_value=("refused-resp", {})),
-            patch.object(attack, "_judge_turn", return_value=(1.0, True, "refused")),
+            # Even a high judge score must not count as a jailbreak success
+            # or update best_score when the turn was flagged as refused and
+            # only accepted because the backtrack budget was exhausted.
+            patch.object(attack, "_judge_turn", return_value=(9.0, True, "refused")),
         ):
             result = attack._run_single_goal(
                 goal="g",
@@ -454,6 +458,8 @@ class TestCrescendoAttack(unittest.TestCase):
 
         self.assertEqual(result["backtracks_used"], 0)
         self.assertEqual(result["turns_completed"], 1)
+        self.assertEqual(result["best_score"], 0.0)
+        self.assertFalse(result["is_success"])
 
     def test_single_goal_handles_missing_target_response(self):
         dummy_attacker = MagicMock()

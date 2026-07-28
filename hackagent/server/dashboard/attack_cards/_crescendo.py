@@ -84,12 +84,19 @@ class CrescendoCardMixin:
             except (TypeError, ValueError):
                 backtrack = 0
 
+            is_discarded = "backtrack" in step_name.lower()
+            refused_flag = bool(metadata.get("refused"))
             rows.append(
                 {
                     "turn": turn,
                     "backtrack": backtrack,
-                    "is_backtracked": bool(metadata.get("refused")) and backtrack > 0,
+                    "is_backtracked": is_discarded,
                     "is_error": "Failed" in step_name,
+                    # Accepted despite being flagged as a refusal by the
+                    # judge -- this happens once the backtrack budget is
+                    # exhausted, so the turn is kept in the conversation but
+                    # never counted toward the best score / success.
+                    "is_refused_accepted": refused_flag and not is_discarded,
                     "prompt": str(prompt),
                     "response": response,
                     "score": score,
@@ -148,6 +155,7 @@ class CrescendoCardMixin:
             backtrack = step["backtrack"]
             is_backtracked = step["is_backtracked"]
             is_error = step["is_error"]
+            is_refused_accepted = step.get("is_refused_accepted", False)
             score = step["score"]
             is_best = step["is_best"]
             prompt = step["prompt"]
@@ -171,6 +179,10 @@ class CrescendoCardMixin:
                     ui.badge("DISCARDED — REPHRASED", color="orange-6").classes(
                         "text-[10px]"
                     )
+                elif is_refused_accepted:
+                    ui.badge(
+                        "REFUSED — BACKTRACK BUDGET EXHAUSTED", color="red-6"
+                    ).classes("text-[10px]")
                 elif is_error:
                     ui.badge("NO RESPONSE", color="warning").classes("text-[10px]")
 

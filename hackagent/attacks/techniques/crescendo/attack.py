@@ -36,7 +36,7 @@ import re
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import nullcontext
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
@@ -418,7 +418,7 @@ class CrescendoAttack(BaseAttack):
 
     def _query_target(
         self, target_messages: List[Dict[str, str]]
-    ) -> tuple:
+    ) -> Tuple[Optional[str], Dict[str, Any]]:
         """Send the full conversation so far to the target model.
 
         Returns:
@@ -466,7 +466,7 @@ class CrescendoAttack(BaseAttack):
 
     def _judge_turn(
         self, goal: str, question: str, response: str
-    ) -> tuple:
+    ) -> Tuple[float, bool, str]:
         """Score a single target turn and detect refusals.
 
         Returns:
@@ -693,7 +693,10 @@ class CrescendoAttack(BaseAttack):
             )
             self._trim_attacker_history(attacker_messages)
 
-            is_new_best = not best_prompt or score > best_score
+            # Turns accepted only because the backtrack budget was exhausted
+            # (refused=True) must never count toward the best score or an
+            # early jailbreak success -- they are still refusals.
+            is_new_best = not refused and (not best_prompt or score > best_score)
             if is_new_best:
                 best_score = score
                 best_prompt = question
@@ -737,7 +740,7 @@ class CrescendoAttack(BaseAttack):
 
             turn += 1
 
-            if early_stop and score >= jailbreak_threshold:
+            if early_stop and not refused and score >= jailbreak_threshold:
                 is_success = True
                 self.logger.info(
                     "Jailbreak detected at turn %d (score %s/%d+).",
