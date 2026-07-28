@@ -639,6 +639,8 @@ class CrescendoAttack(BaseAttack):
                 goal, question, target_response
             )
 
+            # If the backtrack budget is exhausted, fall through to the
+            # acceptance branch below instead of retrying this turn.
             if refused and backtracks_used < max_backtracks:
                 backtracks_used += 1
                 self.logger.info(
@@ -764,6 +766,9 @@ class CrescendoAttack(BaseAttack):
                     progress_bar.update(task, advance=remaining)
                 break
 
+        # Safety net for the `early_stop_on_success=False` path (and any
+        # exit before the inline early-stop check runs): `is_success` is
+        # only set True above, so re-derive it from `best_score` here.
         is_success = is_success or best_score >= jailbreak_threshold
 
         return {
