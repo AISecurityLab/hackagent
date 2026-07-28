@@ -44,6 +44,65 @@ from ._helpers import (
 class DashboardRunHistoryResultsMixin:
     """History run results view (_open_run_history_results)."""
 
+    def _build_history_goal_detail_data(
+        self,
+        attack_type_str: str,
+        rows: list[dict],
+        static_template_traces_map: dict[str, list[dict]],
+        bon_traces_map: dict[str, list[dict]],
+        generic_traces_map: dict[str, list[dict]],
+    ) -> dict[str, object]:
+        """Pre-parse per-row detail data keyed by result id for History goals.
+
+        Dispatches on the run's attack type to the matching ``_parse_*_traces``
+        helper. RAG (and its legacy ``indirect_prompt_injection`` alias) skip
+        parsing and keep the raw serialized traces, since
+        ``_render_indirect_injection_view`` consumes them directly. Anything
+        else falls back to a generic request/response extraction.
+        """
+        atk = attack_type_str.lower()
+        detail_data: dict[str, object] = {}
+        for row in rows:
+            rid = str(row.get("id") or "")
+            if atk in ("static_template", "statictemplate"):
+                t = static_template_traces_map.get(rid, [])
+                detail_data[rid] = self._parse_static_template_traces(
+                    t, str(row.get("goal") or "")
+                )
+            elif atk == "bon":
+                t = bon_traces_map.get(rid, [])
+                detail_data[rid] = self._parse_bon_traces(t)
+            elif atk == "pap":
+                t = generic_traces_map.get(rid, [])
+                detail_data[rid] = self._parse_pap_traces(t)
+            elif atk == "pair":
+                t = generic_traces_map.get(rid, [])
+                detail_data[rid] = self._parse_pair_traces(t)
+            elif atk == "tap":
+                t = generic_traces_map.get(rid, [])
+                detail_data[rid] = self._parse_tap_traces(t)
+            elif atk == "advprefix":
+                t = generic_traces_map.get(rid, [])
+                detail_data[rid] = self._parse_advprefix_traces(t)
+            elif atk == "autodanturbo":
+                t = generic_traces_map.get(rid, [])
+                detail_data[rid] = self._parse_autodan_traces(t)
+            elif atk == "mml":
+                t = generic_traces_map.get(rid, [])
+                detail_data[rid] = self._parse_mml_traces(t)
+            elif atk in ("fc", "tfc"):
+                t = generic_traces_map.get(rid, [])
+                if atk == "fc":
+                    detail_data[rid] = self._parse_fc_traces(t)
+                else:
+                    detail_data[rid] = self._parse_tfc_traces(t)
+            elif atk in ("indirect_prompt_injection", "rag"):
+                detail_data[rid] = generic_traces_map.get(rid, [])
+            else:
+                t = generic_traces_map.get(rid, [])
+                detail_data[rid] = self._extract_prompt_response_from_traces(t)
+        return detail_data
+
     async def _open_run_history_results(self, run: dict) -> None:
         """Open the compact results list in a non-modal side dialog."""
         run_id_raw = str(run.get("id") or "")
@@ -1430,49 +1489,13 @@ class DashboardRunHistoryResultsMixin:
 
             if all_items and self.history_results_list_area is not None:
                 # ── Pre-parse detail data for all rows ─────────────
-                _h_atk = attack_type_str.lower()
-                _h_detail_data: dict[str, object] = {}
-                for _row in new_rows:
-                    _rid = str(_row.get("id") or "")
-                    if _h_atk in ("static_template", "statictemplate"):
-                        _t = static_template_traces_map_hr.get(_rid, [])
-                        _h_detail_data[_rid] = self._parse_static_template_traces(
-                            _t, str(_row.get("goal") or "")
-                        )
-                    elif _h_atk == "bon":
-                        _t = bon_traces_map_hr.get(_rid, [])
-                        _h_detail_data[_rid] = self._parse_bon_traces(_t)
-                    elif _h_atk == "pap":
-                        _t = generic_traces_map_hr.get(_rid, [])
-                        _h_detail_data[_rid] = self._parse_pap_traces(_t)
-                    elif _h_atk == "pair":
-                        _t = generic_traces_map_hr.get(_rid, [])
-                        _h_detail_data[_rid] = self._parse_pair_traces(_t)
-                    elif _h_atk == "tap":
-                        _t = generic_traces_map_hr.get(_rid, [])
-                        _h_detail_data[_rid] = self._parse_tap_traces(_t)
-                    elif _h_atk == "advprefix":
-                        _t = generic_traces_map_hr.get(_rid, [])
-                        _h_detail_data[_rid] = self._parse_advprefix_traces(_t)
-                    elif _h_atk == "autodanturbo":
-                        _t = generic_traces_map_hr.get(_rid, [])
-                        _h_detail_data[_rid] = self._parse_autodan_traces(_t)
-                    elif _h_atk == "mml":
-                        _t = generic_traces_map_hr.get(_rid, [])
-                        _h_detail_data[_rid] = self._parse_mml_traces(_t)
-                    elif _h_atk in ("fc", "tfc"):
-                        _t = generic_traces_map_hr.get(_rid, [])
-                        if _h_atk == "fc":
-                            _h_detail_data[_rid] = self._parse_fc_traces(_t)
-                        else:
-                            _h_detail_data[_rid] = self._parse_tfc_traces(_t)
-                    elif _h_atk in ("indirect_prompt_injection", "rag"):
-                        _h_detail_data[_rid] = generic_traces_map_hr.get(_rid, [])
-                    else:
-                        _t = generic_traces_map_hr.get(_rid, [])
-                        _h_detail_data[_rid] = (
-                            self._extract_prompt_response_from_traces(_t)
-                        )  # returns (req, resp, guardrail_event)
+                _h_detail_data = self._build_history_goal_detail_data(
+                    attack_type_str,
+                    new_rows,
+                    static_template_traces_map_hr,
+                    bon_traces_map_hr,
+                    generic_traces_map_hr,
+                )
 
                 # Store for filter re-rendering
                 self._history_goal_rows = new_rows
