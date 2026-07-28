@@ -1466,6 +1466,8 @@ class DashboardRunHistoryResultsMixin:
                             _h_detail_data[_rid] = self._parse_fc_traces(_t)
                         else:
                             _h_detail_data[_rid] = self._parse_tfc_traces(_t)
+                    elif _h_atk in ("indirect_prompt_injection", "rag"):
+                        _h_detail_data[_rid] = generic_traces_map_hr.get(_rid, [])
                     else:
                         _t = generic_traces_map_hr.get(_rid, [])
                         _h_detail_data[_rid] = (
