@@ -22,6 +22,11 @@ ATTACK_CATALOG: Dict[str, Dict[str, str]] = {
         "label": "PAIR",
         "description": "Prompt Automatic Iterative Refinement with attacker/scorer loops.",
     },
+    "crescendo": {
+        "label": "Crescendo",
+        "description": "Multi-turn escalation attack that gradually steers a persistent "
+        "conversation toward the goal, with judge-driven backtracking on refusals.",
+    },
     "flipattack": {
         "label": "FlipAttack",
         "description": "Prompt obfuscation via character/word flipping modes.",

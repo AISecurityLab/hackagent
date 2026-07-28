@@ -11,6 +11,7 @@ from ._shared import AttackCardSharedMixin  # noqa: F401
 from ._static_template import StaticTemplateCardMixin  # noqa: F401
 from ._bon import BonCardMixin  # noqa: F401
 from ._pair import PairCardMixin  # noqa: F401
+from ._crescendo import CrescendoCardMixin  # noqa: F401
 from ._autodan import AutodanCardMixin  # noqa: F401
 from ._advprefix import AdvprefixCardMixin  # noqa: F401
 from ._pap import PapCardMixin  # noqa: F401

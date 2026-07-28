@@ -96,6 +96,10 @@ class TestAttackRegistry(unittest.TestCase):
         """Test that registry contains Baseline attack."""
         self.assertIn("Baseline", ATTACK_REGISTRY)
 
+    def test_registry_contains_crescendo(self):
+        """Test that registry contains Crescendo attack."""
+        self.assertIn("crescendo", ATTACK_REGISTRY)
+
 
 class TestAdvPrefixOrchestrator(unittest.TestCase):
     """Test AdvPrefixOrchestrator configuration."""
