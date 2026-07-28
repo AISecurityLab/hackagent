@@ -6,7 +6,6 @@ import unittest
 from hackagent.attacks.techniques.crescendo.config import (
     ATTACKER_SYSTEM_PROMPT,
     DEFAULT_CRESCENDO_CONFIG,
-    JUDGE_SYSTEM_PROMPT,
     CrescendoConfig,
 )
 
@@ -31,7 +30,7 @@ class TestCrescendoConfig(unittest.TestCase):
     def test_default_values(self):
         self.assertEqual(DEFAULT_CRESCENDO_CONFIG["max_turns"], 10)
         self.assertEqual(DEFAULT_CRESCENDO_CONFIG["max_backtracks"], 10)
-        self.assertEqual(DEFAULT_CRESCENDO_CONFIG["jailbreak_threshold"], 8)
+        self.assertEqual(DEFAULT_CRESCENDO_CONFIG["jailbreak_threshold"], 7.0)
         self.assertTrue(DEFAULT_CRESCENDO_CONFIG["early_stop_on_success"])
         self.assertEqual(DEFAULT_CRESCENDO_CONFIG["keep_last_n"], 6)
 
@@ -70,19 +69,15 @@ class TestCrescendoConfig(unittest.TestCase):
     def test_jailbreak_threshold_bounds(self):
         with self.assertRaises(Exception):
             CrescendoConfig.from_dict({"jailbreak_threshold": 11})
+        CrescendoConfig.from_dict({"jailbreak_threshold": 0})
         with self.assertRaises(Exception):
-            CrescendoConfig.from_dict({"jailbreak_threshold": 0})
+            CrescendoConfig.from_dict({"jailbreak_threshold": -0.1})
 
     def test_prompts_keep_goal_placeholder(self):
         self.assertIn("{goal}", ATTACKER_SYSTEM_PROMPT)
-        self.assertIn("{goal}", JUDGE_SYSTEM_PROMPT)
 
     def test_attacker_prompt_formats_with_goal_only(self):
         formatted = ATTACKER_SYSTEM_PROMPT.format(goal="test goal")
-        self.assertIn("test goal", formatted)
-
-    def test_judge_prompt_formats_with_goal_only(self):
-        formatted = JUDGE_SYSTEM_PROMPT.format(goal="test goal")
         self.assertIn("test goal", formatted)
 
 

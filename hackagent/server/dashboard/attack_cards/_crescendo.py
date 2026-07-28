@@ -127,12 +127,14 @@ class CrescendoCardMixin:
                     best_score = max(scores) if scores else None
                     backtrack_count = sum(1 for s in steps if s["is_backtracked"])
                     accepted_count = sum(
-                        1 for s in steps if not s["is_backtracked"] and not s["is_error"]
+                        1
+                        for s in steps
+                        if not s["is_backtracked"] and not s["is_error"]
                     )
                     with ui.row().classes("items-center gap-2 flex-wrap mb-1"):
-                        ui.badge(
-                            f"{accepted_count} turns", color="grey-7"
-                        ).classes("text-xs")
+                        ui.badge(f"{accepted_count} turns", color="grey-7").classes(
+                            "text-xs"
+                        )
                         if backtrack_count:
                             ui.badge(
                                 f"{backtrack_count} backtracks", color="orange-6"

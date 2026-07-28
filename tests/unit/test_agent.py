@@ -235,6 +235,7 @@ class TestHackAgentAttackStrategies(unittest.TestCase):
         self.assertIn("advprefix", strategies)
         self.assertIn("static_template", strategies)
         self.assertIn("pair", strategies)
+        self.assertIn("crescendo", strategies)
 
     @patch("hackagent.agent.AgentRouter")
     @patch("hackagent.agent.utils.resolve_api_token", return_value="test-token")

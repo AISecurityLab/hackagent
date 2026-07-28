@@ -109,88 +109,86 @@ class TestCrescendoAttack(unittest.TestCase):
     def test_judge_turn_extracts_score_and_refused(self):
         dummy_attacker = MagicMock()
         dummy_attacker._agent_registry = {"a": object()}
-        dummy_judge = MagicMock()
-        dummy_judge._agent_registry = {"j": object()}
-        dummy_judge.route_request.return_value = {
-            "generated_text": '{"refused": false, "score": 7, "explanation": "progress"}'
-        }
 
-        with (
-            patch.object(
-                CrescendoAttack,
-                "_initialize_attacker_router",
-                return_value=dummy_attacker,
-            ),
-            patch.object(
-                CrescendoAttack, "_initialize_judge_router", return_value=dummy_judge
-            ),
+        with patch.object(
+            CrescendoAttack,
+            "_initialize_attacker_router",
+            return_value=dummy_attacker,
         ):
             attack = CrescendoAttack(
-                config={"output_dir": "./logs/runs"},
+                config={
+                    "output_dir": "./logs/runs",
+                    "judge": {"type": "harmbench", "identifier": "judge"},
+                },
                 client=MagicMock(),
                 agent_router=MagicMock(),
             )
 
-        score, refused, explanation = attack._judge_turn("goal", "question", "response")
-        self.assertEqual(score, 7.0)
+        with patch(
+            "hackagent.attacks.techniques.crescendo.attack.BaseEvaluationStep._run_evaluation",
+            return_value=[{"eval_hb": 1, "explanation_hb": "progress"}],
+        ):
+            score, refused, explanation = attack._judge_turn(
+                "goal", "question", "response"
+            )
+
+        self.assertEqual(score, 10.0)
         self.assertFalse(refused)
         self.assertEqual(explanation, "progress")
 
     def test_judge_turn_detects_refusal(self):
         dummy_attacker = MagicMock()
         dummy_attacker._agent_registry = {"a": object()}
-        dummy_judge = MagicMock()
-        dummy_judge._agent_registry = {"j": object()}
-        dummy_judge.route_request.return_value = {
-            "generated_text": '{"refused": true, "score": 1, "explanation": "declined"}'
-        }
-
-        with (
-            patch.object(
-                CrescendoAttack,
-                "_initialize_attacker_router",
-                return_value=dummy_attacker,
-            ),
-            patch.object(
-                CrescendoAttack, "_initialize_judge_router", return_value=dummy_judge
-            ),
+        with patch.object(
+            CrescendoAttack,
+            "_initialize_attacker_router",
+            return_value=dummy_attacker,
         ):
             attack = CrescendoAttack(
-                config={"output_dir": "./logs/runs"},
+                config={
+                    "output_dir": "./logs/runs",
+                    "judge": {"type": "harmbench", "identifier": "judge"},
+                },
                 client=MagicMock(),
                 agent_router=MagicMock(),
             )
 
-        score, refused, explanation = attack._judge_turn("goal", "question", "response")
-        self.assertEqual(score, 1.0)
+        with patch(
+            "hackagent.attacks.techniques.crescendo.attack.BaseEvaluationStep._run_evaluation",
+            return_value=[{"eval_hb": 0, "explanation_hb": "declined"}],
+        ):
+            score, refused, explanation = attack._judge_turn(
+                "goal", "question", "I cannot assist with that request."
+            )
+
+        self.assertEqual(score, 0.0)
         self.assertTrue(refused)
+        self.assertEqual(explanation, "declined")
 
     def test_judge_turn_clamps_score_range(self):
         dummy_attacker = MagicMock()
         dummy_attacker._agent_registry = {"a": object()}
-        dummy_judge = MagicMock()
-        dummy_judge._agent_registry = {"j": object()}
-        dummy_judge.route_request.return_value = {
-            "generated_text": '{"refused": false, "score": 42}'
-        }
-
-        with (
-            patch.object(
-                CrescendoAttack,
-                "_initialize_attacker_router",
-                return_value=dummy_attacker,
-            ),
-            patch.object(
-                CrescendoAttack, "_initialize_judge_router", return_value=dummy_judge
-            ),
+        with patch.object(
+            CrescendoAttack,
+            "_initialize_attacker_router",
+            return_value=dummy_attacker,
         ):
             attack = CrescendoAttack(
-                config={"output_dir": "./logs/runs"},
+                config={
+                    "output_dir": "./logs/runs",
+                    "judge": {"type": "scorer", "identifier": "judge"},
+                },
                 client=MagicMock(),
                 agent_router=MagicMock(),
             )
 
-        score, _refused, _explanation = attack._judge_turn("goal", "question", "response")
+        with patch(
+            "hackagent.attacks.techniques.crescendo.attack.BaseEvaluationStep._run_evaluation",
+            return_value=[{"eval_scorer": 42, "explanation_scorer": "high"}],
+        ):
+            score, _refused, _explanation = attack._judge_turn(
+                "goal", "question", "response"
+            )
         self.assertEqual(score, 10.0)
 
     def test_run_uses_global_goal_index_offset_for_tracking_context(self):
@@ -397,7 +395,11 @@ class TestCrescendoAttack(unittest.TestCase):
             patch.object(
                 attack,
                 "_judge_turn",
-                side_effect=[(1.0, True, "refused"), (3.0, False, "ok"), (3.0, False, "ok")],
+                side_effect=[
+                    (1.0, True, "refused"),
+                    (3.0, False, "ok"),
+                    (3.0, False, "ok"),
+                ],
             ),
         ):
             result = attack._run_single_goal(
