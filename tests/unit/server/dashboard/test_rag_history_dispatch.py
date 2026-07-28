@@ -98,6 +98,137 @@ class TestBuildHistoryGoalDetailDataForRag(unittest.TestCase):
         self.assertEqual(result, {"missing": []})
 
 
+class _AllParsersHistoryResultsPage(DashboardRunHistoryResultsMixin):
+    """Double with a stub for every ``_parse_*_traces`` collaborator.
+
+    Used to exercise *every* branch of ``_build_history_goal_detail_data``
+    (not just the rag/indirect_prompt_injection one), since the method
+    dispatches on attack type to sibling mixins normally composed onto the
+    real dashboard page class.
+    """
+
+    def __init__(self) -> None:
+        self.calls: list[tuple] = []
+
+    def _parse_static_template_traces(self, traces, goal=""):
+        self.calls.append(("static_template", traces, goal))
+        return "ST_RESULT"
+
+    def _parse_bon_traces(self, traces):
+        self.calls.append(("bon", traces))
+        return "BON_RESULT"
+
+    def _parse_pap_traces(self, traces):
+        self.calls.append(("pap", traces))
+        return "PAP_RESULT"
+
+    def _parse_pair_traces(self, traces):
+        self.calls.append(("pair", traces))
+        return "PAIR_RESULT"
+
+    def _parse_tap_traces(self, traces):
+        self.calls.append(("tap", traces))
+        return "TAP_RESULT"
+
+    def _parse_advprefix_traces(self, traces):
+        self.calls.append(("advprefix", traces))
+        return "ADVPREFIX_RESULT"
+
+    def _parse_autodan_traces(self, traces):
+        self.calls.append(("autodan", traces))
+        return "AUTODAN_RESULT"
+
+    def _parse_mml_traces(self, traces):
+        self.calls.append(("mml", traces))
+        return "MML_RESULT"
+
+    def _parse_fc_traces(self, traces):
+        self.calls.append(("fc", traces))
+        return "FC_RESULT"
+
+    def _parse_tfc_traces(self, traces):
+        self.calls.append(("tfc", traces))
+        return "TFC_RESULT"
+
+    def _extract_prompt_response_from_traces(self, traces):
+        self.calls.append(("generic", traces))
+        return ("req", "resp", None)
+
+
+class TestBuildHistoryGoalDetailDataAllBranches(unittest.TestCase):
+    """Covers every dispatch branch of ``_build_history_goal_detail_data``,
+    not only the rag one, so the whole extracted method is exercised."""
+
+    def setUp(self):
+        self.rows = [{"id": "r1", "goal": "g1"}]
+        self.static_template_map = {"r1": ["st-trace"]}
+        self.bon_map = {"r1": ["bon-trace"]}
+        self.generic_map = {"r1": ["generic-trace"]}
+
+    def _build(self, attack_type_str):
+        page = _AllParsersHistoryResultsPage()
+        result = page._build_history_goal_detail_data(
+            attack_type_str,
+            self.rows,
+            self.static_template_map,
+            self.bon_map,
+            self.generic_map,
+        )
+        return page, result
+
+    def test_static_template(self):
+        page, result = self._build("static_template")
+        self.assertEqual(result, {"r1": "ST_RESULT"})
+        self.assertEqual(page.calls, [("static_template", ["st-trace"], "g1")])
+
+    def test_statictemplate_alias(self):
+        page, result = self._build("statictemplate")
+        self.assertEqual(result, {"r1": "ST_RESULT"})
+
+    def test_bon(self):
+        page, result = self._build("bon")
+        self.assertEqual(result, {"r1": "BON_RESULT"})
+        self.assertEqual(page.calls, [("bon", ["bon-trace"])])
+
+    def test_pap(self):
+        page, result = self._build("pap")
+        self.assertEqual(result, {"r1": "PAP_RESULT"})
+        self.assertEqual(page.calls, [("pap", ["generic-trace"])])
+
+    def test_pair(self):
+        page, result = self._build("pair")
+        self.assertEqual(result, {"r1": "PAIR_RESULT"})
+
+    def test_tap(self):
+        page, result = self._build("tap")
+        self.assertEqual(result, {"r1": "TAP_RESULT"})
+
+    def test_advprefix(self):
+        page, result = self._build("advprefix")
+        self.assertEqual(result, {"r1": "ADVPREFIX_RESULT"})
+
+    def test_autodanturbo(self):
+        page, result = self._build("autodanturbo")
+        self.assertEqual(result, {"r1": "AUTODAN_RESULT"})
+
+    def test_mml(self):
+        page, result = self._build("mml")
+        self.assertEqual(result, {"r1": "MML_RESULT"})
+
+    def test_fc(self):
+        page, result = self._build("fc")
+        self.assertEqual(result, {"r1": "FC_RESULT"})
+
+    def test_tfc(self):
+        page, result = self._build("tfc")
+        self.assertEqual(result, {"r1": "TFC_RESULT"})
+
+    def test_unknown_attack_type_falls_back_to_generic(self):
+        page, result = self._build("some_unknown_attack")
+        self.assertEqual(result, {"r1": ("req", "resp", None)})
+        self.assertEqual(page.calls, [("generic", ["generic-trace"])])
+
+
 class _TraceAnalysisPage(DashboardTraceAnalysisMixin):
     """Minimal double for ``_load_attack_specific_traces``."""
 
