@@ -83,7 +83,7 @@ def main() -> None:
                 "endpoint": JUDGE_ENDPOINT,
             },
         ],
-        "batch_size_judge": 20,
+        "judge_concurrency": 20,
         "batch_size": 20,
     }
 

@@ -10,10 +10,11 @@ backend so the router can be initialised with a real adapter instance,
 then patch ``litellm.completion`` to control the response.
 """
 
+import asyncio
 import logging
 import unittest
 import uuid
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from hackagent.router.router import AgentRouter
 from hackagent.router.types import AgentTypeEnum
@@ -252,6 +253,19 @@ class TestDispatchViaLiteLLM(unittest.TestCase):
         env = router.route_request(reg_key, {"prompt": "hi"})
         self.assertNotIn("response_cost", env["agent_specific_data"])
 
+    @patch("litellm.acompletion", new_callable=AsyncMock)
+    def test_async_chat_request_matches_sync_envelope(self, mock_acompletion):
+        """The async twin uses ``acompletion`` and preserves the envelope shape."""
+        mock_acompletion.return_value = _make_litellm_response("async reply")
+        router, reg_key = self._make_router_for_openai()
+
+        response = asyncio.run(router.route_request_async(reg_key, {"prompt": "hi"}))
+
+        self.assertEqual(response["status_code"], 200)
+        self.assertEqual(response["generated_text"], "async reply")
+        self.assertEqual(response["adapter_type"], "OpenAIAgent")
+        mock_acompletion.assert_awaited_once()
+
 
 class TestDispatchADKBypassesLiteLLM(unittest.TestCase):
     """Verify ADK requests still flow through the adapter's handle_request."""
@@ -295,6 +309,35 @@ class TestDispatchADKBypassesLiteLLM(unittest.TestCase):
         self.assertEqual(response["generated_text"], "adk reply")
         adapter.handle_request.assert_called_once()
         mock_completion.assert_not_called()
+
+    def test_async_adk_uses_adapter_handle_request(self):
+        agent_id = uuid.uuid4()
+        backend = _make_backend(
+            agent_id=agent_id,
+            name="my_app",
+            agent_type_str=AgentTypeEnum.GOOGLE_ADK.value,
+            endpoint="http://fake-adk.com",
+            metadata={"name": "my_app"},
+        )
+        router = AgentRouter(
+            backend=backend,
+            name="my_app",
+            agent_type=AgentTypeEnum.GOOGLE_ADK,
+            endpoint="http://fake-adk.com",
+            metadata={"name": "my_app"},
+            adapter_operational_config={
+                "name": "my_app",
+                "endpoint": "http://fake-adk.com",
+            },
+        )
+        reg_key = str(agent_id)
+        adapter = router.get_agent_instance(reg_key)
+        adapter.handle_request = MagicMock(return_value={"generated_text": "adk reply"})
+
+        response = asyncio.run(router.route_request_async(reg_key, {"prompt": "hi"}))
+
+        self.assertEqual(response["generated_text"], "adk reply")
+        adapter.handle_request.assert_called_once_with({"prompt": "hi"})
 
 
 if __name__ == "__main__":

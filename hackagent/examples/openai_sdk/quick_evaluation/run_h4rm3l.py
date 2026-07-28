@@ -81,7 +81,7 @@ def run_h4rm3l() -> list:
             "max_tokens": 100,
             "temperature": 0.0,
         },
-        "batch_size_judge": 20,
+        "judge_concurrency": 20,
         "goal_batch_size": 20,
         "goal_batch_workers": 20,
     }

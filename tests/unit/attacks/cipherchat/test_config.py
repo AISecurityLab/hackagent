@@ -14,7 +14,7 @@ class TestConfig(unittest.TestCase):
             "attack_type",
             "cipherchat_params",
             "judges",
-            "batch_size_judge",
+            "judge_concurrency",
             "output_dir",
             "batch_size",
             "goal_batch_size",

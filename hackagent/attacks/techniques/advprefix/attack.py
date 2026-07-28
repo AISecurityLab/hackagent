@@ -165,7 +165,7 @@ class AdvPrefixAttack(BaseAttack):
             "n_samples",
             # Keys needed for Step 7: Evaluation (includes judge evaluation, aggregation, and selection)
             "judges",
-            "batch_size_judge",
+            "judge_concurrency",
             "max_tokens_eval",
             "filter_len",
             "n_prefixes_per_goal",
@@ -257,7 +257,7 @@ class AdvPrefixAttack(BaseAttack):
                 "step_type_enum": "EVALUATION",
                 "config_keys": [
                     "judges",
-                    "batch_size_judge",
+                    "judge_concurrency",
                     "max_tokens_eval",
                     "filter_len",
                     "n_prefixes_per_goal",

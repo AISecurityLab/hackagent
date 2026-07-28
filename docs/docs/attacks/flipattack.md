@@ -150,7 +150,7 @@ advanced_config = {
     "batch_size": 4,           # Concurrent requests to target model
     "goal_batch_size": 20,     # Goals per macro-batch (omit to disable)
     "goal_batch_workers": 2,   # Concurrent macro-batches
-    "batch_size_judge": 2,     # Concurrent judge evaluations
+    "judge_concurrency": 2,   # Concurrent judge evaluations
 
     # Judge configuration
     "judges": [
@@ -162,7 +162,6 @@ advanced_config = {
             "endpoint": None
         }
     ],
-    "batch_size_judge": 1,
     "max_tokens_eval": 256,
     "filter_len": 10,
     "judge_timeout": 120,
@@ -185,7 +184,7 @@ advanced_config = {
 | `batch_size` | Concurrent generation requests to target model (see [Batching](#parallelization--batching)) | `16` |
 | `goal_batch_size` | Max goals per macro-batch (see [Batching](#parallelization--batching)) | *disabled* |
 | `goal_batch_workers` | Concurrent macro-batch workers (see [Batching](#parallelization--batching)) | `1` |
-| `batch_size_judge` | Concurrent judge evaluation requests (see [Batching](#parallelization--batching)) | `1` |
+| `judge_concurrency` | Concurrent judge evaluation requests (see [Batching](#parallelization--batching)) | `1` |
 | `filter_len` | Minimum response length (chars) to be considered non-trivial | `10` |
 | `judge_temperature` | Sampling temperature for judge model | `0.0` |
 | `max_judge_retries` | Maximum judge retry attempts | `1` |
@@ -240,7 +239,7 @@ flowchart LR
 > **`goal_batch_size`** controls how many goals enter each macro-batch (sequential).
 > **`goal_batch_workers`** controls how many macro-batches run in parallel.
 > Within each macro-batch, **`batch_size`** controls concurrent generation threads.
-> After generation, **`batch_size_judge`** controls concurrent judge threads.
+> After generation, **`judge_concurrency`** controls concurrent judge threads.
 
 ### Parameters reference
 
@@ -249,7 +248,7 @@ flowchart LR
 | `batch_size` | Generation | Max concurrent requests to the **target model**. A `ThreadPoolExecutor` fires up to this many goals in parallel; as soon as one finishes a new one starts (sliding window). | `16` |
 | `goal_batch_size` | Orchestrator | Splits all goals into sequential macro-batches of this size. Generation + Evaluation run once per macro-batch. Only activates when `len(goals) > goal_batch_size`. | *disabled* |
 | `goal_batch_workers` | Orchestrator | Runs multiple macro-batches in parallel. Increase when you have many goals and enough API budget to process batches concurrently. | `1` |
-| `batch_size_judge` | Evaluation | Max concurrent requests to the **judge model**. Works the same way as `batch_size` but for scoring. | `1` |
+| `judge_concurrency` | Evaluation | Max concurrent requests to the **judge model**. Works the same way as `batch_size` but for scoring. | `1` |
 
 ### Example
 
@@ -260,7 +259,7 @@ config = {
     "goal_batch_size": 20,       # 5 macro-batches of 20 goals
     "goal_batch_workers": 2,     # 2 macro-batches in parallel
     "batch_size": 10,            # 10 concurrent target requests
-    "batch_size_judge": 5,       # 5 concurrent judge requests
+    "judge_concurrency": 5,      # 5 concurrent judge requests
     "flipattack_params": {
         "flip_mode": "FCS",
         "judge": "gpt-4-0613",
@@ -279,17 +278,17 @@ With this configuration:
 
 1. The orchestrator creates **5 sequential macro-batches** of 20 goals.
 2. Inside each macro-batch, generation fires **10 concurrent** HTTP requests to the target model (sliding window — as one completes, the next starts).
-3. Once all 20 responses are collected, the judge evaluates them with **5 concurrent** scoring threads.
+3. Once all 20 responses are collected, the judge evaluates them with **5 concurrent** scoring requests.
 
 ### Tuning guidelines
 
 | Scenario | Recommendation |
 |----------|----------------|
 | Local model (LM Studio, Ollama) | `batch_size=2–4` to avoid GPU saturation |
-| Remote API with rate limits | `batch_size=5–10`, `batch_size_judge=2–5` |
+| Remote API with rate limits | `batch_size=5–10`, `judge_concurrency=2–5` |
 | Large goal lists (100+) | `goal_batch_size=20–50` to cap peak memory |
-| Fast judge (small model) | `batch_size_judge=8–16` |
-| Slow judge (GPT-4 class) | `batch_size_judge=1–3` to avoid timeouts |
+| Fast judge (small model) | `judge_concurrency=8–16` |
+| Slow judge (GPT-4 class) | `judge_concurrency=1–3` to avoid timeouts |
 
 ---
 

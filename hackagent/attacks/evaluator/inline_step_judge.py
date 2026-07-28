@@ -34,7 +34,7 @@ def build_inline_judge_base_config(config: Dict[str, Any]) -> Dict[str, Any]:
         - BoN generation
     """
     return {
-        "batch_size": config.get("batch_size_judge", 1),
+        "judge_concurrency": config.get("judge_concurrency", 1),
         "max_tokens_eval": config.get("max_tokens_eval", 256),
         "filter_len": config.get("filter_len", 10),
         "timeout": config.get("judge_timeout", 120),

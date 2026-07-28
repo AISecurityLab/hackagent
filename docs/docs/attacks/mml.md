@@ -174,7 +174,7 @@ advanced_config = {
     "batch_size": 4,           # Concurrent requests to target model
     "goal_batch_size": 20,     # Goals per macro-batch (omit to disable)
     "goal_batch_workers": 2,   # Concurrent macro-batches
-    "batch_size_judge": 2,     # Concurrent judge evaluations
+    "judge_concurrency": 2,   # Concurrent judge evaluations
 
     # Judge configuration
     "judges": [
@@ -212,7 +212,7 @@ advanced_config = {
 | `batch_size` | Concurrent generation requests to target model | `16` |
 | `goal_batch_size` | Max goals per macro-batch | *disabled* |
 | `goal_batch_workers` | Concurrent macro-batch workers | `1` |
-| `batch_size_judge` | Concurrent judge evaluation requests | `1` |
+| `judge_concurrency` | Concurrent judge evaluation requests | `1` |
 | `filter_len` | Minimum response length (chars) to be considered non-trivial | `10` |
 | `judge_temperature` | Sampling temperature for judge model | `0.0` |
 | `max_judge_retries` | Maximum judge retry attempts | `1` |
@@ -262,7 +262,7 @@ flowchart LR
 ```
 
 > **`batch_size`** controls concurrent generation threads (encoding + model query).  
-> **`batch_size_judge`** controls concurrent judge evaluation threads.  
+> **`judge_concurrency`** controls concurrent judge evaluation requests.  
 > **`goal_batch_size`** splits large goal lists into sequential macro-batches.
 
 ---

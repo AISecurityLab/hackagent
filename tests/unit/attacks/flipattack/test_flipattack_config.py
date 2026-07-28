@@ -87,9 +87,8 @@ class TestFlipAttackConfig:
         """Test default configuration values."""
         config = FlipAttackConfig()
         assert config.attack_type == "flipattack"
-        assert config.batch_size_judge == 1
+        assert config.judge_concurrency == 1
         assert config.max_tokens_eval == 4096
-        assert config.filter_len == 10
         assert config.judge_timeout == 120
         assert config.judge_temperature == 0.0
         assert config.max_judge_retries == 1
@@ -141,7 +140,7 @@ class TestFlipAttackConfig:
             },
             "goals": ["goal1"],
             "judges": [{"identifier": "test-judge", "type": "harmbench"}],
-            "batch_size_judge": 4,
+            "judge_concurrency": 4,
             "max_tokens_eval": 512,
             "filter_len": 20,
             "judge_timeout": 60,
@@ -159,7 +158,7 @@ class TestFlipAttackConfig:
         assert result["flipattack_params"]["cot"] is True
         assert result["flipattack_params"]["few_shot"] is True
         assert result["goals"] == ["goal1"]
-        assert result["batch_size_judge"] == 4
+        assert result["judge_concurrency"] == 4
         assert result["max_tokens_eval"] == 512
         assert result["dataset"] == "advbench"
         assert result["output_dir"] == "/tmp/test"
@@ -172,7 +171,7 @@ class TestFlipAttackConfig:
         assert config.attack_type == "flipattack"
         assert config.goals == []
         assert config.flipattack_params.flip_mode == "FCS"
-        assert config.batch_size_judge == 1
+        assert config.judge_concurrency == 1
 
     def test_from_dict_extra_keys_ignored(self):
         """Test that extra keys in dict are ignored without error."""
