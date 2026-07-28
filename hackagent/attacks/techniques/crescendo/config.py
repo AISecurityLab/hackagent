@@ -12,7 +12,6 @@ from pydantic import Field
 from hackagent.attacks.techniques.config import (
     AttackerConfig,
     ConfigBase,
-    DEFAULT_ATTACKER_IDENTIFIER,
     DEFAULT_CONFIG_BASE,
     DEFAULT_JUDGE_IDENTIFIER,
 )
@@ -62,7 +61,7 @@ class CrescendoConfig(ConfigBase):
     objective: str = "jailbreak"
     judge: Dict[str, Any] = Field(
         default_factory=lambda: AttackerConfig(
-            identifier=DEFAULT_ATTACKER_IDENTIFIER
+            identifier=DEFAULT_JUDGE_IDENTIFIER
         ).model_dump()
     )
     max_turns: int = Field(default=10, ge=1)
