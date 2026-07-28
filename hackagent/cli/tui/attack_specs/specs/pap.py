@@ -116,8 +116,8 @@ SPEC = AttackConfigSpec(
             section="Execution",
         ),
         ConfigField(
-            key="batch_size_judge",
-            label="Judge Batch Size",
+            key="judge_concurrency",
+            label="Judge Concurrency",
             field_type=FieldType.INTEGER,
             default=1,
             description="Parallelism for judge evaluation requests.",

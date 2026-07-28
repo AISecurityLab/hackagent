@@ -1767,7 +1767,11 @@ class AttackOrchestrator:
                         if k in ("identifier", "endpoint", "agent_type")
                     }
 
-        # 2. Create Attack record
+        # 2. Start Attack/Run record creation in the background.  The local
+        # implementation is intentionally not constructed until the run id is
+        # available: constructors initialise tracking state from ``_run_id``.
+        # We can still overlap these server round-trips with the remaining
+        # configuration preparation below.
         backend_agent = getattr(router_obj, "backend_agent", None)
         victim_agent_id = getattr(backend_agent, "id", None) or getattr(
             self.hack_agent, "agent_id", None
@@ -1777,34 +1781,37 @@ class AttackOrchestrator:
             self.hack_agent, "organization_id", None
         )
 
-        attack_id = self._create_server_attack_record(
-            attack_type=self.attack_type,
-            victim_agent_id=victim_agent_id,
-            organization_id=organization_id,
-            attack_config=attack_config,
-        )
-
-        # 3. Create Run record
-        run_id = self._create_server_run_record(
-            attack_id=attack_id,
-            victim_agent_id=str(victim_agent_id),
-            run_config_override=effective_run_config,
-        )
-
-        # 4. Update run status to RUNNING
-        try:
-            logger.info(f"Updating run {run_id} status to RUNNING")
-            self.hackagent_agent.backend.update_run(
-                UUID(run_id),
-                status=StatusEnum.RUNNING.value,
+        def _create_and_start_run() -> Tuple[str, str]:
+            attack_id = self._create_server_attack_record(
+                attack_type=self.attack_type,
+                victim_agent_id=victim_agent_id,
+                organization_id=organization_id,
+                attack_config=attack_config,
             )
-        except Exception as e:
-            logger.error(
-                f"Failed to update run status to RUNNING: {e}",
-                exc_info=True,
+            run_id = self._create_server_run_record(
+                attack_id=attack_id,
+                victim_agent_id=str(victim_agent_id),
+                run_config_override=effective_run_config,
             )
-            if fail_on_run_error:
-                raise HackAgentError(f"Failed to start audit run {run_id}: {e}") from e
+            try:
+                logger.info(f"Updating run {run_id} status to RUNNING")
+                self.hackagent_agent.backend.update_run(
+                    UUID(run_id),
+                    status=StatusEnum.RUNNING.value,
+                )
+            except Exception as e:
+                logger.error(
+                    f"Failed to update run status to RUNNING: {e}",
+                    exc_info=True,
+                )
+                if fail_on_run_error:
+                    raise HackAgentError(
+                        f"Failed to start audit run {run_id}: {e}"
+                    ) from e
+            return attack_id, run_id
+
+        run_pool = ThreadPoolExecutor(max_workers=1)
+        run_future = run_pool.submit(_create_and_start_run)
 
         if goal_labels_by_index:
             attack_config = {
@@ -1832,6 +1839,15 @@ class AttackOrchestrator:
                 **effective_run_config,
                 "_tui_event_bus": _tui_event_bus,
             }
+
+        # Propagate record-creation errors exactly as before, but only after
+        # independent setup has had a chance to overlap the network work.
+        try:
+            attack_id, run_id = run_future.result()
+        finally:
+            run_pool.shutdown(wait=True)
+
+        if _tui_event_bus is not None:
             _tui_event_bus.emit(
                 "step_started",
                 step_name="Attack Execution",

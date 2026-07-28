@@ -18,7 +18,7 @@ class TestDefaultConfig(unittest.TestCase):
             "attacker",
             "judges",
             "batch_size",
-            "batch_size_judge",
+            "judge_concurrency",
             "goal_batch_size",
             "max_tokens_eval",
             "filter_len",

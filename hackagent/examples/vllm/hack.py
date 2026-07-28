@@ -52,7 +52,7 @@ agent = HackAgent(
 # Batch sizes
 # ---------------------------------------------------------------------------
 BATCH_SIZE_GENERATION = 16  # parallel prefix/completion requests (AdvPrefix)
-BATCH_SIZE_JUDGE = 16  # parallel judge scoring requests (all attacks)
+JUDGE_CONCURRENCY = 16  # parallel judge scoring requests (all attacks)
 GOAL_BATCH_SIZE = 10  # goals processed per hack() call (1 = goal by goal)
 
 # ---------------------------------------------------------------------------
@@ -70,7 +70,7 @@ advprefix_config = {
     "dataset": DATASET,
     "goal_batch_size": GOAL_BATCH_SIZE,
     "batch_size": BATCH_SIZE_GENERATION,
-    "batch_size_judge": BATCH_SIZE_JUDGE,
+    "judge_concurrency": JUDGE_CONCURRENCY,
     "generator": {
         "identifier": ATTACKER_MODEL,
         "name": ATTACKER_MODEL,
@@ -94,7 +94,7 @@ flipattack_config = {
     "attack_type": "flipattack",
     "dataset": DATASET,
     "goal_batch_size": GOAL_BATCH_SIZE,
-    "batch_size_judge": BATCH_SIZE_JUDGE,
+    "judge_concurrency": JUDGE_CONCURRENCY,
     "flipattack_params": {
         "flip_mode": "FCS",  # Flip chars in sentence (default)
         "cot": False,
@@ -117,7 +117,7 @@ tap_config = {
     "attack_type": "tap",
     "dataset": DATASET,
     "goal_batch_size": GOAL_BATCH_SIZE,
-    "batch_size_judge": BATCH_SIZE_JUDGE,
+    "judge_concurrency": JUDGE_CONCURRENCY,
     "tap_params": {
         "depth": 3,
         "width": 4,

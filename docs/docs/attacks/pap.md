@@ -101,7 +101,7 @@ results = agent.hack(attack_config=attack_config)
 | `attacker` | dict | `{...}` | Attacker LLM config: `identifier`, `endpoint`, `agent_type`, `api_key` |
 | `judges` | list | `[{...}]` | Judge configurations |
 | `batch_size` | int | `1` | Parallelism for goal processing |
-| `batch_size_judge` | int | `1` | Parallelism for judge evaluation |
+| `judge_concurrency` | int | `1` | Parallelism for judge evaluation |
 | `goal_batch_size` | int | `1` | Goals processed per batch |
 
 ### Shared Goal Category Classifier

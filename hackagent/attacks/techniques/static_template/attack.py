@@ -196,7 +196,7 @@ class StaticTemplateAttack(BaseAttack):
                     "judge",
                     "judge_config",
                     "min_response_length",
-                    "batch_size_judge",
+                    "judge_concurrency",
                     "judge_parallelism",
                     "max_tokens_eval",
                     "judge_timeout",

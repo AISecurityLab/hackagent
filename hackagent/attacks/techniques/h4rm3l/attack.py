@@ -230,7 +230,7 @@ class H4rm3lAttack(BaseAttack):
                     "_client",
                     "_tracker",
                     "judges",
-                    "batch_size_judge",
+                    "judge_concurrency",
                     "max_tokens_eval",
                     "filter_len",
                     "judge_timeout",

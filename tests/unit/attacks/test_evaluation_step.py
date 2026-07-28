@@ -66,7 +66,7 @@ def _make_step(config=None, **overrides):
                 "agent_type": "OPENAI_SDK",
             }
         ],
-        "batch_size_judge": 1,
+        "judge_concurrency": 1,
         "max_tokens_eval": 256,
         "filter_len": 10,
         "judge_timeout": 120,
@@ -221,7 +221,7 @@ class TestBuildBaseEvalConfig:
         step = _make_step()
         config = step._build_base_eval_config()
 
-        assert config["batch_size"] == 1
+        assert config["judge_concurrency"] == 1
         assert config["max_tokens_eval"] == 256
         assert config["filter_len"] == 10
         assert config["timeout"] == 120
@@ -233,11 +233,11 @@ class TestBuildBaseEvalConfig:
         step = _make_step(
             config={
                 "judges": [{"identifier": "test", "type": "harmbench"}],
-                # No top-level batch_size_judge etc.
+                # No top-level judge_concurrency etc.
             }
         )
         technique_params = {
-            "judge_batch_size": 8,
+            "judge_concurrency": 8,
             "judge_max_tokens_eval": 512,
             "judge_filter_len": 20,
             "judge_timeout": 60,
@@ -246,7 +246,7 @@ class TestBuildBaseEvalConfig:
         }
         config = step._build_base_eval_config(technique_params=technique_params)
 
-        assert config["batch_size"] == 8
+        assert config["judge_concurrency"] == 8
         assert config["max_tokens_eval"] == 512
         assert config["filter_len"] == 20
         assert config["timeout"] == 60

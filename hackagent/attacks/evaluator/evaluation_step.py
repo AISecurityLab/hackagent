@@ -390,14 +390,11 @@ class BaseEvaluationStep:
         cfg = self._raw_config
         tp = technique_params or {}
         return {
-            "batch_size": (
-                cfg.get("batch_size_judge") or tp.get("judge_batch_size", 1)
+            "judge_concurrency": (
+                cfg.get("judge_concurrency") or tp.get("judge_concurrency", 1)
             ),
             "judge_parallelism": (
-                cfg.get("judge_parallelism")
-                or tp.get("judge_parallelism")
-                or cfg.get("batch_size_judge")
-                or tp.get("judge_batch_size", 1)
+                cfg.get("judge_parallelism") or tp.get("judge_parallelism", 1)
             ),
             "max_tokens_eval": (
                 cfg.get("max_tokens_eval") or tp.get("judge_max_tokens_eval", 256)
