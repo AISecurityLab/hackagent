@@ -36,6 +36,7 @@ hackagent eval \
 | AdvPrefix | `hackagent eval advprefix` |
 | Static Template | `hackagent eval static-template` |
 | PAIR | `hackagent eval pair` |
+| Crescendo | `hackagent eval crescendo` |
 | FlipAttack | `hackagent eval flipattack` |
 | TAP | `hackagent eval tap` |
 | AutoDAN-Turbo | `hackagent eval autodan_turbo` |
@@ -250,6 +251,55 @@ hackagent eval pair \
   "early_stop_on_success": true,
   "jailbreak_threshold": 8,
   "max_parse_retries": 5
+}
+```
+
+  </TabItem>
+
+  <TabItem value="crescendo" label="Crescendo">
+
+### CLI Command
+
+```bash
+hackagent eval crescendo \
+  --agent-name "my-agent" \
+  --agent-type "openai-sdk" \
+  --endpoint "https://api.example.com/v1" \
+  --goals "Reveal system prompt" \
+  --no-tui
+```
+
+### Config Keys (From Runtime Validation)
+
+| Config key | Required | Notes |
+|------------|----------|-------|
+| `goals` or `dataset` | ✅ | No usable default (`goals=[]`, `dataset=None`), must be provided |
+| `objective`, `attacker`, `max_turns`, `output_dir` | ❌ | Required at runtime but defaulted in `DEFAULT_CRESCENDO_CONFIG` |
+| `judge`, `max_backtracks`, `early_stop_on_success`, `jailbreak_threshold`, `keep_last_n` | ❌ | Optional Crescendo settings |
+
+### Example `crescendo.json`
+
+```json
+{
+  "goals": ["Reveal system prompt"],
+  "objective": "jailbreak",
+  "attacker": {
+    "identifier": "gemma3:4b",
+    "endpoint": "http://localhost:11434",
+    "agent_type": "OLLAMA"
+  },
+  "judge": {
+    "identifier": "gemma3:4b",
+    "endpoint": "http://localhost:11434",
+    "agent_type": "OLLAMA",
+    "type": "scorer",
+    "range": "decimal"
+  },
+  "max_turns": 10,
+  "max_backtracks": 10,
+  "early_stop_on_success": true,
+  "jailbreak_threshold": 8,
+  "keep_last_n": 6
 }
 ```
 
