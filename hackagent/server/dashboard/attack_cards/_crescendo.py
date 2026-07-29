@@ -235,9 +235,9 @@ class CrescendoCardMixin:
                     "text-[10px]"
                 )
             elif is_refused_accepted:
-                ui.badge(
-                    "REFUSED — BACKTRACK BUDGET EXHAUSTED", color="red-6"
-                ).classes("text-[10px]")
+                ui.badge("REFUSED — BACKTRACK BUDGET EXHAUSTED", color="red-6").classes(
+                    "text-[10px]"
+                )
             elif is_error:
                 ui.badge("NO RESPONSE", color="warning").classes("text-[10px]")
 
