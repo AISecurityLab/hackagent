@@ -92,3 +92,50 @@ def test_format_crescendo_score_preserves_decimal_and_handles_none():
     assert CrescendoCardMixin._format_crescendo_score(None) == "\u2014"
     assert CrescendoCardMixin._format_crescendo_score(8) == "8"
     assert CrescendoCardMixin._format_crescendo_score(7.5) == "7.5"
+
+
+def test_crescendo_traces_mark_before_side_guardrail_blocks():
+    rows = CrescendoCardMixin._parse_crescendo_traces(
+        [
+            {
+                "sequence": 1,
+                "content": {
+                    "step_name": "Turn 1: Blocked by before guardrail",
+                    "request": {"prompt": "prompt-1"},
+                    "response": {
+                        "adapter_type": "guardrail",
+                        "agent_specific_data": {"side": "before"},
+                    },
+                    "metadata": {"turn": 1, "error": "No response"},
+                },
+            }
+        ]
+    )
+
+    assert rows[0]["is_guardrail_blocked"] is True
+    assert rows[0]["is_error"] is False
+
+
+def test_crescendo_traces_after_side_guardrail_still_counts_as_turn():
+    rows = CrescendoCardMixin._parse_crescendo_traces(
+        [
+            {
+                "sequence": 1,
+                "content": {
+                    "step_name": "Turn 1",
+                    "request": {"prompt": "prompt-1"},
+                    "response": {
+                        "adapter_type": "guardrail",
+                        "agent_specific_data": {
+                            "side": "after",
+                            "target_response": "censored reply",
+                        },
+                    },
+                    "metadata": {"turn": 1, "score": 4},
+                },
+            }
+        ]
+    )
+
+    assert rows[0]["is_guardrail_blocked"] is False
+    assert rows[0]["_guardrail_side"] == "after"

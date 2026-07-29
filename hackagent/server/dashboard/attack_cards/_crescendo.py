@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import html
 import json
+from collections import defaultdict
 
 from nicegui import ui
 
@@ -86,12 +87,18 @@ class CrescendoCardMixin:
 
             is_discarded = "backtrack" in step_name.lower()
             refused_flag = bool(metadata.get("refused"))
+            # "before"-side guardrail blocks mean the target never actually
+            # responded (the request itself was blocked), so no real turn
+            # happened -- unlike "after"-side blocks, which censor a
+            # genuine target response and still count as a turn.
+            is_guardrail_blocked = _guardrail_side == "before"
             rows.append(
                 {
                     "turn": turn,
                     "backtrack": backtrack,
                     "is_backtracked": is_discarded,
                     "is_error": "Failed" in step_name,
+                    "is_guardrail_blocked": is_guardrail_blocked,
                     # Accepted despite being flagged as a refusal by the
                     # judge -- this happens once the backtrack budget is
                     # exhausted, so the turn is kept in the conversation but
@@ -123,13 +130,24 @@ class CrescendoCardMixin:
                     if not detail_mode:
                         body_col.set_visibility(False)
 
-                    scores = [s["score"] for s in steps if s["score"] is not None]
-                    best_score = max(scores) if scores else None
+                    # Only the step(s) the attack itself flagged as the new
+                    # best (is_best=True) should feed the badge, so a
+                    # discarded backtrack or a refused-but-accepted turn
+                    # (kept only because the backtrack budget ran out)
+                    # can never outrank the attack's actual best_score.
+                    best_scores = [
+                        s["score"]
+                        for s in steps
+                        if s["is_best"] and s["score"] is not None
+                    ]
+                    best_score = max(best_scores) if best_scores else None
                     backtrack_count = sum(1 for s in steps if s["is_backtracked"])
                     accepted_count = sum(
                         1
                         for s in steps
-                        if not s["is_backtracked"] and not s["is_error"]
+                        if not s["is_backtracked"]
+                        and not s["is_error"]
+                        and not s["is_guardrail_blocked"]
                     )
                     with ui.row().classes("items-center gap-2 flex-wrap mb-1"):
                         ui.badge(f"{accepted_count} turns", color="grey-7").classes(
@@ -151,93 +169,125 @@ class CrescendoCardMixin:
                     self._wire_expand_toggle(body_col)
 
     def _render_crescendo_turns(self, steps: list[dict]) -> None:
-        """Render the prompt/response cards for every turn, in conversation order."""
-        for index, step in enumerate(steps):
+        """Render the prompt/response cards for every turn, in conversation order.
+
+        Multiple attempts can share the same turn number when the first
+        (or an intermediate) attempt is refused and backtracked. Those
+        earlier attempts are grouped into a collapsed expansion so the
+        accepted/final attempt for that turn stays visually distinct from
+        the retries that led up to it.
+        """
+        groups: dict[int, list[dict]] = defaultdict(list)
+        order: list[int] = []
+        for step in steps:
             turn = step["turn"]
-            backtrack = step["backtrack"]
-            is_backtracked = step["is_backtracked"]
-            is_error = step["is_error"]
-            is_refused_accepted = step.get("is_refused_accepted", False)
-            score = step["score"]
-            is_best = step["is_best"]
-            prompt = step["prompt"]
-            response = step["response"]
-            _guardrail_side = step.get("_guardrail_side") or ""
-            _guardrail_explanation = step.get("_guardrail_explanation") or ""
-            _guardrail_categories = step.get("_guardrail_categories") or []
+            if turn not in groups:
+                order.append(turn)
+            groups[turn].append(step)
 
-            with ui.row().classes("items-center gap-2 mt-3 mb-1 px-1"):
-                iter_label = f"Turn {turn}"
-                if is_backtracked:
-                    iter_label += f" — Backtrack {backtrack}"
-                if score is not None:
-                    iter_label += f" — Score {self._format_crescendo_score(score)}/10"
-                if is_best:
-                    iter_label += " — Best"
-                ui.label(iter_label).classes(
-                    "text-xs font-semibold text-grey-6 uppercase tracking-wide"
+        for group_index, turn in enumerate(order):
+            group = groups[turn]
+            if len(group) > 1:
+                earlier, final = group[:-1], group[-1]
+                with ui.expansion(
+                    f"Turn {turn} — {len(earlier)} earlier attempt(s) refused",
+                    icon="history",
+                ).classes("w-full text-xs"):
+                    for earlier_index, earlier_step in enumerate(earlier):
+                        self._render_crescendo_turn_step(earlier_step)
+                        if earlier_index < len(earlier) - 1:
+                            ui.separator().classes("mt-2 mb-0")
+                self._render_crescendo_turn_step(final)
+            else:
+                self._render_crescendo_turn_step(group[0])
+
+            if group_index < len(order) - 1:
+                ui.separator().classes("mt-2 mb-0")
+
+    def _render_crescendo_turn_step(self, step: dict) -> None:
+        """Render the prompt/response card for a single turn attempt."""
+        turn = step["turn"]
+        backtrack = step["backtrack"]
+        is_backtracked = step["is_backtracked"]
+        is_error = step["is_error"]
+        is_refused_accepted = step.get("is_refused_accepted", False)
+        score = step["score"]
+        is_best = step["is_best"]
+        prompt = step["prompt"]
+        response = step["response"]
+        _guardrail_side = step.get("_guardrail_side") or ""
+        _guardrail_explanation = step.get("_guardrail_explanation") or ""
+        _guardrail_categories = step.get("_guardrail_categories") or []
+
+        with ui.row().classes("items-center gap-2 mt-3 mb-1 px-1"):
+            iter_label = f"Turn {turn}"
+            if is_backtracked:
+                iter_label += f" — Backtrack {backtrack}"
+            if score is not None:
+                iter_label += f" — Score {self._format_crescendo_score(score)}/10"
+            if is_best:
+                iter_label += " — Best"
+            ui.label(iter_label).classes(
+                "text-xs font-semibold text-grey-6 uppercase tracking-wide"
+            )
+            if is_backtracked:
+                ui.badge("DISCARDED — REPHRASED", color="orange-6").classes(
+                    "text-[10px]"
                 )
-                if is_backtracked:
-                    ui.badge("DISCARDED — REPHRASED", color="orange-6").classes(
-                        "text-[10px]"
-                    )
-                elif is_refused_accepted:
-                    ui.badge(
-                        "REFUSED — BACKTRACK BUDGET EXHAUSTED", color="red-6"
-                    ).classes("text-[10px]")
-                elif is_error:
-                    ui.badge("NO RESPONSE", color="warning").classes("text-[10px]")
+            elif is_refused_accepted:
+                ui.badge(
+                    "REFUSED — BACKTRACK BUDGET EXHAUSTED", color="red-6"
+                ).classes("text-[10px]")
+            elif is_error:
+                ui.badge("NO RESPONSE", color="warning").classes("text-[10px]")
 
+        with ui.row().classes("w-full items-center justify-between"):
+            ui.label("QUESTION SENT TO TARGET").classes(
+                "text-[10px] text-grey-6 font-semibold uppercase tracking-wide px-1"
+            )
+            ui.button(icon="content_copy").props(
+                "flat dense size=xs color=grey-6"
+            ).tooltip("Copy to clipboard").on(
+                "click",
+                js_handler=f"(event) => {{var b=event.currentTarget,ic=b.querySelector('.q-icon');if(navigator.clipboard)navigator.clipboard.writeText({json.dumps(prompt or '')});if(ic){{ic.textContent='check';setTimeout(function(){{ic.textContent='content_copy';}},2000);}}}}",
+            )
+        ui.html(
+            '<pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;'
+            'border-radius:4px;margin-bottom:6px;white-space:pre-wrap;word-break:break-word">'
+            + html.escape(prompt or "\u2014")
+            + "</pre>"
+        )
+
+        if _guardrail_side == "before":
+            self._render_guardrail_event_block(
+                {
+                    "side": "before",
+                    "explanation": _guardrail_explanation,
+                    "categories": _guardrail_categories,
+                }
+            )
+        else:
             with ui.row().classes("w-full items-center justify-between"):
-                ui.label("QUESTION SENT TO TARGET").classes(
+                ui.label("TARGET RESPONSE").classes(
                     "text-[10px] text-grey-6 font-semibold uppercase tracking-wide px-1"
                 )
                 ui.button(icon="content_copy").props(
                     "flat dense size=xs color=grey-6"
                 ).tooltip("Copy to clipboard").on(
                     "click",
-                    js_handler=f"(event) => {{var b=event.currentTarget,ic=b.querySelector('.q-icon');if(navigator.clipboard)navigator.clipboard.writeText({json.dumps(prompt or '')});if(ic){{ic.textContent='check';setTimeout(function(){{ic.textContent='content_copy';}},2000);}}}}",
+                    js_handler=f"(event) => {{var b=event.currentTarget,ic=b.querySelector('.q-icon');if(navigator.clipboard)navigator.clipboard.writeText({json.dumps(response or '')});if(ic){{ic.textContent='check';setTimeout(function(){{ic.textContent='content_copy';}},2000);}}}}",
                 )
             ui.html(
                 '<pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;'
-                'border-radius:4px;margin-bottom:6px;white-space:pre-wrap;word-break:break-word">'
-                + html.escape(prompt or "\u2014")
+                'border-radius:4px;white-space:pre-wrap;word-break:break-word">'
+                + html.escape(response or "No response recorded.")
                 + "</pre>"
             )
-
-            if _guardrail_side == "before":
+            if _guardrail_side:
                 self._render_guardrail_event_block(
                     {
-                        "side": "before",
+                        "side": _guardrail_side,
                         "explanation": _guardrail_explanation,
                         "categories": _guardrail_categories,
                     }
                 )
-            else:
-                with ui.row().classes("w-full items-center justify-between"):
-                    ui.label("TARGET RESPONSE").classes(
-                        "text-[10px] text-grey-6 font-semibold uppercase tracking-wide px-1"
-                    )
-                    ui.button(icon="content_copy").props(
-                        "flat dense size=xs color=grey-6"
-                    ).tooltip("Copy to clipboard").on(
-                        "click",
-                        js_handler=f"(event) => {{var b=event.currentTarget,ic=b.querySelector('.q-icon');if(navigator.clipboard)navigator.clipboard.writeText({json.dumps(response or '')});if(ic){{ic.textContent='check';setTimeout(function(){{ic.textContent='content_copy';}},2000);}}}}",
-                    )
-                ui.html(
-                    '<pre style="font-size:11px;padding:8px;background:white;border:1px solid #e0e0e0;'
-                    'border-radius:4px;white-space:pre-wrap;word-break:break-word">'
-                    + html.escape(response or "No response recorded.")
-                    + "</pre>"
-                )
-                if _guardrail_side:
-                    self._render_guardrail_event_block(
-                        {
-                            "side": _guardrail_side,
-                            "explanation": _guardrail_explanation,
-                            "categories": _guardrail_categories,
-                        }
-                    )
-
-            if index < len(steps) - 1:
-                ui.separator().classes("mt-2 mb-0")
