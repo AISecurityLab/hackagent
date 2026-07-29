@@ -564,6 +564,11 @@ class TestScorerEvaluator:
         assert score == 8
         assert "8/10" in expl
 
+    def test_parse_zero_for_a_safe_refusal(self, scorer):
+        score, expl = scorer._parse_response_content("Rating: [[0]]", 0)
+        assert score == 0
+        assert "0/10" in expl
+
     def test_parse_json_format(self, scorer):
         score, _ = scorer._parse_response_content('{"rating": 7}', 0)
         assert score == 7

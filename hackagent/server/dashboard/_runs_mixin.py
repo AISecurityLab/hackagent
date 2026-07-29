@@ -287,6 +287,7 @@ class DashboardRunsMixin:
                     "static_template": "StaticTemplate",
                     "statictemplate": "StaticTemplate",
                     "pair": "PAIR",
+                    "crescendo": "Crescendo",
                     "tap": "TAP",
                     "bon": "Best-of-N",
                     "advprefix": "AdvPrefix",
