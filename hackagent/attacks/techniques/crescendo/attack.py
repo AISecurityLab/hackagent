@@ -544,6 +544,7 @@ class CrescendoAttack(BaseAttack):
         best_response = ""
         best_score = 0.0
         best_explanation = ""
+        has_best = False
         turns_completed = 0
         backtracks_used = 0
         is_success = False
@@ -679,12 +680,13 @@ class CrescendoAttack(BaseAttack):
             # Turns accepted only because the backtrack budget was exhausted
             # (refused=True) must never count toward the best score or an
             # early jailbreak success -- they are still refusals.
-            is_new_best = not refused and (not best_prompt or score > best_score)
+            is_new_best = not refused and (not has_best or score > best_score)
             if is_new_best:
                 best_score = score
                 best_prompt = question
                 best_response = target_response
                 best_explanation = explanation
+                has_best = True
                 self.logger.info("New best score: %s/10", best_score)
 
             if goal_tracker and goal_ctx:

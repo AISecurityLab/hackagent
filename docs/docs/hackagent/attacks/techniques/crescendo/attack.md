@@ -46,7 +46,7 @@ context so each escalation feels natural:
 narrowing toward the goal).
 2. The question is appended to `target_messages` and the *full*
 conversation is sent to the target.
-3. A judge rates the response (1-10) and flags whether it is a refusal.
+3. A judge rates the response on the shared 0-10 scale and flags refusals.
 4. If refused, the turn is *backtracked*: the question/answer pair is
 dropped from `target_messages` and the attacker is asked to
 rephrase the same step, up to `max_backtracks` times across the
