@@ -529,6 +529,9 @@ class DashboardTraceAnalysisMixin:
                 elif atk == "pair":
                     detail_data = self._parse_pair_traces(serialized_traces)
                     self._render_pair_goal_card(row, detail_data, detail_mode=True)
+                elif atk == "crescendo":
+                    detail_data = self._parse_crescendo_traces(serialized_traces)
+                    self._render_crescendo_goal_card(row, detail_data, detail_mode=True)
                 elif atk == "tap":
                     nodes, depth_stats = self._parse_tap_traces(serialized_traces)
                     self._render_tap_goal_card(

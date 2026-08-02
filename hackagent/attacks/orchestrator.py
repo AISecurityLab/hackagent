@@ -148,6 +148,14 @@ class AttackOrchestrator:
             ("judge", ("judge",), False, "judge"),
             ("judge", ("scorer",), False, "judge"),
         ),
+        "crescendo": (
+            # Crescendo's judge is also its per-turn 1--10 scorer.  These
+            # paths make the target, attacker, judge and category classifier
+            # all participate in the same availability preflight flow as the
+            # other iterative attacks.
+            ("attacker", ("attacker",), False, "attacker"),
+            ("judge", ("judge",), False, "judge"),
+        ),
         "autodan_turbo": (
             ("attacker", ("attacker",), False, "attacker"),
             ("judge", ("judge",), False, "judge"),

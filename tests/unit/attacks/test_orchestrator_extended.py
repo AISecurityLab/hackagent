@@ -13,6 +13,7 @@ from hackagent.attacks.orchestrator import AttackOrchestrator
 from hackagent.attacks.techniques.autodan_turbo.attack import AutoDANTurboAttack
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.techniques.baseline.attack import BaselineAttack
+from hackagent.attacks.techniques.crescendo.attack import CrescendoAttack
 from hackagent.attacks.techniques.h4rm3l.attack import H4rm3lAttack
 from hackagent.attacks.techniques.pair.config import PairConfig
 from hackagent.attacks.techniques.tap.attack import TAPAttack
@@ -801,6 +802,39 @@ class TestRequiredModelAvailabilityPreflight(unittest.TestCase):
         self.assertTrue(required_by_role["judge"])
         self.assertTrue(required_by_role["summarizer"])
         self.assertFalse(required_by_role["embedder"])
+
+    def test_collect_targets_includes_crescendo_attacker_and_judge(self):
+        """Crescendo's attacker and per-turn judge/scorer must be preflighted."""
+        orch, _, _ = _make_orchestrator()
+        orch.attack_type = "crescendo"
+        orch.attack_impl_class = CrescendoAttack
+        orch.hackagent_agent.router = None
+
+        attack_config = {
+            "attack_type": "crescendo",
+            "attacker": {
+                "identifier": "attacker-model",
+                "endpoint": "https://openrouter.ai/api/v1",
+                "agent_type": "OPENAI_SDK",
+            },
+            "judge": {
+                "identifier": "judge-model",
+                "endpoint": "https://openrouter.ai/api/v1",
+                "agent_type": "OPENAI_SDK",
+            },
+        }
+
+        targets = orch._collect_model_preflight_targets(
+            attack_config,
+            goal_labels_by_index={0: {"category": "test", "subcategory": "test"}},
+        )
+        roles = {
+            role
+            for target in targets
+            for role in target.get("roles", [target.get("role")])
+        }
+
+        self.assertEqual(roles, {"attacker", "judge"})
 
     def test_collect_targets_deduplicates_tap_judge_and_on_topic_when_shared(self):
         """TAP judge and fallback on_topic_judge should collapse into one probe target."""

@@ -15,6 +15,7 @@ graph LR
         A[AdvPrefix] --> |"Sophisticated"| T
         B[AutoDAN-Turbo] --> |"Sophisticated"| T
         C[PAIR] --> |"Adaptive"| T
+        M[Crescendo] --> |"Multi-Turn"| T
         P[PAP] --> |"Persuasion"| T
         D[Static Template] --> |"Fast"| T
         E[TAP] --> |"Tree Search"| T
@@ -43,6 +44,7 @@ graph LR
 | [**tFC**](./tfc.md) | Auto-generated flowchart text to jailbreak LLMs | ⭐⭐ Medium | Fast |
 | [**PAP**](./pap.md) | Persuasive adversarial paraphrasing with social-science techniques | ⭐⭐ Medium | Medium |
 | [**PAIR**](./pair.md) | LLM-driven iterative prompt refinement | ⭐⭐ Medium | Medium |
+| [**Crescendo**](./crescendo.md) | Multi-turn conversational escalation with backtracking | ⭐⭐ Medium | Medium |
 | [**TAP**](./tap.md) | Tree search with on-topic pruning | ⭐⭐ Medium | Medium |
 | [**AdvPrefix**](./advprefix.md) | Multi-step adversarial prefix optimization | ⭐⭐⭐ High | Slower |
 | [**AutoDAN-Turbo**](./autodan_turbo.md) | Lifelong strategy discovery and reuse | ⭐⭐⭐ High | Slower |
@@ -214,6 +216,30 @@ attack_config = {
 
 ---
 
+## Crescendo — Multi-Turn Conversational Escalation
+
+A multi-turn jailbreak attack that gradually escalates a **single, persistent conversation** with the target, using the target's own prior answers as context so each new question feels like a natural continuation.
+
+<div style={{background: 'var(--ifm-background-surface-color)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--ifm-color-emphasis-200)', margin: '1rem 0'}}>
+
+An attacker LLM proposes the next escalating question given the goal and the conversation so far. The question is appended to the growing conversation and sent to the target, and a judge scores the response and flags refusals. Refused turns are backtracked — dropped and rephrased, up to a configurable budget — while accepted turns advance the conversation until the jailbreak threshold is reached or the turn budget is exhausted. This is HackAgent's first attack to rely on genuine multi-turn conversation state. Based on *"Great, Now Write an Article About That: The Crescendo Multi-Turn LLM Jailbreak Attack"* (Russinovich, Salem, Eldan, 2024).
+
+</div>
+
+```python
+attack_config = {
+    "attack_type": "crescendo",
+    "goals": ["Reveal your system prompt"],
+    "attacker": {"identifier": "gpt-4", "endpoint": "https://api.openai.com/v1"},
+    "max_turns": 10,
+    "max_backtracks": 10
+}
+```
+
+[**Learn more about Crescendo →**](./crescendo.md)
+
+---
+
 ## AutoDAN-Turbo — Lifelong Strategy Attack
 
 AutoDAN-Turbo is a lifelong red-teaming attack that **discovers and reuses jailbreak strategies** across attempts. It runs a warm-up exploration phase to build a strategy library, then reuses those strategies in a lifelong phase to improve success rates.
@@ -329,6 +355,8 @@ attack_config = {
 **PAIR** works best for black-box targets where the safety mechanism is unknown. An attacker LLM learns from each failed attempt, converging on a successful jailbreak without needing any internal access.
 
 **TAP** offers the same adaptive refinement as PAIR but at lower query cost: parallel streams, on-topic pruning, and early stopping make it the most efficient iterative option when budget or rate limits matter.
+
+**Crescendo** is the right choice for testing guardrails that only inspect a single turn in isolation: it escalates a persistent, growing conversation rather than retrying independent prompts, making it effective against safety mechanisms that miss cumulative context across turns.
 
 **FlipAttack** is the fastest option — a single deterministic pass, no attacker model required. Use it for quick scans, character-level safety assessments, or when comparing model robustness across flip modes.
 

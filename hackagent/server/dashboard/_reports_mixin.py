@@ -165,6 +165,8 @@ class DashboardReportsMixin:
             self._render_pap_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
         elif ha == "pair":
             self._render_pair_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
+        elif ha == "crescendo":
+            self._render_crescendo_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
         elif ha == "tap":
             _nodes, _ds = data  # type: ignore[misc]
             self._render_tap_goal_card(row, _nodes, _ds, detail_mode=True)

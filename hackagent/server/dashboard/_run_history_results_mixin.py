@@ -78,6 +78,9 @@ class DashboardRunHistoryResultsMixin:
             elif atk == "pair":
                 t = generic_traces_map.get(rid, [])
                 detail_data[rid] = self._parse_pair_traces(t)
+            elif atk == "crescendo":
+                t = generic_traces_map.get(rid, [])
+                detail_data[rid] = self._parse_crescendo_traces(t)
             elif atk == "tap":
                 t = generic_traces_map.get(rid, [])
                 detail_data[rid] = self._parse_tap_traces(t)
@@ -203,6 +206,7 @@ class DashboardRunHistoryResultsMixin:
                     "statictemplate": "StaticTemplate",
                     "baseline": "Baseline",
                     "pair": "PAIR",
+                    "crescendo": "Crescendo",
                     "tap": "TAP",
                     "bon": "Best-of-N",
                     "advprefix": "AdvPrefix",
