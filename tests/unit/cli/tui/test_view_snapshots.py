@@ -8,9 +8,17 @@ future refactors of ``hackagent.cli.tui.views.*`` cannot silently change the
 layout. Regenerate the snapshots with::
 
     uv run pytest tests/unit/cli/tui --snapshot-update
+
+``snap_compare`` also accepts a file path, but ``pytest-textual-snapshot``
+resolves it to an absolute path and hands it to Textual's ``import_app``,
+which runs it through ``shlex.split``. When the repository checkout lives
+under a directory containing a space (e.g. ``.../VS Code/hackagent``), that
+split mangles the path and the import fails with ``No module named ...``.
+Loading the app class ourselves and passing a fresh instance sidesteps
+``import_app``/``shlex`` entirely.
 """
 
-import shlex
+import importlib.util
 from pathlib import Path
 
 import pytest
@@ -24,38 +32,29 @@ _LARGE_TERMINAL = (140, 50)
 _NARROW_TERMINAL = (80, 24)
 
 
-@pytest.fixture(autouse=True)
-def _quote_app_path_for_import(monkeypatch):
-    """Work around a ``textual`` bug when the repo path contains spaces.
+def _load_app_instance(app_file: str, class_name: str):
+    """Import ``app_file`` fresh and return a new instance of ``class_name``.
 
-    ``pytest_textual_snapshot.snap_compare`` resolves the app to an absolute
-    path and hands the raw string to ``textual._import_app.import_app``,
-    which immediately runs it through ``shlex.split``. Any space in the path
-    (e.g. a checkout under a directory like ``.../VS Code/...``) is then
-    parsed as an argument separator, so the importer looks for a module
-    named after just the first path fragment. Quoting the path before it
-    reaches ``shlex.split`` keeps it intact as a single token.
+    A fresh module/instance per call avoids reusing an already-run Textual
+    ``App`` object across parametrized cases that share the same file.
     """
-    from textual import _import_app as textual_import_app
-
-    original_import_app = textual_import_app.import_app
-
-    def _patched_import_app(import_name: str):
-        if import_name.endswith(".py") and " " in import_name:
-            import_name = shlex.quote(import_name)
-        return original_import_app(import_name)
-
-    monkeypatch.setattr(textual_import_app, "import_app", _patched_import_app)
+    path = _APPS / app_file
+    spec = importlib.util.spec_from_file_location(path.stem, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return getattr(module, class_name)()
 
 
 @pytest.mark.parametrize(
-    ("app_file", "terminal_size"),
+    ("app_file", "class_name", "terminal_size"),
     [
-        ("attacks_tab_app.py", _LARGE_TERMINAL),
-        ("results_tab_app.py", _LARGE_TERMINAL),
-        ("attacks_tab_app.py", _NARROW_TERMINAL),
+        ("attacks_tab_app.py", "AttacksTabApp", _LARGE_TERMINAL),
+        ("results_tab_app.py", "ResultsTabApp", _LARGE_TERMINAL),
+        ("attacks_tab_app.py", "AttacksTabApp", _NARROW_TERMINAL),
     ],
     ids=["attacks-large", "results-large", "attacks-narrow"],
 )
-def test_view_renders(snap_compare, app_file, terminal_size):
-    assert snap_compare(_APPS / app_file, terminal_size=terminal_size)
+def test_view_renders(snap_compare, app_file, class_name, terminal_size):
+    app_instance = _load_app_instance(app_file, class_name)
+    assert snap_compare(app_instance, terminal_size=terminal_size)

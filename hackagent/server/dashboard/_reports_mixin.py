@@ -182,6 +182,8 @@ class DashboardReportsMixin:
                 self._render_fc_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
             else:
                 self._render_tfc_goal_card(row, data, detail_mode=True)  # type: ignore[arg-type]
+        elif ha in ("indirect_prompt_injection", "rag"):
+            self._render_indirect_injection_view(row, data)  # type: ignore[arg-type]
         else:
             _req, _resp, _gr_evt = data  # type: ignore[misc]
             self._render_generic_goal_card(

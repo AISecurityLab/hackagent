@@ -557,6 +557,8 @@ class DashboardTraceAnalysisMixin:
                     else:
                         detail_data = self._parse_tfc_traces(serialized_traces)
                         self._render_tfc_goal_card(row, detail_data, detail_mode=True)
+                elif atk in ("indirect_prompt_injection", "rag"):
+                    self._render_indirect_injection_view(row, serialized_traces)
                 else:
                     req_text, resp_text, _generic_guardrail = (
                         self._extract_prompt_response_from_traces(serialized_traces)
