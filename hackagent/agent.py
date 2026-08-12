@@ -5,6 +5,7 @@ from hackagent.logger import get_logger
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 from hackagent import utils
+from hackagent.config import resolve_remote_base_url
 from hackagent.errors import HackAgentError
 from hackagent.router import AgentRouter
 from hackagent.router.types import AgentTypeEnum
@@ -129,7 +130,7 @@ class HackAgent:
             from hackagent.server.client import AuthenticatedClient
             from hackagent.server.storage.remote import RemoteBackend
 
-            _base_url = base_url or "https://api.hackagent.dev"
+            _base_url = base_url or resolve_remote_base_url()
             _client = AuthenticatedClient(
                 base_url=_base_url,
                 token=resolved_auth_token,

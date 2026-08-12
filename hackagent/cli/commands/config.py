@@ -13,6 +13,7 @@ from rich.table import Table
 
 from hackagent.cli.config import CLIConfig
 from hackagent.cli.utils import display_info, display_success, handle_errors
+from hackagent.config import resolve_remote_base_url
 
 console = Console()
 
@@ -41,13 +42,13 @@ def set(ctx, api_key, base_url, verbose):
     updated = False
 
     if api_key:
-        cli_config.api_key = api_key
+        cli_config.set_user_override("api_key", api_key)
         updated = True
         if cli_config.should_show_info():
             display_success("API key updated")
 
     if base_url:
-        cli_config.base_url = base_url
+        cli_config.set_user_override("base_url", base_url)
         updated = True
         if cli_config.should_show_info():
             display_success(f"Base URL updated to: {base_url}")
@@ -58,7 +59,7 @@ def set(ctx, api_key, base_url, verbose):
         try:
             verbose_int = int(verbose)
             if 0 <= verbose_int <= 3:
-                cli_config.verbose = verbose_int
+                cli_config.set_user_override("verbose", verbose_int)
                 updated = True
                 if cli_config.verbose > 0:
                     display_success(
@@ -70,7 +71,7 @@ def set(ctx, api_key, base_url, verbose):
             verbose_lower = verbose.lower()
             if verbose_lower in VERBOSITY_LEVELS:
                 verbose_int = VERBOSITY_LEVELS[verbose_lower]
-                cli_config.verbose = verbose_int
+                cli_config.set_user_override("verbose", verbose_int)
                 updated = True
                 if cli_config.verbose > 0:
                     display_success(
@@ -113,7 +114,7 @@ def show(ctx):
             api_key_source = "Environment/Default config"
 
     base_url_source = "Default"
-    if cli_config.base_url != "https://api.hackagent.dev":
+    if cli_config.base_url != resolve_remote_base_url():
         if ctx.params.get("base_url"):
             base_url_source = "CLI argument"
         elif cli_config.config_file:
@@ -220,7 +221,7 @@ def validate(ctx):
         console.print("\n[cyan]💡 Quick fixes:")
         console.print("  • Set API key: hackagent config set --api-key YOUR_KEY")
         console.print(
-            "  • Set base URL: hackagent config set --base-url https://api.hackagent.dev"
+            f"  • Set base URL: hackagent config set --base-url {resolve_remote_base_url()}"
         )
         raise click.ClickException("Configuration validation failed")
     except Exception as e:

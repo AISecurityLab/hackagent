@@ -58,14 +58,13 @@ console = Console()
 )
 @click.option(
     "--api-key",
-    envvar="HACKAGENT_API_KEY",
-    help="HackAgent API key (or set HACKAGENT_API_KEY)",
+    default=None,
+    help="HackAgent API key (or set HACKAGENT_API_KEY env var)",
 )
 @click.option(
     "--base-url",
-    envvar="HACKAGENT_BASE_URL",
-    default="https://api.hackagent.dev",
-    help="HackAgent API base URL",
+    default=None,
+    help="HackAgent API base URL (or set HACKAGENT_BASE_URL env var)",
 )
 @click.option("--verbose", "-v", count=True, help="Increase verbosity (-v, -vv, -vvv)")
 @click.version_option(version=get_version(), prog_name="hackagent")

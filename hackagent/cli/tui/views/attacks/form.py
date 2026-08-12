@@ -122,7 +122,10 @@ class AttacksFormMixin:
         self._render_strategy_config(technique_key)
         cached = self._strategy_value_cache.get(technique_key)
         if cached and self._current_spec:
-            self._apply_values_to_spec_widgets(self._current_spec, cached)
+            # Delay widget value assignment until after refresh to ensure widgets are fully initialized
+            self.call_after_refresh(
+                lambda: self._apply_values_to_spec_widgets(self._current_spec, cached)
+            )
 
     def _apply_values_to_spec_widgets(
         self, spec: AttackConfigSpec, flat_values: Dict[str, Any]
@@ -142,7 +145,11 @@ class AttacksFormMixin:
             if isinstance(widget, Select):
                 # None isn't a legal Select value (only the NoSelection sentinel is) — skip and keep its constructed default.
                 if value is not None:
-                    widget.value = value
+                    try:
+                        widget.value = value
+                    except Exception:
+                        # Textual Select widget may not be fully initialized yet; skip this value.
+                        pass
             elif isinstance(widget, Switch):
                 widget.value = bool(value)
             elif isinstance(widget, TextArea):
