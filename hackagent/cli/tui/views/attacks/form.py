@@ -239,6 +239,20 @@ class AttacksFormMixin:
             collapsible = Collapsible(*section_widgets, title=section, collapsed=False)
             container.mount(collapsible)
 
+        # Apply default values to Select widgets after mount
+        def _apply_defaults() -> None:
+            for cfg_field in spec.fields:
+                if cfg_field.field_type == FieldType.CHOICE and cfg_field.default is not None:
+                    widget_id = _field_widget_id(cfg_field)
+                    try:
+                        widget = self.query_one(f"#{widget_id}")
+                        if isinstance(widget, Select):
+                            widget.value = cfg_field.default
+                    except Exception:
+                        pass
+
+        self.call_after_refresh(_apply_defaults)
+
         # Clear validation errors
         self.query_one("#validation-errors", Static).update("")
 
@@ -271,7 +285,6 @@ class AttacksFormMixin:
             return Select(
                 cfg_field.choices or [],
                 id=widget_id,
-                value=cfg_field.default,
             )
 
         if cfg_field.field_type == FieldType.BOOLEAN:
