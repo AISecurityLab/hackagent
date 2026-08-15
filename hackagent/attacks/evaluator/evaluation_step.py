@@ -888,7 +888,24 @@ class BaseEvaluationStep:
                 "agent_type", "OPENAI_SDK"
             )
             subprocess_config["model_id"] = judge_identifier
-            subprocess_config["agent_endpoint"] = judge_config_item.get("endpoint")
+
+            # Use explicit endpoint if provided, otherwise fallback to backend API
+            agent_endpoint = subprocess_config.get(
+                "agent_endpoint"
+            ) or judge_config_item.get("endpoint")
+            if not agent_endpoint:
+                # Try to get endpoint from client
+                if hasattr(self.client, "base_url") and self.client.base_url:
+                    agent_endpoint = self.client.base_url
+                else:
+                    # Fallback: default to localhost backend API (development default)
+                    agent_endpoint = "http://localhost:8000"
+
+                self.logger.info(
+                    f"✅ Judge '{subprocess_config['agent_name']}': endpoint not in config, "
+                    f"using fallback: {agent_endpoint}"
+                )
+            subprocess_config["agent_endpoint"] = agent_endpoint
             subprocess_config["agent_metadata"] = dict(
                 judge_config_item.get("agent_metadata", {}) or {}
             )

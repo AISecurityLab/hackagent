@@ -30,6 +30,21 @@ class TestCLIConfig:
             assert config.base_url == "https://api.hackagent.dev"
             assert config.verbose == 1  # Default is VERBOSITY_WARNING
 
+    def test_explicit_none_args_fall_back_to_defaults(self):
+        """cli/main.py always passes every option, so None must mean 'not provided'."""
+        with (
+            patch("pathlib.Path.exists", return_value=False),
+            patch("pathlib.Path.home", return_value=Path("/fake/home")),
+            patch.dict("os.environ", {}, clear=True),
+        ):
+            config = CLIConfig(
+                config_file=None, api_key=None, base_url=None, verbose=None
+            )
+
+            assert config.base_url == "https://api.hackagent.dev"
+            assert config.verbose == 1  # Default is VERBOSITY_WARNING
+            config.validate()  # must not raise "Base URL is required"
+
     def test_env_variable_loading(self):
         """Test loading from environment variables"""
         with (

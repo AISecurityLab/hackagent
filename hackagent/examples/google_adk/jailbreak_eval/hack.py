@@ -25,6 +25,7 @@ import time
 import httpx
 
 from hackagent import HackAgent
+from hackagent.config import resolve_remote_role_endpoint
 
 # ---------------------------------------------------------------------------
 # 1. Target agent — the Gemini ADK agent
@@ -61,7 +62,7 @@ ATTACKER = {
 JUDGES = [
     {
         "identifier": "hackagent-judge",
-        "endpoint": "https://api.hackagent.dev/v1",
+        "endpoint": resolve_remote_role_endpoint(),
         "type": "harmbench",
     },
 ]
