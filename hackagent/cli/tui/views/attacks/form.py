@@ -242,7 +242,10 @@ class AttacksFormMixin:
         # Apply default values to Select widgets after mount
         def _apply_defaults() -> None:
             for cfg_field in spec.fields:
-                if cfg_field.field_type == FieldType.CHOICE and cfg_field.default is not None:
+                if (
+                    cfg_field.field_type == FieldType.CHOICE
+                    and cfg_field.default is not None
+                ):
                     widget_id = _field_widget_id(cfg_field)
                     try:
                         widget = self.query_one(f"#{widget_id}")

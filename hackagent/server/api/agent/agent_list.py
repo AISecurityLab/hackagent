@@ -96,17 +96,9 @@ def sync_detailed(
         page=page,
     )
 
-    import logging
-    logger = logging.getLogger(__name__)
-    http_client = client.get_httpx_client()
-    logger.info(f"[agent_list] Client headers: {dict(http_client.headers)}")
-
-    response = http_client.request(
+    response = client.get_httpx_client().request(
         **kwargs,
     )
-
-    logger.info(f"[agent_list] Response status: {response.status_code}")
-    logger.info(f"[agent_list] Request headers actually sent: {dict(response.request.headers)}")
 
     return _build_response(client=client, response=response)
 

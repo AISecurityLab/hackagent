@@ -244,10 +244,6 @@ class AuthenticatedClient(BaseModel):
                 **self.headers,
                 self.auth_header_name: self._auth_header_value(),
             }
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.info(f"[AuthenticatedClient] Creating httpx.Client with headers: {list(merged_headers.keys())}")
-            logger.info(f"[AuthenticatedClient] Auth header value: {self._auth_header_value()[:20]}...")
             self._client = httpx.Client(
                 base_url=self.base_url,
                 cookies=self.cookies,
@@ -257,10 +253,6 @@ class AuthenticatedClient(BaseModel):
                 follow_redirects=self.follow_redirects,
                 **self.httpx_args,
             )
-        else:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.info(f"[AuthenticatedClient] Reusing existing httpx.Client, headers: {list(self._client.headers.keys())}")
         return self._client
 
     def __enter__(self) -> "AuthenticatedClient":

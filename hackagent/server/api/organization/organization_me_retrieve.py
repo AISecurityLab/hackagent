@@ -59,18 +59,9 @@ def sync_detailed(
 
     kwargs = _get_kwargs()
 
-    import logging
-    logger = logging.getLogger(__name__)
-    http_client = client.get_httpx_client()
-    logger.info(f"[organization_me_retrieve] Client headers: {dict(http_client.headers)}")
-    logger.info(f"[organization_me_retrieve] Making request with method={kwargs['method']}, url={kwargs['url']}")
-
-    response = http_client.request(
+    response = client.get_httpx_client().request(
         **kwargs,
     )
-
-    logger.info(f"[organization_me_retrieve] Response status: {response.status_code}")
-    logger.info(f"[organization_me_retrieve] Request headers actually sent: {dict(response.request.headers)}")
 
     return _build_response(client=client, response=response)
 

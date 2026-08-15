@@ -890,7 +890,9 @@ class BaseEvaluationStep:
             subprocess_config["model_id"] = judge_identifier
 
             # Use explicit endpoint if provided, otherwise fallback to backend API
-            agent_endpoint = subprocess_config.get("agent_endpoint") or judge_config_item.get("endpoint")
+            agent_endpoint = subprocess_config.get(
+                "agent_endpoint"
+            ) or judge_config_item.get("endpoint")
             if not agent_endpoint:
                 # Try to get endpoint from client
                 if hasattr(self.client, "base_url") and self.client.base_url:

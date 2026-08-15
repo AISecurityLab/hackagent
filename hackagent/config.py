@@ -113,18 +113,18 @@ _DEFAULT_REMOTE_BASE_URL = "https://api.hackagent.dev"
 
 
 def resolve_remote_base_url() -> str:
-	"""Return the HackAgent remote API base URL, honouring environment and config overrides."""
-	# Check HACKAGENT_BASE_URL env var first
-	env_base_url = os.environ.get("HACKAGENT_BASE_URL", "").strip()
-	if env_base_url:
-		return env_base_url.rstrip("/")
-	return _DEFAULT_REMOTE_BASE_URL
+    """Return the HackAgent remote API base URL, honouring environment and config overrides."""
+    # Check HACKAGENT_BASE_URL env var first
+    env_base_url = os.environ.get("HACKAGENT_BASE_URL", "").strip()
+    if env_base_url:
+        return env_base_url.rstrip("/")
+    return _DEFAULT_REMOTE_BASE_URL
 
 
 def resolve_remote_role_endpoint() -> str:
-	"""Return the remote API endpoint for LLM roles (base URL + /v1)."""
-	base_url = resolve_remote_base_url()
-	return f"{base_url}/v1"
+    """Return the remote API endpoint for LLM roles (base URL + /v1)."""
+    base_url = resolve_remote_base_url()
+    return f"{base_url}/v1"
 
 
 DEFAULT_REMOTE_BASE_URL = resolve_remote_base_url()

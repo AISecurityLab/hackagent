@@ -104,23 +104,12 @@ def show(ctx):
     table.add_column("Value", style="green")
     table.add_column("Source", style="dim")
 
-    api_key_source = "Not set"
-    if cli_config.api_key:
-        if ctx.params.get("api_key"):
-            api_key_source = "CLI argument"
-        elif cli_config.config_file:
-            api_key_source = f"Config file ({cli_config.config_file})"
-        else:
-            api_key_source = "Environment/Default config"
-
-    base_url_source = "Default"
-    if cli_config.base_url != resolve_remote_base_url():
-        if ctx.params.get("base_url"):
-            base_url_source = "CLI argument"
-        elif cli_config.config_file:
-            base_url_source = f"Config file ({cli_config.config_file})"
-        else:
-            base_url_source = "Environment/Default config"
+    # ctx.params holds only this subcommand's options; --api-key/--base-url are
+    # group-level, so ask the config itself where each value came from.
+    api_key_source = (
+        cli_config.source_of("api_key") if cli_config.api_key else "Not set"
+    )
+    base_url_source = cli_config.source_of("base_url")
 
     api_key_display = (
         cli_config.api_key[:8] + "..." if cli_config.api_key else "Not set"
@@ -186,28 +175,23 @@ def validate(ctx):
     try:
         cli_config.validate()
 
-        if cli_config.should_show_info():
-            with console.status("[bold green]Testing API connection..."):
-                from hackagent.server.client import AuthenticatedClient
+        from contextlib import nullcontext
 
-                client = AuthenticatedClient(
-                    base_url=cli_config.base_url,
-                    token=cli_config.api_key,
-                    prefix="Bearer",
-                )
+        from hackagent.server.api.agent import agent_list
+        from hackagent.server.client import AuthenticatedClient
 
-                from hackagent.server.api.key import key_list
-
-                response = key_list.sync_detailed(client=client)
-        else:
-            from hackagent.server.client import AuthenticatedClient
-
-            client = AuthenticatedClient(
-                base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
-            )
-            from hackagent.server.api.key import key_list
-
-            response = key_list.sync_detailed(client=client)
+        client = AuthenticatedClient(
+            base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
+        )
+        spinner = (
+            console.status("[bold green]Testing API connection...")
+            if cli_config.should_show_info()
+            else nullcontext()
+        )
+        with spinner:
+            # /key and /organization/me are Auth0-only on the deployed API; /agent is
+            # the SDK-primary endpoint that accepts API keys, so probe that.
+            response = agent_list.sync_detailed(client=client)
 
         if response.status_code == 200:
             display_success("✅ Configuration valid - API connection successful")
