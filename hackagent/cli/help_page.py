@@ -8,6 +8,7 @@ from rich.console import Console
 from rich.panel import Panel
 
 from hackagent._version import get_version
+from hackagent.config import resolve_remote_base_url
 
 console = Console()
 
@@ -103,7 +104,7 @@ def _render_rich_help(ctx: click.Context) -> None:
     env_table.add_column(style="dim")
     env_table.add_row("  HACKAGENT_API_KEY", "API key (overrides config file value)")
     env_table.add_row(
-        "  HACKAGENT_BASE_URL", "API base URL (default: https://api.hackagent.dev)"
+        "  HACKAGENT_BASE_URL", f"API base URL (default: {resolve_remote_base_url()})"
     )
     env_table.add_row(
         "  HACKAGENT_DEBUG", "Enable debug output (set to any non-empty value)"

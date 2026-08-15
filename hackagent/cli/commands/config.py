@@ -13,6 +13,7 @@ from rich.table import Table
 
 from hackagent.cli.config import CLIConfig
 from hackagent.cli.utils import display_info, display_success, handle_errors
+from hackagent.config import resolve_remote_base_url
 
 console = Console()
 
@@ -41,13 +42,13 @@ def set(ctx, api_key, base_url, verbose):
     updated = False
 
     if api_key:
-        cli_config.api_key = api_key
+        cli_config.set_user_override("api_key", api_key)
         updated = True
         if cli_config.should_show_info():
             display_success("API key updated")
 
     if base_url:
-        cli_config.base_url = base_url
+        cli_config.set_user_override("base_url", base_url)
         updated = True
         if cli_config.should_show_info():
             display_success(f"Base URL updated to: {base_url}")
@@ -58,7 +59,7 @@ def set(ctx, api_key, base_url, verbose):
         try:
             verbose_int = int(verbose)
             if 0 <= verbose_int <= 3:
-                cli_config.verbose = verbose_int
+                cli_config.set_user_override("verbose", verbose_int)
                 updated = True
                 if cli_config.verbose > 0:
                     display_success(
@@ -70,7 +71,7 @@ def set(ctx, api_key, base_url, verbose):
             verbose_lower = verbose.lower()
             if verbose_lower in VERBOSITY_LEVELS:
                 verbose_int = VERBOSITY_LEVELS[verbose_lower]
-                cli_config.verbose = verbose_int
+                cli_config.set_user_override("verbose", verbose_int)
                 updated = True
                 if cli_config.verbose > 0:
                     display_success(
@@ -103,23 +104,12 @@ def show(ctx):
     table.add_column("Value", style="green")
     table.add_column("Source", style="dim")
 
-    api_key_source = "Not set"
-    if cli_config.api_key:
-        if ctx.params.get("api_key"):
-            api_key_source = "CLI argument"
-        elif cli_config.config_file:
-            api_key_source = f"Config file ({cli_config.config_file})"
-        else:
-            api_key_source = "Environment/Default config"
-
-    base_url_source = "Default"
-    if cli_config.base_url != "https://api.hackagent.dev":
-        if ctx.params.get("base_url"):
-            base_url_source = "CLI argument"
-        elif cli_config.config_file:
-            base_url_source = f"Config file ({cli_config.config_file})"
-        else:
-            base_url_source = "Environment/Default config"
+    # ctx.params holds only this subcommand's options; --api-key/--base-url are
+    # group-level, so ask the config itself where each value came from.
+    api_key_source = (
+        cli_config.source_of("api_key") if cli_config.api_key else "Not set"
+    )
+    base_url_source = cli_config.source_of("base_url")
 
     api_key_display = (
         cli_config.api_key[:8] + "..." if cli_config.api_key else "Not set"
@@ -185,28 +175,23 @@ def validate(ctx):
     try:
         cli_config.validate()
 
-        if cli_config.should_show_info():
-            with console.status("[bold green]Testing API connection..."):
-                from hackagent.server.client import AuthenticatedClient
+        from contextlib import nullcontext
 
-                client = AuthenticatedClient(
-                    base_url=cli_config.base_url,
-                    token=cli_config.api_key,
-                    prefix="Bearer",
-                )
+        from hackagent.server.api.agent import agent_list
+        from hackagent.server.client import AuthenticatedClient
 
-                from hackagent.server.api.key import key_list
-
-                response = key_list.sync_detailed(client=client)
-        else:
-            from hackagent.server.client import AuthenticatedClient
-
-            client = AuthenticatedClient(
-                base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
-            )
-            from hackagent.server.api.key import key_list
-
-            response = key_list.sync_detailed(client=client)
+        client = AuthenticatedClient(
+            base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
+        )
+        spinner = (
+            console.status("[bold green]Testing API connection...")
+            if cli_config.should_show_info()
+            else nullcontext()
+        )
+        with spinner:
+            # /key and /organization/me are Auth0-only on the deployed API; /agent is
+            # the SDK-primary endpoint that accepts API keys, so probe that.
+            response = agent_list.sync_detailed(client=client)
 
         if response.status_code == 200:
             display_success("✅ Configuration valid - API connection successful")
@@ -220,7 +205,7 @@ def validate(ctx):
         console.print("\n[cyan]💡 Quick fixes:")
         console.print("  • Set API key: hackagent config set --api-key YOUR_KEY")
         console.print(
-            "  • Set base URL: hackagent config set --base-url https://api.hackagent.dev"
+            f"  • Set base URL: hackagent config set --base-url {resolve_remote_base_url()}"
         )
         raise click.ClickException("Configuration validation failed")
     except Exception as e:

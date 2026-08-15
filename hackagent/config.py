@@ -107,7 +107,28 @@ DEFAULT_MAX_OUTPUT_TOKENS = 4096
 # HACKAGENT_API_KEY is available).
 # ---------------------------------------------------------------------------
 
-DEFAULT_REMOTE_ROLE_ENDPOINT = "https://api.hackagent.dev/v1"
+# Hardcoded fallback for remote API base URL. Override via HACKAGENT_BASE_URL env var
+# or by passing base_url to CLIConfig/Agent.
+_DEFAULT_REMOTE_BASE_URL = "https://api.hackagent.dev"
+
+
+def resolve_remote_base_url() -> str:
+    """Return the HackAgent remote API base URL, honouring environment and config overrides."""
+    # Check HACKAGENT_BASE_URL env var first
+    env_base_url = os.environ.get("HACKAGENT_BASE_URL", "").strip()
+    if env_base_url:
+        return env_base_url.rstrip("/")
+    return _DEFAULT_REMOTE_BASE_URL
+
+
+def resolve_remote_role_endpoint() -> str:
+    """Return the remote API endpoint for LLM roles (base URL + /v1)."""
+    base_url = resolve_remote_base_url()
+    return f"{base_url}/v1"
+
+
+DEFAULT_REMOTE_BASE_URL = resolve_remote_base_url()
+DEFAULT_REMOTE_ROLE_ENDPOINT = resolve_remote_role_endpoint()
 DEFAULT_REMOTE_AGENT_TYPE = "OPENAI_SDK"
 DEFAULT_REMOTE_ATTACKER_IDENTIFIER = "hackagent-attacker"
 DEFAULT_REMOTE_JUDGE_IDENTIFIER = "hackagent-judge"
@@ -139,6 +160,9 @@ __all__ = [
     "DEFAULT_CATEGORY_CLASSIFIER_MAX_TOKENS",
     "DEFAULT_MAX_OUTPUT_TOKENS",
     # remote roles
+    "resolve_remote_base_url",
+    "resolve_remote_role_endpoint",
+    "DEFAULT_REMOTE_BASE_URL",
     "DEFAULT_REMOTE_ROLE_ENDPOINT",
     "DEFAULT_REMOTE_AGENT_TYPE",
     "DEFAULT_REMOTE_ATTACKER_IDENTIFIER",

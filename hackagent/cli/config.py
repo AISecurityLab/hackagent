@@ -13,6 +13,8 @@ import os
 from pathlib import Path
 from typing import Optional
 
+from hackagent.config import resolve_remote_base_url
+
 # Sentinel object to detect if a parameter was explicitly passed
 _UNSET = object()
 
@@ -50,23 +52,24 @@ class CLIConfig:
         """Initialize with explicit tracking of what was passed via CLI"""
         self._defaults = {
             "api_key": None,
-            "base_url": "https://api.hackagent.dev",
+            "base_url": resolve_remote_base_url(),
             "verbose": VERBOSITY_WARNING,
         }
 
         self._cli_overrides = set()
+        self._explicit_user_overrides = set()
 
-        if api_key is not _UNSET:
+        # click passes None for unset options, so None means "not provided" here too —
+        # only a real value counts as a CLI override.
+        if api_key is not _UNSET and api_key is not None:
             self.api_key = api_key
-            if api_key is not None:
-                self._cli_overrides.add("api_key")
+            self._cli_overrides.add("api_key")
         else:
             self.api_key = self._defaults["api_key"]
 
-        if base_url is not _UNSET:
+        if base_url is not _UNSET and base_url is not None:
             self.base_url = base_url
-            if base_url is not None:
-                self._cli_overrides.add("base_url")
+            self._cli_overrides.add("base_url")
         else:
             self.base_url = self._defaults["base_url"]
 
@@ -75,9 +78,9 @@ class CLIConfig:
         else:
             self.config_file = None
 
-        if verbose is not _UNSET:
+        if verbose is not _UNSET and verbose is not None:
             self.verbose = verbose
-            if verbose is not None and verbose > 0:
+            if verbose > 0:
                 self._cli_overrides.add("verbose")
         else:
             self.verbose = self._defaults["verbose"]
@@ -93,23 +96,21 @@ class CLIConfig:
 
     def _load_from_env(self):
         """Load from environment variables (only if not already set by CLI or config)."""
-        if "api_key" not in self._cli_overrides:
-            if (
-                "api_key" not in self._config_overrides
-                or getattr(self, "api_key", None) is None
-            ):
-                env_api_key = os.getenv("HACKAGENT_API_KEY")
-                if env_api_key:
-                    self.api_key = env_api_key
+        if (
+            "api_key" not in self._cli_overrides
+            and "api_key" not in self._config_overrides
+        ):
+            env_api_key = os.getenv("HACKAGENT_API_KEY")
+            if env_api_key:
+                self.api_key = env_api_key
 
-        if "base_url" not in self._cli_overrides:
-            if (
-                "base_url" not in self._config_overrides
-                or getattr(self, "base_url", None) is None
-            ):
-                env_base_url = os.getenv("HACKAGENT_BASE_URL")
-                if env_base_url:
-                    self.base_url = env_base_url
+        if (
+            "base_url" not in self._cli_overrides
+            and "base_url" not in self._config_overrides
+        ):
+            env_base_url = os.getenv("HACKAGENT_BASE_URL")
+            if env_base_url:
+                self.base_url = env_base_url
 
     def _load_from_file(self, config_path: str):
         """Load from configuration file (JSON or YAML)."""
@@ -132,7 +133,8 @@ class CLIConfig:
                     config_data = json.load(f)
 
                 for key, value in config_data.items():
-                    if key in self._cli_overrides:
+                    # A null in the file means "not set" — keep the default and let env win
+                    if value is None or key in self._cli_overrides:
                         continue
                     if hasattr(self, key):
                         setattr(self, key, value)
@@ -161,9 +163,17 @@ class CLIConfig:
                 if attr == "api_key" and isinstance(value, str) and not value.strip():
                     continue
                 if value is not None:
-                    if attr == "base_url" and value == self._defaults["base_url"]:
+                    # Save if explicitly set by user or previously loaded from config
+                    if (
+                        attr in self._explicit_user_overrides
+                        or attr in self._config_overrides
+                    ):
+                        config_dict[attr] = value
+                    elif attr == "base_url" and value == self._defaults["base_url"]:
+                        # Skip default base_url only if not from user/config
                         continue
-                    config_dict[attr] = value
+                    else:
+                        config_dict[attr] = value
             json.dump(config_dict, f, indent=2)
 
     def validate(self):
@@ -179,6 +189,21 @@ class CLIConfig:
                 "environment variable, use --api-key flag, or run "
                 "'hackagent config set --api-key YOUR_KEY'"
             )
+
+    def source_of(self, key: str) -> str:
+        """Where the current value of `key` came from (CLI > config file > env > default)."""
+        if key in self._cli_overrides:
+            return "CLI argument"
+        if key in self._config_overrides:
+            return f"Config file ({self.config_file or self.default_config_path})"
+        if os.getenv(f"HACKAGENT_{key.upper()}"):
+            return "Environment"
+        return "Default"
+
+    def set_user_override(self, key: str, value):
+        """Explicitly set a configuration value and track it for persistence"""
+        setattr(self, key, value)
+        self._explicit_user_overrides.add(key)
 
     def should_show_info(self) -> bool:
         return self.verbose >= VERBOSITY_INFO
