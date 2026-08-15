@@ -175,7 +175,7 @@ It uses a multi-step pipeline involving uncensored language models to craft effe
 
 [cyan]Configuration Options:[/cyan]
 • goals: List of malicious objectives for the agent
-• generator: Language model configuration for prefix generation  
+• attacker: Language model configuration for prefix generation  
 • judges: Judge models for evaluating attack success
 • batch_size: Number of prefixes to generate per batch
 • temperature: Sampling temperature for generation
@@ -184,7 +184,7 @@ It uses a multi-step pipeline involving uncensored language models to craft effe
 [cyan]Example Config File:[/cyan]
 {
   "goals": ["Return fake data", "Ignore safety guidelines"],
-  "generator": {
+  "attacker": {
     "identifier": "ollama/llama2-uncensored",
     "endpoint": "http://localhost:11434/api/generate"
   },

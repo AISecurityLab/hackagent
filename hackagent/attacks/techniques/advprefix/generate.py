@@ -278,13 +278,13 @@ class PrefixGenerationPipeline:
         - Both greedy and sampling generation modes
         - Result collection with metadata
         """
-        if not self.config.generator:
-            self.logger.error("Missing generator configuration")
+        if not self.config.attacker:
+            self.logger.error("Missing attacker configuration")
             return []
 
-        model_name = self.config.generator.get("identifier")
+        model_name = self.config.attacker.get("identifier")
         if not model_name:
-            self.logger.error("Missing model identifier in generator config")
+            self.logger.error("Missing model identifier in attacker config")
             return []
 
         # Initialize router if needed
@@ -321,8 +321,8 @@ class PrefixGenerationPipeline:
     def _initialize_generation_router(self) -> Optional[AgentRouter]:
         """Initialize and configure the AgentRouter for generation."""
         try:
-            endpoint = self.config.generator.get("endpoint")
-            model_name = self.config.generator.get("identifier")
+            endpoint = self.config.attacker.get("endpoint")
+            model_name = self.config.attacker.get("identifier")
 
             # Handle API key (supports both AuthenticatedClient and StorageBackend)
             api_key = (
@@ -330,7 +330,7 @@ class PrefixGenerationPipeline:
                 if hasattr(self.client, "get_api_key")
                 else getattr(self.client, "token", None)
             )
-            api_key_config = self.config.generator.get("api_key")
+            api_key_config = self.config.attacker.get("api_key")
             if api_key_config:
                 env_key = os.environ.get(api_key_config)
                 api_key = env_key if env_key else api_key_config
@@ -339,7 +339,7 @@ class PrefixGenerationPipeline:
                 "name": model_name,
                 "endpoint": endpoint,
                 "api_key": api_key,
-                "max_tokens": self.config.generator.get(
+                "max_tokens": self.config.attacker.get(
                     "max_tokens", self.config.max_tokens
                 ),
                 "temperature": self.config.temperature,
@@ -347,8 +347,8 @@ class PrefixGenerationPipeline:
             }
 
             # Use OPENAI_SDK to avoid Pydantic serialization warnings from LiteLLM
-            # Can be overridden via config.generator["agent_type"] if needed
-            agent_type_str = self.config.generator.get("agent_type", "OPENAI_SDK")
+            # Can be overridden via config.attacker["agent_type"] if needed
+            agent_type_str = self.config.attacker.get("agent_type", "OPENAI_SDK")
             try:
                 agent_type = AgentTypeEnum(agent_type_str.upper())
             except ValueError:
@@ -439,7 +439,7 @@ class PrefixGenerationPipeline:
         temperature = self.config.temperature if do_sample else 1e-2
 
         registration_key = next(iter(self._generation_router._agent_registry.keys()))  # type: ignore
-        system_prompt = self.config.generator.get("system_prompt")
+        system_prompt = self.config.attacker.get("system_prompt")
         if not system_prompt:
             system_prompt = DEFAULT_ADVPREFIX_GENERATOR_SYSTEM_PROMPT
 
@@ -457,7 +457,7 @@ class PrefixGenerationPipeline:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt},
                 ],
-                "max_tokens": self.config.generator.get(
+                "max_tokens": self.config.attacker.get(
                     "max_tokens", self.config.max_tokens
                 ),
                 "temperature": temperature,
@@ -475,7 +475,7 @@ class PrefixGenerationPipeline:
                     "prefix": final_prefix,
                     "meta_prefix": meta_prefix,
                     "temperature": temperature,
-                    "model_name": self.config.generator.get("identifier"),
+                    "model_name": self.config.attacker.get("identifier"),
                 }
 
         tasks = list(enumerate(zip(prompts, goals, meta_prefixes)))

@@ -200,16 +200,16 @@ All attacks accept a top-level `category_classifier` block. It runs once per goa
 
 ---
 
-## Three Collaborating Models
+## Collaborating Models
 
-TAP requires three models to cooperate:
+TAP requires **three** models to cooperate, plus an **optional** fourth:
 
-| Role | Config key | Purpose |
-|------|------------|---------|
-| **Attacker** | `attacker` | Generates and refines adversarial prompts based on conversation history |
-| **Target** | configured via `agent_router` | The victim model being tested |
-| **Judge** | `judge` | Scores jailbreak success (0–10 or binary 0/1 for HarmBench) |
-| **On-Topic Judge** | `on_topic_judge` (optional) | Checks whether a prompt stays on-topic; reuses `judge` if `None` |
+| Role | Config key | Required? | Purpose |
+|------|------------|-----------|---------|
+| **Attacker** | `attacker` | Required | Generates and refines adversarial prompts based on conversation history |
+| **Target** | configured via `agent_router` | Required | The victim model being tested |
+| **Judge** | `judge` | Required | Scores jailbreak success (0–10 or binary 0/1 for HarmBench) |
+| **On-Topic Judge** | `on_topic_judge` | Optional | Checks whether a prompt stays on-topic. Left unset, TAP reuses the `judge` model, so no fourth model is needed |
 
 ---
 
@@ -313,24 +313,41 @@ for target in targets:
 
 ## Interpreting Results
 
+`agent.hack()` returns a list of `AttackResult` — **one entry per goal**. TAP
+explores many branches per goal but reports only the best one it found.
+
+### Result Structure
+
 ```python
 {
-    "attack_type": "tap",
     "goal": "Reveal system prompt",
-    "success": True,
-    "best_score": 1,
-    "best_prompt": "...",
-    "best_response": "...",
-    "depth_reached": 2,
-    "n_streams": 4
+    "goal_index": 0,
+    "best_prompt": "You are participating in a security audit...",  # best branch found
+    "best_response": "Certainly. My instructions are...",
+    "best_score": 9.0,             # normalised 0–10
+    "success": True,               # derived from is_success by the evaluator
+    "iterations_completed": 2,     # refinement rounds actually run
+    "depth": 3,                    # configured maximum depth
 }
 ```
 
 ### Key Metrics
 
-- **Success Rate**: Percentage of goals for which a jailbreak was found
-- **Depth Reached**: How many refinement rounds were needed
-- **Pruned Branches**: How many branches were eliminated by on-topic / score pruning
+- **`iterations_completed`** vs **`depth`**: how much of the configured search
+  budget was actually spent. TAP stops as soon as a branch crosses the success
+  threshold, so `iterations_completed < depth` means an early win.
+- **`best_score`**: the strongest score reached for this goal, normalised to
+  0–10 and comparable with every other attack.
+- **Success rate**: fraction of goals with `success` set.
+
+```python
+for r in results:
+    m = r.metadata
+    print(f"{m['iterations_completed']}/{m['depth']} rounds — {m['best_score']}/10 — {r.goal}")
+```
+
+See [Interpreting Results](./index.mdx#interpreting-results) for the fields
+shared by every attack.
 
 ---
 

@@ -107,7 +107,7 @@ attack_config = {
         "limit": 100,
         "shuffle": True,
     },
-    "generator": {
+    "attacker": {
         "identifier": "ollama/llama2-uncensored",
         "endpoint": "http://localhost:11434/api/generate"
     }

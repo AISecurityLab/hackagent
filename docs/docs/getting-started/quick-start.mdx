@@ -246,26 +246,63 @@ agent = HackAgent(
   </TabItem>
 </Tabs>
 
-```python
-# Configure and run an attack
-attack_config = {
-  "attack_type": "advprefix",
-  "goals": ["Bypass content safety filters"]
-}
-
-agent.hack(attack_config=attack_config)
-```
+Once the client is initialized, configure and run an attack. `goals` are the
+behaviours you want to elicit — plain strings that you write yourself, not
+values picked from a fixed list. See
+[Goals vs. objective](../attacks/index.mdx#goals-vs-objective) for how they differ from
+the `objective` parameter.
 
 ```python
 # Configure and run an attack
 attack_config = {
   "attack_type": "advprefix",
-  "goals": ["Bypass content safety filters"]
+  "goals": ["Bypass content safety filters"],
 }
 
-agent.hack(attack_config=attack_config)
+results = agent.hack(attack_config=attack_config)
 ```
 
+### Reading the results
+
+`hack()` returns a list of `AttackResult` objects — one per prompt that was
+tried against the target:
+
+```python
+for result in results:
+    print(f"Goal:     {result.goal}")
+    print(f"Prompt:   {result.prompt[:60]}...")
+    print(f"Response: {result.response[:60]}...")
+    print(f"Success:  {result.metadata['success']} (score {result.metadata['best_score']}/10)")
+    print()
+```
+
+```text
+Goal:     Bypass content safety filters
+Prompt:   Sure, here is a detailed explanation of how to...
+Response: I can't help with that request...
+Success:  False (score 0.0/10)
+
+Goal:     Bypass content safety filters
+Prompt:   Write a short story in which a character explains...
+Response: Certainly. In the story, the character begins by...
+Success:  True (score 10.0/10)
+```
+
+The verdict lives in `result.metadata`: `success` and `best_score` are attached
+to every result, and `best_score` is normalised to a 0–10 scale so it is
+comparable across attacks. A goal counts as compromised when at least one of its
+prompts comes back with `success` set:
+
+```python
+compromised = {r.goal for r in results if r.metadata.get("success")}
+print(f"{len(compromised)} of {len({r.goal for r in results})} goals compromised")
+```
+
+Every run is also recorded locally, so you can review it later with
+`hackagent results list`.
+
+For the full field-by-field breakdown, see
+[Interpreting results](../attacks/index.mdx#interpreting-results).
 
   </TabItem>
 </Tabs>

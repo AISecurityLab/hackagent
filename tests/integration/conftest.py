@@ -633,7 +633,7 @@ def advprefix_attack_config_with_ollama_judges(
         "category_classifier": _explicit_default_category_classifier(
             model=ollama_model, endpoint=ollama_base_url
         ),
-        "generator": {
+        "attacker": {
             "identifier": "ollama/llama2-uncensored",
             "endpoint": f"{ollama_base_url}/api/generate",
         },
