@@ -94,9 +94,7 @@ class TestFreePort(unittest.TestCase):
     """Test the safe port-reclaim behaviour of the web command."""
 
     def test_free_port_returns_true_when_port_is_free(self):
-        with patch(
-            "hackagent.cli.commands.web._port_in_use", return_value=False
-        ):
+        with patch("hackagent.cli.commands.web._port_in_use", return_value=False):
             self.assertTrue(_free_port("127.0.0.1", 7860))
 
     def test_free_port_kills_only_hackagent_listener(self):
