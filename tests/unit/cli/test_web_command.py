@@ -99,9 +99,7 @@ class TestFreePort(unittest.TestCase):
 
     def test_free_port_kills_only_hackagent_listener(self):
         with (
-            patch(
-                "hackagent.cli.commands.web._port_in_use", return_value=True
-            ),
+            patch("hackagent.cli.commands.web._port_in_use", return_value=True),
             patch(
                 "hackagent.cli.commands.web._listener_pids",
                 return_value=["4242"],
@@ -118,9 +116,7 @@ class TestFreePort(unittest.TestCase):
 
     def test_free_port_refuses_foreign_listener(self):
         with (
-            patch(
-                "hackagent.cli.commands.web._port_in_use", return_value=True
-            ),
+            patch("hackagent.cli.commands.web._port_in_use", return_value=True),
             patch(
                 "hackagent.cli.commands.web._listener_pids",
                 return_value=["4242"],
@@ -136,12 +132,8 @@ class TestFreePort(unittest.TestCase):
 
     def test_free_port_refuses_when_listener_unknown(self):
         with (
-            patch(
-                "hackagent.cli.commands.web._port_in_use", return_value=True
-            ),
-            patch(
-                "hackagent.cli.commands.web._listener_pids", return_value=[]
-            ),
+            patch("hackagent.cli.commands.web._port_in_use", return_value=True),
+            patch("hackagent.cli.commands.web._listener_pids", return_value=[]),
             patch("hackagent.cli.commands.web.os.kill") as mock_kill,
         ):
             self.assertFalse(_free_port("127.0.0.1", 7860))
@@ -173,14 +165,10 @@ class TestFreePort(unittest.TestCase):
                 "hackagent.server.storage.local.LocalBackend",
                 return_value=_DummyLocalBackend(),
             ),
-            patch(
-                "hackagent.server.dashboard.create_app", return_value=app
-            ),
+            patch("hackagent.server.dashboard.create_app", return_value=app),
             patch("hackagent.cli.commands.web._free_port", return_value=False),
         ):
-            result = runner.invoke(
-                web, ["--no-browser"], obj={"config": config}
-            )
+            result = runner.invoke(web, ["--no-browser"], obj={"config": config})
 
         self.assertNotEqual(result.exit_code, 0)
         app.run.assert_not_called()
