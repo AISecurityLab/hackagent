@@ -273,6 +273,25 @@ class AttackOrchestrator:
             return api_key
         return None
 
+    def _is_remote_backend_endpoint(self) -> bool:
+        """Check if the configured backend endpoint is truly remote (not localhost)."""
+        backend = getattr(self.hackagent_agent, "backend", None)
+        if backend is None:
+            return False
+
+        # Try to get the base_url from the backend's client
+        client = getattr(backend, "_client", None)
+        if client is None:
+            return False
+
+        base_url = getattr(client, "base_url", "").lower()
+        if not base_url:
+            return False
+
+        # Check if it's localhost or 127.0.0.1
+        localhost_indicators = ("localhost", "127.0.0.1", "0.0.0.0", ":8000", ":8080", ":5000", ":3000")
+        return not any(indicator in base_url for indicator in localhost_indicators)
+
     @staticmethod
     def _remote_role_defaults(api_key: str) -> Dict[str, Dict[str, Any]]:
         """Build remote role defaults with backend-key fallback semantics."""
@@ -292,18 +311,28 @@ class AttackOrchestrator:
             },
         }
 
-    @staticmethod
-    def _remote_classifier_defaults(api_key: str) -> Dict[str, Any]:
+    def _remote_classifier_defaults(self, api_key: str) -> Dict[str, Any]:
         """Remote (HackAgent API) defaults for the goal category classifier.
 
-        Routes the classifier through the same hosted endpoint as the judge so
+        Routes the classifier through the configured backend endpoint so
         it never requires a local Ollama model when a HackAgent API key is
         available. Without a key, the classifier keeps its local default
         (see techniques.config) — this is only applied in remote mode.
+
+        Uses the backend's base_url to construct the endpoint, ensuring that
+        custom base_url configurations (e.g., localhost instances) are honored.
         """
+        # Get the endpoint from the backend's configured base_url
+        endpoint = DEFAULT_REMOTE_ROLE_ENDPOINT
+        client = getattr(getattr(self.hackagent_agent, "backend", None), "_client", None)
+        if client:
+            base_url = getattr(client, "base_url", "").rstrip("/")
+            if base_url:
+                endpoint = f"{base_url}/v1"
+
         return {
             "identifier": DEFAULT_REMOTE_JUDGE_IDENTIFIER,
-            "endpoint": DEFAULT_REMOTE_ROLE_ENDPOINT,
+            "endpoint": endpoint,
             "agent_type": DEFAULT_REMOTE_AGENT_TYPE,
             "api_key": api_key,
         }
@@ -368,7 +397,9 @@ class AttackOrchestrator:
     ) -> Dict[str, Any]:
         """Apply local/remote role defaults before preflight and execution."""
         api_key = self._backend_api_key_for_role_defaults()
-        is_remote_mode = bool(api_key)
+        # Check if backend is actually remote by inspecting the base_url.
+        # If base_url points to localhost, use local defaults even if api_key exists.
+        is_remote_mode = bool(api_key) and self._is_remote_backend_endpoint()
 
         selected_attack_type = (
             attack_config.get("attack_type")
