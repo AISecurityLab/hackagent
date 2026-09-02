@@ -186,6 +186,9 @@ def validate(ctx):
     try:
         cli_config.validate()
 
+        key_preview = cli_config.api_key[:8] + "..." if cli_config.api_key else "Not set"
+        console.print(f"[bold cyan]Testing with key: {key_preview}")
+
         if cli_config.should_show_info():
             with console.status("[bold green]Testing API connection..."):
                 from hackagent.server.client import AuthenticatedClient
@@ -196,18 +199,18 @@ def validate(ctx):
                     prefix="Bearer",
                 )
 
-                from hackagent.server.api.key import key_list
+                from hackagent.server.api.key import key_context_retrieve
 
-                response = key_list.sync_detailed(client=client)
+                response = key_context_retrieve.sync_detailed(client=client)
         else:
             from hackagent.server.client import AuthenticatedClient
 
             client = AuthenticatedClient(
                 base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
             )
-            from hackagent.server.api.key import key_list
+            from hackagent.server.api.key import key_context_retrieve
 
-            response = key_list.sync_detailed(client=client)
+            response = key_context_retrieve.sync_detailed(client=client)
 
         if response.status_code == 200:
             display_success("✅ Configuration valid - API connection successful")
