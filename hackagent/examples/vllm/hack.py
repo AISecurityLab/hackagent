@@ -71,7 +71,7 @@ advprefix_config = {
     "goal_batch_size": GOAL_BATCH_SIZE,
     "batch_size": BATCH_SIZE_GENERATION,
     "judge_concurrency": JUDGE_CONCURRENCY,
-    "generator": {
+    "attacker": {
         "identifier": ATTACKER_MODEL,
         "name": ATTACKER_MODEL,
         "endpoint": VLLM_ATTACKER_BASE,

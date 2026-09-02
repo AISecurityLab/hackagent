@@ -36,7 +36,7 @@ GOALS = [
 ]
 
 
-GENERATOR = {
+ATTACKER = {
     "identifier": "nidum-gemma-2b-uncensored",
     "endpoint": ENDPOINT_LMSTUDIO,
     "agent_type": AgentTypeEnum.OPENAI_SDK,
@@ -54,7 +54,7 @@ config = {
     "attack_type": "advprefix",
     "goals": GOALS,
     "max_tokens": 300,
-    "generator": GENERATOR,
+    "attacker": ATTACKER,
 }
 
 results = agent.hack(attack_config=config)

@@ -446,9 +446,9 @@ class DashboardRunHistoryResultsMixin:
                         )
                         if _h_attacker_id:
                             _chip("psychology", "Attacker", str(_h_attacker_id))
-                    # AdvPrefix: generator role
+                    # AdvPrefix: attacker role
                     if _h_atk_lower_r == "advprefix":
-                        _h_gen_cfg = _hcfg.get("generator") or {}
+                        _h_gen_cfg = _hcfg.get("attacker") or {}
                         if isinstance(_h_gen_cfg, dict):
                             _h_gen_id = (
                                 _h_gen_cfg.get("identifier")

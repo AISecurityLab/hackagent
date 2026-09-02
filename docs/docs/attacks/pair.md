@@ -328,6 +328,10 @@ for target in targets:
 - **Average Iterations**: How quickly attacks succeed
 - **Score Distribution**: Pattern of scores across iterations
 
+
+See [Interpreting Results](./index.mdx#interpreting-results) for the fields
+shared by every attack.
+
 ---
 
 ## Limitations

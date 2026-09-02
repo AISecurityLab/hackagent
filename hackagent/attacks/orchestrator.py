@@ -125,7 +125,7 @@ class AttackOrchestrator:
         str, Tuple[Tuple[str, Tuple[str, ...], bool, Optional[str]], ...]
     ] = {
         "advprefix": (
-            ("generator", ("generator",), False, "attacker"),
+            ("attacker", ("attacker",), False, "attacker"),
             # ("judge", ("judge",), False, "judge"),
             ("judge", ("judges",), True, "judge"),
         ),

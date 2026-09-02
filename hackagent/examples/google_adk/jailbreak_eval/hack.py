@@ -49,7 +49,7 @@ DATASET = {
 # ---------------------------------------------------------------------------
 # 3. Generator — uncensored model that crafts adversarial prefixes
 # ---------------------------------------------------------------------------
-GENERATOR = {
+ATTACKER = {
     "identifier": "llama2-uncensored",
     "endpoint": "http://localhost:11434",
     "agent_type": "ollama",
@@ -126,7 +126,7 @@ if __name__ == "__main__":
             attack_config={
                 "attack_type": "advprefix",
                 "dataset": DATASET,
-                "generator": GENERATOR,
+                "attacker": ATTACKER,
                 "judges": JUDGES,
             }
         )

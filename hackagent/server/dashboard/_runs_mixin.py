@@ -417,7 +417,7 @@ class DashboardRunsMixin:
 
                     # Generator (AdvPrefix)
                     if atk_lower == "advprefix":
-                        _gen = cfg.get("generator") or {}
+                        _gen = cfg.get("attacker") or {}
                         if isinstance(_gen, dict):
                             _gen_id = (
                                 _gen.get("identifier") or _gen.get("model_id") or ""

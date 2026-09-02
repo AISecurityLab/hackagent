@@ -296,6 +296,10 @@ Static Template attacks evaluate responses using predefined objectives:
 - **Category Effectiveness**: Which template categories work best
 - **Response Analysis**: Common patterns in successful/failed attempts
 
+
+See [Interpreting Results](./index.mdx#interpreting-results) for the fields
+shared by every attack.
+
 ---
 
 ## Use Cases
