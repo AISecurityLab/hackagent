@@ -21,6 +21,7 @@ Based on: https://arxiv.org/abs/2401.06373
 import logging
 import time
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from hackagent.attacks.shared.router_factory import create_router
 
 from hackagent.attacks.evaluator.inline_step_judge import (
     InlineStepJudge,
@@ -73,21 +74,15 @@ def _create_attacker_router(
     attacker_config: Dict[str, Any],
     backend: Any,
 ) -> AgentRouter:
-    """Create an AgentRouter for the attacker LLM."""
-    metadata: Dict[str, Any] = {
-        "name": attacker_config.get("identifier"),
-    }
-    api_key = attacker_config.get("api_key")
-    if api_key:
-        metadata["api_key"] = api_key
+    """Create an AgentRouter for the attacker LLM, using the shared create_router function"""
 
-    return AgentRouter(
-        backend=backend,
-        name=f"pap-attacker-{attacker_config.get('identifier', 'unknown')[:30]}",
-        agent_type=attacker_config.get("agent_type", "OPENAI_SDK"),
-        endpoint=attacker_config.get("endpoint") or "",
-        metadata=metadata,
-    )
+    router, _reg_key = create_router(
+            backend=backend,
+            router_name=f"pap-attacker-{attacker_config.get('identifier', 'unknown')[:30]}",
+            config=attacker_config,
+            )
+
+    return router
 
 
 # ---------------------------------------------------------------------------
