@@ -77,10 +77,10 @@ def _create_attacker_router(
     """Create an AgentRouter for the attacker LLM, using the shared create_router function"""
 
     router, _reg_key = create_router(
-            backend=backend,
-            router_name=f"pap-attacker-{attacker_config.get('identifier', 'unknown')[:30]}",
-            config=attacker_config,
-            )
+        backend=backend,
+        router_name=f"pap-attacker-{attacker_config.get('identifier', 'unknown')[:30]}",
+        config=attacker_config,
+    )
 
     return router
 
