@@ -19,7 +19,7 @@ from hackagent.attacks.shared.tui import with_tui_logging
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 
 from . import generation, static_eval as evaluation
-from .config import DEFAULT_TEMPLATE_CONFIG
+from .config import DEFAULT_TEMPLATE_CONFIG, validate_template_config
 
 
 class StaticTemplateAttack(BaseAttack):
@@ -110,6 +110,8 @@ class StaticTemplateAttack(BaseAttack):
         if missing:
             raise ValueError(f"Missing required config keys: {missing}")
 
+        validate_template_config(self.config)
+
         # Validate objective exists
         from hackagent.attacks.objectives import OBJECTIVES
 
@@ -174,6 +176,8 @@ class StaticTemplateAttack(BaseAttack):
                 "config_keys": [
                     "template_categories",
                     "templates_per_category",
+                    "template_parameters",
+                    "batch_size",
                     "max_tokens",
                     "temperature",
                     "n_samples_per_template",
@@ -244,6 +248,8 @@ class StaticTemplateAttack(BaseAttack):
         goals = goals or []
         if not goals:
             return []
+
+        validate_template_config(self.config)
 
         # Initialize unified coordinator
         coordinator = self._initialize_coordinator(

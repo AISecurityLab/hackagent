@@ -26,6 +26,7 @@ from hackagent.attacks.shared.progress import create_progress_bar
 from hackagent.router.router import AgentRouter
 from hackagent.router.tracking import Tracker
 
+from .config import DEFAULT_TEMPLATE_CONFIG, validate_template_config
 
 logger = logging.getLogger("hackagent.attacks.static_template.generation")
 
@@ -63,10 +64,14 @@ def generate_prompts(
     Returns:
         List of dicts with keys: goal, template_category, template, attack_prompt
     """
+    validate_template_config(config)
     logger.info(f"Generating static template prompts for {len(goals)} goals...")
 
     # Get template configuration
-    categories = config.get("template_categories", [])
+    categories = config.get(
+        "template_categories", DEFAULT_TEMPLATE_CONFIG["template_categories"]
+    )
+    template_parameters = config.get("template_parameters", {})
     templates_per_cat = _safe_positive_int(config.get("templates_per_category", 3), 3)
     requested_batch_size = _safe_positive_int(config.get("batch_size", 0), 0)
     goal_index_offset = _safe_goal_index(config.get("_goal_index_offset", 0), 0)
@@ -108,7 +113,9 @@ def generate_prompts(
         def _format_entry(entry: Dict[str, Any]) -> Dict[str, Any]:
             return {
                 **entry,
-                "attack_prompt": entry["template"].format(goal=goal),
+                "attack_prompt": AttackTemplates.apply_template(
+                    entry["template"], goal, **template_parameters
+                ),
             }
 
         # Parallelize prompt materialization per goal when batch mode is requested.

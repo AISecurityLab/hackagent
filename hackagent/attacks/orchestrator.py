@@ -1713,6 +1713,23 @@ class AttackOrchestrator:
             ValueError: If configuration is invalid
             HackAgentError: If server record creation fails
         """
+        if (
+            self._normalize_attack_type_for_preflight(self.attack_type)
+            == "static_template"
+        ):
+            from hackagent.attacks.techniques.static_template.config import (
+                validate_template_config,
+            )
+
+            # Match attack-constructor precedence before any model probes or records.
+            validate_template_config(
+                {
+                    **(getattr(self.hackagent_agent, "target_config", {}) or {}),
+                    **attack_config,
+                    **(run_config_override or {}),
+                }
+            )
+
         attack_config = self._apply_mode_based_role_defaults(attack_config)
 
         # 1. Validate parameters
