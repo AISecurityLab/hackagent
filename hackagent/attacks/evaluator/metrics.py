@@ -345,8 +345,11 @@ def calculate_per_goal_metrics(
     for goal, goal_results in grouped.items():
         goal_metrics: Dict[str, Any] = {
             "total_attempts": len(goal_results),
+            # Same predicate as success_rate below: is_successful_result is the
+            # single source of truth for success, so a row that only carries
+            # is_success, scorer_verdict or eval_* votes counts here as well.
             "successful_attacks": sum(
-                1 for r in goal_results if r.get("success", False)
+                1 for r in goal_results if is_successful_result(r)
             ),
             "success_rate": calculate_success_rate(goal_results),
             "majority_vote_asr": calculate_majority_vote_asr(goal_results),
