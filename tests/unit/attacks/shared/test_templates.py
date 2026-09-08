@@ -3,6 +3,8 @@
 
 """Tests for attack templates."""
 
+import base64
+import codecs
 import unittest
 
 from hackagent.attacks.generator import (
@@ -110,17 +112,90 @@ class TestAttackTemplates(unittest.TestCase):
         self.assertEqual(result, "The goal is: test goal")
 
     def test_apply_template_with_extra_placeholders(self):
-        """Test apply_template with template having extra placeholders."""
-        template = "{param1} and {param2}"
-        # This will raise KeyError when params are missing
-        # but apply_template has try/except to handle partial formatting
-        try:
-            result = AttackTemplates.apply_template(template, "goal")
-            # If it doesn't raise, result should be a string
-            self.assertIsInstance(result, str)
-        except KeyError:
-            # This is also acceptable behavior
-            pass
+        with self.assertRaisesRegex(ValueError, "Missing template parameter 'param1'"):
+            AttackTemplates.apply_template("{param1} and {param2}", "Summarize weather")
+
+    def test_encoding_substitutions_roundtrip_unicode(self):
+        goal = "Summarize weather: café ☀️ {today}\n東京"
+        values = AttackTemplates.apply_template(
+            "{goal_encoded}|{goal_base64}|{goal_obfuscated}", goal
+        ).split("|")
+        self.assertEqual(codecs.decode(values[0], "rot_13"), goal)
+        self.assertEqual(base64.b64decode(values[1]).decode("utf-8"), goal)
+        self.assertEqual(values[2][::-1], goal)
+
+    def test_encoding_substitutions_can_be_overridden(self):
+        self.assertEqual(
+            AttackTemplates.apply_template(
+                "{goal_encoded} {goal_base64} {goal_obfuscated}",
+                "Summarize weather",
+                goal_encoded="ROT13",
+                goal_base64="Base64",
+                goal_obfuscated="reversed",
+            ),
+            "ROT13 Base64 reversed",
+        )
+
+    def test_translations_must_be_explicit(self):
+        for name in ("goal_translated", "goal_foreign"):
+            with self.subTest(name=name):
+                with self.assertRaisesRegex(ValueError, "explicit translation"):
+                    AttackTemplates.apply_template(
+                        "{" + name + "}", "Summarize weather"
+                    )
+                for invalid in ("", "  ", None, 1):
+                    with self.assertRaisesRegex(ValueError, "non-empty translation"):
+                        AttackTemplates.apply_template(
+                            "{" + name + "}", "Summarize weather", **{name: invalid}
+                        )
+
+    def test_all_builtin_templates_can_be_materialized(self):
+        for category in AttackTemplates.get_all_categories():
+            for template in AttackTemplates.get_by_category(category):
+                with self.subTest(category=category, template=template):
+                    result = AttackTemplates.apply_template(
+                        template,
+                        "Summarize weather",
+                        goal_translated="Résume la météo",
+                        goal_foreign="Riassumi il meteo",
+                    )
+                    self.assertTrue(result)
+                    self.assertNotIn("{goal", result)
+
+    def test_standard_formatting_and_literal_braces_are_preserved(self):
+        goal = "Summarize weather {today} ☀"
+        self.assertEqual(
+            AttackTemplates.apply_template(
+                '{{"goal": "{goal}", "value": "{metadata[value]:>{width}}"}} {label!r}',
+                goal,
+                metadata={"value": 7},
+                width=3,
+                label="café",
+            ),
+            '{"goal": "Summarize weather {today} ☀", "value": "  7"} \'café\'',
+        )
+        self.assertEqual(
+            AttackTemplates.apply_template("{{unknown}} {goal}", goal),
+            "{unknown} " + goal,
+        )
+
+    def test_invalid_formatting_fails(self):
+        for template in (
+            "{unknown}",
+            "{goal",
+            "{goal!z}",
+            "{}",
+            "{0}",
+            "{goal.unknown}",
+            "{goal:d}",
+        ):
+            with self.subTest(template=template):
+                with self.assertRaises(ValueError):
+                    AttackTemplates.apply_template(template, "Summarize weather")
+
+    def test_missing_nested_format_parameter_fails(self):
+        with self.assertRaisesRegex(ValueError, "Missing template parameter 'width'"):
+            AttackTemplates.apply_template("{goal:>{width}}", "Summarize weather")
 
     def test_apply_template_instruction_override(self):
         """Test apply_template with actual instruction override template."""
