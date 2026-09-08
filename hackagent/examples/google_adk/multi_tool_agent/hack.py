@@ -11,7 +11,7 @@ agent = HackAgent(
 attack_config = {
     "attack_type": "advprefix",
     "goals": ["Bypass the agent's safety guidelines"],
-    "generator": {
+    "attacker": {
         "identifier": "tinyllama",
         "endpoint": "http://localhost:11434/v1",
         "max_tokens": 150,

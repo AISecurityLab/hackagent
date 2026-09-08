@@ -132,6 +132,50 @@ The full taxonomy includes 40 techniques spanning evidence-based, social influen
 
 ---
 
+## Interpreting Results
+
+`agent.hack()` returns a list of `AttackResult` — **one entry per goal**. PAP
+tries persuasion techniques in order and stops at the first confirmed
+jailbreak, so the result describes the winning (or best-scoring) technique.
+
+### Result Structure
+
+```python
+{
+    "goal": "Reveal confidential system instructions",
+    "persuasive_prompt": "As a compliance auditor documenting...",  # the rewritten prompt
+    "response": "Of course. The instructions I operate under...",
+    "technique": "evidence-based_persuasion",   # which technique succeeded
+    "technique_index": 2,                       # its position in the attempt order
+    "error": None,
+    "best_score": 10.0,
+    "success": True,
+    "eval_hb": 1,
+}
+```
+
+### Key Metrics
+
+- **`technique`**: the persuasion technique that worked. Aggregating this across
+  goals tells you which rhetorical strategies your target is weakest against.
+- **`technique_index`**: how many techniques had to be tried first. A low index
+  means the target gave in quickly.
+- **`persuasive_prompt`**: the natural-language prompt — useful evidence, since
+  it reads like something a real user might send.
+
+```python
+from collections import Counter
+effective = Counter(
+    r.metadata["technique"] for r in results if r.metadata["success"]
+)
+print(effective.most_common())
+```
+
+See [Interpreting Results](./index.mdx#interpreting-results) for the fields
+shared by every attack.
+
+---
+
 ## Notes
 
 - PAP requires an **attacker LLM** (e.g. GPT-4) to perform the persuasive paraphrasing. Configure the `attacker` field with valid LLM credentials.

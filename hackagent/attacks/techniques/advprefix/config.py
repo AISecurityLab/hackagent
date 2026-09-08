@@ -51,7 +51,7 @@ DEFAULT_PREFIX_GENERATION_CONFIG: Dict[str, Any] = {
     # --- Paths ---
     "output_dir": DEFAULT_OUTPUT_DIR,
     # --- Model Configurations ---
-    "generator": {
+    "attacker": {
         "identifier": DEFAULT_ATTACKER_IDENTIFIER,
         "endpoint": DEFAULT_LOCAL_MODEL_ENDPOINT,
         "system_prompt": DEFAULT_ADVPREFIX_GENERATOR_SYSTEM_PROMPT,
@@ -119,7 +119,7 @@ class PrefixGenerationConfig(BaseModel):
     """
 
     # Generation settings
-    generator: Dict[str, Any] = Field(default_factory=dict)
+    attacker: Dict[str, Any] = Field(default_factory=dict)
     meta_prefixes: List[str] = Field(default_factory=list)
     meta_prefix_samples: int = 1
     batch_size: int = 32

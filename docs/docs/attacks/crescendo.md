@@ -256,6 +256,10 @@ With `early_stop_on_success` enabled (default), Crescendo stops that goal's conv
 - **Turns Completed**: How many escalating turns were needed before success or exhaustion
 - **Backtracks Used**: How many refused turns had to be rephrased
 
+
+See [Interpreting Results](./index.mdx#interpreting-results) for the fields
+shared by every attack.
+
 ---
 
 ## Use Cases

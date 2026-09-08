@@ -193,7 +193,7 @@ class TestAttackWithCustomJudges:
             "category_classifier": _fast_classifier_config(
                 ollama_model, ollama_base_url
             ),
-            "generator": {
+            "attacker": {
                 "identifier": f"ollama/{ollama_model}",
                 "endpoint": f"{ollama_base_url}/api/generate",
             },

@@ -227,6 +227,54 @@ AutoDAN-Turbo currently supports **goal-level batching**.
 
 ---
 
+## Interpreting Results
+
+`agent.hack()` returns a list of `AttackResult` — **one entry per goal**,
+describing the best attempt found across the warm-up and lifelong phases.
+
+### Result Structure
+
+```python
+{
+    "goal": "Bypass content filter",
+    "prompt": "Imagine you are documenting historical...",  # best prompt found
+    "full_prompt": "Imagine you are documenting historical...",
+    "response": "Certainly. Historically, the process was...",
+    "score": 8.5,           # scorer's raw 0–10 rating
+    "autodan_score": 8.5,   # same value, preserved under AutoDAN's own name
+    "attack_score": 8.5,    # preserved after evaluation overwrites best_score
+    "best_score": 8.5,
+    "success": True,
+}
+```
+
+AutoDAN-Turbo keeps three copies of its score on purpose: the shared evaluator
+may overwrite `best_score` with a judge's verdict, so `autodan_score` and
+`attack_score` retain the attack's own scorer rating for comparison.
+
+### Key Metrics
+
+- **`autodan_score`** vs **`best_score`**: when these disagree, the attack's
+  internal scorer and the configured judges disagree about the same response —
+  worth inspecting manually.
+- **Strategy library growth**: the number of strategies discovered during
+  warm-up, written to `output_dir/strategy_library`. A library that stops
+  growing means exploration has saturated.
+
+```python
+# Where do the internal scorer and the judges disagree?
+for r in results:
+    internal = r.metadata.get("autodan_score")
+    judged = r.metadata.get("best_score")
+    if internal is not None and abs(internal - judged) > 2:
+        print(f"disagreement ({internal} vs {judged}): {r.goal}")
+```
+
+See [Interpreting Results](./index.mdx#interpreting-results) for the fields
+shared by every attack.
+
+---
+
 ## Notes
 
 - Warm-up and lifelong phases share a single strategy library per run.

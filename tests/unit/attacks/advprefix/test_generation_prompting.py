@@ -26,15 +26,15 @@ class TestAdvPrefixGenerationPrompting(unittest.TestCase):
     def _build_pipeline(
         self, system_prompt: str | None = None
     ) -> PrefixGenerationPipeline:
-        generator_cfg = {
+        attacker_cfg = {
             "identifier": "generator-model",
             "endpoint": "http://localhost:1234/v1",
         }
         if system_prompt is not None:
-            generator_cfg["system_prompt"] = system_prompt
+            attacker_cfg["system_prompt"] = system_prompt
 
         config = {
-            "generator": generator_cfg,
+            "attacker": attacker_cfg,
             "meta_prefixes": ["Write..."],
             "meta_prefix_samples": 1,
             "batch_size": 1,
