@@ -18,7 +18,6 @@ import glob
 import json
 import logging
 import math
-import os
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -227,16 +226,14 @@ def get_embeddings(
 ) -> np.ndarray:
     """Get embeddings using OpenAI-compatible API."""
     import openai
+    from hackagent.attacks.shared.embedding_utils import embedding_request_kwargs
 
-    api_key = config.get("api_key") or os.environ.get("OPENAI_API_KEY", "")
-    raw_endpoint = str(config.get("endpoint", "https://api.openai.com/v1")).strip()
-    endpoint = raw_endpoint.rstrip("/")
-    if endpoint.lower().endswith("/embeddings"):
-        # OpenAI client expects API base and appends '/embeddings' internally.
-        endpoint = endpoint[: -len("/embeddings")]
-    model = config.get("identifier", "embeddinggemma")
-
-    client = openai.OpenAI(api_key=api_key, base_url=endpoint)
+    kwargs = embedding_request_kwargs({"identifier": "embeddinggemma", **config})
+    model = kwargs["model"]
+    client = openai.OpenAI(
+        api_key=kwargs.get("api_key", ""),
+        base_url=kwargs.get("api_base", "https://api.openai.com/v1"),
+    )
 
     all_embeddings = []
     batch_size = 100  # OpenAI supports up to 2048, but be conservative

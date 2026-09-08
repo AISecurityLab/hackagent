@@ -6,6 +6,43 @@ from hackagent.attacks.techniques.autodan_turbo import config as autodan_config
 
 
 class TestAutoDANTurboConfig(unittest.TestCase):
+    def test_embedding_defaults_and_failure_policy(self):
+        from hackagent.attacks.techniques.config import default_embedder
+        from hackagent.attacks.techniques.autodan_turbo.strategy_library import (
+            StrategyLibrary,
+        )
+
+        defaults = default_embedder()
+        self.assertEqual(defaults["identifier"], "embeddinggemma")
+        self.assertEqual(defaults["on_error"], "disable")
+        self.assertEqual(StrategyLibrary().embedder_config, defaults)
+        self.assertEqual(autodan_config.AutoDANTurboConfig().embedder, defaults)
+        with self.assertRaises(ValidationError):
+            autodan_config.AutoDANTurboConfig(embedder={"on_error": "local"})
+        for invalid in (
+            {"identifier": ""},
+            {"identifier": None},
+            {"agent_type": "GOOGLE_ADK"},
+        ):
+            with self.subTest(invalid=invalid), self.assertRaises(ValidationError):
+                autodan_config.AutoDANTurboConfig(embedder=invalid)
+
+    def test_openai_embedder_does_not_inherit_ollama_endpoint(self):
+        config = autodan_config.AutoDANTurboConfig(
+            embedder={
+                "identifier": "text-embedding-3-small",
+                "agent_type": "OPENAI_SDK",
+            }
+        )
+        self.assertIsNone(config.embedder["endpoint"])
+        self.assertEqual(config.embedder["on_error"], "disable")
+        self.assertEqual(
+            autodan_config.AutoDANTurboConfig(embedder={"endpoint": None}).embedder[
+                "endpoint"
+            ],
+            None,
+        )
+
     def test_default_config_has_required_sections(self):
         cfg = autodan_config.DEFAULT_AUTODAN_TURBO_CONFIG
         self.assertEqual(cfg["attack_type"], "autodan_turbo")
