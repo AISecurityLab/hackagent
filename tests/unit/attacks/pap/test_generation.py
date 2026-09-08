@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from hackagent.attacks.techniques.pap.taxonomy import (
     PERSUASION_TAXONOMY,
@@ -9,10 +9,100 @@ from hackagent.attacks.techniques.pap.taxonomy import (
     extract_mutated_text,
 )
 from hackagent.attacks.techniques.pap.generation import (
+    _create_attacker_router,
     _resolve_techniques,
     _attack_single_goal,
 )
 from hackagent.attacks.techniques.pap.config import TOP_5_TECHNIQUES
+from hackagent.router.types import AgentTypeEnum
+from hackagent.server.storage.local import LocalBackend
+
+
+class TestCreateAttackerRouter(unittest.TestCase):
+    def setUp(self):
+        self.backend = LocalBackend(":memory:")
+        self.addCleanup(self.backend.close)
+        env = patch.dict("os.environ", {}, clear=True)
+        env.start()
+        self.addCleanup(env.stop)
+
+    def test_normalizes_string_and_enum_agent_types(self):
+        for agent_type in ("OLLAMA", "ollama", AgentTypeEnum.OLLAMA):
+            with self.subTest(agent_type=agent_type):
+                router = _create_attacker_router(
+                    {
+                        "identifier": "test-model",
+                        "agent_type": agent_type,
+                        "endpoint": "http://localhost:11434",
+                    },
+                    self.backend,
+                )
+                key = next(iter(router._agent_registry))
+                self.assertEqual(router._agent_types[key], AgentTypeEnum.OLLAMA)
+                self.assertEqual(
+                    router.get_agent_instance(key).litellm_model,
+                    "ollama_chat/test-model",
+                )
+
+    def test_provider_credentials_do_not_use_storage_token(self):
+        cases = (
+            ({}, "fake-provider-env-key"),
+            ({"api_key": None}, "fake-provider-env-key"),
+            ({"api_key": ""}, "fake-provider-env-key"),
+            ({"api_key": "fake-explicit-key"}, "fake-explicit-key"),
+            ({"api_key": "ATTACKER_API_KEY"}, "fake-attacker-env-key"),
+            (
+                {"agent_metadata": {"api_key": "ATTACKER_API_KEY"}},
+                "fake-attacker-env-key",
+            ),
+        )
+        for storage_key in (None, "fake-storage-token"):
+            for config, expected in cases:
+                with (
+                    self.subTest(storage_key=storage_key, config=config),
+                    patch.object(
+                        self.backend, "get_api_key", return_value=storage_key
+                    ) as get_storage_key,
+                    patch.dict(
+                        "os.environ",
+                        {
+                            "OPENAI_API_KEY": "fake-provider-env-key",
+                            "ATTACKER_API_KEY": "fake-attacker-env-key",
+                        },
+                    ),
+                ):
+                    router = _create_attacker_router(
+                        {
+                            "identifier": "test-model",
+                            "agent_type": "OPENAI_SDK",
+                            **config,
+                        },
+                        self.backend,
+                    )
+                    key = next(iter(router._agent_registry))
+                    self.assertEqual(
+                        router.get_agent_instance(key).actual_api_key, expected
+                    )
+                    get_storage_key.assert_not_called()
+
+    def test_custom_endpoint_without_provider_key_uses_placeholder(self):
+        with patch.object(
+            self.backend, "get_api_key", return_value="fake-storage-token"
+        ):
+            router = _create_attacker_router(
+                {
+                    "identifier": "test-model",
+                    "agent_type": "openai",
+                    "endpoint": "http://localhost:8000/v1",
+                },
+                self.backend,
+            )
+        key = next(iter(router._agent_registry))
+        self.assertEqual(router.get_agent_instance(key).actual_api_key, "not-required")
+
+    def test_missing_identifier_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "identifier"):
+            _create_attacker_router({"agent_type": "OLLAMA"}, self.backend)
 
 
 class TestTaxonomy(unittest.TestCase):

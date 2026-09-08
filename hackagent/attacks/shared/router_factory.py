@@ -79,6 +79,8 @@ def create_router(
     config: Dict[str, Any],
     logger: Optional[logging.Logger] = None,
     router_name: Optional[str] = None,
+    *,
+    use_backend_api_key: bool = True,
 ) -> Tuple[AgentRouter, str]:
     """
     Create an AgentRouter from a configuration dictionary.
@@ -88,6 +90,8 @@ def create_router(
         config: Configuration dictionary (identifier, endpoint, agent_type, api_key etc.)
         logger: Logger instance.
         router_name: Human-readable name for logging.
+        use_backend_api_key: Retain the legacy storage-key fallback when True.
+            Set False for provider roles that must resolve their own credentials.
 
     Returns:
         Tuple of (AgentRouter, registration_key).
@@ -106,7 +110,7 @@ def create_router(
 
     # ---- API key resolution ----
     # Priority: explicit config key → env var lookup → backend api key
-    api_key = backend.get_api_key() or ""
+    api_key = (backend.get_api_key() or "") if use_backend_api_key else ""
     api_key_config = config.get("api_key")
     if api_key_config:
         env_key = os.environ.get(api_key_config)

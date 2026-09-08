@@ -21,7 +21,6 @@ Based on: https://arxiv.org/abs/2401.06373
 import logging
 import time
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
-from hackagent.attacks.shared.router_factory import create_router
 
 from hackagent.attacks.evaluator.inline_step_judge import (
     InlineStepJudge,
@@ -31,6 +30,7 @@ from hackagent.attacks.shared.response_utils import (
     get_guardrail_info,
     is_guardrail_response,
 )
+from hackagent.attacks.shared.router_factory import create_router
 from hackagent.attacks.techniques.config import DEFAULT_MAX_OUTPUT_TOKENS
 from hackagent.router.router import AgentRouter
 
@@ -74,12 +74,13 @@ def _create_attacker_router(
     attacker_config: Dict[str, Any],
     backend: Any,
 ) -> AgentRouter:
-    """Create an AgentRouter for the attacker LLM, using the shared create_router function"""
+    """Create an attacker router with normalized type and provider credentials."""
 
     router, _reg_key = create_router(
         backend=backend,
         router_name=f"pap-attacker-{attacker_config.get('identifier', 'unknown')[:30]}",
         config=attacker_config,
+        use_backend_api_key=False,
     )
 
     return router
