@@ -10,9 +10,13 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from hackagent.attacks.shared.response_utils import extract_response_content
-from hackagent.attacks.shared.router_factory import create_router
-from hackagent.attacks.techniques.config import default_category_classifier
+from hackagent.attacks.shared.embedding_utils import (
+    embedding_request_kwargs,
+    extract_embedding_vector,
+    request_embedding,
+    validate_embedding_vector,
+)
+from hackagent.attacks.techniques.config import resolve_embedder_config
 
 try:
     import faiss
@@ -44,8 +48,9 @@ class StrategyLibrary:
 
         Args:
             embedder_config: Top-level ``embedder`` config from attack config.
-                Uses category-classifier schema/defaults.
-            backend: Storage backend used to initialize an embedder router.
+                Uses embedding-only provider defaults. ``on_error`` is ``disable``
+                (skip retrieval after failure) or ``raise``. No implicit local fallback.
+            backend: Retained for compatibility; never used for model credentials.
             embedding_model: Legacy embedding model argument kept for backward
                 compatibility. Prefer ``embedder_config``.
             embedding_api_key: Legacy API key for OpenAI-compatible embeddings.
@@ -58,8 +63,7 @@ class StrategyLibrary:
         self.library: Dict[str, Dict[str, Any]] = {}
         self.logger = logger or logging.getLogger(__name__)
         self._embedding_disabled_reason: Optional[str] = None
-        self._embedder_router = None
-        self._embedder_registration_key: Optional[str] = None
+        self._embedding_dimension: Optional[int] = None
 
         # Backward compatibility mode: preserve direct embedding endpoint usage
         # when old parameters are explicitly provided.
@@ -73,47 +77,23 @@ class StrategyLibrary:
             self.embedding_api_key = embedding_api_key
             self.embedding_api_base = embedding_api_base
             self.embedder_config = {
-                **default_category_classifier(),
                 "identifier": self.embedding_model,
                 "endpoint": self.embedding_api_base,
                 "api_key": self.embedding_api_key,
-                "agent_type": "OPENAI_SDK",
+                "agent_type": "LITELLM",
+                "on_error": "disable",
             }
         else:
             self.embedder_config = self._resolve_embedder_config(embedder_config)
-            self.embedding_model = str(
-                self.embedder_config.get("identifier") or "local/bag-of-words"
-            )
+            self.embedding_model = self.embedder_config["identifier"].strip()
             self.embedding_api_key = self.embedder_config.get("api_key")
             self.embedding_api_base = self.embedder_config.get("endpoint")
 
-            if not self.embedding_model.startswith("local/") and backend is not None:
-                try:
-                    router, registration_key = create_router(
-                        backend=backend,
-                        config=self.embedder_config,
-                        logger=self.logger,
-                        router_name="autodan-embedder",
-                    )
-                    self._embedder_router = router
-                    self._embedder_registration_key = registration_key
-                except Exception as exc:
-                    self._embedding_disabled_reason = (
-                        "Embedder router unavailable; falling back to local embedding."
-                    )
-                    self.logger.warning(
-                        "%s reason=%s",
-                        self._embedding_disabled_reason,
-                        exc,
-                    )
-
-        backend_mode = "local"
-        if self._legacy_embedding_mode and not self.embedding_model.startswith(
-            "local/"
-        ):
-            backend_mode = "legacy-openai-embeddings"
-        elif self._embedder_router is not None:
-            backend_mode = "router-semantic-signature"
+        backend_mode = (
+            "local"
+            if self.embedding_model.startswith("local/")
+            else "provider-embeddings"
+        )
 
         endpoint_display = (
             self.embedding_api_base
@@ -129,14 +109,7 @@ class StrategyLibrary:
 
     @staticmethod
     def _resolve_embedder_config(config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        resolved = default_category_classifier()
-        if not config:
-            return resolved
-
-        for key, value in config.items():
-            if value is not None:
-                resolved[key] = value
-        return resolved
+        return resolve_embedder_config(config)
 
     def embed(self, text: str) -> Optional[np.ndarray]:
         """Encode text to an embedding vector for strategy retrieval.
@@ -153,128 +126,38 @@ class StrategyLibrary:
         if self.embedding_model.startswith("local/"):
             return self._local_embed(text)
 
-        if self._legacy_embedding_mode:
-            return self._embed_legacy_openai(text)
-
-        signature = self._build_router_semantic_signature(text)
-        if signature:
-            return self._local_embed(signature)
-
-        # Keep the run alive even if external embedding infrastructure fails.
-        return self._local_embed(text)
-
-    def _build_router_semantic_signature(self, text: str) -> Optional[str]:
-        if not self._embedder_router or not self._embedder_registration_key:
-            return None
-
-        system_prompt = (
-            "You are an embedding proxy. Convert input text into a compact, "
-            "deterministic semantic signature for vector retrieval. "
-            "Output plain text only: key entities, actions, intent, and constraints."
-        )
-        user_prompt = (
-            f"Input:\n{text}\n\nReturn a short semantic signature (max 80 words)."
-        )
-
-        request_data: Dict[str, Any] = {
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            "max_tokens": self.embedder_config.get("max_tokens", 100),
-            "temperature": self.embedder_config.get("temperature", 0.0),
-        }
-
-        try:
-            response = self._embedder_router.route_request(
-                registration_key=self._embedder_registration_key,
-                request_data=request_data,
-            )
-            if isinstance(response, dict) and response.get("error_message"):
-                self.logger.warning(
-                    "Embedder router error: %s",
-                    response.get("error_message"),
-                )
-                return None
-
-            signature = extract_response_content(response, self.logger)
-            if not signature:
-                return None
-            return str(signature).strip()
-        except Exception as exc:
-            self.logger.warning("Embedder semantic signature failed: %s", exc)
-            return None
-
-    def _embed_legacy_openai(self, text: str) -> Optional[np.ndarray]:
         if self._embedding_disabled_reason is not None:
             return None
 
         try:
-            import litellm
-
-            kwargs: Dict[str, Any] = {
-                "model": self.embedding_model,
-                "input": [text],
-                # OpenRouter/OpenAI-compatible embedding endpoints expect
-                # encoding_format to be one of: float|base64.
-                "encoding_format": "float",
-            }
-            if self.embedding_api_base:
-                kwargs["api_base"] = self.embedding_api_base
-            if self.embedding_api_key:
-                kwargs["api_key"] = self.embedding_api_key
-
-            response = litellm.embedding(**kwargs)
-            vector = self._extract_embedding_vector(response)
-            if vector is None:
-                raise ValueError("No embedding data received")
-            return np.array(vector, dtype=np.float32)
+            vector = validate_embedding_vector(
+                request_embedding(self.embedder_config, text),
+                dimension=self._embedding_dimension,
+            )
+            self._embedding_dimension = vector.size
+            return vector
         except Exception as exc:
-            message = str(exc)
-            if "No embedding data received" in message:
-                self._embedding_disabled_reason = (
-                    "Embedding endpoint returned no vectors; the selected model "
-                    "likely does not support /v1/embeddings."
-                )
-                self.logger.error(
-                    "Embedding disabled for this run: %s (model=%s, base=%s)",
-                    self._embedding_disabled_reason,
-                    self.embedding_model,
-                    self.embedding_api_base or "<provider-default>",
-                )
-            else:
-                self.logger.error("Embedding failed: %s", message)
+            self.logger.error(
+                "Embedding failed (model=%s); no local fallback will be used: %s",
+                self.embedding_model,
+                exc,
+                exc_info=True,
+            )
+            if self.embedder_config.get("on_error") == "raise":
+                raise
+            # Preserve legacy transient-error retries. Normal config disables
+            # retrieval for the run rather than silently changing vector spaces.
+            if not self._legacy_embedding_mode or isinstance(exc, ValueError):
+                self._embedding_disabled_reason = str(exc)
             return None
 
     @staticmethod
     def _extract_embedding_vector(response: Any) -> Optional[List[float]]:
-        """Extract first embedding vector from LiteLLM response payload.
-
-        Supports both object-style payloads (response.data[0].embedding)
-        and dict-style payloads ({"data": [{"embedding": [...]}]}).
-        """
-        if response is None:
+        """Compatibility wrapper for the shared validated vector extractor."""
+        try:
+            return extract_embedding_vector(response).tolist()
+        except ValueError:
             return None
-
-        data = None
-        if isinstance(response, dict):
-            data = response.get("data")
-        else:
-            data = getattr(response, "data", None)
-
-        if not isinstance(data, list) or not data:
-            return None
-
-        first = data[0]
-        vector = (
-            first.get("embedding")
-            if isinstance(first, dict)
-            else getattr(first, "embedding", None)
-        )
-        if not isinstance(vector, list):
-            return None
-
-        return vector
 
     def _local_embed(self, text: str, _dim: int = 512) -> np.ndarray:
         """Deterministic hashing-trick bag-of-words embedding (``local/bag-of-words``).
@@ -307,18 +190,25 @@ class StrategyLibrary:
             None.
         """
         name = strategy.get("Strategy", "unknown")
+        fields = {"Example": "", "Score": 0, "Embeddings": None}
+        row_count = max(len(strategy.get(key) or []) for key in fields)
+        values = {
+            key: list(strategy.get(key) or [])
+            + [default] * (row_count - len(strategy.get(key) or []))
+            for key, default in fields.items()
+        }
         if name in self.library:
             existing = self.library[name]
-            for key in ("Example", "Score", "Embeddings"):
-                if key in strategy and strategy[key]:
-                    existing.setdefault(key, []).extend(strategy[key])
+            existing_count = max(len(existing.get(key, [])) for key in fields)
+            for key, default in fields.items():
+                column = existing.setdefault(key, [])
+                column.extend([default] * (existing_count - len(column)))
+                column.extend(values[key])
         else:
             self.library[name] = {
                 "Strategy": name,
                 "Definition": strategy.get("Definition", ""),
-                "Example": strategy.get("Example", []),
-                "Score": strategy.get("Score", []),
-                "Embeddings": strategy.get("Embeddings", []),
+                **values,
             }
         if notify:
             self.logger.info(f"Strategy '{name}' updated (total: {len(self.library)})")
@@ -350,6 +240,11 @@ class StrategyLibrary:
         query_embedding = self.embed(query)
         if query_embedding is None:
             return True, []
+        try:
+            query_embedding = validate_embedding_vector(query_embedding)
+        except ValueError as exc:
+            self.logger.warning("Skipping retrieval: %s", exc)
+            return True, []
 
         # Collect all embeddings from all strategies
         all_embeddings, all_scores, all_examples, reverse_map = [], [], [], []
@@ -357,7 +252,14 @@ class StrategyLibrary:
             for i, emb in enumerate(s_info.get("Embeddings", [])):
                 if not isinstance(emb, np.ndarray):
                     continue
-                all_embeddings.append(emb.astype(np.float32))
+                try:
+                    emb = validate_embedding_vector(emb, dimension=query_embedding.size)
+                except ValueError as exc:
+                    self.logger.warning(
+                        "Skipping invalid embedding for %s: %s", s_name, exc
+                    )
+                    continue
+                all_embeddings.append(emb)
                 all_scores.append(s_info["Score"][i] if i < len(s_info["Score"]) else 0)
                 all_examples.append(
                     s_info["Example"][i] if i < len(s_info["Example"]) else ""
@@ -379,6 +281,8 @@ class StrategyLibrary:
         # Collect up to 2*k unique strategies (same as original)
         seen, retrieved = set(), {}
         for dist, idx in zip(distances, indices):
+            if idx < 0 or idx >= len(reverse_map) or not np.isfinite(dist):
+                continue
             s_name = reverse_map[idx]
             if s_name not in seen:
                 seen.add(s_name)
@@ -440,7 +344,14 @@ class StrategyLibrary:
             None.
         """
         with open(path + ".pkl", "wb") as f:
-            pickle.dump(self.library, f)
+            pickle.dump(
+                {
+                    "format": "hackagent-strategy-library-v1",
+                    "embedding_space": self._embedding_space(),
+                    "library": self.library,
+                },
+                f,
+            )
         self.logger.info(f"Strategy library saved to {path}.pkl")
 
     def load(self, path: str) -> None:
@@ -455,5 +366,35 @@ class StrategyLibrary:
         pkl = path if path.endswith(".pkl") else path + ".pkl"
         if os.path.exists(pkl):
             with open(pkl, "rb") as f:
-                self.library = pickle.load(f)
+                saved = pickle.load(f)
+            if saved.get("format") == "hackagent-strategy-library-v1":
+                self.library = saved["library"]
+                compatible = saved.get("embedding_space") == self._embedding_space()
+            else:
+                self.library = saved
+                # Old normal-config libraries contain hashed chat signatures.
+                compatible = (
+                    self._legacy_embedding_mode
+                    or self.embedding_model.startswith("local/")
+                )
+            if not compatible:
+                self.logger.warning(
+                    "Loaded library has an incompatible or unknown embedding space; "
+                    "discarding stored vectors. Rebuild the library for semantic retrieval."
+                )
+                for strategy in self.library.values():
+                    strategy["Embeddings"] = [None] * max(
+                        len(strategy.get(key, []))
+                        for key in ("Example", "Score", "Embeddings")
+                    )
             self.logger.info(f"Loaded {len(self.library)} strategies from {pkl}")
+
+    def _embedding_space(self) -> Dict[str, Any]:
+        """Persist provider identity, never credentials, to guard library reuse."""
+        if self.embedding_model.startswith("local/"):
+            return {"model": "local/bag-of-words", "dimension": 512}
+        config = {**self.embedder_config, "api_key": None}
+        kwargs = embedding_request_kwargs(config)
+        return {
+            key: kwargs.get(key) for key in ("model", "custom_llm_provider", "api_base")
+        }

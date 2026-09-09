@@ -135,12 +135,11 @@ advanced_config = {
         "api_key": "${OPENROUTER_API_KEY}"
     },
     "embedder": {
-        "identifier": "gemma3:4b",
+        "identifier": "embeddinggemma:300m",
         "endpoint": "http://localhost:11434",
         "agent_type": "OLLAMA",
         "api_key": None,
-        "max_tokens": 100,
-        "temperature": 0.0
+        "on_error": "disable"
     },
     "category_classifier": {
         "identifier": "gemma3:4b",
@@ -175,13 +174,53 @@ advanced_config = {
 
 ### Embedder Role
 
-AutoDAN-Turbo uses a top-level `embedder` config for strategy retrieval. This role is now fully configurable from `attack_config`.
+AutoDAN-Turbo uses a top-level `embedder` config for strategy retrieval. It sends
+embedding requests through LiteLLM and uses the returned numeric vectors directly
+in FAISS. It never sends chat messages to the embedder or hashes generated text.
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `embedder.identifier` | Embedder model used for strategy retrieval | `gemma3:4b` |
-| `embedder.endpoint` | Endpoint used by the embedder router | `http://localhost:11434` |
-| `embedder.agent_type` | Router adapter type for the embedder | `OLLAMA` |
+| `embedder.identifier` | Embedding-capable model used for retrieval | `embeddinggemma` |
+| `embedder.endpoint` | Embedding provider API base or full embedding endpoint | `http://localhost:11434` |
+| `embedder.agent_type` | Embedding provider: `OLLAMA`, `OPENAI_SDK`, or `LITELLM` | `OLLAMA` |
+| `embedder.api_key` | Literal key or environment variable name (`NAME` / `${NAME}`) | `None` |
+| `embedder.on_error` | `disable`: log failure and skip external retrieval for this run; `raise`: propagate the error | `disable` |
+
+For Ollama, base URLs, `/v1`, `/v1/embeddings`, `/api/embed`, and `/api/embeddings`
+are accepted (including trailing slashes). All select Ollama's OpenAI-compatible
+`/v1/embeddings` endpoint. Optional `ollama/` or `ollama_chat/` model prefixes are
+removed before sending the model name. Reverse-proxy path prefixes are preserved.
+
+For OpenAI-compatible providers, use `agent_type="OPENAI_SDK"`. A full
+`.../embeddings` URL is reduced to its API base; a bare origin gets `/v1`.
+Custom API paths such as OpenRouter's `/api/v1` are preserved. Omitting `endpoint`
+uses the OpenAI provider default, not the Ollama default. Set `api_key` explicitly,
+reference an environment variable, or use `OPENAI_API_KEY`; HackAgent storage
+tokens are never reused. On custom compatible endpoints, `identifier` is the
+server-native model ID: names such as `openai/text-embedding-3-small` are preserved
+verbatim. Only the default/official OpenAI service accepts `openai/` as an optional
+routing prefix in `OPENAI_SDK` mode.
+
+`LITELLM` preserves provider-prefixed identifiers and provider environment
+credentials. Native provider bases (for example an Azure resource URL) pass
+through unchanged; they do not acquire an OpenAI-compatible `/v1` suffix.
+OpenAI endpoint normalization applies to `openai/` routes, while `ollama/` and
+`ollama_chat/` routes select the Ollama-compatible endpoint described above.
+
+External failures or malformed/nonfinite/empty vectors **never silently fall back
+to local embeddings**. With the default `on_error="disable"`, the attack continues
+without semantic retrieval after a failure. Choose `on_error="raise"` to fail on
+runtime embedding errors. For deterministic offline retrieval, explicitly select
+`embedder={"identifier": "local/bag-of-words"}` (512-dimensional hashing, no service
+or credentials). Legacy `StrategyLibrary(embedding_model=..., embedding_api_key=...,
+embedding_api_base=...)` arguments remain supported.
+
+Saved libraries record their embedding provider/model/base. Loading a library
+from another vector space discards its vectors while retaining strategy text and
+scores; rebuild it for retrieval. Old unversioned libraries loaded through normal
+provider config also discard vectors because they may contain hashed chat
+signatures. Explicit local and legacy modes can still load their old libraries.
+Malformed or dimension-incompatible stored vectors are skipped before FAISS.
 
 ### Preflight Controls (Advanced)
 
@@ -189,6 +228,12 @@ AutoDAN-Turbo uses a top-level `embedder` config for strategy retrieval. This ro
 |-----------|-------|-------------|---------|
 | `_preflight_require_embedder` | AutoDAN-Turbo | When `true`, `embedder` is treated as required during preflight availability checks. | `false` |
 | `_preflight_probe_optional_roles` | Global (all attacks) | When `true`, preflight also probes roles marked optional by attack-specific role resolution. | `false` |
+
+The embedder remains optional by default; `on_error` does not change preflight
+requirements. Enable `_preflight_require_embedder` to abort before a run if a real
+embedding request fails. When probed, the embedder must return a valid numeric
+vector: model presence or an HTTP success without vectors is insufficient.
+Chat and embedding capabilities are checked separately even for the same model.
 
 ### Role Models
 
@@ -280,5 +325,5 @@ shared by every attack.
 - Warm-up and lifelong phases share a single strategy library per run.
 - For custom endpoints, pass `agent_type="OPENAI_SDK"` with the appropriate `endpoint`.
 - Use a fast, cheap scorer to reduce cost. The scorer runs for every attempt.
-- You can set `embedder.identifier` to `local/bag-of-words` for deterministic local retrieval signatures.
+- You can set `embedder.identifier` to `local/bag-of-words` for deterministic local retrieval vectors.
 - The jailbreak condition uses scorer threshold: success when `score >= break_score`.

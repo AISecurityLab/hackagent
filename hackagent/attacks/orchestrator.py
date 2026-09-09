@@ -42,6 +42,7 @@ from uuid import UUID
 import httpx
 
 from hackagent.errors import HackAgentError
+from hackagent.attacks.shared.embedding_utils import request_embedding
 from hackagent.router.tracking.audit import record_run_audit_failure
 from hackagent.attacks.techniques.config import (
     DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE,
@@ -684,12 +685,19 @@ class AttackOrchestrator:
         by a local Ollama are fetched on first use. Failures are swallowed — the
         probe still reports anything genuinely unreachable.
         """
-        candidates = [
-            str(t.get("identifier"))
-            for t in targets
-            if str(t.get("agent_type") or "").upper() == "OLLAMA"
-            and t.get("identifier")
-        ]
+        candidates = []
+        for target in targets:
+            model = str(target.get("identifier") or "")
+            if str(target.get("agent_type") or "").upper() != "OLLAMA":
+                continue
+            if not model or model.startswith("local/"):
+                continue
+            if target.get("role") == "embedder":
+                for prefix in ("ollama/", "ollama_chat/"):
+                    if model.startswith(prefix):
+                        model = model[len(prefix) :]
+                        break
+            candidates.append(model)
         if not candidates or shutil.which("ollama") is None:
             return
         try:
@@ -944,12 +952,13 @@ class AttackOrchestrator:
         return str(role or "unknown")
 
     @staticmethod
-    def _preflight_target_key(target: Dict[str, Any]) -> Tuple[str, str, str]:
+    def _preflight_target_key(target: Dict[str, Any]) -> Tuple[str, str, str, str]:
         """Build deduplication key for effective model endpoint checks."""
         return (
             str(target.get("identifier") or ""),
             str(target.get("endpoint") or ""),
             str(target.get("agent_type") or ""),
+            "embedding" if target.get("role") == "embedder" else "chat",
         )
 
     def _collect_model_preflight_targets(
@@ -960,7 +969,7 @@ class AttackOrchestrator:
     ) -> List[Dict[str, Any]]:
         """Collect model endpoints that must be reachable before run start."""
         targets: List[Dict[str, Any]] = []
-        targets_by_key: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
+        targets_by_key: Dict[Tuple[str, str, str, str], Dict[str, Any]] = {}
 
         def _register_target(
             target: Dict[str, Any],
@@ -1200,54 +1209,18 @@ class AttackOrchestrator:
         return env_value if env_value else raw_text
 
     def _probe_embedding_target(self, target: Dict[str, Any]) -> Optional[str]:
-        """Probe embedding endpoint using an embeddings request instead of chat."""
-        endpoint = str(target.get("endpoint") or "").strip().rstrip("/")
-        identifier = str(target.get("identifier") or "")
-        role_config = (
-            target.get("config") if isinstance(target.get("config"), dict) else {}
-        )
-
-        if not endpoint:
-            return "missing endpoint for embedding health check"
-        if not identifier:
-            return "missing identifier for embedding health check"
-
-        probe_endpoint = endpoint
-        if not probe_endpoint.lower().endswith("/embeddings"):
-            probe_endpoint = f"{probe_endpoint}/embeddings"
-
-        headers: Dict[str, str] = {
-            "Content-Type": "application/json",
-            "User-Agent": "HackAgent/0.1.0",
-        }
-        api_key = self._resolve_probe_api_key(role_config)
-        if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
-
-        payload = {
-            "model": identifier,
-            "input": ["healthcheck"],
-        }
-
+        """Verify embedding capability with the same provider path as retrieval."""
+        role_config = dict(target.get("config") or {})
+        for key in ("identifier", "endpoint", "agent_type"):
+            if key not in role_config:
+                role_config[key] = target.get(key)
+        if str(role_config.get("identifier") or "").startswith("local/"):
+            return None
+        role_config["timeout"] = 20.0
         try:
-            response = httpx.post(
-                probe_endpoint,
-                headers=headers,
-                json=payload,
-                timeout=20.0,
-            )
+            request_embedding(role_config, "healthcheck")
         except Exception as exc:
             return f"embedding health check failed ({type(exc).__name__}): {exc}"
-
-        if response.status_code >= 400:
-            body = response.text.strip()
-            if len(body) > 300:
-                body = f"{body[:297]}..."
-            return (
-                f"embedding endpoint returned {response.status_code}: "
-                f"{body or 'empty response body'}"
-            )
-
         return None
 
     def _probe_model_target(self, target: Dict[str, Any]) -> Optional[str]:
@@ -1263,6 +1236,9 @@ class AttackOrchestrator:
             "embedder" in normalized_roles or endpoint.lower().endswith("/embeddings")
         )
 
+        if should_use_embedding_probe:
+            return self._probe_embedding_target(target)
+
         if kind == "existing_router":
             router = target.get("router")
             registration_key = str(target.get("registration_key") or "")
@@ -1271,9 +1247,6 @@ class AttackOrchestrator:
             return self._probe_router_registration(router, registration_key)
 
         if kind == "router_config":
-            if should_use_embedding_probe:
-                return self._probe_embedding_target(target)
-
             from hackagent.attacks.shared.router_factory import create_router
 
             try:
