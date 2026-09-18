@@ -247,6 +247,9 @@ class EvaluatorConfig(BaseModel):
     max_judge_retries: int = 1
     # Optional user-defined system prompt prepended to every judge request.
     system_prompt: Optional[str] = None
+    # Reasoning control passed on every judge request. Missing/None is
+    # normalized to False by BaseJudgeEvaluator.
+    thinking: Optional[bool] = False
 
     @model_validator(mode="before")
     @classmethod

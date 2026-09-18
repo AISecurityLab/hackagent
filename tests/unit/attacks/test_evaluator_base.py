@@ -778,6 +778,7 @@ class TestProcessRowsWithRouter(unittest.TestCase):
         self.assertEqual(raw, ["yes", "no"])
         self.assertEqual(len(expls), 2)
         self.assertEqual(len(router.calls), 2)
+        self.assertTrue(all(call[1]["thinking"] is False for call in router.calls))
 
 
 if __name__ == "__main__":
