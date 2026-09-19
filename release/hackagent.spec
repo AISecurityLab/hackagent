@@ -17,19 +17,17 @@ datas = []
 # metadata by default without this.
 datas += copy_metadata("hackagent")
 # hackagent ships non-.py data (datasets/omnisafebench/*.json, examples/**,
-# server/dashboard/templates/*, server/api/scripts/*) that PyInstaller's
+# server/webui/static/**, server/api/scripts/*) that PyInstaller's
 # default import hook does not collect for first-party packages.
 datas += collect_data_files("hackagent")
 datas += collect_data_files("textual")
-datas += collect_data_files("nicegui")
 
 hiddenimports = []
-# textual.widgets and nicegui both lazily import internal submodules via
+# textual.widgets lazily imports internal submodules via
 # module-level __getattr__, which PyInstaller's static bytecode analysis
 # does not follow (confirmed: frozen builds without this raise
 # ModuleNotFoundError: No module named 'textual.widgets._tab_pane').
 hiddenimports += collect_submodules("textual")
-hiddenimports += collect_submodules("nicegui")
 
 a = Analysis(
     [os.path.join(SPECPATH, "entrypoint.py")],

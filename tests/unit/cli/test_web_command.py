@@ -17,49 +17,48 @@ from hackagent.cli.commands.web import (
 
 
 class _DummyLocalBackend:
-    pass
+    """Stand-in for LocalBackend that records whether it was closed."""
+
+    def __init__(self) -> None:
+        self.closed = False
+
+    def close(self) -> None:
+        self.closed = True
 
 
 class TestWebCommand(unittest.TestCase):
-    """Test backend selection and command execution for web CLI."""
+    """Test mode selection and command execution for the web CLI."""
 
     def _free_port_socket(self):
         mock_socket = MagicMock()
         mock_socket.__enter__.return_value.connect_ex.return_value = 1
         return mock_socket
 
-    def test_web_remote_mode_opens_cloud_dashboard(self):
+    def test_web_remote_mode_proxies_with_api_key(self):
         runner = CliRunner()
         config = MagicMock()
         config.api_key = "test-key"
         config.base_url = "https://api.hackagent.dev"
-        with (
-            patch("webbrowser.open", return_value=True) as mock_open,
-            patch("hackagent.server.dashboard.create_app") as mock_create_app,
-        ):
-            result = runner.invoke(web, [], obj={"config": config})
-
-        self.assertEqual(result.exit_code, 0)
-        mock_open.assert_called_once_with("https://app.hackagent.dev")
-        mock_create_app.assert_not_called()
-
-    def test_web_remote_mode_no_browser_does_not_open_browser(self):
-        runner = CliRunner()
-        config = MagicMock()
-        config.api_key = "test-key"
-        config.base_url = "https://api.hackagent.dev"
+        app = MagicMock()
 
         with (
-            patch("webbrowser.open") as mock_open,
-            patch("hackagent.server.dashboard.create_app") as mock_create_app,
+            patch("hackagent.server.webui.create_app", return_value=app) as mock_create,
+            patch("hackagent.server.storage.local.LocalBackend") as mock_local_cls,
+            patch("socket.socket", return_value=self._free_port_socket()),
         ):
             result = runner.invoke(web, ["--no-browser"], obj={"config": config})
 
         self.assertEqual(result.exit_code, 0)
-        mock_open.assert_not_called()
-        mock_create_app.assert_not_called()
+        # Remote mode must not touch the local database at all.
+        mock_local_cls.assert_not_called()
+        mock_create.assert_called_once_with(
+            backend=None,
+            api_key="test-key",
+            base_url="https://api.hackagent.dev",
+        )
+        app.run.assert_called_once_with(host="127.0.0.1", port=7860, threaded=True)
 
-    def test_web_local_mode_uses_local_dashboard(self):
+    def test_web_local_mode_serves_from_local_backend(self):
         runner = CliRunner()
         config = MagicMock()
         config.api_key = None
@@ -73,9 +72,7 @@ class TestWebCommand(unittest.TestCase):
                 "hackagent.server.storage.local.LocalBackend",
                 return_value=local_backend,
             ) as mock_local_cls,
-            patch(
-                "hackagent.server.dashboard.create_app", return_value=app
-            ) as mock_create_app,
+            patch("hackagent.server.webui.create_app", return_value=app) as mock_create,
             patch("socket.socket", return_value=self._free_port_socket()),
         ):
             result = runner.invoke(
@@ -86,8 +83,80 @@ class TestWebCommand(unittest.TestCase):
 
         self.assertEqual(result.exit_code, 0)
         mock_local_cls.assert_called_once_with(db_path="/tmp/test-dashboard.db")
-        mock_create_app.assert_called_once_with(backend=local_backend)
-        app.run.assert_called_once_with(host="127.0.0.1", port=7860, show=False)
+        mock_create.assert_called_once_with(
+            backend=local_backend,
+            api_key=None,
+            base_url="https://api.hackagent.dev",
+        )
+        app.run.assert_called_once_with(host="127.0.0.1", port=7860, threaded=True)
+        self.assertTrue(local_backend.closed)
+
+    def test_web_local_flag_overrides_configured_api_key(self):
+        runner = CliRunner()
+        config = MagicMock()
+        config.api_key = "test-key"
+        config.base_url = "https://api.hackagent.dev"
+
+        local_backend = _DummyLocalBackend()
+        app = MagicMock()
+
+        with (
+            patch(
+                "hackagent.server.storage.local.LocalBackend",
+                return_value=local_backend,
+            ),
+            patch("hackagent.server.webui.create_app", return_value=app) as mock_create,
+            patch("socket.socket", return_value=self._free_port_socket()),
+        ):
+            result = runner.invoke(
+                web, ["--local", "--no-browser"], obj={"config": config}
+            )
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertIsNone(mock_create.call_args.kwargs["api_key"])
+
+    def test_web_without_bundle_exits_with_guidance(self):
+        runner = CliRunner()
+        config = MagicMock()
+        config.api_key = None
+        config.base_url = "https://api.hackagent.dev"
+
+        from hackagent.server.webui import MissingBundleError
+
+        with (
+            patch(
+                "hackagent.server.storage.local.LocalBackend",
+                return_value=_DummyLocalBackend(),
+            ),
+            patch(
+                "hackagent.server.webui.create_app",
+                side_effect=MissingBundleError(),
+            ),
+        ):
+            result = runner.invoke(web, ["--no-browser"], obj={"config": config})
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn("No web UI bundle", result.output)
+
+    def test_web_opens_browser_once_the_server_is_up(self):
+        runner = CliRunner()
+        config = MagicMock()
+        config.api_key = "test-key"
+        config.base_url = "https://api.hackagent.dev"
+
+        with (
+            patch("hackagent.server.webui.create_app", return_value=MagicMock()),
+            patch("socket.socket", return_value=self._free_port_socket()),
+            patch(
+                "hackagent.cli.commands.web._open_browser_when_up"
+            ) as mock_open_browser,
+        ):
+            result = runner.invoke(web, [], obj={"config": config})
+
+        self.assertEqual(result.exit_code, 0)
+        mock_open_browser.assert_called_once_with(
+            "http://127.0.0.1:7860", "127.0.0.1", 7860
+        )
 
 
 class TestFreePort(unittest.TestCase):
@@ -165,7 +234,7 @@ class TestFreePort(unittest.TestCase):
                 "hackagent.server.storage.local.LocalBackend",
                 return_value=_DummyLocalBackend(),
             ),
-            patch("hackagent.server.dashboard.create_app", return_value=app),
+            patch("hackagent.server.webui.create_app", return_value=app),
             patch("hackagent.cli.commands.web._free_port", return_value=False),
         ):
             result = runner.invoke(web, ["--no-browser"], obj={"config": config})

@@ -105,14 +105,20 @@ HackAgent uses a modular pipeline to test agent robustness end-to-end.
 
 HackAgent supports both local and remote reporting.
 
-- Local mode stores test results in SQLite and includes a built-in dashboard.
+- Local mode stores test results in SQLite, readable offline.
 - Cloud mode syncs runs to the HackAgent remote platform when an API key is configured.
+
+`hackagent web` serves the HackAgent dashboard — the same app as
+[app.hackagent.dev](https://app.hackagent.dev) — from your own machine, against
+your cloud data when an API key is configured and against the local SQLite
+database (read-only) when it is not. Your API key stays in the CLI process and
+is never exposed to the browser.
 
 ```bash
 hackagent web
 ```
 
-Access cloud reporting at [https://app.hackagent.dev](https://app.hackagent.dev).
+See [INSTALL.md](INSTALL.md) for setup, modes and options.
 
 ## Responsible Use
 

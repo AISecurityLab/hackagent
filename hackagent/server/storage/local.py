@@ -33,6 +33,7 @@ from hackagent.server.storage.base import (
     RunRecord,
     TraceRecord,
 )
+from hackagent.server.storage.buckets import result_bucket
 
 logger = logging.getLogger("hackagent.server.storage.local")
 
@@ -518,8 +519,6 @@ class LocalBackend:
             rows = self._conn.execute(
                 "SELECT evaluation_status, evaluation_notes FROM results"
             ).fetchall()
-        from hackagent.server.dashboard._helpers import _result_bucket
-
         buckets = {
             "total": 0,
             "jailbreaks": 0,
@@ -529,7 +528,7 @@ class LocalBackend:
         }
         for r in rows:
             buckets["total"] += 1
-            b = _result_bucket(r["evaluation_status"], r["evaluation_notes"])
+            b = result_bucket(r["evaluation_status"], r["evaluation_notes"])
             if b == "jailbreak":
                 buckets["jailbreaks"] += 1
             elif b == "mitigated":

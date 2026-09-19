@@ -32,7 +32,6 @@ dependencies = [
     "python-dateutil>=2.8.0",
     "faiss-cpu>=1.13.2",
     "datasets>=2.14.0",
-    "nicegui>=2.0",
     "playwright>=1.40",
     "Pillow>=10.0.0",
     "flask>=3.1.3",
@@ -85,8 +84,12 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["hackagent"]
+# `artifacts` re-includes paths that .gitignore excludes. The web UI bundle is
+# a build output (scripts/build_webui.sh) but must ship in the wheel, otherwise
+# `hackagent web` has nothing to serve.
 artifacts = [
     "hackagent/examples/**",
+    "hackagent/server/webui/static/**",
 ]
 
 [tool.hatch.build.targets.sdist]

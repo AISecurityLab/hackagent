@@ -145,3 +145,7 @@ tests/e2e/attacks/
 
 # pytest-textual-snapshot report artifact
 snapshot_report.html
+
+# Web UI bundle (built by scripts/build_webui.sh)
+hackagent/server/webui/static/*
+!hackagent/server/webui/static/.gitignore

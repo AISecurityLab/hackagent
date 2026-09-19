@@ -7,6 +7,10 @@ on:
 
 env:
   UV_VERSION: "0.10.11"
+  # Revision of AISecurityLab/hackagent-webapp whose static export is
+  # bundled as the dashboard. Bump deliberately: it pins the UI a release
+  # ships, independently of this repo's own version.
+  WEBAPP_REF: "main"
 
 jobs:
   publish:
@@ -27,6 +31,18 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Build the web UI bundle
+        # Git Bash on the Windows runner; the default shell there is PowerShell.
+        shell: bash
+        env:
+          HACKAGENT_WEBAPP_REF: ${{ env.WEBAPP_REF }}
+        run: scripts/build_webui.sh
 
       - name: Build package
         run: uv build
@@ -83,6 +99,18 @@ jobs:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
 
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Build the web UI bundle
+        # Git Bash on the Windows runner; the default shell there is PowerShell.
+        shell: bash
+        env:
+          HACKAGENT_WEBAPP_REF: ${{ env.WEBAPP_REF }}
+        run: scripts/build_webui.sh
+
       - name: Install build dependencies
         run: uv sync --no-default-groups --group binaries
 
@@ -97,6 +125,16 @@ jobs:
           ./dist/hackagent/hackagent --version
           ./dist/hackagent/hackagent version
           ./dist/hackagent/hackagent scan --help
+          # The dashboard must be inside the archive, not rebuilt at runtime.
+          ./dist/hackagent/hackagent web --no-browser --port 7871 &
+          pid=$!
+          for _ in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:7871/healthz && break || sleep 1
+          done
+          curl -fsS http://127.0.0.1:7871/healthz | tee health.json
+          grep -q '"mode"' health.json
+          curl -fsS http://127.0.0.1:7871/ | grep -qi "<html"
+          kill "$pid" 2>/dev/null || true
 
       - name: Smoke test binary (Windows)
         if: runner.os == 'Windows'
