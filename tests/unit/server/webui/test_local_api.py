@@ -211,6 +211,25 @@ class TestStaticServing(_WebUITestCase):
         self.assertEqual(response.status_code, 404)
         self.assertIn(b"missing", response.data)
 
+    def test_serves_through_a_symlinked_bundle_path(self):
+        """A symlink anywhere above the bundle must not break serving.
+
+        macOS resolves temporary and per-user directories under /private, and
+        virtualenvs are often installed beneath a symlinked prefix, so comparing
+        a resolved candidate against an unresolved base would 404 everything.
+        """
+        real = Path(self._tmp.name) / "real-bundle"
+        real.mkdir()
+        (real / "index.html").write_text("<html>via symlink</html>")
+        link = Path(self._tmp.name) / "linked-bundle"
+        link.symlink_to(real, target_is_directory=True)
+
+        _static.static_dir = lambda: link
+        client = create_app(backend=self.backend).test_client()
+        response = client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"via symlink", response.data)
+
     def test_traversal_outside_the_bundle_is_refused(self):
         response = self.client.get("/../../etc/passwd")
         self.assertNotIn(b"root:", response.data)

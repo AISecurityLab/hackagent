@@ -61,11 +61,18 @@ def _resolve_asset(bundle: Path, subpath: str) -> Optional[Path]:
     if not subpath or subpath.endswith("/"):
         subpath = f"{subpath}index.html"
 
+    # Resolve the bundle too, not just the candidate: comparing a resolved path
+    # against an unresolved base fails the moment anything above the bundle is a
+    # symlink, which would reject every request. macOS puts temporary and
+    # per-user directories behind /private, and virtualenvs are routinely
+    # installed under symlinked prefixes.
+    base = bundle.resolve()
+
     candidates = [subpath, f"{subpath}.html", f"{subpath}/index.html"]
     for candidate in candidates:
-        resolved = (bundle / candidate).resolve()
+        resolved = (base / candidate).resolve()
         # Never serve outside the bundle, whatever the request path contains.
-        if not resolved.is_relative_to(bundle):
+        if not resolved.is_relative_to(base):
             return None
         if resolved.is_file():
             return resolved
