@@ -14,6 +14,8 @@ For attacks against text-only models using graph description languages (DOT, Mer
 
 FC-Attack exploits visual structured representations to encode harmful instructions as flowchart diagrams rendered as images. The attack decomposes a harmful goal into step-by-step descriptions, renders them as a flowchart image using Graphviz, and sends it to the target VLM alongside a jailbreak text prompt.
 
+FC-specific knobs live under **`fc_params`**. The optional step-decomposition LLM is top-level `step_generator`. Shared keys: [Shared Attack Config](./shared-args.md).
+
 ### Research Foundation
 
 > **"FC-Attack: Jailbreaking Multimodal Large Language Models via Auto-Generated Flowcharts"**
@@ -106,6 +108,8 @@ hackagent eval fc \
 ## Configuration Parameters
 
 ### Flowchart Parameters (`fc_params`)
+
+These keys belong **inside `fc_params`**, not next to `goals`. `step_generator`, `batch_size`, `judges`, and `output_dir` are top-level.
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
@@ -219,3 +223,9 @@ Notes:
 - If Graphviz is already installed (`dot` in `PATH`), that system binary is used first.
 - During `hackagent init`, HackAgent also checks for Graphviz and can prefetch portable binaries after explicit user confirmation.
 - On unsupported platforms, set `HACKAGENT_GRAPHVIZ_DOT` explicitly or install Graphviz manually.
+
+## Related
+
+- [Shared Attack Config](./shared-args.md) — goals, judges, batching, `*_params` convention
+- [tFC-Attack](./tfc.md) — text-only flowchart encoding
+- [MML](./mml.md) — multimodal image encoding
