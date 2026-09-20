@@ -44,7 +44,7 @@ def list_attacks(ctx):
     table.add_column("Status", style="yellow")
 
     grouped = grouped_attack_keys(ATTACK_CATALOG.keys())
-    for category in AttackCategory:
+    for category in list(AttackCategory):
         for attack_key in grouped[category]:
             meta = ATTACK_CATALOG[attack_key]
             tax = get_attack_taxonomy(attack_key)

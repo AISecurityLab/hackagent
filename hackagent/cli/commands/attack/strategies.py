@@ -88,7 +88,8 @@ def _make_strategy_command(
     tax = get_attack_taxonomy(technique_key)
     tags = f" Tags: {', '.join(tag.value for tag in tax.tags)}." if tax.tags else ""
     _command.__doc__ = (
-        f"{help_text.rstrip()} Category: {tax.category.label} — "
+        f"{help_text.rstrip()}\n\n"
+        f"Category: {tax.category.label} — "
         f"{tax.category.description}{tags}"
     )
 
