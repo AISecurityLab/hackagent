@@ -20,7 +20,7 @@ algorithm parameters, but they should not redefine the shared defaults.
 How an attack hits the target (static / adaptive / multi-turn, plus tags such
 as multimodal or RAG/indirect) is defined separately in
 `hackagent.attacks.taxonomy` — not in these shared argument models.
-See [Attack taxonomy](../../attacks/taxonomy.mdx).
+See [Attack taxonomy](../../../attacks/taxonomy.mdx).
 
 Victim-model request defaults are still defined here for compatibility and
 for callers that want the canonical schema, but the preferred runtime source
