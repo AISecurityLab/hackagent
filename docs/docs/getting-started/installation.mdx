@@ -20,6 +20,19 @@ source .venv/bin/activate
 pip install hackagent
 ```
 
+### Optional: the web dashboard
+
+[`hackagent web`](../cli/web.md) serves the HackAgent dashboard locally. It ships
+as a separate package so an install that never opens it does not carry the
+frontend assets:
+
+```bash
+pip install 'hackagent[web]'
+```
+
+You can add it at any time without reinstalling anything else. Release binaries
+already include it.
+
 ### Verify Installation
 
 After installation, verify everything works:

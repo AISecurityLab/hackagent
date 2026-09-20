@@ -5,12 +5,18 @@
 import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import ExitStack
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import httpx
 import numpy as np
 import pytest
+
+try:  # openai >= 3 ships its own httpx fork and no longer uses httpx directly.
+    import httpx2
+except ImportError:  # pragma: no cover - depends on the installed openai major
+    httpx2 = None
 
 from hackagent.attacks.shared.embedding_utils import (
     embedding_request_kwargs,
@@ -246,7 +252,14 @@ def embedding_http_transport(monkeypatch, local_litellm_cost_map):
             },
         )
 
-    with patch.object(httpx.Client, "send", send):
+    # Patch every HTTP client the SDKs may reach for. openai 3.x moved to the
+    # `httpx2` fork, so patching only `httpx` lets its requests reach the
+    # network — which is a real call to the provider, not a test failure the
+    # assertions below would catch.
+    clients = [httpx.Client] + ([httpx2.Client] if httpx2 is not None else [])
+    with ExitStack() as stack:
+        for client in clients:
+            stack.enter_context(patch.object(client, "send", send))
         yield requests
     assert not unexpected_requests
 

@@ -29,12 +29,13 @@ BUILD_DIR = Path(workpath).resolve()
 # bake the version into a runtime hook as a belt-and-braces fallback.
 datas = copy_metadata("hackagent")
 
-# Textual and NiceGUI serve non-Python assets (CSS, static web files) from their
-# package data, which the default import hooks do not collect.
-for package in ("textual", "nicegui"):
+# Textual serves non-Python assets (CSS) from its package data, which the
+# default import hooks do not collect.
+for package in ("textual",):
     datas += collect_data_files(package)
 
-# First-party non-Python assets (dataset taxonomies, bundled examples, docs).
+# First-party non-Python assets (dataset taxonomies, bundled examples, docs,
+# and the exported web UI under server/webui/static).
 datas += collect_data_files("hackagent", include_py_files=False)
 
 hiddenimports = ["faiss"]
