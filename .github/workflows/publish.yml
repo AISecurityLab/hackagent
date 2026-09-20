@@ -4,6 +4,15 @@ on:
   push:
     tags:
       - 'v*'
+  # Called by release.yml once it has tagged a merge to main. A tag pushed with
+  # GITHUB_TOKEN never triggers a workflow, so the release cannot rely on the
+  # push trigger above and calls this workflow directly instead.
+  workflow_call:
+    inputs:
+      tag:
+        description: Tag to build and publish.
+        required: true
+        type: string
 
 env:
   UV_VERSION: "0.10.11"
@@ -21,6 +30,11 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          # On a tag push this is already the tag; when this workflow is
+          # called, the caller's ref is main, whose tip is not necessarily
+          # the commit that was tagged.
+          ref: ${{ inputs.tag || github.ref_name }}
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -62,8 +76,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          name: ${{ inputs.tag || github.ref_name }}
           body_path: CHANGELOG.md
           draft: false
           prerelease: false
@@ -94,6 +108,11 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          # On a tag push this is already the tag; when this workflow is
+          # called, the caller's ref is main, whose tip is not necessarily
+          # the commit that was tagged.
+          ref: ${{ inputs.tag || github.ref_name }}
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -129,7 +148,7 @@ jobs:
 
       - name: Build binary
         env:
-          HACKAGENT_BUILD_VERSION: ${{ github.ref_name }}
+          HACKAGENT_BUILD_VERSION: ${{ inputs.tag || github.ref_name }}
         run: uv run --no-sync pyinstaller --noconfirm packaging/hackagent.spec
 
       - name: Smoke test binary (Unix)
@@ -202,5 +221,5 @@ jobs:
       - name: Attach archive to release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ inputs.tag || github.ref_name }}
           files: hackagent-*.${{ matrix.archive }}

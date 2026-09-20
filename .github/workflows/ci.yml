@@ -2,7 +2,7 @@ name: CI Checks
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "stage"]
   pull_request:
     branches: ["**"]
 
@@ -10,6 +10,30 @@ env:
   UV_VERSION: "0.10.11"
 
 jobs:
+  promotion-policy:
+    name: Promotion policy
+    # Production changes reach main only by promoting stage, so a release is
+    # always something that has already run on the staging branch.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce stage to main promotion
+        env:
+          # Read the base from the event payload rather than github.base_ref:
+          # for a pull request belonging to a stack the latter reports the
+          # stack's final target instead of the branch this pull request merges
+          # into, which fails stage-targeted work as if it were going straight
+          # to production.
+          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          echo "Pull request merges $HEAD_BRANCH into $BASE_BRANCH (github.base_ref reports '${{ github.base_ref }}')."
+          if [[ "$BASE_BRANCH" == "main" && "$HEAD_BRANCH" != "stage" ]]; then
+            echo "Production changes must be promoted from stage to main; received $HEAD_BRANCH -> $BASE_BRANCH." >&2
+            exit 1
+          fi
+          echo "Allowed promotion path: $HEAD_BRANCH -> $BASE_BRANCH"
+
   python-checks:
     name: Linting and Formatting
     runs-on: ubuntu-latest
