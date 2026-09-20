@@ -221,10 +221,11 @@ class TestStaticServing(_WebUITestCase):
         self.assertEqual(payload["authProvider"], "disabled")
         self.assertEqual(payload["apiUrl"], "/api/proxy")
 
-    def test_healthz_reports_mode_and_bundle_version(self):
+    def test_healthz_reports_mode_version_and_bundle_source(self):
         payload = self.get("/healthz")
         self.assertEqual(payload["mode"], "local")
         self.assertEqual(payload["webapp_version"], "9.9.9")
+        self.assertEqual(payload["webapp_source"], "package")
 
 
 if __name__ == "__main__":

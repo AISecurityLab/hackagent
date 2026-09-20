@@ -47,17 +47,28 @@ intact — the binary loads the dashboard and its datasets from alongside itself
 
 ### From PyPI
 
+The dashboard ships as a separate package, so an install that never opens it
+does not carry the frontend assets. Ask for it with the `web` extra:
+
 ```bash
-pip install hackagent      # or: uv tool install hackagent
+pip install 'hackagent[web]'      # or: uv tool install 'hackagent[web]'
 hackagent --version
 ```
 
-Release wheels ship the dashboard bundle too.
+`pip install hackagent` alone gives you the CLI, the SDK and the TUI; `hackagent
+web` will then tell you to add the extra. You can also install the dashboard
+later — `pip install 'hackagent[web]'` at any time — without reinstalling
+anything else.
+
+Behind a proxy, a private index, or an offline wheelhouse, this works like any
+other dependency: `pip download 'hackagent[web]'` on a connected machine and
+install from the resulting directory.
 
 ### From a source checkout
 
 A git checkout has **no** bundle — it is a build artifact, not tracked in the
-repository — so `hackagent web` will tell you to build one:
+repository. Either install the published one (`pip install 'hackagent[web]'`
+into your environment) or build it from a webapp checkout:
 
 ```bash
 git clone https://github.com/AISecurityLab/hackagent.git
@@ -171,8 +182,13 @@ bundled webapp version — useful when reporting a bug.
 
 ## 4. Troubleshooting
 
-**“No web UI bundle found …”** — you are running from a source checkout. Run
-`scripts/build_webui.sh` (Node 18+ required), or install a release build.
+**“No web UI bundle found …”** — nothing supplied a dashboard. Install it with
+`pip install 'hackagent[web]'`, build one from a webapp checkout with
+`scripts/build_webui.sh` (Node 18+ required), or use a release binary.
+
+A bundle inside the package tree always wins over an installed
+`hackagent-webui`, so a release binary serves the assets it shipped with. `GET
+/healthz` reports which one is in use.
 
 **“Port 7860 is already in use by another process.”** — a previous `hackagent`
 dashboard is reclaimed automatically; an unrelated process is never killed. Use

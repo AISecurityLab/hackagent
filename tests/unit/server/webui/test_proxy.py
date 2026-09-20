@@ -8,6 +8,7 @@ process and not in the browser, so the tests that matter here are the ones
 about which headers cross which boundary.
 """
 
+import sys
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -137,18 +138,29 @@ class TestCreateAppValidation(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = TemporaryDirectory()
         self._real_static_dir = _static.static_dir
+        # "No bundle" now means neither the package tree nor an installed
+        # hackagent-webui has one. A None entry makes the import fail, which
+        # matters because the real distribution may be installed here.
+        self._saved_module = sys.modules.get("hackagent_webui")
+        sys.modules["hackagent_webui"] = None
 
     def tearDown(self) -> None:
         _static.static_dir = self._real_static_dir
+        if self._saved_module is not None:
+            sys.modules["hackagent_webui"] = self._saved_module
+        else:
+            sys.modules.pop("hackagent_webui", None)
         self._tmp.cleanup()
 
-    def test_missing_bundle_raises_with_build_instructions(self):
+    def test_missing_bundle_raises_with_install_instructions(self):
         from hackagent.server.webui import MissingBundleError
 
         _static.static_dir = lambda: Path(self._tmp.name) / "absent"
         with self.assertRaises(MissingBundleError) as ctx:
             create_app(api_key="k")
-        self.assertIn("build_webui", str(ctx.exception))
+        message = str(ctx.exception)
+        self.assertIn("hackagent[web]", message)
+        self.assertIn("build_webui", message)
 
     def test_offline_mode_requires_a_backend(self):
         bundle = Path(self._tmp.name) / "static"

@@ -67,6 +67,16 @@ binaries = [
     "pyinstaller>=6.0",
 ]
 
+[project.optional-dependencies]
+# The dashboard bundle, published from the hackagent-webapp repository. Kept out
+# of the base wheel so an install that never opens `hackagent web` does not
+# carry ~0.9 MB of frontend assets; a compatible range rather than a pin, so UI
+# fixes reach users without a hackagent release. Release binaries bundle the
+# same assets directly and do not need this.
+web = [
+    "hackagent-webui>=0.3,<0.4",
+]
+
 [project.scripts]
 hackagent = "hackagent.cli.main:cli"
 

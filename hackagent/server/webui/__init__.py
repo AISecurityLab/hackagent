@@ -25,7 +25,12 @@ from typing import Any, Dict, Optional
 
 from flask import Flask, Response, jsonify, send_from_directory
 
-from hackagent.server.webui._static import bundle_version, find_bundle, static_dir
+from hackagent.server.webui._static import (
+    bundle_source,
+    bundle_version,
+    find_bundle,
+    static_dir,
+)
 
 logger = logging.getLogger("hackagent.server.webui")
 
@@ -39,9 +44,10 @@ class MissingBundleError(RuntimeError):
 
     def __init__(self) -> None:
         super().__init__(
-            f"No web UI bundle found at {static_dir()}. Build one with "
-            "`scripts/build_webui.sh` (needs a hackagent-webapp checkout), or "
-            "install a release build, which ships the bundle."
+            f"No web UI bundle found at {static_dir()}. Install it with "
+            "`pip install 'hackagent[web]'`, build one from a hackagent-webapp "
+            "checkout with `scripts/build_webui.sh`, or use a release binary, "
+            "which ships the bundle."
         )
 
 
@@ -138,6 +144,10 @@ def create_app(
                 "status": "ok",
                 "mode": app.config["HACKAGENT_MODE"],
                 "webapp_version": bundle_version(),
+                # "package" (shipped in this build) or "installed"
+                # (hackagent-webui): the first question to ask when the UI is
+                # not the version someone expects.
+                "webapp_source": bundle_source(),
             }
         )
 
