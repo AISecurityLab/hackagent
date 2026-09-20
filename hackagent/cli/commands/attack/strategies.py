@@ -9,11 +9,13 @@ repeating ~40 lines of boilerplate fourteen times, the commands are generated
 from :data:`_STRATEGY_COMMANDS` by :func:`_make_strategy_command`.
 
 To expose a new strategy, add an entry to :data:`_STRATEGY_COMMANDS` (and to
-``ATTACK_CATALOG``).
+``ATTACK_CATALOG``) and assign a primary category in
+:mod:`hackagent.attacks.taxonomy`.
 """
 
 import click
 
+from hackagent.attacks.taxonomy import get_attack_taxonomy
 from hackagent.cli.commands.attack.catalog import ATTACK_CATALOG
 from hackagent.cli.commands.attack.group import eval_cmd
 from hackagent.cli.commands.attack.options import _common_attack_options
@@ -83,7 +85,12 @@ def _make_strategy_command(
         )
 
     _command.__name__ = technique_key
-    _command.__doc__ = help_text
+    tax = get_attack_taxonomy(technique_key)
+    tags = f" Tags: {', '.join(tag.value for tag in tax.tags)}." if tax.tags else ""
+    _command.__doc__ = (
+        f"{help_text.rstrip()} Category: {tax.category.label} — "
+        f"{tax.category.description}{tags}"
+    )
 
     return eval_cmd.command(name=command_name)(
         _common_attack_options(handle_errors(_command))

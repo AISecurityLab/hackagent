@@ -6,6 +6,8 @@ sidebar_position: 1
 
 The Baseline attack sends goals **directly to the target with no transformation** — no obfuscation, no persuasion, no iterative refinement. It exists as a **control condition**: a way to measure how often the target complies with a harmful request when asked plainly, so that every other attack's success rate can be interpreted relative to it.
 
+**Category:** Static — one (or a few) fixed transforms, with no attacker refinement loop. See [Attack taxonomy](./taxonomy.mdx).
+
 ## Overview
 
 Baseline is the simplest attack in HackAgent and is typically the first one you run:

@@ -6,6 +6,8 @@ sidebar_position: 11
 
 A jailbreak attack that encodes harmful prompts as text-based graph descriptions (DOT, Mermaid, TikZ, PlantUML, ASCII) to exploit text-only LLMs.
 
+**Category:** Static. tFC is not tagged multimodal — it hits text-only models, unlike [FC-Attack](./fc.md). See [Attack taxonomy](./taxonomy.mdx).
+
 :::tip Looking for multimodal VLMs?
 For attacks using rendered flowchart images against Vision-Language Models, see [FC-Attack](./fc.md).
 :::

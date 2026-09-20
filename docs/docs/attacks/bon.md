@@ -6,6 +6,8 @@ sidebar_position: 7
 
 BoN is a stochastic black-box attack that **generates N randomly augmented versions** of a harmful prompt — using word scrambling, random capitalization, and ASCII perturbation — and picks the best candidate that bypasses the target model's safety mechanisms. The technique exploits the observation that random text mutations can break safety classifiers while preserving semantic meaning for the LLM.
 
+**Category:** Adaptive — Best-of-N searches many independently augmented candidates until a judge confirms success. See [Attack taxonomy](./taxonomy.mdx).
+
 ## Overview
 
 BoN operates without an external attacker model. The harmful goal is augmented with random text transformations controlled by a single strength parameter σ (sigma), and multiple augmented candidates are tested in parallel against the target. After each step, the best candidate is **evaluated by a judge** (e.g. HarmBench) to determine if it constitutes a successful jailbreak. If the judge confirms success, the search **terminates early**. Otherwise, the attack continues to the next step until the budget is exhausted.

@@ -6,49 +6,97 @@ sidebar_position: 1
 
 HackAgent provides multiple attack strategies, each designed for different security testing scenarios. Choose the right attack based on your testing goals, time constraints, and target characteristics.
 
+Every technique has exactly one **primary category** — Static, Adaptive, or Multi-turn — describing how it hits the target. Tags such as **multimodal** and **RAG/indirect** are secondary labels, not extra categories. See [Attack taxonomy](./taxonomy.mdx) for definitions and the assignment table.
+
 ## Overview
 
 ```mermaid
 graph LR
-    subgraph "Attack Types"
-        Z[Baseline] --> |"Control"| T[Target Agent]
-        A[AdvPrefix] --> |"Sophisticated"| T
-        B[AutoDAN-Turbo] --> |"Sophisticated"| T
-        C[PAIR] --> |"Adaptive"| T
-        M[Crescendo] --> |"Multi-Turn"| T
-        P[PAP] --> |"Persuasion"| T
-        D[Static Template] --> |"Fast"| T
-        E[TAP] --> |"Tree Search"| T
-        F[FlipAttack] --> |"Obfuscation"| T
-        G[BoN] --> |"Augmentation"| T
-        H4[h4rm3l] --> |"Composable"| T
-        I[CipherChat] --> |"Cipher"| T
-        J[RAG Attack] --> |"RAG Poisoning"| T
-        K[MML] --> |"Multimodal"| T
+    subgraph "Static"
+        Z[Baseline]
+        D[Static Template]
+        F[FlipAttack]
+        I[CipherChat]
+        H4[h4rm3l]
+        K[MML]
+        FC[FC]
+        TFC[tFC]
+        J[RAG Attack]
     end
+    subgraph "Adaptive"
+        C[PAIR]
+        E[TAP]
+        P[PAP]
+        G[BoN]
+        A[AdvPrefix]
+        B[AutoDAN-Turbo]
+    end
+    subgraph "Multi-turn"
+        M[Crescendo]
+    end
+    Z --> T[Target Agent]
+    D --> T
+    F --> T
+    I --> T
+    H4 --> T
+    K --> T
+    FC --> T
+    TFC --> T
+    J --> T
+    C --> T
+    E --> T
+    P --> T
+    G --> T
+    A --> T
+    B --> T
+    M --> T
     T --> R[Results & Analysis]
 ```
 
 ## Available Attacks
 
-| Attack | Description | Sophistication | Speed |
-|--------|-------------|----------------|-------|
-| [**Baseline**](./baseline.md) | Sends goals to the target with no transformation (control condition) | — None | Fastest |
-| [**Static Template**](./static-template.md) | Template-based prompt injection | ⭐ Basic | Fast |
-| [**FlipAttack**](./flipattack.md) | Character-level text obfuscation | ⭐ Basic | Fast |
-| [**BoN**](./bon.md) | Best-of-N random text augmentation | ⭐ Basic | Fast |
-| [**CipherChat**](./cipherchat.md) | Cipher-based non-natural-language jailbreak prompts | ⭐⭐ Medium | Fast |
-| [**h4rm3l**](./h4rm3l.md) | Composable prompt-decoration chains | ⭐⭐ Medium | Fast |
-| [**MML**](./mml.md) | Multimodal image-encoded jailbreak for Vision-Language Models | ⭐⭐ Medium | Fast |
-| [**FC**](./fc.md) | Auto-generated flowchart images to jailbreak VLMs | ⭐⭐ Medium | Fast |
-| [**tFC**](./tfc.md) | Auto-generated flowchart text to jailbreak LLMs | ⭐⭐ Medium | Fast |
-| [**PAP**](./pap.md) | Persuasive adversarial paraphrasing with social-science techniques | ⭐⭐ Medium | Medium |
-| [**PAIR**](./pair.md) | LLM-driven iterative prompt refinement | ⭐⭐ Medium | Medium |
-| [**Crescendo**](./crescendo.md) | Multi-turn conversational escalation with backtracking | ⭐⭐ Medium | Medium |
-| [**TAP**](./tap.md) | Tree search with on-topic pruning | ⭐⭐ Medium | Medium |
-| [**AdvPrefix**](./advprefix.md) | Multi-step adversarial prefix optimization | ⭐⭐⭐ High | Slower |
-| [**AutoDAN-Turbo**](./autodan_turbo.md) | Lifelong strategy discovery and reuse | ⭐⭐⭐ High | Slower |
-| [**RAG Attack**](./rag.md) | RAG document poisoning for indirect instruction following (Indirect Injection) | ⭐⭐⭐ High | Medium |
+Grouped by primary category. Speed/sophistication still vary inside a category (Baseline is a control; AdvPrefix is a long search).
+
+### Static
+
+One (or a few) fixed transforms, with no attacker refinement loop.
+
+| Attack | Description | Tags |
+|--------|-------------|------|
+| [**Baseline**](./baseline.md) | Sends goals to the target with no transformation (control condition) | — |
+| [**Static Template**](./static-template.md) | Template-based prompt injection | — |
+| [**FlipAttack**](./flipattack.md) | Character-level text obfuscation | — |
+| [**CipherChat**](./cipherchat.md) | Cipher-based non-natural-language jailbreak prompts | — |
+| [**h4rm3l**](./h4rm3l.md) | Composable prompt-decoration chains | — |
+| [**MML**](./mml.md) | Image-encoded jailbreak for Vision-Language Models | multimodal |
+| [**FC**](./fc.md) | Auto-generated flowchart images to jailbreak VLMs | multimodal |
+| [**tFC**](./tfc.md) | Auto-generated flowchart text to jailbreak LLMs | — |
+| [**RAG Attack**](./rag.md) | RAG document poisoning for indirect instruction following | indirect, rag |
+
+### Adaptive
+
+Many independent attempts that refine or search, without a shared growing conversation.
+
+| Attack | Description | Tags |
+|--------|-------------|------|
+| [**PAIR**](./pair.md) | LLM-driven iterative prompt refinement | — |
+| [**TAP**](./tap.md) | Tree search with on-topic pruning | — |
+| [**PAP**](./pap.md) | Persuasive adversarial paraphrasing with social-science techniques | — |
+| [**BoN**](./bon.md) | Best-of-N random text augmentation search | — |
+| [**AdvPrefix**](./advprefix.md) | Multi-step adversarial prefix optimization | — |
+| [**AutoDAN-Turbo**](./autodan_turbo.md) | Lifelong strategy discovery and reuse | — |
+
+### Multi-turn
+
+One growing conversation with the target.
+
+| Attack | Description | Tags |
+|--------|-------------|------|
+| [**Crescendo**](./crescendo.md) | Multi-turn conversational escalation with backtracking | — |
+
+:::tip Tags are secondary
+**multimodal** marks VLM/image attacks (MML, FC). **indirect** / **rag** mark document poisoning (RAG Attack). They never replace Static / Adaptive / Multi-turn.
+:::
 
 :::tip Dataset Support
 All attacks support loading goals from AI safety benchmarks like **AgentHarm**, **StrongREJECT**, and **HarmBench**. See [Dataset Providers](../datasets/) for details.
@@ -416,6 +464,8 @@ attack_config = {
 ---
 
 ## Choosing the Right Attack
+
+Start from the [attack taxonomy](./taxonomy.mdx): **static** for a fast first pass, **adaptive** when you can spend queries on search or refinement, **multi-turn** when you need a growing conversation, plus **multimodal** or **indirect**/**rag** tags when the channel matters.
 
 **AdvPrefix** is the right choice when thoroughness is the priority — comprehensive audits, sophisticated safety mechanisms, or detailed analytics where longer runtimes are acceptable.
 
