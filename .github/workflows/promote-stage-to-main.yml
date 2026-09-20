@@ -26,9 +26,14 @@ jobs:
     steps:
       - name: Ensure stage → main promotion PR
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.PROMOTE_GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+
+          if [[ -z "${GH_TOKEN:-}" ]]; then
+            echo "::error::PROMOTE_GITHUB_TOKEN secret is not set. Add a PAT (repo scope) that can open PRs; org policy blocks github.token from creating PRs."
+            exit 1
+          fi
 
           existing="$(gh pr list --repo "${{ github.repository }}" \
             --base main --head stage --state open \
