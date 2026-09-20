@@ -28,6 +28,7 @@ from hackagent.cli.tui.attack_specs import (
 from hackagent.cli.tui.views.attacks.helpers import (
     _ENDPOINT_OPTIONAL_AGENT_TYPES,
     _escape,
+    _selected_technique_keys,
 )
 
 
@@ -48,9 +49,9 @@ class AttacksRunnerMixin:
         endpoint = self.query_one("#endpoint-url", Input).value
         timeout = self.query_one("#timeout", Input).value
 
-        selected_strategies = [
-            str(v) for v in self.query_one("#attack-strategies", SelectionList).selected
-        ]
+        selected_strategies = _selected_technique_keys(
+            self.query_one("#attack-strategies", SelectionList).selected
+        )
 
         # Detect which input source is active (Goals vs Dataset)
         using_dataset = self.query_one("#radio-dataset", RadioButton).value

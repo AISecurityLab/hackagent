@@ -2,7 +2,7 @@ name: CI Checks
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "stage"]
   pull_request:
     branches: ["**"]
 
@@ -10,11 +10,36 @@ env:
   UV_VERSION: "0.10.11"
 
 jobs:
+  promotion-policy:
+    name: Promotion policy
+    # Production changes reach main only by promoting stage, so a release is
+    # always something that has already run on the staging branch.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce stage to main promotion
+        env:
+          # Read the base from the event payload rather than github.base_ref:
+          # for a pull request belonging to a stack the latter reports the
+          # stack's final target instead of the branch this pull request merges
+          # into, which fails stage-targeted work as if it were going straight
+          # to production.
+          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          echo "Pull request merges $HEAD_BRANCH into $BASE_BRANCH."
+          if [[ "$BASE_BRANCH" == "main" && "$HEAD_BRANCH" != "stage" ]]; then
+            echo "Production changes must be promoted from stage to main; received $HEAD_BRANCH -> $BASE_BRANCH." >&2
+            exit 1
+          fi
+          echo "Allowed promotion path: $HEAD_BRANCH -> $BASE_BRANCH"
+
   python-checks:
     name: Linting and Formatting
     runs-on: ubuntu-latest
-    # Skip on main push since PR already validated
-    if: github.event_name == 'pull_request'
+    # Skip on main push since the promoting PR already validated; run on
+    # push to stage so a merge into the promotion gate is still checked.
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/stage')
     steps:
       - uses: actions/checkout@v7
 
@@ -45,7 +70,7 @@ jobs:
     name: Tests (Python ${{ matrix.python-version }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
-    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    if: (github.event_name == 'pull_request' && github.base_ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/stage')
     strategy:
       fail-fast: false
       matrix:
@@ -124,7 +149,7 @@ jobs:
     name: Integration Tests (Offline)
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    if: (github.event_name == 'pull_request' && github.base_ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/stage')
     steps:
       - uses: actions/checkout@v7
 
@@ -176,7 +201,7 @@ jobs:
     name: Integration Tests (Ollama, ${{ matrix.shard }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    if: (github.event_name == 'pull_request' && github.base_ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/stage')
     strategy:
       fail-fast: false
       matrix:
@@ -262,7 +287,7 @@ jobs:
     name: E2E Tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    if: (github.event_name == 'pull_request' && github.base_ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/stage')
     env:
       HACKAGENT_API_KEY: ${{ secrets.HACKAGENT_API_KEY }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
@@ -310,7 +335,7 @@ jobs:
     name: Coverage Report
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    if: (github.event_name == 'pull_request' && github.base_ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/stage')
     needs:
       - test-matrix
       - integration-offline

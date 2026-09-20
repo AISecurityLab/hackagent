@@ -6,6 +6,8 @@ sidebar_position: 11
 
 MML is a multimodal jailbreak attack that **encodes harmful prompts into images** using visual transformations (word replacement, mirroring, rotation, Base64 encoding, or a combination), then constructs multimodal prompts that instruct a Vision-Language Model (VLM) to decode and act on the embedded content.
 
+**Category:** Static. **Tags:** Multimodal. See [Attack taxonomy](./taxonomy.mdx).
+
 ## Overview
 
 MML exploits the gap between text-only safety classifiers and multimodal understanding. By hiding the harmful request inside an image and providing decoding instructions in the text prompt, it bypasses safety filters that only inspect the textual part of the input.

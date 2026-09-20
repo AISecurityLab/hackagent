@@ -36,6 +36,7 @@ from hackagent.cli.tui.widgets.logs import AttackLogViewer
 
 from hackagent.cli.tui.views.attacks.helpers import (
     _default_campaign_attack_keys,
+    _selected_technique_keys,
 )
 
 from hackagent.cli.tui.views.attacks.executor import AttacksExecutorMixin
@@ -275,7 +276,7 @@ class AttacksTab(
         """React to attack multi-selection changes (which attacks will run)."""
         if event.selection_list.id != "attack-strategies":
             return
-        selected = list(event.selection_list.selected)
+        selected = _selected_technique_keys(event.selection_list.selected)
         self._sync_configuring_options(selected)
         self._sync_chain_mode_visibility(selected)
 

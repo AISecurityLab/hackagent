@@ -25,7 +25,6 @@ from hackagent.cli.tui.attack_specs import (
     AttackConfigSpec,
     ConfigField,
     FieldType,
-    get_all_attack_specs,
     get_attack_config_spec,
 )
 
@@ -34,6 +33,8 @@ from hackagent.cli.tui.views.attacks.helpers import (
     _AGENT_TYPE_CHOICES,
     _escape,
     _field_widget_id,
+    _selected_technique_keys,
+    _strategy_focus_choices,
 )
 
 
@@ -60,10 +61,8 @@ class AttacksFormMixin:
             return
         self._configuring_options_keys = list(selected)
 
-        all_specs = get_all_attack_specs()
-        focus_choices = [
-            (all_specs[key].display_name, key) for key in selected if key in all_specs
-        ]
+        labels = {key: label for label, key in _strategy_focus_choices()}
+        focus_choices = [(labels[key], key) for key in selected if key in labels]
         focus_select = self.query_one("#attack-strategy-focus", Select)
 
         if not focus_choices:
@@ -86,7 +85,7 @@ class AttacksFormMixin:
         """Show the hack_chain escalation toggle only when 2+ attacks are checked."""
         if selected is None:
             try:
-                selected = list(
+                selected = _selected_technique_keys(
                     self.query_one("#attack-strategies", SelectionList).selected
                 )
             except Exception:

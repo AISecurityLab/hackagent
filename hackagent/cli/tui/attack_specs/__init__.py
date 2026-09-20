@@ -21,7 +21,8 @@ Layout:
     - ``specs/``: one module per attack technique, each exposing ``SPEC``.
 
 To add a new attack to the TUI, add a module under ``specs/`` and list it in
-``specs/__init__.py``.
+``specs/__init__.py``. Assign the technique a primary category (and any tags)
+in :mod:`hackagent.attacks.taxonomy`.
 """
 
 from __future__ import annotations

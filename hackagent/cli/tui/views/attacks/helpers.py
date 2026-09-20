@@ -3,9 +3,12 @@
 
 """Module-level helpers and constants for the Attacks tab."""
 
-from typing import Any, List
+from typing import Any, List, Sequence, Union
+
+from textual.widgets.selection_list import Selection
 
 
+from hackagent.attacks.taxonomy import grouped_attack_keys
 from hackagent.cli.tui.attack_specs import (
     ConfigField,
     get_all_attack_specs,
@@ -75,6 +78,45 @@ def _default_campaign_attack_keys() -> List[str]:
 
     all_specs = get_all_attack_specs()
     return [next(iter(all_specs))] if all_specs else []
+
+
+def _strategy_selection_choices() -> List[Union[Selection[str], tuple]]:
+    """Build the Attacks-tab selector, grouped by primary taxonomy category.
+
+    Category headers are disabled rows so they cannot be checked as techniques.
+    Tags (for example multimodal) are appended to the technique label.
+    """
+    all_specs = get_all_attack_specs()
+    grouped = grouped_attack_keys(all_specs.keys())
+    choices: List[Union[Selection[str], tuple]] = []
+    for category, keys in grouped.items():
+        if not keys:
+            continue
+        choices.append(
+            Selection(
+                f"— {category.label} —",
+                f"_cat_{category.value}",
+                disabled=True,
+            )
+        )
+        for key in keys:
+            spec = all_specs[key]
+            tag_suffix = ""
+            if spec.tags:
+                tag_suffix = "  · " + ", ".join(tag.value for tag in spec.tags)
+            choices.append((f"{spec.display_name}{tag_suffix}", key))
+    return choices
+
+
+def _strategy_focus_choices() -> List[tuple]:
+    """Technique options for the Configuring-attack dropdown (no category headers)."""
+    return [item for item in _strategy_selection_choices() if isinstance(item, tuple)]
+
+
+def _selected_technique_keys(selected: Sequence[Any]) -> List[str]:
+    """Keep real technique keys; drop category-header placeholders."""
+    available = get_all_attack_specs()
+    return [str(key) for key in selected if str(key) in available]
 
 
 # =====================================================================
