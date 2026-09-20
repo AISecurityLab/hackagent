@@ -83,6 +83,43 @@ class TestIndirectPromptInjectionAttackReturnType(unittest.TestCase):
             with self.assertRaises(ValueError):
                 attack.run(["g1"])
 
+    def test_judge_request_disables_thinking_by_default(self):
+        attack = self._make_attack()
+        attack.judge_router.route_request.return_value = {
+            "generated_text": '{"classification": "FAILURE"}',
+        }
+
+        attack._judge_response("query", "context", "response", "goal")
+
+        request_data = attack.judge_router.route_request.call_args.kwargs[
+            "request_data"
+        ]
+        self.assertIs(request_data["thinking"], False)
+
+    def test_judge_request_honors_explicit_thinking(self):
+        with patch(
+            "hackagent.attacks.techniques.indirect_prompt_injection.attack.create_router",
+            side_effect=_fake_create_router,
+        ):
+            attack = IndirectPromptInjectionAttack(
+                config={
+                    "output_dir": "./logs/runs",
+                    "judges": [{"identifier": "judge", "thinking": True}],
+                },
+                client=MagicMock(),
+                agent_router=MagicMock(),
+            )
+        attack.judge_router.route_request.return_value = {
+            "generated_text": '{"classification": "FAILURE"}',
+        }
+
+        attack._judge_response("query", "context", "response", "goal")
+
+        request_data = attack.judge_router.route_request.call_args.kwargs[
+            "request_data"
+        ]
+        self.assertIs(request_data["thinking"], True)
+
 
 if __name__ == "__main__":
     unittest.main()

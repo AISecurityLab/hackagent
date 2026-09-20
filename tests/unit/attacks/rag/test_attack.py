@@ -137,6 +137,29 @@ class TestRagAttackMethods(unittest.TestCase):
         attack, _ = _make_attack()
         result = attack._judge_response("q", "ctx", "resp", "goal")
         self.assertEqual(result["classification"], "SUCCESS")
+        request_data = attack.judge_router.route_request.call_args.kwargs[
+            "request_data"
+        ]
+        self.assertIs(request_data["thinking"], False)
+
+    def test_judge_response_honors_explicit_thinking(self):
+        attack, _ = _make_attack(
+            {
+                "judges": [
+                    {
+                        "identifier": "gpt",
+                        "endpoint": "http://x/v1",
+                        "api_key": "k",
+                        "thinking": True,
+                    }
+                ]
+            }
+        )
+        attack._judge_response("q", "ctx", "resp", "goal")
+        request_data = attack.judge_router.route_request.call_args.kwargs[
+            "request_data"
+        ]
+        self.assertIs(request_data["thinking"], True)
 
     def test_judge_response_keyword_failure(self):
         attack, _ = _make_attack()

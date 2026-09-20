@@ -265,6 +265,12 @@ class TestCoreGenerationAndScoring(unittest.TestCase):
         self.assertEqual(score, 8.0)
         self.assertIn("Analysis", assessment)
         self.assertEqual(scorer_router.route_request.call_count, 2)
+        self.assertTrue(
+            all(
+                call.kwargs["request_data"]["thinking"] is False
+                for call in scorer_router.route_request.call_args_list
+            )
+        )
 
     @patch("hackagent.attacks.techniques.autodan_turbo.core.extract_response_content")
     def test_score_response_explicit_assessment_skips_wrapper(self, mock_extract):
@@ -285,6 +291,10 @@ class TestCoreGenerationAndScoring(unittest.TestCase):
         self.assertEqual(score, 6.0)
         self.assertIn("score", assessment)
         scorer_router.route_request.assert_called_once()
+        self.assertIs(
+            scorer_router.route_request.call_args.kwargs["request_data"]["thinking"],
+            False,
+        )
 
     @patch("hackagent.attacks.techniques.autodan_turbo.core.extract_response_content")
     def test_score_response_empty_wrapper_uses_direct_numeric(self, mock_extract):
@@ -304,6 +314,40 @@ class TestCoreGenerationAndScoring(unittest.TestCase):
             max_retries=1,
         )
         self.assertEqual(score, 7.5)
+        self.assertEqual(scorer_router.route_request.call_count, 3)
+        self.assertTrue(
+            all(
+                call.kwargs["request_data"]["thinking"] is False
+                for call in scorer_router.route_request.call_args_list
+            )
+        )
+
+    @patch(
+        "hackagent.attacks.techniques.autodan_turbo.core.extract_response_content",
+        side_effect=["analysis without parseable wrapper", "", "7.5"],
+    )
+    def test_score_response_honors_explicit_thinking(self, _mock_extract):
+        scorer_router = MagicMock()
+        scorer_router.route_request.return_value = {"dummy": True}
+
+        score, _ = core.score_response(
+            scorer_router,
+            "sc-key",
+            "goal",
+            "target response",
+            logger=MagicMock(),
+            max_retries=1,
+            thinking=True,
+        )
+
+        self.assertEqual(score, 7.5)
+        self.assertEqual(scorer_router.route_request.call_count, 3)
+        self.assertTrue(
+            all(
+                call.kwargs["request_data"]["thinking"] is True
+                for call in scorer_router.route_request.call_args_list
+            )
+        )
 
     @patch(
         "hackagent.attacks.techniques.autodan_turbo.core.extract_response_content",

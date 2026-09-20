@@ -726,6 +726,11 @@ class PAIRAttack(BaseAttack):
                 max_retries=max_parse_retries,
                 scorer_max_tokens=scorer_max_tokens,
                 role_label="pair-judge",
+                thinking=(
+                    judge_config.get("thinking")
+                    if isinstance(judge_config.get("thinking"), bool)
+                    else False
+                ),
             )
             self._set_scorer_explanation(assessment or "")
 
