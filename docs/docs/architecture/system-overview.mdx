@@ -114,7 +114,7 @@ import Link from '@docusaurus/Link';
 ### Attack Framework (`hackagent/attacks/`)
 
 - **Registry & orchestrator**: `registry.py` maps attack-technique names to implementations; `orchestrator.py` runs a technique end-to-end against a configured agent.
-- **Techniques** (`attacks/techniques/`): Baseline, StaticTemplate, FlipAttack, BON, CipherChat, H4rm3l, MML, FC/tFC, PAP, PAIR, TAP, AdvPrefix, AutoDAN-Turbo, RAG (indirect prompt injection). See [Attacks](../attacks/index.mdx) for the full catalog.
+- **Techniques** (`attacks/techniques/`): Baseline, StaticTemplate, FlipAttack, BON, CipherChat, H4rm3l, MML, FC/tFC, PAP, PAIR, TAP, AdvPrefix, AutoDAN-Turbo, Crescendo, RAG (indirect prompt injection). Each technique has exactly one primary category (static / adaptive / multi-turn) plus optional tags in `hackagent.attacks.taxonomy`. See [Attack taxonomy](../attacks/taxonomy.mdx) and the [Attacks](../attacks/index.mdx) catalog.
 - **Evaluator** (`attacks/evaluator/`): shared judge/pattern-based evaluators and metrics used across techniques to score attack success.
 
 ### Risk Profiles (`hackagent/risks/`)

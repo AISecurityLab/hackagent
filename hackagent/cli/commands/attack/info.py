@@ -12,6 +12,11 @@ from hackagent.cli.utils import (
 )
 
 
+from hackagent.attacks.taxonomy import (
+    AttackCategory,
+    get_attack_taxonomy,
+    grouped_attack_keys,
+)
 from hackagent.cli.commands.attack.catalog import ATTACK_CATALOG
 from hackagent.cli.commands.attack.display import (
     _display_advprefix_info,
@@ -27,19 +32,38 @@ console = Console()
 @click.pass_context
 @handle_errors
 def list_attacks(ctx):
-    """List available attack strategies"""
+    """List available attack strategies, grouped by primary category"""
 
     table = Table(
         title="Available Attack Strategies", show_header=True, header_style="bold cyan"
     )
     table.add_column("Strategy", style="cyan")
+    table.add_column("Category", style="magenta")
+    table.add_column("Tags", style="blue")
     table.add_column("Description", style="green")
     table.add_column("Status", style="yellow")
 
-    for attack_key, meta in ATTACK_CATALOG.items():
-        table.add_row(attack_key, meta["description"], "✅ Available")
+    grouped = grouped_attack_keys(ATTACK_CATALOG.keys())
+    for category in list(AttackCategory):
+        for attack_key in grouped[category]:
+            meta = ATTACK_CATALOG[attack_key]
+            tax = get_attack_taxonomy(attack_key)
+            tags = ", ".join(tag.value for tag in tax.tags) if tax.tags else "—"
+            table.add_row(
+                attack_key,
+                tax.category.label,
+                tags,
+                meta["description"],
+                "✅ Available",
+            )
 
     console.print(table)
+    console.print(
+        "\n[dim]Primary category is how the target is hit: Static (fixed "
+        "transforms), Adaptive (independent refine/search), or Multi-turn "
+        "(one growing conversation). Tags such as multimodal or RAG/indirect "
+        "are secondary.[/dim]"
+    )
     console.print(
         "\n[cyan]💡 Use 'hackagent eval STRATEGY --help' for strategy-specific options"
     )

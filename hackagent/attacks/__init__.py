@@ -41,9 +41,20 @@ from .registry import (
     FlipAttackOrchestrator,
     TAPOrchestrator,
 )
+from .taxonomy import (
+    ATTACK_TAXONOMY,
+    AttackCategory,
+    AttackTag,
+    AttackTaxonomy,
+    get_attack_taxonomy,
+)
 
 __all__ = [
     "ATTACK_REGISTRY",
+    "ATTACK_TAXONOMY",
+    "AttackCategory",
+    "AttackTag",
+    "AttackTaxonomy",
     "AdvPrefixOrchestrator",
     "AutoDANTurboOrchestrator",
     "BaselineOrchestrator",
@@ -52,4 +63,5 @@ __all__ = [
     "PAIROrchestrator",
     "FlipAttackOrchestrator",
     "TAPOrchestrator",
+    "get_attack_taxonomy",
 ]

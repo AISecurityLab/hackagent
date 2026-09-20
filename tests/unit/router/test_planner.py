@@ -59,6 +59,14 @@ class TestCatalog(unittest.TestCase):
         tap = next(c for c in catalog if c["attack_type"] == "tap")
         param_keys = {p["key"] for p in tap["parameters"]}
         self.assertIn("tap_params.depth", param_keys)
+        self.assertEqual(tap["category"], "adaptive")
+        self.assertEqual(tap["tags"], [])
+
+    def test_catalog_includes_taxonomy_tags(self):
+        catalog = build_attack_catalog()
+        mml = next(c for c in catalog if c["attack_type"] == "mml")
+        self.assertEqual(mml["category"], "static")
+        self.assertEqual(mml["tags"], ["multimodal"])
 
     def test_catalog_excludes_credential_fields(self):
         catalog = build_attack_catalog()
