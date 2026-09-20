@@ -139,6 +139,16 @@ def create_local_api(backend) -> Blueprint:
         page, page_size = _page_args()
         return jsonify(ser.paginate([], 0, page, page_size))
 
+    @bp.get("/apilogs/summary")
+    def apilogs_summary():
+        """Pre-aggregated usage, which offline is always empty.
+
+        The UI treats a failure here as "endpoint unavailable" and falls back to
+        paging the full log, so answering with an empty summary is both correct
+        and cheaper than letting it 404 and retry.
+        """
+        return jsonify({"timezone": request.args.get("tz", "UTC"), "days": []})
+
     # ── Agents ───────────────────────────────────────────────────────────────
     @bp.get("/agent")
     def agent_list():
