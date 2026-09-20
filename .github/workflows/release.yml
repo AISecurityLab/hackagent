@@ -12,7 +12,14 @@ on:
   push:
     branches: [main]
   # Re-run a release that failed after tagging, or cut one by hand.
+  # Optional `tag` input republishes an existing tag (skips bump); leave it
+  # empty to bump from main as usual.
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to republish (skip bump). Leave empty to bump from main.
+        required: false
+        type: string
 
 env:
   UV_VERSION: "0.10.11"
@@ -38,6 +45,10 @@ jobs:
           # Commitizen needs the full history and the existing tags to work out
           # which commits are new and what the last version was.
           fetch-depth: 0
+          # workflow_dispatch can be started from any ref; always operate on
+          # main so the bump commit and tag are based on (and pushed to)
+          # production, not a feature or stage branch.
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || github.ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -51,8 +62,22 @@ jobs:
 
       - name: Bump the version and tag
         id: bump
+        env:
+          REPUBLISH_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
+
+          # Recovery path: republish an existing tag without bumping.
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && -n "${REPUBLISH_TAG}" ]]; then
+            if ! git rev-parse -q --verify "refs/tags/${REPUBLISH_TAG}" >/dev/null; then
+              echo "::error::Tag ${REPUBLISH_TAG} does not exist; cannot republish."
+              exit 1
+            fi
+            echo "Tagged ${REPUBLISH_TAG} (republish; bump skipped)"
+            echo "tag=${REPUBLISH_TAG}" >> "$GITHUB_OUTPUT"
+            echo "released=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -88,9 +113,12 @@ jobs:
           echo "released=true" >> "$GITHUB_OUTPUT"
 
       - name: Summarise
+        env:
+          RELEASED: ${{ steps.bump.outputs.released }}
+          TAG: ${{ steps.bump.outputs.tag }}
         run: |
-          if [[ "${{ steps.bump.outputs.released }}" == "true" ]]; then
-            echo "### Released ${{ steps.bump.outputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "${RELEASED}" == "true" ]]; then
+            echo "### Released ${TAG}" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "### No release — no eligible commits since the last tag" >> "$GITHUB_STEP_SUMMARY"
           fi
