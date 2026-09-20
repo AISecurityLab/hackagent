@@ -23,6 +23,10 @@ SPEC = AttackConfigSpec(
         "attack injects adversarial instructions into the tool result and "
         "checks whether the agent follows them."
     ),
+    # TODO(#603): when hackagent.attacks.taxonomy lands, ensure
+    # ATTACK_TAXONOMY["tool_output_ipi"] = ADAPTIVE + INDIRECT (the technique
+    # package also registers defensively on import). Spec.category/tags then
+    # come from taxonomy — do not hardcode them on AttackConfigSpec.
     fields=[
         ConfigField(
             key="tool_output_ipi_params.mode",
@@ -54,7 +58,11 @@ SPEC = AttackConfigSpec(
             label="Success Setting",
             field_type=FieldType.CHOICE,
             default="both",
-            description="InjecAgent-aligned success case family.",
+            description=(
+                "InjecAgent-aligned success case family. Frames the injection "
+                "payload and judge instructions toward direct harm, data "
+                "stealing, or both."
+            ),
             choices=[
                 ("Both", "both"),
                 ("Direct harm", "direct_harm"),

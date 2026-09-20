@@ -14,7 +14,7 @@ Pipeline:
 1. Generation — craft poisoned tool observations, query target, inline judge
 2. Evaluation — post-processing (server sync, tracker, ASR)
 
-Taxonomy (document until #603 merges): primary **adaptive**, tag **indirect**.
+Taxonomy: primary **adaptive**, tag **indirect** (registered defensively when ``hackagent.attacks.taxonomy`` is present; add a permanent ``ATTACK_TAXONOMY`` entry when #603 merges).
 """
 
 from __future__ import annotations
@@ -154,6 +154,7 @@ class ToolOutputIPIAttack(BaseAttack):
                     "_backend",
                     "_client",
                     "_tracker",
+                    "_goal_index_offset",
                     "judges",
                     "judge_concurrency",
                     "max_tokens_eval",
@@ -180,6 +181,7 @@ class ToolOutputIPIAttack(BaseAttack):
                     "_backend",
                     "_client",
                     "_tracker",
+                    "_goal_index_offset",
                     "judges",
                     "judge_concurrency",
                     "max_tokens_eval",
