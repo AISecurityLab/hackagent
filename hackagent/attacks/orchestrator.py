@@ -188,6 +188,11 @@ class AttackOrchestrator:
             ("judge", ("judges",), True, "judge"),
             ("embedder", ("rag_injection_params", "embedder"), False, None),
         ),
+        "tool_output_ipi": (
+            ("attacker", ("attacker",), False, "attacker"),
+            # ("judge", ("judge",), False, "judge"),
+            ("judge", ("judges",), True, "judge"),
+        ),
         "fc": (
             ("step_generator", ("step_generator",), False, "attacker"),
             # ("judge", ("judge",), False, "judge"),

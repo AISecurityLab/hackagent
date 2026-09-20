@@ -24,6 +24,7 @@ graph LR
         H4[h4rm3l] --> |"Composable"| T
         I[CipherChat] --> |"Cipher"| T
         J[RAG Attack] --> |"RAG Poisoning"| T
+        TIPI[Tool-output IPI] --> |"Tool Observation"| T
         K[MML] --> |"Multimodal"| T
     end
     T --> R[Results & Analysis]
@@ -49,6 +50,7 @@ graph LR
 | [**AdvPrefix**](./advprefix.md) | Multi-step adversarial prefix optimization | ⭐⭐⭐ High | Slower |
 | [**AutoDAN-Turbo**](./autodan_turbo.md) | Lifelong strategy discovery and reuse | ⭐⭐⭐ High | Slower |
 | [**RAG Attack**](./rag.md) | RAG document poisoning for indirect instruction following (Indirect Injection) | ⭐⭐⭐ High | Medium |
+| [**Tool-output IPI**](./tool_output_ipi.md) | Poisoned tool observations (InjecAgent / OPI; Indirect Injection) | ⭐⭐ Medium | Medium |
 
 :::tip Dataset Support
 All attacks support loading goals from AI safety benchmarks like **AgentHarm**, **StrongREJECT**, and **HarmBench**. See [Dataset Providers](../datasets/) for details.
@@ -391,7 +393,7 @@ attack_config = {
 
 ## RAG Attack — RAG Document Poisoning
 
-The RAG Attack is HackAgent's **indirect prompt injection** technique (risk microcategory: **Indirect Injection**). It tests whether a RAG-augmented agent can be manipulated through **poisoned documents** in its knowledge base. HackAgent controls the entire RAG pipeline internally.
+The RAG Attack is HackAgent's **document-poisoning** indirect prompt injection technique (risk microcategory: **Indirect Injection**). For tool-observation injection see [Tool-output IPI](./tool_output_ipi.md). It tests whether a RAG-augmented agent can be manipulated through **poisoned documents** in its knowledge base. HackAgent controls the entire RAG pipeline internally.
 
 <div style={{background: 'var(--ifm-background-surface-color)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--ifm-color-emphasis-200)', margin: '1rem 0'}}>
 
@@ -437,7 +439,7 @@ attack_config = {
 
 **Static Template** is ideal for a rapid first-pass: template-based prompts sent directly to the target with no setup overhead, good for establishing a vulnerability baseline before running heavier attacks.
 
-**RAG Attack** is the only attack testing **indirect** vectors: it evaluates whether poisoned documents in a knowledge base can manipulate the agent's responses to innocent users. Use it when assessing RAG pipeline security.
+**RAG Attack** and **Tool-output IPI** test **indirect** vectors: RAG poisons knowledge-base documents; tool-output IPI poisons tool observations (InjecAgent / OPI). Use them when assessing RAG pipelines or tool-using agents.
 
 ---
 

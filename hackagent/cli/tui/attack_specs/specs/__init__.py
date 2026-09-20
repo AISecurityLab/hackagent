@@ -30,6 +30,7 @@ from hackagent.cli.tui.attack_specs.specs import (
     static_template,
     tap,
     tfc,
+    tool_output_ipi,
 )
 
 _SPEC_MODULES = (
@@ -47,6 +48,7 @@ _SPEC_MODULES = (
     fc,
     tfc,
     mml,
+    tool_output_ipi,
 )
 
 for _module in _SPEC_MODULES:

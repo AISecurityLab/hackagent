@@ -10,7 +10,7 @@ This page describes a dedicated cybersecurity risk scenario where an LLM is mani
 
 - **Risk Macro-Category**: Cybersecurity
 - **Risk Scenario**: Indirect Injection (hidden instructions in content the model consumes)
-- **Example Attack in HackAgent**: [RAG Attack](../attacks/rag.md) (`attack_type="rag"`)
+- **Example Attacks in HackAgent**: [RAG Attack](../attacks/rag.md) (`attack_type="rag"`), [Tool-output IPI](../attacks/tool_output_ipi.md) (`attack_type="tool_output_ipi"`)
 
 Indirect injection is a *family* of attacks, not a single technique. Any data path that feeds external content into the model's context can be weaponized. Retrieval-augmented generation (RAG) document poisoning is one well-known instance, but it is only one example.
 
@@ -37,7 +37,7 @@ Indirect injection can enter through any channel that injects external text into
 | **Ingested messages & files** | Emails, tickets, calendar invites, or uploaded files are summarized/acted on | A support email containing a hidden instruction the agent follows |
 | **Multi-agent / shared memory** | One agent writes attacker-influenced content another agent later reads | A poisoned shared note propagated across an agent pipeline |
 
-RAG is the vector currently implemented end-to-end in HackAgent; the others share the same root cause (the model trusting untrusted context) and the same evaluation signals.
+RAG document poisoning and tool-output observation injection are both implemented end-to-end (`rag` and `tool_output_ipi`); other vectors share the same root cause (the model trusting untrusted context) and similar evaluation signals.
 
 ## Comparison with Direct Prompt Injection
 
