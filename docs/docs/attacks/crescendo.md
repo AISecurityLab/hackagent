@@ -23,6 +23,8 @@ Crescendo is based on the paper:
 
 This is HackAgent's first multi-turn attack. No router changes were required to support it: `AgentRouter` already forwards an arbitrary `messages` history verbatim to the target adapter on every call.
 
+Crescendo-specific knobs (`max_turns`, `max_backtracks`, `jailbreak_threshold`, `early_stop_on_success`, `keep_last_n`, payload-size caps, `max_parse_retries`) currently live at the **top level** of `attack_config`. There is **no** `crescendo_params` block — passing one is ignored. Contrast with [AutoDAN-Turbo](./autodan_turbo.md) / [PAP](./pap.md), which nest algorithm knobs under `*_params`. See [Attack-specific params convention](./shared-args.md#attack-specific-params-vs-top-level).
+
 ---
 
 ## How Crescendo Works
@@ -146,7 +148,7 @@ advanced_config = {
         "endpoint": "https://api.openai.com/v1"
     },
 
-    # Crescendo-specific parameters
+    # Crescendo-specific parameters (top-level today — not nested)
     "max_turns": 10,                       # Max escalating question turns per goal
     "max_backtracks": 10,                  # Max rephrase attempts across the whole conversation
     "jailbreak_threshold": 7.0,             # Judge score (0-10) that marks success
@@ -167,6 +169,8 @@ advanced_config = {
 
 ### Configuration Parameters
 
+These keys are **top-level** on `attack_config` (not inside a `crescendo_params` block). Shared keys such as `goals`, `attacker`, `judge`, and `output_dir`: [Shared Attack Config](./shared-args.md).
+
 | Parameter | Description | Default | Range |
 |-----------|-------------|---------|-------|
 | `max_turns` | Maximum escalating question turns per goal | 10 | 1+ |
@@ -183,18 +187,7 @@ advanced_config = {
 
 ### Shared Goal Category Classifier
 
-All attacks accept a top-level `category_classifier` block. It runs once per goal to attach a normalized category to tracking metadata (independent from judge scoring).
-
-```python
-"category_classifier": {
-    "identifier": "gemma3:4b",
-    "endpoint": "http://localhost:11434",
-    "agent_type": "OLLAMA",
-    "api_key": None,
-    "max_tokens": 100,
-    "temperature": 0.0
-}
-```
+Top-level `category_classifier` is shared by every attack. See [Shared Attack Config](./shared-args.md#category_classifier).
 
 ---
 
@@ -303,6 +296,7 @@ for target in targets:
 
 ## Related
 
+- [Shared Attack Config](./shared-args.md) — goals, judges, batching, `*_params` convention
 - [Attack Overview](./index.mdx) — Compare all attack types
 - [PAIR](./pair) — Single-turn iterative refinement attack
 - [TAP](./tap) — Tree-of-attacks iterative refinement

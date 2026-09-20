@@ -98,6 +98,12 @@ One growing conversation with the target.
 **multimodal** marks VLM/image attacks (MML, FC). **indirect** / **rag** mark document poisoning (RAG Attack). They never replace Static / Adaptive / Multi-turn.
 :::
 
+:::tip Shared configuration
+Keys such as `goals`, `dataset`, `intents`, `objective`, `attacker`, `judges`, batching (`batch_size`, `goal_batch_size`, `goal_batch_workers`, `judge_concurrency`), `output_dir`, and `category_classifier` are documented on **[Shared Attack Config](./shared-args.md)**. Attack pages cover technique-specific options and say exactly whether those live in a `*_params` block or at the top level.
+
+Crescendo, PAIR, and AdvPrefix still put many attack-specific keys at the top level (`max_turns`, `n_iterations`, `meta_prefixes`). AutoDAN-Turbo, PAP, CipherChat, MML, and others already nest theirs under `*_params`. The long-term convention is one nested `*_params` field per attack; that API change is **not** in this docs-only update.
+:::
+
 :::tip Dataset Support
 All attacks support loading goals from AI safety benchmarks like **AgentHarm**, **StrongREJECT**, and **HarmBench**. See [Dataset Providers](../datasets/) for details.
 :::
@@ -126,7 +132,7 @@ These are advanced/debug controls and are usually not needed in standard runs.
 
 `goals` and `objective` look similar in an `attack_config` but do completely
 different jobs. **You write goals yourself; you pick an objective from a fixed
-list.**
+list.** Full shared-config reference: [Shared Attack Config](./shared-args.md).
 
 | | `goals` | `objective` |
 |---|---|---|
@@ -628,9 +634,12 @@ options.
 
 ## Next Steps
 
+- [Shared Attack Config](./shared-args.md) — goals, judges, batching, and where `*_params` belong
 - [AdvPrefix Deep Dive](./advprefix.md) — Full documentation with advanced configuration
 - [PAIR Attack Guide](./pair.md) — Iterative refinement techniques
 - [TAP Attack Guide](./tap.md) — Tree-search with pruning
+- [CipherChat](./cipherchat.md) — Cipher-based encoding
+- [PAP](./pap.md) — Persuasive paraphrasing
 - [FlipAttack Guide](./flipattack.md) — Character-level obfuscation
 - [BoN Guide](./bon.md) — Best-of-N random augmentation
 - [Static Template Templates](./static-template.md) — Template categories and customization

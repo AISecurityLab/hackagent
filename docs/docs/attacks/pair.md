@@ -22,6 +22,8 @@ PAIR is based on the paper:
 
 The technique demonstrates that LLMs can be used to systematically jailbreak other LLMs through iterative refinement, achieving high success rates against commercial models.
 
+PAIR-specific knobs (`n_iterations`, `n_streams`, `keep_last_n`, `target_str`, `jailbreak_threshold`, …) currently live at the **top level** of `attack_config`. There is **no** `pair_params` block. Shared keys: [Shared Attack Config](./shared-args.md). Long-term direction is a nested `pair_params` field; it is not implemented yet.
+
 ---
 
 ## How PAIR Works
@@ -144,8 +146,8 @@ advanced_config = {
         "temperature": 1.0  # Higher for more creative attacks
     },
     
-    # Attack parameters
-    "n_iterations": 20,          # Max refinement rounds per goal
+    # Attack parameters (top-level today — not nested under pair_params)
+    "n_iterations": 5,           # Max refinement rounds per goal
     "n_streams": 5,              # Independent attacker conversations per goal
     "keep_last_n": 4,            # Latest attacker/feedback turn pairs retained per stream
     "target_str": "Sure, here is", # Expected prefix of a successful response
@@ -170,9 +172,11 @@ advanced_config = {
 
 ### Configuration Parameters
 
+These keys are **top-level** on `attack_config` (not inside a `pair_params` block). Defaults below are from `DEFAULT_PAIR_CONFIG`. Shared keys: [Shared Attack Config](./shared-args.md).
+
 | Parameter | Description | Default | Range |
 |-----------|-------------|---------|-------|
-| `n_iterations` | Maximum iterations per goal | 20 | 1-100 |
+| `n_iterations` | Maximum iterations per goal | `5` | 1-100 |
 | `n_streams` | Independent PAIR attacker conversations explored per goal | 5 | 1+ |
 | `keep_last_n` | Latest attacker/feedback turn pairs retained in each stream history | 4 | 1+ |
 | `target_str` | Expected prefix of a successful target response | `"Sure, here is"` | String |
@@ -185,18 +189,7 @@ advanced_config = {
 
 ### Shared Goal Category Classifier
 
-All attacks accept a top-level `category_classifier` block. It runs once per goal to attach a normalized category to tracking metadata (independent from judge scoring).
-
-```python
-"category_classifier": {
-    "identifier": "gemma3:4b",
-    "endpoint": "http://localhost:11434",
-    "agent_type": "OLLAMA",
-    "api_key": None,
-    "max_tokens": 100,
-    "temperature": 0.0
-}
-```
+Top-level `category_classifier` is shared by every attack. See [Shared Attack Config](./shared-args.md#category_classifier).
 
 ---
 
@@ -347,6 +340,7 @@ shared by every attack.
 
 ## Related
 
+- [Shared Attack Config](./shared-args.md) — goals, judges, batching, `*_params` convention
 - [Attack Overview](./index.mdx) — Compare all attack types
 - [AdvPrefix Attacks](./advprefix) — Alternative sophisticated attack
 - [Static Template Attacks](./static-template) — Quick template-based testing

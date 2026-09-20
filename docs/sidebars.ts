@@ -89,6 +89,7 @@ const sidebars: SidebarsConfig = {
       },
       items: [
         'attacks/taxonomy',
+        'attacks/shared-args',
         {
           type: 'category',
           label: 'Jailbreak',

@@ -22,6 +22,8 @@ FlipAttack is based on the paper:
 
 The paper demonstrates that simple character-level text reversal can bypass safety filters across multiple frontier models.
 
+FlipAttack-specific knobs live under **`flipattack_params`**. Shared keys (`goals`, `judges`, `batch_size`, …) are top-level. See [Shared Attack Config](./shared-args.md).
+
 ---
 
 ## How FlipAttack Works
@@ -177,6 +179,8 @@ advanced_config = {
 
 ### Configuration Parameters
 
+Obfuscation knobs go in **`flipattack_params`**. Batching, judges, and output are **top-level**. Shared defaults for `batch_size` / `goal_batch_*` are `1` after config merge (generation falls back to `16` only if the key is missing). See [Shared Attack Config](./shared-args.md).
+
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `flipattack_params.flip_mode` | Obfuscation strategy: `FWO`, `FCW`, `FCS`, `FMM` | `"FCS"` |
@@ -193,24 +197,13 @@ advanced_config = {
 
 ### Shared Goal Category Classifier
 
-All attacks accept a top-level `category_classifier` block. It runs once per goal to attach a normalized category to tracking metadata (independent from judge scoring).
-
-```python
-"category_classifier": {
-    "identifier": "gemma3:4b",
-    "endpoint": "http://localhost:11434",
-    "agent_type": "OLLAMA",
-    "api_key": None,
-    "max_tokens": 100,
-    "temperature": 0.0
-}
-```
+Top-level `category_classifier` is shared by every attack. See [Shared Attack Config](./shared-args.md#category_classifier).
 
 ---
 
 ## Parallelization & Batching
 
-FlipAttack supports **three independent batching parameters** that control how work is parallelized across the pipeline. Tuning them lets you trade off between throughput, memory, and API rate limits.
+FlipAttack supports the same batching infrastructure as other HackAgent attacks. Canonical explanation: [Shared Attack Config — Parallelization & batching](./shared-args.md#parallelization--batching).
 
 ### Pipeline overview
 
@@ -444,6 +437,7 @@ shared by every attack.
 
 ## Related
 
+- [Shared Attack Config](./shared-args.md) — goals, judges, batching, `*_params` convention
 - [Attack Overview](./index.mdx) — Compare all attack types
 - [TAP Attacks](./tap.md) — Tree-search based adaptive attack
 - [PAIR Attacks](./pair.md) — Iterative refinement with attacker LLM

@@ -22,6 +22,8 @@ MML is based on the paper:
 
 The paper demonstrates that encoding harmful prompts into images using visual transformations can bypass safety mechanisms of frontier Vision-Language Models.
 
+MML-specific knobs live under **`mml_params`**. Shared keys (`goals`, `judges`, `batch_size`, …) are top-level. See [Shared Attack Config](./shared-args.md).
+
 ---
 
 ## How MML Works
@@ -201,6 +203,8 @@ advanced_config = {
 
 ### Configuration Parameters
 
+Encoding knobs go in **`mml_params`**. Batching, judges, and output are **top-level**. Shared `batch_size` default after merge is `1` (generation falls back to `16` only if the key is missing). See [Shared Attack Config](./shared-args.md).
+
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `mml_params.encoding_mode` | Visual encoding strategy | `"word_replacement"` |
@@ -221,24 +225,13 @@ advanced_config = {
 
 ### Shared Goal Category Classifier
 
-All attacks accept a top-level `category_classifier` block. It runs once per goal to attach a normalized category to tracking metadata (independent from judge scoring).
-
-```python
-"category_classifier": {
-    "identifier": "gemma3:4b",
-    "endpoint": "http://localhost:11434",
-    "agent_type": "OLLAMA",
-    "api_key": None,
-    "max_tokens": 100,
-    "temperature": 0.0
-}
-```
+Top-level `category_classifier` is shared by every attack. See [Shared Attack Config](./shared-args.md#category_classifier).
 
 ---
 
 ## Parallelization & Batching
 
-MML supports the same batching infrastructure as other HackAgent attacks:
+MML supports the same batching infrastructure as other HackAgent attacks. Canonical explanation: [Shared Attack Config — Parallelization & batching](./shared-args.md#parallelization--batching).
 
 ```mermaid
 flowchart LR
@@ -435,6 +428,7 @@ shared by every attack.
 
 ## Related
 
+- [Shared Attack Config](./shared-args.md) — goals, judges, batching, `*_params` convention
 - [Attack Overview](./index.mdx) — Compare all attack types
 - [FlipAttack](./flipattack.md) — Character-level text obfuscation
 - [CipherChat](./cipherchat.md) — Cipher-based encoding attacks
