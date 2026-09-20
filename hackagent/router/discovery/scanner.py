@@ -181,10 +181,13 @@ def build_attack_catalog(*, include_advanced: bool = False) -> List[Dict[str, An
     """Serialize the registered attack specs into a compact catalog.
 
     The catalog is what the planner is shown and constrained to: it lists every
-    technique and its tunable parameters. Advanced/auth fields (attacker model,
-    API keys…) are excluded by default — the planner picks the *strategy*, while
-    model credentials come from the run config.
+    technique, its primary taxonomy category/tags, and its tunable parameters.
+    Advanced/auth fields (attacker model, API keys…) are excluded by default —
+    the planner picks the *strategy*, while model credentials come from the run
+    config.
     """
+    from hackagent.attacks.taxonomy import get_attack_taxonomy
+
     catalog: List[Dict[str, Any]] = []
     for key, spec in _attack_specs().get_all_attack_specs().items():
         fields = [
@@ -194,11 +197,14 @@ def build_attack_catalog(*, include_advanced: bool = False) -> List[Dict[str, An
             # Skip model-identity / credential fields — not the planner's job.
             and not f.key.endswith(("identifier", "api_key", "endpoint", "model"))
         ]
+        taxonomy = get_attack_taxonomy(key)
         catalog.append(
             {
                 "attack_type": key,
                 "name": spec.display_name,
                 "description": spec.description,
+                "category": taxonomy.category.value,
+                "tags": list(taxonomy.tag_values()),
                 "parameters": fields,
             }
         )

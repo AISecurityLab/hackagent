@@ -6,6 +6,8 @@ sidebar_position: 9
 
 CipherChat is a cipher-based jailbreak attack that converts the user goal into a non-natural language (cipher) before querying the target model.
 
+**Category:** Static — one (or a few) fixed transforms, with no attacker refinement loop. See [Attack taxonomy](./taxonomy.mdx).
+
 This implementation integrates the full attack workflow from the original project and paper:
 
 - Paper: *GPT-4 Is Too Smart To Be Safe: Stealthy Chat with LLMs via Cipher* (ICLR 2024)

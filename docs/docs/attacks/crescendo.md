@@ -6,6 +6,8 @@ sidebar_position: 4
 
 Crescendo is a multi-turn jailbreak attack that gradually escalates a single, **persistent conversation** with the target model until it produces the harmful content described in the goal.
 
+**Category:** Multi-turn — one growing conversation with the target. See [Attack taxonomy](./taxonomy.mdx).
+
 ## Overview
 
 Unlike single-turn/iterative attacks such as [PAIR](./pair) or [TAP](./tap), which retry independent prompts, Crescendo keeps one growing conversation history (`target_messages`) across the whole goal. Every accepted turn is appended to it and re-sent in full on the next request, so the target sees genuine multi-turn context — each new question feels like a natural continuation of the conversation rather than an isolated jailbreak attempt.

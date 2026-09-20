@@ -6,6 +6,8 @@ sidebar_position: 5
 
 FlipAttack is a character-level adversarial attack that **obfuscates harmful requests** by reversing characters or word order before sending them to the target model. The technique exploits the token-level pattern-matching used by safety classifiers, which struggle to detect reversed or rearranged text, while the target LLM is instructed to decode the obfuscated input internally.
 
+**Category:** Static — one (or a few) fixed transforms, with no attacker refinement loop. See [Attack taxonomy](./taxonomy.mdx).
+
 ## Overview
 
 FlipAttack operates without an external attacker model. The harmful goal is deterministically transformed and wrapped in a carefully crafted system prompt that instructs the target to reverse the text and answer directly. Because the obfuscated input looks nothing like the original harmful request, many safety classifiers fail to trigger.

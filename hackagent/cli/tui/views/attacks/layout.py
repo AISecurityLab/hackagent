@@ -3,8 +3,6 @@
 
 """Widget layout (``compose``) for the Attacks tab."""
 
-from typing import List
-
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical, VerticalScroll
 from textual.widgets import (
@@ -37,6 +35,8 @@ from hackagent.cli.tui.widgets.logs import AttackLogViewer
 from hackagent.cli.tui.views.attacks.helpers import (
     _AGENT_TYPE_CHOICES,
     _default_campaign_attack_keys,
+    _strategy_focus_choices,
+    _strategy_selection_choices,
 )
 
 
@@ -48,16 +48,13 @@ class AttacksLayoutMixin:
 
     def compose(self) -> ComposeResult:
         """Compose the attacks layout."""
-        # Build strategy choices from the registry
+        # Build strategy choices from the registry, grouped by taxonomy.
         all_specs = get_all_attack_specs()
-        strategy_choices: List[tuple] = [
-            (spec.display_name, spec.technique_key) for spec in all_specs.values()
-        ]
+        strategy_choices = _strategy_selection_choices()
+        focus_choices = _strategy_focus_choices()
         campaign_keys = _default_campaign_attack_keys()
         default_strategy = (
-            campaign_keys[0]
-            if campaign_keys
-            else (strategy_choices[0][1] if strategy_choices else "advprefix")
+            campaign_keys[0] if campaign_keys else next(iter(all_specs), "advprefix")
         )
 
         with Horizontal():
@@ -172,11 +169,12 @@ class AttacksLayoutMixin:
                 # instead of `HackAgent.hack`, escalating each goal through
                 # the selected attacks in the order they were checked.
                 #
-                # Nothing is pre-selected here via the option tuples: doing
-                # so would select in *option list* order (registration
-                # order in attack_specs.py), not the desired campaign order
-                # (h4rm3l → TAP → PAIR). `on_mount` selects the default
-                # campaign attacks explicitly, in the right order, instead.
+                # Attacks are listed by primary taxonomy category (static /
+                # adaptive / multi-turn). Nothing is pre-selected here via the
+                # option tuples: doing so would select in *option list* order,
+                # not the desired campaign order (h4rm3l → TAP → PAIR).
+                # `on_mount` selects the default campaign attacks explicitly,
+                # in the right order, instead.
                 yield Static("[bold]Attacks[/bold]", classes="section-title")
                 yield Static(
                     "[dim]Select one attack, or check multiple to chain them. "
@@ -202,7 +200,7 @@ class AttacksLayoutMixin:
 
                 yield Label("Configuring attack:")
                 yield Select(
-                    strategy_choices,
+                    focus_choices,
                     id="attack-strategy-focus",
                     value=default_strategy,
                 )

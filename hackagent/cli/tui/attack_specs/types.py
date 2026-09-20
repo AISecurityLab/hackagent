@@ -13,7 +13,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple, Union
+
+if TYPE_CHECKING:
+    from hackagent.attacks.taxonomy import AttackCategory, AttackTag, AttackTaxonomy
 
 
 class FieldType(str, Enum):
@@ -72,12 +75,33 @@ class AttackConfigSpec:
         display_name: Human-friendly name shown in the UI selector.
         description: Short description of the technique.
         fields: Ordered list of :class:`ConfigField`.
+
+    Category and tags are not stored here. They come from
+    :mod:`hackagent.attacks.taxonomy` so TUI, CLI, and docs share one
+    assignment table.
     """
 
     technique_key: str
     display_name: str
     description: str = ""
     fields: List[ConfigField] = field(default_factory=list)
+
+    @property
+    def taxonomy(self) -> "AttackTaxonomy":
+        """Primary category and tags for this technique."""
+        from hackagent.attacks.taxonomy import get_attack_taxonomy
+
+        return get_attack_taxonomy(self.technique_key)
+
+    @property
+    def category(self) -> "AttackCategory":
+        """How this attack hits the target (static / adaptive / multi-turn)."""
+        return self.taxonomy.category
+
+    @property
+    def tags(self) -> Tuple["AttackTag", ...]:
+        """Orthogonal labels such as multimodal or RAG/indirect."""
+        return self.taxonomy.tags
 
     # ------------------------------------------------------------------
     # Helpers

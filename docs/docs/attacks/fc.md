@@ -6,6 +6,8 @@ sidebar_position: 10
 
 A jailbreak attack that converts harmful prompts into auto-generated flowchart images to exploit Vision-Language Models (VLMs).
 
+**Category:** Static. **Tags:** Multimodal. See [Attack taxonomy](./taxonomy.mdx).
+
 :::tip Looking for text-only LLMs?
 For attacks against text-only models using graph description languages (DOT, Mermaid, TikZ, PlantUML, ASCII), see [tFC-Attack](./tfc.md).
 :::
