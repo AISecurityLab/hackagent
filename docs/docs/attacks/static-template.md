@@ -15,6 +15,8 @@ Static Template attacks work by combining known jailbreak templates with your te
 - **Establishing initial scans**: Measure before deploying advanced attacks
 - **Template development**: Test new prompt injection patterns
 
+Static Template-specific knobs (`template_categories`, `templates_per_category`, `template_parameters`) currently live at the **top level** of `attack_config`. There is **no** `static_template_params` block. `batch_size` has a **template-specific meaning** (not shared generation workers) — see below and [Shared Attack Config](./shared-args.md#notable-exceptions).
+
 ---
 
 ## How Static Template Attacks Work
@@ -197,6 +199,8 @@ advanced_config = {
 
 ### Configuration Parameters
 
+These keys are **top-level** on `attack_config`. Shared `goals` / `objective` / `output_dir`: [Shared Attack Config](./shared-args.md).
+
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `template_categories` | Exact category names to use | `["instruction_override", "delimiter_bypass", "role_play"]` |
@@ -253,18 +257,7 @@ Constructor/schema validation and direct prompt generation use the same checks.
 
 ### Shared Goal Category Classifier
 
-All attacks accept a top-level `category_classifier` block. It runs once per goal to attach a normalized category to tracking metadata (independent from judge scoring).
-
-```python
-"category_classifier": {
-    "identifier": "gemma3:4b",
-    "endpoint": "http://localhost:11434",
-    "agent_type": "OLLAMA",
-    "api_key": None,
-    "max_tokens": 100,
-    "temperature": 0.0
-}
-```
+Top-level `category_classifier` is shared by every attack. See [Shared Attack Config](./shared-args.md#category_classifier).
 
 ---
 
@@ -445,6 +438,7 @@ For more sophisticated testing, consider [AdvPrefix](./advprefix) or [PAIR](./pa
 
 ## Related
 
+- [Shared Attack Config](./shared-args.md) — goals, judges, batching, `*_params` convention
 - [Attack Overview](./index.mdx) — Compare all attack types
 - [AdvPrefix Attacks](./advprefix) — Sophisticated prefix optimization
 - [PAIR Attacks](./pair) — Adaptive iterative refinement
