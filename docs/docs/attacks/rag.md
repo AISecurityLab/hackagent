@@ -6,8 +6,10 @@ sidebar_position: 11
 
 The **RAG Attack** tests whether a RAG-augmented agent can be manipulated through poisoned documents in its knowledge base. It is HackAgent's implementation of **indirect prompt injection**: the attack falls under the **Indirect Injection** risk microcategory, the same way **FlipAttack** sits under **Jailbreak**. HackAgent handles the entire RAG pipeline internally — the user only provides documents, a malicious goal, and the target agent endpoint.
 
+**Category:** Static. **Tags:** Indirect, RAG — the payload lives in retrieved documents, not in an attacker refinement loop. See [Attack taxonomy](./taxonomy.mdx).
+
 :::info Risk categorization
-**Attack:** RAG Attack (`attack_type: "rag"`) · **Risk microcategory:** Indirect Injection
+**Attack:** RAG Attack (`attack_type: "rag"`) · **Primary category:** Static · **Tags:** Indirect, RAG · **Risk microcategory:** Indirect Injection
 :::
 
 ## Overview

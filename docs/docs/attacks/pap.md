@@ -6,6 +6,8 @@ sidebar_position: 9
 
 PAP is a taxonomy-guided persuasion attack that **paraphrases harmful prompts into persuasive variants** using 40 social-science persuasion techniques. An attacker LLM rewrites the harmful goal using a selected persuasion technique (e.g. Evidence-based Persuasion, Expert Endorsement, Misrepresentation), and the resulting human-readable persuasive prompt is sent to the target model. The technique exploits the observation that LLMs, trained to be helpful conversational partners, are vulnerable to the same persuasion strategies that work on humans.
 
+**Category:** Adaptive — it searches across persuasion techniques with early-stop on success, not a growing target conversation. See [Attack taxonomy](./taxonomy.mdx).
+
 ## Overview
 
 PAP uses an attacker LLM to paraphrase harmful goals into persuasive variants via in-context learning. For each goal, the attack iterates over selected persuasion techniques from a taxonomy of 40 techniques. For each technique, the attacker LLM generates a persuasive version of the harmful prompt, which is then sent to the target model. A judge evaluates the response and if a jailbreak is confirmed, the remaining techniques are skipped (early stop).
