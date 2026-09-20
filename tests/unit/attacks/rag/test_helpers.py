@@ -174,6 +174,36 @@ class TestParseDocuments(unittest.TestCase):
 
 
 class TestGetEmbeddings(unittest.TestCase):
+    def test_uses_shared_embedding_endpoint_and_credential_resolution(self):
+        from hackagent.attacks.shared.embedding_utils import embedding_request_kwargs
+
+        for config in (
+            {
+                "identifier": "embeddinggemma",
+                "agent_type": "OLLAMA",
+                "endpoint": "http://x/api/embed",
+            },
+            {
+                "identifier": "openai/text-embedding-3-small",
+                "endpoint": "https://example.test",
+                "api_key": "${EMBED_KEY}",
+            },
+        ):
+            with (
+                self.subTest(config=config),
+                patch.dict("os.environ", {"EMBED_KEY": "embedding-key"}, clear=True),
+            ):
+                kwargs = embedding_request_kwargs(config)
+                fake_client = self._fake_client()
+                with patch("openai.OpenAI", return_value=fake_client) as mock_client:
+                    get_embeddings(["a"], config, LOGGER)
+                mock_client.assert_called_once_with(
+                    api_key=kwargs["api_key"], base_url=kwargs["api_base"]
+                )
+                fake_client.embeddings.create.assert_called_once_with(
+                    input=["a"], model=kwargs["model"]
+                )
+
     def _fake_client(self, dim=4):
         fake_client = MagicMock()
 

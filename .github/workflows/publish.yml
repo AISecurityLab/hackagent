@@ -7,6 +7,11 @@ on:
 
 env:
   UV_VERSION: "0.10.11"
+  # Version of the published dashboard (hackagent-webui on PyPI, built from
+  # AISecurityLab/hackagent-webapp) that release artifacts bundle. Pinned to an
+  # exact version so rebuilding a tag reproduces the same UI; bump deliberately,
+  # and keep it inside the range of the `web` extra in pyproject.toml.
+  WEBUI_VERSION: "0.2.0"
 
 jobs:
   publish:
@@ -27,6 +32,24 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
+
+      - name: Fetch the dashboard bundle
+        # Take the published artifact rather than rebuilding it from the webapp
+        # sources: it is the same wheel `pip install 'hackagent[web]'` gets, so
+        # a release binary and a pip install serve identical assets, and this
+        # repository's release pipeline needs no Node toolchain.
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --target "${RUNNER_TEMP}/webui" "hackagent-webui==${WEBUI_VERSION}"
+          python - <<'PY'
+          import os, shutil, sys
+          sys.path.insert(0, os.path.join(os.environ["RUNNER_TEMP"], "webui"))
+          from hackagent_webui import __version__, bundle_path
+          dest = os.path.join("hackagent", "server", "webui", "static")
+          shutil.copytree(bundle_path(), dest, dirs_exist_ok=True)
+          print(f"staged hackagent-webui {__version__} into {dest}")
+          PY
 
       - name: Build package
         run: uv build
@@ -83,6 +106,24 @@ jobs:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
 
+      - name: Fetch the dashboard bundle
+        # Take the published artifact rather than rebuilding it from the webapp
+        # sources: it is the same wheel `pip install 'hackagent[web]'` gets, so
+        # a release binary and a pip install serve identical assets, and this
+        # repository's release pipeline needs no Node toolchain.
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --target "${RUNNER_TEMP}/webui" "hackagent-webui==${WEBUI_VERSION}"
+          python - <<'PY'
+          import os, shutil, sys
+          sys.path.insert(0, os.path.join(os.environ["RUNNER_TEMP"], "webui"))
+          from hackagent_webui import __version__, bundle_path
+          dest = os.path.join("hackagent", "server", "webui", "static")
+          shutil.copytree(bundle_path(), dest, dirs_exist_ok=True)
+          print(f"staged hackagent-webui {__version__} into {dest}")
+          PY
+
       - name: Install build dependencies
         run: uv sync --no-default-groups --group binaries
 
@@ -97,6 +138,16 @@ jobs:
           ./dist/hackagent/hackagent --version
           ./dist/hackagent/hackagent version
           ./dist/hackagent/hackagent scan --help
+          # The dashboard must be inside the archive, not rebuilt at runtime.
+          ./dist/hackagent/hackagent web --no-browser --port 7871 &
+          pid=$!
+          for _ in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:7871/healthz && break || sleep 1
+          done
+          curl -fsS http://127.0.0.1:7871/healthz | tee health.json
+          grep -q '"mode"' health.json
+          curl -fsS http://127.0.0.1:7871/ | grep -qi "<html"
+          kill "$pid" 2>/dev/null || true
 
       - name: Smoke test binary (Windows)
         if: runner.os == 'Windows'

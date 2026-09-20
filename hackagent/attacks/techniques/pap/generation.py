@@ -30,6 +30,7 @@ from hackagent.attacks.shared.response_utils import (
     get_guardrail_info,
     is_guardrail_response,
 )
+from hackagent.attacks.shared.router_factory import create_router
 from hackagent.attacks.techniques.config import DEFAULT_MAX_OUTPUT_TOKENS
 from hackagent.router.router import AgentRouter
 
@@ -73,21 +74,16 @@ def _create_attacker_router(
     attacker_config: Dict[str, Any],
     backend: Any,
 ) -> AgentRouter:
-    """Create an AgentRouter for the attacker LLM."""
-    metadata: Dict[str, Any] = {
-        "name": attacker_config.get("identifier"),
-    }
-    api_key = attacker_config.get("api_key")
-    if api_key:
-        metadata["api_key"] = api_key
+    """Create an attacker router with normalized type and provider credentials."""
 
-    return AgentRouter(
+    router, _reg_key = create_router(
         backend=backend,
-        name=f"pap-attacker-{attacker_config.get('identifier', 'unknown')[:30]}",
-        agent_type=attacker_config.get("agent_type", "OPENAI_SDK"),
-        endpoint=attacker_config.get("endpoint") or "",
-        metadata=metadata,
+        router_name=f"pap-attacker-{attacker_config.get('identifier', 'unknown')[:30]}",
+        config=attacker_config,
+        use_backend_api_key=False,
     )
+
+    return router
 
 
 # ---------------------------------------------------------------------------

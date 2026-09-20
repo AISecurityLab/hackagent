@@ -3,8 +3,10 @@
 
 import unittest
 from contextlib import contextmanager
+from itertools import product
 from unittest.mock import MagicMock, patch
 
+from hackagent.attacks.generator import AttackTemplates
 from hackagent.attacks.techniques.static_template.attack import StaticTemplateAttack
 
 
@@ -48,6 +50,124 @@ class TestStaticTemplateAttack(unittest.TestCase):
         self.assertEqual(len(steps), 2)
         self.assertIn("Generation", steps[0]["name"])
         self.assertIn("Evaluation", steps[1]["name"])
+        self.assertIn("template_parameters", steps[0]["config_keys"])
+        self.assertIn("batch_size", steps[0]["config_keys"])
+
+    def test_invalid_template_config_fails_during_construction(self):
+        for categories, parameters, message in (
+            (["unknown"], {}, "Unknown template category"),
+            (["multi_language"], {}, "goal_translated"),
+            (
+                ["multi_language"],
+                {"goal_translated": "Résume la météo"},
+                "goal_foreign",
+            ),
+        ):
+            with self.subTest(categories=categories, parameters=parameters):
+                router = MagicMock()
+                with self.assertRaisesRegex(ValueError, message):
+                    StaticTemplateAttack(
+                        config={
+                            "template_categories": categories,
+                            "template_parameters": parameters,
+                        },
+                        client=MagicMock(),
+                        agent_router=router,
+                    )
+                router.route_request.assert_not_called()
+
+    def test_unknown_placeholder_fails_during_construction(self):
+        router = MagicMock()
+        with (
+            patch.object(AttackTemplates, "ENCODING_BYPASS", ["{unknown}"]),
+            self.assertRaisesRegex(ValueError, "Missing template parameter 'unknown'"),
+        ):
+            StaticTemplateAttack(
+                config={"template_categories": ["encoding"]},
+                client=MagicMock(),
+                agent_router=router,
+            )
+        router.route_request.assert_not_called()
+
+    def test_modified_config_is_revalidated_before_tracking_or_model_calls(self):
+        router = MagicMock()
+        attack = StaticTemplateAttack(client=MagicMock(), agent_router=router)
+        attack.config["template_categories"] = ["multi_language"]
+        with (
+            patch.object(attack, "_initialize_coordinator") as initialize,
+            self.assertRaisesRegex(ValueError, "goal_translated"),
+        ):
+            attack.run(["Summarize weather"])
+        initialize.assert_not_called()
+        router.route_request.assert_not_called()
+
+    @patch("hackagent.attacks.techniques.static_template.attack.evaluation.execute")
+    def test_real_generation_pipeline_forwards_parameters_and_batch_size(
+        self, evaluation
+    ):
+        for category, batch_size in product(("encoding", "multi_language"), (0, 5)):
+            with self.subTest(category=category, batch_size=batch_size):
+                templates = AttackTemplates.get_by_category(category)
+                parameters = {
+                    "goal_translated": "Résume la météo",
+                    "goal_foreign": "Riassumi il meteo",
+                }
+                router = MagicMock()
+                router._agent_registry = {"target": MagicMock()}
+                router.route_request.return_value = {
+                    "generated_text": "Weather summary"
+                }
+                attack = StaticTemplateAttack(
+                    config={
+                        "template_categories": [category],
+                        "template_parameters": parameters,
+                        "batch_size": batch_size,
+                    },
+                    client=MagicMock(),
+                    agent_router=router,
+                )
+                attack.tracker = _DummyStepTracker()
+                evaluation.return_value = {"evaluated": [], "summary": []}
+                with patch.object(
+                    attack, "_initialize_coordinator", return_value=_DummyCoordinator()
+                ):
+                    attack.run(["Summarize weather"])
+                rows = evaluation.call_args.kwargs["input_data"]
+                count = batch_size or len(templates)
+                self.assertEqual(len(rows), count)
+                self.assertEqual(router.route_request.call_count, count)
+                self.assertEqual(
+                    [row["attack_prompt"] for row in rows],
+                    [
+                        AttackTemplates.apply_template(
+                            templates[i % len(templates)],
+                            "Summarize weather",
+                            **parameters,
+                        )
+                        for i in range(count)
+                    ],
+                )
+                self.assertCountEqual(
+                    [
+                        call.kwargs["request_data"]["messages"][0]["content"]
+                        for call in router.route_request.call_args_list
+                    ],
+                    [row["attack_prompt"] for row in rows],
+                )
+
+    @patch("hackagent.attacks.techniques.static_template.attack.evaluation.execute")
+    def test_default_pipeline_still_uses_all_nine_templates(self, evaluation):
+        router = MagicMock()
+        router._agent_registry = {"target": MagicMock()}
+        router.route_request.return_value = {"generated_text": "Weather summary"}
+        attack = StaticTemplateAttack(client=MagicMock(), agent_router=router)
+        attack.tracker = _DummyStepTracker()
+        evaluation.return_value = {"evaluated": [], "summary": []}
+        with patch.object(
+            attack, "_initialize_coordinator", return_value=_DummyCoordinator()
+        ):
+            attack.run(["Summarize weather"])
+        self.assertEqual(router.route_request.call_count, 9)
 
     def test_run_empty_goals(self):
         attack = StaticTemplateAttack(

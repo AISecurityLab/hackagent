@@ -34,6 +34,133 @@ class TestDeepUpdate(unittest.TestCase):
         self.assertIsNot(dst["data"], src["data"])
 
 
+class TestPAIRScorerPrecedence(unittest.TestCase):
+    def _make_attack(self, judge_outputs):
+        attacker = MagicMock()
+        attacker._agent_registry = {"sample-attacker": object()}
+        attacker.route_request.return_value = "Rating: [[10]]"
+        judge = MagicMock()
+        judge._agent_registry = {"sample-judge": object()}
+        judge.route_request.side_effect = judge_outputs
+        with (
+            patch.object(
+                PAIRAttack, "_initialize_attacker_router", return_value=attacker
+            ),
+            patch.object(PAIRAttack, "_initialize_judge_router", return_value=judge),
+        ):
+            attack = PAIRAttack(
+                config={
+                    "output_dir": "./logs/runs",
+                    "n_iterations": 2,
+                    "n_streams": 1,
+                    "jailbreak_threshold": 8,
+                    "max_parse_retries": 1,
+                },
+                client=MagicMock(),
+                agent_router=MagicMock(),
+            )
+        return attack
+
+    def test_assessment_score_drives_threshold_and_traces(self):
+        from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
+        from hackagent.attacks.techniques.autodan_turbo.config import (
+            SCORER_WRAPPER_SYSTEM_PROMPT,
+        )
+
+        for score, success in ((2.5, False), (1.0, False), (8.0, True)):
+            with self.subTest(score=score):
+                assessment = f"SCORE: {score}/10.0\nEXPLANATION: sample assessment"
+
+                def judge_response(registration_key, request_data):
+                    if (
+                        request_data["messages"][0]["content"]
+                        == SCORER_WRAPPER_SYSTEM_PROMPT
+                    ):
+                        return "10.0"
+                    return assessment
+
+                attack = self._make_attack(judge_response)
+                goal_tracker = MagicMock()
+                with (
+                    patch.object(
+                        attack, "_query_attacker", return_value="sample prompt"
+                    ),
+                    patch.object(
+                        attack, "_query_target_simple", return_value="sample response"
+                    ),
+                ):
+                    result = attack._run_single_goal(
+                        goal="sample goal",
+                        goal_index=0,
+                        goal_tracker=goal_tracker,
+                        goal_ctx=MagicMock(),
+                    )
+
+                iterations = 1 if success else 2
+                self.assertEqual(result["best_score"], score)
+                self.assertEqual(result["is_success"], success)
+                self.assertEqual(result["best_scorer_explanation"], assessment)
+                self.assertEqual(result["iterations_completed"], iterations)
+                self.assertEqual(
+                    attack.judge_router.route_request.call_count, iterations
+                )
+                attack.attacker_router.route_request.assert_not_called()
+                self.assertEqual(
+                    goal_tracker.add_evaluation_trace.call_count, iterations
+                )
+                for call in goal_tracker.add_evaluation_trace.call_args_list:
+                    evaluation = call.kwargs["evaluation_result"]
+                    self.assertEqual(evaluation["score"], score)
+                    self.assertEqual(evaluation["threshold"], 8)
+                    self.assertEqual(evaluation["is_success"], success)
+                    self.assertEqual(evaluation["scorer_explanation"], assessment)
+
+                step = BaseEvaluationStep({}, MagicMock(), MagicMock())
+                rows = step._postprocess_inline_judge_results(
+                    [result], attack_label="PAIR"
+                )
+                self.assertEqual(rows[0]["success"], success)
+                self.assertEqual(rows[0]["best_score"], score)
+
+    def test_valid_wrapper_minimum_does_not_trigger_legacy_rescoring(self):
+        assessment = "The sample was refused."
+        attack = self._make_attack([assessment, "1.0"])
+        self.assertEqual(
+            attack._judge_response("sample goal", "sample prompt", "sample response"),
+            1.0,
+        )
+        self.assertEqual(attack._get_scorer_explanation(), assessment)
+        self.assertEqual(attack.judge_router.route_request.call_count, 2)
+        attack.attacker_router.route_request.assert_not_called()
+
+    def test_legacy_fallback_after_failure_keeps_its_own_assessment(self):
+        attack = self._make_attack([""])
+        attack.attacker_router.route_request.return_value = "Rating: [[7.5]]"
+        self.assertEqual(
+            attack._judge_response("sample goal", "sample prompt", "sample response"),
+            7.5,
+        )
+        self.assertEqual(attack._get_scorer_explanation(), "Rating: [[7.5]]")
+        attack.judge_router.route_request.assert_called_once()
+        attack.attacker_router.route_request.assert_called_once()
+
+    def test_malformed_legacy_fallback_preserves_scoring_failure(self):
+        for legacy in ("", "ERROR 503: retry in 10 seconds", "SCORE: 2.5/100"):
+            with self.subTest(legacy=legacy):
+                attack = self._make_attack([""])
+                attack.attacker_router.route_request.return_value = legacy
+                self.assertEqual(
+                    attack._judge_response(
+                        "sample goal", "sample prompt", "sample response"
+                    ),
+                    1.0,
+                )
+                self.assertEqual(
+                    attack._get_scorer_explanation(), "Score extraction failed"
+                )
+                attack.attacker_router.route_request.assert_called_once()
+
+
 class TestPAIRAttack(unittest.TestCase):
     def test_requires_client(self):
         with self.assertRaises(ValueError):

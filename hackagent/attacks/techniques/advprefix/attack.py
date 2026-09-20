@@ -57,7 +57,7 @@ class AdvPrefixAttack(BaseAttack):
 
     Implements a multi-stage pipeline that:
 
-    1. **Generation** — uses an uncensored generator LLM to produce
+    1. **Generation** — uses an uncensored attacker LLM to produce
        candidate adversarial prefixes for each harmless meta-prompt.
        Prefixes are filtered by cross-entropy (``max_ce``) and token
        segment count before being passed downstream.
@@ -190,7 +190,7 @@ class AdvPrefixAttack(BaseAttack):
         Define the three AdvPrefix pipeline stage descriptors.
 
         Stage 1 — **Generation** (:class:`PrefixGenerationPipeline`):
-            Produces candidate adversarial prefixes via the generator LLM,
+            Produces candidate adversarial prefixes via the attacker LLM,
             applies CE and token-segment filters, and returns one row per
             (goal, candidate_prefix) pair.
 
@@ -217,7 +217,7 @@ class AdvPrefixAttack(BaseAttack):
                 ).execute(goals=kwargs["goals"]),
                 "step_type_enum": "GENERATION",
                 "config_keys": [
-                    "generator",
+                    "attacker",
                     "batch_size",
                     "max_tokens",
                     "guided_topk",

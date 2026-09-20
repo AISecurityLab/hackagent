@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from hackagent.attacks.shared.tui import with_tui_logging
 from hackagent.attacks.techniques.base import BaseAttack
+from hackagent.attacks.techniques.config import resolve_embedder_config
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 
 from . import autodan_eval as evaluation, lifelong, warm_up
@@ -85,6 +86,8 @@ class AutoDANTurboAttack(BaseAttack):
         if config:
             user_config, internal_config = _split_internal_keys(config)
             _deep_update(cfg, user_config)
+            if "embedder" in user_config:
+                cfg["embedder"] = resolve_embedder_config(user_config["embedder"])
         cfg = AutoDANTurboConfig.from_dict(cfg).to_dict()
         cfg.update(internal_config)
 
@@ -126,7 +129,7 @@ class AutoDANTurboAttack(BaseAttack):
             if isinstance(role_config, dict):
                 roles.append({"role": role_name, "config": role_config})
 
-        embedder = attack_config.get("embedder")
+        embedder = resolve_embedder_config(attack_config.get("embedder"))
         if isinstance(embedder, dict):
             roles.append(
                 {

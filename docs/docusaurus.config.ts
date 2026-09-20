@@ -40,7 +40,23 @@ const config: Config = {
       onBrokenMarkdownLinks: 'warn',
     },
   },
-  themes: ['@docusaurus/theme-mermaid'],
+  themes: [
+    '@docusaurus/theme-mermaid',
+    // Offline search: builds a Lucene index at build time and ships it with the
+    // site. No external service and no API keys, so it works on any host.
+    [
+      require.resolve('@easyops-cn/docusaurus-search-local'),
+      {
+        hashed: true,
+        // routeBasePath is '/', so the docs live at the site root.
+        docsRouteBasePath: '/',
+        indexBlog: false,
+        highlightSearchTermsOnTargetPage: true,
+        searchResultLimits: 10,
+        explicitSearchResultPath: true,
+      },
+    ],
+  ],
 
   presets: [
     [

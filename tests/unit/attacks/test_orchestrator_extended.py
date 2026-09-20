@@ -740,6 +740,157 @@ class TestDefaultCategoryClassifierPreflight(unittest.TestCase):
 class TestRequiredModelAvailabilityPreflight(unittest.TestCase):
     """Test fail-fast behavior for model availability preflight."""
 
+    @patch("litellm.embedding", return_value={"data": [{"embedding": [0.25, 0.75]}]})
+    def test_embedding_probe_uses_runtime_provider_path(self, mock_embedding):
+        orch, _, _ = _make_orchestrator()
+        for endpoint in (
+            "http://ollama.test",
+            "http://ollama.test/v1",
+            "http://ollama.test/api/embed",
+            "http://ollama.test/v1/embeddings",
+        ):
+            with (
+                self.subTest(endpoint=endpoint),
+                patch.object(orch, "_probe_router_registration") as mock_chat,
+            ):
+                error = orch._probe_model_target(
+                    {
+                        "role": "embedder",
+                        "kind": "router_config",
+                        "identifier": "ollama/embeddinggemma:300m",
+                        "agent_type": "OLLAMA",
+                        "endpoint": endpoint,
+                    }
+                )
+                self.assertIsNone(error)
+                self.assertEqual(
+                    mock_embedding.call_args.kwargs["api_base"], "http://ollama.test/v1"
+                )
+                self.assertEqual(
+                    mock_embedding.call_args.kwargs["input"], ["healthcheck"]
+                )
+                self.assertEqual(mock_embedding.call_args.kwargs["timeout"], 20.0)
+                mock_chat.assert_not_called()
+
+    @patch("litellm.embedding")
+    def test_embedding_probe_requires_vector_not_model_presence_or_http_success(
+        self, mock_embedding
+    ):
+        orch, _, _ = _make_orchestrator()
+        target = {
+            "role": "embedder",
+            "kind": "router_config",
+            "identifier": "embeddinggemma:300m",
+            "agent_type": "OLLAMA",
+        }
+        for response in (
+            {},
+            {"models": [{"name": "embeddinggemma:300m"}]},
+            {"data": []},
+            {"data": [{"embedding": []}]},
+            {"data": [{"embedding": [float("inf")]}]},
+        ):
+            with self.subTest(response=response):
+                mock_embedding.return_value = response
+                self.assertIn(
+                    "embedding health check failed", orch._probe_model_target(target)
+                )
+        mock_embedding.side_effect = RuntimeError(
+            "HTTP 400: does not support embeddings"
+        )
+        self.assertIn("HTTP 400", orch._probe_model_target(target))
+
+    @patch("litellm.embedding", return_value={"data": [{"embedding": [0.0, 1.0]}]})
+    def test_embedding_probe_provider_default_endpoint_and_env_credentials(
+        self, mock_embedding
+    ):
+        orch, _, _ = _make_orchestrator()
+        with patch.dict(os.environ, {"EMBED_KEY": "provider-key"}, clear=True):
+            self.assertIsNone(
+                orch._probe_model_target(
+                    {
+                        "role": "embedder",
+                        "kind": "router_config",
+                        "config": {
+                            "identifier": "text-embedding-3-small",
+                            "agent_type": "OPENAI_SDK",
+                            "api_key": "${EMBED_KEY}",
+                        },
+                    }
+                )
+            )
+        self.assertEqual(mock_embedding.call_args.kwargs["api_key"], "provider-key")
+        self.assertNotIn("api_base", mock_embedding.call_args.kwargs)
+
+    @patch("litellm.embedding")
+    def test_explicit_local_embedding_needs_no_network_or_ollama_pull(
+        self, mock_embedding
+    ):
+        orch, _, _ = _make_orchestrator()
+        target = {
+            "role": "embedder",
+            "kind": "router_config",
+            "identifier": "local/bag-of-words",
+            "agent_type": "OLLAMA",
+        }
+        with patch.object(orch, "_get_installed_ollama_models") as mock_models:
+            orch._autopull_missing_ollama_targets([target])
+            self.assertIsNone(orch._probe_model_target(target))
+        mock_models.assert_not_called()
+        mock_embedding.assert_not_called()
+
+    def test_chat_and_embedding_capabilities_are_not_deduplicated(self):
+        orch, _, _ = _make_orchestrator()
+        orch.attack_impl_class = AutoDANTurboAttack
+        orch.hackagent_agent.router = None
+        role = {
+            "identifier": "same-model",
+            "endpoint": "http://ollama.test",
+            "agent_type": "OLLAMA",
+        }
+        targets = orch._collect_model_preflight_targets(
+            {
+                "attacker": role,
+                "embedder": role,
+            },
+            goal_labels_by_index={0: {"category": "c", "subcategory": "s"}},
+        )
+        self.assertEqual(len(targets), 2)
+        self.assertEqual(
+            [target["roles"] for target in targets], [["attacker"], ["embedder"]]
+        )
+        self.assertTrue(targets[0]["required"])
+        self.assertFalse(targets[1]["required"])
+
+    @patch("hackagent.attacks.orchestrator.shutil.which", return_value="/mock/ollama")
+    def test_embedding_autopull_uses_native_model_name(self, _mock_which):
+        orch, _, _ = _make_orchestrator()
+        with (
+            patch.object(orch, "_get_installed_ollama_models", return_value=set()),
+            patch.object(orch, "_pull_ollama_model", return_value=True) as mock_pull,
+        ):
+            orch._autopull_missing_ollama_targets(
+                [
+                    {
+                        "role": "embedder",
+                        "agent_type": "OLLAMA",
+                        "identifier": "ollama/embeddinggemma:300m",
+                    }
+                ]
+            )
+        mock_pull.assert_called_once_with("embeddinggemma:300m")
+
+    def test_default_embedder_is_optional_unless_explicitly_required(self):
+        from hackagent.attacks.techniques.config import default_embedder
+
+        for required in (False, True):
+            roles = AutoDANTurboAttack.get_effective_model_roles(
+                {"_preflight_require_embedder": required}
+            )
+            embedder = next(role for role in roles if role["role"] == "embedder")
+            self.assertEqual(embedder["required"], required)
+            self.assertEqual(embedder["config"], default_embedder())
+
     def test_normalize_attack_type_for_preflight_accepts_autodan_aliases(self):
         """AutoDAN aliases should resolve to autodan_turbo mapping key."""
         orch, _, _ = _make_orchestrator()

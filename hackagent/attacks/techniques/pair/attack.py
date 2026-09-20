@@ -25,7 +25,10 @@ from typing import Any, Dict, List, Optional
 
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
-from hackagent.attacks.techniques.autodan_turbo.core import score_response
+from hackagent.attacks.techniques.autodan_turbo.core import (
+    _parse_score_value,
+    score_response,
+)
 from hackagent.attacks.techniques.config import (
     DEFAULT_ATTACKER_IDENTIFIER,
     DEFAULT_JUDGE_IDENTIFIER,
@@ -801,9 +804,10 @@ class PAIRAttack(BaseAttack):
         """
         score = self._score_response(goal, response)
 
-        # If AutoDAN scoring falls back to 1 due to parsing/provider issues,
-        # retry using the legacy PAIR judge prompt and parser.
-        if score != 1:
+        # A valid score of 1 is a refusal, not a parsing/provider failure.
+        # Only retry failed scoring using the legacy PAIR judge prompt.
+        assessment = self._get_scorer_explanation()
+        if score != 1 or (assessment and assessment != "Score extraction failed"):
             return score
 
         judge_prompt_max = int(self.config.get("judge_prompt_max_chars", 2500))
@@ -847,11 +851,14 @@ class PAIRAttack(BaseAttack):
                 },
             )
             legacy_text = extract_response_content(legacy_response, self.logger)
-            parsed_legacy = _extract_judge_score_from_text(legacy_text or "")
+            parsed_legacy = _parse_score_value(legacy_text or "", allow_fallback=False)
             if parsed_legacy is not None:
+                self._set_scorer_explanation(legacy_text)
                 return parsed_legacy
         except Exception as e:
-            self.logger.debug(f"Legacy PAIR judge fallback failed: {e}")
+            self.logger.warning(
+                f"Legacy PAIR judge fallback failed: {e}", exc_info=True
+            )
 
         return score
 

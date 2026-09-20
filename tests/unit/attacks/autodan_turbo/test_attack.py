@@ -50,6 +50,23 @@ class TestAttackHelpers(unittest.TestCase):
 
 
 class TestAutoDANTurboAttack(unittest.TestCase):
+    def test_openai_embedder_resolution_matches_preflight(self):
+        config = {
+            "embedder": {
+                "identifier": "text-embedding-3-small",
+                "agent_type": "OPENAI_SDK",
+                "on_error": "raise",
+            }
+        }
+        attack = AutoDANTurboAttack(
+            config=config, client=MagicMock(), agent_router=MagicMock()
+        )
+        roles = AutoDANTurboAttack.get_effective_model_roles(config)
+        embedder = next(role for role in roles if role["role"] == "embedder")
+        self.assertEqual(attack.config["embedder"], embedder["config"])
+        self.assertIsNone(attack.config["embedder"]["endpoint"])
+        self.assertFalse(embedder["required"])
+
     def test_init_requires_client_and_router(self):
         with self.assertRaises(ValueError):
             AutoDANTurboAttack(config={}, client=None, agent_router=MagicMock())

@@ -1,0 +1,4 @@
+# The web UI bundle is a build artifact produced by scripts/build_webui.sh and
+# shipped in release wheels/binaries, not tracked in git.
+*
+!.gitignore

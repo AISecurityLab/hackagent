@@ -16,6 +16,13 @@ Tests whether adversarial examples, feature manipulation, or boundary exploitati
 
 **Objective**: `jailbreak`
 
+:::note Objective vs. goals
+The `objective` above selects the **scoring rubric** for a run — it is one of a
+fixed set of built-in names, not something you write. The `goals` you pass to an
+attack are separate free-text strings that you author yourself. See
+[Goals vs. objective](../../attacks/index.mdx#goals-vs-objective).
+:::
+
 ### Recommended Datasets
 
 **Primary**

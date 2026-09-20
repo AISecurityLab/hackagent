@@ -442,9 +442,15 @@ output_dir/
 │       └── ...
 ```
 
-### Results Format
+---
 
-The `agent.hack()` call returns a list of result dictionaries (one per goal):
+## Interpreting Results
+
+The RAG Attack is one of the few attacks that populates `evaluations` rather
+than reporting a flat per-attempt verdict: it returns **one entry per goal**,
+each aggregating every benign query issued against the poisoned index.
+
+### Result Structure
 
 ```python
 {
@@ -485,6 +491,19 @@ The `agent.hack()` call returns a list of result dictionaries (one per goal):
 | **Retrieval Hit Rate** | Fraction of retrieval slots occupied by poisoned chunks |
 | **Payload Hit Rate** | Coverage-weighted fraction of payload text recovered in retrieval slots (not binary containment) |
 | **Inconclusive Rate** | Fraction of ambiguous evaluations |
+
+Note that `classification` is **three-valued** here — `SUCCESS`, `FAILURE`, or
+`INCONCLUSIVE` — rather than the boolean `success` used by other attacks. Treat
+`INCONCLUSIVE` separately: it means the judge could not tell, not that the
+attack failed.
+
+Retrieval metrics matter as much as ASR. A low `retrieval_hit_rate` means the
+poisoned chunks were never retrieved in the first place, so a low ASR says
+nothing about the target's susceptibility — fix retrieval before drawing
+conclusions.
+
+See [Interpreting Results](./index.mdx#interpreting-results) for the fields
+shared by every attack.
 
 ---
 

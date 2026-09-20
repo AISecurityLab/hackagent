@@ -45,7 +45,7 @@ DATASET = {"preset": "harmbench", "limit": 100}
 advprefix_config = {
     "attack_type": "advprefix",
     "dataset": DATASET,
-    "generator": {
+    "attacker": {
         "identifier": ATTACKER_MODEL,
         "endpoint": OLLAMA_BASE,
         "agent_type": "ollama",

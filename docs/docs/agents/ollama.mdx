@@ -1,4 +1,5 @@
 ---
+title: Ollama
 sidebar_position: 2
 slug: /agents/ollama
 ---
@@ -130,16 +131,16 @@ agent = HackAgent(
 )
 ```
 
-### Using Ollama as Generator/Judge
+### Using Ollama as Attacker/Judge
 
-Ollama models can also be used as attack generators and judges:
+Ollama models can also be used as attacker models and judges:
 
 ```python
 attack_config = {
 	"attack_type": "advprefix",
 	"goals": ["Test prompt injection vulnerability"],
 	# Use Ollama for attack generation
-	"generator": {
+	"attacker": {
 		"identifier": "ollama/llama3",
 		"endpoint": "http://localhost:11434/api/generate",
 	},

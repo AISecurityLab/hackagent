@@ -83,6 +83,21 @@ class TestCreateRouter:
         call_kwargs = MockRouter.call_args[1]
         assert call_kwargs["adapter_operational_config"]["api_key"] == "test-token-123"
 
+    @pytest.mark.parametrize("api_key", [None, "explicit-provider-key"])
+    @patch("hackagent.attacks.shared.router_factory.AgentRouter")
+    def test_backend_key_fallback_can_be_disabled(
+        self, MockRouter, mock_client, basic_config, api_key
+    ):
+        MockRouter.return_value._agent_registry = {"key-1": MagicMock()}
+        basic_config["api_key"] = api_key
+
+        create_router(mock_client, basic_config, use_backend_api_key=False)
+
+        mock_client.get_api_key.assert_not_called()
+        assert MockRouter.call_args.kwargs["adapter_operational_config"]["api_key"] == (
+            api_key or ""
+        )
+
     @patch("hackagent.attacks.shared.router_factory.AgentRouter")
     def test_api_key_override_from_metadata(
         self, MockRouter, mock_client, basic_config, logger

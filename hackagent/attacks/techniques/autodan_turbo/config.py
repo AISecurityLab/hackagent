@@ -15,7 +15,7 @@ Based on: https://arxiv.org/abs/2410.05295
 
 from typing import Any, Dict
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from hackagent.attacks.techniques.config import (
     AttackerConfig,
@@ -25,6 +25,7 @@ from hackagent.attacks.techniques.config import (
     DEFAULT_JUDGE_IDENTIFIER,
     DEFAULT_MAX_OUTPUT_TOKENS,
     default_embedder,
+    resolve_embedder_config,
 )
 
 
@@ -76,6 +77,11 @@ class AutoDANTurboConfig(ConfigBase):
     )
     embedder: Dict[str, Any] = Field(default_factory=default_embedder)
     target_request_overrides: Dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("embedder", mode="before")
+    @classmethod
+    def _resolve_embedder(cls, value: Any) -> Dict[str, Any]:
+        return resolve_embedder_config(value)
 
     @model_validator(mode="before")
     @classmethod

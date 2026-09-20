@@ -257,14 +257,45 @@ def default_category_classifier() -> Dict[str, Any]:
 def default_embedder() -> Dict[str, Any]:
     """Return a fresh embedder config dict (local ``embeddinggemma`` on Ollama).
 
-    Used by router-based embedder roles such as AutoDAN-Turbo strategy retrieval.
+    Used by embedding-only roles such as AutoDAN-Turbo strategy retrieval.
     """
     return {
         "identifier": DEFAULT_EMBEDDER_IDENTIFIER,
         "endpoint": DEFAULT_EMBEDDER_ENDPOINT,
         "agent_type": DEFAULT_EMBEDDER_AGENT_TYPE,
         "api_key": None,
+        "on_error": "disable",
     }
+
+
+def resolve_embedder_config(config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Merge embedding defaults without leaking the Ollama base to other providers."""
+    if config is not None and not isinstance(config, dict):
+        raise ValueError("embedder must be a configuration dictionary")
+    resolved = default_embedder()
+    if config:
+        agent_type = config.get("agent_type", resolved["agent_type"])
+        agent_type = str(getattr(agent_type, "value", agent_type)).upper()
+        if agent_type != "OLLAMA":
+            resolved["endpoint"] = None
+        resolved.update(config)
+    if resolved.get("on_error") not in ("disable", "raise"):
+        raise ValueError("embedder.on_error must be 'disable' or 'raise'")
+    if (
+        not isinstance(resolved.get("identifier"), str)
+        or not resolved["identifier"].strip()
+    ):
+        raise ValueError("embedder.identifier must be a nonempty model name")
+    resolved["identifier"] = resolved["identifier"].strip()
+    agent_type = resolved.get("agent_type")
+    agent_type = str(getattr(agent_type, "value", agent_type)).upper()
+    if not resolved["identifier"].startswith("local/") and agent_type not in (
+        "OLLAMA",
+        "OPENAI_SDK",
+        "LITELLM",
+    ):
+        raise ValueError(f"Unsupported embedding agent_type: {agent_type}")
+    return resolved
 
 
 def default_rag_embedder() -> Dict[str, Any]:
@@ -398,6 +429,7 @@ __all__ = [
     "default_judge",
     "default_category_classifier",
     "default_embedder",
+    "resolve_embedder_config",
     "default_rag_embedder",
     "default_judges",
     "default_judge_eval",
