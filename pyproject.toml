@@ -70,11 +70,17 @@ binaries = [
 [project.optional-dependencies]
 # The dashboard bundle, published from the hackagent-webapp repository. Kept out
 # of the base wheel so an install that never opens `hackagent web` does not
-# carry ~0.9 MB of frontend assets; a compatible range rather than a pin, so UI
-# fixes reach users without a hackagent release. Release binaries bundle the
-# same assets directly and do not need this.
+# carry ~0.9 MB of frontend assets. Release binaries bundle the same assets
+# directly and do not need this.
+#
+# A wide range rather than a pin, so dashboard fixes reach users without a
+# hackagent release. The bound stays below 1.0 because the dashboard is
+# pre-1.0: its own minor releases may change the API contract it speaks, and
+# that contract is what has to match this package's offline implementation.
+# Note the upper bound must admit a *stable* release — hackagent-webapp also
+# publishes .devN pre-releases from its stage branch, which pip ignores.
 web = [
-    "hackagent-webui>=0.3,<0.4",
+    "hackagent-webui>=0.2,<1.0",
 ]
 
 [project.scripts]

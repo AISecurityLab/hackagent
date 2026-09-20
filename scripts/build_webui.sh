@@ -2,11 +2,19 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
-# Build the HackAgent web UI bundle that `hackagent web` serves.
+# Build the HackAgent web UI bundle that `hackagent web` serves, from source.
+#
+# Most people do not need this: the dashboard is published to PyPI, so
+#
+#     pip install 'hackagent[web]'
+#
+# installs the same bundle release binaries ship, with no Node toolchain. Use
+# this script to build from a hackagent-webapp working tree — testing an
+# unreleased dashboard change against the CLI, or working offline.
 #
 # Produces a static export of the hackagent-webapp single-page app into
 # hackagent/server/webui/static/, where the package finds it at runtime and
-# PyInstaller picks it up for release binaries.
+# takes precedence over any installed hackagent-webui.
 #
 # The webapp checkout is never modified: the sources are copied to a scratch
 # directory and the export is configured there. That matters because the webapp
@@ -28,9 +36,10 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEST="${REPO_ROOT}/hackagent/server/webui/static"
 
 WEBAPP_REPO="${HACKAGENT_WEBAPP_REPO:-https://github.com/AISecurityLab/hackagent-webapp.git}"
-# Pinned tag, not a branch: hackagent-webapp releases through `stage` and
-# `main` trails it. Keep in step with WEBAPP_REF in .github/workflows/publish.yml.
-WEBAPP_REF="${HACKAGENT_WEBAPP_REF:-v0.3.0-stage}"
+# Pinned tag rather than a branch, so a clone-and-build is reproducible. Must be
+# a revision that carries scripts/build-community.mjs: tags from before the
+# community packaging landed cannot produce a static export at all.
+WEBAPP_REF="${HACKAGENT_WEBAPP_REF:-v0.2.0}"
 
 # Server-only sources that a static export cannot contain. The CLI answers both
 # of these paths from Python instead.
