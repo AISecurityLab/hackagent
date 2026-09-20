@@ -28,7 +28,9 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEST="${REPO_ROOT}/hackagent/server/webui/static"
 
 WEBAPP_REPO="${HACKAGENT_WEBAPP_REPO:-https://github.com/AISecurityLab/hackagent-webapp.git}"
-WEBAPP_REF="${HACKAGENT_WEBAPP_REF:-main}"
+# Pinned tag, not a branch: hackagent-webapp releases through `stage` and
+# `main` trails it. Keep in step with WEBAPP_REF in .github/workflows/publish.yml.
+WEBAPP_REF="${HACKAGENT_WEBAPP_REF:-v0.3.0-stage}"
 
 # Server-only sources that a static export cannot contain. The CLI answers both
 # of these paths from Python instead.

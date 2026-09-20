@@ -7,10 +7,13 @@ on:
 
 env:
   UV_VERSION: "0.10.11"
-  # Revision of AISecurityLab/hackagent-webapp whose static export is
-  # bundled as the dashboard. Bump deliberately: it pins the UI a release
-  # ships, independently of this repo's own version.
-  WEBAPP_REF: "main"
+  # Revision of AISecurityLab/hackagent-webapp whose static export is bundled as
+  # the dashboard. Pinned to a tag on purpose, so a release always bundles a
+  # known UI and rebuilding an old tag reproduces it. Bump deliberately: the
+  # dashboard version moves independently of this repo's own.
+  # Not a branch — hackagent-webapp releases through `stage`, and `main` trails
+  # it (0.2.1, pre-Keycloak, as of 2026-09-20).
+  WEBAPP_REF: "v0.3.0-stage"
 
 jobs:
   publish:

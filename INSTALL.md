@@ -77,10 +77,12 @@ scripts/build_webui.sh /path/to/hackagent-webapp
 # or: HACKAGENT_WEBAPP_DIR=/path/to/hackagent-webapp scripts/build_webui.sh
 ```
 
-To pin a particular webapp revision when cloning:
+When it clones, the script builds a pinned webapp tag (`v0.3.0-stage` at the
+time of writing) rather than a branch, so the bundle is reproducible. Override
+it to try a different revision:
 
 ```bash
-HACKAGENT_WEBAPP_REF=v0.2.1 scripts/build_webui.sh
+HACKAGENT_WEBAPP_REF=stage scripts/build_webui.sh
 ```
 
 ---
