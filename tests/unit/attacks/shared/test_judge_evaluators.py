@@ -467,9 +467,11 @@ class TestRequestWithAssertions:
         assert score == 1
         # Router should be called exactly once (no retry)
         assert evaluator_with_router.agent_router.route_request.call_count == 1
-        sent_request = evaluator_with_router.agent_router.route_request.call_args.kwargs[
-            "request_data"
-        ]
+        sent_request = (
+            evaluator_with_router.agent_router.route_request.call_args.kwargs[
+                "request_data"
+            ]
+        )
         assert sent_request["thinking"] is False
 
     def test_missing_thinking_is_normalized_to_false(self, evaluator_with_router):

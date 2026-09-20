@@ -162,9 +162,7 @@ class TestDispatchViaLiteLLM(unittest.TestCase):
         self.assertEqual(kwargs.get("reasoning_effort"), "medium")
 
     @patch("litellm.completion")
-    def test_ollama_thinking_false_is_translated_to_think_false(
-        self, mock_completion
-    ):
+    def test_ollama_thinking_false_is_translated_to_think_false(self, mock_completion):
         """An explicit disabled judge request reaches Ollama's native field."""
         mock_completion.return_value = _make_litellm_response("no")
         agent_id = uuid.uuid4()
