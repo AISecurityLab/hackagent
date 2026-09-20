@@ -14,6 +14,8 @@ For attacks using rendered flowchart images against Vision-Language Models, see 
 
 tFC-Attack adapts the FC-Attack technique for text-only LLMs by encoding harmful instructions as graph description language text rather than rendered images. The attack decomposes a harmful goal into step-by-step descriptions and serializes them using a structured graph format that models trained on code and structured text can interpret.
 
+tFC-specific knobs live under **`tfc_params`**. The optional step-decomposition LLM is top-level `step_generator`. Shared keys: [Shared Attack Config](./shared-args.md).
+
 ### Research Foundation
 
 > **"FC-Attack: Jailbreaking Multimodal Large Language Models via Auto-Generated Flowcharts"**
@@ -120,6 +122,8 @@ hackagent eval tfc \
 
 ### Flowchart Parameters (`tfc_params`)
 
+These keys belong **inside `tfc_params`**, not next to `goals`. `step_generator`, `batch_size`, `judges`, and `output_dir` are top-level.
+
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `text_format` | Graph language (`dot`, `mermaid`, `tikz`, `plantuml`, `ascii`) | `"dot"` |
@@ -208,3 +212,8 @@ shared by every attack.
 
 - Any LLM target (no vision capability required).
 - Best results with models trained on code and structured text (e.g., code-capable models that understand DOT/Mermaid syntax).
+
+## Related
+
+- [Shared Attack Config](./shared-args.md) — goals, judges, batching, `*_params` convention
+- [FC-Attack](./fc.md) — rendered flowchart images for VLMs
