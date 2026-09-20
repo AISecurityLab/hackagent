@@ -132,9 +132,7 @@ class ToolOutputIPIAttack(BaseAttack):
         if params.get("use_attacker_llm"):
             attacker = attack_config.get("attacker")
             if isinstance(attacker, dict):
-                roles.append(
-                    {"role": "attacker", "config": attacker, "required": True}
-                )
+                roles.append({"role": "attacker", "config": attacker, "required": True})
 
         judges = attack_config.get("judges")
         if isinstance(judges, list) and judges:

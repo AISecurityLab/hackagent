@@ -22,7 +22,7 @@ import json
 import logging
 import time
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from hackagent.attacks.evaluator.inline_step_judge import (
     InlineStepJudge,
@@ -42,12 +42,6 @@ from .config import (
     DEFAULT_INJECTION_TEMPLATE,
     DEFAULT_TOOL_NAME,
 )
-
-if TYPE_CHECKING:
-    from hackagent.server.client import AuthenticatedClient
-    from hackagent.router.tracking import Tracker
-    from hackagent.router.tracking.tracker import Context
-
 
 _StepJudge = InlineStepJudge
 
@@ -208,8 +202,10 @@ def extract_tool_calls(response: Any) -> List[Dict[str, Any]]:
                         }
                     )
                 return out
-    except Exception:
-        pass
+    except Exception as exc:
+        logging.getLogger(__name__).debug(
+            "Failed to extract tool_calls from response object: %s", exc
+        )
 
     if not isinstance(response, dict):
         return []
@@ -369,8 +365,8 @@ def execute(
     params = config.get("tool_output_ipi_params", {}) or {}
     attacker_cfg = config.get("attacker", {}) or {}
 
-    tracker: Optional["Tracker"] = config.get("_tracker")
-    client: Optional["AuthenticatedClient"] = config.get("_client")
+    tracker: Optional[Any] = config.get("_tracker")
+    client: Optional[Any] = config.get("_client")
     backend = config.get("_backend") or getattr(agent_router, "backend", None)
 
     mode = str(params.get("mode", "simulated")).lower()
@@ -399,9 +395,7 @@ def execute(
         try:
             attacker_router = _create_attacker_router(attacker_cfg, backend)
             attacker_key = str(attacker_router.backend_agent.id)
-            logger.info(
-                f"Attacker LLM enabled: {attacker_cfg.get('identifier')}"
-            )
+            logger.info(f"Attacker LLM enabled: {attacker_cfg.get('identifier')}")
         except Exception as exc:
             logger.error(f"Failed to create attacker router: {exc}")
             raise
@@ -515,7 +509,7 @@ def _attack_single_goal(
     attacker_router: Optional[AgentRouter],
     attacker_key: Optional[str],
     step_judge: Optional[_StepJudge],
-    tracker: Optional["Tracker"],
+    tracker: Optional[Any],
     logger: logging.Logger,
 ) -> Dict[str, Any]:
     benign_task = resolve_benign_task(goal_idx, params, goal)
@@ -562,8 +556,10 @@ def _attack_single_goal(
     for attempt_idx in range(max_attempts):
         label = f"Goal {goal_idx + 1}, attempt {attempt_idx + 1}/{max_attempts}"
         injection_body = base_injection
-        if attacker_router and attacker_key and (
-            params.get("use_attacker_llm") or attempt_idx > 0
+        if (
+            attacker_router
+            and attacker_key
+            and (params.get("use_attacker_llm") or attempt_idx > 0)
         ):
             refined = _refine_injection_with_attacker(
                 attacker_router=attacker_router,
@@ -684,7 +680,9 @@ def _attack_single_goal(
                     "poisoned_observation": poisoned,
                     "response": response_text,
                     "followup_tool_calls": followup_calls,
-                    "error": target_error if not response_text and not followup_calls else None,
+                    "error": target_error
+                    if not response_text and not followup_calls
+                    else None,
                     "best_score": judge_score,
                     "success": is_success,
                     "mode": used_mode,
@@ -719,8 +717,8 @@ def _attack_single_goal(
 
 def _persist_attempt_trace(
     *,
-    tracker: "Tracker",
-    goal_ctx: "Context",
+    tracker: Any,
+    goal_ctx: Any,
     attempt_idx: int,
     max_attempts: int,
     benign_task: str,
