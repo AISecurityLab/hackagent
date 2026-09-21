@@ -81,6 +81,9 @@ jobs:
           # another ref.
           ref: stage
           token: ${{ secrets.PROMOTE_GITHUB_TOKEN }}
+          # Do not leave the PAT in .git/config for later steps; the ref is
+          # updated through the API with GH_TOKEN instead of git push.
+          persist-credentials: false
 
       - name: Sync promote/to-main and ensure promotion PR
         if: steps.compare.outputs.should_promote == 'true'
@@ -91,9 +94,18 @@ jobs:
 
           REPO="${{ github.repository }}"
           PROMOTE_HEAD="promote/to-main"
+          SHA="$(git rev-parse HEAD)"
 
-          echo "Force-updating ${PROMOTE_HEAD} to the current stage tip."
-          git push --force origin "HEAD:refs/heads/${PROMOTE_HEAD}"
+          echo "Force-updating ${PROMOTE_HEAD} to ${SHA}."
+          if gh api --silent "repos/${REPO}/git/ref/heads/${PROMOTE_HEAD}" >/dev/null 2>&1; then
+            gh api --method PATCH "repos/${REPO}/git/refs/heads/${PROMOTE_HEAD}" \
+              -f sha="${SHA}" \
+              -F force=true >/dev/null
+          else
+            gh api --method POST "repos/${REPO}/git/refs" \
+              -f ref="refs/heads/${PROMOTE_HEAD}" \
+              -f sha="${SHA}" >/dev/null
+          fi
 
           existing="$(gh pr list --repo "${REPO}" \
             --base main --head "${PROMOTE_HEAD}" --state open \
