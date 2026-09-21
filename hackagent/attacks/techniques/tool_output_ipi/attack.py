@@ -256,6 +256,7 @@ class ToolOutputIPIAttack(BaseAttack):
             return rows_to_attack_results(results)
 
         except Exception:
+            self.logger.exception("tool_output_ipi pipeline failed with exception")
             coordinator.finalize_on_error(
                 "tool_output_ipi pipeline failed with exception"
             )

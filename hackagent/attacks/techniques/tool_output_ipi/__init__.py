@@ -15,13 +15,11 @@ __all__ = ["ToolOutputIPIAttack"]
 
 
 def _register_taxonomy_entry() -> None:
-    """Register adaptive+indirect when taxonomy module exists (#603).
+    """Ensure adaptive+indirect taxonomy entry exists (safety net).
 
-    ``hackagent.attacks.taxonomy`` is introduced by PR #603
-    (``feat/attack-category-taxonomy``). Until that lands on main this is a
-    no-op. After #603 merges, prefer adding a permanent line in
-    ``ATTACK_TAXONOMY``; this helper remains as a safety net so TUI/CLI
-    discovery does not fail if the permanent entry is temporarily missing.
+    The permanent assignment lives in ``ATTACK_TAXONOMY``. This helper remains
+    so TUI/CLI discovery does not fail if that permanent entry is temporarily
+    missing during a partial merge.
     """
     try:
         from hackagent.attacks.taxonomy import (

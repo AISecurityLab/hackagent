@@ -28,6 +28,7 @@ import os
 import copy
 import re
 import shutil
+from urllib.parse import urlparse
 import subprocess
 import sys
 import time
@@ -279,6 +280,47 @@ class AttackOrchestrator:
             return api_key
         return None
 
+    #: Hosts that mean "this machine". A backend on one of these is not the
+    #: hosted service, however it was authenticated.
+    _LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "0.0.0.0", "::1", ""})
+
+    def _backend_base_url(self) -> Optional[str]:
+        """Return the backend client's base URL, or ``None`` if it has none.
+
+        Defensive about the type: a backend may be a stub or a test double whose
+        attributes are not strings, and treating one of those as a URL would
+        produce an endpoint like ``<MagicMock ...>/v1`` instead of failing.
+        """
+        backend = getattr(self.hackagent_agent, "backend", None)
+        client = getattr(backend, "_client", None) if backend is not None else None
+        base_url = getattr(client, "base_url", None) if client is not None else None
+        if isinstance(base_url, str) and base_url.strip():
+            return base_url.strip().rstrip("/")
+        return None
+
+    def _is_remote_backend_endpoint(self) -> bool:
+        """Return True when the backend points at a genuinely remote host.
+
+        An API key alone does not mean the hosted service: pointing
+        ``HACKAGENT_BASE_URL`` at a local deployment should keep the attacker
+        and judge local rather than sending traffic to hackagent.dev.
+
+        Matches on the parsed hostname rather than a substring of the URL — a
+        substring test flags ``https://api.example.com:8000`` as local purely
+        because of its port, and silently downgrades a remote run.
+
+        Only a host we can positively identify as local downgrades the run. A
+        backend that exposes no usable base URL keeps the long-standing
+        behaviour where holding an API key means remote, so this can never
+        quietly route a hosted run to Ollama because of an unreadable client.
+        """
+        base_url = self._backend_base_url()
+        if base_url is None:
+            return True
+
+        host = (urlparse(base_url).hostname or "").lower()
+        return host not in self._LOCAL_HOSTS and not host.endswith(".localhost")
+
     @staticmethod
     def _remote_role_defaults(api_key: str) -> Dict[str, Dict[str, Any]]:
         """Build remote role defaults with backend-key fallback semantics."""
@@ -298,18 +340,23 @@ class AttackOrchestrator:
             },
         }
 
-    @staticmethod
-    def _remote_classifier_defaults(api_key: str) -> Dict[str, Any]:
+    def _remote_classifier_defaults(self, api_key: str) -> Dict[str, Any]:
         """Remote (HackAgent API) defaults for the goal category classifier.
 
-        Routes the classifier through the same hosted endpoint as the judge so
+        Routes the classifier through the configured backend endpoint so
         it never requires a local Ollama model when a HackAgent API key is
         available. Without a key, the classifier keeps its local default
         (see techniques.config) — this is only applied in remote mode.
+
+        Uses the backend's base_url to construct the endpoint, ensuring that
+        custom base_url configurations (e.g., localhost instances) are honored.
         """
+        base_url = self._backend_base_url()
+        endpoint = f"{base_url}/v1" if base_url else DEFAULT_REMOTE_ROLE_ENDPOINT
+
         return {
             "identifier": DEFAULT_REMOTE_JUDGE_IDENTIFIER,
-            "endpoint": DEFAULT_REMOTE_ROLE_ENDPOINT,
+            "endpoint": endpoint,
             "agent_type": DEFAULT_REMOTE_AGENT_TYPE,
             "api_key": api_key,
         }
@@ -374,7 +421,9 @@ class AttackOrchestrator:
     ) -> Dict[str, Any]:
         """Apply local/remote role defaults before preflight and execution."""
         api_key = self._backend_api_key_for_role_defaults()
-        is_remote_mode = bool(api_key)
+        # Check if backend is actually remote by inspecting the base_url.
+        # If base_url points to localhost, use local defaults even if api_key exists.
+        is_remote_mode = bool(api_key) and self._is_remote_backend_endpoint()
 
         selected_attack_type = (
             attack_config.get("attack_type")

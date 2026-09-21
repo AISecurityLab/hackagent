@@ -6,6 +6,8 @@ sidebar_position: 6
 
 AutoDAN-Turbo is a lifelong jailbreak attack that **discovers, stores, and reuses attack strategies** across multiple attempts. It runs a warm-up exploration phase to seed a strategy library, then a lifelong phase that retrieves and applies the best strategies to new attempts.
 
+**Category:** Adaptive — strategy search and reuse across independent attempts, not a single growing conversation. See [Attack taxonomy](./taxonomy.mdx).
+
 ## Overview
 
 AutoDAN-Turbo combines three core LLM roles plus a configurable retrieval embedder:
@@ -15,8 +17,10 @@ AutoDAN-Turbo combines three core LLM roles plus a configurable retrieval embedd
 - **Summarizer**: extracts reusable strategies from prompt pairs
 - **Embedder**: computes strategy-retrieval signatures for library search
 
-It uses these roles to build a strategy library, then reuses that library across iterations to improve success rates.
-An attack attempt is considered jailbroken as soon as the scorer reports a value greater than or equal to `break_score`.
+It uses these roles to build a strategy library, then reuses that library across iterations to improve success rates. An attack attempt is considered jailbroken as soon as the scorer reports a value greater than or equal to `break_score`.
+
+AutoDAN-Turbo-specific knobs live under **`autodan_turbo_params`**. Role configs (`attacker`, `judge`, `summarizer`, `embedder`) and batching (`goal_batch_size`, `goal_batch_workers`) sit at the **top level**. `batch_size` is **not used**. See [Shared Attack Config](./shared-args.md).
+
 ---
 
 ## How AutoDAN-Turbo Works
@@ -161,16 +165,48 @@ advanced_config = {
 
 ## Configuration Parameters
 
-### Core AutoDAN-Turbo
+### Where parameters go
+
+| Goes in `autodan_turbo_params` | Goes at top-level `attack_config` |
+|--------------------------------|-----------------------------------|
+| `epochs`, `break_score` | `attack_type` (`"autodan_turbo"`) |
+| `warm_up_iterations`, `lifelong_iterations` | `goals` / `dataset` / `intents` |
+| `skip_warm_up`, `warm_up_only` | `attacker`, `judge`, `summarizer`, `embedder` |
+| `retrieval_top_k`, `strategy_library_path` | `judges` (optional post-hoc evaluation) |
+| `high_score_threshold`, `moderate_score_threshold` | `goal_batch_size`, `goal_batch_workers` |
+| `refusal_keywords` | `output_dir`, `category_classifier` |
+| `attacker_temperature`, `attacker_top_p`, `attacker_max_tokens` | `target_request_overrides` |
+| `scorer_temperature`, `scorer_top_p`, `scorer_max_tokens` | `_preflight_require_embedder` |
+| `summarizer_temperature`, `summarizer_top_p`, `summarizer_max_tokens` | `_preflight_probe_optional_roles` |
+| `max_parse_retries` | |
+
+Contrast with [Crescendo](./crescendo.md): Crescendo puts `max_turns` at the **top level** (no `crescendo_params` yet). AutoDAN-Turbo already nests algorithm knobs under `autodan_turbo_params`. See [Attack-specific params convention](./shared-args.md#attack-specific-params-vs-top-level).
+
+### Core AutoDAN-Turbo (`autodan_turbo_params`)
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `autodan_turbo_params.warm_up_iterations` | Warm-up outer loops | `1` |
-| `autodan_turbo_params.lifelong_iterations` | Lifelong outer loops | `1` |
-| `autodan_turbo_params.epochs` | Attempts per iteration | `1` |
-| `autodan_turbo_params.break_score` | Success threshold (jailbreak if `score >= break_score`) | `8.5` |
-| `autodan_turbo_params.retrieval_top_k` | Strategies retrieved per query | `5` |
-| `autodan_turbo_params.strategy_library_path` | Load a prebuilt library | `None` |
+| `epochs` | Attack attempts per goal per iteration | `1` |
+| `break_score` | Success threshold (jailbreak if `score >= break_score`) | `8.5` |
+| `warm_up_iterations` | Warm-up outer loops | `1` |
+| `lifelong_iterations` | Lifelong outer loops | `1` |
+| `skip_warm_up` | Skip warm-up and go straight to lifelong | `False` |
+| `warm_up_only` | Run only the warm-up phase | `False` |
+| `retrieval_top_k` | Strategies retrieved per query | `5` |
+| `strategy_library_path` | Load a prebuilt library | `None` |
+| `high_score_threshold` | Score threshold for high-confidence strategy reuse | `5.0` |
+| `moderate_score_threshold` | Score threshold for moderate-confidence strategy reuse | `2.0` |
+| `refusal_keywords` | Quick-check refusal substrings | `["I cannot", "I am unable", "I can't"]` |
+| `attacker_temperature` | Attacker sampling temperature | `1.0` |
+| `attacker_top_p` | Attacker top-p | `1.0` |
+| `attacker_max_tokens` | Attacker max tokens | `4096` |
+| `scorer_temperature` | Scorer sampling temperature | `0.7` |
+| `scorer_top_p` | Scorer top-p | `0.9` |
+| `scorer_max_tokens` | Scorer max tokens | `4096` |
+| `summarizer_temperature` | Summarizer sampling temperature | `0.6` |
+| `summarizer_top_p` | Summarizer top-p | `0.9` |
+| `summarizer_max_tokens` | Summarizer max tokens | `4096` |
+| `max_parse_retries` | Retries when scorer/summarizer wrappers fail to parse | `5` |
 
 ### Embedder Role
 
@@ -246,29 +282,18 @@ Chat and embedding capabilities are checked separately even for the same model.
 
 ### Shared Goal Category Classifier
 
-All attacks (including AutoDAN-Turbo) accept a top-level `category_classifier` block. It runs once per goal to attach a normalized category to tracking metadata (it does not replace scorer/judge logic).
-
-```python
-"category_classifier": {
-    "identifier": "gemma3:4b",
-    "endpoint": "http://localhost:11434",
-    "agent_type": "OLLAMA",
-    "api_key": None,
-    "max_tokens": 100,
-    "temperature": 0.0
-}
-```
+Top-level `category_classifier` is shared by every attack (it does not replace scorer/judge logic). See [Shared Attack Config](./shared-args.md#category_classifier).
 
 ---
 
 ## Parallelization and Batching
 
-AutoDAN-Turbo currently supports **goal-level batching**.
+AutoDAN-Turbo currently supports **goal-level batching** only. Full shared semantics: [Shared Attack Config](./shared-args.md#parallelization--batching).
 
 - `goal_batch_size`: how many goals go into each macro-batch (sequential batches)
 - `goal_batch_workers`: how many macro-batches are processed concurrently
 
-> Note: `batch_size` is **not used** by AutoDAN-Turbo in the current implementation.
+> `batch_size` is **not used** by AutoDAN-Turbo. Do not expect it to parallelize epochs or warm-up attempts.
 
 ---
 
@@ -327,3 +352,9 @@ shared by every attack.
 - Use a fast, cheap scorer to reduce cost. The scorer runs for every attempt.
 - You can set `embedder.identifier` to `local/bag-of-words` for deterministic local retrieval vectors.
 - The jailbreak condition uses scorer threshold: success when `score >= break_score`.
+
+## Related
+
+- [Shared Attack Config](./shared-args.md) — goals, roles, batching, `*_params` convention
+- [Attack Overview](./index.mdx) — compare all attack types
+- [Crescendo](./crescendo.md) — multi-turn escalation (top-level attack keys, no `*_params` yet)

@@ -6,6 +6,8 @@ sidebar_position: 7
 
 BoN is a stochastic black-box attack that **generates N randomly augmented versions** of a harmful prompt — using word scrambling, random capitalization, and ASCII perturbation — and picks the best candidate that bypasses the target model's safety mechanisms. The technique exploits the observation that random text mutations can break safety classifiers while preserving semantic meaning for the LLM.
 
+**Category:** Adaptive — Best-of-N searches many independently augmented candidates until a judge confirms success. See [Attack taxonomy](./taxonomy.mdx).
+
 ## Overview
 
 BoN operates without an external attacker model. The harmful goal is augmented with random text transformations controlled by a single strength parameter σ (sigma), and multiple augmented candidates are tested in parallel against the target. After each step, the best candidate is **evaluated by a judge** (e.g. HarmBench) to determine if it constitutes a successful jailbreak. If the judge confirms success, the search **terminates early**. Otherwise, the attack continues to the next step until the budget is exhausted.
@@ -19,6 +21,8 @@ BoN is based on the paper:
 > [arXiv:2412.03556](https://arxiv.org/abs/2412.03556)
 
 The paper demonstrates that simple random text augmentations can achieve high attack success rates across multiple frontier models with minimal computational cost.
+
+BoN-specific knobs live under **`bon_params`**. Shared keys (`goals`, `judges`, `batch_size`, …) are top-level. See [Shared Attack Config](./shared-args.md).
 
 ---
 
@@ -189,6 +193,8 @@ advanced_config = {
 
 #### Top-Level Parameters
 
+Shared keys — [Shared Attack Config](./shared-args.md). `bon_params` holds only augmentation/search knobs. Match `batch_size` to `num_concurrent_k` for full intra-step throughput.
+
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `batch_size` | int | 1 | Concurrent target-model requests within a step |
@@ -201,18 +207,7 @@ advanced_config = {
 
 ### Shared Goal Category Classifier
 
-All attacks accept a top-level `category_classifier` block. It runs once per goal to attach a normalized category to tracking metadata (independent from judge scoring).
-
-```python
-"category_classifier": {
-    "identifier": "gemma3:4b",
-    "endpoint": "http://localhost:11434",
-    "agent_type": "OLLAMA",
-    "api_key": None,
-    "max_tokens": 100,
-    "temperature": 0.0
-}
-```
+Top-level `category_classifier` is shared by every attack. See [Shared Attack Config](./shared-args.md#category_classifier).
 
 ### Parallelization
 
@@ -282,3 +277,9 @@ shared by every attack.
 - **Sigma tuning**: the default σ = 0.4 works well across most models. Lower values produce subtler augmentations; higher values produce more aggressive mutations that may reduce semantic coherence.
 - **Deterministic seeds**: each candidate uses a deterministic seed derived from the step and candidate index, ensuring reproducible results given the same configuration.
 - **Scalability**: increasing `n_steps` and `num_concurrent_k` improves attack success rate at the cost of more target model queries. Total queries per goal = `n_steps × num_concurrent_k` in the worst case (less if early stopped by inline judge).
+
+## Related
+
+- [Shared Attack Config](./shared-args.md) — goals, judges, batching, `*_params` convention
+- [Attack Overview](./index.mdx) — compare all attack types
+- [FlipAttack](./flipattack.md) — deterministic character-level obfuscation

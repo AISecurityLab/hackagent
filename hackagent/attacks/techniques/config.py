@@ -16,6 +16,11 @@ standard across attacks:
 Technique-specific modules should extend these building blocks with their own
 algorithm parameters, but they should not redefine the shared defaults.
 
+How an attack hits the target (static / adaptive / multi-turn, plus tags such
+as multimodal or RAG/indirect) is defined separately in
+``hackagent.attacks.taxonomy`` — not in these shared argument models.
+See the docs page ``docs/docs/attacks/taxonomy.mdx``.
+
 Victim-model request defaults are still defined here for compatibility and
 for callers that want the canonical schema, but the preferred runtime source
 for those settings is now `HackAgent(..., target_config=...)`.

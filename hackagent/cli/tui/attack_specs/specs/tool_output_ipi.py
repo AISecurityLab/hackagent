@@ -23,10 +23,8 @@ SPEC = AttackConfigSpec(
         "attack injects adversarial instructions into the tool result and "
         "checks whether the agent follows them."
     ),
-    # TODO(#603): when hackagent.attacks.taxonomy lands, ensure
-    # ATTACK_TAXONOMY["tool_output_ipi"] = ADAPTIVE + INDIRECT (the technique
-    # package also registers defensively on import). Spec.category/tags then
-    # come from taxonomy — do not hardcode them on AttackConfigSpec.
+    # Category/tags come from ATTACK_TAXONOMY (ADAPTIVE + INDIRECT).
+    # Do not hardcode them on AttackConfigSpec.
     fields=[
         ConfigField(
             key="tool_output_ipi_params.mode",

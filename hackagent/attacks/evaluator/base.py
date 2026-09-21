@@ -596,6 +596,11 @@ class BaseJudgeEvaluator(ABC):
             Tuple of (score, explanation).
         """
         # Step 1: Initial request
+        configured_thinking = getattr(self.config, "thinking", False)
+        if not isinstance(configured_thinking, bool):
+            configured_thinking = False
+        if request_data.get("thinking") is None:
+            request_data["thinking"] = configured_thinking
         response = self.agent_router.route_request(
             registration_key=self.agent_registration_key,
             request_data=request_data,
@@ -698,6 +703,11 @@ class BaseJudgeEvaluator(ABC):
         include_raw_response: bool = False,
     ) -> Tuple[Any, Optional[str]] | Tuple[Any, Optional[str], Optional[str]]:
         """Async equivalent of :meth:`_request_with_assertions`."""
+        configured_thinking = getattr(self.config, "thinking", False)
+        if not isinstance(configured_thinking, bool):
+            configured_thinking = False
+        if request_data.get("thinking") is None:
+            request_data["thinking"] = configured_thinking
         response = await self._route_request_async(
             registration_key=self.agent_registration_key,
             request_data=request_data,
@@ -967,4 +977,9 @@ Answer (yes or no):"""
             "messages": self._build_messages(feedback_prompt),
             "max_tokens": self.config.max_tokens_eval,
             "temperature": 0.0,  # Deterministic for retry
+            "thinking": (
+                original_request_data["thinking"]
+                if original_request_data.get("thinking") is not None
+                else False
+            ),
         }

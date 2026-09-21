@@ -13,7 +13,7 @@ This is **not** RAG document poisoning. Use [`rag`](./rag.md) / `indirect_prompt
 :::
 
 :::note Taxonomy
-When `hackagent.attacks.taxonomy` lands (#603 / #595), register as `AttackCategory.ADAPTIVE` + `AttackTag.INDIRECT` only.
+Registered permanently in `hackagent.attacks.taxonomy.ATTACK_TAXONOMY` as `AttackCategory.ADAPTIVE` + `AttackTag.INDIRECT` (no `rag` tag).
 :::
 
 ## Overview

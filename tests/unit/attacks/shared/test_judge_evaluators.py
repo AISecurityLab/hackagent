@@ -367,6 +367,7 @@ class TestBuildRetryRequest:
         assert "1.  **An explanation**" in messages[0]["content"]
         assert "yes" in messages[0]["content"].lower()
         assert "no" in messages[0]["content"].lower()
+        assert retry["thinking"] is False
 
     def test_retry_request_preserves_constraints(self, mock_evaluator):
         original = {
@@ -466,6 +467,47 @@ class TestRequestWithAssertions:
         assert score == 1
         # Router should be called exactly once (no retry)
         assert evaluator_with_router.agent_router.route_request.call_count == 1
+        sent_request = (
+            evaluator_with_router.agent_router.route_request.call_args.kwargs[
+                "request_data"
+            ]
+        )
+        assert sent_request["thinking"] is False
+
+    def test_missing_thinking_is_normalized_to_false(self, evaluator_with_router):
+        """A judge request without a thinking setting disables reasoning."""
+        evaluator_with_router.config.thinking = None
+        evaluator_with_router.agent_router.route_request.return_value = {
+            "processed_response": "yes",
+        }
+        request_data = {
+            "messages": [{"role": "user", "content": "test"}],
+            "thinking": None,
+        }
+
+        evaluator_with_router._request_with_assertions(
+            request_data=request_data, original_index=0, max_retries=1
+        )
+
+        assert request_data["thinking"] is False
+
+    def test_retry_preserves_disabled_thinking(self, evaluator_with_router):
+        """Assertion retries also carry the disabled reasoning setting."""
+        evaluator_with_router.agent_router.route_request.side_effect = [
+            {"processed_response": "ambiguous response"},
+            {"processed_response": "yes"},
+        ]
+        request_data = {
+            "messages": [{"role": "user", "content": "test"}],
+        }
+
+        evaluator_with_router._request_with_assertions(
+            request_data=request_data, original_index=0, max_retries=1
+        )
+
+        calls = evaluator_with_router.agent_router.route_request.call_args_list
+        assert calls[0].kwargs["request_data"]["thinking"] is False
+        assert calls[1].kwargs["request_data"]["thinking"] is False
 
     def test_retry_succeeds_on_second_try(self, evaluator_with_router):
         """When first response is gibberish and retry returns 'yes'."""
@@ -597,6 +639,17 @@ class TestScorerEvaluator:
         assert "answer (yes or no)" not in body.lower()
         assert req["temperature"] == 0.0
         assert req["max_tokens"] == scorer.config.max_tokens_eval
+        assert req["thinking"] is False
+
+    def test_evaluator_config_thinking_defaults_to_false(self):
+        from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
+
+        config = EvaluatorConfig(
+            agent_name="judge",
+            agent_type="OLLAMA",
+            model_id="test-model",
+        )
+        assert config.thinking is False
 
 
 class TestCustomJudgeSystemPrompt:

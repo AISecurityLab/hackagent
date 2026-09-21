@@ -1,7 +1,12 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Static catalog of attack strategies exposed by ``hackagent eval``."""
+"""Static catalog of attack strategies exposed by ``hackagent eval``.
+
+Labels and descriptions live here. Primary category and tags come from
+:mod:`hackagent.attacks.taxonomy` so CLI listing/help cannot drift from the
+official assignment table.
+"""
 
 from typing import Dict
 

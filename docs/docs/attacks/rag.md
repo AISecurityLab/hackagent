@@ -6,8 +6,10 @@ sidebar_position: 11
 
 The **RAG Attack** tests whether a RAG-augmented agent can be manipulated through poisoned documents in its knowledge base. It is HackAgent's implementation of **indirect prompt injection**: the attack falls under the **Indirect Injection** risk microcategory, the same way **FlipAttack** sits under **Jailbreak**. HackAgent handles the entire RAG pipeline internally — the user only provides documents, a malicious goal, and the target agent endpoint.
 
+**Category:** Static. **Tags:** Indirect, RAG — the payload lives in retrieved documents, not in an attacker refinement loop. See [Attack taxonomy](./taxonomy.mdx).
+
 :::info Risk categorization
-**Attack:** RAG Attack (`attack_type: "rag"`) · **Risk microcategory:** Indirect Injection
+**Attack:** RAG Attack (`attack_type: "rag"`) · **Primary category:** Static · **Tags:** Indirect, RAG · **Risk microcategory:** Indirect Injection
 :::
 
 ## Overview
@@ -255,6 +257,8 @@ results = agent.hack(attack_config=attack_config)
 ## Configuration Reference
 
 ### Required Parameters
+
+RAG-specific options live under **`rag_injection_params`** (including nested `documents`, `poisoning`, `target_retrieval`, and the RAG `embedder`). `attacker`, `judges`, `goals`, and orchestrator batching are **top-level**. Do not put `poisoning` next to `goals`. Shared keys: [Shared Attack Config](./shared-args.md).
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -652,4 +656,9 @@ The RAG Attack — in particular the `maximize_retrieval` strategy — is inform
 > [arXiv:2402.07867](https://arxiv.org/abs/2402.07867)
 
 PoisonedRAG shows that injecting a small number of crafted texts into a knowledge base can reliably steer a RAG system's answers for targeted queries. HackAgent adapts this query-targeted poisoning idea to harmful-intent execution goals and couples it with end-to-end ingestion, retrieval, target response, and judging.
+
+## Related
+
+- [Shared Attack Config](./shared-args.md) — goals, judges, batching, `*_params` convention
+- [Attack Overview](./index.mdx) — compare all attack types
 

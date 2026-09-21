@@ -9,6 +9,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from hackagent.attacks.taxonomy import get_attack_taxonomy
 from hackagent.cli.commands.attack.catalog import ATTACK_CATALOG
 
 from hackagent.cli.utils import (
@@ -22,8 +23,17 @@ console = Console()
 def _display_generic_attack_info(strategy: str) -> None:
     """Display concise info for attack strategies that don't have long-form docs."""
     meta = ATTACK_CATALOG[strategy]
+    tax = get_attack_taxonomy(strategy)
+    tags = (
+        ", ".join(tag.label for tag in tax.tags) if tax.tags else "none (primary only)"
+    )
 
     info_content = f"""[bold]{meta["label"]} Attack Strategy[/bold]
+
+[cyan]Category:[/cyan]
+{tax.category.label} — {tax.category.description}
+[cyan]Tags:[/cyan]
+{tags}
 
 [cyan]Description:[/cyan]
 {meta["description"]}
@@ -160,9 +170,15 @@ def _display_attack_results(results: Any) -> None:
 def _display_advprefix_info() -> None:
     """Display detailed information about AdvPrefix attack strategy"""
 
-    info_content = """[bold]AdvPrefix Attack Strategy[/bold]
+    tax = get_attack_taxonomy("advprefix")
+    info_content = (
+        f"""[bold]AdvPrefix Attack Strategy[/bold]
 
-[cyan]Description:[/cyan]
+[cyan]Category:[/cyan]
+{tax.category.label} — {tax.category.description}
+
+"""
+        + """[cyan]Description:[/cyan]
 The AdvPrefix attack generates adversarial prefixes that can manipulate AI agent behavior.
 It uses a multi-step pipeline involving uncensored language models to craft effective attacks.
 
@@ -209,6 +225,7 @@ It uses a multi-step pipeline involving uncensored language models to craft effe
 [yellow]⚠️ Ethical Usage:[/yellow]
 Only use this attack against agents you own or have explicit permission to test.
 Always follow responsible disclosure practices for any vulnerabilities found."""
+    )
 
     panel = Panel(
         info_content,

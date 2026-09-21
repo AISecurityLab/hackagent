@@ -88,29 +88,48 @@ const sidebars: SidebarsConfig = {
         id: 'attacks/index',
       },
       items: [
+        'attacks/taxonomy',
+        'attacks/shared-args',
         {
           type: 'category',
           label: 'Jailbreak',
           items: [
-            // Ordered by mechanism sophistication: control condition first,
-            // then simple fixed/stochastic transforms, then composable/
-            // multimodal encodings, then attacker-LLM-driven techniques,
-            // then multi-step/iterative and lifelong-learning pipelines.
-            'attacks/baseline',
-            'attacks/static-template',
-            'attacks/flipattack',
-            'attacks/bon',
-            'attacks/cipherchat',
-            'attacks/h4rm3l',
-            'attacks/mml',
-            'attacks/fc',
-            'attacks/tfc',
-            'attacks/pap',
-            'attacks/pair',
-            'attacks/crescendo',
-            'attacks/tap',
-            'attacks/advprefix',
-            'attacks/autodan_turbo',
+            {
+              type: 'category',
+              label: 'Static',
+              collapsed: false,
+              items: [
+                'attacks/baseline',
+                'attacks/static-template',
+                'attacks/flipattack',
+                'attacks/cipherchat',
+                'attacks/h4rm3l',
+                'attacks/mml',
+                'attacks/fc',
+                'attacks/tfc',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Adaptive',
+              collapsed: false,
+              items: [
+                'attacks/pair',
+                'attacks/tap',
+                'attacks/pap',
+                'attacks/bon',
+                'attacks/advprefix',
+                'attacks/autodan_turbo',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Multi-turn',
+              collapsed: false,
+              items: [
+                'attacks/crescendo',
+              ],
+            },
           ],
         },
         {

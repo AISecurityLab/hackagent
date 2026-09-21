@@ -15,6 +15,7 @@ To add a new attack:
 1. Implement BaseAttack subclass in techniques/your_attack/
 2. Register here using create_orchestrator()
 3. Add to ATTACK_REGISTRY dict
+4. Assign exactly one primary category (and any tags) in taxonomy.py
 """
 
 from typing import Callable, Optional, Type
