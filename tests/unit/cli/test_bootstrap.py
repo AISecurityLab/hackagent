@@ -9,8 +9,17 @@ from unittest.mock import MagicMock, patch
 
 from hackagent.cli import bootstrap
 
+try:
+    import termios
+except ImportError:  # pragma: no cover - Windows / non-POSIX
+    termios = None
+
 
 class TestPatchTextualTerminalQueries(unittest.TestCase):
+    @unittest.skipIf(
+        termios is None,
+        "Textual linux drivers import termios, which is unavailable on Windows",
+    )
     def test_both_linux_drivers_are_neutralised(self):
         from textual.drivers.linux_driver import LinuxDriver
         from textual.drivers.linux_inline_driver import LinuxInlineDriver
@@ -33,6 +42,14 @@ class TestPatchTextualTerminalQueries(unittest.TestCase):
         # The patched hooks must be callable no-ops, not the originals.
         self.assertIsNone(LinuxDriver._query_in_band_window_resize(object()))
         self.assertIsNone(LinuxInlineDriver._query_in_band_window_resize(object()))
+
+    @unittest.skipIf(
+        termios is not None,
+        "linux drivers are available; covered by test_both_linux_drivers_are_neutralised",
+    )
+    def test_linux_driver_patch_is_a_noop_without_termios(self):
+        """Windows (and other non-POSIX hosts) must still apply the patch safely."""
+        bootstrap._patch_textual_terminal_queries()
 
     def test_missing_textual_drivers_are_tolerated(self):
         with patch.dict(
