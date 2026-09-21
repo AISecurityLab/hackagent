@@ -1,3 +1,34 @@
+## v0.13.0 (2026-09-21)
+
+### BREAKING CHANGE
+
+- the AdvPrefix attack config key "generator" is renamed
+to "attacker", matching every other attack. Existing advprefix configs
+using "generator" must be updated.
+
+### Feat
+
+- **attacks**: add official static/adaptive/multi-turn taxonomy
+- **web**: serve the hosted dashboard from the CLI, drop the NiceGUI app (#591)
+
+### Fix
+
+- resolve merge conflicts with main for taxonomy PR
+- **cli**: restore CI snapshot theme colors and address Copilot review
+- **ci**: use PAT for promotion PRs
+- **ci**: address Copilot review on release automation
+- **orchestrator**: judge a backend remote by its host, not a URL substring (#592)
+- **autodan**: use native embedding requests for strategy retrieval (#576)
+- **scoring**: preserve assessment scores over wrapper output (#575)
+- **static-template**: materialize and validate template placeholders (#574)
+- **pap**: normalize attacker types and preserve provider credentials (#573)
+- **metrics**: count successful_attacks with the same predicate as success_rate (#572)
+- **web**: stop killing unrelated processes on the dashboard port
+- **cli**: honour base-url defaults and drop leaked debug logging
+- merge conflict
+- fix evaluation scoring for all attacks
+- fix merge conflict
+
 ## v0.12.0 (2026-07-27)
 
 ### Fix
