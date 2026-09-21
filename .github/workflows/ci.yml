@@ -26,8 +26,14 @@ jobs:
           # to production.
           BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
           HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPO: ${{ github.repository }}
         run: |
-          echo "Pull request merges $HEAD_BRANCH into $BASE_BRANCH."
+          echo "Pull request merges $HEAD_REPO:$HEAD_BRANCH into $BASE_REPO:$BASE_BRANCH."
+          if [[ "$HEAD_REPO" != "$BASE_REPO" ]]; then
+            echo "Allowing fork PR to $BASE_BRANCH without stage promotion enforcement."
+            exit 0
+          fi
           if [[ "$BASE_BRANCH" == "main" && "$HEAD_BRANCH" != "stage" ]]; then
             echo "Production changes must be promoted from stage to main; received $HEAD_BRANCH -> $BASE_BRANCH." >&2
             exit 1
