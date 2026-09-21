@@ -41,6 +41,16 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Extract changelog section for this tag
+        # Fail before build/publish so a missing section cannot leave a PyPI
+        # package without a matching GitHub Release.
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          python scripts/extract_changelog_section.py "$RELEASE_TAG" \
+            --changelog CHANGELOG.md \
+            --output "${RUNNER_TEMP}/release-notes.md"
+
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
@@ -78,7 +88,7 @@ jobs:
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
           name: ${{ inputs.tag || github.ref_name }}
-          body_path: CHANGELOG.md
+          body_path: ${{ runner.temp }}/release-notes.md
           draft: false
           prerelease: false
 
