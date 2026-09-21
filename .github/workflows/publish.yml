@@ -170,10 +170,21 @@ jobs:
 
       - name: Smoke test binary (Windows)
         if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          # Frozen binaries inherit the console code page (typically cp1252).
+          # Do not set PYTHONIOENCODING: that would hide encoding regressions.
+          PYTHONUTF8: "0"
         run: |
-          .\dist\hackagent\hackagent.exe --version
-          .\dist\hackagent\hackagent.exe version
-          .\dist\hackagent\hackagent.exe scan --help
+          if ($env:PYTHONIOENCODING) { Remove-Item Env:PYTHONIOENCODING }
+          chcp 1252 | Out-Null
+          $ErrorActionPreference = 'Stop'
+          & .\dist\hackagent\hackagent.exe --version
+          if ($LASTEXITCODE -ne 0) { throw "hackagent --version exited $LASTEXITCODE" }
+          & .\dist\hackagent\hackagent.exe version
+          if ($LASTEXITCODE -ne 0) { throw "hackagent version exited $LASTEXITCODE" }
+          & .\dist\hackagent\hackagent.exe scan --help
+          if ($LASTEXITCODE -ne 0) { throw "hackagent scan --help exited $LASTEXITCODE" }
 
       - name: Smoke test TUI launch (Unix)
         if: runner.os != 'Windows'
