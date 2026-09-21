@@ -120,6 +120,7 @@ ATTACK_TAXONOMY: Mapping[str, AttackTaxonomy] = {
     "bon": _entry(AttackCategory.ADAPTIVE),
     "advprefix": _entry(AttackCategory.ADAPTIVE),
     "autodan_turbo": _entry(AttackCategory.ADAPTIVE),
+    "tool_output_ipi": _entry(AttackCategory.ADAPTIVE, AttackTag.INDIRECT),
     # Multi-turn — one growing conversation with the target.
     "crescendo": _entry(AttackCategory.MULTI_TURN),
 }

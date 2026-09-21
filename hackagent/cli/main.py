@@ -35,6 +35,7 @@ from hackagent.cli.bootstrap import (
 )
 from hackagent.cli.config import CLIConfig
 from hackagent.cli.help_page import _help_option_callback
+from hackagent.cli.safe_stdio import configure_safe_stdio, install_on_click_command
 from hackagent.cli.utils import display_info, handle_errors
 
 # Install rich traceback handler for better error display
@@ -410,10 +411,19 @@ cli.add_command(results.results)
 cli.add_command(web_cmd.web)
 
 
-if __name__ == "__main__":
-    cli()
-
-
 # Add command groups
 cli.add_command(config.config)
 cli.add_command(agent.agent)
+
+# Cover Click eager options (--version, --help) and the console-script entry.
+install_on_click_command(cli)
+
+
+def main() -> None:
+    """Process entry for the ``hackagent`` console script and frozen binary."""
+    configure_safe_stdio()
+    cli()
+
+
+if __name__ == "__main__":
+    main()

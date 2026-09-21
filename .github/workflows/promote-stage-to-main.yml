@@ -1,8 +1,10 @@
 name: Promote stage to main
 
-# After something lands on stage, open (or reuse) the stage → main promotion
-# PR. Merging that PR is what ships to production and triggers Release
-# (bump + tag + publish).
+# After something lands on stage, force-update a disposable promote/to-main
+# branch from the current stage tip and open (or reuse) a PR against main.
+# Merging that PR ships to production and triggers Release (bump + tag +
+# publish). GitHub's delete_branch_on_merge then deletes only the disposable
+# head; the long-lived stage integration branch is left intact.
 
 on:
   push:
@@ -24,38 +26,101 @@ jobs:
     name: Open promotion PR
     runs-on: ubuntu-latest
     steps:
-      - name: Ensure stage → main promotion PR
+      - name: Ensure promote token
+        env:
+          PROMOTE_GITHUB_TOKEN: ${{ secrets.PROMOTE_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${PROMOTE_GITHUB_TOKEN:-}" ]]; then
+            echo "::error::PROMOTE_GITHUB_TOKEN secret is not set. Add a PAT (repo scope) that can open PRs and push branches; org policy blocks github.token from creating PRs."
+            exit 1
+          fi
+
+      - name: Close leftover stage → main promotion PRs
+        env:
+          GH_TOKEN: ${{ secrets.PROMOTE_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # A leftover stage → main PR would still delete stage on merge
+          # (delete_branch_on_merge). Close those so only the disposable
+          # promote/to-main head can ship to production.
+          legacy="$(gh pr list --repo "${{ github.repository }}" \
+            --base main --head stage --state open \
+            --json number --jq '.[].number' | tr '\n' ' ')"
+          if [[ -z "${legacy}" ]]; then
+            echo "No leftover stage → main promotion PRs."
+            exit 0
+          fi
+          for number in ${legacy}; do
+            echo "Closing leftover stage → main PR #${number}."
+            gh pr close "${number}" --repo "${{ github.repository }}" \
+              --comment "Closed because promotion now uses \`promote/to-main\` as a disposable head. Merging a \`stage\` → \`main\` PR would delete the long-lived \`stage\` branch."
+          done
+
+      - name: Check whether stage is ahead of main
+        id: compare
+        env:
+          GH_TOKEN: ${{ secrets.PROMOTE_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ahead="$(gh api "repos/${{ github.repository }}/compare/main...stage" \
+            --jq '.ahead_by')"
+          echo "ahead_by=${ahead}" >> "$GITHUB_OUTPUT"
+          if [[ "${ahead}" -eq 0 ]]; then
+            echo "stage is not ahead of main; nothing to promote."
+            echo "should_promote=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "stage is ${ahead} commit(s) ahead of main."
+            echo "should_promote=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.compare.outputs.should_promote == 'true'
+        with:
+          # Always snapshot stage, even when this run was started by hand from
+          # another ref.
+          ref: stage
+          token: ${{ secrets.PROMOTE_GITHUB_TOKEN }}
+          # Do not leave the PAT in .git/config for later steps; the ref is
+          # updated through the API with GH_TOKEN instead of git push.
+          persist-credentials: false
+
+      - name: Sync promote/to-main and ensure promotion PR
+        if: steps.compare.outputs.should_promote == 'true'
         env:
           GH_TOKEN: ${{ secrets.PROMOTE_GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
-          if [[ -z "${GH_TOKEN:-}" ]]; then
-            echo "::error::PROMOTE_GITHUB_TOKEN secret is not set. Add a PAT (repo scope) that can open PRs; org policy blocks github.token from creating PRs."
-            exit 1
+          REPO="${{ github.repository }}"
+          PROMOTE_HEAD="promote/to-main"
+          SHA="$(git rev-parse HEAD)"
+
+          echo "Force-updating ${PROMOTE_HEAD} to ${SHA}."
+          if gh api --silent "repos/${REPO}/git/ref/heads/${PROMOTE_HEAD}" >/dev/null 2>&1; then
+            gh api --method PATCH "repos/${REPO}/git/refs/heads/${PROMOTE_HEAD}" \
+              -f sha="${SHA}" \
+              -F force=true >/dev/null
+          else
+            gh api --method POST "repos/${REPO}/git/refs" \
+              -f ref="refs/heads/${PROMOTE_HEAD}" \
+              -f sha="${SHA}" >/dev/null
           fi
 
-          existing="$(gh pr list --repo "${{ github.repository }}" \
-            --base main --head stage --state open \
+          existing="$(gh pr list --repo "${REPO}" \
+            --base main --head "${PROMOTE_HEAD}" --state open \
             --json number --jq '.[0].number // empty')"
           if [[ -n "${existing}" ]]; then
-            echo "Promotion PR #${existing} already open; nothing to do."
+            echo "Promotion PR #${existing} already open; head updated to the current stage tip."
             exit 0
           fi
 
-          ahead="$(gh api "repos/${{ github.repository }}/compare/main...stage" \
-            --jq '.ahead_by')"
-          if [[ "${ahead}" -eq 0 ]]; then
-            echo "stage is not ahead of main; nothing to promote."
-            exit 0
-          fi
+          echo "Opening promotion PR from ${PROMOTE_HEAD} to main."
 
-          echo "stage is ${ahead} commit(s) ahead of main; opening promotion PR."
+          body=$'This pull request was opened automatically after a merge into `stage`.\n\nMerging it promotes the current staging tip to production (`main`). That merge triggers the Release workflow, which bumps the version, tags, and publishes when there are releasable commits.\n\nThe head is the disposable `promote/to-main` branch (a snapshot of `stage`). After merge, GitHub may delete that branch; `stage` is left intact.'
 
-          body=$'This pull request was opened automatically after a merge into `stage`.\n\nMerging it promotes the current staging tip to production (`main`). That merge triggers the Release workflow, which bumps the version, tags, and publishes when there are releasable commits.'
-
-          gh pr create --repo "${{ github.repository }}" \
+          gh pr create --repo "${REPO}" \
             --base main \
-            --head stage \
+            --head "${PROMOTE_HEAD}" \
             --title "chore: promote stage to main" \
             --body "${body}"

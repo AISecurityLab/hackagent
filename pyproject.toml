@@ -84,7 +84,7 @@ web = [
 ]
 
 [project.scripts]
-hackagent = "hackagent.cli.main:cli"
+hackagent = "hackagent.cli.main:main"
 
 [tool.commitizen]
 name = "cz_conventional_commits"

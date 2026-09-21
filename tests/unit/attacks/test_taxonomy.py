@@ -42,10 +42,12 @@ _ADAPTIVE = (
     "bon",
     "advprefix",
     "autodan_turbo",
+    "tool_output_ipi",
 )
 _MULTI_TURN = ("crescendo",)
 _MULTIMODAL = ("mml", "fc")
-_INDIRECT_RAG = ("rag",)
+_INDIRECT = ("rag", "tool_output_ipi")
+_RAG = ("rag",)
 
 
 class TestNormalizeAttackType(unittest.TestCase):
@@ -87,6 +89,12 @@ class TestAgreedAssignments(unittest.TestCase):
     def test_bon_is_adaptive(self):
         self.assertEqual(get_attack_taxonomy("bon").category, AttackCategory.ADAPTIVE)
 
+    def test_tool_output_ipi_is_adaptive_indirect(self):
+        tax = get_attack_taxonomy("tool_output_ipi")
+        self.assertEqual(tax.category, AttackCategory.ADAPTIVE)
+        self.assertEqual(tax.tags, (AttackTag.INDIRECT,))
+        self.assertNotIn(AttackTag.RAG, tax.tags)
+
     def test_crescendo_is_multi_turn(self):
         self.assertEqual(
             get_attack_taxonomy("crescendo").category, AttackCategory.MULTI_TURN
@@ -104,8 +112,8 @@ class TestAgreedAssignments(unittest.TestCase):
         tax = get_attack_taxonomy("rag")
         self.assertEqual(tax.category, AttackCategory.STATIC)
         self.assertEqual(tax.tags, (AttackTag.INDIRECT, AttackTag.RAG))
-        self.assertEqual(attacks_with_tag(AttackTag.INDIRECT), _INDIRECT_RAG)
-        self.assertEqual(attacks_with_tag(AttackTag.RAG), _INDIRECT_RAG)
+        self.assertEqual(attacks_with_tag(AttackTag.INDIRECT), _INDIRECT)
+        self.assertEqual(attacks_with_tag(AttackTag.RAG), _RAG)
 
 
 class TestLookup(unittest.TestCase):

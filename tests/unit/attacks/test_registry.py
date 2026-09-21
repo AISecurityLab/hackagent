@@ -100,6 +100,10 @@ class TestAttackRegistry(unittest.TestCase):
         """Test that registry contains Crescendo attack."""
         self.assertIn("crescendo", ATTACK_REGISTRY)
 
+    def test_registry_contains_tool_output_ipi(self):
+        """Test that registry contains tool_output_ipi attack."""
+        self.assertIn("tool_output_ipi", ATTACK_REGISTRY)
+
 
 class TestAdvPrefixOrchestrator(unittest.TestCase):
     """Test AdvPrefixOrchestrator configuration."""

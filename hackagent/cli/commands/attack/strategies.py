@@ -67,6 +67,10 @@ _STRATEGY_COMMANDS = {
         "tfc",
         "Execute tFC-Attack (text-only flowchart) strategy against any LLM.",
     ),
+    "tool_output_ipi": (
+        "tool-output-ipi",
+        "Execute tool-output indirect prompt injection (InjecAgent / OPI).",
+    ),
 }
 
 
