@@ -1,3 +1,21 @@
+## v0.14.0 (2026-09-21)
+
+### Feat
+
+- **attacks**: add tool_output_ipi indirect injection technique
+
+### Fix
+
+- **attacks**: address Copilot review on tool_output_ipi
+- **ci**: format tool_output_ipi and refresh attacks-large snapshot
+- **ci**: extract release notes before publishing to PyPI
+- **ci**: use tagged changelog section as GitHub Release body
+- **cli**: prevent UnicodeEncodeError on Windows consoles
+- **ci**: keep the promote PAT out of the bump step
+- **ci**: stop persisting the promote PAT after checkout
+- **ci**: require same-repo head for promotion PRs
+- **ci**: promote stage via disposable head branch
+
 ## v0.13.1 (2026-09-21)
 
 ### Fix
