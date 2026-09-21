@@ -31,6 +31,19 @@ class TestToolOutputIPIParams(unittest.TestCase):
         with self.assertRaises(ValidationError):
             ToolOutputIPIParams(mode="offline")
 
+    def test_rejects_max_attempts_below_one(self):
+        with self.assertRaises(ValidationError):
+            ToolOutputIPIParams(max_attempts=0)
+
+    def test_rejects_bad_success_setting(self):
+        with self.assertRaises(ValidationError):
+            ToolOutputIPIParams(success_setting="maybe")
+
+    def test_accepts_all_success_settings(self):
+        for setting in ("direct_harm", "data_stealing", "both"):
+            params = ToolOutputIPIParams(success_setting=setting)
+            self.assertEqual(params.success_setting, setting)
+
 
 class TestToolOutputIPIConfig(unittest.TestCase):
     def test_default_dict_has_attack_type(self):

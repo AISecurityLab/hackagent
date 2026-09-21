@@ -48,6 +48,57 @@ class TestAttackValidation(unittest.TestCase):
                 agent_router=MagicMock(),
             )
 
+    def test_rejects_max_attempts_below_one(self):
+        with self.assertRaises(ValueError):
+            ToolOutputIPIAttack(
+                config={"tool_output_ipi_params": {"max_attempts": 0}},
+                client=MagicMock(),
+                agent_router=MagicMock(),
+            )
+
+    def test_rejects_use_attacker_llm_without_identifier(self):
+        with self.assertRaises(ValueError):
+            ToolOutputIPIAttack(
+                config={
+                    "tool_output_ipi_params": {"use_attacker_llm": True},
+                    "attacker": {"identifier": ""},
+                },
+                client=MagicMock(),
+                agent_router=MagicMock(),
+            )
+
+    def test_pipeline_propagates_goal_index_offset(self):
+        attack = ToolOutputIPIAttack(
+            config={},
+            client=MagicMock(),
+            agent_router=MagicMock(),
+        )
+        steps = attack._get_pipeline_steps()
+        self.assertEqual(len(steps), 2)
+        self.assertIn("_goal_index_offset", steps[0]["config_keys"])
+        self.assertIn("_goal_index_offset", steps[1]["config_keys"])
+        self.assertIn("tool_output_ipi_params", steps[0]["config_keys"])
+        self.assertEqual(steps[0]["step_type_enum"], "GENERATION")
+        self.assertEqual(steps[1]["step_type_enum"], "EVALUATION")
+
+    def test_get_effective_model_roles(self):
+        roles = ToolOutputIPIAttack.get_effective_model_roles(
+            {
+                "tool_output_ipi_params": {"use_attacker_llm": True},
+                "attacker": {"identifier": "attacker-model"},
+                "judges": [{"identifier": "judge-model"}],
+            }
+        )
+        self.assertEqual([r["role"] for r in roles], ["attacker", "judge"])
+        self.assertTrue(roles[0]["required"])
+        self.assertFalse(roles[1]["required"])
+
+    def test_get_effective_model_roles_without_attacker_llm(self):
+        roles = ToolOutputIPIAttack.get_effective_model_roles(
+            {"tool_output_ipi_params": {}, "judges": []}
+        )
+        self.assertEqual(roles, [])
+
     def test_run_empty_goals(self):
         attack = ToolOutputIPIAttack(
             config={},
@@ -99,6 +150,49 @@ class TestAttackValidation(unittest.TestCase):
         self.assertIsInstance(results[0], AttackResult)
         coordinator.finalize_all_goals.assert_called()
         coordinator.finalize_pipeline.assert_called()
+
+    def test_run_empty_generation_skips_evaluation(self):
+        attack = ToolOutputIPIAttack(
+            config={},
+            client=MagicMock(),
+            agent_router=MagicMock(),
+        )
+        coordinator = MagicMock()
+        coordinator.has_goal_tracking = False
+        coordinator.goal_tracker = None
+
+        with (
+            patch.object(attack, "_initialize_coordinator", return_value=coordinator),
+            patch.object(attack, "_execute_pipeline", return_value=[]),
+        ):
+            results = attack.run(goals=["g"])
+
+        self.assertEqual(results, [])
+        coordinator.finalize_pipeline.assert_called_once()
+        coordinator.finalize_all_goals.assert_not_called()
+
+    def test_run_attaches_goal_tracker(self):
+        attack = ToolOutputIPIAttack(
+            config={},
+            client=MagicMock(),
+            agent_router=MagicMock(),
+        )
+        coordinator = MagicMock()
+        coordinator.has_goal_tracking = True
+        tracker = MagicMock()
+        coordinator.goal_tracker = tracker
+
+        with (
+            patch.object(attack, "_initialize_coordinator", return_value=coordinator),
+            patch.object(
+                attack,
+                "_execute_pipeline",
+                side_effect=[[{"goal": "g", "success": False}], [{"goal": "g"}]],
+            ),
+        ):
+            attack.run(goals=["g"])
+
+        self.assertIs(attack.config["_tracker"], tracker)
 
 
 if __name__ == "__main__":
