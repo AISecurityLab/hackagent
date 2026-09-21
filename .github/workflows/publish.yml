@@ -107,9 +107,6 @@ jobs:
           - os: macos-latest
             target: macos-arm64
             archive: tar.gz
-          - os: macos-13
-            target: macos-x86_64
-            archive: tar.gz
           - os: windows-latest
             target: windows-x86_64
             archive: zip

@@ -67,7 +67,6 @@ self-contained archive per platform:
 |----------|-------|
 | Linux x86_64 | `hackagent-<version>-linux-x86_64.tar.gz` |
 | macOS arm64 | `hackagent-<version>-macos-arm64.tar.gz` |
-| macOS x86_64 | `hackagent-<version>-macos-x86_64.tar.gz` |
 | Windows x86_64 | `hackagent-<version>-windows-x86_64.zip` |
 
 Extract the archive and run the `hackagent` launcher inside it — no Python, `pip`
