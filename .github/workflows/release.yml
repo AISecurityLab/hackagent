@@ -64,8 +64,11 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || github.ref }}
           # Org ruleset main-protection requires a PR for the default
           # GITHUB_TOKEN. OrganizationAdmin (this PAT) can bypass and push the
-          # bump commit + tag directly.
+          # bump commit + tag directly. persist-credentials is false so the
+          # PAT is used only for this clone, not stored in .git/config for
+          # later steps (setup-python, setup-uv, the bump script, ...).
           token: ${{ secrets.PROMOTE_GITHUB_TOKEN }}
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -81,6 +84,7 @@ jobs:
         id: bump
         env:
           REPUBLISH_TAG: ${{ inputs.tag }}
+          PROMOTE_GITHUB_TOKEN: ${{ secrets.PROMOTE_GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
@@ -126,8 +130,10 @@ jobs:
           # bypasses main-protection. A user PAT *does* trigger further
           # workflows, so the queued Release re-run sees the new tag (pushed
           # below before this job ends) and exits with nothing to do.
-          git push origin HEAD:main
-          git push origin "${TAG}"
+          # Token is on these two commands only: checkout did not persist it
+          # into .git/config, so origin has no PAT for the rest of the job.
+          git push "https://x-access-token:${PROMOTE_GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main
+          git push "https://x-access-token:${PROMOTE_GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "${TAG}"
 
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "released=true" >> "$GITHUB_OUTPUT"
