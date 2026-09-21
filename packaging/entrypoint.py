@@ -5,8 +5,13 @@
 
 import multiprocessing
 
-from hackagent.cli.main import cli
+from hackagent.cli.safe_stdio import configure_safe_stdio
 
 if __name__ == "__main__":
     multiprocessing.freeze_support()
-    cli()
+    # Configure stdio before importing the CLI so import-time Rich/Click
+    # writes cannot crash a cp1252 Windows console.
+    configure_safe_stdio()
+    from hackagent.cli.main import main
+
+    main()
