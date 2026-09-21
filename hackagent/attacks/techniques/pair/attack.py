@@ -817,6 +817,13 @@ class PAIRAttack(BaseAttack):
 
         judge_prompt_max = int(self.config.get("judge_prompt_max_chars", 2500))
         judge_response_max = int(self.config.get("judge_response_max_chars", 3500))
+        judge_config = self.config.get("judge") or self.config.get("scorer", {})
+        configured_thinking = (
+            judge_config.get("thinking") if isinstance(judge_config, dict) else None
+        )
+        thinking = (
+            configured_thinking if isinstance(configured_thinking, bool) else False
+        )
 
         prompt_for_judge = _truncate_text(prompt or "", judge_prompt_max)
         response_for_judge = _truncate_text(response or "", judge_response_max)
@@ -838,7 +845,6 @@ class PAIRAttack(BaseAttack):
         ]
 
         try:
-            judge_config = self.config.get("judge") or self.config.get("scorer", {})
             request_timeout = judge_config.get(
                 "timeout",
                 judge_config.get("request_timeout", self.config.get("timeout", 120)),
@@ -853,6 +859,7 @@ class PAIRAttack(BaseAttack):
                     "max_tokens": max_tokens,
                     "temperature": 0.0,
                     "timeout": request_timeout,
+                    "thinking": thinking,
                 },
             )
             legacy_text = extract_response_content(legacy_response, self.logger)

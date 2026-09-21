@@ -143,6 +143,24 @@ class TestPAIRScorerPrecedence(unittest.TestCase):
         self.assertEqual(attack._get_scorer_explanation(), "Rating: [[7.5]]")
         attack.judge_router.route_request.assert_called_once()
         attack.attacker_router.route_request.assert_called_once()
+        request_data = attack.attacker_router.route_request.call_args.kwargs[
+            "request_data"
+        ]
+        self.assertIs(request_data["thinking"], False)
+
+    def test_legacy_fallback_honors_explicit_thinking(self):
+        attack = self._make_attack([""])
+        attack.config["judge"] = {"thinking": True}
+        attack.attacker_router.route_request.return_value = "Rating: [[7.5]]"
+
+        self.assertEqual(
+            attack._judge_response("sample goal", "sample prompt", "sample response"),
+            7.5,
+        )
+        request_data = attack.attacker_router.route_request.call_args.kwargs[
+            "request_data"
+        ]
+        self.assertIs(request_data["thinking"], True)
 
     def test_malformed_legacy_fallback_preserves_scoring_failure(self):
         for legacy in ("", "ERROR 503: retry in 10 seconds", "SCORE: 2.5/100"):
