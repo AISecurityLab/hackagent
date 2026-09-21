@@ -6,6 +6,8 @@ sidebar_position: 11
 
 MML is a multimodal jailbreak attack that **encodes harmful prompts into images** using visual transformations (word replacement, mirroring, rotation, Base64 encoding, or a combination), then constructs multimodal prompts that instruct a Vision-Language Model (VLM) to decode and act on the embedded content.
 
+**Category:** Static. **Tags:** Multimodal. See [Attack taxonomy](./taxonomy.mdx).
+
 ## Overview
 
 MML exploits the gap between text-only safety classifiers and multimodal understanding. By hiding the harmful request inside an image and providing decoding instructions in the text prompt, it bypasses safety filters that only inspect the textual part of the input.
@@ -19,6 +21,8 @@ MML is based on the paper:
 > [arXiv:2412.00473](https://arxiv.org/abs/2412.00473)
 
 The paper demonstrates that encoding harmful prompts into images using visual transformations can bypass safety mechanisms of frontier Vision-Language Models.
+
+MML-specific knobs live under **`mml_params`**. Shared keys (`goals`, `judges`, `batch_size`, …) are top-level. See [Shared Attack Config](./shared-args.md).
 
 ---
 
@@ -199,6 +203,8 @@ advanced_config = {
 
 ### Configuration Parameters
 
+Encoding knobs go in **`mml_params`**. Batching, judges, and output are **top-level**. Shared `batch_size` default after merge is `1` (generation falls back to `16` only if the key is missing). See [Shared Attack Config](./shared-args.md).
+
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `mml_params.encoding_mode` | Visual encoding strategy | `"word_replacement"` |
@@ -219,24 +225,13 @@ advanced_config = {
 
 ### Shared Goal Category Classifier
 
-All attacks accept a top-level `category_classifier` block. It runs once per goal to attach a normalized category to tracking metadata (independent from judge scoring).
-
-```python
-"category_classifier": {
-    "identifier": "gemma3:4b",
-    "endpoint": "http://localhost:11434",
-    "agent_type": "OLLAMA",
-    "api_key": None,
-    "max_tokens": 100,
-    "temperature": 0.0
-}
-```
+Top-level `category_classifier` is shared by every attack. See [Shared Attack Config](./shared-args.md#category_classifier).
 
 ---
 
 ## Parallelization & Batching
 
-MML supports the same batching infrastructure as other HackAgent attacks:
+MML supports the same batching infrastructure as other HackAgent attacks. Canonical explanation: [Shared Attack Config — Parallelization & batching](./shared-args.md#parallelization--batching).
 
 ```mermaid
 flowchart LR
@@ -433,6 +428,7 @@ shared by every attack.
 
 ## Related
 
+- [Shared Attack Config](./shared-args.md) — goals, judges, batching, `*_params` convention
 - [Attack Overview](./index.mdx) — Compare all attack types
 - [FlipAttack](./flipattack.md) — Character-level text obfuscation
 - [CipherChat](./cipherchat.md) — Cipher-based encoding attacks

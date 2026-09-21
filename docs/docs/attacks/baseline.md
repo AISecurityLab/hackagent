@@ -6,6 +6,8 @@ sidebar_position: 1
 
 The Baseline attack sends goals **directly to the target with no transformation** — no obfuscation, no persuasion, no iterative refinement. It exists as a **control condition**: a way to measure how often the target complies with a harmful request when asked plainly, so that every other attack's success rate can be interpreted relative to it.
 
+**Category:** Static — one (or a few) fixed transforms, with no attacker refinement loop. See [Attack taxonomy](./taxonomy.mdx).
+
 ## Overview
 
 Baseline is the simplest attack in HackAgent and is typically the first one you run:
@@ -14,6 +16,8 @@ Baseline is the simplest attack in HackAgent and is typically the first one you 
 - **Contextualizes other attacks**: A PAIR/TAP/AdvPrefix success rate is only meaningful compared to how often the *same* goals succeed with no attack at all.
 - **Fast smoke test**: One request per goal, no attacker model required — just the target and (optionally) a judge.
 - **hack_chain seed step**: Because it never mitigates via obfuscation, it's a natural first step in a [`hack_chain`](../hackagent/agent) fallback ladder — only goals the target refuses plainly are escalated to real attacks.
+
+Baseline has **no** `*_params` block. Target generation (`max_tokens`, `temperature`), `batch_size` (default `16` in Baseline's own config), `objective`, `judges`, and `output_dir` are all **top-level**. See [Shared Attack Config](./shared-args.md).
 
 ---
 
@@ -117,18 +121,7 @@ attack_config = {
 
 ### Shared Goal Category Classifier
 
-Like all attacks, Baseline accepts a top-level `category_classifier` block that classifies each goal at tracking time, independent of judge scoring.
-
-```python
-"category_classifier": {
-    "identifier": "gemma3:4b",
-    "endpoint": "http://localhost:11434",
-    "agent_type": "OLLAMA",
-    "api_key": None,
-    "max_tokens": 100,
-    "temperature": 0.0
-}
-```
+Top-level `category_classifier` is shared by every attack. See [Shared Attack Config](./shared-args.md#category_classifier).
 
 ---
 
@@ -192,3 +185,9 @@ results = agent.hack_chain(
 ```
 
 `escalate_only_mitigated=True` (the default) drops any goal Baseline already succeeds on, so CipherChat only spend budget on goals that actually needed extra effort. See the [`HackAgent.hack_chain`](../hackagent/agent) reference for the full behavior.
+
+## Related
+
+- [Shared Attack Config](./shared-args.md) — goals, judges, batching
+- [Attack Overview](./index.mdx) — compare all attack types
+- [CipherChat](./cipherchat.md) — typical next step in a `hack_chain`

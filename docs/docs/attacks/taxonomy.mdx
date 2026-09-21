@@ -1,0 +1,39 @@
+---
+sidebar_position: 0
+---
+
+# Attack taxonomy
+
+HackAgent classifies every attack by **how it hits the target**. There is exactly one primary category per technique. Tags are optional secondary labels (multimodal, RAG/indirect) and are **not** extra top-level categories.
+
+The assignments live in code in `hackagent.attacks.taxonomy` and are the single source of truth for the TUI, CLI (`hackagent eval list` / `--help`), planner catalog, and these docs.
+
+## Primary categories
+
+| Category | Meaning | Attacks |
+|----------|---------|---------|
+| **Static** | One (or a few) fixed transforms, with no attacker refinement loop | Baseline, Static Template, FlipAttack, CipherChat, h4rm3l, MML, FC, tFC, RAG |
+| **Adaptive** | Many independent attempts that refine or search, without a shared growing conversation | PAIR, TAP, PAP, BoN, AdvPrefix, AutoDAN-Turbo, Tool-output IPI |
+| **Multi-turn** | One growing conversation with the target | Crescendo |
+
+Use these three only. A search that retries independent attempts (PAIR, TAP, BoN, PAP, AdvPrefix, AutoDAN-Turbo, Tool-output IPI) is adaptive even when it uses an attacker LLM. A technique that keeps a single `messages` history (Crescendo) is multi-turn. A one-shot encoding or template (FlipAttack, CipherChat, MML, FC, tFC, Baseline, Static Template, h4rm3l, RAG poisoning) is static.
+
+## Tags (secondary)
+
+Tags do not replace the primary category. Filter or label with them when the channel or injection path matters:
+
+| Tag | Meaning | Attacks |
+|-----|---------|---------|
+| **multimodal** | VLM / image attacks | MML, FC |
+| **indirect** / **rag** | Document poisoning and other indirect injection | RAG Attack (indirect + rag); Tool-output IPI (indirect only) |
+
+tFC is the text-only sibling of FC, so it stays **static** and is **not** tagged multimodal. RAG is **static** in how it hits the target (poison once, then query) and tagged **indirect** and **rag**. Tool-output IPI is **adaptive** (attempt/refine over poisoned observations) and tagged **indirect** only — never `rag`.
+
+## Choosing by category
+
+- Start with **static** attacks for a fast first pass and a control condition (Baseline).
+- Move to **adaptive** attacks when the target refuses fixed transforms and you can spend queries on search or refinement.
+- Use **multi-turn** when guardrails inspect a single turn in isolation and you need cumulative conversation context.
+- Add the **multimodal** tag when the target is a vision-language model. Use **indirect** when the payload lives in retrieved documents or tool observations rather than the user turn; add **rag** only for document poisoning (RAG Attack), not for tool-output IPI.
+
+See the [attack catalog](./index.mdx) for per-technique guides. Shared attacker/judge/goal arguments are documented in the [shared technique config](../hackagent/attacks/techniques/config.md); category metadata is separate from those runtime knobs.

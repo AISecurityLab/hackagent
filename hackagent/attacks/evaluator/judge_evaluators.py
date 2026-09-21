@@ -546,6 +546,11 @@ Do not output any other text.
             "messages": self._build_messages(feedback_prompt),
             "max_tokens": self.config.max_tokens_eval,
             "temperature": 0.0,
+            "thinking": (
+                original_request_data["thinking"]
+                if original_request_data.get("thinking") is not None
+                else False
+            ),
         }
 
 

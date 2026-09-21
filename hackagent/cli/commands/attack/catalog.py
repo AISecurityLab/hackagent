@@ -1,7 +1,12 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Static catalog of attack strategies exposed by ``hackagent eval``."""
+"""Static catalog of attack strategies exposed by ``hackagent eval``.
+
+Labels and descriptions live here. Primary category and tags come from
+:mod:`hackagent.attacks.taxonomy` so CLI listing/help cannot drift from the
+official assignment table.
+"""
 
 from typing import Dict
 
@@ -66,5 +71,9 @@ ATTACK_CATALOG: Dict[str, Dict[str, str]] = {
     "tfc": {
         "label": "tFC-Attack",
         "description": "tFC-Attack: text-only flowchart encoding attack for any LLM (DOT, Mermaid, TikZ, PlantUML, ASCII).",
+    },
+    "tool_output_ipi": {
+        "label": "Tool-output IPI",
+        "description": "Indirect prompt injection via poisoned tool observations (InjecAgent / OPI).",
     },
 }

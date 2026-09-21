@@ -1,0 +1,174 @@
+name: Release
+
+# Every merge into main is a candidate release. Commitizen reads the
+# conventional-commit messages since the last tag, decides the next version,
+# writes it into pyproject.toml and CHANGELOG.md, and tags the result; the
+# publish workflow then builds and ships that tag.
+#
+# A merge that carried nothing releasable — chores, dependency bumps, docs-only
+# changes — produces no tag and no release, so this is safe to run on every push.
+
+on:
+  push:
+    branches: [main]
+  # Re-run a release that failed after tagging, or cut one by hand.
+  # Optional `tag` input republishes an existing tag (skips bump); leave it
+  # empty to bump from main as usual.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to republish (skip bump). Leave empty to bump from main.
+        required: false
+        type: string
+
+env:
+  UV_VERSION: "0.10.11"
+
+concurrency:
+  # Never let two releases interleave: they would race on the version in
+  # pyproject.toml and could publish the same number twice.
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: Tag release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      released: ${{ steps.bump.outputs.released }}
+      tag: ${{ steps.bump.outputs.tag }}
+      # Bump path pushes the tag with PROMOTE_GITHUB_TOKEN, which triggers
+      # publish.yml via push:tags. Only republish needs workflow_call.
+      call_publish: ${{ steps.bump.outputs.call_publish }}
+    steps:
+      - name: Ensure promote token
+        env:
+          PROMOTE_GITHUB_TOKEN: ${{ secrets.PROMOTE_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${PROMOTE_GITHUB_TOKEN:-}" ]]; then
+            echo "::error::PROMOTE_GITHUB_TOKEN secret is not set. Add a PAT with org-admin (or Maintain) so the bump commit and tag can push to main past the branch ruleset; GITHUB_TOKEN cannot bypass main-protection."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+        with:
+          # Commitizen needs the full history and the existing tags to work out
+          # which commits are new and what the last version was.
+          fetch-depth: 0
+          # workflow_dispatch can be started from any ref; always operate on
+          # main so the bump commit and tag are based on (and pushed to)
+          # production, not a feature or stage branch.
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || github.ref }}
+          # Org ruleset main-protection requires a PR for the default
+          # GITHUB_TOKEN. OrganizationAdmin (this PAT) can bypass and push the
+          # bump commit + tag directly. persist-credentials is false so the
+          # PAT is used only for this clone, not stored in .git/config.
+          # Push authenticates in a later step scoped to those two commands.
+          token: ${{ secrets.PROMOTE_GITHUB_TOKEN }}
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+
+      - name: Bump the version and tag
+        id: bump
+        env:
+          REPUBLISH_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+
+          # Recovery path: republish an existing tag without bumping.
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && -n "${REPUBLISH_TAG}" ]]; then
+            if ! git rev-parse -q --verify "refs/tags/${REPUBLISH_TAG}" >/dev/null; then
+              echo "::error::Tag ${REPUBLISH_TAG} does not exist; cannot republish."
+              exit 1
+            fi
+            echo "Tagged ${REPUBLISH_TAG} (republish; bump skipped)"
+            echo "tag=${REPUBLISH_TAG}" >> "$GITHUB_OUTPUT"
+            echo "released=true" >> "$GITHUB_OUTPUT"
+            echo "call_publish=true" >> "$GITHUB_OUTPUT"
+            echo "needs_push=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git config user.name "Nicola Franco"
+          git config user.email "franconicola@users.noreply.github.com"
+
+          status=0
+          uv tool run --from commitizen cz bump --yes --changelog || status=$?
+
+          # 21 is commitizen's NoneIncrementExit — commits exist but none of
+          # them warrant a version change; 3 is NoCommitsFoundError, nothing at
+          # all since the last tag. Dependabot's "bump(deps):" subject is not a
+          # conventional type, so dependency-only merges land in the first case.
+          if [[ "${status}" -eq 21 || "${status}" -eq 3 ]]; then
+            echo "released=false" >> "$GITHUB_OUTPUT"
+            echo "call_publish=false" >> "$GITHUB_OUTPUT"
+            echo "needs_push=false" >> "$GITHUB_OUTPUT"
+            echo "No releasable commits since the last tag; nothing to do."
+            exit 0
+          fi
+          if [[ "${status}" -ne 0 ]]; then
+            echo "::error::commitizen failed with exit code ${status}"
+            exit "${status}"
+          fi
+
+          TAG="$(git describe --tags --abbrev=0)"
+          echo "Tagged ${TAG}"
+
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "released=true" >> "$GITHUB_OUTPUT"
+          # Tag push with the PAT already starts publish.yml (push:tags: v*).
+          # Skip workflow_call to avoid a second concurrent publish.
+          echo "call_publish=false" >> "$GITHUB_OUTPUT"
+          echo "needs_push=true" >> "$GITHUB_OUTPUT"
+
+      # PAT is scoped to this step so commitizen / setup steps never see it.
+      # persist-credentials is false on checkout, so origin has no stored token.
+      - name: Push bump commit and tag
+        if: steps.bump.outputs.needs_push == 'true'
+        env:
+          PROMOTE_GITHUB_TOKEN: ${{ secrets.PROMOTE_GITHUB_TOKEN }}
+          TAG: ${{ steps.bump.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          # Bump commit must reach main so the next release computes from the
+          # right base. Pushed with PROMOTE_GITHUB_TOKEN (org admin), which
+          # bypasses main-protection. A user PAT *does* trigger further
+          # workflows, so the queued Release re-run sees the new tag (pushed
+          # below before this job ends) and exits with nothing to do.
+          git push "https://x-access-token:${PROMOTE_GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main
+          git push "https://x-access-token:${PROMOTE_GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "${TAG}"
+
+      - name: Summarise
+        env:
+          RELEASED: ${{ steps.bump.outputs.released }}
+          TAG: ${{ steps.bump.outputs.tag }}
+        run: |
+          if [[ "${RELEASED}" == "true" ]]; then
+            echo "### Released ${TAG}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### No release — no eligible commits since the last tag" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  publish:
+    name: Publish
+    needs: tag
+    if: needs.tag.outputs.released == 'true' && needs.tag.outputs.call_publish == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/publish.yml
+    with:
+      tag: ${{ needs.tag.outputs.tag }}
+    secrets: inherit

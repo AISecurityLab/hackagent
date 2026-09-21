@@ -15,6 +15,7 @@ To add a new attack:
 1. Implement BaseAttack subclass in techniques/your_attack/
 2. Register here using create_orchestrator()
 3. Add to ATTACK_REGISTRY dict
+4. Assign exactly one primary category (and any tags) in taxonomy.py
 """
 
 from typing import Callable, Optional, Type
@@ -40,6 +41,7 @@ from hackagent.attacks.techniques.pap import PAPAttack
 from hackagent.attacks.techniques.rag import (
     RagAttack,
 )
+from hackagent.attacks.techniques.tool_output_ipi import ToolOutputIPIAttack
 
 
 def create_orchestrator(
@@ -97,6 +99,7 @@ FCOrchestrator = create_orchestrator("FC", FCAttack)
 tFCOrchestrator = create_orchestrator("tFC", tFCAttack)
 PAPOrchestrator = create_orchestrator("pap", PAPAttack)
 RagOrchestrator = create_orchestrator("rag", RagAttack)
+ToolOutputIPIOrchestrator = create_orchestrator("tool_output_ipi", ToolOutputIPIAttack)
 
 # Registry of all available attacks
 ATTACK_REGISTRY = {
@@ -116,6 +119,7 @@ ATTACK_REGISTRY = {
     "tFC": tFCOrchestrator,
     "pap": PAPOrchestrator,
     "rag": RagOrchestrator,
+    "tool_output_ipi": ToolOutputIPIOrchestrator,
 }
 
 __all__ = [
@@ -134,5 +138,6 @@ __all__ = [
     "tFCOrchestrator",
     "PAPOrchestrator",
     "RagOrchestrator",
+    "ToolOutputIPIOrchestrator",
     "ATTACK_REGISTRY",
 ]

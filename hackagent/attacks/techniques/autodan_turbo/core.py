@@ -365,6 +365,7 @@ def score_response(
     max_retries=5,
     scorer_max_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
     role_label="scorer",
+    thinking=False,
 ):
     """Score target output, using a wrapper only for unstructured assessments.
 
@@ -386,6 +387,8 @@ def score_response(
         Explicit assessment scores take precedence over model-based extraction.
         Exhausted retries return ``(1.0, "Score extraction failed")``.
     """
+    if not isinstance(thinking, bool):
+        thinking = False
     goal_text = str(goal or "")
     system = SCORER_SYSTEM_PROMPT.format(
         goal=goal_text,
@@ -410,6 +413,7 @@ def score_response(
                     "max_tokens": scorer_max_tokens,
                     "temperature": 0.7,
                     "top_p": 0.9,
+                    "thinking": thinking,
                 },
             )
             assessment = extract_response_content(resp, logger)
@@ -438,7 +442,12 @@ def score_response(
             ]
             resp2 = scorer_router.route_request(
                 registration_key=scorer_key,
-                request_data={"messages": msgs2, "max_tokens": 50, "temperature": 0.0},
+                request_data={
+                    "messages": msgs2,
+                    "max_tokens": 50,
+                    "temperature": 0.0,
+                    "thinking": thinking,
+                },
             )
             score_text = extract_response_content(resp2, logger)
             if score_text:
@@ -479,6 +488,7 @@ def score_response(
                     "messages": direct_numeric_msgs,
                     "max_tokens": 16,
                     "temperature": 0.0,
+                    "thinking": thinking,
                 },
             )
             direct_text = extract_response_content(resp3, logger)

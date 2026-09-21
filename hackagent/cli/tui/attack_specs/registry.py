@@ -18,7 +18,15 @@ _SPECS: Dict[str, AttackConfigSpec] = {}
 
 
 def register(spec: AttackConfigSpec) -> AttackConfigSpec:
-    """Register and return *spec* (convenience for inline use)."""
+    """Register and return *spec* (convenience for inline use).
+
+    Requires a primary-category assignment in
+    :mod:`hackagent.attacks.taxonomy` so TUI listings never drift from the
+    official taxonomy.
+    """
+    from hackagent.attacks.taxonomy import get_attack_taxonomy
+
+    get_attack_taxonomy(spec.technique_key)
     _SPECS[spec.technique_key] = spec
     return spec
 

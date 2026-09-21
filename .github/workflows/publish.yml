@@ -4,6 +4,15 @@ on:
   push:
     tags:
       - 'v*'
+  # Called by release.yml once it has tagged a merge to main. A tag pushed with
+  # GITHUB_TOKEN never triggers a workflow, so the release cannot rely on the
+  # push trigger above and calls this workflow directly instead.
+  workflow_call:
+    inputs:
+      tag:
+        description: Tag to build and publish.
+        required: true
+        type: string
 
 env:
   UV_VERSION: "0.10.11"
@@ -21,11 +30,26 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          # On a tag push this is already the tag; when this workflow is
+          # called, the caller's ref is main, whose tip is not necessarily
+          # the commit that was tagged.
+          ref: ${{ inputs.tag || github.ref_name }}
 
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
           python-version: '3.11'
+
+      - name: Extract changelog section for this tag
+        # Fail before build/publish so a missing section cannot leave a PyPI
+        # package without a matching GitHub Release.
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          python scripts/extract_changelog_section.py "$RELEASE_TAG" \
+            --changelog CHANGELOG.md \
+            --output "${RUNNER_TEMP}/release-notes.md"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -62,9 +86,9 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-          body_path: CHANGELOG.md
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          name: ${{ inputs.tag || github.ref_name }}
+          body_path: ${{ runner.temp }}/release-notes.md
           draft: false
           prerelease: false
 
@@ -94,6 +118,11 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          # On a tag push this is already the tag; when this workflow is
+          # called, the caller's ref is main, whose tip is not necessarily
+          # the commit that was tagged.
+          ref: ${{ inputs.tag || github.ref_name }}
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -129,7 +158,7 @@ jobs:
 
       - name: Build binary
         env:
-          HACKAGENT_BUILD_VERSION: ${{ github.ref_name }}
+          HACKAGENT_BUILD_VERSION: ${{ inputs.tag || github.ref_name }}
         run: uv run --no-sync pyinstaller --noconfirm packaging/hackagent.spec
 
       - name: Smoke test binary (Unix)
@@ -151,10 +180,21 @@ jobs:
 
       - name: Smoke test binary (Windows)
         if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          # Frozen binaries inherit the console code page (typically cp1252).
+          # Do not set PYTHONIOENCODING: that would hide encoding regressions.
+          PYTHONUTF8: "0"
         run: |
-          .\dist\hackagent\hackagent.exe --version
-          .\dist\hackagent\hackagent.exe version
-          .\dist\hackagent\hackagent.exe scan --help
+          if ($env:PYTHONIOENCODING) { Remove-Item Env:PYTHONIOENCODING }
+          chcp 1252 | Out-Null
+          $ErrorActionPreference = 'Stop'
+          & .\dist\hackagent\hackagent.exe --version
+          if ($LASTEXITCODE -ne 0) { throw "hackagent --version exited $LASTEXITCODE" }
+          & .\dist\hackagent\hackagent.exe version
+          if ($LASTEXITCODE -ne 0) { throw "hackagent version exited $LASTEXITCODE" }
+          & .\dist\hackagent\hackagent.exe scan --help
+          if ($LASTEXITCODE -ne 0) { throw "hackagent scan --help exited $LASTEXITCODE" }
 
       - name: Smoke test TUI launch (Unix)
         if: runner.os != 'Windows'
@@ -184,8 +224,12 @@ jobs:
 
       - name: Package archive (Unix)
         if: runner.os != 'Windows'
+        env:
+          # workflow_call leaves GITHUB_REF_NAME as the caller ref (main);
+          # prefer the resolved tag so assets are hackagent-<version>-...
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${RELEASE_TAG#v}"
           NAME="hackagent-${VERSION}-${{ matrix.target }}"
           mv dist/hackagent "dist/${NAME}"
           tar -czf "${NAME}.tar.gz" -C dist "${NAME}"
@@ -193,8 +237,10 @@ jobs:
       - name: Package archive (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          $version = "${env:GITHUB_REF_NAME}" -replace '^v', ''
+          $version = "${env:RELEASE_TAG}" -replace '^v', ''
           $name = "hackagent-$version-${{ matrix.target }}"
           Move-Item dist/hackagent "dist/$name"
           Compress-Archive -Path "dist/$name" -DestinationPath "$name.zip"
@@ -202,5 +248,5 @@ jobs:
       - name: Attach archive to release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ inputs.tag || github.ref_name }}
           files: hackagent-*.${{ matrix.archive }}

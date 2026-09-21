@@ -6,6 +6,8 @@ sidebar_position: 8
 
 h4rm3l is a **composable prompt-decoration attack** that chains multiple text transformations — encoding, obfuscation, roleplaying, persuasion — to bypass LLM safety filters. Users define a "program" of chained decorators that transform each harmful goal before sending it to the target model.
 
+**Category:** Static — a fixed decorator program, not an attacker refinement loop. See [Attack taxonomy](./taxonomy.mdx).
+
 
 ## Overview
 
@@ -20,6 +22,8 @@ h4rm3l is based on the paper:
 > [arXiv:2408.04811](https://arxiv.org/abs/2408.04811)
 
 The paper demonstrates that composing multiple prompt decorators significantly increases attack success rates compared to individual techniques, and provides a formal language for expressing attack programs.
+
+h4rm3l-specific knobs live under **`h4rm3l_params`**. The synthesizer role is top-level `decorator_llm` (not inside `h4rm3l_params`). Shared keys: [Shared Attack Config](./shared-args.md).
 
 ---
 
@@ -395,6 +399,8 @@ advanced_config = {
 
 #### Top-Level Parameters
 
+Shared keys — [Shared Attack Config](./shared-args.md). Program/syntax go in `h4rm3l_params`; the synthesizer is the separate top-level `decorator_llm` role.
+
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `goal_batch_size` | int | `1` | Goals processed per macro-batch |
@@ -407,18 +413,7 @@ advanced_config = {
 
 ### Shared Goal Category Classifier
 
-All attacks accept a top-level `category_classifier` block. It runs once per goal to attach a normalized category to tracking metadata (independent from judge scoring).
-
-```python
-"category_classifier": {
-    "identifier": "gemma3:4b",
-    "endpoint": "http://localhost:11434",
-    "agent_type": "OLLAMA",
-    "api_key": None,
-    "max_tokens": 100,
-    "temperature": 0.0
-}
-```
+Top-level `category_classifier` is shared by every attack. See [Shared Attack Config](./shared-args.md#category_classifier).
 
 ### Parallelization
 
@@ -594,3 +589,9 @@ shared by every attack.
 - **Single-pass attack**: h4rm3l applies the decorator chain once per goal — there is no iterative refinement. For iterative approaches, consider PAIR or TAP.
 - **Composability is key**: The paper shows that composing 3-5 decorators typically yields much higher ASR than any single decorator alone.
 - **Reproducibility**: Decorators with randomness (CharCorrupt, CharDropout, WordMixIn) accept a `seed` parameter for deterministic results.
+
+## Related
+
+- [Shared Attack Config](./shared-args.md) — goals, judges, batching, `*_params` convention
+- [Attack Overview](./index.mdx) — compare all attack types
+- [PAP](./pap.md) — persuasion taxonomy (also used by `PAPDecorator`)

@@ -162,6 +162,38 @@ class TestDispatchViaLiteLLM(unittest.TestCase):
         self.assertEqual(kwargs.get("reasoning_effort"), "medium")
 
     @patch("litellm.completion")
+    def test_ollama_thinking_false_is_translated_to_think_false(self, mock_completion):
+        """An explicit disabled judge request reaches Ollama's native field."""
+        mock_completion.return_value = _make_litellm_response("no")
+        agent_id = uuid.uuid4()
+        backend = _make_backend(
+            agent_id=agent_id,
+            name="qwen3.5:9b",
+            agent_type_str=AgentTypeEnum.OLLAMA.value,
+            endpoint="http://127.0.0.1:11434",
+            metadata={"name": "qwen3.5:9b"},
+        )
+        router = AgentRouter(
+            backend=backend,
+            name="qwen3.5:9b",
+            agent_type=AgentTypeEnum.OLLAMA,
+            endpoint="http://127.0.0.1:11434",
+            metadata={"name": "qwen3.5:9b"},
+            adapter_operational_config={
+                "name": "qwen3.5:9b",
+                "endpoint": "http://127.0.0.1:11434",
+            },
+        )
+
+        router.route_request(
+            str(agent_id),
+            {"prompt": "Answer yes or no", "thinking": False},
+        )
+
+        kwargs = mock_completion.call_args.kwargs
+        self.assertEqual(kwargs["think"], False)
+
+    @patch("litellm.completion")
     def test_dispatch_attaches_hackagent_metadata_namespace(self, mock_completion):
         """Phase F.2 — identifiers live under ``metadata['hackagent']``."""
         mock_completion.return_value = _make_litellm_response("ok")

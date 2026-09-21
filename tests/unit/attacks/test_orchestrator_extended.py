@@ -351,6 +351,64 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
         self.assertEqual(final_results[1]["success"], True)
 
 
+class TestBackendEndpointClassification(unittest.TestCase):
+    """Where an API key points decides whether a run is really remote.
+
+    Holding a key does not by itself mean the hosted service: pointing
+    HACKAGENT_BASE_URL at a local deployment must keep the attacker and judge
+    local instead of sending traffic to hackagent.dev.
+    """
+
+    def _orchestrator_with_base_url(self, base_url):
+        orch, hack_agent, _ = _make_orchestrator()
+        hack_agent.backend._client.base_url = base_url
+        return orch
+
+    def test_hosted_url_is_remote(self):
+        orch = self._orchestrator_with_base_url("https://api.hackagent.dev")
+        self.assertTrue(orch._is_remote_backend_endpoint())
+
+    def test_localhost_deployments_are_not_remote(self):
+        for url in (
+            "http://localhost:8000",
+            "http://127.0.0.1:8000",
+            "http://0.0.0.0:8000",
+            "http://[::1]:8000",
+            "http://api.localhost:8000",
+        ):
+            with self.subTest(url=url):
+                orch = self._orchestrator_with_base_url(url)
+                self.assertFalse(orch._is_remote_backend_endpoint())
+
+    def test_a_remote_host_is_not_judged_by_its_port(self):
+        # A substring test on the URL would read ":8000" as local and silently
+        # downgrade a genuinely hosted run to Ollama.
+        for url in (
+            "https://api.example.com:8000",
+            "https://staging.hackagent.dev:3000",
+        ):
+            with self.subTest(url=url):
+                orch = self._orchestrator_with_base_url(url)
+                self.assertTrue(orch._is_remote_backend_endpoint())
+
+    def test_an_unreadable_base_url_keeps_the_historical_behaviour(self):
+        # A backend exposing no usable URL must not quietly become "local".
+        for value in (None, "", "   ", 12345):
+            with self.subTest(value=value):
+                orch = self._orchestrator_with_base_url(value)
+                self.assertTrue(orch._is_remote_backend_endpoint())
+
+    def test_classifier_follows_a_self_hosted_base_url(self):
+        orch = self._orchestrator_with_base_url("https://hackagent.internal/")
+        defaults = orch._remote_classifier_defaults("hk_key")
+        self.assertEqual(defaults["endpoint"], "https://hackagent.internal/v1")
+
+    def test_classifier_falls_back_when_no_base_url_is_readable(self):
+        orch = self._orchestrator_with_base_url(None)
+        defaults = orch._remote_classifier_defaults("hk_key")
+        self.assertEqual(defaults["endpoint"], "https://api.hackagent.dev/v1")
+
+
 class TestModeBasedRoleDefaults(unittest.TestCase):
     """Test remote/local role defaults injected before attack execution."""
 

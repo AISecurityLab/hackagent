@@ -6,6 +6,8 @@ sidebar_position: 4
 
 TAP (Tree of Attacks with Pruning) is an efficient adversarial attack technique that uses a **tree search** to find jailbreak prompts. It combines iterative prompt refinement (like PAIR) with a bounded tree structure and on-topic pruning to dramatically reduce the number of queries needed.
 
+**Category:** Adaptive — independent search streams that refine and prune, not a single growing conversation. See [Attack taxonomy](./taxonomy.mdx).
+
 ## Overview
 
 TAP frames jailbreaking as a **tree search** where each node represents an attacker-generated prompt candidate. Multiple independent search streams run in parallel, and branches that drift off-topic or score poorly are pruned before querying the target, saving cost and improving signal quality.
@@ -19,6 +21,8 @@ TAP is based on the paper:
 > [arXiv:2312.02119](https://arxiv.org/abs/2312.02119)
 
 The technique shows that a structured tree search with pruning can find jailbreaks in far fewer target queries than purely linear iterative methods.
+
+TAP-specific knobs live under **`tap_params`**. `attacker`, `judge`, `on_topic_judge`, `target_str`, and `output_dir` are **top-level**. See [Shared Attack Config](./shared-args.md).
 
 ---
 
@@ -122,7 +126,10 @@ advanced_config = {
         "max_n_attack_attempts": 3, # Retry budget for malformed attacker output
         "early_stop_on_success": True,
         "min_on_topic_score": 1,  # 0/1 threshold; 1 = strict on-topic check
-        "success_score_threshold": 10  # Judge score threshold for success (1-10 scale)
+        "success_score_threshold": 10,  # Judge score threshold for success (1-10 scale)
+        "min_judge_prune_score": 3,
+        "n_parallel_goals": 1,
+        "verbose": True,
     },
 
     # Goals to attack
@@ -171,32 +178,38 @@ advanced_config = {
 
 ### Configuration Parameters
 
+#### `tap_params` (nested)
+
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `tap_params.depth` | Maximum refinement rounds (tree depth) | `3` |
-| `tap_params.width` | Branches kept after scoring per level | `4` |
-| `tap_params.branching_factor` | Prompt variations generated per branch | `3` |
-| `tap_params.n_streams` | Independent parallel search streams | `4` |
-| `tap_params.keep_last_n` | Attacker conversation history window | `6` |
-| `tap_params.early_stop_on_success` | Stop all streams on first success | `True` |
-| `tap_params.min_on_topic_score` | Minimum on-topic score to keep branch | `1` |
-| `tap_params.success_score_threshold` | Judge score threshold for success (1-10 scale) | `10` |
+| `depth` | Maximum refinement rounds (tree depth) | `3` |
+| `width` | Branches kept after scoring per level | `4` |
+| `branching_factor` | Prompt variations generated per branch | `3` |
+| `n_streams` | Independent parallel search streams | `4` |
+| `keep_last_n` | Attacker conversation history window | `6` |
+| `max_n_attack_attempts` | Retry budget for malformed attacker output | `3` |
+| `early_stop_on_success` | Stop all streams on first success | `True` |
+| `min_on_topic_score` | Minimum on-topic score to keep branch | `1` |
+| `success_score_threshold` | Judge score threshold for success (1-10 scale) | `10` |
+| `min_judge_prune_score` | Minimum judge score to keep a branch during pruning | `3` |
+| `n_parallel_goals` | Concurrent goals inside TAP generation | `1` |
+| `verbose` | Extra generation logging | `True` |
+
+#### Top-level
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `attacker` | Attacker LLM role | required |
+| `judge` | Main jailbreak judge (TAP also accepts `judges`) | required |
+| `on_topic_judge` | Optional on-topic prune judge; TAP reuses `judge` when omitted | `None` |
 | `target_str` | Expected response prefix from target model | `"Sure, here is"` |
+| `output_dir` | Run artifacts | `"./logs/runs"` |
+
+`n_iterations`-style PAIR keys do **not** belong here. Shared batching: [Shared Attack Config](./shared-args.md#parallelization--batching). TAP's extra in-technique parallel knob is `tap_params.n_parallel_goals`, not top-level `batch_size`.
 
 ### Shared Goal Category Classifier
 
-All attacks accept a top-level `category_classifier` block. It runs once per goal to attach a normalized category to tracking metadata (independent from judge scoring).
-
-```python
-"category_classifier": {
-    "identifier": "gemma3:4b",
-    "endpoint": "http://localhost:11434",
-    "agent_type": "OLLAMA",
-    "api_key": None,
-    "max_tokens": 100,
-    "temperature": 0.0
-}
-```
+Top-level `category_classifier` is shared by every attack. See [Shared Attack Config](./shared-args.md#category_classifier).
 
 ---
 
@@ -362,6 +375,7 @@ shared by every attack.
 
 ## Related
 
+- [Shared Attack Config](./shared-args.md) — goals, judges, batching, `*_params` convention
 - [Attack Overview](./index.mdx) — Compare all attack types
 - [PAIR Attacks](./pair.md) — Linear iterative refinement
 - [AdvPrefix Attacks](./advprefix.md) — Prefix optimisation approach
