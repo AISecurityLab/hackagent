@@ -69,7 +69,11 @@ class TestRepoLayoutHelpers(unittest.TestCase):
                     _resolve_example_dir("demo", required_files=("demo.py",))
 
         self.assertIn("Required files", str(ctx.exception))
-        self.assertIn("demo/demo.py", str(ctx.exception))
+        # Compare with POSIX separators so Windows `demo\demo.py` still matches.
+        self.assertIn(
+            (Path("demo") / "demo.py").as_posix(),
+            str(ctx.exception).replace("\\", "/"),
+        )
 
     def test_missing_directory_lists_the_candidates(self):
         with tempfile.TemporaryDirectory() as tmp:
