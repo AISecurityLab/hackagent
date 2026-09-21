@@ -494,9 +494,7 @@ def execute(
     try:
         goal_index_offset = int(raw_offset or 0)
     except (TypeError, ValueError):
-        logger.debug(
-            "Invalid _goal_index_offset=%r; defaulting to 0", raw_offset
-        )
+        logger.debug("Invalid _goal_index_offset=%r; defaulting to 0", raw_offset)
         goal_index_offset = 0
 
     results: List[Dict[str, Any]] = []
