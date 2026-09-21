@@ -61,6 +61,13 @@ class TestCLIHelp(unittest.TestCase):
         self.assertIn("version", result.output)
         self.assertIn("doctor", result.output)
 
+    def test_scan_help_prints_without_error(self):
+        """scan --help includes the globe docstring and must not crash."""
+        runner = CliRunner()
+        result = runner.invoke(cli, ["scan", "--help"])
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("Red-team", result.output)
+
 
 class TestCLIConfigContext(unittest.TestCase):
     """Test CLI configuration context setup."""

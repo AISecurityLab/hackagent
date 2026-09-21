@@ -64,8 +64,11 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || github.ref }}
           # Org ruleset main-protection requires a PR for the default
           # GITHUB_TOKEN. OrganizationAdmin (this PAT) can bypass and push the
-          # bump commit + tag directly.
+          # bump commit + tag directly. persist-credentials is false so the
+          # PAT is used only for this clone, not stored in .git/config.
+          # Push authenticates in a later step scoped to those two commands.
           token: ${{ secrets.PROMOTE_GITHUB_TOKEN }}
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -94,6 +97,7 @@ jobs:
             echo "tag=${REPUBLISH_TAG}" >> "$GITHUB_OUTPUT"
             echo "released=true" >> "$GITHUB_OUTPUT"
             echo "call_publish=true" >> "$GITHUB_OUTPUT"
+            echo "needs_push=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -110,6 +114,7 @@ jobs:
           if [[ "${status}" -eq 21 || "${status}" -eq 3 ]]; then
             echo "released=false" >> "$GITHUB_OUTPUT"
             echo "call_publish=false" >> "$GITHUB_OUTPUT"
+            echo "needs_push=false" >> "$GITHUB_OUTPUT"
             echo "No releasable commits since the last tag; nothing to do."
             exit 0
           fi
@@ -121,19 +126,30 @@ jobs:
           TAG="$(git describe --tags --abbrev=0)"
           echo "Tagged ${TAG}"
 
-          # Bump commit must reach main so the next release computes from the
-          # right base. Pushed with PROMOTE_GITHUB_TOKEN (org admin), which
-          # bypasses main-protection. A user PAT *does* trigger further
-          # workflows, so the queued Release re-run sees the new tag (pushed
-          # below before this job ends) and exits with nothing to do.
-          git push origin HEAD:main
-          git push origin "${TAG}"
-
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "released=true" >> "$GITHUB_OUTPUT"
           # Tag push with the PAT already starts publish.yml (push:tags: v*).
           # Skip workflow_call to avoid a second concurrent publish.
           echo "call_publish=false" >> "$GITHUB_OUTPUT"
+          echo "needs_push=true" >> "$GITHUB_OUTPUT"
+
+      # PAT is scoped to this step so commitizen / setup steps never see it.
+      # persist-credentials is false on checkout, so origin has no stored token.
+      - name: Push bump commit and tag
+        if: steps.bump.outputs.needs_push == 'true'
+        env:
+          PROMOTE_GITHUB_TOKEN: ${{ secrets.PROMOTE_GITHUB_TOKEN }}
+          TAG: ${{ steps.bump.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          # Bump commit must reach main so the next release computes from the
+          # right base. Pushed with PROMOTE_GITHUB_TOKEN (org admin), which
+          # bypasses main-protection. A user PAT *does* trigger further
+          # workflows, so the queued Release re-run sees the new tag (pushed
+          # below before this job ends) and exits with nothing to do.
+          git push "https://x-access-token:${PROMOTE_GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main
+          git push "https://x-access-token:${PROMOTE_GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "${TAG}"
 
       - name: Summarise
         env:
