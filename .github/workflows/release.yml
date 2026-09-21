@@ -39,7 +39,20 @@ jobs:
     outputs:
       released: ${{ steps.bump.outputs.released }}
       tag: ${{ steps.bump.outputs.tag }}
+      # Bump path pushes the tag with PROMOTE_GITHUB_TOKEN, which triggers
+      # publish.yml via push:tags. Only republish needs workflow_call.
+      call_publish: ${{ steps.bump.outputs.call_publish }}
     steps:
+      - name: Ensure promote token
+        env:
+          PROMOTE_GITHUB_TOKEN: ${{ secrets.PROMOTE_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${PROMOTE_GITHUB_TOKEN:-}" ]]; then
+            echo "::error::PROMOTE_GITHUB_TOKEN secret is not set. Add a PAT with org-admin (or Maintain) so the bump commit and tag can push to main past the branch ruleset; GITHUB_TOKEN cannot bypass main-protection."
+            exit 1
+          fi
+
       - uses: actions/checkout@v7
         with:
           # Commitizen needs the full history and the existing tags to work out
@@ -49,6 +62,10 @@ jobs:
           # main so the bump commit and tag are based on (and pushed to)
           # production, not a feature or stage branch.
           ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || github.ref }}
+          # Org ruleset main-protection requires a PR for the default
+          # GITHUB_TOKEN. OrganizationAdmin (this PAT) can bypass and push the
+          # bump commit + tag directly.
+          token: ${{ secrets.PROMOTE_GITHUB_TOKEN }}
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -76,11 +93,12 @@ jobs:
             echo "Tagged ${REPUBLISH_TAG} (republish; bump skipped)"
             echo "tag=${REPUBLISH_TAG}" >> "$GITHUB_OUTPUT"
             echo "released=true" >> "$GITHUB_OUTPUT"
+            echo "call_publish=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "Nicola Franco"
+          git config user.email "franconicola@users.noreply.github.com"
 
           status=0
           uv tool run --from commitizen cz bump --yes --changelog || status=$?
@@ -91,6 +109,7 @@ jobs:
           # conventional type, so dependency-only merges land in the first case.
           if [[ "${status}" -eq 21 || "${status}" -eq 3 ]]; then
             echo "released=false" >> "$GITHUB_OUTPUT"
+            echo "call_publish=false" >> "$GITHUB_OUTPUT"
             echo "No releasable commits since the last tag; nothing to do."
             exit 0
           fi
@@ -102,15 +121,19 @@ jobs:
           TAG="$(git describe --tags --abbrev=0)"
           echo "Tagged ${TAG}"
 
-          # The bump commit has to reach main for the next release to compute
-          # from the right base. Pushed with GITHUB_TOKEN, which bypasses the
-          # branch ruleset as an integration and — deliberately — triggers no
-          # further workflow, so this cannot loop.
+          # Bump commit must reach main so the next release computes from the
+          # right base. Pushed with PROMOTE_GITHUB_TOKEN (org admin), which
+          # bypasses main-protection. A user PAT *does* trigger further
+          # workflows, so the queued Release re-run sees the new tag (pushed
+          # below before this job ends) and exits with nothing to do.
           git push origin HEAD:main
           git push origin "${TAG}"
 
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "released=true" >> "$GITHUB_OUTPUT"
+          # Tag push with the PAT already starts publish.yml (push:tags: v*).
+          # Skip workflow_call to avoid a second concurrent publish.
+          echo "call_publish=false" >> "$GITHUB_OUTPUT"
 
       - name: Summarise
         env:
@@ -126,7 +149,7 @@ jobs:
   publish:
     name: Publish
     needs: tag
-    if: needs.tag.outputs.released == 'true'
+    if: needs.tag.outputs.released == 'true' && needs.tag.outputs.call_publish == 'true'
     permissions:
       contents: write
     uses: ./.github/workflows/publish.yml
