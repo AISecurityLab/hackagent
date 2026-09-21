@@ -1,3 +1,12 @@
+## v0.13.1 (2026-09-21)
+
+### Fix
+
+- **ci**: push release bumps with PROMOTE_GITHUB_TOKEN
+- enforced fallbacks to also send thinking parameter in requests
+- **judges**: added the thinking settings to the direct judge/scorer paths
+- **judges**: disable reasoning by default on judge requests
+
 ## v0.13.0 (2026-09-21)
 
 ### BREAKING CHANGE
