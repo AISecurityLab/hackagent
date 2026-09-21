@@ -228,6 +228,11 @@ def execute(
                     max_retries=max_parse_retries,
                     scorer_max_tokens=scorer_max_tokens,
                     role_label=scorer_label,
+                    thinking=(
+                        _judge_cfg.get("thinking")
+                        if isinstance(_judge_cfg.get("thinking"), bool)
+                        else False
+                    ),
                 )
                 emit_phase_trace(
                     config,
