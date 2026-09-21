@@ -30,6 +30,7 @@ graph LR
         G[BoN]
         A[AdvPrefix]
         B[AutoDAN-Turbo]
+        TIPI[Tool-output IPI]
     end
     subgraph "Multi-turn"
         M[Crescendo]
@@ -49,6 +50,7 @@ graph LR
     G --> T
     A --> T
     B --> T
+    TIPI --> T
     M --> T
     T --> R[Results & Analysis]
 ```
@@ -85,6 +87,7 @@ Many independent attempts that refine or search, without a shared growing conver
 | [**BoN**](./bon.md) | Best-of-N random text augmentation search | — |
 | [**AdvPrefix**](./advprefix.md) | Multi-step adversarial prefix optimization | — |
 | [**AutoDAN-Turbo**](./autodan_turbo.md) | Lifelong strategy discovery and reuse | — |
+| [**Tool-output IPI**](./tool_output_ipi.md) | Poisoned tool observations (InjecAgent / OPI) | indirect |
 
 ### Multi-turn
 
@@ -95,7 +98,7 @@ One growing conversation with the target.
 | [**Crescendo**](./crescendo.md) | Multi-turn conversational escalation with backtracking | — |
 
 :::tip Tags are secondary
-**multimodal** marks VLM/image attacks (MML, FC). **indirect** / **rag** mark document poisoning (RAG Attack). They never replace Static / Adaptive / Multi-turn.
+**multimodal** marks VLM/image attacks (MML, FC). **indirect** / **rag** mark document poisoning (RAG Attack); **indirect** alone also marks tool-observation injection (Tool-output IPI). They never replace Static / Adaptive / Multi-turn.
 :::
 
 :::tip Shared configuration
@@ -445,11 +448,11 @@ attack_config = {
 
 ## RAG Attack — RAG Document Poisoning
 
-The RAG Attack is HackAgent's **indirect prompt injection** technique (risk microcategory: **Indirect Injection**). It tests whether a RAG-augmented agent can be manipulated through **poisoned documents** in its knowledge base. HackAgent controls the entire RAG pipeline internally.
+The RAG Attack is HackAgent's **document-poisoning** indirect prompt injection technique (risk microcategory: **Indirect Injection**). For tool-observation injection see [Tool-output IPI](./tool_output_ipi.md). It tests whether a RAG-augmented agent can be manipulated through **poisoned documents** in its knowledge base. HackAgent controls the entire RAG pipeline internally.
 
 <div style={{background: 'var(--ifm-background-surface-color)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--ifm-color-emphasis-200)', margin: '1rem 0'}}>
 
-Unlike all other attacks in HackAgent (which craft malicious user queries), this attack embeds malicious instructions inside documents that are later retrieved as context. A poisoner LLM generates short payloads that the code inserts into existing documents. These are then chunked, embedded into FAISS, and retrieved when benign queries are issued. A judge evaluates whether the target followed the hidden instructions. The user only provides documents + goals + target endpoint — HackAgent handles embedding, retrieval, and prompt augmentation transparently.
+Unlike jailbreak attacks (which craft malicious user queries), this attack embeds malicious instructions inside documents that are later retrieved as context. A poisoner LLM generates short payloads that the code inserts into existing documents. These are then chunked, embedded into FAISS, and retrieved when benign queries are issued. A judge evaluates whether the target followed the hidden instructions. The user only provides documents + goals + target endpoint — HackAgent handles embedding, retrieval, and prompt augmentation transparently.
 
 </div>
 
@@ -493,7 +496,7 @@ Start from the [attack taxonomy](./taxonomy.mdx): **static** for a fast first pa
 
 **Static Template** is ideal for a rapid first-pass: template-based prompts sent directly to the target with no setup overhead, good for establishing a vulnerability baseline before running heavier attacks.
 
-**RAG Attack** is the only attack testing **indirect** vectors: it evaluates whether poisoned documents in a knowledge base can manipulate the agent's responses to innocent users. Use it when assessing RAG pipeline security.
+**RAG Attack** and **Tool-output IPI** test **indirect** vectors: RAG poisons knowledge-base documents; tool-output IPI poisons tool observations (InjecAgent / OPI). Use them when assessing RAG pipelines or tool-using agents.
 
 ---
 

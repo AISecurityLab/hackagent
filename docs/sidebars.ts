@@ -137,6 +137,7 @@ const sidebars: SidebarsConfig = {
           label: 'Indirect Injection',
           items: [
             'attacks/rag',
+            'attacks/tool_output_ipi',
           ],
         },
       ],

@@ -72,4 +72,8 @@ ATTACK_CATALOG: Dict[str, Dict[str, str]] = {
         "label": "tFC-Attack",
         "description": "tFC-Attack: text-only flowchart encoding attack for any LLM (DOT, Mermaid, TikZ, PlantUML, ASCII).",
     },
+    "tool_output_ipi": {
+        "label": "Tool-output IPI",
+        "description": "Indirect prompt injection via poisoned tool observations (InjecAgent / OPI).",
+    },
 }
