@@ -30,25 +30,25 @@ hackagent eval \
 
 ## Available Attacks
 
-| Attack | CLI Command |
-|--------|-------------|
-| Baseline | `hackagent eval baseline` |
-| AdvPrefix | `hackagent eval advprefix` |
-| Static Template | `hackagent eval static-template` |
-| PAIR | `hackagent eval pair` |
-| Crescendo | `hackagent eval crescendo` |
-| FlipAttack | `hackagent eval flipattack` |
-| TAP | `hackagent eval tap` |
-| AutoDAN-Turbo | `hackagent eval autodan_turbo` |
-| BoN | `hackagent eval bon` |
-| CipherChat | `hackagent eval cipherchat` |
-| h4rm3l | `hackagent eval h4rm3l` |
-| MML | `hackagent eval mml` |
-| FC | `hackagent eval fc` |
-| tFC | `hackagent eval tfc` |
-| PAP | `hackagent eval pap` |
+| Attack | Category | CLI Command |
+|--------|----------|-------------|
+| Baseline | Static | `hackagent eval baseline` |
+| Static Template | Static | `hackagent eval static-template` |
+| FlipAttack | Static | `hackagent eval flipattack` |
+| CipherChat | Static | `hackagent eval cipherchat` |
+| h4rm3l | Static | `hackagent eval h4rm3l` |
+| MML | Static (tag: multimodal) | `hackagent eval mml` |
+| FC | Static (tag: multimodal) | `hackagent eval fc` |
+| tFC | Static | `hackagent eval tfc` |
+| PAIR | Adaptive | `hackagent eval pair` |
+| TAP | Adaptive | `hackagent eval tap` |
+| PAP | Adaptive | `hackagent eval pap` |
+| BoN | Adaptive | `hackagent eval bon` |
+| AdvPrefix | Adaptive | `hackagent eval advprefix` |
+| AutoDAN-Turbo | Adaptive | `hackagent eval autodan_turbo` |
+| Crescendo | Multi-turn | `hackagent eval crescendo` |
 
-Additionally, `hackagent eval chain` runs a fallback-ladder sequence of multiple attacks against a shared pool of goals (own `--config-file`/`--goals`/`--timeout`/`--dry-run`/guardrail options; see `hackagent eval chain --help`). The RAG attack (indirect prompt injection) is SDK-only — see [RAG Attack](../attacks/rag.md).
+Additionally, `hackagent eval chain` runs a fallback-ladder sequence of multiple attacks against a shared pool of goals (own `--config-file`/`--goals`/`--timeout`/`--dry-run`/guardrail options; see `hackagent eval chain --help`). The RAG attack (indirect prompt injection) is SDK-only — primary category **Static**, tags **indirect** / **rag** — see [RAG Attack](../attacks/rag.md). Categories are defined in [Attack taxonomy](../attacks/taxonomy.mdx); `hackagent eval list` prints the same assignments.
 
 ## Common CLI Options (All Attacks)
 

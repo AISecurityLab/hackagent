@@ -1,0 +1,61 @@
+name: Promote stage to main
+
+# After something lands on stage, open (or reuse) the stage → main promotion
+# PR. Merging that PR is what ships to production and triggers Release
+# (bump + tag + publish).
+
+on:
+  push:
+    branches: [stage]
+  workflow_dispatch:
+
+concurrency:
+  # Parallel pushes to stage must not open duplicate promotion PRs; the
+  # existence check below is the real guard, and we never cancel a sibling run.
+  group: promote-stage-to-main
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  open-promotion-pr:
+    name: Open promotion PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure stage → main promotion PR
+        env:
+          GH_TOKEN: ${{ secrets.PROMOTE_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${GH_TOKEN:-}" ]]; then
+            echo "::error::PROMOTE_GITHUB_TOKEN secret is not set. Add a PAT (repo scope) that can open PRs; org policy blocks github.token from creating PRs."
+            exit 1
+          fi
+
+          existing="$(gh pr list --repo "${{ github.repository }}" \
+            --base main --head stage --state open \
+            --json number --jq '.[0].number // empty')"
+          if [[ -n "${existing}" ]]; then
+            echo "Promotion PR #${existing} already open; nothing to do."
+            exit 0
+          fi
+
+          ahead="$(gh api "repos/${{ github.repository }}/compare/main...stage" \
+            --jq '.ahead_by')"
+          if [[ "${ahead}" -eq 0 ]]; then
+            echo "stage is not ahead of main; nothing to promote."
+            exit 0
+          fi
+
+          echo "stage is ${ahead} commit(s) ahead of main; opening promotion PR."
+
+          body=$'This pull request was opened automatically after a merge into `stage`.\n\nMerging it promotes the current staging tip to production (`main`). That merge triggers the Release workflow, which bumps the version, tags, and publishes when there are releasable commits.'
+
+          gh pr create --repo "${{ github.repository }}" \
+            --base main \
+            --head stage \
+            --title "chore: promote stage to main" \
+            --body "${body}"

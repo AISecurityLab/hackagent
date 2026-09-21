@@ -6,6 +6,8 @@ sidebar_position: 2
 
 AdvPrefix is HackAgent's most sophisticated attack technique, implementing a multi-step pipeline for generating optimized adversarial prefixes that can bypass AI safety mechanisms. This attack type is based on cutting-edge research and provides highly effective jailbreaking capabilities.
 
+**Category:** Adaptive — a multi-step generate/score/select search, not a growing conversation with the target. See [Attack taxonomy](./taxonomy.mdx).
+
 ## Overview
 
 AdvPrefix attacks work by automatically generating and optimizing attack prefixes that are specifically tailored to the target model. Unlike simple prompt injection, AdvPrefix uses a sophisticated evaluation system to create prefixes that maximize attack success rates.

@@ -9,7 +9,8 @@ the default evaluation-campaign selection.
 
 To add a new attack to the TUI, drop a module here exposing a ``SPEC``
 :class:`~hackagent.cli.tui.attack_specs.types.AttackConfigSpec` and append it
-to ``_SPEC_MODULES``.
+to ``_SPEC_MODULES``. The technique must already have a primary category in
+:mod:`hackagent.attacks.taxonomy`.
 """
 
 from __future__ import annotations
