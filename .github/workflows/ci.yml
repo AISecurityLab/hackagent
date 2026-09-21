@@ -12,8 +12,9 @@ env:
 jobs:
   promotion-policy:
     name: Promotion policy
-    # Production changes reach main only by promoting stage, so a release is
-    # always something that has already run on the staging branch.
+    # Production changes reach main only by promoting stage (via the disposable
+    # promote/to-main head), so a release is always something that has already
+    # run on the staging branch.
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -28,9 +29,15 @@ jobs:
           HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
           echo "Pull request merges $HEAD_BRANCH into $BASE_BRANCH."
-          if [[ "$BASE_BRANCH" == "main" && "$HEAD_BRANCH" != "stage" ]]; then
-            echo "Production changes must be promoted from stage to main; received $HEAD_BRANCH -> $BASE_BRANCH." >&2
-            exit 1
+          if [[ "$BASE_BRANCH" == "main" ]]; then
+            case "$HEAD_BRANCH" in
+              stage|promote/to-main)
+                ;;
+              *)
+                echo "Production changes must be promoted from stage to main; received $HEAD_BRANCH -> $BASE_BRANCH." >&2
+                exit 1
+                ;;
+            esac
           fi
           echo "Allowed promotion path: $HEAD_BRANCH -> $BASE_BRANCH"
 
