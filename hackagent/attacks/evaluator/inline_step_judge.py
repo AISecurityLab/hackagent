@@ -17,10 +17,10 @@ Note:
 import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
+from hackagent.attacks.evaluator.config import EvaluatorConfig
 from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
 from hackagent.attacks.evaluator.judge_evaluators import EVALUATOR_MAP
 from hackagent.attacks.shared.router_factory import extract_passthrough_request_config
-from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
 
 if TYPE_CHECKING:
     from hackagent.server.client import AuthenticatedClient

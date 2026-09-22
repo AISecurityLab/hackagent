@@ -23,6 +23,7 @@ from hackagent.attacks.evaluator import (
     ScorerEvaluator,
     EVALUATOR_MAP,
 )
+from hackagent.attacks.evaluator.config import EvaluatorConfig
 
 
 @pytest.fixture
@@ -642,8 +643,6 @@ class TestScorerEvaluator:
         assert req["thinking"] is False
 
     def test_evaluator_config_thinking_defaults_to_false(self):
-        from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
-
         config = EvaluatorConfig(
             agent_name="judge",
             agent_type="OLLAMA",
@@ -708,8 +707,6 @@ class TestCustomJudgeSystemPrompt:
         assert request["messages"][0]["role"] == "user"
 
     def test_evaluator_config_accepts_system_prompt(self):
-        from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
-
         config = EvaluatorConfig(
             agent_name="judge",
             agent_type="OPENAI_SDK",
@@ -719,11 +716,17 @@ class TestCustomJudgeSystemPrompt:
         assert config.system_prompt == "You are a strict judge."
 
     def test_evaluator_config_system_prompt_defaults_to_none(self):
-        from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
-
         config = EvaluatorConfig(
             agent_name="judge",
             agent_type="OPENAI_SDK",
             model_id="test-model",
         )
         assert config.system_prompt is None
+
+
+def test_advprefix_evaluator_config_import_is_compatible():
+    from hackagent.attacks.techniques.advprefix.config import (
+        EvaluatorConfig as AdvPrefixEvaluatorConfig,
+    )
+
+    assert AdvPrefixEvaluatorConfig is EvaluatorConfig

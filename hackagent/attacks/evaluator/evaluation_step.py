@@ -46,12 +46,11 @@ from dataclasses import fields as dataclass_fields, is_dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 from uuid import UUID, uuid4
 
+from hackagent.attacks.evaluator.config import EvaluatorConfig
 from hackagent.attacks.evaluator.metrics import generate_summary_report
-
 from hackagent.attacks.evaluator.judge_evaluators import EVALUATOR_MAP
 from hackagent.attacks.shared.router_factory import extract_passthrough_request_config
 from hackagent.attacks.evaluator.sync import sync_evaluation_to_server
-from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
 from hackagent.attacks.techniques.config import (
     DEFAULT_JUDGE_IDENTIFIER,
     DEFAULT_LOCAL_AGENT_TYPE,
