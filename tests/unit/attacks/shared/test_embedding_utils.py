@@ -264,41 +264,16 @@ def embedding_http_transport(monkeypatch, local_litellm_cost_map):
     assert not unexpected_requests
 
 
-def _fetch_remote_model_cost_map(url: str) -> dict:
-    """litellm 1.101+ replacement for GetModelCostMap.fetch_remote_model_cost_map.
-
-    The class method was removed; remote loads now go through the module-level
-    retrying fetcher and return a ModelCostMapReloaded / Unavailable result.
-    This helper keeps the old dict-shaped contract for the isolation test and
-    still bypasses LITELLM_LOCAL_MODEL_COST_MAP (as an already-started refresh
-    would).
-    """
-    import random
-    import time
-
-    from litellm.litellm_core_utils.get_model_cost_map import (
-        ModelCostMapReloaded,
-        _fetch_remote_model_cost_map_with_retry_sync,
-    )
-
-    result = _fetch_remote_model_cost_map_with_retry_sync(
-        url,
-        5,
-        1,
-        time.sleep,
-        random.Random(0),
-        httpx,
-    )
-    assert isinstance(result, ModelCostMapReloaded), result
-    return result.model_cost_map
-
-
 def test_embedding_transport_isolates_concurrent_cost_map_refresh(
     embedding_http_transport, local_litellm_cost_map
 ):
     """Reproduce an already-started refresh that bypasses the environment guard."""
+    from litellm.litellm_core_utils.get_model_cost_map import GetModelCostMap
+
     with ThreadPoolExecutor(max_workers=1) as executor:
-        refresh = executor.submit(_fetch_remote_model_cost_map, _LITELLM_COST_MAP_URL)
+        refresh = executor.submit(
+            GetModelCostMap.fetch_remote_model_cost_map, _LITELLM_COST_MAP_URL
+        )
         vector = request_embedding(
             {
                 "identifier": "openai/text-embedding-3-small",
