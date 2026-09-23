@@ -274,7 +274,6 @@ const sidebars: SidebarsConfig = {
           type: 'category',
           label: 'Attacks',
           items: [
-            'hackagent/attacks/base',
             'hackagent/attacks/orchestrator',
             'hackagent/attacks/registry',
             {
