@@ -2,37 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import unittest
-from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
 from hackagent.attacks.techniques.tap.attack import TAPAttack
-
-
-class _DummyStepTracker:
-    @contextmanager
-    def track_step(self, *_args, **_kwargs):
-        yield
-
-    def add_step_metadata(self, *_args, **_kwargs):
-        pass
-
-
-class _DummyCoordinator:
-    def __init__(self):
-        self.goal_tracker = None
-        self.has_goal_tracking = False
-
-    def finalize_all_goals(self, *_args, **_kwargs):
-        pass
-
-    def log_summary(self):
-        pass
-
-    def finalize_pipeline(self, *_args, **_kwargs):
-        pass
-
-    def finalize_on_error(self, *_args, **_kwargs):
-        pass
+from tests.fakes import RecordingCoordinator, RecordingStepTracker
 
 
 class TestTAPAttack(unittest.TestCase):
@@ -80,10 +53,10 @@ class TestTAPAttack(unittest.TestCase):
             agent_router=MagicMock(),
         )
 
-        coordinator = _DummyCoordinator()
+        coordinator = RecordingCoordinator()
 
         def _init_coord(*_args, **_kwargs):
-            attack.tracker = _DummyStepTracker()
+            attack.tracker = RecordingStepTracker()
             return coordinator
 
         mock_generation.return_value = [{"goal": "g1", "best_prompt": "p1"}]
