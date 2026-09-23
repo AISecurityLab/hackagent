@@ -54,7 +54,7 @@ SPEC = AttackConfigSpec(
         ),
         # --- Attacker LLM ---
         ConfigField(
-            key="attacker.model",
+            key="attacker.identifier",
             label="Attacker Model",
             field_type=FieldType.STRING,
             default=DEFAULT_ATTACKER_IDENTIFIER,

@@ -16,6 +16,7 @@ from hackagent.attacks.shared.response_utils import (
     get_guardrail_info,
     is_guardrail_response,
 )
+from hackagent.attacks.shared.router_factory import create_router
 from hackagent.router.router import AgentRouter
 
 from .config import PRESET_PROGRAMS
@@ -32,7 +33,9 @@ if TYPE_CHECKING:
 
 
 def _build_prompting_interface(
-    config: Dict[str, Any], agent_router: AgentRouter
+    config: Dict[str, Any],
+    agent_router: AgentRouter,
+    logger: logging.Logger,
 ) -> Optional[Callable]:
     """Build an LLM prompting function for LLM-assisted decorators.
 
@@ -40,43 +43,49 @@ def _build_prompting_interface(
 
     Returns:
         A callable ``(prompt, maxtokens, temperature) -> str``, or ``None``.
+
+    Raises:
+        ValueError: If ``decorator_llm`` is configured but its router
+            cannot be created.
     """
-    decorator_llm = config.get("decorator_llm", {})
+    decorator_llm = config.get("decorator_llm") or {}
     identifier = decorator_llm.get("identifier")
-    endpoint = decorator_llm.get("endpoint")
-    api_key = decorator_llm.get("api_key")
-    agent_type = decorator_llm.get("agent_type", "OPENAI_SDK")
 
-    # If decorator_llm has valid config, create a separate router
-    if identifier and api_key:
+    # An explicitly configured decorator LLM must be used or fail loudly;
+    # silently decorating with the target model changes the attack.
+    if identifier:
+        backend = config.get("_backend") or config.get("_client")
         try:
-            from hackagent.router.router import AgentRouter as AR
-
-            llm_router = AR.create_for_config(
-                identifier=identifier,
-                endpoint=endpoint,
-                agent_type=agent_type,
-                api_key=api_key,
+            llm_router, llm_key = create_router(
+                backend=backend,
+                config=decorator_llm,
+                logger=logger,
+                router_name="decorator_llm",
             )
-            llm_key = str(llm_router.backend_agent.id)
+        except Exception as e:
+            raise ValueError(
+                f"decorator_llm '{identifier}' could not be initialised: {e}"
+            ) from e
 
-            def _prompt(
-                prompt_text: str, maxtokens: int = 500, temperature: float = 1.0
-            ) -> str:
-                resp = llm_router.route_request(
-                    registration_key=llm_key,
-                    request_data={"prompt": prompt_text},
-                )
-                return resp.get("generated_text", "")
+        def _prompt(
+            prompt_text: str, maxtokens: int = 500, temperature: float = 1.0
+        ) -> str:
+            resp = llm_router.route_request(
+                registration_key=llm_key,
+                request_data={
+                    "prompt": prompt_text,
+                    "max_tokens": maxtokens,
+                    "temperature": temperature,
+                },
+            )
+            return resp.get("generated_text", "")
 
-            _prompt._llm_identifier = identifier
-            _prompt._llm_endpoint = endpoint
-            _prompt._llm_agent_type = str(agent_type)
-            _prompt._llm_role = "decorator_llm"
+        _prompt._llm_identifier = identifier
+        _prompt._llm_endpoint = decorator_llm.get("endpoint")
+        _prompt._llm_agent_type = str(decorator_llm.get("agent_type", "OPENAI_SDK"))
+        _prompt._llm_role = "decorator_llm"
 
-            return _prompt
-        except Exception:
-            pass
+        return _prompt
 
     # Fallback: use the target model itself
     victim_key = str(agent_router.backend_agent.id)
@@ -154,7 +163,7 @@ def execute(
     decoration_llm_endpoint = None
 
     if needs_llm:
-        prompting_fn = _build_prompting_interface(config, agent_router)
+        prompting_fn = _build_prompting_interface(config, agent_router, logger)
         if prompting_fn:
             set_prompting_interface(prompting_fn)
             decoration_llm_identifier = getattr(prompting_fn, "_llm_identifier", None)
