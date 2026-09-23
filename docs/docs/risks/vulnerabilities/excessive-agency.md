@@ -46,8 +46,8 @@ attack are separate free-text strings that you author yourself. See
 ### Instantiate the Vulnerability
 
 ```python
-from hackagent.risks import ExcessiveAgency
-from hackagent.risks.excessive_agency.types import ExcessiveAgencyType
+from hackagent.catalog.risks import ExcessiveAgency
+from hackagent.catalog.risks.excessive_agency.types import ExcessiveAgencyType
 
 # Use all sub-types
 vuln = ExcessiveAgency()
@@ -63,7 +63,7 @@ vuln = ExcessiveAgency(types=[
 
 ```python
 from hackagent import HackAgent
-from hackagent.risks.excessive_agency import EXCESSIVE_AGENCY_PROFILE
+from hackagent.catalog.risks.excessive_agency import EXCESSIVE_AGENCY_PROFILE
 
 agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 

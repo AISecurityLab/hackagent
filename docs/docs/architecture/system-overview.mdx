@@ -114,10 +114,10 @@ import Link from '@docusaurus/Link';
 ### Attack Framework (`hackagent/attacks/`)
 
 - **Registry & orchestrator**: `registry.py` maps attack-technique names to implementations; `orchestrator.py` runs a technique end-to-end against a configured agent.
-- **Techniques** (`attacks/techniques/`): Baseline, StaticTemplate, FlipAttack, BON, CipherChat, H4rm3l, MML, FC/tFC, PAP, PAIR, TAP, AdvPrefix, AutoDAN-Turbo, Crescendo, RAG (indirect prompt injection). Each technique has exactly one primary category (static / adaptive / multi-turn) plus optional tags in `hackagent.attacks.taxonomy`. See [Attack taxonomy](../attacks/taxonomy.mdx) and the [Attacks](../attacks/index.mdx) catalog.
+- **Techniques** (`attacks/techniques/`): Baseline, StaticTemplate, FlipAttack, BON, CipherChat, H4rm3l, MML, FC/tFC, PAP, PAIR, TAP, AdvPrefix, AutoDAN-Turbo, Crescendo, RAG (indirect prompt injection). Each technique has exactly one primary category (static / adaptive / multi-turn) plus optional tags in `hackagent.catalog.taxonomy`. See [Attack taxonomy](../attacks/taxonomy.mdx) and the [Attacks](../attacks/index.mdx) catalog.
 - **Evaluator** (`attacks/evaluator/`): shared judge/pattern-based evaluators and metrics used across techniques to score attack success.
 
-### Risk Profiles (`hackagent/risks/`)
+### Risk Profiles (`hackagent/catalog/risks/`)
 
 - One package per OWASP-style LLM risk category (jailbreak, prompt injection, sensitive information disclosure, excessive agency, model evasion, etc.), each defining vulnerability types and a `profile.py` that maps the category to relevant attack techniques. See [AI Risks](../risks/index.mdx).
 

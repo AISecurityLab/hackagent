@@ -47,8 +47,8 @@ attack are separate free-text strings that you author yourself. See
 ### Instantiate the Vulnerability
 
 ```python
-from hackagent.risks import InputManipulationAttack
-from hackagent.risks.input_manipulation_attack.types import InputManipulationAttackType
+from hackagent.catalog.risks import InputManipulationAttack
+from hackagent.catalog.risks.input_manipulation_attack.types import InputManipulationAttackType
 
 # Use all sub-types
 vuln = InputManipulationAttack()
@@ -64,7 +64,7 @@ vuln = InputManipulationAttack(types=[
 
 ```python
 from hackagent import HackAgent
-from hackagent.risks.input_manipulation_attack import INPUT_MANIPULATION_ATTACK_PROFILE
+from hackagent.catalog.risks.input_manipulation_attack import INPUT_MANIPULATION_ATTACK_PROFILE
 
 agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 

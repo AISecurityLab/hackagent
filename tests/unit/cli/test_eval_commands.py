@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 from click.testing import CliRunner
 
 from hackagent.cli.commands.attack import eval_cmd
-from hackagent.cli.commands.attack.catalog import ATTACK_CATALOG
+from hackagent.catalog.attacks import ATTACK_CATALOG
 from hackagent.cli.commands.attack.display import (
     _display_attack_results,
     _display_attack_summary,

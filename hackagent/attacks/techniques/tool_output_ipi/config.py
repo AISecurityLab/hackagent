@@ -9,7 +9,7 @@ benign user task would normally trigger a tool call; the attack appends a
 ``role=tool`` message whose content carries adversarial instructions aimed
 at the malicious goal, then re-queries the target with the full history.
 
-Taxonomy (when ``hackagent.attacks.taxonomy`` lands, #603 / #595):
+Taxonomy (when ``hackagent.catalog.taxonomy`` lands, #603 / #595):
     Primary category: ``adaptive``
     Tags: ``indirect`` (do **not** also tag ``rag``)
 

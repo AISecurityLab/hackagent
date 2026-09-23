@@ -381,7 +381,7 @@ class HackAgent:
                 Defaults to ``None``, which resolves to the Jailbreak
                 evaluation campaign's primary attacks, in order — ``h4rm3l``
                 → ``TAP`` → ``PAIR`` (see
-                ``hackagent.risks.jailbreak.JAILBREAK_PROFILE``). A goal
+                ``hackagent.catalog.risks.jailbreak.JAILBREAK_PROFILE``). A goal
                 source is still required either way, via ``goals`` or a
                 ``dataset``/``goals``/``intents`` key on the first step.
             goals: Optional explicit list of goal strings to use for the
@@ -414,10 +414,10 @@ class HackAgent:
             # attacks, in campaign order. `technique` strings in the profile
             # (e.g. "TAP", "PAIR") use display casing; `attack_strategies`
             # keys are lowercase, so normalize before use.
-            from hackagent.risks.jailbreak import JAILBREAK_PROFILE
+            from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 
             attacks = [
-                {"attack_type": rec.technique.strip().lower()}
+                {"attack_type": rec.technique}
                 for rec in JAILBREAK_PROFILE.primary_attacks
             ]
 

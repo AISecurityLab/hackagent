@@ -48,8 +48,8 @@ attack are separate free-text strings that you author yourself. See
 ### Instantiate the Vulnerability
 
 ```python
-from hackagent.risks import SensitiveInformationDisclosure
-from hackagent.risks.sensitive_information_disclosure.types import SensitiveInformationDisclosureType
+from hackagent.catalog.risks import SensitiveInformationDisclosure
+from hackagent.catalog.risks.sensitive_information_disclosure.types import SensitiveInformationDisclosureType
 
 # Use all sub-types
 vuln = SensitiveInformationDisclosure()
@@ -65,7 +65,7 @@ vuln = SensitiveInformationDisclosure(types=[
 
 ```python
 from hackagent import HackAgent
-from hackagent.risks.sensitive_information_disclosure import SENSITIVE_INFORMATION_DISCLOSURE_PROFILE
+from hackagent.catalog.risks.sensitive_information_disclosure import SENSITIVE_INFORMATION_DISCLOSURE_PROFILE
 
 agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 

@@ -23,7 +23,7 @@ Layout:
     - ``chain.py`` / ``info.py``: the ``chain``, ``list`` and ``info`` commands.
 """
 
-from hackagent.cli.commands.attack.catalog import ATTACK_CATALOG
+from hackagent.catalog.attacks import ATTACK_CATALOG
 from hackagent.cli.commands.attack.config import (
     _build_attack_config,
     _build_guardrail_config,

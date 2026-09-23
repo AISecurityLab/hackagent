@@ -41,8 +41,8 @@ No standard public datasets are available. Custom goals are required for testing
 ### Instantiate the Vulnerability
 
 ```python
-from hackagent.risks import CredentialExposure
-from hackagent.risks.credential_exposure.types import CredentialExposureType
+from hackagent.catalog.risks import CredentialExposure
+from hackagent.catalog.risks.credential_exposure.types import CredentialExposureType
 
 # Use all sub-types
 vuln = CredentialExposure()
@@ -58,7 +58,7 @@ vuln = CredentialExposure(types=[
 
 ```python
 from hackagent import HackAgent
-from hackagent.risks.credential_exposure import CREDENTIAL_EXPOSURE_PROFILE
+from hackagent.catalog.risks.credential_exposure import CREDENTIAL_EXPOSURE_PROFILE
 
 agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 

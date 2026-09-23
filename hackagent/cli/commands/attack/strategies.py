@@ -10,13 +10,13 @@ from :data:`_STRATEGY_COMMANDS` by :func:`_make_strategy_command`.
 
 To expose a new strategy, add an entry to :data:`_STRATEGY_COMMANDS` (and to
 ``ATTACK_CATALOG``) and assign a primary category in
-:mod:`hackagent.attacks.taxonomy`.
+:mod:`hackagent.catalog.taxonomy`.
 """
 
 import click
 
-from hackagent.attacks.taxonomy import get_attack_taxonomy
-from hackagent.cli.commands.attack.catalog import ATTACK_CATALOG
+from hackagent.catalog.taxonomy import get_attack_taxonomy
+from hackagent.catalog.attacks import ATTACK_CATALOG
 from hackagent.cli.commands.attack.group import eval_cmd
 from hackagent.cli.commands.attack.options import _common_attack_options
 from hackagent.cli.commands.attack.runner import _run_attack_command

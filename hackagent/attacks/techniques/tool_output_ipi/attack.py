@@ -14,7 +14,7 @@ Pipeline:
 1. Generation — craft poisoned tool observations, query target, inline judge
 2. Evaluation — post-processing (server sync, tracker, ASR)
 
-Taxonomy: primary **adaptive**, tag **indirect** (registered defensively when ``hackagent.attacks.taxonomy`` is present; add a permanent ``ATTACK_TAXONOMY`` entry when #603 merges).
+Taxonomy: primary **adaptive**, tag **indirect** (registered defensively when ``hackagent.catalog.taxonomy`` is present; add a permanent ``ATTACK_TAXONOMY`` entry when #603 merges).
 """
 
 from __future__ import annotations
@@ -215,7 +215,7 @@ class ToolOutputIPIAttack(BaseAttack):
             "max_attempts": params.get("max_attempts", 3),
             "success_setting": params.get("success_setting", "both"),
             "tool_name": params.get("tool_name"),
-            # Documented taxonomy until hackagent.attacks.taxonomy lands (#603).
+            # Documented taxonomy until hackagent.catalog.taxonomy lands (#603).
             "category": "adaptive",
             "tags": ["indirect"],
         }

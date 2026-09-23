@@ -28,9 +28,9 @@ Focus on 3-5 critical vulnerabilities using:
 
 ```python
 from hackagent import HackAgent
-from hackagent.risks.prompt_injection import PROMPT_INJECTION_PROFILE
-from hackagent.risks.jailbreak import JAILBREAK_PROFILE
-from hackagent.risks.misinformation import MISINFORMATION_PROFILE
+from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
+from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
+from hackagent.catalog.risks.misinformation import MISINFORMATION_PROFILE
 
 agent = HackAgent(
     endpoint="http://localhost:8080/chat",

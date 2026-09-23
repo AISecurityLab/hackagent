@@ -186,7 +186,7 @@ def build_attack_catalog(*, include_advanced: bool = False) -> List[Dict[str, An
     the planner picks the *strategy*, while model credentials come from the run
     config.
     """
-    from hackagent.attacks.taxonomy import get_attack_taxonomy
+    from hackagent.catalog.taxonomy import get_attack_taxonomy
 
     catalog: List[Dict[str, Any]] = []
     for key, spec in _attack_specs().get_all_attack_specs().items():

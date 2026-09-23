@@ -16,7 +16,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple, Union
 
 if TYPE_CHECKING:
-    from hackagent.attacks.taxonomy import AttackCategory, AttackTag, AttackTaxonomy
+    from hackagent.catalog.taxonomy import AttackCategory, AttackTag, AttackTaxonomy
 
 
 class FieldType(str, Enum):
@@ -77,7 +77,7 @@ class AttackConfigSpec:
         fields: Ordered list of :class:`ConfigField`.
 
     Category and tags are not stored here. They come from
-    :mod:`hackagent.attacks.taxonomy` so TUI, CLI, and docs share one
+    :mod:`hackagent.catalog.taxonomy` so TUI, CLI, and docs share one
     assignment table.
     """
 
@@ -89,7 +89,7 @@ class AttackConfigSpec:
     @property
     def taxonomy(self) -> "AttackTaxonomy":
         """Primary category and tags for this technique."""
-        from hackagent.attacks.taxonomy import get_attack_taxonomy
+        from hackagent.catalog.taxonomy import get_attack_taxonomy
 
         return get_attack_taxonomy(self.technique_key)
 

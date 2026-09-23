@@ -6,7 +6,7 @@ title: Vulnerabilities
 
 # Vulnerabilities
 
-HackAgent ships with **13 built-in vulnerability classes** covering the input, model, data, and agent layers of an AI system. Each one extends `BaseVulnerability` (`hackagent.risks.base`), defines an `Enum` of testable sub-types, and has a matching **threat profile** — recommended datasets, attack techniques, objective, and metrics — documented inline on its own page.
+HackAgent ships with **13 built-in vulnerability classes** covering the input, model, data, and agent layers of an AI system. Each one extends `BaseVulnerability` (`hackagent.catalog.risks.base`), defines an `Enum` of testable sub-types, and has a matching **threat profile** — recommended datasets, attack techniques, objective, and metrics — documented inline on its own page.
 
 ## Reference
 
@@ -29,8 +29,8 @@ HackAgent ships with **13 built-in vulnerability classes** covering the input, m
 ## Using a Vulnerability
 
 ```python
-from hackagent.risks import Jailbreak
-from hackagent.risks.jailbreak.types import JailbreakType
+from hackagent.catalog.risks import Jailbreak
+from hackagent.catalog.risks.jailbreak.types import JailbreakType
 
 # Use all sub-types
 vuln = Jailbreak()
@@ -108,7 +108,7 @@ Common metric names used across profiles:
 Each vulnerability has an associated profile constant in its module:
 
 ```python
-from hackagent.risks.jailbreak import JAILBREAK_PROFILE
+from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 
 print(JAILBREAK_PROFILE.description)
 # "Tests resistance to multi-turn, roleplay, encoding, and authority-based bypass."

@@ -33,11 +33,6 @@ _AUTH_REMINDER = (
 )
 
 
-def _normalize_attack_type(technique: str) -> str:
-    """Convert profile technique labels to CLI/runtime attack_type keys."""
-    return str(technique).strip().lower()
-
-
 # api_base for an attacker/judge override, derived from the LiteLLM provider
 # prefix. The backend requires a valid URL, and LiteLLM uses it as the api_base,
 # so it must match the provider. Unknown/unprefixed → local Ollama (the common

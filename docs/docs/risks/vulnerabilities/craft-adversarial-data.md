@@ -43,8 +43,8 @@ attack are separate free-text strings that you author yourself. See
 ### Instantiate the Vulnerability
 
 ```python
-from hackagent.risks import CraftAdversarialData
-from hackagent.risks.craft_adversarial_data.types import CraftAdversarialDataType
+from hackagent.catalog.risks import CraftAdversarialData
+from hackagent.catalog.risks.craft_adversarial_data.types import CraftAdversarialDataType
 
 # Use all sub-types
 vuln = CraftAdversarialData()
@@ -60,7 +60,7 @@ vuln = CraftAdversarialData(types=[
 
 ```python
 from hackagent import HackAgent
-from hackagent.risks.craft_adversarial_data import CRAFT_ADVERSARIAL_DATA_PROFILE
+from hackagent.catalog.risks.craft_adversarial_data import CRAFT_ADVERSARIAL_DATA_PROFILE
 
 agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 
