@@ -31,7 +31,7 @@ from hackagent.attacks.shared.response_utils import (
     get_guardrail_info,
     is_guardrail_response,
 )
-from hackagent.router.router import AgentRouter
+from hackagent.models.router import AgentRouter
 
 # --- Import shared progress bar ---
 from hackagent.attacks.shared.progress import create_progress_bar

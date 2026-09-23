@@ -364,6 +364,7 @@
               "type": "category"
             },
             "reference/hackagent/datasets/base",
+            "reference/hackagent/datasets/goals",
             "reference/hackagent/datasets/intents",
             "reference/hackagent/datasets/presets",
             "reference/hackagent/datasets/registry"
@@ -484,21 +485,33 @@
           "items": [
             {
               "items": [
-                "reference/hackagent/router/discovery/browser",
+                "reference/hackagent/models/adapters/adk",
+                "reference/hackagent/models/adapters/base",
+                "reference/hackagent/models/adapters/browser",
+                "reference/hackagent/models/adapters/claude",
+                "reference/hackagent/models/adapters/cli_agent",
+                "reference/hackagent/models/adapters/codex",
+                "reference/hackagent/models/adapters/hermes",
+                "reference/hackagent/models/adapters/litellm_callbacks",
+                "reference/hackagent/models/adapters/web"
+              ],
+              "label": "hackagent.models.adapters",
+              "type": "category"
+            },
+            "reference/hackagent/models/envelope",
+            "reference/hackagent/models/provider_config",
+            "reference/hackagent/models/router"
+          ],
+          "label": "hackagent.models",
+          "type": "category"
+        },
+        {
+          "items": [
+            {
+              "items": [
                 "reference/hackagent/router/discovery/scanner"
               ],
               "label": "hackagent.router.discovery",
-              "type": "category"
-            },
-            {
-              "items": [
-                "reference/hackagent/router/providers/adk",
-                "reference/hackagent/router/providers/claude",
-                "reference/hackagent/router/providers/codex",
-                "reference/hackagent/router/providers/hermes",
-                "reference/hackagent/router/providers/web"
-              ],
-              "label": "hackagent.router.providers",
               "type": "category"
             },
             {
@@ -514,12 +527,7 @@
               ],
               "label": "hackagent.router.tracking",
               "type": "category"
-            },
-            "reference/hackagent/router/agent",
-            "reference/hackagent/router/envelope",
-            "reference/hackagent/router/provider_config",
-            "reference/hackagent/router/router",
-            "reference/hackagent/router/tracking_logger"
+            }
           ],
           "label": "hackagent.router",
           "type": "category"

@@ -35,7 +35,7 @@ from hackagent.attacks.shared.response_utils import (
 )
 from hackagent.attacks.shared.router_factory import create_router
 from hackagent.core.defaults import DEFAULT_MAX_OUTPUT_TOKENS
-from hackagent.router.router import AgentRouter
+from hackagent.models.router import AgentRouter
 
 from .config import (
     DEFAULT_BENIGN_TASKS,

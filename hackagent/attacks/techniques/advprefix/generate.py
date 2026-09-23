@@ -21,7 +21,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional, Tuple
 
 from hackagent.storage.store import Store
-from hackagent.router.router import AgentRouter
+from hackagent.models.router import AgentRouter
 from hackagent.core.contracts import AgentType
 
 from .config import (

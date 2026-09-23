@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from hackagent.attacks.shared.response_utils import is_guardrail_response
-from hackagent.router.router import AgentRouter
+from hackagent.models.router import AgentRouter
 
 from .encode_experts import encode_expert_dict
 from .prompts_and_demonstrations import demonstration_dict, system_role_propmts

@@ -1,31 +1,14 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Main router logic for dispatching requests to appropriate agents."""
+"""Run tracking and attack planning, until they move to their own packages.
 
-from .agent import (
-    Agent,
-    AdapterConfigurationError,
-    AdapterInteractionError,
-    AdapterResponseParsingError,
-)
-from .providers.adk import ADKAgent
-from .providers.claude import ClaudeCodeAgent
-from .providers.codex import CodexAgent
-from .providers.web import WebAgent
-from .router import AgentRouter
+Model access lives in :mod:`hackagent.models`.
+"""
+
 from .tracking import StepTracker, TrackingContext, track_operation
 
 __all__ = [
-    "AgentRouter",
-    "Agent",
-    "ADKAgent",
-    "ClaudeCodeAgent",
-    "CodexAgent",
-    "WebAgent",
-    "AdapterConfigurationError",
-    "AdapterInteractionError",
-    "AdapterResponseParsingError",
     "StepTracker",
     "TrackingContext",
     "track_operation",

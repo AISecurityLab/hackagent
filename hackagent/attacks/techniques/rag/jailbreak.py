@@ -34,7 +34,7 @@ from hackagent.attacks.techniques.pap.taxonomy import (
     extract_mutated_text,
     get_technique_names,
 )
-from hackagent.router.router import AgentRouter
+from hackagent.models.router import AgentRouter
 
 SUPPORTED_JAILBREAK_TECHNIQUES = (
     "static_template",

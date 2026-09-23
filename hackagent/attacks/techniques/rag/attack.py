@@ -29,7 +29,7 @@ from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.attacks.shared.router_factory import create_router
 from hackagent.attacks.shared.response_utils import extract_response_content
-from hackagent.router.router import AgentRouter
+from hackagent.models.router import AgentRouter
 from hackagent.router.tracking.tracker import Tracker
 from hackagent.storage.store import Store
 from hackagent.core.contracts import EvalStatus, StepKind

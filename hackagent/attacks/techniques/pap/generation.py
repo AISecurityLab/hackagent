@@ -32,7 +32,7 @@ from hackagent.attacks.shared.response_utils import (
 )
 from hackagent.attacks.shared.router_factory import create_router
 from hackagent.core.defaults import DEFAULT_MAX_OUTPUT_TOKENS
-from hackagent.router.router import AgentRouter
+from hackagent.models.router import AgentRouter
 
 from .config import ALL_TECHNIQUES, TOP_5_TECHNIQUES
 from .taxonomy import build_mutation_prompt, extract_mutated_text

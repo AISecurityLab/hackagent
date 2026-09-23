@@ -556,7 +556,7 @@ class TestModeBasedRoleDefaults(unittest.TestCase):
     def test_remote_attacker_enables_reasoning(self):
         """The remote attacker (HackAgent generator endpoint) must keep reasoning
         on — it maps to reasoning_effort and the endpoint rejects it disabled."""
-        from hackagent.router.provider_config import openai_thinking_translator
+        from hackagent.models.provider_config import openai_thinking_translator
 
         orch, hack_agent, _ = _make_orchestrator()
         orch.attack_type = "pair"

@@ -44,7 +44,7 @@ class TestPackageImports:
 
     def test_router_import(self):
         """Test that the AgentRouter can be imported."""
-        from hackagent.router import AgentRouter
+        from hackagent.models.router import AgentRouter
 
         assert AgentRouter is not None
 

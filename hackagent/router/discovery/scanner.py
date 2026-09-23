@@ -28,28 +28,13 @@ from urllib.parse import urlparse
 
 from hackagent.core.defaults import DEFAULT_LOCAL_LITELLM_MODEL
 from hackagent.core.logging import get_logger
+from hackagent.models.adapters.base import get_litellm
 
 logger = get_logger(__name__)
 
 # Local Ollama planner default (no API key). Override with --planner-model.
 # Pull: ollama pull Librellama/gemma4:e2b-Uncensored
 DEFAULT_PLANNER_MODEL = DEFAULT_LOCAL_LITELLM_MODEL
-
-_litellm_module = None
-
-
-def _get_litellm():
-    """Lazily import litellm. Returns ``(module, is_available)``."""
-    global _litellm_module
-    if _litellm_module is not None:
-        return _litellm_module, True
-    try:
-        import litellm
-
-        _litellm_module = litellm
-        return litellm, True
-    except ImportError:
-        return None, False
 
 
 def _attack_specs():
@@ -388,7 +373,7 @@ def plan_attack(
         PlannerError: if litellm is unavailable, the call fails, or the model's
             output can't be turned into a valid plan.
     """
-    litellm, available = _get_litellm()
+    litellm, available = get_litellm()
     if not available:
         raise PlannerError(
             "litellm is required for the attack planner but is not installed."

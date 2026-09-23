@@ -38,7 +38,7 @@ import textwrap
 from typing import Any, Dict, List, Optional
 
 from hackagent.storage.store import Store
-from hackagent.router.router import AgentRouter
+from hackagent.models.router import AgentRouter
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.core.defaults import DEFAULT_JUDGE_IDENTIFIER

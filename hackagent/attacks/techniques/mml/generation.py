@@ -20,7 +20,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from hackagent.router.router import AgentRouter
+from hackagent.models.router import AgentRouter
 
 from .image_encoder import encode_prompt
 from .prompts import get_prompt_template

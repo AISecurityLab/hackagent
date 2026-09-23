@@ -28,7 +28,7 @@ from hackagent.router.discovery.scanner import (
 # never pulls Playwright at package-import time. Importing the names explicitly
 # (rather than resolving them via ``__getattr__``) keeps every entry in
 # ``__all__`` defined in module scope for static analysis.
-from hackagent.router.discovery.browser import (
+from hackagent.models.adapters.browser import (
     BrowserScanError,
     chromium_installed,
     ensure_chromium,

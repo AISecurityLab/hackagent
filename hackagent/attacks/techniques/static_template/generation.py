@@ -23,7 +23,7 @@ from hackagent.attacks.shared.response_utils import (
 )
 from hackagent.attacks.generator import AttackTemplates
 from hackagent.attacks.shared.progress import create_progress_bar
-from hackagent.router.router import AgentRouter
+from hackagent.models.router import AgentRouter
 from hackagent.router.tracking import Tracker
 
 from .config import DEFAULT_TEMPLATE_CONFIG, validate_template_config
