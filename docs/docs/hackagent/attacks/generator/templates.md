@@ -73,12 +73,21 @@ Apply a template with goal and optional additional parameters.
 
 - `template` - Template string with placeholders
 - `goal` - Goal to insert into template
-- `**kwargs` - Additional template parameters
+- `**kwargs` - Additional template parameters, overriding generated values.
+  Translations must be supplied explicitly; none are generated.
   
 
 **Returns**:
 
   Formatted attack prompt
+  
+
+**Raises**:
+
+- `ValueError` - If a required parameter is missing or formatting is invalid.
+  
+  ``goal_encoded`` uses ROT13, ``goal_base64`` uses UTF-8 Base64, and
+  ``goal_obfuscated`` reverses the goal&#x27;s Unicode code points.
 
 #### generate\_variations
 

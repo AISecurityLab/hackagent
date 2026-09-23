@@ -25,6 +25,7 @@ from uuid import uuid4
 
 from hackagent.server.api.models import EvaluationStatusEnum
 from hackagent.router.tracking import Tracker
+from tests.fakes import FakeRouter
 
 
 class TestEvaluationStatusUpdates(unittest.TestCase):
@@ -209,16 +210,6 @@ class TestEvaluationEndToEnd(unittest.TestCase):
         mock_backend.update_result.assert_called_once()
 
 
-class _DummyRouter:
-    """Minimal router stub for execute_prompts tests."""
-
-    def __init__(self):
-        self._agent_registry = {"victim": object()}
-
-    def route_request(self, registration_key, request_data):  # noqa: ARG002
-        return {"generated_text": "dummy completion"}
-
-
 class TestStaticTemplateTrackerConsistency(unittest.TestCase):
     """Regression tests for static template tracker wiring and goal finalization."""
 
@@ -258,7 +249,7 @@ class TestStaticTemplateTrackerConsistency(unittest.TestCase):
 
         execute_prompts(
             data=data,
-            agent_router=_DummyRouter(),
+            agent_router=FakeRouter(default="dummy completion", agent_id="victim"),
             config=config,
             logger=logging.getLogger("test"),
             goal_tracker=tracker,

@@ -18,11 +18,11 @@ Reference:
     https://crescendo-the-multiturn-jailbreak.github.io
 
 Unlike single-turn attacks (PAIR, TAP, ...), Crescendo keeps one growing
-`target_messages` conversation across the whole goal: every accepted turn
+``target_messages`` conversation across the whole goal: every accepted turn
 is appended to it and re-sent in full on the next request, so the target
 sees genuine multi-turn context. This is HackAgent&#x27;s first attack to rely on
-that behaviour; no router changes were required because `AgentRouter`
-already forwards an arbitrary `messages` history verbatim to the target
+that behaviour; no router changes were required because ``AgentRouter``
+already forwards an arbitrary ``messages`` history verbatim to the target
 adapter on every call.
 
 Result Tracking:
@@ -44,23 +44,23 @@ context so each escalation feels natural:
 
 1. The attacker proposes the next question (benign at first, gradually
 narrowing toward the goal).
-2. The question is appended to `target_messages` and the *full*
+2. The question is appended to ``target_messages`` and the *full*
 conversation is sent to the target.
 3. A judge rates the response on the shared 0-10 scale and flags refusals.
 4. If refused, the turn is *backtracked*: the question/answer pair is
-dropped from `target_messages` and the attacker is asked to
-rephrase the same step, up to `max_backtracks` times across the
+dropped from ``target_messages`` and the attacker is asked to
+rephrase the same step, up to ``max_backtracks`` times across the
 conversation.
 5. If accepted, the turn is kept and the loop advances, stopping early
-once `jailbreak_threshold` is reached or `max_turns` is exhausted.
+once ``jailbreak_threshold`` is reached or ``max_turns`` is exhausted.
 
 The attack requires two separate model roles:
 
-* **Attacker** (`config[&quot;attacker&quot;]`) — an LLM that proposes the next
+* **Attacker** (``config[&quot;attacker&quot;]``) — an LLM that proposes the next
 escalating question based on the conversation so far.
-* **Target** — the victim model reached via `agent_router`, addressed
+* **Target** — the victim model reached via ``agent_router``, addressed
 with the full, growing conversation history on every turn.
-* **Judge** (`config[&quot;judge&quot;]`) — rates each target turn and detects
+* **Judge** (``config[&quot;judge&quot;]``) — rates each target turn and detects
 refusals, driving both scoring and the backtrack mechanism.
 
 **Attributes**:
@@ -69,10 +69,10 @@ refusals, driving both scoring and the backtrack mechanism.
 - `client` - Authenticated HackAgent API client.
 - `agent_router` - Router for the victim model.
 - `attacker_router` - Router for the attacker LLM.
-- `judge_router` - Router for the judge LLM.
+- `judge` - Shared-evaluator configuration for the per-turn judge/scorer.
 - `objective` - Loaded :class:`~hackagent.attacks.objectives.base.ObjectiveConfig`
-  instance for the configured `objective` key.
-- `logger` - Hierarchical logger at `hackagent.attacks.crescendo`.
+  instance for the configured ``objective`` key.
+- `logger` - Hierarchical logger at ``hackagent.attacks.crescendo``.
 
 #### \_\_init\_\_
 
@@ -94,15 +94,14 @@ Initialize Crescendo attack.
 
 **Raises**:
 
-- `ValueError` - If `client` or `agent_router` is `None`, if the
+- `ValueError` - If ``client`` or ``agent_router`` is ``None``, if the
   attacker router cannot be initialised, or if the configured
-  `objective` key is not in
+  ``objective`` key is not in
   :data:`~hackagent.attacks.objectives.OBJECTIVES`.
 
 #### run
 
 ```python
-@with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
 def run(goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]
 ```
 

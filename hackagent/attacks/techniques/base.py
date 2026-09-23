@@ -57,7 +57,7 @@ class BaseAttack(abc.ABC):
 
     Attributes:
         config: Merged configuration dictionary
-        client: Authenticated HackAgent client
+        backend: Storage backend used for result tracking
         agent_router: Target agent router for queries
         logger: Logger instance for this attack
         run_id: Unique run identifier
@@ -71,7 +71,6 @@ class BaseAttack(abc.ABC):
         config: Dict[str, Any],
         client: Any = None,
         agent_router: Any = None,
-        **kwargs,
     ):
         """
         Initialize attack implementation with common setup.
@@ -80,17 +79,9 @@ class BaseAttack(abc.ABC):
             config: Attack configuration (will be merged with DEFAULT_CONFIG)
             client: Authenticated HackAgent client
             agent_router: Target agent router
-            **kwargs: Additional technique-specific parameters
         """
-        # Store additional kwargs for subclass access
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
         # Store core dependencies
-        self.backend = (
-            getattr(client, "backend", None) or client
-        )  # accept either backend or legacy client
-        self.client = client  # keep for backward compat with adapters that need it
+        self.backend = client
         self.agent_router = agent_router
 
         # Config will be set by subclass before calling super().__init__()
@@ -330,7 +321,7 @@ class BaseAttack(abc.ABC):
         if "logger" in required_args:
             args["logger"] = self.logger
         if "client" in required_args:
-            args["client"] = self.client
+            args["client"] = self.backend
         if "agent_router" in required_args:
             args["agent_router"] = self.agent_router
 

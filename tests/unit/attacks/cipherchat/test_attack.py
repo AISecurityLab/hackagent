@@ -4,49 +4,13 @@
 """Tests for CipherChat attack class."""
 
 import unittest
-from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
 from hackagent.attacks.techniques.cipherchat.attack import (
     CipherChatAttack,
     _recursive_update,
 )
-
-
-class _DummyStepTracker:
-    @contextmanager
-    def track_step(self, *_args, **_kwargs):
-        yield
-
-    def add_step_metadata(self, *_args, **_kwargs):
-        pass
-
-
-class _DummyCoordinator:
-    def __init__(self):
-        self.goal_tracker = None
-        self.has_goal_tracking = False
-
-    def initialize_goals(self, *a, **kw):
-        pass
-
-    def initialize_goals_from_pipeline_data(self, *a, **kw):
-        pass
-
-    def enrich_with_result_ids(self, r):
-        return r
-
-    def finalize_all_goals(self, *a, **kw):
-        pass
-
-    def log_summary(self):
-        pass
-
-    def finalize_pipeline(self, *a, **kw):
-        pass
-
-    def finalize_on_error(self, *a, **kw):
-        pass
+from tests.fakes import RecordingCoordinator, RecordingStepTracker
 
 
 class TestRecursiveUpdate(unittest.TestCase):
@@ -181,10 +145,10 @@ class TestCipherChatAttack(unittest.TestCase):
             agent_router=MagicMock(),
         )
 
-        coordinator = _DummyCoordinator()
+        coordinator = RecordingCoordinator()
 
         def _init_coord(*_args, **_kwargs):
-            attack.tracker = _DummyStepTracker()
+            attack.tracker = RecordingStepTracker()
             return coordinator
 
         mock_gen.return_value = [
@@ -227,10 +191,10 @@ class TestCipherChatAttack(unittest.TestCase):
             agent_router=MagicMock(),
         )
 
-        coordinator = _DummyCoordinator()
+        coordinator = RecordingCoordinator()
 
         def _init_coord(*_args, **_kwargs):
-            attack.tracker = _DummyStepTracker()
+            attack.tracker = RecordingStepTracker()
             return coordinator
 
         mock_gen.return_value = []

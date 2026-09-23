@@ -2,33 +2,12 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import unittest
-from contextlib import contextmanager
 from itertools import product
 from unittest.mock import MagicMock, patch
 
 from hackagent.attacks.generator import AttackTemplates
 from hackagent.attacks.techniques.static_template.attack import StaticTemplateAttack
-
-
-class _DummyStepTracker:
-    @contextmanager
-    def track_step(self, *_args, **_kwargs):
-        yield
-
-    def add_step_metadata(self, *_args, **_kwargs):
-        pass
-
-
-class _DummyCoordinator:
-    def __init__(self):
-        self.goal_tracker = None
-        self.has_goal_tracking = False
-
-    def finalize_pipeline(self, *_args, **_kwargs):
-        pass
-
-    def finalize_on_error(self, *_args, **_kwargs):
-        pass
+from tests.fakes import RecordingCoordinator, RecordingStepTracker
 
 
 class TestStaticTemplateAttack(unittest.TestCase):
@@ -126,10 +105,12 @@ class TestStaticTemplateAttack(unittest.TestCase):
                     client=MagicMock(),
                     agent_router=router,
                 )
-                attack.tracker = _DummyStepTracker()
+                attack.tracker = RecordingStepTracker()
                 evaluation.return_value = {"evaluated": [], "summary": []}
                 with patch.object(
-                    attack, "_initialize_coordinator", return_value=_DummyCoordinator()
+                    attack,
+                    "_initialize_coordinator",
+                    return_value=RecordingCoordinator(),
                 ):
                     attack.run(["Summarize weather"])
                 rows = evaluation.call_args.kwargs["input_data"]
@@ -161,10 +142,10 @@ class TestStaticTemplateAttack(unittest.TestCase):
         router._agent_registry = {"target": MagicMock()}
         router.route_request.return_value = {"generated_text": "Weather summary"}
         attack = StaticTemplateAttack(client=MagicMock(), agent_router=router)
-        attack.tracker = _DummyStepTracker()
+        attack.tracker = RecordingStepTracker()
         evaluation.return_value = {"evaluated": [], "summary": []}
         with patch.object(
-            attack, "_initialize_coordinator", return_value=_DummyCoordinator()
+            attack, "_initialize_coordinator", return_value=RecordingCoordinator()
         ):
             attack.run(["Summarize weather"])
         self.assertEqual(router.route_request.call_count, 9)
@@ -186,10 +167,10 @@ class TestStaticTemplateAttack(unittest.TestCase):
             agent_router=MagicMock(),
         )
 
-        coordinator = _DummyCoordinator()
+        coordinator = RecordingCoordinator()
 
         def _init_coord(*_args, **_kwargs):
-            attack.tracker = _DummyStepTracker()
+            attack.tracker = RecordingStepTracker()
             return coordinator
 
         mock_generation.return_value = [

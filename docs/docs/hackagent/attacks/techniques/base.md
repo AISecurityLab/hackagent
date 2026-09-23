@@ -51,7 +51,7 @@ Subclasses only need to:
 **Attributes**:
 
 - `config` - Merged configuration dictionary
-- `client` - Authenticated HackAgent client
+- `backend` - Storage backend used for result tracking
 - `agent_router` - Target agent router for queries
 - `logger` - Logger instance for this attack
 - `run_id` - Unique run identifier
@@ -64,8 +64,7 @@ Subclasses only need to:
 ```python
 def __init__(config: Dict[str, Any],
              client: Any = None,
-             agent_router: Any = None,
-             **kwargs)
+             agent_router: Any = None)
 ```
 
 Initialize attack implementation with common setup.
@@ -75,7 +74,6 @@ Initialize attack implementation with common setup.
 - `config` - Attack configuration (will be merged with DEFAULT_CONFIG)
 - `client` - Authenticated HackAgent client
 - `agent_router` - Target agent router
-- `**kwargs` - Additional technique-specific parameters
 
 #### get\_effective\_model\_roles
 
@@ -105,7 +103,7 @@ Returning ``[]`` means no attack-specific model roles are required.
 
 ```python
 @abc.abstractmethod
-def run(**kwargs) -> Any
+def run(**kwargs) -> List[AttackResult]
 ```
 
 Execute the attack technique.
@@ -115,7 +113,7 @@ This method should:
 2. Define pipeline with self._get_pipeline_steps()
 3. Execute pipeline with self._execute_pipeline()
 4. Finalize with coordinator.finalize_all_goals() and coordinator.finalize_pipeline()
-5. Return results
+5. Return results as ``list[AttackResult]``
 
 **Arguments**:
 
@@ -124,5 +122,5 @@ This method should:
 
 **Returns**:
 
-  Attack results (format varies by implementation)
+  A list of :class:`~hackagent.attacks.types.AttackResult` instances.
 

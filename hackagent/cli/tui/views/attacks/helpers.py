@@ -3,7 +3,8 @@
 
 """Module-level helpers and constants for the Attacks tab."""
 
-from typing import Any, List, Sequence, Union
+import os
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Union
 
 from textual.widgets.selection_list import Selection
 
@@ -129,3 +130,42 @@ _CFG_PREFIX = "cfg-"
 def _field_widget_id(field: ConfigField) -> str:
     """Return the Textual widget ID for a config field."""
     return f"{_CFG_PREFIX}{field.key.replace('.', '-')}"
+
+
+def build_guardrail_config(
+    name: str, agent_type: Any, endpoint: str
+) -> Optional[Dict[str, str]]:
+    """Build a guardrail config dict from the form's name/type/endpoint fields.
+
+    Returns ``None`` when no guardrail name was entered. The name is used
+    verbatim: model identifiers are case-sensitive.
+    """
+    name = (name or "").strip()
+    if not name:
+        return None
+    return {
+        "identifier": name,
+        "agent_type": str(agent_type),
+        "endpoint": (endpoint or "").strip(),
+    }
+
+
+def apply_env_overrides(overrides: Mapping[str, str]) -> Dict[str, Optional[str]]:
+    """Set environment variables and return their previous values.
+
+    Pass the result to :func:`restore_env` to undo the overrides; a variable
+    that was unset beforehand is removed again, one the user had set gets
+    its original value back.
+    """
+    saved = {key: os.environ.get(key) for key in overrides}
+    os.environ.update(overrides)
+    return saved
+
+
+def restore_env(saved: Mapping[str, Optional[str]]) -> None:
+    """Restore environment variables saved by :func:`apply_env_overrides`."""
+    for key, value in saved.items():
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = value

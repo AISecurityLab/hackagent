@@ -15,7 +15,6 @@ from typing import Any, Dict, List, Optional
 from hackagent.server.client import AuthenticatedClient
 from hackagent.router.router import AgentRouter
 from hackagent.attacks.techniques.base import BaseAttack
-from hackagent.attacks.shared.tui import with_tui_logging
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 
 from . import generation, static_eval as evaluation
@@ -232,7 +231,6 @@ class StaticTemplateAttack(BaseAttack):
             args["config"]["_tracker"] = self.coordinator.goal_tracker
         return args
 
-    @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
     def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
         """
         Execute static template attack.

@@ -33,13 +33,13 @@
             },
             {
               "items": [
+                "reference/hackagent/attacks/shared/embedding_utils",
                 "reference/hackagent/attacks/shared/guardrail",
                 "reference/hackagent/attacks/shared/progress",
                 "reference/hackagent/attacks/shared/prompt_parser",
                 "reference/hackagent/attacks/shared/response_utils",
                 "reference/hackagent/attacks/shared/router_factory",
                 "reference/hackagent/attacks/shared/translation",
-                "reference/hackagent/attacks/shared/tui",
                 "reference/hackagent/attacks/shared/utils"
               ],
               "label": "hackagent.attacks.shared",
@@ -103,6 +103,14 @@
                 },
                 {
                   "items": [
+                    "reference/hackagent/attacks/techniques/crescendo/attack",
+                    "reference/hackagent/attacks/techniques/crescendo/config"
+                  ],
+                  "label": "hackagent.attacks.techniques.crescendo",
+                  "type": "category"
+                },
+                {
+                  "items": [
                     "reference/hackagent/attacks/techniques/fc/attack",
                     "reference/hackagent/attacks/techniques/fc/config",
                     "reference/hackagent/attacks/techniques/fc/flowchart_renderer",
@@ -128,14 +136,6 @@
                     "reference/hackagent/attacks/techniques/h4rm3l/generation"
                   ],
                   "label": "hackagent.attacks.techniques.h4rm3l",
-                  "type": "category"
-                },
-                {
-                  "items": [
-                    "reference/hackagent/attacks/techniques/indirect_prompt_injection/attack",
-                    "reference/hackagent/attacks/techniques/indirect_prompt_injection/config"
-                  ],
-                  "label": "hackagent.attacks.techniques.indirect_prompt_injection",
                   "type": "category"
                 },
                 {
@@ -170,7 +170,8 @@
                 {
                   "items": [
                     "reference/hackagent/attacks/techniques/rag/attack",
-                    "reference/hackagent/attacks/techniques/rag/config"
+                    "reference/hackagent/attacks/techniques/rag/config",
+                    "reference/hackagent/attacks/techniques/rag/jailbreak"
                   ],
                   "label": "hackagent.attacks.techniques.rag",
                   "type": "category"
@@ -195,15 +196,25 @@
                   "label": "hackagent.attacks.techniques.tap",
                   "type": "category"
                 },
+                {
+                  "items": [
+                    "reference/hackagent/attacks/techniques/tool_output_ipi/attack",
+                    "reference/hackagent/attacks/techniques/tool_output_ipi/config",
+                    "reference/hackagent/attacks/techniques/tool_output_ipi/generation"
+                  ],
+                  "label": "hackagent.attacks.techniques.tool_output_ipi",
+                  "type": "category"
+                },
                 "reference/hackagent/attacks/techniques/base",
                 "reference/hackagent/attacks/techniques/config"
               ],
               "label": "hackagent.attacks.techniques",
               "type": "category"
             },
-            "reference/hackagent/attacks/base",
             "reference/hackagent/attacks/orchestrator",
-            "reference/hackagent/attacks/registry"
+            "reference/hackagent/attacks/registry",
+            "reference/hackagent/attacks/taxonomy",
+            "reference/hackagent/attacks/types"
           ],
           "label": "hackagent.attacks",
           "type": "category"
@@ -262,6 +273,13 @@
                 }
               ],
               "label": "hackagent.examples.google_adk",
+              "type": "category"
+            },
+            {
+              "items": [
+                "reference/hackagent/examples/hermes/hack_hermes"
+              ],
+              "label": "hackagent.examples.hermes",
               "type": "category"
             },
             {
@@ -460,6 +478,7 @@
                 "reference/hackagent/router/providers/adk",
                 "reference/hackagent/router/providers/claude",
                 "reference/hackagent/router/providers/codex",
+                "reference/hackagent/router/providers/hermes",
                 "reference/hackagent/router/providers/web"
               ],
               "label": "hackagent.router.providers",
@@ -467,6 +486,7 @@
             },
             {
               "items": [
+                "reference/hackagent/router/tracking/audit",
                 "reference/hackagent/router/tracking/category_classifier",
                 "reference/hackagent/router/tracking/context",
                 "reference/hackagent/router/tracking/coordinator",
@@ -626,6 +646,7 @@
             {
               "items": [
                 "reference/hackagent/server/storage/base",
+                "reference/hackagent/server/storage/buckets",
                 "reference/hackagent/server/storage/local",
                 "reference/hackagent/server/storage/remote"
               ],
@@ -638,7 +659,10 @@
           "label": "hackagent.server",
           "type": "category"
         },
+        "reference/hackagent/_version",
         "reference/hackagent/agent",
+        "reference/hackagent/async_utils",
+        "reference/hackagent/config",
         "reference/hackagent/errors",
         "reference/hackagent/logger",
         "reference/hackagent/utils"

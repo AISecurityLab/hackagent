@@ -1,42 +1,11 @@
 import unittest
-from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
 from hackagent.attacks.techniques.autodan_turbo.attack import (
     AutoDANTurboAttack,
     _deep_update,
 )
-
-
-class _DummyStepTracker:
-    @contextmanager
-    def track_step(self, *_args, **_kwargs):
-        yield
-
-
-class _DummyCoordinator:
-    def __init__(self):
-        self.goal_tracker = None
-        self.finalize_all_goals_calls = []
-
-    def initialize_goals(self, *_args, **_kwargs):
-        return None
-
-    def enrich_with_result_ids(self, results):
-        return results
-
-    def finalize_all_goals(self, *args, **kwargs):
-        self.finalize_all_goals_calls.append((args, kwargs))
-        return None
-
-    def log_summary(self):
-        return None
-
-    def finalize_pipeline(self, *_args, **_kwargs):
-        return None
-
-    def finalize_on_error(self, *_args, **_kwargs):
-        return None
+from tests.fakes import RecordingCoordinator, RecordingStepTracker
 
 
 class TestAttackHelpers(unittest.TestCase):
@@ -131,10 +100,10 @@ class TestAutoDANTurboAttack(unittest.TestCase):
             agent_router=agent_router,
         )
 
-        coordinator = _DummyCoordinator()
+        coordinator = RecordingCoordinator()
 
         def _init_coord(*_args, **_kwargs):
-            attack.tracker = _DummyStepTracker()
+            attack.tracker = RecordingStepTracker()
             return coordinator
 
         attack._initialize_coordinator = MagicMock(side_effect=_init_coord)
@@ -159,8 +128,8 @@ class TestAutoDANTurboAttack(unittest.TestCase):
         self.assertEqual(mock_lifelong.call_count, 1)
         self.assertEqual(mock_eval.call_count, 1)
         strategy_lib.save.assert_called_once()
-        self.assertEqual(len(coordinator.finalize_all_goals_calls), 1)
-        _args, finalize_kwargs = coordinator.finalize_all_goals_calls[0]
+        self.assertEqual(len(coordinator.calls_to("finalize_all_goals")), 1)
+        _args, finalize_kwargs = coordinator.calls_to("finalize_all_goals")[0]
         scorer = finalize_kwargs.get("scorer")
         self.assertTrue(callable(scorer))
         self.assertTrue(scorer([{"success": True}]))
@@ -189,11 +158,11 @@ class TestAutoDANTurboAttack(unittest.TestCase):
             agent_router=agent_router,
         )
 
-        coordinator = _DummyCoordinator()
+        coordinator = RecordingCoordinator()
         coordinator.goal_tracker = MagicMock()
 
         def _init_coord(*_args, **_kwargs):
-            attack.tracker = _DummyStepTracker()
+            attack.tracker = RecordingStepTracker()
             return coordinator
 
         attack._initialize_coordinator = MagicMock(side_effect=_init_coord)
@@ -225,10 +194,10 @@ class TestAutoDANTurboAttack(unittest.TestCase):
             agent_router=agent_router,
         )
 
-        coordinator = _DummyCoordinator()
+        coordinator = RecordingCoordinator()
 
         def _init_coord(*_args, **_kwargs):
-            attack.tracker = _DummyStepTracker()
+            attack.tracker = RecordingStepTracker()
             return coordinator
 
         attack._initialize_coordinator = MagicMock(side_effect=_init_coord)

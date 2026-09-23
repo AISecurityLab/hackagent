@@ -34,8 +34,9 @@ Initialize in-memory strategy store and embedding backend.
 **Arguments**:
 
 - `embedder_config` - Top-level ``embedder`` config from attack config.
-  Uses category-classifier schema/defaults.
-- `backend` - Storage backend used to initialize an embedder router.
+  Uses embedding-only provider defaults. ``on_error`` is ``disable``
+  (skip retrieval after failure) or ``raise``. No implicit local fallback.
+- `backend` - Retained for compatibility; never used for model credentials.
 - `embedding_model` - Legacy embedding model argument kept for backward
   compatibility. Prefer ``embedder_config``.
 - `embedding_api_key` - Legacy API key for OpenAI-compatible embeddings.

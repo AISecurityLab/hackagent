@@ -42,8 +42,7 @@ Baseline always needs judge models for LLM-judge evaluation.
 #### run
 
 ```python
-@with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
-def run(goals: List[str]) -> Dict[str, Any]
+def run(goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]
 ```
 
 Execute baseline attack (direct goal submission).
@@ -55,5 +54,5 @@ Execute baseline attack (direct goal submission).
 
 **Returns**:
 
-  Dictionary with &#x27;evaluated&#x27; and &#x27;summary&#x27; DataFrames.
+  A list of :class:`~hackagent.attacks.types.AttackResult` instances.
 

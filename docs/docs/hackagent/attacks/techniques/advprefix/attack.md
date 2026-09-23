@@ -23,7 +23,7 @@ AdvPrefix attack — adversarial prefix generation pipeline.
 
 Implements a multi-stage pipeline that:
 
-1. **Generation** — uses an uncensored generator LLM to produce
+1. **Generation** — uses an uncensored attacker LLM to produce
 candidate adversarial prefixes for each harmless meta-prompt.
 Prefixes are filtered by cross-entropy (``max_ce``) and token
 segment count before being passed downstream.
@@ -83,8 +83,7 @@ Initialize the AdvPrefix attack pipeline.
 #### run
 
 ```python
-@with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
-def run(goals: List[str]) -> List[Dict]
+def run(goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]
 ```
 
 Executes the full prefix generation pipeline.

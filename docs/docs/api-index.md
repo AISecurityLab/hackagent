@@ -20,4 +20,4 @@ For practical usage examples, see the [Python SDK Quickstart](./sdk/python-quick
 
 ---
 
-*Auto-generated from hackagent v0.11.0.*
+*Auto-generated from hackagent v0.12.0.*

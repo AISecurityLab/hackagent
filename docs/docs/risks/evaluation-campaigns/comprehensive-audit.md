@@ -192,22 +192,23 @@ attack_config = {
 result = agent.hack(attack_config=attack_config)
 ```
 
-### Custom Metrics
+### Summary Metrics
 
-Track additional metrics:
+Compute run-level metrics (ASR, majority-vote ASR, inter-judge agreement) from the evaluated result rows:
 
 ```python
-from hackagent.metrics import ToxicityScore, RefusalRate
+from hackagent.attacks.evaluator.metrics import generate_summary_report
 
 attack_config = {
     "attack_type": "static_template",
     "dataset": {"preset": "strongreject"},
-    metrics=[
-        ToxicityScore(),
-        RefusalRate(),
-    ],
 }
-result = agent.hack(attack_config=attack_config)
+rows = agent.hack(attack_config=attack_config)
+summary = generate_summary_report(rows)
+
+print(summary["overall_success_rate"])
+print(summary["majority_vote_asr"], summary["fleiss_kappa"])
+print(summary["per_judge_asr"])
 ```
 
 ## Report Generation

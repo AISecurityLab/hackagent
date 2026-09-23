@@ -43,7 +43,6 @@ from hackagent.attacks.shared.response_utils import (
     is_guardrail_response,
 )
 from hackagent.attacks.shared.router_factory import create_router
-from hackagent.attacks.shared.tui import with_tui_logging
 from hackagent.server.client import AuthenticatedClient
 from hackagent.server.storage.enums import StepTypeEnum
 from hackagent.router.router import AgentRouter
@@ -312,7 +311,7 @@ class PAIRAttack(BaseAttack):
                 router_config["agent_metadata"]["api_key"] = api_key_config
 
             router, _reg_key = create_router(
-                backend=self.client,
+                backend=self.backend,
                 config=router_config,
                 logger=self.logger,
                 router_name=attacker_config.get("model", router_config["identifier"]),
@@ -360,7 +359,7 @@ class PAIRAttack(BaseAttack):
                 router_config["agent_metadata"]["api_key"] = api_key_config
 
             router, _reg_key = create_router(
-                backend=self.client,
+                backend=self.backend,
                 config=router_config,
                 logger=self.logger,
                 router_name=judge_config.get("model", router_config["identifier"]),
@@ -768,7 +767,7 @@ class PAIRAttack(BaseAttack):
             judge_config.get("identifier"), default="harmbench"
         )
 
-        step = BaseEvaluationStep(self.config, self.logger, self.client)
+        step = BaseEvaluationStep(self.config, self.logger, self.backend)
         base_config = step._build_base_eval_config()
         subprocess_config = {**base_config, **judge_config}
         subprocess_config["model_id"] = judge_config.get("identifier", "")
@@ -1208,7 +1207,6 @@ class PAIRAttack(BaseAttack):
             "n_streams": n_streams,
         }
 
-    @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
     def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
         """
         Execute PAIR attack on goals.

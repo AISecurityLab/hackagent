@@ -5,9 +5,12 @@
 
 import logging
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
-from hackagent.attacks.techniques.h4rm3l.generation import execute
+from hackagent.attacks.techniques.h4rm3l.generation import (
+    _build_prompting_interface,
+    execute,
+)
 
 
 class TestGeneration(unittest.TestCase):
@@ -142,6 +145,83 @@ class TestGeneration(unittest.TestCase):
         self.assertEqual(len(results), 5)
         for i, r in enumerate(results):
             self.assertEqual(r["goal"], f"goal_{i}")
+
+
+class TestBuildPromptingInterface(unittest.TestCase):
+    """The decorator LLM must be used when configured, never silently skipped."""
+
+    def setUp(self):
+        self.logger = logging.getLogger("test")
+        self.target = MagicMock()
+        self.target.backend_agent.id = "target-id"
+        self.target.route_request.return_value = {"generated_text": "from target"}
+        self.decorator_router = MagicMock()
+        self.decorator_router.route_request.return_value = {
+            "generated_text": "from decorator"
+        }
+
+    @patch("hackagent.attacks.techniques.h4rm3l.generation.create_router")
+    def test_configured_decorator_llm_is_used(self, mock_create_router):
+        mock_create_router.return_value = (self.decorator_router, "decorator-key")
+        backend = MagicMock()
+        config = {
+            "decorator_llm": {
+                "identifier": "ollama/llama3",
+                "endpoint": "http://localhost:11434",
+                "agent_type": "OLLAMA",
+                "api_key": "secret",
+            },
+            "_backend": backend,
+        }
+
+        prompt = _build_prompting_interface(config, self.target, self.logger)
+        text = prompt("rewrite this", maxtokens=123, temperature=0.2)
+
+        self.assertEqual(text, "from decorator")
+        self.assertEqual(prompt._llm_role, "decorator_llm")
+        mock_create_router.assert_called_once()
+        self.assertIs(mock_create_router.call_args.kwargs["backend"], backend)
+        self.assertEqual(
+            mock_create_router.call_args.kwargs["config"], config["decorator_llm"]
+        )
+        self.decorator_router.route_request.assert_called_once_with(
+            registration_key="decorator-key",
+            request_data={
+                "prompt": "rewrite this",
+                "max_tokens": 123,
+                "temperature": 0.2,
+            },
+        )
+        self.target.route_request.assert_not_called()
+
+    @patch("hackagent.attacks.techniques.h4rm3l.generation.create_router")
+    def test_decorator_llm_without_api_key_is_used(self, mock_create_router):
+        mock_create_router.return_value = (self.decorator_router, "decorator-key")
+        config = {"decorator_llm": {"identifier": "ollama/llama3"}}
+
+        prompt = _build_prompting_interface(config, self.target, self.logger)
+
+        self.assertEqual(prompt("x"), "from decorator")
+        self.target.route_request.assert_not_called()
+
+    @patch(
+        "hackagent.attacks.techniques.h4rm3l.generation.create_router",
+        side_effect=RuntimeError("unreachable endpoint"),
+    )
+    def test_decorator_llm_failure_raises(self, _mock_create_router):
+        config = {"decorator_llm": {"identifier": "ollama/llama3"}}
+
+        with self.assertRaises(ValueError) as ctx:
+            _build_prompting_interface(config, self.target, self.logger)
+
+        self.assertIn("ollama/llama3", str(ctx.exception))
+        self.target.route_request.assert_not_called()
+
+    def test_without_decorator_llm_falls_back_to_target(self):
+        prompt = _build_prompting_interface({}, self.target, self.logger)
+
+        self.assertEqual(prompt("x"), "from target")
+        self.assertEqual(prompt._llm_role, "target_fallback")
 
 
 if __name__ == "__main__":

@@ -44,7 +44,8 @@ def __init__(endpoint: str,
              adapter_operational_config: Optional[Dict[str, Any]] = None,
              thinking: Optional[bool] = None,
              before_guardrail: Optional[Dict[str, Any]] = None,
-             after_guardrail: Optional[Dict[str, Any]] = None)
+             after_guardrail: Optional[Dict[str, Any]] = None,
+             backend: Optional[Any] = None)
 ```
 
 Initializes the HackAgent client and prepares it for interaction.
@@ -87,6 +88,11 @@ attack strategies.
   When set to `False`, requests sent through the target OLLAMA adapter
   include `think: false` to disable thinking output. Ignored for
   non-OLLAMA target agent types.
+- `backend` - Optional pre-built ``StorageBackend`` to persist runs and
+  results through. When omitted, a backend is selected from the
+  resolved API key (remote) or a default local SQLite database.
+  Supplying one lets an embedding host — e.g. the local dashboard
+  — reuse its own already-open backend.
 
 #### attack\_strategies
 

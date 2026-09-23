@@ -19,6 +19,9 @@ from hackagent.cli.tui.widgets.logs import AttackLogViewer
 
 from hackagent.cli.tui.views.attacks.helpers import (
     _escape,
+    apply_env_overrides,
+    build_guardrail_config,
+    restore_env,
 )
 
 
@@ -64,7 +67,6 @@ class AttacksExecutorMixin:
         """
         import io
         import logging
-        import os
         import re
         import sys
         import time
@@ -98,8 +100,7 @@ class AttacksExecutorMixin:
             )
 
         # Comprehensive rich suppression
-        saved_term = os.environ.get("TERM")
-        os.environ["TERM"] = "dumb"
+        saved_env = apply_env_overrides({"TERM": "dumb"})
 
         hackagent_logger = logging.getLogger("hackagent")
         saved_handlers = hackagent_logger.handlers.copy()
@@ -171,8 +172,7 @@ class AttacksExecutorMixin:
         logging.getLogger("httpx").setLevel(logging.CRITICAL)
         logging.getLogger("litellm").setLevel(logging.CRITICAL)
 
-        os.environ["FORCE_COLOR"] = "0"
-        os.environ["NO_COLOR"] = "1"
+        saved_env.update(apply_env_overrides({"FORCE_COLOR": "0", "NO_COLOR": "1"}))
 
         original_stdout = sys.stdout
         original_stderr = sys.stderr
@@ -201,29 +201,16 @@ class AttacksExecutorMixin:
             before_gr_name = self.query_one("#before-gr-name", Input).value.strip()
             after_gr_name = self.query_one("#after-gr-name", Input).value.strip()
 
-            before_guardrail = None
-            if before_gr_name:
-                before_gr_type_raw = self.query_one("#before-gr-type", Select).value
-                before_gr_endpoint = self.query_one(
-                    "#before-gr-endpoint", Input
-                ).value.strip()
-                before_guardrail = {
-                    "identifier": before_gr_name.capitalize,
-                    "agent_type": str(before_gr_type_raw),
-                    "endpoint": before_gr_endpoint,
-                }
-
-            after_guardrail = None
-            if after_gr_name:
-                after_gr_type_raw = self.query_one("#after-gr-type", Select).value
-                after_gr_endpoint = self.query_one(
-                    "#after-gr-endpoint", Input
-                ).value.strip()
-                after_guardrail = {
-                    "identifier": after_gr_name,
-                    "agent_type": str(after_gr_type_raw),
-                    "endpoint": after_gr_endpoint,
-                }
+            before_guardrail = build_guardrail_config(
+                before_gr_name,
+                self.query_one("#before-gr-type", Select).value,
+                self.query_one("#before-gr-endpoint", Input).value,
+            )
+            after_guardrail = build_guardrail_config(
+                after_gr_name,
+                self.query_one("#after-gr-type", Select).value,
+                self.query_one("#after-gr-endpoint", Input).value,
+            )
 
             agent = HackAgent(
                 name=agent_name,
@@ -361,15 +348,7 @@ class AttacksExecutorMixin:
                 for handler in saved_handlers:
                     hackagent_logger.addHandler(handler)
 
-                if saved_term is not None:
-                    os.environ["TERM"] = saved_term
-                elif "TERM" in os.environ:
-                    del os.environ["TERM"]
-
-                if "FORCE_COLOR" in os.environ:
-                    del os.environ["FORCE_COLOR"]
-                if "NO_COLOR" in os.environ:
-                    del os.environ["NO_COLOR"]
+                restore_env(saved_env)
 
             duration = time.time() - start_time
             self.app.call_from_thread(progress_bar.update, progress=100)
@@ -418,12 +397,4 @@ class AttacksExecutorMixin:
             for handler in saved_handlers:
                 hackagent_logger.addHandler(handler)
 
-            if saved_term is not None:
-                os.environ["TERM"] = saved_term
-            elif "TERM" in os.environ:
-                del os.environ["TERM"]
-
-            if "FORCE_COLOR" in os.environ:
-                del os.environ["FORCE_COLOR"]
-            if "NO_COLOR" in os.environ:
-                del os.environ["NO_COLOR"]
+            restore_env(saved_env)

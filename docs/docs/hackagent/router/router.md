@@ -118,3 +118,13 @@ that all code using the router can handle errors uniformly without try/except bl
   When raise_on_error=False (default), this method never raises exceptions,
   making it safer to use in pipelines where continuity is important.
 
+#### route\_request\_async
+
+```python
+async def route_request_async(registration_key: str,
+                              request_data: Dict[str, Any],
+                              raise_on_error: bool = False) -> Dict[str, Any]
+```
+
+Asynchronously route a request while preserving ``route_request`` semantics.
+

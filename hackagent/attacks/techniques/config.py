@@ -231,14 +231,6 @@ class ConfigBase(
     )
 
 
-# Backward-compatible aliases while the shared config layer settles.
-TechniqueConfigBase = ConfigBase
-JudgeConfigBase = ConfigBase
-JudgeTechniqueConfigBase = ConfigBase
-JudgeTargetConfigBase = ConfigBase
-JudgeTargetTechniqueConfigBase = ConfigBase
-
-
 # ---------------------------------------------------------------------------
 # Factory helpers (always return fresh copies — safe for dict mutation)
 # ---------------------------------------------------------------------------
@@ -425,11 +417,6 @@ __all__ = [
     "RunConfig",
     "ExecutionConfig",
     "ConfigBase",
-    "TechniqueConfigBase",
-    "JudgeConfigBase",
-    "JudgeTechniqueConfigBase",
-    "JudgeTargetConfigBase",
-    "JudgeTargetTechniqueConfigBase",
     "default_attacker",
     "default_judge",
     "default_category_classifier",

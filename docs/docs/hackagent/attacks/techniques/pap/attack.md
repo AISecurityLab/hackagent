@@ -45,8 +45,7 @@ Pipeline:
 #### run
 
 ```python
-@with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
-def run(goals: List[str]) -> List[Dict]
+def run(goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]
 ```
 
 Execute the full PAP attack pipeline.

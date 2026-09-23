@@ -9,6 +9,7 @@ from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
 from hackagent.attacks.techniques.pair.attack import PAIRAttack, _deep_update
+from tests.fakes import RecordingStepTracker
 
 
 class TestDeepUpdate(unittest.TestCase):
@@ -289,13 +290,6 @@ class TestPAIRAttack(unittest.TestCase):
         self.assertEqual(attack.config.get("dataset", {}).get("preset"), "harmbench")
 
     def test_run_uses_global_goal_index_offset_for_tracking_context(self):
-        class _DummyStepTracker:
-            @contextmanager
-            def track_step(self, *_args, **_kwargs):
-                yield None
-
-            def add_step_metadata(self, *_args, **_kwargs):
-                return None
 
         class _DummyProgress:
             def update(self, *_args, **_kwargs):
@@ -322,7 +316,7 @@ class TestPAIRAttack(unittest.TestCase):
                 agent_router=MagicMock(),
             )
 
-        attack.tracker = _DummyStepTracker()
+        attack.tracker = RecordingStepTracker()
         fake_goal_ctx = MagicMock()
         fake_goal_tracker = MagicMock()
         fake_coordinator = MagicMock()
@@ -717,13 +711,6 @@ class TestPAIRAttack(unittest.TestCase):
         self.assertFalse(progress.overlapping_updates)
 
     def test_run_suppresses_pipeline_status_updates_in_sub_run(self):
-        class _DummyStepTracker:
-            @contextmanager
-            def track_step(self, *_args, **_kwargs):
-                yield None
-
-            def add_step_metadata(self, *_args, **_kwargs):
-                return None
 
         class _DummyProgress:
             def update(self, *_args, **_kwargs):
@@ -750,7 +737,7 @@ class TestPAIRAttack(unittest.TestCase):
                 agent_router=MagicMock(),
             )
 
-        attack.tracker = _DummyStepTracker()
+        attack.tracker = RecordingStepTracker()
         fake_goal_ctx = MagicMock()
         fake_goal_tracker = MagicMock()
         fake_coordinator = MagicMock()

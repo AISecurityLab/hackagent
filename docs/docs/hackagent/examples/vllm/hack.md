@@ -27,7 +27,7 @@ vLLM exposes an OpenAI-compatible REST API, so agent_type is &quot;openai&quot;.
 
 parallel prefix/completion requests (AdvPrefix)
 
-#### BATCH\_SIZE\_JUDGE
+#### JUDGE\_CONCURRENCY
 
 parallel judge scoring requests (all attacks)
 

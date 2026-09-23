@@ -86,8 +86,7 @@ Initialize PAIR attack.
 #### run
 
 ```python
-@with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
-def run(goals: List[str]) -> List[Dict[str, Any]]
+def run(goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]
 ```
 
 Execute PAIR attack on goals.

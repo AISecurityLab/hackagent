@@ -462,45 +462,6 @@ class TestLogViewer:
 class TestLogTrackingFlow:
     """Tests for the complete log tracking flow."""
 
-    def test_with_tui_logging_decorator(self) -> None:
-        """Test the with_tui_logging decorator attaches handlers correctly."""
-        from hackagent.cli.tui.logger import TUILogHandler, with_tui_logging
-
-        # Create a mock attack class
-        class MockAttack:
-            def __init__(self):
-                self._tui_log_handler = None
-
-            @with_tui_logging(logger_name="hackagent.test")
-            def run(self, goals):
-                logger = logging.getLogger("hackagent.test")
-                logger.info("Running attack")
-                return ["result"]
-
-        # Create handler
-        mock_app = MagicMock()
-        mock_app.call_from_thread = lambda callback, *args, **kwargs: callback(
-            *args, **kwargs
-        )
-        mock_callback = MagicMock()
-
-        handler = TUILogHandler(
-            app=mock_app,
-            callback=mock_callback,
-            max_buffer_size=100,
-            level=logging.INFO,
-        )
-
-        # Attach handler to attack instance
-        attack = MockAttack()
-        attack._tui_log_handler = handler
-
-        # Run attack
-        result = attack.run(["goal1"])
-
-        # Verify result
-        assert result == ["result"]
-
     # NOTE: tests for the removed ``attach_tui_handler`` / ``detach_tui_handler``
     # helpers were dropped in the TUI cleanup pass — those helpers were never
     # called by production code and have been removed.

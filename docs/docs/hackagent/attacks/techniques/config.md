@@ -19,8 +19,8 @@ algorithm parameters, but they should not redefine the shared defaults.
 
 How an attack hits the target (static / adaptive / multi-turn, plus tags such
 as multimodal or RAG/indirect) is defined separately in
-`hackagent.attacks.taxonomy` — not in these shared argument models.
-See [Attack taxonomy](../../../attacks/taxonomy.mdx).
+``hackagent.attacks.taxonomy`` — not in these shared argument models.
+See the docs page ``docs/docs/attacks/taxonomy.mdx``.
 
 Victim-model request defaults are still defined here for compatibility and
 for callers that want the canonical schema, but the preferred runtime source
@@ -148,7 +148,16 @@ def default_embedder() -> Dict[str, Any]
 
 Return a fresh embedder config dict (local ``embeddinggemma`` on Ollama).
 
-Used by router-based embedder roles such as AutoDAN-Turbo strategy retrieval.
+Used by embedding-only roles such as AutoDAN-Turbo strategy retrieval.
+
+#### resolve\_embedder\_config
+
+```python
+def resolve_embedder_config(
+        config: Optional[Dict[str, Any]]) -> Dict[str, Any]
+```
+
+Merge embedding defaults without leaking the Ollama base to other providers.
 
 #### default\_rag\_embedder
 

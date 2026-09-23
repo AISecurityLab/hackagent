@@ -22,7 +22,6 @@ The orchestrator handles:
 Technique implementations remain pure algorithms, unaware of server integration.
 """
 
-import json
 import logging
 import os
 import copy
@@ -40,7 +39,6 @@ from hackagent.logger import get_logger
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
-import httpx
 
 from hackagent.errors import HackAgentError
 from hackagent.attacks.shared.embedding_utils import request_embedding
@@ -226,10 +224,6 @@ class AttackOrchestrator:
             ValueError: If attack_type or attack_impl_class not defined
         """
         self.hackagent_agent = hackagent_agent
-        # Backward-compatible alias used by older tests/integrations.
-        self.hack_agent = hackagent_agent
-        # keep self.client as legacy attr for subclasses that may reference it directly
-        self.client = getattr(hackagent_agent, "client", None)
 
         if not self.attack_type:
             raise ValueError(f"{self.__class__.__name__} must define attack_type")
@@ -1463,10 +1457,10 @@ class AttackOrchestrator:
             Kwargs for attack_impl_class constructor
         """
         target_config = getattr(self.hackagent_agent, "target_config", {}) or {}
-        agent_router = getattr(self.hack_agent, "router", None) or getattr(
-            self.hack_agent, "agent_router", None
+        agent_router = getattr(self.hackagent_agent, "router", None) or getattr(
+            self.hackagent_agent, "agent_router", None
         )
-        backend = getattr(self.hack_agent, "backend", None)
+        backend = getattr(self.hackagent_agent, "backend", None)
         run_config_for_attack = dict(run_config_override or {})
         # Run-level dashboard metadata must not leak into strict attack configs.
         run_config_for_attack.pop("expected_total_goals", None)
@@ -1826,11 +1820,11 @@ class AttackOrchestrator:
         # configuration preparation below.
         backend_agent = getattr(router_obj, "backend_agent", None)
         victim_agent_id = getattr(backend_agent, "id", None) or getattr(
-            self.hack_agent, "agent_id", None
+            self.hackagent_agent, "agent_id", None
         )
 
         organization_id = getattr(router_obj, "organization_id", None) or getattr(
-            self.hack_agent, "organization_id", None
+            self.hackagent_agent, "organization_id", None
         )
 
         def _create_and_start_run() -> Tuple[str, str]:
@@ -2133,110 +2127,3 @@ class AttackOrchestrator:
                         error=flush_error,
                         logger=logger,
                     )
-
-    # ========================================================================
-    # HTTP Response Helpers
-    # ========================================================================
-
-    def _decode_response(self, response: httpx.Response) -> str:
-        """Decode response content to UTF-8 string."""
-        return (
-            response.content.decode("utf-8", errors="replace")
-            if response.content
-            else "N/A"
-        )
-
-    def _parse_json(
-        self,
-        response: httpx.Response,
-        decoded_content: str,
-        context: str,
-    ) -> Optional[Dict[str, Any]]:
-        """Parse JSON from response with fallback to pre-parsed attributes."""
-        parsed_data: Optional[Dict[str, Any]] = None
-
-        if response.content:
-            try:
-                parsed_data = json.loads(decoded_content)
-            except json.JSONDecodeError as jde:
-                if response.status_code == 201:
-                    logger.error(f"Failed to parse JSON for {context} (201): {jde}")
-                    raise HackAgentError(
-                        f"Failed to parse 201 response for {context}"
-                    ) from jde
-                logger.warning(
-                    f"Could not parse JSON for {context} (status {response.status_code})",
-                    exc_info=False,
-                )
-
-        # Fallback to pre-parsed attributes
-        if not parsed_data and hasattr(response, "parsed") and response.parsed:
-            if hasattr(response.parsed, "additional_properties") and isinstance(
-                response.parsed.additional_properties, dict
-            ):
-                parsed_data = response.parsed.additional_properties
-            elif isinstance(response.parsed, dict):
-                parsed_data = response.parsed
-
-        return parsed_data
-
-    def _parse_response(
-        self,
-        response: httpx.Response,
-        decoded_content: str,
-        context: str,
-    ) -> Dict[str, Any]:
-        """Parse and validate response data."""
-        parsed_data = self._parse_json(response, decoded_content, context)
-
-        if response.status_code == 201:
-            if not parsed_data:
-                logger.error(f"201 response for {context} but no parseable data")
-                raise HackAgentError(f"201 for {context} but no parseable data")
-        elif response.status_code >= 300:
-            err = f"Failed {context}. Status: {response.status_code}, Body: {decoded_content}"
-            logger.error(err)
-            raise HackAgentError(err)
-        else:
-            logger.warning(f"Unexpected status {response.status_code} for {context}")
-            if not parsed_data:
-                err = f"No parseable data for {context} (status {response.status_code})"
-                logger.error(err)
-                raise HackAgentError(err)
-
-        if not parsed_data:
-            err = f"Failed to parse data for {context} (status {response.status_code})"
-            logger.error(err)
-            raise HackAgentError(err)
-
-        return parsed_data
-
-    def _extract_ids_from_data(
-        self,
-        parsed_data: Dict[str, Any],
-        context: str,
-        original_content: str,
-    ) -> Tuple[str, Optional[str]]:
-        """Extract attack_id and optional run_id from parsed data."""
-        raw_attack_id = parsed_data.get("id")
-        attack_id = str(raw_attack_id) if raw_attack_id is not None else None
-
-        if not attack_id:
-            err = f"Could not extract attack_id from {context}. Data: {parsed_data}"
-            logger.error(err)
-            raise HackAgentError(err)
-
-        raw_run_id = parsed_data.get("associated_run_id")
-        run_id = str(raw_run_id) if raw_run_id is not None else None
-
-        logger.info(f"Extracted Attack ID: {attack_id}, Run ID: {run_id or 'N/A'}")
-        return attack_id, run_id
-
-    def _extract_ids_from_response(
-        self, response: httpx.Response, context: str = "attack"
-    ) -> Tuple[str, Optional[str]]:
-        """Main entry point for extracting IDs from API response."""
-        logger.debug(f"Extracting IDs for '{context}' (status: {response.status_code})")
-        decoded_content = self._decode_response(response)
-        parsed_data = self._parse_response(response, decoded_content, context)
-        return self._extract_ids_from_data(parsed_data, context, decoded_content)
