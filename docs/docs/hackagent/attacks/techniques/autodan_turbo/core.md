@@ -8,7 +8,7 @@ Shared helpers for AutoDAN-Turbo warm-up and lifelong phases.
 #### init\_routers
 
 ```python
-def init_routers(config, client, logger)
+def init_routers(config, logger)
 ```
 
 Initialize all LLM roles required by the paper components.
@@ -21,7 +21,6 @@ externally by the framework.
 
 - `config` - Full attack config containing ``attacker``, ``scorer`` and
   ``summarizer`` router settings.
-- `client` - Authenticated API client used by router factory.
 - `logger` - Logger used by router initialization and request flow.
   
 

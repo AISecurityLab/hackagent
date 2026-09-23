@@ -37,7 +37,7 @@ Generate attack prompts using templates.
 ```python
 def execute_prompts(
         data: List[Dict[str, Any]],
-        agent_router: AgentRouter,
+        agent_router: LLMRouter,
         config: Dict[str, Any],
         logger: logging.Logger,
         goal_tracker: Optional[Tracker] = None) -> List[Dict[str, Any]]
@@ -65,7 +65,7 @@ grouping all attempts under a single Result per goal.
 
 ```python
 def execute(goals: List[str],
-            agent_router: AgentRouter,
+            agent_router: LLMRouter,
             config: Dict[str, Any],
             logger: logging.Logger,
             goal_tracker: Optional[Tracker] = None) -> List[Dict[str, Any]]

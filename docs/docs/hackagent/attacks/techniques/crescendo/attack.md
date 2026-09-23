@@ -21,7 +21,7 @@ Unlike single-turn attacks (PAIR, TAP, ...), Crescendo keeps one growing
 ``target_messages`` conversation across the whole goal: every accepted turn
 is appended to it and re-sent in full on the next request, so the target
 sees genuine multi-turn context. This is HackAgent&#x27;s first attack to rely on
-that behaviour; no router changes were required because ``AgentRouter``
+that behaviour; no router changes were required because ``LLMRouter``
 already forwards an arbitrary ``messages`` history verbatim to the target
 adapter on every call.
 
@@ -79,7 +79,7 @@ refusals, driving both scoring and the backtrack mechanism.
 ```python
 def __init__(config: Optional[Dict[str, Any]] = None,
              client: Optional[Store] = None,
-             agent_router: Optional[AgentRouter] = None)
+             agent_router: Optional[LLMRouter] = None)
 ```
 
 Initialize Crescendo attack.

@@ -76,7 +76,7 @@ Uses a neutral list-filling prompt.
 ```python
 def __init__(config: Optional[Dict[str, Any]] = None,
              client: Optional[Store] = None,
-             agent_router: Optional[AgentRouter] = None)
+             agent_router: Optional[LLMRouter] = None)
 ```
 
 Initialize MMLAttack with configuration.
@@ -86,7 +86,7 @@ Initialize MMLAttack with configuration.
 - `config` - Optional dictionary containing parameters to override
   :data:`~hackagent.attacks.techniques.mml.config.DEFAULT_MML_CONFIG`.
 - `client` - Store instance passed from the orchestrator.
-- `agent_router` - AgentRouter instance for the target model.
+- `agent_router` - LLMRouter instance for the target model.
   
 
 **Raises**:

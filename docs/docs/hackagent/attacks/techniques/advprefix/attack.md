@@ -61,7 +61,7 @@ the dashboard shows all goals from the moment the run starts.
 ```python
 def __init__(config: Optional[Dict[str, Any]] = None,
              client: Optional[Store] = None,
-             agent_router: Optional[AgentRouter] = None)
+             agent_router: Optional[LLMRouter] = None)
 ```
 
 Initialize the AdvPrefix attack pipeline.

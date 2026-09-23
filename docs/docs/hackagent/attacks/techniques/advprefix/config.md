@@ -53,7 +53,7 @@ Create config from dictionary, extracting only known fields.
 class EvaluatorConfig(BaseModel)
 ```
 
-Configuration class for response evaluators using AgentRouter framework.
+Configuration class for response evaluators using LLMRouter framework.
 
 #### agent\_type
 

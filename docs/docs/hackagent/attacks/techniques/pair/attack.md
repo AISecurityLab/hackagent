@@ -63,7 +63,7 @@ the AutoDAN-Turbo scorer+wrapper protocol.
 ```python
 def __init__(config: Optional[Dict[str, Any]] = None,
              client: Optional[Store] = None,
-             agent_router: Optional[AgentRouter] = None)
+             agent_router: Optional[LLMRouter] = None)
 ```
 
 Initialize PAIR attack.

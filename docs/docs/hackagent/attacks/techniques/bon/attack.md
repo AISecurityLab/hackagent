@@ -48,7 +48,7 @@ Pipeline:
 ```python
 def __init__(config: Optional[Dict[str, Any]] = None,
              client: Optional[Store] = None,
-             agent_router: Optional[AgentRouter] = None)
+             agent_router: Optional[LLMRouter] = None)
 ```
 
 Initialise BoNAttack with configuration.
@@ -58,7 +58,7 @@ Initialise BoNAttack with configuration.
 - `config` - Optional dictionary overriding
   :data:`~hackagent.attacks.techniques.bon.config.DEFAULT_BON_CONFIG`.
 - `client` - Store instance from the orchestrator.
-- `agent_router` - AgentRouter instance for the target model.
+- `agent_router` - LLMRouter instance for the target model.
   
 
 **Raises**:

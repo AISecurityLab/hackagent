@@ -23,7 +23,7 @@ and keep the best branches across depths.
 #### \_\_init\_\_
 
 ```python
-def __init__(config: Dict[str, Any], client: Store, agent_router: AgentRouter,
+def __init__(config: Dict[str, Any], client: Store, agent_router: LLMRouter,
              logger: logging.Logger)
 ```
 
@@ -70,8 +70,7 @@ scoring branches for the next depth.
 #### execute
 
 ```python
-def execute(goals: List[str], agent_router: AgentRouter, config: Dict[str,
-                                                                      Any],
+def execute(goals: List[str], agent_router: LLMRouter, config: Dict[str, Any],
             logger: logging.Logger, client: Store) -> List[Dict[str, Any]]
 ```
 

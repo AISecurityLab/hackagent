@@ -17,7 +17,7 @@ graph TB
     end
 
     subgraph "Core Library"
-        ROUTER["Router (AgentRouter)"]
+        ROUTER["Models (connect, Guarded, ModelFactory)"]
         ATTACKS["Attack Framework (registry, orchestrator, techniques)"]
         RISKS["Risk Profiles (OWASP LLM risk categories)"]
         DATASETS["Datasets (providers, presets, registry)"]
@@ -106,9 +106,13 @@ import Link from '@docusaurus/Link';
 
 ### Models (`hackagent/models/`)
 
-**`hackagent.models.router.AgentRouter`**
-- Resolves an `AgentType` (e.g. `GOOGLE_ADK`, `CLAUDE_CODE`, `CODEX`, `HERMES`, `WEB`, `LITELLM`, `OPENAI_SDK`, `OLLAMA`, `LANGCHAIN`) to a provider adapter and dispatches attack prompts to the target agent.
-- `GOOGLE_ADK`, `CLAUDE_CODE`, `CODEX`, `HERMES`, and `WEB` use dedicated adapter classes in `hackagent/models/adapters/`; the CLI-driven ones (`CLAUDE_CODE`, `CODEX`, `HERMES`) share the `SubprocessCLIAgent` base in `cli_agent.py`. The remaining chat-completions-style types are driven generically through `provider_config.py` + `_ChatRegistration`.
+**`hackagent.models.connect(spec)`**
+- Takes a `ModelSpec` (identifier, endpoint, `AgentType`, credentials, generation parameters) and returns an `LLM`: `complete()` / `acomplete()` return a `Completion`, with provider errors as values rather than exceptions. Connecting needs no storage backend and registers nothing.
+- `dispatch.py` resolves the `AgentType` (e.g. `GOOGLE_ADK`, `CLAUDE_CODE`, `CODEX`, `HERMES`, `WEB`, `LITELLM`, `OPENAI_SDK`, `OLLAMA`, `LANGCHAIN`) to an adapter. `GOOGLE_ADK`, `CLAUDE_CODE`, `CODEX`, `HERMES`, and `WEB` use dedicated adapter classes in `hackagent/models/adapters/`; the CLI-driven ones (`CLAUDE_CODE`, `CODEX`, `HERMES`) share the `SubprocessCLIAgent` base in `cli_agent.py`. The remaining chat-completions-style types are driven generically through `provider_config.py` + `_ChatRegistration`.
+- `llm.with_params(...)` returns a copy with run-scoped parameters (e.g. a run's `max_tokens`); the shared adapter is never mutated.
+- `guardrail.py`: `Guarded(llm, before, after)` checks prompts before they reach the model and responses before they are returned.
+- `factory.py`: `ModelFactory(settings)` builds role models (attacker, judges, guardrails). A role model uses only the credentials its spec names; the HackAgent API key is added only for the hosted LLM gateway.
+- Only the target is registered as an Agent record, by the `HackAgent` facade.
 - Per-step traces are recorded by `hackagent/router/tracking/` for later inspection in the web UI.
 
 ### Attack Framework (`hackagent/attacks/`)
@@ -133,7 +137,7 @@ import Link from '@docusaurus/Link';
 **`RemoteBackend` (optional)**
 - Used automatically once a HackAgent Cloud API key is resolved. Talks to `https://api.hackagent.dev` through the generated OpenAPI client in `hackagent/storage/_http/`, enabling team dashboards and hosted result storage.
 
-Both backends implement the same `Store` protocol (`hackagent/storage/store.py`), so the router, attack orchestrator, tracker, and TUI/dashboard code are fully decoupled from where results are actually persisted.
+Both backends implement the same `Store` protocol (`hackagent/storage/store.py`), so the attack orchestrator, tracker, and TUI/dashboard code are fully decoupled from where results are actually persisted.
 
 ## Attack Execution Flow
 
@@ -141,18 +145,18 @@ Both backends implement the same `Store` protocol (`hackagent/storage/store.py`)
 sequenceDiagram
     participant User
     participant SDK as HackAgent SDK/CLI
-    participant Router as AgentRouter
+    participant Router as Target LLM
     participant Orchestrator as Attack Orchestrator
     participant Target as Target Agent
     participant Evaluator
     participant Storage as Local/Remote Storage
 
     User->>SDK: agent.hack(attack_config)
-    SDK->>Storage: Register agent + create Run
+    SDK->>Storage: Register target agent + create Run
     SDK->>Orchestrator: Execute selected technique
     loop For each generated prompt
         Orchestrator->>Router: Dispatch prompt
-        Router->>Target: Send request via provider adapter
+        Router->>Target: Send request via adapter (guardrails applied)
         Target->>Router: Response
         Router->>Evaluator: Evaluate response
         Evaluator->>Orchestrator: Verdict + score

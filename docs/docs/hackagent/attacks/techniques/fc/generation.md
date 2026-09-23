@@ -19,8 +19,8 @@ Language Models via Auto-Generated Flowcharts&quot; (EMNLP 2025 Findings)
 #### execute\_fc
 
 ```python
-def execute_fc(goals: List[str], agent_router: AgentRouter, config: Dict[str,
-                                                                         Any],
+def execute_fc(goals: List[str], agent_router: LLMRouter, config: Dict[str,
+                                                                       Any],
                logger: logging.Logger) -> List[Dict[str, Any]]
 ```
 
@@ -47,8 +47,8 @@ Pipeline:
 #### execute\_tfc
 
 ```python
-def execute_tfc(goals: List[str], agent_router: AgentRouter, config: Dict[str,
-                                                                          Any],
+def execute_tfc(goals: List[str], agent_router: LLMRouter, config: Dict[str,
+                                                                        Any],
                 logger: logging.Logger) -> List[Dict[str, Any]]
 ```
 

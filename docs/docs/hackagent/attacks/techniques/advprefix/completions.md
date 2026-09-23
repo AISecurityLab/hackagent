@@ -26,7 +26,7 @@ determine attack success rates.
 @handle_empty_input("Get Completions", empty_result=[])
 @require_agent_router("Get Completions")
 @log_errors("Get Completions")
-def execute(agent_router: AgentRouter, input_data: List[Dict],
+def execute(agent_router: LLMRouter, input_data: List[Dict],
             config: Dict[str, Any], logger: logging.Logger) -> List[Dict]
 ```
 
@@ -39,7 +39,7 @@ for evaluation.
 
 **Arguments**:
 
-- `agent_router` - AgentRouter instance configured for the target agent (validated by decorator).
+- `agent_router` - LLMRouter instance configured for the target agent (validated by decorator).
 - `input_data` - List of dictionaries containing adversarial prefixes.
   Each dict should have key: &#x27;prefix&#x27;, and optionally &#x27;goal&#x27;.
 - `config` - Configuration dictionary containing completion parameters including:

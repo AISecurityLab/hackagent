@@ -64,7 +64,7 @@ few_shot Injects two task-specific decoding demonstrations.
 ```python
 def __init__(config: Optional[Dict[str, Any]] = None,
              client: Optional[Store] = None,
-             agent_router: Optional[AgentRouter] = None)
+             agent_router: Optional[LLMRouter] = None)
 ```
 
 Initialize FlipAttack with configuration.
@@ -74,7 +74,7 @@ Initialize FlipAttack with configuration.
 - `config` - Optional dictionary containing parameters to override
   :data:`~hackagent.attacks.techniques.flipattack.config.DEFAULT_FLIPATTACK_CONFIG`.
 - `client` - Store instance passed from the orchestrator.
-- `agent_router` - AgentRouter instance for the target model.
+- `agent_router` - LLMRouter instance for the target model.
   
 
 **Raises**:

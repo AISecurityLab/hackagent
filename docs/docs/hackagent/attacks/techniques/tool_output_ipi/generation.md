@@ -104,8 +104,7 @@ Best-effort extraction of tool/function calls from a target response.
 #### execute
 
 ```python
-def execute(goals: List[str], agent_router: AgentRouter, config: Dict[str,
-                                                                      Any],
+def execute(goals: List[str], agent_router: LLMRouter, config: Dict[str, Any],
             logger: logging.Logger) -> List[Dict[str, Any]]
 ```
 
