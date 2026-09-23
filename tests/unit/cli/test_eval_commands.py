@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 from click.testing import CliRunner
 
 from hackagent.cli.commands.attack import eval_cmd
-from hackagent.cli.commands.attack.catalog import ATTACK_CATALOG
+from hackagent.catalog.attacks import ATTACK_CATALOG
 from hackagent.cli.commands.attack.display import (
     _display_attack_results,
     _display_attack_summary,
@@ -110,7 +110,7 @@ class TestRunAttackCommand(unittest.TestCase):
     def test_dry_run_validates_without_creating_an_agent(self):
         ctx = self._ctx()
         with (
-            patch("hackagent.utils.display_hackagent_splash"),
+            patch("hackagent.cli.banner.display_hackagent_splash"),
             patch("hackagent.cli.commands.attack.runner.HackAgent") as mock_agent,
         ):
             _run_attack_command(
@@ -202,12 +202,8 @@ class TestRunAttackCommand(unittest.TestCase):
         agent = MagicMock()
         agent.hack.return_value = [{"eval_hb": 1, "goal": "g"}]
         with (
-            patch("hackagent.utils.display_hackagent_splash"),
+            patch("hackagent.cli.banner.display_hackagent_splash"),
             patch("hackagent.cli.commands.attack.runner.HackAgent", return_value=agent),
-            patch(
-                "hackagent.cli.commands.attack.runner.get_agent_type_enum",
-                return_value="LITELLM",
-            ),
             patch(
                 "hackagent.cli.commands.attack.runner._display_attack_results"
             ) as mock_display,
@@ -234,12 +230,8 @@ class TestRunAttackCommand(unittest.TestCase):
         agent = MagicMock()
         agent.hack.side_effect = RuntimeError("target down")
         with (
-            patch("hackagent.utils.display_hackagent_splash"),
+            patch("hackagent.cli.banner.display_hackagent_splash"),
             patch("hackagent.cli.commands.attack.runner.HackAgent", return_value=agent),
-            patch(
-                "hackagent.cli.commands.attack.runner.get_agent_type_enum",
-                return_value="LITELLM",
-            ),
         ):
             import click
 
@@ -352,13 +344,9 @@ class TestEvalChainCommand(unittest.TestCase):
                     handle,
                 )
             with (
-                patch("hackagent.utils.display_hackagent_splash"),
+                patch("hackagent.cli.banner.display_hackagent_splash"),
                 patch(
                     "hackagent.cli.commands.attack.chain.HackAgent", return_value=agent
-                ),
-                patch(
-                    "hackagent.cli.commands.attack.chain.get_agent_type_enum",
-                    return_value="OTHER",
                 ),
             ):
                 result = runner.invoke(

@@ -27,7 +27,6 @@ from hackagent import HackAgent
 from hackagent.cli.config import CLIConfig
 from hackagent.cli.utils import (
     display_success,
-    get_agent_type_enum,
     handle_errors,
 )
 from hackagent.cli.commands.attack import (
@@ -35,6 +34,7 @@ from hackagent.cli.commands.attack import (
     _display_attack_summary,
     _parse_goals,
 )
+from hackagent.core.contracts import AgentType
 
 console = Console()
 
@@ -230,7 +230,7 @@ def claude(
         "goals": resolved_goals,
     }
 
-    from hackagent.utils import display_hackagent_splash
+    from hackagent.cli.banner import display_hackagent_splash
 
     display_hackagent_splash()
     _display_attack_summary(
@@ -247,7 +247,7 @@ def claude(
         console.print("[dim]Drop --dry-run to execute the attack[/dim]")
         return
 
-    agent_type_enum = get_agent_type_enum(DEFAULT_AGENT_TYPE)
+    agent_type_enum = AgentType.parse(DEFAULT_AGENT_TYPE)
 
     with console.status("[bold green]Initializing HackAgent..."):
         try:

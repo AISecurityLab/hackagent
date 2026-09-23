@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from rich.console import Console
 
-from hackagent.config import resolve_ollama_base_url
+from hackagent.core.settings import resolve_ollama_base_url
 
 console = Console()
 
@@ -31,11 +31,6 @@ _AUTH_REMINDER = (
     "Only run this against a target you are authorized to test "
     "(your own system, a contracted engagement, or written permission)."
 )
-
-
-def _normalize_attack_type(technique: str) -> str:
-    """Convert profile technique labels to CLI/runtime attack_type keys."""
-    return str(technique).strip().lower()
 
 
 # api_base for an attacker/judge override, derived from the LiteLLM provider

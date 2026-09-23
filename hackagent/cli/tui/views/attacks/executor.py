@@ -72,7 +72,7 @@ class AttacksExecutorMixin:
         import time
 
         from hackagent import HackAgent
-        from hackagent.cli.utils import get_agent_type_enum
+        from hackagent.core.contracts import AgentType
 
         status_widget = self.query_one("#execution-status", Static)
         progress_bar = self.query_one("#attack-progress", ProgressBar)
@@ -180,7 +180,7 @@ class AttacksExecutorMixin:
         sys.stderr = io.StringIO()
 
         try:
-            agent_type_enum = get_agent_type_enum(agent_type)
+            agent_type_enum = AgentType.parse(agent_type)
 
             self.app.call_from_thread(progress_bar.update, progress=10)
             self.app.call_from_thread(

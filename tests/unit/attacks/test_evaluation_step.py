@@ -18,7 +18,7 @@ Integration tests for BaseEvaluationStep (evaluation_step.py).
 Tests the shared foundation for all evaluation pipeline stages, covering:
 - Multi-judge evaluation orchestration
 - Judge type inference from model identifiers
-- Agent type resolution (string/enum → AgentTypeEnum)
+- Agent type resolution (string/enum → AgentType)
 - EvaluatorConfig construction from raw judge config dicts
 - Result merging via (goal, prefix, completion) lookup keys
 - Best-score computation across judge columns
@@ -40,8 +40,8 @@ from hackagent.attacks.evaluator.evaluation_step import (
     JUDGE_TYPE_LABELS,
     MERGE_KEYS,
 )
-from hackagent.attacks.techniques.config import DEFAULT_JUDGE_IDENTIFIER
-from hackagent.router.types import AgentTypeEnum
+from hackagent.core.defaults import DEFAULT_JUDGE_IDENTIFIER
+from hackagent.core.contracts import AgentType
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ logger = logging.getLogger(__name__)
 
 
 def _make_mock_client():
-    """Create a mock AuthenticatedClient."""
+    """Create a mock storage backend."""
     return MagicMock()
 
 
@@ -202,36 +202,33 @@ class TestResolveAgentType:
     """Test agent type resolution."""
 
     def test_enum_passthrough(self):
-        """Test that AgentTypeEnum passes through unchanged."""
+        """Test that AgentType passes through unchanged."""
         step = _make_step()
-        assert (
-            step.resolve_agent_type(AgentTypeEnum.OPENAI_SDK)
-            == AgentTypeEnum.OPENAI_SDK
-        )
-        assert step.resolve_agent_type(AgentTypeEnum.OLLAMA) == AgentTypeEnum.OLLAMA
+        assert step.resolve_agent_type(AgentType.OPENAI_SDK) == AgentType.OPENAI_SDK
+        assert step.resolve_agent_type(AgentType.OLLAMA) == AgentType.OLLAMA
 
     def test_string_resolution(self):
         """Test string-to-enum resolution."""
         step = _make_step()
-        assert step.resolve_agent_type("OPENAI_SDK") == AgentTypeEnum.OPENAI_SDK
-        assert step.resolve_agent_type("OLLAMA") == AgentTypeEnum.OLLAMA
-        assert step.resolve_agent_type("LITELLM") == AgentTypeEnum.LITELLM
+        assert step.resolve_agent_type("OPENAI_SDK") == AgentType.OPENAI_SDK
+        assert step.resolve_agent_type("OLLAMA") == AgentType.OLLAMA
+        assert step.resolve_agent_type("LITELLM") == AgentType.LITELLM
 
     def test_none_defaults_to_openai_sdk(self):
         """Test that None defaults to OPENAI_SDK."""
         step = _make_step()
-        assert step.resolve_agent_type(None) == AgentTypeEnum.OPENAI_SDK
+        assert step.resolve_agent_type(None) == AgentType.OPENAI_SDK
 
     def test_empty_string_defaults_to_openai_sdk(self):
         """Test that empty string defaults to OPENAI_SDK."""
         step = _make_step()
-        assert step.resolve_agent_type("") == AgentTypeEnum.OPENAI_SDK
+        assert step.resolve_agent_type("") == AgentType.OPENAI_SDK
 
     def test_invalid_string_defaults_with_warning(self):
         """Test that invalid string falls back with warning."""
         step = _make_step()
         result = step.resolve_agent_type("NONEXISTENT_TYPE")
-        assert result == AgentTypeEnum.OPENAI_SDK
+        assert result == AgentType.OPENAI_SDK
 
 
 # ============================================================================

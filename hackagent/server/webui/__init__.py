@@ -124,7 +124,7 @@ def create_app(
     app = Flask(__name__, static_folder=None)
 
     if api_key:
-        from hackagent.config import resolve_remote_base_url
+        from hackagent.core.settings import resolve_remote_base_url
         from hackagent.server.webui._proxy import create_proxy
 
         target = base_url or resolve_remote_base_url()

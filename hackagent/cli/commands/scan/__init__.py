@@ -30,7 +30,6 @@ from hackagent.cli.commands.scan.helpers import (
     DEFAULT_GOALS,
     _extract_asr,
     _format_asr,
-    _normalize_attack_type,
     _provider_endpoint,
 )
 from hackagent.cli.commands.scan.quick import run_quick_scan
@@ -42,6 +41,5 @@ __all__ = [
     "scan",
     "_extract_asr",
     "_format_asr",
-    "_normalize_attack_type",
     "_provider_endpoint",
 ]

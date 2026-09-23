@@ -99,7 +99,7 @@ classifier prompt shown above.
 **Arguments**:
 
 - `config` - Guardrail model configuration dict.
-- `backend` - ``StorageBackend`` instance (forwarded to ``create_router``).
+- `backend` - ``Store`` instance (forwarded to ``create_router``).
 
 #### check
 
@@ -131,7 +131,7 @@ Currently only :class:`LLMGuardrail` is supported.
 
 - `config` - Guardrail config dict (same fields as router config plus
   optional ``system_prompt``).
-- `backend` - ``StorageBackend`` instance forwarded to the guardrail.
+- `backend` - ``Store`` instance forwarded to the guardrail.
   
 
 **Returns**:

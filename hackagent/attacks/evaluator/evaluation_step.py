@@ -21,7 +21,7 @@ evaluation pipeline stages across attack techniques (AdvPrefix, FlipAttack, etc.
 It centralises the common logic that was previously duplicated:
 - Multi-judge evaluation orchestration
 - Judge type inference from model identifiers
-- Agent type resolution (string / enum → ``AgentTypeEnum``)
+- Agent type resolution (string / enum → ``AgentType``)
 - ``EvaluatorConfig`` construction from raw judge config dicts
 - Single evaluator instantiation and execution
 - Result merging via lookup keys ``(goal, prefix, completion)``
@@ -52,13 +52,13 @@ from hackagent.attacks.evaluator.judge_evaluators import EVALUATOR_MAP
 from hackagent.attacks.shared.router_factory import extract_passthrough_request_config
 from hackagent.attacks.evaluator.sync import sync_evaluation_to_server
 from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
-from hackagent.attacks.techniques.config import (
+from hackagent.core.defaults import (
     DEFAULT_JUDGE_IDENTIFIER,
     DEFAULT_LOCAL_AGENT_TYPE,
     DEFAULT_LOCAL_MODEL_ENDPOINT,
 )
-from hackagent.server.client import AuthenticatedClient
-from hackagent.router.types import AgentTypeEnum
+from hackagent.storage.store import Store
+from hackagent.core.contracts import AgentType
 
 if TYPE_CHECKING:
     from hackagent.router.tracking import Tracker
@@ -226,7 +226,7 @@ class BaseEvaluationStep:
         self,
         config: Dict[str, Any],
         logger: logging.Logger,
-        client: AuthenticatedClient,
+        client: Store,
     ):
         """
         Extract common tracking context and dependencies.
@@ -235,7 +235,7 @@ class BaseEvaluationStep:
             config: Step configuration dictionary (may contain ``_run_id``,
                      ``_client``, ``_tracker`` internal keys).
             logger: Logger instance.
-            client: ``AuthenticatedClient`` for backend API calls.
+            client: ``Store`` for backend API calls.
         """
         # Store raw config for subclass access
         self._raw_config: Dict[str, Any] = config if isinstance(config, dict) else {}
@@ -415,19 +415,19 @@ class BaseEvaluationStep:
                 exc_info=True,
             )
 
-    def resolve_agent_type(self, agent_type_value: Any) -> AgentTypeEnum:
-        """Convert a string, enum, or ``None`` into an ``AgentTypeEnum``."""
-        if isinstance(agent_type_value, AgentTypeEnum):
+    def resolve_agent_type(self, agent_type_value: Any) -> AgentType:
+        """Convert a string, enum, or ``None`` into an ``AgentType``."""
+        if isinstance(agent_type_value, AgentType):
             return agent_type_value
         if not agent_type_value:
-            return AgentTypeEnum.OPENAI_SDK
+            return AgentType.OPENAI_SDK
         try:
-            return AgentTypeEnum(str(agent_type_value).upper())
+            return AgentType(str(agent_type_value).upper())
         except ValueError:
             self.logger.warning(
                 f"Invalid agent_type '{agent_type_value}', defaulting to OPENAI_SDK"
             )
-            return AgentTypeEnum.OPENAI_SDK
+            return AgentType.OPENAI_SDK
 
     # ====================================================================
     # CONFIGURATION HELPERS

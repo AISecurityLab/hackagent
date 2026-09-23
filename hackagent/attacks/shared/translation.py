@@ -20,7 +20,7 @@ import hashlib
 import re
 from typing import Callable, Dict, Tuple
 
-from hackagent.logger import get_logger
+from hackagent.core.logging import get_logger
 
 logger = get_logger(__name__)
 

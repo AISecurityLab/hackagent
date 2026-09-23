@@ -16,14 +16,9 @@ from collections import defaultdict
 from typing import Any, Dict, List, Optional
 
 from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
-from hackagent.attacks.techniques.config import DEFAULT_JUDGE_IDENTIFIER
-from hackagent.server.storage.enums import EvaluationStatusEnum
+from hackagent.core.defaults import DEFAULT_JUDGE_IDENTIFIER
+from hackagent.core.contracts import EvalStatus
 from hackagent.router.tracking import Tracker
-
-# Kept for backward-compatibility checks in unit tests that verify legacy
-# sync intent is still represented in this module.
-from hackagent.server.api.result import result_partial_update  # noqa: F401
-
 
 logger = logging.getLogger("hackagent.attacks.static_template.evaluation")
 
@@ -335,7 +330,7 @@ def _update_result_status(
         result_id: UUID of the result to update
         success: Whether the attack was successful
         evaluation_notes: Notes explaining the evaluation
-        backend: StorageBackend used for persistence
+        backend: Store used for persistence
         logger: Logger instance
 
     Returns:
@@ -347,9 +342,7 @@ def _update_result_status(
         # Map success to appropriate evaluation status
         # From attacker's perspective: success=True means jailbreak succeeded
         eval_status = (
-            EvaluationStatusEnum.SUCCESSFUL_JAILBREAK
-            if success
-            else EvaluationStatusEnum.FAILED_JAILBREAK
+            EvalStatus.SUCCESSFUL_JAILBREAK if success else EvalStatus.FAILED_JAILBREAK
         )
 
         backend.update_result(
@@ -549,7 +542,7 @@ def _finalize_goals_with_tracker(
             finalize_notes = (
                 f"All {total} result(s) failed with execution/adapter errors"
             )
-            evaluation_status_override = EvaluationStatusEnum.ERROR_AGENT_RESPONSE
+            evaluation_status_override = EvalStatus.ERROR_AGENT_RESPONSE
 
         if goal_tracker.finalize_goal(
             ctx=ctx,

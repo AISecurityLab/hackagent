@@ -11,8 +11,8 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from hackagent.router.router import AgentRouter
-from hackagent.router.types import AgentTypeEnum
-from hackagent.server.storage.base import StorageBackend
+from hackagent.core.contracts import AgentType
+from hackagent.storage.store import Store
 
 UNKNOWN_CATEGORY = "Z. Unclassified Risk"
 UNKNOWN_SUBCATEGORY = "Z0. Unclassified Subcategory"
@@ -197,7 +197,7 @@ def _extract_response_content(response: Any) -> Optional[str]:
 
 
 def _create_classifier_router(
-    backend: StorageBackend,
+    backend: Store,
     config: Dict[str, Any],
     logger: logging.Logger,
 ) -> Tuple[AgentRouter, str]:
@@ -222,15 +222,15 @@ def _create_classifier_router(
         "timeout": config.get("timeout", config.get("request_timeout")),
     }
 
-    agent_type_raw = (config.get("agent_type") or AgentTypeEnum.OLLAMA.value).upper()
+    agent_type_raw = (config.get("agent_type") or AgentType.OLLAMA.value).upper()
     try:
-        agent_type = AgentTypeEnum(agent_type_raw)
+        agent_type = AgentType(agent_type_raw)
     except ValueError:
         logger.warning(
             "Invalid category classifier agent_type '%s'. Falling back to OLLAMA.",
             agent_type_raw,
         )
-        agent_type = AgentTypeEnum.OLLAMA
+        agent_type = AgentType.OLLAMA
 
     router = AgentRouter(
         backend=backend,
@@ -254,7 +254,7 @@ class GoalCategoryClassifier:
 
     def __init__(
         self,
-        backend: Optional[StorageBackend],
+        backend: Optional[Store],
         config: Optional[Dict[str, Any]] = None,
         logger: Optional[logging.Logger] = None,
     ):
@@ -284,7 +284,7 @@ class GoalCategoryClassifier:
     @staticmethod
     def _resolve_config(config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         # Imported lazily to avoid a router↔attacks import cycle at load time.
-        from hackagent.attacks.techniques.config import (
+        from hackagent.core.defaults import (
             DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
             DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT,
         )

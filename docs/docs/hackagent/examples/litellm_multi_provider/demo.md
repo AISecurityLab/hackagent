@@ -55,7 +55,7 @@ def build_demo_config(provider: str) -> dict
 Return the HackAgent config for the chosen provider.
 
 The structure is identical to ``examples/ollama/demo.py``; only the
-``agent_type`` becomes ``AgentTypeEnum.LITELLM`` and the model
+``agent_type`` becomes ``AgentType.LITELLM`` and the model
 strings carry a provider prefix (``anthropic/…``, ``gemini/…``…).
 
 #### run\_demo

@@ -12,7 +12,7 @@ from hackagent.examples.litellm_multi_provider.demo import (
     _PROVIDERS,
     build_demo_config,
 )
-from hackagent.router.types import AgentTypeEnum
+from hackagent.core.contracts import AgentType
 
 logging.disable(logging.CRITICAL)
 
@@ -49,7 +49,7 @@ class TestBuildDemoConfig(unittest.TestCase):
     @patch.dict(os.environ, _FAKE_ENV, clear=False)
     def test_build_config_returns_litellm_agent_type(self):
         config = build_demo_config("anthropic")
-        self.assertEqual(config["agent"]["agent_type"], AgentTypeEnum.LITELLM)
+        self.assertEqual(config["agent"]["agent_type"], AgentType.LITELLM)
         self.assertTrue(
             config["agent"]["adapter_operational_config"]["name"].startswith(
                 "anthropic/"
@@ -58,11 +58,11 @@ class TestBuildDemoConfig(unittest.TestCase):
         # Attacker + judge also use LITELLM.
         self.assertEqual(
             config["attack_config"]["attacker"]["agent_type"],
-            AgentTypeEnum.LITELLM,
+            AgentType.LITELLM,
         )
         self.assertEqual(
             config["attack_config"]["judge"]["agent_type"],
-            AgentTypeEnum.LITELLM,
+            AgentType.LITELLM,
         )
 
     @patch.dict(os.environ, {}, clear=True)

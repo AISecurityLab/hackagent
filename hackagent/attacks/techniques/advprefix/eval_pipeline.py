@@ -29,7 +29,7 @@ from hackagent.attacks.evaluator.evaluation_step import (
     BaseEvaluationStep,
     JUDGE_MEAN_COLUMN_MAP,
 )
-from hackagent.server.client import AuthenticatedClient
+from hackagent.storage.store import Store
 
 from .config import EvaluationPipelineConfig
 from .utils import handle_empty_input, log_errors
@@ -72,7 +72,7 @@ class EvaluationPipeline(BaseEvaluationStep):
         self,
         config: Dict[str, Any],
         logger: logging.Logger,
-        client: AuthenticatedClient,
+        client: Store,
     ):
         super().__init__(config, logger, client)
 

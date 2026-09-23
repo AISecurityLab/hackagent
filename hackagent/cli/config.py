@@ -4,16 +4,21 @@
 """
 CLI Configuration Management
 
-Handles configuration loading from environment variables, files, and command line arguments.
-Uses standardized priority order: CLI args > Config file > Environment > Default
+Adds CLI flags and verbosity on top of :class:`hackagent.core.settings.Settings`,
+so the CLI resolves credentials exactly like the SDK:
+CLI args > Environment > Config file > Default.
 """
 
 import json
-import os
 from pathlib import Path
 from typing import Optional
 
-from hackagent.config import resolve_remote_base_url
+from hackagent.core.settings import (
+    DEFAULT_REMOTE_BASE_URL,
+    Settings,
+    Source,
+    read_config_file,
+)
 
 # Sentinel object to detect if a parameter was explicitly passed
 _UNSET = object()
@@ -40,7 +45,7 @@ VERBOSITY_LEVELS = {
 
 
 class CLIConfig:
-    """CLI configuration management with multiple sources"""
+    """CLI configuration: resolved settings plus CLI-only options."""
 
     def __init__(
         self,
@@ -49,131 +54,58 @@ class CLIConfig:
         config_file=_UNSET,
         verbose=_UNSET,
     ):
-        """Initialize with explicit tracking of what was passed via CLI"""
-        self._defaults = {
-            "api_key": None,
-            "base_url": resolve_remote_base_url(),
-            "verbose": VERBOSITY_WARNING,
+        # click passes None for unset options, so None means "not provided".
+        self._explicit_api_key = None if api_key is _UNSET else api_key
+        self._explicit_base_url = None if base_url is _UNSET else base_url
+        self._explicit_verbose = None if verbose is _UNSET else verbose
+        self.config_file = None if config_file is _UNSET else config_file
+        self._explicit_user_overrides = set()
+        self.reload()
+
+    def reload(self) -> None:
+        """Re-resolve every value from CLI flags, environment and config file."""
+        self.settings = Settings.resolve(
+            api_key=self._explicit_api_key,
+            base_url=self._explicit_base_url,
+            config_path=self.config_file,
+        )
+        self.api_key = self.settings.api_key
+        self.base_url = self.settings.base_url
+        self._sources = {
+            "api_key": self.settings.api_key_source,
+            "base_url": self.settings.base_url_source,
         }
 
-        self._cli_overrides = set()
-        self._explicit_user_overrides = set()
-
-        # click passes None for unset options, so None means "not provided" here too —
-        # only a real value counts as a CLI override.
-        if api_key is not _UNSET and api_key is not None:
-            self.api_key = api_key
-            self._cli_overrides.add("api_key")
+        file_verbose = read_config_file(self.settings.config_path).get("verbose")
+        if self._explicit_verbose is not None and self._explicit_verbose > 0:
+            self.verbose = self._explicit_verbose
+            self._sources["verbose"] = Source.EXPLICIT
+        elif file_verbose is not None:
+            self.verbose = file_verbose
+            self._sources["verbose"] = Source.FILE
         else:
-            self.api_key = self._defaults["api_key"]
-
-        if base_url is not _UNSET and base_url is not None:
-            self.base_url = base_url
-            self._cli_overrides.add("base_url")
-        else:
-            self.base_url = self._defaults["base_url"]
-
-        if config_file is not _UNSET:
-            self.config_file = config_file
-        else:
-            self.config_file = None
-
-        if verbose is not _UNSET and verbose is not None:
-            self.verbose = verbose
-            if verbose > 0:
-                self._cli_overrides.add("verbose")
-        else:
-            self.verbose = self._defaults["verbose"]
-
-        self._config_overrides = set()
-
-        if self.config_file:
-            self._load_from_file(self.config_file)
-        else:
-            self._load_default_config()
-
-        self._load_from_env()
-
-    def _load_from_env(self):
-        """Load from environment variables (only if not already set by CLI or config)."""
-        if (
-            "api_key" not in self._cli_overrides
-            and "api_key" not in self._config_overrides
-        ):
-            env_api_key = os.getenv("HACKAGENT_API_KEY")
-            if env_api_key:
-                self.api_key = env_api_key
-
-        if (
-            "base_url" not in self._cli_overrides
-            and "base_url" not in self._config_overrides
-        ):
-            env_base_url = os.getenv("HACKAGENT_BASE_URL")
-            if env_base_url:
-                self.base_url = env_base_url
-
-    def _load_from_file(self, config_path: str):
-        """Load from configuration file (JSON or YAML)."""
-        path = Path(config_path)
-        if not path.exists():
-            return
-
-        try:
-            with open(path) as f:
-                if path.suffix.lower() in [".yaml", ".yml"]:
-                    try:
-                        import yaml
-
-                        config_data = yaml.safe_load(f)
-                    except ImportError:
-                        raise ImportError(
-                            "PyYAML required for YAML config files. Install with: pip install pyyaml"
-                        )
-                else:
-                    config_data = json.load(f)
-
-                for key, value in config_data.items():
-                    # A null in the file means "not set" — keep the default and let env win
-                    if value is None or key in self._cli_overrides:
-                        continue
-                    if hasattr(self, key):
-                        setattr(self, key, value)
-                        self._config_overrides.add(key)
-        except Exception as e:
-            raise ValueError(f"Failed to load config file {config_path}: {e}")
-
-    def _load_default_config(self):
-        """Load from default config file."""
-        default_config = Path.home() / ".config" / "hackagent" / "config.json"
-        if default_config.exists():
-            self._load_from_file(str(default_config))
+            self.verbose = VERBOSITY_WARNING
+            self._sources["verbose"] = Source.DEFAULT
 
     def save(self, path: Optional[str] = None):
         """Save configuration to file."""
-        if not path:
-            config_dir = Path.home() / ".config" / "hackagent"
-            config_dir.mkdir(parents=True, exist_ok=True)
-            path = config_dir / "config.json"
-
-        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        path = Path(path) if path else self.default_config_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        config_dict = {}
+        for attr in ["api_key", "base_url", "verbose"]:
+            value = getattr(self, attr, None)
+            if value is None:
+                continue
+            if attr == "api_key" and isinstance(value, str) and not value.strip():
+                continue
+            kept = (
+                attr in self._explicit_user_overrides
+                or self._sources.get(attr) is Source.FILE
+            )
+            if attr == "base_url" and value == DEFAULT_REMOTE_BASE_URL and not kept:
+                continue
+            config_dict[attr] = value
         with open(path, "w") as f:
-            config_dict = {}
-            for attr in ["api_key", "base_url", "verbose"]:
-                value = getattr(self, attr, None)
-                if attr == "api_key" and isinstance(value, str) and not value.strip():
-                    continue
-                if value is not None:
-                    # Save if explicitly set by user or previously loaded from config
-                    if (
-                        attr in self._explicit_user_overrides
-                        or attr in self._config_overrides
-                    ):
-                        config_dict[attr] = value
-                    elif attr == "base_url" and value == self._defaults["base_url"]:
-                        # Skip default base_url only if not from user/config
-                        continue
-                    else:
-                        config_dict[attr] = value
             json.dump(config_dict, f, indent=2)
 
     def validate(self):
@@ -191,12 +123,15 @@ class CLIConfig:
             )
 
     def source_of(self, key: str) -> str:
-        """Where the current value of `key` came from (CLI > config file > env > default)."""
-        if key in self._cli_overrides:
+        """Where the current value of ``key`` came from."""
+        if key in self._explicit_user_overrides:
             return "CLI argument"
-        if key in self._config_overrides:
-            return f"Config file ({self.config_file or self.default_config_path})"
-        if os.getenv(f"HACKAGENT_{key.upper()}"):
+        source = self._sources.get(key, Source.DEFAULT)
+        if source is Source.EXPLICIT:
+            return "CLI argument"
+        if source is Source.FILE:
+            return f"Config file ({self.settings.config_path})"
+        if source is Source.ENV:
             return "Environment"
         return "Default"
 
@@ -219,4 +154,4 @@ class CLIConfig:
 
     @property
     def default_config_path(self) -> Path:
-        return Path.home() / ".config" / "hackagent" / "config.json"
+        return self.settings.config_path

@@ -21,7 +21,7 @@ Usage (TUI — two terminals):
 
 import os
 from hackagent import HackAgent
-from hackagent.router.types import AgentTypeEnum
+from hackagent.core.contracts import AgentType
 
 HACKAGENT_API_KEY = os.getenv("HACKAGENT_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -43,7 +43,7 @@ GOALS = [
 agent = HackAgent(
     name="corpbot-ibm-granite/granite-4.1-8b",
     endpoint="http://localhost:8000/v1",
-    agent_type=AgentTypeEnum.OPENAI_SDK,
+    agent_type=AgentType.OPENAI_SDK,
     api_key=HACKAGENT_API_KEY,
 )
 
@@ -59,7 +59,7 @@ config = {
         {
             "identifier": "openai/gpt-4o",
             "type": "harmbench_variant",
-            "agent_type": AgentTypeEnum.OPENAI_SDK,
+            "agent_type": AgentType.OPENAI_SDK,
             "api_key": OPENROUTER_API_KEY,
             "endpoint": "https://openrouter.ai/api/v1",
             "max_tokens": 100,

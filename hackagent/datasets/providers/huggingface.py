@@ -3,7 +3,7 @@
 
 """HuggingFace dataset provider for loading goals from HuggingFace Hub."""
 
-from hackagent.logger import get_logger
+from hackagent.core.logging import get_logger
 from typing import Any, Dict, List, Optional
 
 from hackagent.datasets.base import DatasetProvider

@@ -17,11 +17,13 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field, model_validator
 
-from hackagent.attacks.techniques.config import (
+from hackagent.core.defaults import (
     DEFAULT_ATTACKER_IDENTIFIER,
-    DEFAULT_FILTER_LEN,
     DEFAULT_JUDGE_IDENTIFIER,
     DEFAULT_LOCAL_MODEL_ENDPOINT,
+)
+from hackagent.attacks.techniques.config import (
+    DEFAULT_FILTER_LEN,
     DEFAULT_OUTPUT_DIR,
     DEFAULT_TIMEOUT,
     DEFAULT_RUN_ID,
@@ -233,7 +235,7 @@ class EvaluatorConfig(BaseModel):
     """
 
     agent_name: str
-    agent_type: Any  # AgentTypeEnum from hackagent.router.types
+    agent_type: Any  # AgentType from hackagent.core.contracts
     model_id: str
     agent_endpoint: Optional[str] = None
     organization_id: Optional[int] = None
@@ -254,11 +256,11 @@ class EvaluatorConfig(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def coerce_agent_type(cls, values: Any) -> Any:
-        """Coerce agent_type strings to AgentTypeEnum on construction."""
+        """Coerce agent_type strings to AgentType on construction."""
         if isinstance(values, dict) and isinstance(values.get("agent_type"), str):
-            from hackagent.router.types import AgentTypeEnum
+            from hackagent.core.contracts import AgentType
 
-            values["agent_type"] = AgentTypeEnum(values["agent_type"])
+            values["agent_type"] = AgentType(values["agent_type"])
         return values
 
 

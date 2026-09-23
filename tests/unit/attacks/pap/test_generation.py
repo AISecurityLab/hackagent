@@ -14,8 +14,8 @@ from hackagent.attacks.techniques.pap.generation import (
     _attack_single_goal,
 )
 from hackagent.attacks.techniques.pap.config import TOP_5_TECHNIQUES
-from hackagent.router.types import AgentTypeEnum
-from hackagent.server.storage.local import LocalBackend
+from hackagent.core.contracts import AgentType
+from hackagent.storage.local import LocalBackend
 
 
 class TestCreateAttackerRouter(unittest.TestCase):
@@ -27,7 +27,7 @@ class TestCreateAttackerRouter(unittest.TestCase):
         self.addCleanup(env.stop)
 
     def test_normalizes_string_and_enum_agent_types(self):
-        for agent_type in ("OLLAMA", "ollama", AgentTypeEnum.OLLAMA):
+        for agent_type in ("OLLAMA", "ollama", AgentType.OLLAMA):
             with self.subTest(agent_type=agent_type):
                 router = _create_attacker_router(
                     {
@@ -38,7 +38,7 @@ class TestCreateAttackerRouter(unittest.TestCase):
                     self.backend,
                 )
                 key = next(iter(router._agent_registry))
-                self.assertEqual(router._agent_types[key], AgentTypeEnum.OLLAMA)
+                self.assertEqual(router._agent_types[key], AgentType.OLLAMA)
                 self.assertEqual(
                     router.get_agent_instance(key).litellm_model,
                     "ollama_chat/test-model",

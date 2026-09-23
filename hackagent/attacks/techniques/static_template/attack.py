@@ -12,7 +12,7 @@ import copy
 import logging
 from typing import Any, Dict, List, Optional
 
-from hackagent.server.client import AuthenticatedClient
+from hackagent.storage.store import Store
 from hackagent.router.router import AgentRouter
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
@@ -52,7 +52,7 @@ class StaticTemplateAttack(BaseAttack):
     def __init__(
         self,
         config: Optional[Dict[str, Any]] = None,
-        client: Optional[AuthenticatedClient] = None,
+        client: Optional[Store] = None,
         agent_router: Optional[AgentRouter] = None,
     ):
         """
@@ -68,7 +68,7 @@ class StaticTemplateAttack(BaseAttack):
             ValueError: If ``client`` or ``agent_router`` is ``None``.
         """
         if client is None:
-            raise ValueError("AuthenticatedClient must be provided")
+            raise ValueError("A storage backend must be provided")
         if agent_router is None:
             raise ValueError("AgentRouter must be provided")
 
@@ -183,7 +183,7 @@ class StaticTemplateAttack(BaseAttack):
                     "_goal_index_offset",  # Global goal index offset in batched runs
                     "_tracker",  # Shared goal tracker from coordinator
                     "_run_id",  # For real-time result tracking
-                    "_backend",  # For real-time result tracking (StorageBackend)
+                    "_backend",  # For real-time result tracking (Store)
                     "_client",  # Legacy fallback
                 ],
                 "input_data_arg_name": "goals",
@@ -210,7 +210,7 @@ class StaticTemplateAttack(BaseAttack):
                     "_goal_index_offset",  # Global goal index offset in batched runs
                     "_tracker",  # Shared goal tracker from coordinator
                     "_run_id",  # For real-time result tracking
-                    "_backend",  # For real-time result tracking (StorageBackend)
+                    "_backend",  # For real-time result tracking (Store)
                     "_client",  # Legacy fallback
                 ],
                 "input_data_arg_name": "input_data",

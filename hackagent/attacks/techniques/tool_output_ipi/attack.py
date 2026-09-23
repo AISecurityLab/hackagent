@@ -14,7 +14,7 @@ Pipeline:
 1. Generation — craft poisoned tool observations, query target, inline judge
 2. Evaluation — post-processing (server sync, tracker, ASR)
 
-Taxonomy: primary **adaptive**, tag **indirect** (registered defensively when ``hackagent.attacks.taxonomy`` is present; add a permanent ``ATTACK_TAXONOMY`` entry when #603 merges).
+Taxonomy: primary **adaptive**, tag **indirect** (registered defensively when ``hackagent.catalog.taxonomy`` is present; add a permanent ``ATTACK_TAXONOMY`` entry when #603 merges).
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ import copy
 import logging
 from typing import Any, Dict, List, Optional
 
-from hackagent.server.client import AuthenticatedClient
+from hackagent.storage.store import Store
 from hackagent.router.router import AgentRouter
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
@@ -60,12 +60,12 @@ class ToolOutputIPIAttack(BaseAttack):
     def __init__(
         self,
         config: Optional[Dict[str, Any]] = None,
-        client: Optional[AuthenticatedClient] = None,
+        client: Optional[Store] = None,
         agent_router: Optional[AgentRouter] = None,
     ):
         if client is None:
             raise ValueError(
-                "AuthenticatedClient must be provided to ToolOutputIPIAttack."
+                "A storage backend must be provided to ToolOutputIPIAttack."
             )
         if agent_router is None:
             raise ValueError(
@@ -215,7 +215,7 @@ class ToolOutputIPIAttack(BaseAttack):
             "max_attempts": params.get("max_attempts", 3),
             "success_setting": params.get("success_setting", "both"),
             "tool_name": params.get("tool_name"),
-            # Documented taxonomy until hackagent.attacks.taxonomy lands (#603).
+            # Documented taxonomy until hackagent.catalog.taxonomy lands (#603).
             "category": "adaptive",
             "tags": ["indirect"],
         }

@@ -73,7 +73,7 @@ hackagent eval \
 
 ```python
 from hackagent import HackAgent
-from hackagent.risks.jailbreak import JAILBREAK_PROFILE
+from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 
 agent = HackAgent(
     endpoint="http://localhost:8080/chat",
@@ -84,7 +84,7 @@ primary_dataset = JAILBREAK_PROFILE.primary_datasets[0].preset
 
 for attack in JAILBREAK_PROFILE.primary_attacks:
     attack_config = {
-        "attack_type": attack.technique.lower(),
+        "attack_type": attack.technique,
         "dataset": {"preset": primary_dataset, "limit": 25},
         "judges": [{"identifier": "ollama/llama3", "type": "harmbench"}],
     }

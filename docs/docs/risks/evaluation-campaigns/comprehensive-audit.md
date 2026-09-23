@@ -32,25 +32,25 @@ Test all 13 vulnerabilities using:
 from hackagent import HackAgent
 
 # Import all profiles
-from hackagent.risks.model_evasion import MODEL_EVASION_PROFILE
-from hackagent.risks.craft_adversarial_data import CRAFT_ADVERSARIAL_DATA_PROFILE
-from hackagent.risks.prompt_injection import PROMPT_INJECTION_PROFILE
-from hackagent.risks.jailbreak import JAILBREAK_PROFILE
-from hackagent.risks.vector_embedding_weaknesses_exploit import (
+from hackagent.catalog.risks.model_evasion import MODEL_EVASION_PROFILE
+from hackagent.catalog.risks.craft_adversarial_data import CRAFT_ADVERSARIAL_DATA_PROFILE
+from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
+from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
+from hackagent.catalog.risks.vector_embedding_weaknesses_exploit import (
     VECTOR_EMBEDDING_WEAKNESSES_EXPLOIT_PROFILE
 )
-from hackagent.risks.sensitive_information_disclosure import (
+from hackagent.catalog.risks.sensitive_information_disclosure import (
     SENSITIVE_INFORMATION_DISCLOSURE_PROFILE
 )
-from hackagent.risks.system_prompt_leakage import SYSTEM_PROMPT_LEAKAGE_PROFILE
-from hackagent.risks.excessive_agency import EXCESSIVE_AGENCY_PROFILE
-from hackagent.risks.input_manipulation_attack import INPUT_MANIPULATION_ATTACK_PROFILE
-from hackagent.risks.public_facing_application_exploitation import (
+from hackagent.catalog.risks.system_prompt_leakage import SYSTEM_PROMPT_LEAKAGE_PROFILE
+from hackagent.catalog.risks.excessive_agency import EXCESSIVE_AGENCY_PROFILE
+from hackagent.catalog.risks.input_manipulation_attack import INPUT_MANIPULATION_ATTACK_PROFILE
+from hackagent.catalog.risks.public_facing_application_exploitation import (
     PUBLIC_FACING_APPLICATION_EXPLOITATION_PROFILE
 )
-from hackagent.risks.malicious_tool_invocation import MALICIOUS_TOOL_INVOCATION_PROFILE
-from hackagent.risks.credential_exposure import CREDENTIAL_EXPOSURE_PROFILE
-from hackagent.risks.misinformation import MISINFORMATION_PROFILE
+from hackagent.catalog.risks.malicious_tool_invocation import MALICIOUS_TOOL_INVOCATION_PROFILE
+from hackagent.catalog.risks.credential_exposure import CREDENTIAL_EXPOSURE_PROFILE
+from hackagent.catalog.risks.misinformation import MISINFORMATION_PROFILE
 
 agent = HackAgent(
     endpoint="http://localhost:8080/chat",
@@ -86,7 +86,7 @@ for profile in profiles:
         for atk in profile.primary_attacks:
             print(f"[RUN] {profile.name}: {atk.technique} + {ds.preset}")
             attack_config = {
-                "attack_type": atk.technique.lower(),
+                "attack_type": atk.technique,
                 "dataset": {"preset": ds.preset},
                 "judges": [{"identifier": "ollama/llama3", "type": "harmbench"}],
             }

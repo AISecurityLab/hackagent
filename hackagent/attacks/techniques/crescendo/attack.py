@@ -40,7 +40,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
-from hackagent.attacks.techniques.config import (
+from hackagent.core.defaults import (
     DEFAULT_ATTACKER_IDENTIFIER,
     DEFAULT_LOCAL_MODEL_ENDPOINT,
 )
@@ -54,8 +54,8 @@ from hackagent.attacks.shared.response_utils import (
     is_guardrail_response,
 )
 from hackagent.attacks.shared.router_factory import create_router
-from hackagent.server.client import AuthenticatedClient
-from hackagent.server.storage.enums import StepTypeEnum
+from hackagent.storage.store import Store
+from hackagent.core.contracts import StepKind
 from hackagent.router.router import AgentRouter
 from hackagent.router.tracking import Tracker, Context
 
@@ -156,7 +156,7 @@ class CrescendoAttack(BaseAttack):
     def __init__(
         self,
         config: Optional[Dict[str, Any]] = None,
-        client: Optional[AuthenticatedClient] = None,
+        client: Optional[Store] = None,
         agent_router: Optional[AgentRouter] = None,
     ):
         """
@@ -175,7 +175,7 @@ class CrescendoAttack(BaseAttack):
                 :data:`~hackagent.attacks.objectives.OBJECTIVES`.
         """
         if client is None:
-            raise ValueError("AuthenticatedClient must be provided.")
+            raise ValueError("A storage backend must be provided.")
         if agent_router is None:
             raise ValueError("Target AgentRouter must be provided.")
 
@@ -644,7 +644,7 @@ class CrescendoAttack(BaseAttack):
                         request={"prompt": question[:500]},
                         response=response_preview,
                         step_name=f"Turn {turn + 1} (backtrack {backtracks_used}/{max_backtracks})",
-                        step_type=StepTypeEnum.OTHER,
+                        step_type=StepKind.OTHER,
                         metadata={
                             "turn": turn + 1,
                             "backtrack": backtracks_used,
@@ -695,7 +695,7 @@ class CrescendoAttack(BaseAttack):
                     request={"prompt": question[:500]},
                     response=response_preview,
                     step_name=f"Turn {turn + 1}",
-                    step_type=StepTypeEnum.OTHER,
+                    step_type=StepKind.OTHER,
                     metadata={
                         "turn": turn + 1,
                         "score": score,

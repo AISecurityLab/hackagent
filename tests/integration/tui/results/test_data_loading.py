@@ -30,7 +30,7 @@ from textual.app import App
 
 from hackagent.cli.config import CLIConfig
 from hackagent.cli.tui.views.results import ResultsTab
-from hackagent.server.storage.base import RunRecord, PaginatedResult
+from hackagent.storage.records import RunRecord, PaginatedResult
 
 
 @pytest.fixture
@@ -60,7 +60,7 @@ def _make_run_record(**overrides):
 
 
 def _make_mock_backend(runs=None, raise_on_list_runs=None):
-    """Create a mock StorageBackend."""
+    """Create a mock Store."""
     backend = MagicMock()
     if raise_on_list_runs is not None:
         backend.list_runs.side_effect = raise_on_list_runs

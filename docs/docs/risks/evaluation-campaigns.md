@@ -48,7 +48,7 @@ Start by deciding which risks you want to evaluate.
 ### Single Vulnerability
 
 ```python
-from hackagent.risks import PromptInjection
+from hackagent.catalog.risks import PromptInjection
 
 # Instantiate the vulnerability
 vuln = PromptInjection()
@@ -58,7 +58,7 @@ print(vuln.name)  # "Prompt Injection"
 ### Multiple Vulnerabilities
 
 ```python
-from hackagent.risks import (
+from hackagent.catalog.risks import (
     PromptInjection,
     Jailbreak,
     SystemPromptLeakage,
@@ -80,7 +80,7 @@ for vuln in security_vulns:
 ### Full Coverage Scan
 
 ```python
-from hackagent.risks import VULNERABILITY_REGISTRY
+from hackagent.catalog.risks import VULNERABILITY_REGISTRY
 
 # Test all 13 vulnerabilities
 for name, vuln_class in VULNERABILITY_REGISTRY.items():
@@ -95,7 +95,7 @@ for name, vuln_class in VULNERABILITY_REGISTRY.items():
 Each vulnerability has an associated threat profile with dataset and attack recommendations:
 
 ```python
-from hackagent.risks.jailbreak import JAILBREAK_PROFILE
+from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 
 # What datasets to use
 print(JAILBREAK_PROFILE.dataset_presets)
@@ -121,7 +121,7 @@ Use the profile's dataset recommendations to load test cases.
 ### Using PRIMARY Datasets (Quick Test)
 
 ```python
-from hackagent.risks.jailbreak import JAILBREAK_PROFILE
+from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 
 # Get only primary datasets for quick testing
 primary_datasets = [d.preset for d in JAILBREAK_PROFILE.primary_datasets]
@@ -143,7 +143,7 @@ print(all_datasets)
 
 ```python
 from hackagent import HackAgent
-from hackagent.risks.prompt_injection import PROMPT_INJECTION_PROFILE
+from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
 
 agent = HackAgent(
     endpoint="http://localhost:8080/chat",
@@ -165,7 +165,7 @@ result = agent.hack(attack_config=attack_config)
 Some vulnerabilities have no pre-built datasets (e.g., `CredentialExposure`, `PublicFacingApplicationExploitation`). Supply custom goals:
 
 ```python
-from hackagent.risks.credential_exposure import CREDENTIAL_EXPOSURE_PROFILE
+from hackagent.catalog.risks.credential_exposure import CREDENTIAL_EXPOSURE_PROFILE
 
 attack_config = {
     "attack_type": "static_template",
@@ -194,7 +194,7 @@ Choose attack techniques based on the profile's recommendations and your testing
 ### Using Profile-Recommended Attacks
 
 ```python
-from hackagent.risks.prompt_injection import PROMPT_INJECTION_PROFILE
+from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
 
 for atk in PROMPT_INJECTION_PROFILE.attacks:
     print(f"[{atk.relevance.value}] {atk.technique}: {atk.rationale}")
@@ -207,7 +207,7 @@ for atk in PROMPT_INJECTION_PROFILE.attacks:
 
 ```python
 from hackagent import HackAgent
-from hackagent.risks.jailbreak import JAILBREAK_PROFILE
+from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 
 agent = HackAgent(
     endpoint="http://localhost:8080/chat",
@@ -219,7 +219,7 @@ agent = HackAgent(
 for atk in JAILBREAK_PROFILE.primary_attacks:
     print(f"\n--- Running {atk.technique} ---")
     attack_config = {
-        "attack_type": atk.technique.lower(),
+        "attack_type": atk.technique,
         "dataset": {"preset": JAILBREAK_PROFILE.primary_datasets[0].preset},
         "judges": [{"identifier": "ollama/llama3", "type": "harmbench"}],
     }
@@ -235,7 +235,7 @@ for atk in JAILBREAK_PROFILE.primary_attacks:
 
 ```python
 from hackagent import HackAgent
-from hackagent.risks.jailbreak import JAILBREAK_PROFILE
+from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 
 agent = HackAgent(
     endpoint="http://localhost:8080/chat",
@@ -248,7 +248,7 @@ primary_attack = JAILBREAK_PROFILE.primary_attacks[0]
 primary_dataset = JAILBREAK_PROFILE.primary_datasets[0]
 
 attack_config = {
-    "attack_type": primary_attack.technique.lower(),
+    "attack_type": primary_attack.technique,
     "dataset": {"preset": primary_dataset.preset},
     "judges": [{"identifier": "ollama/llama3", "type": "harmbench"}],
 }
@@ -261,9 +261,9 @@ print(f"ASR: {result.get('asr')}")
 
 ```python
 from hackagent import HackAgent
-from hackagent.risks.prompt_injection import PROMPT_INJECTION_PROFILE
-from hackagent.risks.jailbreak import JAILBREAK_PROFILE
-from hackagent.risks.system_prompt_leakage import SYSTEM_PROMPT_LEAKAGE_PROFILE
+from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
+from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
+from hackagent.catalog.risks.system_prompt_leakage import SYSTEM_PROMPT_LEAKAGE_PROFILE
 
 agent = HackAgent(
     endpoint="http://localhost:8080/chat",
@@ -287,7 +287,7 @@ for profile in profiles:
     primary_ds = profile.primary_datasets[0]
 
     attack_config = {
-        "attack_type": primary_atk.technique.lower(),
+        "attack_type": primary_atk.technique,
         "dataset": {"preset": primary_ds.preset},
         "judges": [{"identifier": "ollama/llama3", "type": "harmbench"}],
     }
@@ -302,25 +302,25 @@ for profile in profiles:
 from hackagent import HackAgent
 
 # Import all profiles
-from hackagent.risks.model_evasion import MODEL_EVASION_PROFILE
-from hackagent.risks.craft_adversarial_data import CRAFT_ADVERSARIAL_DATA_PROFILE
-from hackagent.risks.prompt_injection import PROMPT_INJECTION_PROFILE
-from hackagent.risks.jailbreak import JAILBREAK_PROFILE
-from hackagent.risks.vector_embedding_weaknesses_exploit import (
+from hackagent.catalog.risks.model_evasion import MODEL_EVASION_PROFILE
+from hackagent.catalog.risks.craft_adversarial_data import CRAFT_ADVERSARIAL_DATA_PROFILE
+from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
+from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
+from hackagent.catalog.risks.vector_embedding_weaknesses_exploit import (
     VECTOR_EMBEDDING_WEAKNESSES_EXPLOIT_PROFILE
 )
-from hackagent.risks.sensitive_information_disclosure import (
+from hackagent.catalog.risks.sensitive_information_disclosure import (
     SENSITIVE_INFORMATION_DISCLOSURE_PROFILE
 )
-from hackagent.risks.system_prompt_leakage import SYSTEM_PROMPT_LEAKAGE_PROFILE
-from hackagent.risks.excessive_agency import EXCESSIVE_AGENCY_PROFILE
-from hackagent.risks.input_manipulation_attack import INPUT_MANIPULATION_ATTACK_PROFILE
-from hackagent.risks.public_facing_application_exploitation import (
+from hackagent.catalog.risks.system_prompt_leakage import SYSTEM_PROMPT_LEAKAGE_PROFILE
+from hackagent.catalog.risks.excessive_agency import EXCESSIVE_AGENCY_PROFILE
+from hackagent.catalog.risks.input_manipulation_attack import INPUT_MANIPULATION_ATTACK_PROFILE
+from hackagent.catalog.risks.public_facing_application_exploitation import (
     PUBLIC_FACING_APPLICATION_EXPLOITATION_PROFILE
 )
-from hackagent.risks.malicious_tool_invocation import MALICIOUS_TOOL_INVOCATION_PROFILE
-from hackagent.risks.credential_exposure import CREDENTIAL_EXPOSURE_PROFILE
-from hackagent.risks.misinformation import MISINFORMATION_PROFILE
+from hackagent.catalog.risks.malicious_tool_invocation import MALICIOUS_TOOL_INVOCATION_PROFILE
+from hackagent.catalog.risks.credential_exposure import CREDENTIAL_EXPOSURE_PROFILE
+from hackagent.catalog.risks.misinformation import MISINFORMATION_PROFILE
 
 agent = HackAgent(
     endpoint="http://localhost:8080/chat",
@@ -357,7 +357,7 @@ for profile in profiles:
 
     print(f"[RUN] {profile.name}: {atk.technique} + {ds.preset}")
     attack_config = {
-        "attack_type": atk.technique.lower(),
+        "attack_type": atk.technique,
         "dataset": {"preset": ds.preset},
         "judges": [{"identifier": "ollama/llama3", "type": "harmbench"}],
     }
@@ -390,26 +390,26 @@ for name, res in audit_results.items():
 ### Coverage Report
 
 ```python
-from hackagent.risks import VULNERABILITY_REGISTRY
-from hackagent.risks.model_evasion import MODEL_EVASION_PROFILE
-from hackagent.risks.craft_adversarial_data import CRAFT_ADVERSARIAL_DATA_PROFILE
-from hackagent.risks.prompt_injection import PROMPT_INJECTION_PROFILE
-from hackagent.risks.jailbreak import JAILBREAK_PROFILE
-from hackagent.risks.vector_embedding_weaknesses_exploit import (
+from hackagent.catalog.risks import VULNERABILITY_REGISTRY
+from hackagent.catalog.risks.model_evasion import MODEL_EVASION_PROFILE
+from hackagent.catalog.risks.craft_adversarial_data import CRAFT_ADVERSARIAL_DATA_PROFILE
+from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
+from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
+from hackagent.catalog.risks.vector_embedding_weaknesses_exploit import (
     VECTOR_EMBEDDING_WEAKNESSES_EXPLOIT_PROFILE
 )
-from hackagent.risks.sensitive_information_disclosure import (
+from hackagent.catalog.risks.sensitive_information_disclosure import (
     SENSITIVE_INFORMATION_DISCLOSURE_PROFILE
 )
-from hackagent.risks.system_prompt_leakage import SYSTEM_PROMPT_LEAKAGE_PROFILE
-from hackagent.risks.excessive_agency import EXCESSIVE_AGENCY_PROFILE
-from hackagent.risks.input_manipulation_attack import INPUT_MANIPULATION_ATTACK_PROFILE
-from hackagent.risks.public_facing_application_exploitation import (
+from hackagent.catalog.risks.system_prompt_leakage import SYSTEM_PROMPT_LEAKAGE_PROFILE
+from hackagent.catalog.risks.excessive_agency import EXCESSIVE_AGENCY_PROFILE
+from hackagent.catalog.risks.input_manipulation_attack import INPUT_MANIPULATION_ATTACK_PROFILE
+from hackagent.catalog.risks.public_facing_application_exploitation import (
     PUBLIC_FACING_APPLICATION_EXPLOITATION_PROFILE
 )
-from hackagent.risks.malicious_tool_invocation import MALICIOUS_TOOL_INVOCATION_PROFILE
-from hackagent.risks.credential_exposure import CREDENTIAL_EXPOSURE_PROFILE
-from hackagent.risks.misinformation import MISINFORMATION_PROFILE
+from hackagent.catalog.risks.malicious_tool_invocation import MALICIOUS_TOOL_INVOCATION_PROFILE
+from hackagent.catalog.risks.credential_exposure import CREDENTIAL_EXPOSURE_PROFILE
+from hackagent.catalog.risks.misinformation import MISINFORMATION_PROFILE
 
 all_profiles = [
     MODEL_EVASION_PROFILE,
@@ -451,9 +451,9 @@ Focus on the highest-impact vulnerabilities with fast Static Template attacks:
 
 ```python
 from hackagent import HackAgent
-from hackagent.risks.prompt_injection import PROMPT_INJECTION_PROFILE
-from hackagent.risks.jailbreak import JAILBREAK_PROFILE
-from hackagent.risks.misinformation import MISINFORMATION_PROFILE
+from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
+from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
+from hackagent.catalog.risks.misinformation import MISINFORMATION_PROFILE
 
 agent = HackAgent(
     endpoint="http://localhost:8080/chat",
@@ -484,8 +484,8 @@ Focus on vulnerabilities specific to AI agents with tool use:
 
 ```python
 from hackagent import HackAgent
-from hackagent.risks.excessive_agency import EXCESSIVE_AGENCY_PROFILE
-from hackagent.risks.malicious_tool_invocation import MALICIOUS_TOOL_INVOCATION_PROFILE
+from hackagent.catalog.risks.excessive_agency import EXCESSIVE_AGENCY_PROFILE
+from hackagent.catalog.risks.malicious_tool_invocation import MALICIOUS_TOOL_INVOCATION_PROFILE
 
 agent = HackAgent(
     endpoint="http://localhost:8080/chat",
@@ -528,10 +528,10 @@ Test vulnerabilities specific to Retrieval-Augmented Generation systems:
 
 ```python
 from hackagent import HackAgent
-from hackagent.risks.vector_embedding_weaknesses_exploit import (
+from hackagent.catalog.risks.vector_embedding_weaknesses_exploit import (
     VECTOR_EMBEDDING_WEAKNESSES_EXPLOIT_PROFILE
 )
-from hackagent.risks.prompt_injection import PROMPT_INJECTION_PROFILE
+from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
 
 agent = HackAgent(
     endpoint="http://localhost:8080/chat",

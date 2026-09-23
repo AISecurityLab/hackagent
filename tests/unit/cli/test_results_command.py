@@ -16,7 +16,7 @@ from hackagent.cli.commands.results import (
     _generate_result_statistics,
     results,
 )
-from hackagent.server.storage.enums import EvaluationStatusEnum
+from hackagent.core.contracts import EvalStatus
 
 
 def _config():
@@ -30,7 +30,7 @@ def _result(**overrides):
         "id": uuid4(),
         "agent_name": "weather-bot",
         "attack_type": "pair",
-        "evaluation_status": EvaluationStatusEnum.SUCCESSFUL_JAILBREAK,
+        "evaluation_status": EvalStatus.SUCCESSFUL_JAILBREAK,
         "created_at": datetime(2026, 1, 2, 3, 4, 5),
         "data": {"overall_majority_vote_asr": 0.8, "overall_fleiss_kappa": 0.4},
     }
@@ -119,7 +119,7 @@ class TestResultsCommands(unittest.TestCase):
         backend.get_result.return_value = record
         with (
             patch("hackagent.cli.commands.results._show_logo_once"),
-            patch("hackagent.server.storage.local.LocalBackend", return_value=backend),
+            patch("hackagent.storage.local.LocalBackend", return_value=backend),
         ):
             result = runner.invoke(
                 results, ["show", str(result_id)], obj={"config": _config()}
@@ -134,7 +134,7 @@ class TestResultsCommands(unittest.TestCase):
         backend.get_result.side_effect = RuntimeError("missing")
         with (
             patch("hackagent.cli.commands.results._show_logo_once"),
-            patch("hackagent.server.storage.local.LocalBackend", return_value=backend),
+            patch("hackagent.storage.local.LocalBackend", return_value=backend),
         ):
             result = runner.invoke(
                 results, ["show", str(uuid4())], obj={"config": _config()}
@@ -161,7 +161,7 @@ class TestResultsCommands(unittest.TestCase):
         backend.list_results.return_value = page
         with (
             patch("hackagent.cli.commands.results._show_logo_once"),
-            patch("hackagent.server.storage.local.LocalBackend", return_value=backend),
+            patch("hackagent.storage.local.LocalBackend", return_value=backend),
         ):
             result = runner.invoke(
                 results,

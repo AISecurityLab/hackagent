@@ -53,7 +53,7 @@ Per-``AgentType`` knobs the router uses to drive ``litellm.completion``.
 #### get\_provider\_config
 
 ```python
-def get_provider_config(agent_type: AgentTypeEnum) -> Optional[ProviderConfig]
+def get_provider_config(agent_type: AgentType) -> Optional[ProviderConfig]
 ```
 
 Return the ``ProviderConfig`` for ``agent_type``, or ``None``.

@@ -9,8 +9,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from hackagent.attacks.taxonomy import get_attack_taxonomy
-from hackagent.cli.commands.attack.catalog import ATTACK_CATALOG
+from hackagent.catalog.taxonomy import get_attack_taxonomy
+from hackagent.catalog.attacks import ATTACK_CATALOG
 
 from hackagent.cli.utils import (
     display_results_table,

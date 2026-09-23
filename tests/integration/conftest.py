@@ -39,7 +39,7 @@ from typing import Any, Dict, Generator, Optional
 import httpx
 import pytest
 
-from hackagent.attacks.techniques.config import (
+from hackagent.core.defaults import (
     DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
     DEFAULT_LOCAL_MODEL_ENDPOINT,
 )
@@ -561,10 +561,10 @@ def hackagent_client_factory(
     hackagent_api_base_url: str, hackagent_api_key: Optional[str]
 ):
     """Factory fixture to create HackAgent instances for different frameworks."""
-    from hackagent import HackAgent, AgentTypeEnum
+    from hackagent import HackAgent, AgentType
 
     def _create_hackagent(
-        name: str, endpoint: str, agent_type: AgentTypeEnum, **kwargs
+        name: str, endpoint: str, agent_type: AgentType, **kwargs
     ) -> HackAgent:
         """Create a HackAgent instance with the given configuration."""
         return HackAgent(

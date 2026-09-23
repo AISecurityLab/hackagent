@@ -155,7 +155,7 @@ class TestLaunchTuiDefault(unittest.TestCase):
 class TestDisplayWelcome(unittest.TestCase):
     def test_welcome_renders_splash_and_getting_started_panel(self):
         with (
-            patch("hackagent.utils.display_hackagent_splash") as splash,
+            patch("hackagent.cli.banner.display_hackagent_splash") as splash,
             patch.object(bootstrap.console, "print") as printer,
         ):
             bootstrap._display_welcome()

@@ -83,15 +83,13 @@ class TestUpdateSingleResult(unittest.TestCase):
             backend=mock_client,
         )
 
-        from hackagent.server.api.models import EvaluationStatusEnum
+        from hackagent.storage._http.api.models import EvalStatus
 
         call_kwargs = mock_client.update_result.call_args
         evaluation_status = call_kwargs.kwargs.get("evaluation_status") or call_kwargs[
             1
         ].get("evaluation_status")
-        self.assertEqual(
-            evaluation_status, EvaluationStatusEnum.SUCCESSFUL_JAILBREAK.value
-        )
+        self.assertEqual(evaluation_status, EvalStatus.SUCCESSFUL_JAILBREAK.value)
 
     def test_success_false_uses_failed_jailbreak(self):
         """Test that success=False maps to FAILED_JAILBREAK."""
@@ -103,13 +101,13 @@ class TestUpdateSingleResult(unittest.TestCase):
             backend=mock_client,
         )
 
-        from hackagent.server.api.models import EvaluationStatusEnum
+        from hackagent.storage._http.api.models import EvalStatus
 
         call_kwargs = mock_client.update_result.call_args
         evaluation_status = call_kwargs.kwargs.get("evaluation_status") or call_kwargs[
             1
         ].get("evaluation_status")
-        self.assertEqual(evaluation_status, EvaluationStatusEnum.FAILED_JAILBREAK.value)
+        self.assertEqual(evaluation_status, EvalStatus.FAILED_JAILBREAK.value)
 
 
 class TestEvaluateRow(unittest.TestCase):

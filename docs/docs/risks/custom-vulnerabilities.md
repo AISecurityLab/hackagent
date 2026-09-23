@@ -11,7 +11,7 @@ When the built-in 13 vulnerability classes don't cover your specific testing nee
 ```python
 from enum import Enum
 from typing import List, Optional
-from hackagent.risks.base import BaseVulnerability
+from hackagent.catalog.risks.base import BaseVulnerability
 
 
 # 1. Define your vulnerability's sub-types
@@ -59,7 +59,7 @@ Here's a complete example for a healthcare-specific vulnerability:
 ```python
 from enum import Enum
 from typing import List, Optional
-from hackagent.risks.base import BaseVulnerability
+from hackagent.catalog.risks.base import BaseVulnerability
 
 
 class HIPAAComplianceType(Enum):
@@ -105,8 +105,8 @@ print(vuln.get_values())  # ['phi_disclosure', 'unauthorized_access']
 A threat profile is optional, but it's what lets an evaluation campaign auto-select datasets, attacks, objective, and metrics for your custom vulnerability instead of you wiring them up by hand each time — see [How Threat Profiles Work](./vulnerabilities.md#how-threat-profiles-work) for the shared `ThreatProfile` anatomy.
 
 ```python
-from hackagent.risks.profile_types import ThreatProfile
-from hackagent.risks.profile_helpers import ds, PRIMARY, SECONDARY, STATIC_TEMPLATE_ONLY
+from hackagent.catalog.risks.profile_types import ThreatProfile
+from hackagent.catalog.risks.profile_helpers import ds, PRIMARY, SECONDARY, STATIC_TEMPLATE_ONLY
 
 HIPAA_COMPLIANCE_PROFILE = ThreatProfile(
     vulnerability=HIPAACompliance,
@@ -138,7 +138,7 @@ print(HIPAA_COMPLIANCE_PROFILE.dataset_presets)  # ['custom_hipaa_test_set', 'do
 The `profile_helpers` module provides utilities for building profiles:
 
 ```python
-from hackagent.risks.profile_helpers import (
+from hackagent.catalog.risks.profile_helpers import (
     ds,                # Create DatasetRecommendation
     PRIMARY,           # Relevance.PRIMARY
     SECONDARY,         # Relevance.SECONDARY
@@ -188,7 +188,7 @@ When extending `BaseVulnerability`, you must provide:
 ```python
 from enum import Enum
 from typing import List, Optional
-from hackagent.risks.base import BaseVulnerability
+from hackagent.catalog.risks.base import BaseVulnerability
 
 
 class PCI_DSSComplianceType(Enum):
@@ -336,7 +336,7 @@ class PCI_DSSComplianceType(Enum):
 Example `vulnerabilities.py`:
 ```python
 from typing import List, Optional
-from hackagent.risks.base import BaseVulnerability
+from hackagent.catalog.risks.base import BaseVulnerability
 from .types import HIPAAComplianceType, PCI_DSSComplianceType
 
 

@@ -22,7 +22,7 @@ Layout:
 
 To add a new attack to the TUI, add a module under ``specs/`` and list it in
 ``specs/__init__.py``. Assign the technique a primary category (and any tags)
-in :mod:`hackagent.attacks.taxonomy`.
+in :mod:`hackagent.catalog.taxonomy`.
 """
 
 from __future__ import annotations

@@ -17,8 +17,8 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from hackagent.router.router import AgentRouter
-from hackagent.router.types import AgentTypeEnum
-from hackagent.server.storage.base import OrganizationContext
+from hackagent.core.contracts import AgentType
+from hackagent.storage.records import OrganizationContext
 
 logging.disable(logging.CRITICAL)
 
@@ -81,14 +81,14 @@ class TestDispatchViaLiteLLM(unittest.TestCase):
         backend = _make_backend(
             agent_id=agent_id,
             name="gpt-4-router-test",
-            agent_type_str=AgentTypeEnum.OPENAI_SDK.value,
+            agent_type_str=AgentType.OPENAI_SDK.value,
             endpoint="",
             metadata={"name": "gpt-4"},
         )
         router = AgentRouter(
             backend=backend,
             name="gpt-4-router-test",
-            agent_type=AgentTypeEnum.OPENAI_SDK,
+            agent_type=AgentType.OPENAI_SDK,
             endpoint="",
             metadata={"name": "gpt-4"},
             adapter_operational_config={"name": "gpt-4"},
@@ -144,14 +144,14 @@ class TestDispatchViaLiteLLM(unittest.TestCase):
         backend = _make_backend(
             agent_id=agent_id,
             name="o1-mini",
-            agent_type_str=AgentTypeEnum.OPENAI_SDK.value,
+            agent_type_str=AgentType.OPENAI_SDK.value,
             endpoint="",
             metadata={"name": "o1-mini"},
         )
         router = AgentRouter(
             backend=backend,
             name="o1-mini",
-            agent_type=AgentTypeEnum.OPENAI_SDK,
+            agent_type=AgentType.OPENAI_SDK,
             endpoint="",
             metadata={"name": "o1-mini"},
             adapter_operational_config={"name": "o1-mini"},
@@ -169,14 +169,14 @@ class TestDispatchViaLiteLLM(unittest.TestCase):
         backend = _make_backend(
             agent_id=agent_id,
             name="qwen3.5:9b",
-            agent_type_str=AgentTypeEnum.OLLAMA.value,
+            agent_type_str=AgentType.OLLAMA.value,
             endpoint="http://127.0.0.1:11434",
             metadata={"name": "qwen3.5:9b"},
         )
         router = AgentRouter(
             backend=backend,
             name="qwen3.5:9b",
-            agent_type=AgentTypeEnum.OLLAMA,
+            agent_type=AgentType.OLLAMA,
             endpoint="http://127.0.0.1:11434",
             metadata={"name": "qwen3.5:9b"},
             adapter_operational_config={
@@ -307,14 +307,14 @@ class TestDispatchADKBypassesLiteLLM(unittest.TestCase):
         backend = _make_backend(
             agent_id=agent_id,
             name="my_app",
-            agent_type_str=AgentTypeEnum.GOOGLE_ADK.value,
+            agent_type_str=AgentType.GOOGLE_ADK.value,
             endpoint="http://fake-adk.com",
             metadata={"name": "my_app"},
         )
         router = AgentRouter(
             backend=backend,
             name="my_app",
-            agent_type=AgentTypeEnum.GOOGLE_ADK,
+            agent_type=AgentType.GOOGLE_ADK,
             endpoint="http://fake-adk.com",
             metadata={"name": "my_app"},
             adapter_operational_config={
@@ -347,14 +347,14 @@ class TestDispatchADKBypassesLiteLLM(unittest.TestCase):
         backend = _make_backend(
             agent_id=agent_id,
             name="my_app",
-            agent_type_str=AgentTypeEnum.GOOGLE_ADK.value,
+            agent_type_str=AgentType.GOOGLE_ADK.value,
             endpoint="http://fake-adk.com",
             metadata={"name": "my_app"},
         )
         router = AgentRouter(
             backend=backend,
             name="my_app",
-            agent_type=AgentTypeEnum.GOOGLE_ADK,
+            agent_type=AgentType.GOOGLE_ADK,
             endpoint="http://fake-adk.com",
             metadata={"name": "my_app"},
             adapter_operational_config={

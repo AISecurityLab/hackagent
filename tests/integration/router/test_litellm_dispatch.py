@@ -28,7 +28,7 @@ import pytest
 from hackagent.router._chat_registration import _ChatRegistration
 from hackagent.router.router import AgentRouter
 from hackagent.router.tracking_logger import HACKAGENT_METADATA_KEY
-from hackagent.router.types import AgentTypeEnum
+from hackagent.core.contracts import AgentType
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +47,8 @@ class TestRouterLiteLLMDispatchIntegration:
         openai_config: Dict[str, Any],
         openai_base_url: str,
     ):
-        from hackagent.server.client import AuthenticatedClient
-        from hackagent.server.storage.remote import RemoteBackend
+        from hackagent.storage._http.client import AuthenticatedClient
+        from hackagent.storage.remote import RemoteBackend
 
         backend = RemoteBackend(
             AuthenticatedClient(
@@ -58,12 +58,12 @@ class TestRouterLiteLLMDispatchIntegration:
             )
         )
 
-        # Use AgentTypeEnum.LITELLM so the model string carries the
+        # Use AgentType.LITELLM so the model string carries the
         # provider prefix already supplied via openai_config["name"].
         router = AgentRouter(
             backend=backend,
             name=openai_config["name"],
-            agent_type=AgentTypeEnum.OPENAI_SDK,
+            agent_type=AgentType.OPENAI_SDK,
             endpoint=openai_base_url,
             metadata={"name": openai_config["name"]},
             adapter_operational_config=openai_config,
@@ -111,8 +111,8 @@ class TestRouterLiteLLMDispatchIntegration:
         openai_base_url: str,
     ):
         """Backwards-compatible ``prompt`` shorthand should still work."""
-        from hackagent.server.client import AuthenticatedClient
-        from hackagent.server.storage.remote import RemoteBackend
+        from hackagent.storage._http.client import AuthenticatedClient
+        from hackagent.storage.remote import RemoteBackend
 
         backend = RemoteBackend(
             AuthenticatedClient(
@@ -124,7 +124,7 @@ class TestRouterLiteLLMDispatchIntegration:
         router = AgentRouter(
             backend=backend,
             name=openai_config["name"],
-            agent_type=AgentTypeEnum.OPENAI_SDK,
+            agent_type=AgentType.OPENAI_SDK,
             endpoint=openai_base_url,
             metadata={"name": openai_config["name"]},
             adapter_operational_config=openai_config,
@@ -150,8 +150,8 @@ class TestRouterLiteLLMDispatchIntegration:
         """Phase F.2 — every dispatched call carries ``metadata['hackagent']``."""
         import litellm
 
-        from hackagent.server.client import AuthenticatedClient
-        from hackagent.server.storage.remote import RemoteBackend
+        from hackagent.storage._http.client import AuthenticatedClient
+        from hackagent.storage.remote import RemoteBackend
 
         # Spy on litellm.completion to capture the kwargs without disabling it.
         captured: Dict[str, Any] = {}
@@ -171,7 +171,7 @@ class TestRouterLiteLLMDispatchIntegration:
         router = AgentRouter(
             backend=backend,
             name=openai_config["name"],
-            agent_type=AgentTypeEnum.OPENAI_SDK,
+            agent_type=AgentType.OPENAI_SDK,
             endpoint=openai_base_url,
             metadata={"name": openai_config["name"]},
             adapter_operational_config=openai_config,

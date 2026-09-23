@@ -5,7 +5,7 @@
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from hackagent.server.storage.enums import StepTypeEnum
+from hackagent.core.contracts import StepKind
 
 
 def emit_phase_trace(
@@ -62,6 +62,6 @@ def emit_phase_trace(
     tracker.add_custom_trace(
         ctx=ctx,
         step_name=step_name,
-        step_type=StepTypeEnum.OTHER,
+        step_type=StepKind.OTHER,
         content=content,
     )

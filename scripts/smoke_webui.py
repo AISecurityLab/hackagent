@@ -58,7 +58,7 @@ def _free_port() -> int:
 
 def seed(db_path: Path) -> None:
     """Write one completed run with a mix of outcomes and a couple of traces."""
-    from hackagent.server.storage.local import LocalBackend
+    from hackagent.storage.local import LocalBackend
 
     backend = LocalBackend(str(db_path))
     try:

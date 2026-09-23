@@ -5,7 +5,7 @@
 import json
 from typing import Dict, List
 
-from hackagent.attacks.techniques.config import DEFAULT_MAX_OUTPUT_TOKENS
+from hackagent.core.defaults import DEFAULT_MAX_OUTPUT_TOKENS
 
 from .config import (
     ATTACKER_CONDITION,

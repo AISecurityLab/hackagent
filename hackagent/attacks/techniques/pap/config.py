@@ -26,11 +26,8 @@ from typing import Any, Dict, List, Union
 
 from pydantic import BaseModel, Field, field_validator
 
-from hackagent.attacks.techniques.config import (
-    DEFAULT_CONFIG_BASE,
-    DEFAULT_MAX_OUTPUT_TOKENS,
-    ConfigBase,
-)
+from hackagent.attacks.techniques.config import DEFAULT_CONFIG_BASE, ConfigBase
+from hackagent.core.defaults import DEFAULT_MAX_OUTPUT_TOKENS
 
 
 # ---- Top-5 persuasion techniques from the paper (broad-scan results) ---- #

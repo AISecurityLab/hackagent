@@ -1,14 +1,13 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from hackagent.logger import get_logger
+from hackagent.core.logging import get_logger
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
-from hackagent import utils
-from hackagent.config import resolve_remote_base_url
-from hackagent.errors import HackAgentError
+from hackagent.core.settings import Settings
+from hackagent.core.errors import HackAgentError
 from hackagent.router import AgentRouter
-from hackagent.router.types import AgentTypeEnum
+from hackagent.core.contracts import AgentType
 
 # Lazy import for attack orchestrators to avoid ~0.5s startup delay
 if TYPE_CHECKING:
@@ -59,7 +58,7 @@ class HackAgent:
         self,
         endpoint: str,
         name: Optional[str] = None,
-        agent_type: Union[AgentTypeEnum, str] = AgentTypeEnum.UNKNOWN,
+        agent_type: Union[AgentType, str] = AgentType.UNKNOWN,
         base_url: Optional[str] = None,
         api_key: Optional[str] = None,
         raise_on_unexpected_status: bool = False,
@@ -88,10 +87,10 @@ class HackAgent:
                 If not provided, a default name might be assigned or behavior might
                 depend on the specific backend agent management policies.
             agent_type: Specifies the type of the agent. This can be provided
-                as an `AgentTypeEnum` member (e.g., `AgentTypeEnum.GOOGLE_ADK`) or
+                as an `AgentType` member (e.g., `AgentType.GOOGLE_ADK`) or
                 as a string identifier (e.g., "google-adk", "litellm").
                 String values are automatically converted to the corresponding
-                `AgentTypeEnum` member. Defaults to `AgentTypeEnum.UNKNOWN` if
+                `AgentType` member. Defaults to `AgentType.UNKNOWN` if
                 not specified or if an invalid string is provided.
             raise_on_unexpected_status: If set to `True`, the API client will
                 raise an exception for any HTTP status codes that are not typically
@@ -112,46 +111,41 @@ class HackAgent:
                 When set to `False`, requests sent through the target OLLAMA adapter
                 include `think: false` to disable thinking output. Ignored for
                 non-OLLAMA target agent types.
-            backend: Optional pre-built ``StorageBackend`` to persist runs and
+            backend: Optional pre-built ``Store`` to persist runs and
                 results through. When omitted, a backend is selected from the
                 resolved API key (remote) or a default local SQLite database.
                 Supplying one lets an embedding host — e.g. the local dashboard
                 — reuse its own already-open backend.
         """
 
-        resolved_auth_token = utils.resolve_api_token(direct_api_key_param=api_key)
+        self.settings = Settings.resolve(api_key=api_key, base_url=base_url)
 
         if backend is not None:
             self.backend = backend
             logger.info(
                 "HackAgent using caller-provided backend %s", type(backend).__name__
             )
-        elif resolved_auth_token:
-            from hackagent.server.client import AuthenticatedClient
-            from hackagent.server.storage.remote import RemoteBackend
+        elif self.settings.api_key:
+            from hackagent.storage.remote import RemoteBackend
 
-            _base_url = base_url or resolve_remote_base_url()
-            _client = AuthenticatedClient(
-                base_url=_base_url,
-                token=resolved_auth_token,
-                prefix="Bearer",
-                raise_on_unexpected_status=raise_on_unexpected_status,
+            self.backend = RemoteBackend.connect(
+                self.settings.base_url,
+                self.settings.api_key,
                 timeout=timeout,
+                raise_on_unexpected_status=raise_on_unexpected_status,
             )
-            self.backend = RemoteBackend(_client)
-            logger.info("HackAgent using remote backend → %s", _base_url)
+            logger.info("HackAgent using remote backend → %s", self.settings.base_url)
         else:
-            from hackagent.server.storage.local import LocalBackend
+            from hackagent.storage.local import LocalBackend
 
-            self.backend = LocalBackend()
+            self.backend = LocalBackend(db_path=self.settings.db_path)
             logger.info(
-                "HackAgent using local backend → ~/.local/share/hackagent/hackagent.db"
+                "HackAgent using local backend → %s. Set HACKAGENT_API_KEY or "
+                "pass api_key= to enable remote tracking.",
+                self.settings.db_path,
             )
 
-        # Backward compatible raw HTTP client reference.
-        self.client = getattr(self.backend, "_client", None)
-
-        processed_agent_type = utils.resolve_agent_type(agent_type)
+        processed_agent_type = AgentType.parse(agent_type)
         self.target_config = _resolve_target_config(target_config)
         explicit_target_config = (
             {
@@ -173,7 +167,7 @@ class HackAgent:
             **(adapter_operational_config or {}),
         }
 
-        if processed_agent_type == AgentTypeEnum.OLLAMA:
+        if processed_agent_type == AgentType.OLLAMA:
             if (
                 thinking is not None
                 and router_operational_config.get("thinking") is None
@@ -384,7 +378,7 @@ class HackAgent:
                 Defaults to ``None``, which resolves to the Jailbreak
                 evaluation campaign's primary attacks, in order — ``h4rm3l``
                 → ``TAP`` → ``PAIR`` (see
-                ``hackagent.risks.jailbreak.JAILBREAK_PROFILE``). A goal
+                ``hackagent.catalog.risks.jailbreak.JAILBREAK_PROFILE``). A goal
                 source is still required either way, via ``goals`` or a
                 ``dataset``/``goals``/``intents`` key on the first step.
             goals: Optional explicit list of goal strings to use for the
@@ -417,10 +411,10 @@ class HackAgent:
             # attacks, in campaign order. `technique` strings in the profile
             # (e.g. "TAP", "PAIR") use display casing; `attack_strategies`
             # keys are lowercase, so normalize before use.
-            from hackagent.risks.jailbreak import JAILBREAK_PROFILE
+            from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 
             attacks = [
-                {"attack_type": rec.technique.strip().lower()}
+                {"attack_type": rec.technique}
                 for rec in JAILBREAK_PROFILE.primary_attacks
             ]
 

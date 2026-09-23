@@ -13,7 +13,7 @@ from hackagent.attacks.shared.guardrail import (
     create_guardrail_from_config,
 )
 from hackagent.router.router import AgentRouter, _extract_prompt_text
-from hackagent.router.types import AgentTypeEnum
+from hackagent.core.contracts import AgentType
 
 
 # ---------------------------------------------------------------------------
@@ -37,7 +37,7 @@ def _make_router_with_guardrails(before_guardrail=None, after_guardrail=None):
         MockADK.__name__ = "ADKAgent"
         with patch(
             "hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP",
-            {AgentTypeEnum.GOOGLE_ADK: MockADK},
+            {AgentType.GOOGLE_ADK: MockADK},
         ):
             backend = _make_backend()
             agent_id = uuid.uuid4()
@@ -53,7 +53,7 @@ def _make_router_with_guardrails(before_guardrail=None, after_guardrail=None):
             router = AgentRouter(
                 backend=backend,
                 name="TestAgent",
-                agent_type=AgentTypeEnum.GOOGLE_ADK,
+                agent_type=AgentType.GOOGLE_ADK,
                 endpoint="http://fake.com/",
             )
     router.before_guardrail = before_guardrail

@@ -43,8 +43,8 @@ attack are separate free-text strings that you author yourself. See
 ### Instantiate the Vulnerability
 
 ```python
-from hackagent.risks import MaliciousToolInvocation
-from hackagent.risks.malicious_tool_invocation.types import MaliciousToolInvocationType
+from hackagent.catalog.risks import MaliciousToolInvocation
+from hackagent.catalog.risks.malicious_tool_invocation.types import MaliciousToolInvocationType
 
 # Use all sub-types
 vuln = MaliciousToolInvocation()
@@ -60,7 +60,7 @@ vuln = MaliciousToolInvocation(types=[
 
 ```python
 from hackagent import HackAgent
-from hackagent.risks.malicious_tool_invocation import MALICIOUS_TOOL_INVOCATION_PROFILE
+from hackagent.catalog.risks.malicious_tool_invocation import MALICIOUS_TOOL_INVOCATION_PROFILE
 
 agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 

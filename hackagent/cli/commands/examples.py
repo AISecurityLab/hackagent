@@ -27,7 +27,7 @@ from rich.console import Console
 
 from hackagent.cli.config import CLIConfig
 from hackagent.cli.utils import handle_errors
-from hackagent.config import resolve_ollama_base_url
+from hackagent.core.settings import resolve_ollama_base_url
 
 console = Console()
 

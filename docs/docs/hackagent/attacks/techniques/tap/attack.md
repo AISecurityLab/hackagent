@@ -87,7 +87,7 @@ checkpointing.
 
 ```python
 def __init__(config: Optional[Dict[str, Any]] = None,
-             client: Optional[AuthenticatedClient] = None,
+             client: Optional[Store] = None,
              agent_router: Optional[AgentRouter] = None)
 ```
 

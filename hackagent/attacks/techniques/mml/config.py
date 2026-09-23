@@ -28,10 +28,7 @@ from typing import Any, Dict, List, Literal
 
 from pydantic import BaseModel, Field
 
-from hackagent.attacks.techniques.config import (
-    DEFAULT_CONFIG_BASE,
-    ConfigBase,
-)
+from hackagent.attacks.techniques.config import DEFAULT_CONFIG_BASE, ConfigBase
 
 DEFAULT_MML_CONFIG: Dict[str, Any] = {
     **DEFAULT_CONFIG_BASE,

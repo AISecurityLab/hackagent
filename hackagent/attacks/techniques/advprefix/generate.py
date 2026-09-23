@@ -20,9 +20,9 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional, Tuple
 
-from hackagent.server.client import AuthenticatedClient
+from hackagent.storage.store import Store
 from hackagent.router.router import AgentRouter
-from hackagent.router.types import AgentTypeEnum
+from hackagent.core.contracts import AgentType
 
 from .config import (
     DEFAULT_ADVPREFIX_GENERATOR_SYSTEM_PROMPT,
@@ -71,7 +71,7 @@ class PrefixGenerationPipeline:
         self,
         config: Dict[str, Any],
         logger: logging.Logger,
-        client: AuthenticatedClient,
+        client: Store,
         agent_router: Optional[AgentRouter] = None,
     ):
         """
@@ -324,7 +324,7 @@ class PrefixGenerationPipeline:
             endpoint = self.config.attacker.get("endpoint")
             model_name = self.config.attacker.get("identifier")
 
-            # Handle API key (supports both AuthenticatedClient and StorageBackend)
+            # Handle API key (supports both Store and Store)
             api_key = (
                 self.client.get_api_key()
                 if hasattr(self.client, "get_api_key")
@@ -350,12 +350,12 @@ class PrefixGenerationPipeline:
             # Can be overridden via config.attacker["agent_type"] if needed
             agent_type_str = self.config.attacker.get("agent_type", "OPENAI_SDK")
             try:
-                agent_type = AgentTypeEnum(agent_type_str.upper())
+                agent_type = AgentType(agent_type_str.upper())
             except ValueError:
                 self.logger.warning(
                     f"Invalid agent_type '{agent_type_str}', defaulting to OPENAI_SDK"
                 )
-                agent_type = AgentTypeEnum.OPENAI_SDK
+                agent_type = AgentType.OPENAI_SDK
 
             router = AgentRouter(
                 backend=self.client,

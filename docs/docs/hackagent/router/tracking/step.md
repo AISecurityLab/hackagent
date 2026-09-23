@@ -49,7 +49,7 @@ or API calls fail, the underlying operations continue unaffected.
   &gt;&gt;&gt; with tracker.track_step(&quot;Process Data&quot;, &quot;STEP1_PROCESS&quot;):
   ...     result = process_data()
   &gt;&gt;&gt;
-  &gt;&gt;&gt; tracker.update_run_status(StatusEnum.COMPLETED)
+  &gt;&gt;&gt; tracker.update_run_status(RunStatus.COMPLETED)
 
 #### \_\_init\_\_
 
@@ -117,7 +117,7 @@ This context manager handles the complete lifecycle of step tracking:
 #### update\_run\_status
 
 ```python
-def update_run_status(status: StatusEnum) -> bool
+def update_run_status(status: RunStatus) -> bool
 ```
 
 Update the run status on the backend.
@@ -135,7 +135,7 @@ Update the run status on the backend.
 
 ```python
 def update_result_status(
-        evaluation_status: EvaluationStatusEnum,
+        evaluation_status: EvalStatus,
         evaluation_notes: Optional[str] = None,
         agent_specific_data: Optional[Dict[str, Any]] = None) -> bool
 ```

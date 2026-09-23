@@ -18,14 +18,13 @@ from hackagent.cli.config import CLIConfig
 from hackagent.cli.utils import (
     display_info,
     display_success,
-    get_agent_type_enum,
 )
 
 from hackagent.cli.commands.scan.helpers import (
     _extract_asr,
     _format_asr,
-    _normalize_attack_type,
 )
+from hackagent.core.contracts import AgentType
 
 console = Console()
 
@@ -47,8 +46,8 @@ def run_quick_scan(
     cli_config: CLIConfig = ctx.obj["config"]
     cli_config.validate()
 
-    from hackagent.risks.jailbreak import JAILBREAK_PROFILE
-    from hackagent.utils import display_hackagent_splash
+    from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
+    from hackagent.cli.banner import display_hackagent_splash
 
     primary_attacks = [rec.technique for rec in JAILBREAK_PROFILE.primary_attacks]
     if not primary_attacks:
@@ -85,7 +84,7 @@ def run_quick_scan(
         display_success("Dry run completed. Configuration is valid.")
         return
 
-    agent_type_enum = get_agent_type_enum(agent_type)
+    agent_type_enum = AgentType.parse(agent_type)
 
     with console.status("[bold green]Initializing HackAgent..."):
         agent = HackAgent(
@@ -100,7 +99,7 @@ def run_quick_scan(
     failed_attacks = 0
 
     for technique in primary_attacks:
-        attack_type = _normalize_attack_type(technique)
+        attack_type = technique
         display_info(f"Running {technique}...")
 
         attack_config: Dict[str, Any] = {

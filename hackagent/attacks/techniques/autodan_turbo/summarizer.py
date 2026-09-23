@@ -5,7 +5,7 @@
 import json
 import re
 
-from hackagent.attacks.techniques.config import DEFAULT_MAX_OUTPUT_TOKENS
+from hackagent.core.defaults import DEFAULT_MAX_OUTPUT_TOKENS
 from hackagent.attacks.shared.response_utils import extract_response_content
 
 from .config import (

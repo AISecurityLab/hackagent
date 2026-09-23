@@ -3,11 +3,8 @@
 
 import unittest
 
-from hackagent.attacks.techniques.config import (
-    DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
-    ConfigBase,
-    default_config_base,
-)
+from hackagent.core.defaults import DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER
+from hackagent.attacks.techniques.config import ConfigBase, default_config_base
 
 
 class TestSharedConfigDefaults(unittest.TestCase):

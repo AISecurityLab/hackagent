@@ -24,14 +24,14 @@ import sys
 
 try:
     from hackagent import HackAgent
-    from hackagent.router.types import AgentTypeEnum
+    from hackagent.core.contracts import AgentType
 except ModuleNotFoundError:
     # Support direct script execution without requiring editable install.
     project_root = Path(__file__).resolve().parents[2]
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
     from hackagent import HackAgent
-    from hackagent.router.types import AgentTypeEnum
+    from hackagent.core.contracts import AgentType
 
 # ---------------------------------------------------------------------------
 # Target agent (victim)
@@ -61,7 +61,7 @@ def build_ollama_demo_config() -> dict:
         "agent": {
             "name": "ollama-target",
             "endpoint": OLLAMA_ENDPOINT,
-            "agent_type": AgentTypeEnum.OLLAMA,
+            "agent_type": AgentType.OLLAMA,
             "adapter_operational_config": {
                 "name": TARGET_MODEL,
             },
@@ -83,7 +83,7 @@ def build_ollama_demo_config() -> dict:
                 {
                     "identifier": JUDGE_MODEL,
                     "type": "harmbench_variant",
-                    "agent_type": AgentTypeEnum.OLLAMA,
+                    "agent_type": AgentType.OLLAMA,
                     "endpoint": OLLAMA_ENDPOINT,
                 }
             ],

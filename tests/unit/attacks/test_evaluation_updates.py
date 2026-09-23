@@ -23,7 +23,7 @@ from unittest.mock import MagicMock
 from types import SimpleNamespace
 from uuid import uuid4
 
-from hackagent.server.api.models import EvaluationStatusEnum
+from hackagent.storage._http.api.models import EvalStatus
 from hackagent.router.tracking import Tracker
 from tests.fakes import FakeRouter
 
@@ -116,8 +116,8 @@ class TestEvaluationStatusUpdates(unittest.TestCase):
 
         # Expected: result_partial_update should be called for each result
         expected_updates = [
-            (evaluated_data[0]["result_id"], EvaluationStatusEnum.FAILED_CRITERIA),
-            (evaluated_data[1]["result_id"], EvaluationStatusEnum.PASSED_CRITERIA),
+            (evaluated_data[0]["result_id"], EvalStatus.FAILED_CRITERIA),
+            (evaluated_data[1]["result_id"], EvalStatus.PASSED_CRITERIA),
         ]
 
         # NOTE: Currently the code does NOT do this!
@@ -150,21 +150,14 @@ class TestEvaluationEndToEnd(unittest.TestCase):
         """
         FIXED: Baseline attack now updates results after evaluation.
 
-        The evaluation step now calls result_partial_update to sync status to server.
+        The evaluation step syncs status to storage via _sync_evaluation_to_server.
         """
         from hackagent.attacks.techniques.static_template import (
             static_eval as evaluation,
         )
         import inspect
 
-        # Check that evaluation.py now calls result_partial_update
         source = inspect.getsource(evaluation)
-
-        self.assertIn(
-            "result_partial_update",
-            source,
-            "Fix confirmed: evaluation.py now imports result_partial_update",
-        )
 
         self.assertIn(
             "_sync_evaluation_to_server",
@@ -197,7 +190,7 @@ class TestEvaluationEndToEnd(unittest.TestCase):
         mock_logger = logging.getLogger("test")
 
         # mock_backend has update_result (MagicMock provides all attrs),
-        # so the StorageBackend path should be taken.
+        # so the Store path should be taken.
         result = _update_result_status(
             result_id=str(uuid4()),
             success=True,

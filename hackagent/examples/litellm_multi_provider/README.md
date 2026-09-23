@@ -33,7 +33,7 @@ editing the `_PROVIDERS` table in [demo.py](demo.py).
 ```python
 HackAgent(
     name="my-target",
-    agent_type=AgentTypeEnum.LITELLM,
+    agent_type=AgentType.LITELLM,
     endpoint="",
     adapter_operational_config={
         # LiteLLM's model-string convention: "<provider>/<model>"
@@ -49,4 +49,4 @@ provider) is at <https://docs.litellm.ai/docs/providers>.
 
 For protocols LiteLLM can't speak natively (Google ADK servers, MCP,
 A2A), HackAgent registers a per-instance `litellm.CustomLLM` provider;
-those keep their own AgentTypeEnum entries (`GOOGLE_ADK` today).
+those keep their own AgentType entries (`GOOGLE_ADK` today).

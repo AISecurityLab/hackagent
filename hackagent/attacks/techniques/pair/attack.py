@@ -29,7 +29,7 @@ from hackagent.attacks.techniques.autodan_turbo.core import (
     _parse_score_value,
     score_response,
 )
-from hackagent.attacks.techniques.config import (
+from hackagent.core.defaults import (
     DEFAULT_ATTACKER_IDENTIFIER,
     DEFAULT_JUDGE_IDENTIFIER,
     DEFAULT_LOCAL_MODEL_ENDPOINT,
@@ -43,8 +43,8 @@ from hackagent.attacks.shared.response_utils import (
     is_guardrail_response,
 )
 from hackagent.attacks.shared.router_factory import create_router
-from hackagent.server.client import AuthenticatedClient
-from hackagent.server.storage.enums import StepTypeEnum
+from hackagent.storage.store import Store
+from hackagent.core.contracts import StepKind
 from hackagent.router.router import AgentRouter
 from hackagent.router.tracking import Tracker, Context
 
@@ -194,7 +194,7 @@ class PAIRAttack(BaseAttack):
     def __init__(
         self,
         config: Optional[Dict[str, Any]] = None,
-        client: Optional[AuthenticatedClient] = None,
+        client: Optional[Store] = None,
         agent_router: Optional[AgentRouter] = None,
     ):
         """
@@ -213,7 +213,7 @@ class PAIRAttack(BaseAttack):
                 :data:`~hackagent.attacks.objectives.OBJECTIVES`.
         """
         if client is None:
-            raise ValueError("AuthenticatedClient must be provided.")
+            raise ValueError("A storage backend must be provided.")
         if agent_router is None:
             raise ValueError("Target AgentRouter must be provided.")
 
@@ -1121,7 +1121,7 @@ class PAIRAttack(BaseAttack):
                         request={"prompt": adversarial_prompt[:500]},
                         response=response_preview,
                         step_name=f"Iteration {iteration + 1}, Stream {stream_index + 1}",
-                        step_type=StepTypeEnum.OTHER,
+                        step_type=StepKind.OTHER,
                         metadata={
                             "iteration": iteration + 1,
                             "stream": stream_index + 1,

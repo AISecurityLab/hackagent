@@ -17,11 +17,7 @@ or per-datapoint tracking, use the Tracker class from tracker.py instead.
 from contextlib import contextmanager
 from typing import Any, Dict, Optional
 
-from hackagent.server.storage.enums import (
-    EvaluationStatusEnum,
-    StatusEnum,
-    StepTypeEnum,
-)
+from hackagent.core.contracts import EvalStatus, RunStatus, StepKind
 
 from .context import TrackingContext
 from .audit import AuditPersistenceError, record_run_audit_failure
@@ -56,7 +52,7 @@ class StepTracker:
         >>> with tracker.track_step("Process Data", "STEP1_PROCESS"):
         ...     result = process_data()
         >>>
-        >>> tracker.update_run_status(StatusEnum.COMPLETED)
+        >>> tracker.update_run_status(RunStatus.COMPLETED)
     """
 
     def __init__(self, context: TrackingContext):
@@ -292,7 +288,7 @@ class StepTracker:
             trace_record = self.context.backend.create_trace(
                 result_uuid,
                 sequence=sequence,
-                step_type=StepTypeEnum.OTHER.value,
+                step_type=StepKind.OTHER.value,
                 content=trace_content,
             )
 
@@ -374,7 +370,7 @@ class StepTracker:
             trace_record = self.context.backend.create_trace(
                 result_uuid,
                 sequence=sequence,
-                step_type=StepTypeEnum.OTHER.value,
+                step_type=StepKind.OTHER.value,
                 content=trace_content,
             )
             trace_id = str(trace_record.id)
@@ -410,7 +406,7 @@ class StepTracker:
 
             self.context.backend.update_result(
                 result_uuid,
-                evaluation_status=EvaluationStatusEnum.ERROR_TEST_FRAMEWORK.value,
+                evaluation_status=EvalStatus.ERROR_TEST_FRAMEWORK.value,
                 evaluation_notes=f"Pipeline failed at '{step_name}': {error_message}",
             )
             self.logger.info(f"Updated result with error status for '{step_name}'")
@@ -419,7 +415,7 @@ class StepTracker:
             self.logger.error(f"Failed to update error status: {e}", exc_info=True)
             self.record_failure(f"{step_name}: update error status", e)
 
-    def update_run_status(self, status: StatusEnum) -> bool:
+    def update_run_status(self, status: RunStatus) -> bool:
         """
         Update the run status on the backend.
 
@@ -450,7 +446,7 @@ class StepTracker:
 
     def update_result_status(
         self,
-        evaluation_status: EvaluationStatusEnum,
+        evaluation_status: EvalStatus,
         evaluation_notes: Optional[str] = None,
         agent_specific_data: Optional[Dict[str, Any]] = None,
     ) -> bool:

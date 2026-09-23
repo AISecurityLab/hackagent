@@ -50,8 +50,8 @@ attack are separate free-text strings that you author yourself. See
 ### Instantiate the Vulnerability
 
 ```python
-from hackagent.risks import ModelEvasion
-from hackagent.risks.model_evasion.types import ModelEvasionType
+from hackagent.catalog.risks import ModelEvasion
+from hackagent.catalog.risks.model_evasion.types import ModelEvasionType
 
 # Use all sub-types
 vuln = ModelEvasion()
@@ -67,7 +67,7 @@ vuln = ModelEvasion(types=[
 
 ```python
 from hackagent import HackAgent
-from hackagent.risks.model_evasion import MODEL_EVASION_PROFILE
+from hackagent.catalog.risks.model_evasion import MODEL_EVASION_PROFILE
 
 agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 

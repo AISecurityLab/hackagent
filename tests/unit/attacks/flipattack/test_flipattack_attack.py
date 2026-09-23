@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 
 
 def _make_mock_client():
-    """Create a mock AuthenticatedClient."""
+    """Create a mock storage backend."""
     client = MagicMock()
     client._base_url = "https://api.hackagent.dev"
     client.token = "test-token"
@@ -129,7 +129,7 @@ class TestFlipAttackInitialization:
 
     def test_requires_client(self):
         """Test that client is required."""
-        with pytest.raises(ValueError, match="AuthenticatedClient must be provided"):
+        with pytest.raises(ValueError, match="A storage backend must be provided"):
             FlipAttack(config={}, client=None, agent_router=_make_mock_router())
 
     def test_requires_agent_router(self):

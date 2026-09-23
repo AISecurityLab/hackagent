@@ -5,7 +5,7 @@
 
 import unittest
 
-from hackagent.errors import (
+from hackagent.core.errors import (
     UnexpectedStatus,
     HackAgentError,
     ApiError,

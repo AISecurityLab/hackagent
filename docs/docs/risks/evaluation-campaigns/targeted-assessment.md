@@ -26,10 +26,10 @@ Focus on vulnerabilities specific to Retrieval-Augmented Generation:
 
 ```python
 from hackagent import HackAgent
-from hackagent.risks.vector_embedding_weaknesses_exploit import (
+from hackagent.catalog.risks.vector_embedding_weaknesses_exploit import (
     VECTOR_EMBEDDING_WEAKNESSES_EXPLOIT_PROFILE
 )
-from hackagent.risks.prompt_injection import PROMPT_INJECTION_PROFILE
+from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
 
 agent = HackAgent(
     endpoint="http://localhost:8080/chat",
@@ -73,9 +73,9 @@ Test vulnerabilities specific to AI agents with tool use:
 
 ```python
 from hackagent import HackAgent
-from hackagent.risks.excessive_agency import EXCESSIVE_AGENCY_PROFILE
-from hackagent.risks.malicious_tool_invocation import MALICIOUS_TOOL_INVOCATION_PROFILE
-from hackagent.risks.credential_exposure import CREDENTIAL_EXPOSURE_PROFILE
+from hackagent.catalog.risks.excessive_agency import EXCESSIVE_AGENCY_PROFILE
+from hackagent.catalog.risks.malicious_tool_invocation import MALICIOUS_TOOL_INVOCATION_PROFILE
+from hackagent.catalog.risks.credential_exposure import CREDENTIAL_EXPOSURE_PROFILE
 
 agent = HackAgent(
     endpoint="http://localhost:8080/chat",
@@ -125,9 +125,9 @@ Focus on safety and content quality:
 
 ```python
 from hackagent import HackAgent
-from hackagent.risks.jailbreak import JAILBREAK_PROFILE
-from hackagent.risks.misinformation import MISINFORMATION_PROFILE
-from hackagent.risks.sensitive_information_disclosure import (
+from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
+from hackagent.catalog.risks.misinformation import MISINFORMATION_PROFILE
+from hackagent.catalog.risks.sensitive_information_disclosure import (
     SENSITIVE_INFORMATION_DISCLOSURE_PROFILE
 )
 
@@ -161,11 +161,11 @@ Test publicly exposed endpoints:
 
 ```python
 from hackagent import HackAgent
-from hackagent.risks.public_facing_application_exploitation import (
+from hackagent.catalog.risks.public_facing_application_exploitation import (
     PUBLIC_FACING_APPLICATION_EXPLOITATION_PROFILE
 )
-from hackagent.risks.input_manipulation_attack import INPUT_MANIPULATION_ATTACK_PROFILE
-from hackagent.risks.prompt_injection import PROMPT_INJECTION_PROFILE
+from hackagent.catalog.risks.input_manipulation_attack import INPUT_MANIPULATION_ATTACK_PROFILE
+from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
 
 agent = HackAgent(
     endpoint="http://localhost:8080/chat",
@@ -213,7 +213,7 @@ healthcare_goals = {
     ],
 }
 
-from hackagent.risks.prompt_injection import PROMPT_INJECTION_PROFILE
+from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
 
 attack_config = {
     "attack_type": "pair",
@@ -237,7 +237,7 @@ financial_goals = {
     ],
 }
 
-from hackagent.risks.credential_exposure import CREDENTIAL_EXPOSURE_PROFILE
+from hackagent.catalog.risks.credential_exposure import CREDENTIAL_EXPOSURE_PROFILE
 
 attack_config = {
     "attack_type": "static_template",
@@ -253,7 +253,7 @@ Start with basic attacks and escalate:
 
 ```python
 from hackagent import HackAgent
-from hackagent.risks.jailbreak import JAILBREAK_PROFILE
+from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 
 agent = HackAgent(
     endpoint="http://localhost:8080/chat",

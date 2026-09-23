@@ -32,10 +32,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from hackagent.async_utils import run_coroutine_blocking
+from hackagent.core.async_utils import run_coroutine_blocking
 from hackagent.attacks.shared.progress import create_progress_bar
 from hackagent.attacks.shared.router_factory import create_router
-from hackagent.server.client import AuthenticatedClient
+from hackagent.storage.store import Store
 
 if TYPE_CHECKING:
     from hackagent.router.tracking import Tracker
@@ -114,10 +114,10 @@ class BaseJudgeEvaluator(ABC):
 
     def __init__(
         self,
-        client: AuthenticatedClient,
+        client: Store,
         config: Any,  # EvaluatorConfig dataclass
         run_id: Optional[str] = None,
-        tracking_client: Optional[AuthenticatedClient] = None,
+        tracking_client: Optional[Store] = None,
         tracker: Optional["Tracker"] = None,
     ):
         """
@@ -155,7 +155,7 @@ class BaseJudgeEvaluator(ABC):
             "agent_metadata": config.agent_metadata or {},
         }
 
-        # Handle API key from client (supports both AuthenticatedClient and StorageBackend)
+        # Handle API key from client (supports both Store and Store)
         api_key = (
             self.client.get_api_key()
             if hasattr(self.client, "get_api_key")

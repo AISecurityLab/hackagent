@@ -210,9 +210,7 @@ class TestFormatTaxonomy(unittest.TestCase):
 
 class TestResolveConfig(unittest.TestCase):
     def test_defaults_when_none(self):
-        from hackagent.attacks.techniques.config import (
-            DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
-        )
+        from hackagent.core.defaults import DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER
 
         cfg = GoalCategoryClassifier._resolve_config(None)
         self.assertEqual(cfg["identifier"], DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER)
@@ -323,7 +321,7 @@ class TestCreateClassifierRouter(unittest.TestCase):
         self.assertTrue(mock_router_cls.called)
 
     def test_invalid_agent_type_falls_back_to_ollama(self):
-        from hackagent.router.types import AgentTypeEnum
+        from hackagent.core.contracts import AgentType
 
         router = MagicMock()
         router._agent_registry = {"k": object()}
@@ -334,7 +332,7 @@ class TestCreateClassifierRouter(unittest.TestCase):
                 logging.getLogger("t"),
             )
         self.assertEqual(
-            mock_router_cls.call_args.kwargs["agent_type"], AgentTypeEnum.OLLAMA
+            mock_router_cls.call_args.kwargs["agent_type"], AgentType.OLLAMA
         )
 
     def test_api_key_from_environment(self):

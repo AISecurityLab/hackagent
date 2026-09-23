@@ -9,7 +9,7 @@ import pytest
 
 from hackagent.agent import HackAgent
 from hackagent.attacks.generator import AttackTemplates
-from hackagent.errors import HackAgentError
+from hackagent.core.errors import HackAgentError
 
 
 TRANSLATIONS = {
@@ -22,10 +22,7 @@ TRANSLATIONS = {
 def public_agent():
     backend = MagicMock()
     backend._client = None
-    with (
-        patch("hackagent.agent.AgentRouter"),
-        patch("hackagent.agent.utils.resolve_api_token", return_value=None),
-    ):
+    with patch("hackagent.agent.AgentRouter"):
         agent = HackAgent(
             name="weather-summary",
             endpoint="http://localhost:11434",

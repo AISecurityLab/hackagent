@@ -54,7 +54,7 @@ direction on each row for compact display.
 
 ```python
 def __init__(config: Optional[Dict[str, Any]] = None,
-             client: Optional[AuthenticatedClient] = None,
+             client: Optional[Store] = None,
              agent_router: Optional[AgentRouter] = None)
 ```
 
@@ -64,7 +64,7 @@ Initialize FlowchartAttack with configuration.
 
 - `config` - Optional dictionary containing parameters to override
   :data:`DEFAULT_FC_CONFIG`.
-- `client` - AuthenticatedClient instance passed from the orchestrator.
+- `client` - Store instance passed from the orchestrator.
 - `agent_router` - AgentRouter instance for the target model.
   
 

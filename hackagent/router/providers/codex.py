@@ -26,7 +26,7 @@ import shutil
 import subprocess
 from typing import Any, Dict, List, Optional
 
-from hackagent.logger import get_logger
+from hackagent.core.logging import get_logger
 from hackagent.router import envelope as _envelope
 from hackagent.router.agent import (
     Agent,

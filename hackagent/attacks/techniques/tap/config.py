@@ -9,10 +9,7 @@ from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
-from hackagent.attacks.techniques.config import (
-    DEFAULT_CONFIG_BASE,
-    ConfigBase,
-)
+from hackagent.attacks.techniques.config import DEFAULT_CONFIG_BASE, ConfigBase
 
 
 DEFAULT_TAP_CONFIG: Dict[str, Any] = {

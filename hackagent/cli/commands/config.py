@@ -13,7 +13,7 @@ from rich.table import Table
 
 from hackagent.cli.config import CLIConfig
 from hackagent.cli.utils import display_info, display_success, handle_errors
-from hackagent.config import resolve_remote_base_url
+from hackagent.core.settings import resolve_remote_base_url
 
 console = Console()
 
@@ -177,27 +177,22 @@ def validate(ctx):
 
         from contextlib import nullcontext
 
-        from hackagent.server.api.agent import agent_list
-        from hackagent.server.client import AuthenticatedClient
+        from hackagent.storage.remote import RemoteBackend
 
-        client = AuthenticatedClient(
-            base_url=cli_config.base_url, token=cli_config.api_key, prefix="Bearer"
-        )
+        backend = RemoteBackend.connect(cli_config.base_url, cli_config.api_key)
         spinner = (
             console.status("[bold green]Testing API connection...")
             if cli_config.should_show_info()
             else nullcontext()
         )
         with spinner:
-            # /key and /organization/me are Auth0-only on the deployed API; /agent is
-            # the SDK-primary endpoint that accepts API keys, so probe that.
-            response = agent_list.sync_detailed(client=client)
+            status_code = backend.check_connection()
 
-        if response.status_code == 200:
+        if status_code == 200:
             display_success("✅ Configuration valid - API connection successful")
         else:
             console.print(
-                f"[yellow]⚠️ Configuration valid but API connection issue: Status {response.status_code}"
+                f"[yellow]⚠️ Configuration valid but API connection issue: Status {status_code}"
             )
 
     except ValueError as e:

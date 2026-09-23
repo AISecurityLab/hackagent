@@ -35,8 +35,8 @@ from hackagent.attacks.shared.response_utils import (
     is_guardrail_response,
 )
 from hackagent.attacks.shared.router_factory import create_router
-from hackagent.server.client import AuthenticatedClient
-from hackagent.server.storage.enums import StepTypeEnum
+from hackagent.storage.store import Store
+from hackagent.core.contracts import StepKind
 from hackagent.router.router import AgentRouter
 from hackagent.router.tracking import Context, Tracker
 
@@ -119,7 +119,7 @@ def _resolve_on_topic_judges_config(
 
 
 def _initialize_attacker_router(
-    client: AuthenticatedClient,
+    client: Store,
     config: Dict[str, Any],
     logger: logging.Logger,
 ) -> Tuple[AgentRouter, str]:
@@ -249,7 +249,7 @@ class TapExecutor:
     def __init__(
         self,
         config: Dict[str, Any],
-        client: AuthenticatedClient,
+        client: Store,
         agent_router: AgentRouter,
         logger: logging.Logger,
     ):
@@ -731,7 +731,7 @@ class TapExecutor:
                         request={"prompt": prompt[:500]},
                         response=response_text,
                         step_name=f"Depth {iteration} Candidate",
-                        step_type=StepTypeEnum.OTHER,
+                        step_type=StepKind.OTHER,
                         metadata={
                             "iteration": iteration,
                             "on_topic_score": on_score,
@@ -770,7 +770,7 @@ class TapExecutor:
                 goal_tracker.add_custom_trace(
                     ctx=goal_ctx,
                     step_name=f"Depth {iteration} Summary",
-                    step_type=StepTypeEnum.OTHER,
+                    step_type=StepKind.OTHER,
                     content={
                         "depth": iteration,
                         "branches": depth_summary,
@@ -870,7 +870,7 @@ def execute(
     agent_router: AgentRouter,
     config: Dict[str, Any],
     logger: logging.Logger,
-    client: AuthenticatedClient,
+    client: Store,
 ) -> List[Dict[str, Any]]:
     """
     Pipeline entry point for TAP generation and search.

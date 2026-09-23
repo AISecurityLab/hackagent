@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 
 from hackagent.attacks.techniques.advprefix import generate as advgen
 from hackagent.attacks.techniques.advprefix.generate import PrefixGenerationPipeline
-from hackagent.router.types import AgentTypeEnum
+from hackagent.core.contracts import AgentType
 
 LOGGER = logging.getLogger("test.advprefix.generate")
 LOGGER.addHandler(logging.NullHandler())
@@ -275,7 +275,7 @@ class TestInitializeGenerationRouter(unittest.TestCase):
         kwargs = cls.call_args.kwargs
         self.assertEqual(kwargs["name"], "gen-model")
         self.assertEqual(kwargs["endpoint"], "http://ep")
-        self.assertEqual(kwargs["agent_type"], AgentTypeEnum.OPENAI_SDK)
+        self.assertEqual(kwargs["agent_type"], AgentType.OPENAI_SDK)
         self.assertEqual(kwargs["adapter_operational_config"]["api_key"], "storage-key")
 
     def test_api_key_is_read_from_the_named_environment_variable(self):
@@ -319,7 +319,7 @@ class TestInitializeGenerationRouter(unittest.TestCase):
 
         _, cls = self._init(pipeline)
 
-        self.assertEqual(cls.call_args.kwargs["agent_type"], AgentTypeEnum.LITELLM)
+        self.assertEqual(cls.call_args.kwargs["agent_type"], AgentType.LITELLM)
 
     def test_invalid_agent_type_falls_back_to_openai_sdk(self):
         pipeline = _pipeline(
@@ -328,7 +328,7 @@ class TestInitializeGenerationRouter(unittest.TestCase):
 
         _, cls = self._init(pipeline)
 
-        self.assertEqual(cls.call_args.kwargs["agent_type"], AgentTypeEnum.OPENAI_SDK)
+        self.assertEqual(cls.call_args.kwargs["agent_type"], AgentType.OPENAI_SDK)
 
     def test_router_without_registered_agents_is_rejected(self):
         pipeline = _pipeline()

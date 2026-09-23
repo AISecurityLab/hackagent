@@ -4,22 +4,15 @@
 """A client library for HackAgent — AI Agent Security Testing"""
 
 from .agent import HackAgent
-from .server.client import AuthenticatedClient, Client
-from .logger import setup_package_logging
-from .router.types import AgentTypeEnum
-from .server.storage.base import StorageBackend
-from .server.storage.local import LocalBackend
-from .server.storage.remote import RemoteBackend
-
-# Configure RichHandler for all hackagent.* loggers on first import.
-setup_package_logging()
+from .core.contracts import AgentType
+from .storage.local import LocalBackend
+from .storage.remote import RemoteBackend
+from .storage.store import Store
 
 __all__ = (
-    "AgentTypeEnum",
-    "AuthenticatedClient",
-    "Client",
+    "AgentType",
     "HackAgent",
     "LocalBackend",
     "RemoteBackend",
-    "StorageBackend",
+    "Store",
 )

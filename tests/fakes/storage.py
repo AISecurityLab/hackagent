@@ -3,7 +3,7 @@
 
 """A real storage backend that lives only in memory."""
 
-from hackagent.server.storage.local import LocalBackend
+from hackagent.storage.local import LocalBackend
 
 
 def in_memory_store() -> LocalBackend:

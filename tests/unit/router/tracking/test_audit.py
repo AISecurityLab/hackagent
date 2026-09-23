@@ -13,7 +13,7 @@ from hackagent.router.tracking.audit import (
     AuditPersistenceError,
     record_run_audit_failure,
 )
-from hackagent.server.storage.enums import StatusEnum
+from hackagent.core.contracts import RunStatus
 
 
 class TestRecordRunAuditFailure(unittest.TestCase):
@@ -38,7 +38,7 @@ class TestRecordRunAuditFailure(unittest.TestCase):
 
         kwargs = self.backend.update_run.call_args.kwargs
         self.assertEqual(str(self.backend.update_run.call_args.args[0]), self.run_id)
-        self.assertEqual(kwargs["status"], StatusEnum.FAILED.value)
+        self.assertEqual(kwargs["status"], RunStatus.FAILED.value)
         notes = json.loads(kwargs["run_notes"])
         self.assertEqual(notes["audit_failure"], entry)
 

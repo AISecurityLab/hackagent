@@ -101,23 +101,23 @@ import Link from '@docusaurus/Link';
 **CLI (`hackagent/cli/`)**
 - A Click-based CLI (`hackagent init`, `agent`, `eval`, `scan`, `claude`, `codex`, `web`, `datasets`, `results`, `config`, `examples`) that wraps the SDK for interactive and scripted use. See [CLI Reference](../cli/overview.md).
 
-**Local Dashboard (`hackagent/server/dashboard/`)**
-- A [NiceGUI](https://nicegui.io/) app (`hackagent web`) that reads directly from the local SQLite database to visualize runs, results, and attack traces — no separate backend process required.
+**Web UI (`hackagent/server/webui/`)**
+- A Flask app (`hackagent web`) that serves the HackAgent web app bundle. In local mode it answers the app's API calls from the local SQLite database to show runs, results, and attack traces; with an API key it proxies them to the HackAgent API. No separate backend process is required.
 
 ### Router
 
 **`hackagent.router.AgentRouter`**
-- Resolves an `AgentTypeEnum` (e.g. `GOOGLE_ADK`, `CLAUDE_CODE`, `CODEX`, `HERMES`, `WEB`, `LITELLM`, `OPENAI_SDK`, `OLLAMA`, `LANGCHAIN`) to a provider adapter and dispatches attack prompts to the target agent.
+- Resolves an `AgentType` (e.g. `GOOGLE_ADK`, `CLAUDE_CODE`, `CODEX`, `HERMES`, `WEB`, `LITELLM`, `OPENAI_SDK`, `OLLAMA`, `LANGCHAIN`) to a provider adapter and dispatches attack prompts to the target agent.
 - `GOOGLE_ADK`, `CLAUDE_CODE`, `CODEX`, `HERMES`, and `WEB` use dedicated adapter classes in `hackagent/router/providers/`. The remaining chat-completions-style types are driven generically through `provider_config.py` + `_ChatRegistration`.
 - Tracks per-step traces via `hackagent/router/tracking/` for later inspection in the dashboard.
 
 ### Attack Framework (`hackagent/attacks/`)
 
 - **Registry & orchestrator**: `registry.py` maps attack-technique names to implementations; `orchestrator.py` runs a technique end-to-end against a configured agent.
-- **Techniques** (`attacks/techniques/`): Baseline, StaticTemplate, FlipAttack, BON, CipherChat, H4rm3l, MML, FC/tFC, PAP, PAIR, TAP, AdvPrefix, AutoDAN-Turbo, Crescendo, RAG (indirect prompt injection). Each technique has exactly one primary category (static / adaptive / multi-turn) plus optional tags in `hackagent.attacks.taxonomy`. See [Attack taxonomy](../attacks/taxonomy.mdx) and the [Attacks](../attacks/index.mdx) catalog.
+- **Techniques** (`attacks/techniques/`): Baseline, StaticTemplate, FlipAttack, BON, CipherChat, H4rm3l, MML, FC/tFC, PAP, PAIR, TAP, AdvPrefix, AutoDAN-Turbo, Crescendo, RAG (indirect prompt injection). Each technique has exactly one primary category (static / adaptive / multi-turn) plus optional tags in `hackagent.catalog.taxonomy`. See [Attack taxonomy](../attacks/taxonomy.mdx) and the [Attacks](../attacks/index.mdx) catalog.
 - **Evaluator** (`attacks/evaluator/`): shared judge/pattern-based evaluators and metrics used across techniques to score attack success.
 
-### Risk Profiles (`hackagent/risks/`)
+### Risk Profiles (`hackagent/catalog/risks/`)
 
 - One package per OWASP-style LLM risk category (jailbreak, prompt injection, sensitive information disclosure, excessive agency, model evasion, etc.), each defining vulnerability types and a `profile.py` that maps the category to relevant attack techniques. See [AI Risks](../risks/index.mdx).
 
@@ -131,9 +131,9 @@ import Link from '@docusaurus/Link';
 - SQLite database at `~/.local/share/hackagent/hackagent.db`. No network access or account required — this is what most SDK/CLI usage runs against.
 
 **`RemoteBackend` (optional)**
-- Used automatically once a HackAgent Cloud API key is resolved. Talks to `https://api.hackagent.dev` through the generated OpenAPI client in `hackagent/server/`, enabling team dashboards and hosted result storage.
+- Used automatically once a HackAgent Cloud API key is resolved. Talks to `https://api.hackagent.dev` through the generated OpenAPI client in `hackagent/storage/_http/`, enabling team dashboards and hosted result storage.
 
-Both backends implement the same `StorageBackend` protocol (`hackagent/server/storage/base.py`), so the router, attack orchestrator, tracker, and TUI/dashboard code are fully decoupled from where results are actually persisted.
+Both backends implement the same `Store` protocol (`hackagent/storage/store.py`), so the router, attack orchestrator, tracker, and TUI/dashboard code are fully decoupled from where results are actually persisted.
 
 ## Attack Execution Flow
 

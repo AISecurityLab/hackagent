@@ -50,7 +50,7 @@ from hackagent.attacks.shared.response_utils import (
 from hackagent.router.router import AgentRouter
 
 if TYPE_CHECKING:
-    from hackagent.server.client import AuthenticatedClient
+    from hackagent.storage.store import Store
     from hackagent.router.tracking import Tracker
     from hackagent.router.tracking.tracker import Context
 
@@ -237,9 +237,7 @@ def execute(
     candidate_workers = max(1, int(num_concurrent_k))
     target_max_tokens = config.get("max_tokens")
     tracker: Optional["Tracker"] = config.get("_tracker")
-    client: Optional["AuthenticatedClient"] = config.get("_backend") or config.get(
-        "_client"
-    )
+    client: Optional["Store"] = config.get("_backend") or config.get("_client")
 
     victim_key = str(agent_router.backend_agent.id)
     logger.info(

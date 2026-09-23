@@ -21,10 +21,12 @@ try:
 except ImportError:
     tomllib = None  # Python < 3.11 fallback handled in get_current_version()
 
-# Prefixes excluded from API docs (CLI internals, web UI serving layer)
+# Prefixes excluded from API docs (CLI internals, web UI serving layer, and the
+# generated HTTP client that is private to hackagent.storage.remote)
 _EXCLUDE_PREFIXES = (
     "hackagent.cli",
     "hackagent.server.webui",
+    "hackagent.storage._http",
 )
 
 

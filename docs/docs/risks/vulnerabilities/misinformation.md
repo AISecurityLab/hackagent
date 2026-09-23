@@ -46,8 +46,8 @@ attack are separate free-text strings that you author yourself. See
 ### Instantiate the Vulnerability
 
 ```python
-from hackagent.risks import Misinformation
-from hackagent.risks.misinformation.types import MisinformationType
+from hackagent.catalog.risks import Misinformation
+from hackagent.catalog.risks.misinformation.types import MisinformationType
 
 # Use all sub-types
 vuln = Misinformation()
@@ -63,7 +63,7 @@ vuln = Misinformation(types=[
 
 ```python
 from hackagent import HackAgent
-from hackagent.risks.misinformation import MISINFORMATION_PROFILE
+from hackagent.catalog.risks.misinformation import MISINFORMATION_PROFILE
 
 agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 

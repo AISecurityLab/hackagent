@@ -6,7 +6,7 @@
 import asyncio
 import unittest
 
-from hackagent.async_utils import run_coroutine_blocking
+from hackagent.core.async_utils import run_coroutine_blocking
 
 
 async def _add(left: int, right: int) -> int:

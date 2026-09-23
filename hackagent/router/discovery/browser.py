@@ -19,7 +19,7 @@ import os
 import subprocess
 import sys
 
-from hackagent.logger import get_logger
+from hackagent.core.logging import get_logger
 
 logger = get_logger(__name__)
 

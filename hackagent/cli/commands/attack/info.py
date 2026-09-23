@@ -12,12 +12,12 @@ from hackagent.cli.utils import (
 )
 
 
-from hackagent.attacks.taxonomy import (
+from hackagent.catalog.taxonomy import (
     AttackCategory,
     get_attack_taxonomy,
     grouped_attack_keys,
 )
-from hackagent.cli.commands.attack.catalog import ATTACK_CATALOG
+from hackagent.catalog.attacks import ATTACK_CATALOG
 from hackagent.cli.commands.attack.display import (
     _display_advprefix_info,
     _display_generic_attack_info,

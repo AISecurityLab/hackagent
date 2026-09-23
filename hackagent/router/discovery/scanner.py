@@ -26,8 +26,8 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
-from hackagent.config import DEFAULT_LOCAL_LITELLM_MODEL
-from hackagent.logger import get_logger
+from hackagent.core.defaults import DEFAULT_LOCAL_LITELLM_MODEL
+from hackagent.core.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -186,7 +186,7 @@ def build_attack_catalog(*, include_advanced: bool = False) -> List[Dict[str, An
     the planner picks the *strategy*, while model credentials come from the run
     config.
     """
-    from hackagent.attacks.taxonomy import get_attack_taxonomy
+    from hackagent.catalog.taxonomy import get_attack_taxonomy
 
     catalog: List[Dict[str, Any]] = []
     for key, spec in _attack_specs().get_all_attack_specs().items():

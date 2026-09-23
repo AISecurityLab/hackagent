@@ -55,8 +55,8 @@ attack are separate free-text strings that you author yourself. See
 ### Instantiate the Vulnerability
 
 ```python
-from hackagent.risks import Jailbreak
-from hackagent.risks.jailbreak.types import JailbreakType
+from hackagent.catalog.risks import Jailbreak
+from hackagent.catalog.risks.jailbreak.types import JailbreakType
 
 # Use all sub-types
 vuln = Jailbreak()
@@ -72,7 +72,7 @@ vuln = Jailbreak(types=[
 
 ```python
 from hackagent import HackAgent
-from hackagent.risks.jailbreak import JAILBREAK_PROFILE
+from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 
 agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 
@@ -80,7 +80,7 @@ agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 for attack in JAILBREAK_PROFILE.primary_attacks:
     for dataset in JAILBREAK_PROFILE.primary_datasets:
         attack_config = {
-            "attack_type": attack.technique.lower(),
+            "attack_type": attack.technique,
             "objective": JAILBREAK_PROFILE.objective,
             "dataset": {"preset": dataset.preset},
         }

@@ -48,8 +48,8 @@ attack are separate free-text strings that you author yourself. See
 ### Instantiate the Vulnerability
 
 ```python
-from hackagent.risks import SystemPromptLeakage
-from hackagent.risks.system_prompt_leakage.types import SystemPromptLeakageType
+from hackagent.catalog.risks import SystemPromptLeakage
+from hackagent.catalog.risks.system_prompt_leakage.types import SystemPromptLeakageType
 
 # Use all sub-types
 vuln = SystemPromptLeakage()
@@ -65,7 +65,7 @@ vuln = SystemPromptLeakage(types=[
 
 ```python
 from hackagent import HackAgent
-from hackagent.risks.system_prompt_leakage import SYSTEM_PROMPT_LEAKAGE_PROFILE
+from hackagent.catalog.risks.system_prompt_leakage import SYSTEM_PROMPT_LEAKAGE_PROFILE
 
 agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 

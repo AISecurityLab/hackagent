@@ -163,12 +163,12 @@ results = agent.hack(
 **Tool-output IPI** (`attack_type: "tool_output_ipi"`) injects adversarial instructions into tool / function-call observations after a benign user task (InjecAgent / OPI). **Category:** Adaptive. **Tags:** Indirect (not `rag`). Full configuration: [Tool-output IPI](../attacks/tool_output_ipi.md).
 
 ```python
-from hackagent import HackAgent, AgentTypeEnum
+from hackagent import HackAgent, AgentType
 
 agent = HackAgent(
     name="pc_tool_sandbox",
     endpoint="http://localhost:8000",
-    agent_type=AgentTypeEnum.OPENAI_SDK,
+    agent_type=AgentType.OPENAI_SDK,
 )
 
 results = agent.hack(

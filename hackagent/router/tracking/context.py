@@ -10,12 +10,12 @@ configuration and state that can be passed between components.
 """
 
 import logging
-from hackagent.logger import get_logger
+from hackagent.core.logging import get_logger
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 from uuid import UUID
 
-from hackagent.server.storage.base import StorageBackend
+from hackagent.storage.store import Store
 
 
 @dataclass
@@ -46,7 +46,7 @@ class TrackingContext:
         ...     tracker = StepTracker(context)
     """
 
-    backend: "Optional[StorageBackend]" = None
+    backend: "Optional[Store]" = None
     run_id: Optional[str] = None
     parent_result_id: Optional[str] = None
     logger: Optional[logging.Logger] = None

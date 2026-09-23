@@ -17,7 +17,7 @@ from hackagent.attacks.techniques.crescendo.attack import CrescendoAttack
 from hackagent.attacks.techniques.h4rm3l.attack import H4rm3lAttack
 from hackagent.attacks.techniques.pair.config import PairConfig
 from hackagent.attacks.techniques.tap.attack import TAPAttack
-from hackagent.attacks.techniques.config import (
+from hackagent.core.defaults import (
     DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE,
     DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT,
     DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
@@ -744,9 +744,7 @@ class TestDefaultCategoryClassifierPreflight(unittest.TestCase):
 
         mock_pull.assert_called_once()
 
-        from hackagent.attacks.techniques.config import (
-            DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
-        )
+        from hackagent.core.defaults import DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER
 
         self.assertIn(DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER, str(ctx.exception))
         mock_create_run.assert_not_called()

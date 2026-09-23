@@ -68,10 +68,10 @@ Class attributes for subclasses:
 #### \_\_init\_\_
 
 ```python
-def __init__(client: AuthenticatedClient,
+def __init__(client: Store,
              config: Any,
              run_id: Optional[str] = None,
-             tracking_client: Optional[AuthenticatedClient] = None,
+             tracking_client: Optional[Store] = None,
              tracker: Optional["Tracker"] = None)
 ```
 

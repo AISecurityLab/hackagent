@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Union
 from textual.widgets.selection_list import Selection
 
 
-from hackagent.attacks.taxonomy import grouped_attack_keys
+from hackagent.catalog.taxonomy import grouped_attack_keys
 from hackagent.cli.tui.attack_specs import (
     ConfigField,
     get_all_attack_specs,
@@ -65,12 +65,10 @@ def _default_campaign_attack_keys() -> List[str]:
     resolvable (e.g. specs were pruned in a downstream deployment).
     """
     try:
-        from hackagent.risks.jailbreak import JAILBREAK_PROFILE
+        from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 
         available = get_all_attack_specs()
-        keys = [
-            rec.technique.strip().lower() for rec in JAILBREAK_PROFILE.primary_attacks
-        ]
+        keys = [rec.technique for rec in JAILBREAK_PROFILE.primary_attacks]
         keys = [key for key in keys if key in available]
         if keys:
             return keys

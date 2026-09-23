@@ -22,14 +22,14 @@ use the StepTracker class from step.py instead.
 import logging
 import threading
 import time
-from hackagent.logger import get_logger
+from hackagent.core.logging import get_logger
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from hackagent.server.storage.base import StorageBackend
-from hackagent.server.storage.enums import EvaluationStatusEnum, StepTypeEnum
+from hackagent.storage.store import Store
+from hackagent.core.contracts import EvalStatus, StepKind
 
 from .category_classifier import (
     GoalCategoryClassifier,
@@ -117,7 +117,7 @@ class Tracker:
 
     def __init__(
         self,
-        backend: StorageBackend,
+        backend: Store,
         run_id: str,
         logger: Optional[logging.Logger] = None,
         attack_type: Optional[str] = None,
@@ -286,7 +286,7 @@ class Tracker:
             self._add_trace(
                 ctx,
                 step_name="Goal Setup",
-                step_type=StepTypeEnum.OTHER,
+                step_type=StepKind.OTHER,
                 content={
                     "goal": goal,
                     "goal_index": goal_index,
@@ -354,7 +354,7 @@ class Tracker:
         request: Dict[str, Any],
         response: Any,
         step_name: str = "Agent Interaction",
-        step_type: StepTypeEnum = StepTypeEnum.OTHER,
+        step_type: StepKind = StepKind.OTHER,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
@@ -419,14 +419,14 @@ class Tracker:
         if metadata:
             content["metadata"] = sanitize_for_json(metadata)
 
-        self._add_trace(ctx, "Evaluation", StepTypeEnum.OTHER, content)
+        self._add_trace(ctx, "Evaluation", StepKind.OTHER, content)
 
     def add_custom_trace(
         self,
         ctx: Context,
         step_name: str,
         content: Dict[str, Any],
-        step_type: StepTypeEnum = StepTypeEnum.OTHER,
+        step_type: StepKind = StepKind.OTHER,
     ) -> None:
         """
         Add a custom trace with arbitrary content.
@@ -443,7 +443,7 @@ class Tracker:
         self,
         ctx: Context,
         step_name: str,
-        step_type: StepTypeEnum,
+        step_type: StepKind,
         content: Dict[str, Any],
     ) -> Optional[str]:
         """
@@ -563,7 +563,7 @@ class Tracker:
                 existing_status = str(
                     getattr(existing, "evaluation_status", "") or ""
                 ).upper()
-                if EvaluationStatusEnum.SUCCESSFUL_JAILBREAK.value in existing_status:
+                if EvalStatus.SUCCESSFUL_JAILBREAK.value in existing_status:
                     final_success = True
                     preserved_prior_success = True
                     self.logger.info(
@@ -619,9 +619,9 @@ class Tracker:
                 else:
                     eval_status_value = str(evaluation_status)
             elif final_success:
-                eval_status_value = EvaluationStatusEnum.SUCCESSFUL_JAILBREAK.value
+                eval_status_value = EvalStatus.SUCCESSFUL_JAILBREAK.value
             else:
-                eval_status_value = EvaluationStatusEnum.FAILED_JAILBREAK.value
+                eval_status_value = EvalStatus.FAILED_JAILBREAK.value
 
             # Backend requires non-null evaluation_notes
             if preserved_prior_success:

@@ -30,7 +30,7 @@ def results():
 def _show_logo_once():
     """Show the logo once per session"""
     if not hasattr(_show_logo_once, "_shown"):
-        from hackagent.utils import display_hackagent_splash
+        from hackagent.cli.banner import display_hackagent_splash
 
         display_hackagent_splash()
         _show_logo_once._shown = True
@@ -67,7 +67,7 @@ def show(ctx, result_id):
     try:
         from uuid import UUID
 
-        from hackagent.server.storage.local import LocalBackend
+        from hackagent.storage.local import LocalBackend
 
         backend = LocalBackend()
         with console.status(f"[bold green]Fetching result {result_id}..."):
@@ -149,7 +149,7 @@ def summary(ctx, status, agent, attack_type, days):
     cli_config.validate()
 
     try:
-        from hackagent.server.storage.local import LocalBackend
+        from hackagent.storage.local import LocalBackend
 
         backend = LocalBackend()
         result_items = []

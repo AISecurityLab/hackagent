@@ -19,7 +19,7 @@ from hackagent.router.providers.web import (
     _last_user_text,
     _new_reply,
 )
-from hackagent.router.types import AgentTypeEnum
+from hackagent.core.contracts import AgentType
 
 logging.disable(logging.CRITICAL)
 
@@ -105,8 +105,8 @@ class TestWebAgentInit(unittest.TestCase):
         self.assertIn(f"hackagent_web_{agent.id}", providers)
 
     def test_agent_type_resolves(self):
-        self.assertEqual(AgentTypeEnum("web"), AgentTypeEnum.WEB)
-        self.assertEqual(AgentTypeEnum("browser"), AgentTypeEnum.WEB)
+        self.assertEqual(AgentType("web"), AgentType.WEB)
+        self.assertEqual(AgentType("browser"), AgentType.WEB)
 
     def test_input_selector_flows_to_session(self):
         agent = WebAgent(
@@ -435,7 +435,7 @@ class TestRouterRegistration(unittest.TestCase):
     def test_web_agent_in_adapter_map(self):
         from hackagent.router.router import AGENT_TYPE_TO_ADAPTER_MAP
 
-        self.assertIs(AGENT_TYPE_TO_ADAPTER_MAP[AgentTypeEnum.WEB], WebAgent)
+        self.assertIs(AGENT_TYPE_TO_ADAPTER_MAP[AgentType.WEB], WebAgent)
 
 
 if __name__ == "__main__":

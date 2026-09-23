@@ -97,7 +97,7 @@ def test_rich_and_click_smoke_glyphs_on_cp1252(monkeypatch: pytest.MonkeyPatch) 
     from rich.console import Console
 
     from hackagent.cli.utils import display_error
-    from hackagent.utils import display_hackagent_splash
+    from hackagent.cli.banner import display_hackagent_splash
 
     stream = _cp1252_text_stream()
     monkeypatch.setattr(sys, "stdout", stream)

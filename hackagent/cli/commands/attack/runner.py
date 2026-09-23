@@ -14,7 +14,6 @@ from hackagent.cli.config import CLIConfig
 from hackagent.cli.utils import (
     display_info,
     display_success,
-    get_agent_type_enum,
 )
 
 
@@ -26,6 +25,7 @@ from hackagent.cli.commands.attack.display import (
     _display_attack_results,
     _display_attack_summary,
 )
+from hackagent.core.contracts import AgentType
 
 
 console = Console()
@@ -98,10 +98,10 @@ def _run_attack_command(
             ctx.exit(1)
 
     # Convert agent type
-    agent_type_enum = get_agent_type_enum(agent_type)
+    agent_type_enum = AgentType.parse(agent_type)
 
     # Display logo first
-    from hackagent.utils import display_hackagent_splash
+    from hackagent.cli.banner import display_hackagent_splash
 
     display_hackagent_splash()
 

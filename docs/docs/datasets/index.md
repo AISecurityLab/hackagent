@@ -59,12 +59,12 @@ pip install hackagent
 Easiest way to get started with industry-standard benchmarks:
 
 ```python
-from hackagent import HackAgent, AgentTypeEnum
+from hackagent import HackAgent, AgentType
 
 agent = HackAgent(
     name="my_agent",
     endpoint="http://localhost:8000",
-    agent_type=AgentTypeEnum.GOOGLE_ADK
+    agent_type=AgentType.GOOGLE_ADK
 )
 
 # Use AgentHarm benchmark with 50 random samples

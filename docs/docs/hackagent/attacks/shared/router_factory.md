@@ -56,7 +56,7 @@ Create an AgentRouter from a configuration dictionary.
 
 **Arguments**:
 
-- `backend` - StorageBackend providing default API key.
+- `backend` - Store providing default API key.
 - `config` - Configuration dictionary (identifier, endpoint, agent_type, api_key etc.)
 - `logger` - Logger instance.
 - `router_name` - Human-readable name for logging.

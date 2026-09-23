@@ -13,7 +13,6 @@ from hackagent import HackAgent
 from hackagent.cli.config import CLIConfig
 from hackagent.cli.utils import (
     display_success,
-    get_agent_type_enum,
     handle_errors,
     load_config_file,
 )
@@ -26,6 +25,7 @@ from hackagent.cli.commands.attack.config import (
 )
 from hackagent.cli.commands.attack.display import _display_attack_results
 from hackagent.cli.commands.attack.group import eval_cmd
+from hackagent.core.contracts import AgentType
 
 
 console = Console()
@@ -174,7 +174,7 @@ def chain(
     )
     attack_chain_summary = " → ".join(str(step["attack_type"]) for step in attacks)
 
-    from hackagent.utils import display_hackagent_splash
+    from hackagent.cli.banner import display_hackagent_splash
 
     display_hackagent_splash()
 
@@ -196,7 +196,7 @@ def chain(
         display_success("✅ Configuration validation passed")
         return
 
-    agent_type_enum = get_agent_type_enum(agent_type)
+    agent_type_enum = AgentType.parse(agent_type)
 
     with console.status("[bold green]Initializing HackAgent..."):
         try:

@@ -70,8 +70,8 @@ For retrieval-augmented targets, pair this profile with a [RAG Attack](../../att
 ### Instantiate the Vulnerability
 
 ```python
-from hackagent.risks import PromptInjection
-from hackagent.risks.prompt_injection.types import PromptInjectionType
+from hackagent.catalog.risks import PromptInjection
+from hackagent.catalog.risks.prompt_injection.types import PromptInjectionType
 
 # Use all sub-types
 vuln = PromptInjection()
@@ -87,7 +87,7 @@ vuln = PromptInjection(types=[
 
 ```python
 from hackagent import HackAgent
-from hackagent.risks.prompt_injection import PROMPT_INJECTION_PROFILE
+from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
 
 agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
 

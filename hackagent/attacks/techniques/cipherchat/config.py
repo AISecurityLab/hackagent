@@ -7,10 +7,7 @@ from typing import Any, Dict
 
 from pydantic import BaseModel, Field
 
-from hackagent.attacks.techniques.config import (
-    DEFAULT_CONFIG_BASE,
-    ConfigBase,
-)
+from hackagent.attacks.techniques.config import DEFAULT_CONFIG_BASE, ConfigBase
 
 
 DEFAULT_CIPHERCHAT_CONFIG: Dict[str, Any] = {

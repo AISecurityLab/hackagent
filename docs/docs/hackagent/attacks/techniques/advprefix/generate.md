@@ -53,7 +53,7 @@ Key Benefits:
 ```python
 def __init__(config: Dict[str, Any],
              logger: logging.Logger,
-             client: AuthenticatedClient,
+             client: Store,
              agent_router: Optional[AgentRouter] = None)
 ```
 

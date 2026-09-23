@@ -50,11 +50,11 @@ threat_model = {
 Choose threat profiles matching your threat model:
 
 ```python
-from hackagent.risks.prompt_injection import PROMPT_INJECTION_PROFILE
-from hackagent.risks.sensitive_information_disclosure import (
+from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
+from hackagent.catalog.risks.sensitive_information_disclosure import (
     SENSITIVE_INFORMATION_DISCLOSURE_PROFILE
 )
-from hackagent.risks.jailbreak import JAILBREAK_PROFILE
+from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 
 selected_profiles = [
     PROMPT_INJECTION_PROFILE,
@@ -233,8 +233,8 @@ def scheduled_security_scan():
     )
 
     # Quick scan with core vulnerabilities
-    from hackagent.risks.jailbreak import JAILBREAK_PROFILE
-    from hackagent.risks.prompt_injection import PROMPT_INJECTION_PROFILE
+    from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
+    from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
 
     for profile in [JAILBREAK_PROFILE, PROMPT_INJECTION_PROFILE]:
         attack_config = {

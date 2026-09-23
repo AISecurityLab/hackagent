@@ -123,7 +123,7 @@ class LLMGuardrail(BaseGuardrail):
 
     Args:
         config: Guardrail model configuration dict.
-        backend: ``StorageBackend`` instance (forwarded to ``create_router``).
+        backend: ``Store`` instance (forwarded to ``create_router``).
     """
 
     def __init__(self, config: Dict[str, Any], backend: Any) -> None:
@@ -248,7 +248,7 @@ def create_guardrail_from_config(
     Args:
         config: Guardrail config dict (same fields as router config plus
             optional ``system_prompt``).
-        backend: ``StorageBackend`` instance forwarded to the guardrail.
+        backend: ``Store`` instance forwarded to the guardrail.
 
     Returns:
         A ready-to-use :class:`BaseGuardrail` instance.
