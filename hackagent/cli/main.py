@@ -193,11 +193,9 @@ def init(ctx):
         )
 
         try:
-            from hackagent.attacks.techniques.fc.flowchart_renderer import (
-                ensure_graphviz_dot_available,
-            )
+            from hackagent.attacks._lib.graphviz import ensure_graphviz
 
-            existing_dot = ensure_graphviz_dot_available(allow_download=False)
+            existing_dot = ensure_graphviz(allow_download=False)
             if existing_dot:
                 console.print(
                     f"[green]✅ Graphviz detected:[/green] [dim]{existing_dot}[/dim]"
@@ -209,7 +207,7 @@ def init(ctx):
                 )
 
                 if should_prefetch:
-                    dot_path = ensure_graphviz_dot_available(allow_download=True)
+                    dot_path = ensure_graphviz(allow_download=True)
                     if dot_path:
                         console.print(
                             f"[green]✅ Graphviz ready:[/green] [dim]{dot_path}[/dim]"

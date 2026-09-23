@@ -250,6 +250,23 @@ class Completion(BaseModel):
         """True when the call produced a usable response."""
         return self.error is None and self.guardrail is None
 
+    @property
+    def blocked(self) -> bool:
+        """True when a guardrail blocked or censored the call."""
+        return self.guardrail is not None
+
+    @property
+    def guardrail_info(self) -> Dict[str, Any]:
+        """Guardrail metadata as a plain dict (empty when not blocked)."""
+        if self.guardrail is None:
+            return {}
+        return {
+            "side": self.guardrail.side,
+            "message": self.guardrail.message,
+            "categories": list(self.guardrail.categories),
+            "reasoning": self.guardrail.reasoning,
+        }
+
 
 # ---------------------------------------------------------------------------
 # Model and judge specifications
