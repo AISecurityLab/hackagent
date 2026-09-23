@@ -56,6 +56,7 @@ from hackagent.core.defaults import (
     DEFAULT_REMOTE_ROLE_ENDPOINT,
 )
 from hackagent.core.contracts import RunStatus
+from hackagent.attacks.config import ATTACK_ROLE_PATHS, role_family_map
 from hackagent.attacks.types import (
     AttackResult,
     attack_results_to_rows,
@@ -121,92 +122,6 @@ class AttackOrchestrator:
     # Model-role extraction map used by pre-run availability preflight.
     # Tuple format: (role_name, path_tuple, is_list, role_family_for_defaults)
     # role_family_for_defaults drives remote/local auto-default injection.
-    _ATTACK_MODEL_ROLE_PATHS: Dict[
-        str, Tuple[Tuple[str, Tuple[str, ...], bool, Optional[str]], ...]
-    ] = {
-        "advprefix": (
-            ("attacker", ("attacker",), False, "attacker"),
-            # ("judge", ("judge",), False, "judge"),
-            ("judge", ("judges",), True, "judge"),
-        ),
-        "static_template": (
-            # ("judge", ("judge",), False, "judge"),
-            ("judge", ("judges",), True, "judge"),
-        ),
-        "flipattack": (
-            # ("judge", ("judge",), False, "judge"),
-            ("judge", ("judges",), True, "judge"),
-        ),
-        "tap": (
-            ("attacker", ("attacker",), False, "attacker"),
-            # ("judge", ("judge",), False, "judge"),
-            ("judge", ("judges",), True, "judge"),
-            ("on_topic_judge", ("on_topic_judge",), False, None),
-        ),
-        "pair": (
-            ("attacker", ("attacker",), False, "attacker"),
-            ("judge", ("judge",), False, "judge"),
-            ("judge", ("scorer",), False, "judge"),
-        ),
-        "crescendo": (
-            # Crescendo's judge is also its per-turn 1--10 scorer.  These
-            # paths make the target, attacker, judge and category classifier
-            # all participate in the same availability preflight flow as the
-            # other iterative attacks.
-            ("attacker", ("attacker",), False, "attacker"),
-            ("judge", ("judge",), False, "judge"),
-        ),
-        "autodan_turbo": (
-            ("attacker", ("attacker",), False, "attacker"),
-            ("judge", ("judge",), False, "judge"),
-            ("judge", ("scorer",), False, "judge"),
-            ("summarizer", ("summarizer",), False, "attacker"),
-            ("embedder", ("embedder",), False, None),
-        ),
-        "bon": (
-            # ("judge", ("judge",), False, "judge"),
-            ("judge", ("judges",), True, "judge"),
-        ),
-        "cipherchat": (
-            # ("judge", ("judge",), False, "judge"),
-            ("judge", ("judges",), True, "judge"),
-        ),
-        "h4rm3l": (
-            ("judge", ("judge",), False, "judge"),
-            ("judge", ("judges",), True, "judge"),
-            ("decorator_llm", ("decorator_llm",), False, "attacker"),
-        ),
-        "pap": (
-            ("attacker", ("attacker",), False, "attacker"),
-            # ("judge", ("judge",), False, "judge"),
-            ("judge", ("judges",), True, "judge"),
-        ),
-        "rag": (
-            ("attacker", ("attacker",), False, "attacker"),
-            # ("judge", ("judge",), False, "judge"),
-            ("judge", ("judges",), True, "judge"),
-            ("embedder", ("rag_injection_params", "embedder"), False, None),
-        ),
-        "tool_output_ipi": (
-            ("attacker", ("attacker",), False, "attacker"),
-            # ("judge", ("judge",), False, "judge"),
-            ("judge", ("judges",), True, "judge"),
-        ),
-        "fc": (
-            ("step_generator", ("step_generator",), False, "attacker"),
-            # ("judge", ("judge",), False, "judge"),
-            ("judge", ("judges",), True, "judge"),
-        ),
-        "tfc": (
-            ("step_generator", ("step_generator",), False, "attacker"),
-            # ("judge", ("judge",), False, "judge"),
-            ("judge", ("judges",), True, "judge"),
-        ),
-        "mml": (
-            # ("judge", ("judge",), False, "judge"),
-            ("judge", ("judges",), True, "judge"),
-        ),
-    }
 
     # Accepted aliases for attack names used by registry/UI labels.
     _ATTACK_TYPE_ALIASES: Dict[str, str] = {
@@ -405,13 +320,8 @@ class AttackOrchestrator:
 
     @classmethod
     def _role_defaults_mapping_for_attack(cls, attack_type: str) -> Dict[str, str]:
-        """Build role->family map from _ATTACK_MODEL_ROLE_PATHS metadata."""
-        role_specs = cls._ATTACK_MODEL_ROLE_PATHS.get(attack_type) or ()
-        mapping: Dict[str, str] = {}
-        for role_name, _, _, role_family in role_specs:
-            if role_family in {"attacker", "judge"} and role_name not in mapping:
-                mapping[role_name] = role_family
-        return mapping
+        """Build role->family map from ATTACK_ROLE_PATHS metadata."""
+        return role_family_map(attack_type)
 
     def _apply_mode_based_role_defaults(
         self, attack_config: Dict[str, Any]
@@ -947,7 +857,7 @@ class AttackOrchestrator:
             if alias:
                 return alias
 
-            if candidate in cls._ATTACK_MODEL_ROLE_PATHS:
+            if candidate in ATTACK_ROLE_PATHS:
                 return candidate
 
         return deduped_candidates[0]
@@ -1147,7 +1057,7 @@ class AttackOrchestrator:
         else:
             raw_attack_type = attack_config.get("attack_type") or self.attack_type
             attack_type = self._normalize_attack_type_for_preflight(raw_attack_type)
-            role_specs = self._ATTACK_MODEL_ROLE_PATHS.get(attack_type)
+            role_specs = ATTACK_ROLE_PATHS.get(attack_type)
 
             if role_specs:
                 for role, path, is_list, _ in role_specs:

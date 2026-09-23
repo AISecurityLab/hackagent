@@ -59,25 +59,20 @@ class TestBaseAttackInfrastructure(unittest.TestCase):
 
         self.assertIn("output_dir", str(context.exception).lower())
 
-    def test_setup_logging_creates_console_handler(self):
-        """Test that logging setup creates a console handler."""
+    def test_setup_logging_is_noop(self):
+        """BaseAttack no longer installs logging handlers (Phase 4)."""
 
         class TestAttack(BaseAttack):
             def _get_pipeline_steps(self):
                 return []
 
-            def run(self, **kwargs):
-                pass
-
-        mock_logger = MagicMock()
-        mock_logger.handlers = []
+            def run(self, goals=None, **kwargs):
+                return []
 
         attack = TestAttack(self.test_config, self.mock_client, self.mock_agent_router)
-        attack.logger = mock_logger
+        before = list(attack.logger.handlers)
         attack._setup_logging()
-
-        # Verify logger was configured
-        mock_logger.setLevel.assert_called()
+        self.assertEqual(list(attack.logger.handlers), before)
 
     @patch("hackagent.router.tracking.coordinator.TrackingCoordinator.create")
     def test_initialize_coordinator_creates_coordinator(self, mock_create):

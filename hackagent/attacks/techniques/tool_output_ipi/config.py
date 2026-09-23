@@ -19,7 +19,7 @@ Based on:
     - ASB OPI (ICLR 2025) — arXiv:2410.02644
 """
 
-from typing import Any, Dict, List, Literal
+from typing import Mapping, Any, Dict, List, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -141,6 +141,25 @@ class ToolOutputIPIConfig(ConfigBase):
     tool_output_ipi_params: ToolOutputIPIParams = Field(
         default_factory=ToolOutputIPIParams
     )
+
+    @classmethod
+    def roles_from_mapping(cls, data: Mapping[str, Any]) -> List[Dict[str, Any]]:
+        """Attacker only when ``use_attacker_llm`` is enabled; judges always."""
+        roles: List[Dict[str, Any]] = []
+        params = data.get("tool_output_ipi_params") or {}
+        if isinstance(params, dict) and params.get("use_attacker_llm"):
+            attacker = data.get("attacker")
+            if isinstance(attacker, dict) and attacker:
+                roles.append({"role": "attacker", "config": attacker, "required": True})
+        judges = data.get("judges")
+        if isinstance(judges, list):
+            for judge in judges:
+                if isinstance(judge, dict) and judge:
+                    roles.append({"role": "judge", "config": judge, "required": False})
+        return roles
+
+    def roles(self) -> List[Dict[str, Any]]:
+        return self.roles_from_mapping(self.model_dump(exclude_unset=True))
 
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> "ToolOutputIPIConfig":

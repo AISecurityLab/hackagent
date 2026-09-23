@@ -19,6 +19,8 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from hackagent.core.contracts import Verdict
+
 
 class Evaluation(BaseModel):
     """A single evaluation/judgement attached to an :class:`AttackResult`."""
@@ -68,6 +70,7 @@ class AttackResult(BaseModel):
     prompt: str = ""
     response: str = ""
     evaluations: List[Evaluation] = Field(default_factory=list)
+    verdict: Optional[Verdict] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
     @classmethod
@@ -106,11 +109,19 @@ class AttackResult(BaseModel):
                         # the Evaluation schema: preserve it verbatim.
                         evaluations.append(Evaluation(metadata=dict(item)))
 
+        verdict = row.get("verdict")
+        if verdict is not None and not isinstance(verdict, Verdict):
+            try:
+                verdict = Verdict.model_validate(verdict)
+            except (TypeError, ValueError):
+                verdict = None
+
         return cls(
             goal=goal,
             prompt=prompt,
             response=response,
             evaluations=evaluations,
+            verdict=verdict,
             metadata=dict(row),
         )
 
@@ -122,6 +133,8 @@ class AttackResult(BaseModel):
         row["response"] = self.response
         if self.evaluations:
             row["evaluations"] = [_evaluation_to_row(e) for e in self.evaluations]
+        if self.verdict is not None:
+            row["verdict"] = self.verdict.model_dump()
         return row
 
 

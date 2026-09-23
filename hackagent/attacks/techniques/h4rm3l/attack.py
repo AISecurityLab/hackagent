@@ -31,7 +31,7 @@ from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
 
 from . import generation
 from .config import DEFAULT_H4RM3L_CONFIG, PRESET_PROGRAMS
-from .decorators import program_uses_llm_assisted_decorators
+from hackagent.attacks.techniques.h4rm3l.config import H4rm3lConfig
 
 
 def _recursive_update(target_dict, source_dict):
@@ -110,6 +110,8 @@ class H4rm3lAttack(BaseAttack):
         syntax_version: Program syntax version (1 or 2).
     """
 
+    config_model = H4rm3lConfig
+
     def __init__(
         self,
         config: Optional[Dict[str, Any]] = None,
@@ -157,44 +159,6 @@ class H4rm3lAttack(BaseAttack):
         syntax_version = params.get("syntax_version", 2)
         if syntax_version not in (1, 2):
             raise ValueError(f"syntax_version must be 1 or 2, got {syntax_version}")
-
-    @classmethod
-    def get_effective_model_roles(
-        cls,
-        attack_config: Dict[str, Any],
-        *,
-        goal_labels_by_index: Optional[Dict[int, Dict[str, str]]] = None,
-    ) -> List[Dict[str, Any]]:
-        """Resolve h4rm3l preflight roles from effective runtime program semantics."""
-        _ = goal_labels_by_index
-
-        roles: List[Dict[str, Any]] = []
-
-        judges = attack_config.get("judges")
-        if isinstance(judges, list) and judges:
-            roles.extend({"role": "judge", "config": judge} for judge in judges)
-        else:
-            judge = attack_config.get("judge")
-            if isinstance(judge, dict):
-                roles.append({"role": "judge", "config": judge})
-
-        params = attack_config.get("h4rm3l_params")
-        if not isinstance(params, dict):
-            params = {}
-
-        program_ref = params.get("program", "IdentityDecorator()")
-        syntax_version = params.get("syntax_version", 2)
-        resolved_program = PRESET_PROGRAMS.get(program_ref, program_ref)
-
-        if program_uses_llm_assisted_decorators(resolved_program, syntax_version):
-            decorator_llm = attack_config.get("decorator_llm")
-            if not isinstance(decorator_llm, dict):
-                decorator_llm = DEFAULT_H4RM3L_CONFIG.get("decorator_llm")
-
-            if isinstance(decorator_llm, dict):
-                roles.append({"role": "decorator_llm", "config": decorator_llm})
-
-        return roles
 
     def _get_pipeline_steps(self) -> List[Dict]:
         """Define the two-stage attack pipeline."""
