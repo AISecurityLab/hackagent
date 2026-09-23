@@ -6,7 +6,7 @@ sidebar_position: 0
 
 Most keys in `attack_config` are **shared** across attacks. Technique-specific options live in a nested `*_params` block (or, for a few older attacks, at the top level). This page is the source of truth for the shared layer that `HackAgent.hack`, the CLI, and shipped techniques still read. Individual attack pages document only their own keys and point here for the rest.
 
-Technique authors building on the forward seam use [`AttackConfig`](./seam.md) plus [`RunContext`](./seam.md#runcontext) and `BaseAttack(config, ctx)`. [`RunSpec`](../hackagent/orchestrator/run_spec.md) and [`TargetParams`](../hackagent/models/target_params.md) are the typed homes for run bookkeeping and target generation. Shipped technique models still subclass `ConfigBase` (goals, batching, output, and target knobs together) until that migration. Use this page for the dict those techniques read today.
+Technique authors construct every shipped technique as [`AttackConfig`](./seam.md) or a dict plus [`RunContext`](./seam.md#runcontext): `BaseAttack(config, ctx)`. Post-hoc `run()` methods are generation-only. Inline-judge techniques score with `ctx.judge.score`. Custom-loop techniques take roles from `ctx.models`, scores from `ctx.judge`, and artifacts from `ctx.workspace`. The legacy `(config, client, agent_router)` constructor is obsolete for new technique code; the orchestrator still calls it. [`RunSpec`](../hackagent/orchestrator/run_spec.md) and [`TargetParams`](../hackagent/models/target_params.md) are the typed homes for run bookkeeping and target generation. Shipped technique models still subclass `ConfigBase` (goals, batching, output, and target knobs together). Use this page for the dict `HackAgent.hack` and those models still read.
 
 ---
 
@@ -105,7 +105,7 @@ Role blocks are **top-level**, never inside `*_params`.
 
 Typical role fields: `identifier`, `endpoint`, `agent_type`, `api_key`, plus optional generation knobs (`max_tokens`, `temperature`, …).
 
-`judges` vs `judge`: AutoDAN-Turbo uses top-level `judge` as its **scorer** during warm-up/lifelong, and can still take `judges` for the shared post-hoc evaluation layer. PAIR/TAP/Crescendo score inside the loop with `judge`. CipherChat, PAP, FlipAttack, BoN, MML, and similar attacks evaluate with `judges`.
+`judges` vs `judge`: AutoDAN-Turbo uses top-level `judge` as its **scorer** during warm-up/lifelong, and can still take `judges` for the shared evaluation layer. On `BaseAttack(config, ctx)`, BoN, PAP, and Tool-output IPI score with `ctx.judge.score` (`CtxJudgeAdapter`); TAP uses `CtxTapEvaluator` instead of `TapEvaluation`. Crescendo, PAIR, AutoDAN-Turbo, and RAG score with `ctx.judge` (`verdict_from_judge` or the same port). Post-hoc techniques other than AdvPrefix do not embed that step; `HackAgent.hack` still scores their rows with `judges`. AdvPrefix selection calls `ctx.judge.evaluate`. The legacy `InlineStepJudge` / `TapEvaluation` path remains only when `ctx` is absent.
 
 ---
 

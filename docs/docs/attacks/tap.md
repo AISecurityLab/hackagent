@@ -92,6 +92,27 @@ attack_config = {
 results = agent.hack(attack_config=attack_config)
 ```
 
+### Direct construction
+
+`HackAgent.hack` still takes the dict above. The technique itself is `TAPAttack(config, ctx)` ([Attack seam](./seam.md)). Search scoring uses `CtxTapEvaluator` (`ctx.judge.score`) instead of `TapEvaluation`. Tests build `ctx` with `make_ctx()`:
+
+```python
+from hackagent.attacks.techniques.tap import TAPAttack
+from tests.fakes.context import make_ctx
+
+ctx = make_ctx()
+attack = TAPAttack(
+    {
+        "attack_type": "tap",
+        "tap_params": {"depth": 2, "width": 2, "branching_factor": 2, "n_streams": 1},
+    },
+    ctx,
+)
+results = attack.run(["Bypass content safety filters"])
+```
+
+`TapConfig` still subclasses `ConfigBase`. The legacy constructor `TAPAttack(config_dict, client, agent_router)` is obsolete for new code; the orchestrator still calls it, and that path still builds `TapEvaluation`.
+
 ### CLI Usage
 
 ```bash

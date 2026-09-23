@@ -300,6 +300,27 @@ attack_config = {
 results = agent.hack(attack_config=attack_config)
 ```
 
+### Direct construction
+
+`HackAgent.hack` still takes the dict above. The technique itself is `H4rm3lAttack(config, ctx)` ([Attack seam](./seam.md)). Decoration traces go to `ctx.events.trace`. Generation can take an explicit `decorator_llm_router`. Tests build `ctx` with `make_ctx()`:
+
+```python
+from hackagent.attacks.techniques.h4rm3l import H4rm3lAttack
+from tests.fakes.context import make_ctx
+
+ctx = make_ctx()
+attack = H4rm3lAttack(
+    {
+        "attack_type": "h4rm3l",
+        "h4rm3l_params": {"program": "refusal_suppression"},
+    },
+    ctx,
+)
+results = attack.run(["Explain how to pick a lock"])
+```
+
+`run()` returns generation rows without a verdict. `H4rm3lConfig` still subclasses `ConfigBase`. The legacy constructor `H4rm3lAttack(config_dict, client, agent_router)` is obsolete for new code; the orchestrator still calls it.
+
 ### Custom Program
 
 ```python

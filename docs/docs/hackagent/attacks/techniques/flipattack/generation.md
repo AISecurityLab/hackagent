@@ -6,7 +6,7 @@ title: hackagent.attacks.techniques.flipattack.generation
 FlipAttack generation and execution module.
 
 Generates flipped prompts by calling :meth:`FlipAttack.generate` on the
-attack instance passed via ``config[&quot;_self&quot;]``, then executes them against
+attack instance passed explicitly as ``attack=``, then executes them against
 the target model via HackAgent&#x27;s LLMRouter.
 
 Result Tracking:
@@ -16,8 +16,12 @@ Result Tracking:
 #### execute
 
 ```python
-def execute(goals: List[str], agent_router: LLMRouter, config: Dict[str, Any],
-            logger: logging.Logger) -> List[Dict]
+def execute(goals: List[str],
+            agent_router: LLMRouter,
+            config: Dict[str, Any],
+            logger: logging.Logger,
+            *,
+            attack: Any = None) -> List[Dict]
 ```
 
 Generate flipped prompts and execute them against target model.
@@ -28,9 +32,12 @@ Generate flipped prompts and execute them against target model.
 - `agent_router` - Router for target model communication
 - `config` - Configuration dictionary with flipattack_params
 - `logger` - Logger instance
+- `attack` - FlipAttack instance. Required for new callers. A leftover
+  ``config[&quot;_self&quot;]`` is still read if ``attack`` is omitted;
+  the pipeline no longer writes that key.
   
 
 **Returns**:
 
-  List of dicts with goal, flipped prompt, and response
+  List of dicts with goal, flipped prompt, and response. No verdict.
 

@@ -101,14 +101,25 @@ class H4rm3lAttack(BaseAttack):
     """
     h4rm3l — composable prompt-decoration jailbreak attack.
 
-    Applies a chain of PromptDecorator transforms to each goal prompt,
-    sends the decorated prompt to the target model, and evaluates the
-    response with multi-judge scoring.
+    Applies a chain of PromptDecorator transforms to each goal prompt
+    and sends the decorated prompt to the target model. The embedded
+    judge step is gone. ``run()`` returns rows without a verdict.
+    Decoration traces go to ``ctx.events.trace`` when ``ctx`` is set
+    (the legacy tracker remains the fallback). Generation can take an
+    explicit ``decorator_llm_router``.
+
+    Construct with ``(config, ctx)``. ``config`` is a dict deep-merged
+    into the h4rm3l defaults. ``ctx`` is a
+    :class:`~hackagent.attacks.ports.RunContext`, passed positionally or
+    as ``ctx=``. Tests build it with ``make_ctx()``
+    (``tests.fakes.context``). The legacy constructor
+    ``(config_dict, client, agent_router)`` is obsolete for new code.
+    :class:`~hackagent.attacks.techniques.h4rm3l.config.H4rm3lConfig`
+    still subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
 
     Pipeline:
         1. **Generation** — Compile the decorator program, apply to each
            goal in parallel, query the target model.
-        2. **Evaluation** — Multi-judge scoring via BaseEvaluationStep.
 
     The decorator program is specified via ``h4rm3l_params.program``.
     It can be:

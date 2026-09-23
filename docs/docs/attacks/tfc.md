@@ -108,6 +108,24 @@ attack_config = {
 results = agent.hack(attack_config=attack_config)
 ```
 
+### Direct construction
+
+`HackAgent.hack` still takes the dict above. The technique itself is `tFCAttack(config, ctx)` ([Attack seam](./seam.md)). Tests build `ctx` with `make_ctx()`:
+
+```python
+from hackagent.attacks.techniques.fc import tFCAttack
+from tests.fakes.context import make_ctx
+
+ctx = make_ctx()
+attack = tFCAttack(
+    {"attack_type": "tfc", "tfc_params": {"text_format": "mermaid"}},
+    ctx,
+)
+results = attack.run(["Describe how to pick a lock"])
+```
+
+`run()` returns generation rows without a verdict. `tFCConfig` still subclasses `ConfigBase`. The legacy constructor `tFCAttack(config_dict, client, agent_router)` is obsolete for new code; the orchestrator still calls it.
+
 ### CLI
 
 ```bash

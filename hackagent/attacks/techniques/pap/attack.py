@@ -67,8 +67,16 @@ class PAPAttack(BaseAttack):
     techniques are skipped (early stop).
 
     Pipeline:
-        1. Generation — persuasive paraphrasing + target query + inline judge
-        2. Evaluation — post-processing (server sync, tracker, ASR)
+        1. Generation — persuasive paraphrasing, target query, and an
+           inline judge. On ``BaseAttack(config, ctx)`` that judge is
+           ``ctx.judge.score`` via
+           :class:`~hackagent.attacks._lib.inline_judge.CtxJudgeAdapter`.
+           ``InlineStepJudge`` remains the fallback when ``ctx`` is absent.
+
+    Construct with ``(config, ctx)``. Tests build ``ctx`` with
+    ``make_ctx()``. The legacy constructor is obsolete for new code.
+    :class:`~hackagent.attacks.techniques.pap.config.PAPConfig` still
+    subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
     """
 
     def __init__(
@@ -80,6 +88,10 @@ class PAPAttack(BaseAttack):
         ctx: Optional[RunContext] = None,
         client: Optional[Store] = None,
     ):
+        """Initialize PAP with ``(config, ctx)`` or the legacy constructor.
+
+        On the new seam, generation scores with ``ctx.judge.score``.
+        """
         if ctx is None and isinstance(ctx_or_client, RunContext):
             ctx = ctx_or_client
         resolved_client = (

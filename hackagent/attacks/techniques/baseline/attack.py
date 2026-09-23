@@ -28,7 +28,21 @@ from .config import DEFAULT_BASELINE_CONFIG
 
 
 class BaselineAttack(BaseAttack):
-    """Baseline attack that sends goals directly to the target."""
+    """Baseline attack that sends goals directly to the target.
+
+    Construct with ``(config, ctx)``. ``config`` is an
+    :class:`~hackagent.attacks.config.AttackConfig` or a dict merged into
+    :data:`~hackagent.attacks.techniques.baseline.config.DEFAULT_BASELINE_CONFIG`.
+    ``ctx`` is a :class:`~hackagent.attacks.ports.RunContext`, passed
+    positionally or as ``ctx=``. Tests build it with ``make_ctx()``
+    (``tests.fakes.context``).
+
+    The pipeline is generation-only. ``run()`` returns rows without a
+    verdict; ``HackAgent.hack`` scores them in the shared evaluator.
+
+    The legacy constructor ``(config_dict, client, agent_router)`` is
+    obsolete for new code. The orchestrator still calls it.
+    """
 
     def __init__(
         self,

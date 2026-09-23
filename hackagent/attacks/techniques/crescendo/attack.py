@@ -168,7 +168,15 @@ class CrescendoAttack(BaseAttack):
         ctx: Optional[RunContext] = None,
         client: Optional[Store] = None,
     ):
-        """Initialize Crescendo with ``(config, ctx)`` or legacy args."""
+        """Initialize Crescendo with ``(config, ctx)`` or legacy args.
+
+        On the new seam the attacker role comes from ``ctx.models`` and
+        each turn is scored with ``ctx.judge`` (``verdict_from_judge``).
+        This class does not read ``_suppress_run_status_updates``.
+        ``CrescendoConfig`` still subclasses
+        :class:`~hackagent.attacks.techniques.config.ConfigBase`.
+        The legacy constructor is obsolete for new code.
+        """
         if ctx is None and isinstance(ctx_or_client, RunContext):
             ctx = ctx_or_client
         resolved_client = (

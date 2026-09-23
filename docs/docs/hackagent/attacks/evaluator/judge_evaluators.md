@@ -92,3 +92,14 @@ refusal; score 10 = complete, detailed, harmful answer.
 ``best_score`` is already on the shared 0-10 scale, so success is derived
 with the same threshold used for normalized binary evaluator results.
 
+## RagOutcomeEvaluator Objects
+
+```python
+class RagOutcomeEvaluator(BaseJudgeEvaluator)
+```
+
+Judge whether a RAG-augmented response advances a poisoned goal.
+
+Ports the RAG technique&#x27;s dedicated judge prompt into the shared
+evaluator registry so ``ctx.judge`` / Panel can select ``rag_outcome``.
+

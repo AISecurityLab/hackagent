@@ -17,9 +17,28 @@ Forward construction is ``BaseAttack(config, ctx)`` with
 is a :class:`~hackagent.attacks.ports.RunContext`. Pipeline stages may be
 typed :class:`~hackagent.attacks.ports.Step` values or legacy dicts.
 
-The orchestrator still instantiates shipped techniques as
-``(config_dict, client, agent_router)`` until they migrate. That legacy
-path, including ``client=`` as a keyword, remains supported.
+Every shipped technique accepts that constructor.
+
+* Post-hoc (advprefix, baseline, static_template, cipherchat, fc, tfc,
+  flipattack, h4rm3l, mml): generation-only pipelines. ``run()`` returns
+  rows without a verdict, except advprefix selection, which calls
+  ``ctx.judge.evaluate``. FlipAttack generation takes ``attack=`` and
+  does not store the instance on ``config["_self"]``.
+* Inline-judge (bon, pap, tool_output_ipi, tap): loop scores go through
+  ``ctx.judge.score`` via :mod:`hackagent.attacks._lib.inline_judge`
+  (``CtxJudgeAdapter`` / ``CtxTapEvaluator``). That replaces
+  ``InlineStepJudge`` / ``TapEvaluation`` on this path. Those classes
+  remain the fallback when ``ctx`` is absent.
+* Custom-loop (crescendo, pair, autodan_turbo, rag): roles from
+  ``ctx.models``, scores from ``ctx.judge``, artifacts under
+  ``ctx.workspace``. They do not read ``_suppress_run_status_updates``.
+
+The orchestrator still instantiates every shipped technique as
+``(config_dict, client, agent_router)``. That legacy path, including
+``client=`` as a keyword, remains supported and is obsolete for new
+technique code. Shared helpers live in ``hackagent.attacks._lib``;
+compatibility shims remain at ``attacks.shared``, ``attacks.generator``,
+and ``attacks.objectives``.
 
 Attack techniques are organized in:
     techniques/advprefix/attack.py    - AdvPrefixAttack
@@ -67,8 +86,11 @@ class BaseAttack(abc.ABC):
     3. Implement ``_get_pipeline_steps()`` (``Step`` or legacy dict)
     4. Implement ``run(goals)``
 
-    Shipped techniques still use the legacy ``(config, client, agent_router)``
-    constructor. Do not treat every technique as already migrated.
+    Every shipped technique accepts ``(config, ctx)``: post-hoc,
+    inline-judge (``ctx.judge.score``), and custom-loop
+    (``ctx.models`` / ``ctx.judge`` / ``ctx.workspace``). The orchestrator
+    still constructs them as ``(config, client, agent_router)``. That
+    legacy constructor is obsolete for new technique code.
 
     Attributes:
         config: Plain dict view of the attack config (``model_dump()`` when
@@ -98,11 +120,12 @@ class BaseAttack(abc.ABC):
     ):
         """Initialize with ``(config, ctx)`` or legacy ``(config, client, agent_router)``.
 
-        Phase 4 seam: prefer ``BaseAttack(config, ctx)``. Existing techniques
-        and the orchestrator still pass ``(config_dict, client, agent_router)``
-        (including ``client=`` as a keyword); that path stays until Phase 5
-        migrates them. Logging handlers are no longer installed here —
-        interfaces own logging (D12).
+        Prefer ``BaseAttack(config, ctx)``. Every shipped technique accepts
+        ``ctx`` positionally or as ``ctx=``. The orchestrator still passes
+        ``(config_dict, client, agent_router)`` (including ``client=`` as a
+        keyword). That legacy constructor is obsolete for new technique
+        code and remains supported. Logging handlers are no longer
+        installed here — interfaces own logging (D12).
         """
         if not isinstance(config, (AttackConfig, dict)):
             raise ValueError(f"config must be AttackConfig or dict, got {type(config)}")

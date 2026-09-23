@@ -58,6 +58,13 @@ class ToolOutputIPIAttack(BaseAttack):
     3. Re-queries the target with the full messages history.
     4. Judges whether the response or subsequent tool call follows the
        injected instructions (direct harm and/or data stealing).
+
+    Construct with ``(config, ctx)``. Scoring uses ``ctx.judge.score``
+    through :class:`~hackagent.attacks._lib.inline_judge.CtxJudgeAdapter`.
+    ``InlineStepJudge`` remains the fallback when ``ctx`` is absent.
+    Tests build ``ctx`` with ``make_ctx()``. The legacy constructor is
+    obsolete for new code. ``ToolOutputIPIConfig`` still subclasses
+    :class:`~hackagent.attacks.techniques.config.ConfigBase`.
     """
 
     config_model = ToolOutputIPIConfig

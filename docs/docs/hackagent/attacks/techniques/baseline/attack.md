@@ -16,14 +16,18 @@ class BaselineAttack(BaseAttack)
 
 Baseline attack that sends goals directly to the target.
 
-No prompt transformation is applied — goals are sent as-is.
-This provides a control condition to compare against actual
-attack techniques (PAIR, TAP, DrAttack, etc.).
+Construct with ``(config, ctx)``. ``config`` is an
+:class:`~hackagent.attacks.config.AttackConfig` or a dict merged into
+:data:`~hackagent.attacks.techniques.baseline.config.DEFAULT_BASELINE_CONFIG`.
+``ctx`` is a :class:`~hackagent.attacks.ports.RunContext`, passed
+positionally or as ``ctx=``. Tests build it with ``make_ctx()``
+(``tests.fakes.context``).
 
-Pipeline stages
----------------
-1. **Generation** — sends each goal verbatim to the target model.
-2. **Evaluation** — scores responses using the configured evaluator.
+The pipeline is generation-only. ``run()`` returns rows without a
+verdict; ``HackAgent.hack`` scores them in the shared evaluator.
+
+The legacy constructor ``(config_dict, client, agent_router)`` is
+obsolete for new code. The orchestrator still calls it.
 
 #### get\_effective\_model\_roles
 
@@ -38,21 +42,4 @@ def get_effective_model_roles(
 ```
 
 Baseline always needs judge models for LLM-judge evaluation.
-
-#### run
-
-```python
-def run(goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]
-```
-
-Execute baseline attack (direct goal submission).
-
-**Arguments**:
-
-- `goals` - List of goal strings to send directly.
-  
-
-**Returns**:
-
-  A list of :class:`~hackagent.attacks.types.AttackResult` instances.
 

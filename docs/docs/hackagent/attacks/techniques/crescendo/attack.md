@@ -78,26 +78,21 @@ refusals, driving both scoring and the backtrack mechanism.
 
 ```python
 def __init__(config: Optional[Dict[str, Any]] = None,
-             client: Optional[Store] = None,
-             agent_router: Optional[LLMRouter] = None)
+             ctx_or_client: Any = None,
+             agent_router: Optional[LLMRouter] = None,
+             *,
+             ctx: Optional[RunContext] = None,
+             client: Optional[Store] = None)
 ```
 
-Initialize Crescendo attack.
+Initialize Crescendo with ``(config, ctx)`` or legacy args.
 
-**Arguments**:
-
-- `config` - Optional configuration overrides merged into
-  :data:`~hackagent.attacks.techniques.crescendo.config.DEFAULT_CRESCENDO_CONFIG`.
-- `client` - Authenticated HackAgent API client.
-- `agent_router` - Router for the victim model.
-  
-
-**Raises**:
-
-- `ValueError` - If ``client`` or ``agent_router`` is ``None``, if the
-  attacker router cannot be initialised, or if the configured
-  ``objective`` key is not in
-  :data:`~hackagent.attacks.objectives.OBJECTIVES`.
+On the new seam the attacker role comes from ``ctx.models`` and
+each turn is scored with ``ctx.judge`` (``verdict_from_judge``).
+This class does not read ``_suppress_run_status_updates``.
+``CrescendoConfig`` still subclasses
+:class:`~hackagent.attacks.techniques.config.ConfigBase`.
+The legacy constructor is obsolete for new code.
 
 #### run
 

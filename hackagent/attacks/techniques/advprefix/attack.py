@@ -63,9 +63,10 @@ class AdvPrefixAttack(BaseAttack):
        segment count before being passed downstream.
     2. **Execution** — appends each surviving prefix to the target model
        prompt and collects completions (``n_samples`` per prefix).
-    3. **Evaluation** — LLM judges (e.g. HarmBench) rate each completion;
-       the top-``n_prefixes_per_goal`` prefixes per goal are selected and
-       returned.
+    3. **Selection** — on the new seam, ``ctx.judge.evaluate`` scores each
+       completion and the top-``n_prefixes_per_goal`` prefixes per goal
+       are kept. That is the only post-hoc path that attaches a verdict.
+       The legacy constructor still uses :class:`EvaluationPipeline`.
 
     The class delegates stage logic to dedicated sub-modules:
 
@@ -74,8 +75,8 @@ class AdvPrefixAttack(BaseAttack):
       filtering.
     * :mod:`~hackagent.attacks.techniques.advprefix.completions` for
       step 2.
-    * :mod:`~hackagent.attacks.techniques.advprefix.evaluation`
-      (:class:`EvaluationPipeline`) for step 3.
+    * :meth:`_evaluate_and_select` for step 3 (``ctx.judge.evaluate``, or
+      :class:`EvaluationPipeline` on the legacy constructor).
 
     Tracking is managed by
     :class:`~hackagent.router.tracking.TrackingCoordinator`; goal
@@ -83,10 +84,22 @@ class AdvPrefixAttack(BaseAttack):
     :class:`~hackagent.router.tracking.StepTracker` are created upfront so
     the dashboard shows all goals from the moment the run starts.
 
+    Construct with ``(config, ctx)``. ``config`` is a dict deep-merged into
+    :data:`~hackagent.attacks.techniques.advprefix.config.DEFAULT_PREFIX_GENERATION_CONFIG`.
+    There is no ``advprefix_params`` block and no
+    :class:`~hackagent.attacks.techniques.config.ConfigBase` subclass;
+    knobs stay at the top level of that dict. ``ctx`` is a
+    :class:`~hackagent.attacks.ports.RunContext`, passed positionally or
+    as ``ctx=``. Tests build it with ``make_ctx()``
+    (``tests.fakes.context``).
+
+    The legacy constructor ``(config_dict, client, agent_router)`` is
+    obsolete for new code. The orchestrator still calls it and still
+    runs :class:`EvaluationPipeline` for selection.
+
     Attributes:
         config: Merged AdvPrefix configuration dictionary.
-        client: Authenticated HackAgent API client.
-        agent_router: Router for the victim model.
+        ctx: RunContext on the new seam, otherwise None.
         logger: Hierarchical logger at ``hackagent.attacks.advprefix``.
     """
 
@@ -107,11 +120,15 @@ class AdvPrefixAttack(BaseAttack):
                 :data:`~hackagent.attacks.techniques.advprefix.config.DEFAULT_PREFIX_GENERATION_CONFIG`
                 using a deep-merge strategy (nested dicts are merged;
                 internal keys starting with ``_`` are passed by reference).
-            client: Authenticated HackAgent API client.
-            agent_router: Router for the victim model.
+            ctx: :class:`~hackagent.attacks.ports.RunContext`. Positional
+                or ``ctx=``. Tests use ``make_ctx()``. Selection then calls
+                ``ctx.judge.evaluate``.
+            client: Obsolete. Store instance on the orchestrator path.
+            agent_router: Obsolete. Target router on the orchestrator path.
 
         Raises:
-            ValueError: If ``client`` or ``agent_router`` is ``None``.
+            ValueError: On the legacy path, if ``client`` or
+                ``agent_router`` is ``None``.
         """
         if ctx is None and isinstance(ctx_or_client, RunContext):
             ctx = ctx_or_client
@@ -211,9 +228,10 @@ class AdvPrefixAttack(BaseAttack):
             Appends each prefix to the target-model prompt and collects
             ``n_samples`` completions per prefix.
 
-        Stage 3 — **Evaluation** (:class:`EvaluationPipeline`):
-            Runs LLM judges, merges scores, aggregates by NLL, and
-            selects the top ``n_prefixes_per_goal`` per goal.
+        Stage 3 — **Selection** (:meth:`_evaluate_and_select`):
+            On the new seam, ``ctx.judge.evaluate`` scores completions and
+            the top ``n_prefixes_per_goal`` rows per goal are kept.
+            The legacy constructor delegates to :class:`EvaluationPipeline`.
 
         Returns:
             List of pipeline-step configuration dicts compatible with

@@ -127,6 +127,24 @@ def ok() -> bool
 
 True when the call produced a usable response.
 
+#### blocked
+
+```python
+@property
+def blocked() -> bool
+```
+
+True when a guardrail blocked or censored the call.
+
+#### guardrail\_info
+
+```python
+@property
+def guardrail_info() -> Dict[str, Any]
+```
+
+Guardrail metadata as a plain dict (empty when not blocked).
+
 ## ModelSpec Objects
 
 ```python

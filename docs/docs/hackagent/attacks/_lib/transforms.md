@@ -1,6 +1,6 @@
 ---
-sidebar_label: utils
-title: hackagent.attacks.shared.utils
+sidebar_label: transforms
+title: hackagent.attacks._lib.transforms
 ---
 
 Shared utility functions for attacks.

@@ -106,7 +106,7 @@ Keys such as `goals`, `dataset`, `intents`, `objective`, `attacker`, `judges`, b
 
 Crescendo, PAIR, and AdvPrefix still put many attack-specific keys at the top level (`max_turns`, `n_iterations`, `meta_prefixes`). AutoDAN-Turbo, PAP, CipherChat, MML, and others already nest theirs under `*_params`. The long-term convention is one nested `*_params` field per attack; that layout change is still ahead.
 
-Technique authors: the forward constructor is [`BaseAttack(config, ctx)`](./seam.md). The attacks on this page are still launched with the `attack_config` dict above.
+SDK and CLI launches still use the `attack_config` dict above. Every technique on this page also constructs as [`BaseAttack(config, ctx)`](./seam.md). The legacy `(config, client, agent_router)` constructor is obsolete for new technique code; the orchestrator still calls it.
 :::
 
 :::tip Dataset Support
@@ -557,9 +557,13 @@ passed around and cached.
 ### Where the verdict lives
 
 This is the part that trips people up. **`evaluations` is not the general way to
-read success.** Only Static Template, the RAG Attack, and Indirect Prompt
-Injection populate it. Every other attack reports its verdict as flat keys
-inside `metadata`.
+read success.** The RAG Attack still fills it from its own loop. Post-hoc
+techniques return rows from `run()` without a verdict, except AdvPrefix
+selection, which calls `ctx.judge.evaluate`. Inline-judge techniques (BoN,
+PAP, Tool-output IPI, TAP) score inside the loop with `ctx.judge.score`.
+Custom-loop techniques (Crescendo, PAIR, AutoDAN-Turbo, RAG) score with
+`ctx.judge` as well. `HackAgent.hack` then runs the shared evaluator and
+writes `success` / `best_score` into `metadata`.
 
 Two keys are attached to **every** evaluated row, whatever the attack:
 

@@ -56,11 +56,14 @@ def execute(
         agent_router: Router for target model communication
         config: Configuration dictionary with flipattack_params
         logger: Logger instance
+        attack: FlipAttack instance. Required for new callers. A leftover
+            ``config["_self"]`` is still read if ``attack`` is omitted;
+            the pipeline no longer writes that key.
 
     Returns:
-        List of dicts with goal, flipped prompt, and response
+        List of dicts with goal, flipped prompt, and response. No verdict.
     """
-    # Prefer the explicit attack instance; legacy config["_self"] remains a fallback.
+    # Prefer the explicit attack instance. config["_self"] is only a leftover fallback.
     fa = attack if attack is not None else config.get("_self")
     if fa is None:
         raise RuntimeError(

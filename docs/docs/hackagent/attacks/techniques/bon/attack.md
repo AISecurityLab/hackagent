@@ -40,30 +40,35 @@ The best candidate is selected by response length (as a proxy for
 non-refusal), and a final multi-judge evaluation scores the result.
 
 Pipeline:
-    1. Generation — multi-step BoN search with text augmentations
-    2. Evaluation — multi-judge scoring via BaseEvaluationStep
+    1. Generation — multi-step BoN search with text augmentations.
+       On ``BaseAttack(config, ctx)``, candidates are scored with
+       ``ctx.judge.score`` through
+       :class:`~hackagent.attacks._lib.inline_judge.CtxJudgeAdapter`.
+       ``InlineStepJudge`` remains the fallback when ``ctx`` is absent.
+
+Construct with ``(config, ctx)``. Tests build ``ctx`` with
+``make_ctx()`` (``tests.fakes.context``). The legacy constructor
+``(config_dict, client, agent_router)`` is obsolete for new code.
+:class:`~hackagent.attacks.techniques.bon.config.BoNConfig` still
+subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
 
 #### \_\_init\_\_
 
 ```python
 def __init__(config: Optional[Dict[str, Any]] = None,
-             client: Optional[Store] = None,
-             agent_router: Optional[LLMRouter] = None)
+             ctx_or_client: Any = None,
+             agent_router: Optional[LLMRouter] = None,
+             *,
+             ctx: Optional[RunContext] = None,
+             client: Optional[Store] = None)
 ```
 
 Initialise BoNAttack with configuration.
 
-**Arguments**:
-
-- `config` - Optional dictionary overriding
-  :data:`~hackagent.attacks.techniques.bon.config.DEFAULT_BON_CONFIG`.
-- `client` - Store instance from the orchestrator.
-- `agent_router` - LLMRouter instance for the target model.
-  
-
-**Raises**:
-
-- `ValueError` - If *client* or *agent_router* is ``None``.
+Prefer ``BoNAttack(config, ctx)``. ``ctx.judge.score`` replaces
+``InlineStepJudge`` on that path. Legacy
+``(config, client, agent_router)`` remains for the orchestrator
+and is obsolete for new code.
 
 #### run
 

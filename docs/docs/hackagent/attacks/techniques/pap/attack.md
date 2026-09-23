@@ -39,8 +39,31 @@ evaluates the response and if a jailbreak is confirmed, the remaining
 techniques are skipped (early stop).
 
 Pipeline:
-    1. Generation — persuasive paraphrasing + target query + inline judge
-    2. Evaluation — post-processing (server sync, tracker, ASR)
+    1. Generation — persuasive paraphrasing, target query, and an
+       inline judge. On ``BaseAttack(config, ctx)`` that judge is
+       ``ctx.judge.score`` via
+       :class:`~hackagent.attacks._lib.inline_judge.CtxJudgeAdapter`.
+       ``InlineStepJudge`` remains the fallback when ``ctx`` is absent.
+
+Construct with ``(config, ctx)``. Tests build ``ctx`` with
+``make_ctx()``. The legacy constructor is obsolete for new code.
+:class:`~hackagent.attacks.techniques.pap.config.PAPConfig` still
+subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
+
+#### \_\_init\_\_
+
+```python
+def __init__(config: Optional[Dict[str, Any]] = None,
+             ctx_or_client: Any = None,
+             agent_router: Optional[LLMRouter] = None,
+             *,
+             ctx: Optional[RunContext] = None,
+             client: Optional[Store] = None)
+```
+
+Initialize PAP with ``(config, ctx)`` or the legacy constructor.
+
+On the new seam, generation scores with ``ctx.judge.score``.
 
 #### run
 

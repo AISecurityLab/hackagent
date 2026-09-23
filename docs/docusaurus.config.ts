@@ -66,6 +66,11 @@ const config: Config = {
           sidebarPath: './sidebars.ts',
           routeBasePath: '/',
           editUrl: 'https://github.com/AISecurityLab/hackagent/edit/main/docs/',
+          // The docs plugin passes `exclude` to globby `ignore`, which does
+          // not honor `!` negation. Drop the default `**/_*/**` rule so the
+          // generated `hackagent/attacks/_lib` pages are published. Files
+          // named `_*.md` (partials, `_version.md`) stay excluded.
+          exclude: ['**/_*.{js,jsx,ts,tsx,md,mdx}'],
           // Enable versioning for API docs
           includeCurrentVersion: true,
           lastVersion: 'current',

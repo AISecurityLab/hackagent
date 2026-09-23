@@ -128,7 +128,15 @@ class TAPAttack(BaseAttack):
         ctx: Optional[RunContext] = None,
         client: Optional[Store] = None,
     ):
-        """Initialize TAP with ``(config, ctx)`` or legacy ``(config, client, router)``."""
+        """Initialize TAP with ``(config, ctx)`` or the legacy constructor.
+
+        On the new seam, search scoring uses
+        :class:`~hackagent.attacks._lib.inline_judge.CtxTapEvaluator`
+        (``ctx.judge.score``) instead of ``TapEvaluation``. ``TapConfig``
+        still subclasses
+        :class:`~hackagent.attacks.techniques.config.ConfigBase`.
+        The legacy constructor is obsolete for new code.
+        """
         if ctx is None and isinstance(ctx_or_client, RunContext):
             ctx = ctx_or_client
         resolved_client = (

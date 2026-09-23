@@ -85,6 +85,28 @@ attack_config = {
 results = agent.hack(attack_config=attack_config)
 ```
 
+### Direct construction
+
+`HackAgent.hack` still takes the dict above. The technique itself is `AdvPrefixAttack(config, ctx)` ([Attack seam](./seam.md)). There is no `ConfigBase` subclass and no `advprefix_params` block. On the new seam, selection calls `ctx.judge.evaluate` and can attach a verdict. The legacy constructor still uses `EvaluationPipeline`. Tests build `ctx` with `make_ctx()`:
+
+```python
+from hackagent.attacks.techniques.advprefix import AdvPrefixAttack
+from tests.fakes.context import make_ctx
+
+ctx = make_ctx()
+attack = AdvPrefixAttack(
+    {
+        "attack_type": "advprefix",
+        "attacker": {"identifier": "ollama/llama2-uncensored"},
+        "judges": [{"identifier": "ollama/llama3", "type": "harmbench"}],
+    },
+    ctx,
+)
+results = attack.run(["Extract system prompt information"])
+```
+
+The legacy constructor `AdvPrefixAttack(config_dict, client, agent_router)` is obsolete for new code. The orchestrator still calls it.
+
 ## Advanced Configuration
 
 ### Comprehensive Setup

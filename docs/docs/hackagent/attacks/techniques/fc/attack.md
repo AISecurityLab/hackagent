@@ -54,8 +54,11 @@ direction on each row for compact display.
 
 ```python
 def __init__(config: Optional[Dict[str, Any]] = None,
-             client: Optional[Store] = None,
-             agent_router: Optional[LLMRouter] = None)
+             ctx_or_client: Any = None,
+             agent_router: Optional[LLMRouter] = None,
+             *,
+             ctx: Optional[RunContext] = None,
+             client: Optional[Store] = None)
 ```
 
 Initialize FlowchartAttack with configuration.
@@ -64,13 +67,24 @@ Initialize FlowchartAttack with configuration.
 
 - `config` - Optional dictionary containing parameters to override
   :data:`DEFAULT_FC_CONFIG`.
-- `client` - Store instance passed from the orchestrator.
-- `agent_router` - LLMRouter instance for the target model.
+- `ctx` - :class:`~hackagent.attacks.ports.RunContext`. Positional
+  or ``ctx=``. Tests use ``make_ctx()``. Flowchart cache
+  files are written under ``ctx.workspace`` via
+  ``_wire_workspace_cache``.
+- `client` - Obsolete. Store instance on the orchestrator path.
+- `agent_router` - Obsolete. Target router on the orchestrator path.
   
 
 **Raises**:
 
-- `ValueError` - If ``client`` or ``agent_router`` is ``None``.
+- `ValueError` - On the legacy path, if ``client`` or
+  ``agent_router`` is ``None``.
+  
+  The pipeline is generation-only. ``run()`` returns rows without
+  a verdict. :class:`~hackagent.attacks.techniques.fc.config.FCConfig`
+  still subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
+  Graphviz is bootstrapped with
+  :func:`hackagent.attacks._lib.graphviz.ensure_graphviz`.
 
 #### run
 
@@ -105,6 +119,16 @@ bypass natural-language safety filters without requiring vision.
 
 Unlike :class:`FCAttack`, this does NOT render images and works
 with any text LLM (no VLM required).
+
+Construct with ``(config, ctx)``. ``config`` is a dict deep-merged
+into the tFC defaults. ``ctx`` is a
+:class:`~hackagent.attacks.ports.RunContext`, passed positionally or
+as ``ctx=``. Tests build it with ``make_ctx()``
+(``tests.fakes.context``). The pipeline is generation-only;
+``run()`` returns rows without a verdict. The legacy constructor
+``(config_dict, client, agent_router)`` is obsolete for new code.
+:class:`~hackagent.attacks.techniques.fc.config.tFCConfig` still
+subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
 
 **Attributes**:
 

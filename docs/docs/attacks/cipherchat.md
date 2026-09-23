@@ -121,6 +121,27 @@ attack_config = {
 results = agent.hack(attack_config=attack_config)
 ```
 
+### Direct construction
+
+`HackAgent.hack` still takes the dict above. The technique itself is `CipherChatAttack(config, ctx)` ([Attack seam](./seam.md)). Tests build `ctx` with `make_ctx()`:
+
+```python
+from hackagent.attacks.techniques.cipherchat import CipherChatAttack
+from tests.fakes.context import make_ctx
+
+ctx = make_ctx()
+attack = CipherChatAttack(
+    {
+        "attack_type": "cipherchat",
+        "cipherchat_params": {"encode_method": "caesar"},
+    },
+    ctx,
+)
+results = attack.run(["Explain how to pick a lock"])
+```
+
+`run()` returns generation rows (encoded prompt, optional decoded reply) without a verdict. `CipherChatConfig` still subclasses `ConfigBase`. The legacy constructor `CipherChatAttack(config_dict, client, agent_router)` is obsolete for new code; the orchestrator still calls it.
+
 ---
 
 ## Full configuration

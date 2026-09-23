@@ -1,6 +1,6 @@
 ---
 sidebar_label: llm_router
-title: hackagent.attacks.shared.llm_router
+title: hackagent.attacks._lib.llm_router
 ---
 
 The ``route_request`` surface the techniques call, over an LLM.
@@ -65,10 +65,14 @@ Asynchronous :meth:`route_request`.
 ```python
 def connect_role(config: Dict[str, Any],
                  *,
-                 name: Optional[str] = None) -> Tuple[LLMRouter, str]
+                 name: Optional[str] = None,
+                 models: Any = None) -> Tuple[LLMRouter, str]
 ```
 
 Connect to the role model ``config`` describes.
+
+When *models* (an ``LLMFactory`` from ``ctx.models``) is provided, the
+role is built through ``models.for_role`` instead of a bare ``connect``.
 
 Returns the router and its registration key. The model uses only the
 credentials its config names.

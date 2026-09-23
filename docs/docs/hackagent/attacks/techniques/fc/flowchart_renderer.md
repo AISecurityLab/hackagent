@@ -27,6 +27,14 @@ It may trigger automatic local binary download when enabled.
 
 - `allow_download` - See ``_resolve_dot_binary``.
 
+#### ensure\_graphviz
+
+```python
+def ensure_graphviz(allow_download: bool | None = None) -> str | None
+```
+
+Public alias for :func:`ensure_graphviz_dot_available`.
+
 #### steps\_to\_mermaid
 
 ```python
@@ -84,6 +92,7 @@ def render_flowchart(steps: List[str],
                      goal_text: str = "",
                      layout: str = "vertical",
                      dpi: int = 600,
+                     cache_dir: Path | str | None = None,
                      **kwargs: Any) -> Dict[str, Any]
 ```
 

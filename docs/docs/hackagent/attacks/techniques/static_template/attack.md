@@ -17,9 +17,19 @@ class StaticTemplateAttack(BaseAttack)
 Static template attack using predefined prompt templates.
 
 Combines a library of prompt templates across several jailbreak
-categories with each goal string to produce attack prompts, sends
-them to the target model, and evaluates responses using a
-LLM judge pipeline.
+categories with each goal string to produce attack prompts and sends
+them to the target model. Scoring is not an embedded pipeline step;
+``HackAgent.hack`` runs the shared evaluator afterward.
+
+Construct with ``(config, ctx)``. ``config`` is a dict merged into
+:data:`~hackagent.attacks.techniques.static_template.config.DEFAULT_TEMPLATE_CONFIG`.
+``ctx`` is a :class:`~hackagent.attacks.ports.RunContext`, passed
+positionally or as ``ctx=``. Tests build it with ``make_ctx()``
+(``tests.fakes.context``). The legacy constructor
+``(config_dict, client, agent_router)`` is obsolete for new code;
+the orchestrator still calls it. Typed defaults still live on
+:class:`~hackagent.attacks.techniques.static_template.config.TemplateAttackConfig`,
+a :class:`~hackagent.attacks.techniques.config.ConfigBase` subclass.
 
 Pipeline stages
 ---------------
@@ -27,25 +37,22 @@ Pipeline stages
 selects up to ``templates_per_category`` templates from each
 category in ``template_categories``, injects each goal, and
 collects target-model responses.
-2. **Evaluation** (:func:`~hackagent.attacks.techniques.static_template.evaluation.execute`) —
-scores responses for jailbreak success using configured LLM judge(s).
-
-This attack is useful as a **sanity-check** with explicit LLM judging,
-surfacing naive template weaknesses in the target model.
 
 **Attributes**:
 
 - `config` - Merged static template configuration dictionary.
-- `client` - Authenticated HackAgent API client.
-- `agent_router` - Router for the victim model.
+- `ctx` - RunContext on the new seam, otherwise None.
 - `logger` - Hierarchical logger at ``hackagent.attacks.static_template``.
 
 #### \_\_init\_\_
 
 ```python
 def __init__(config: Optional[Dict[str, Any]] = None,
-             client: Optional[Store] = None,
-             agent_router: Optional[LLMRouter] = None)
+             ctx_or_client: Any = None,
+             agent_router: Optional[LLMRouter] = None,
+             *,
+             ctx: Optional[RunContext] = None,
+             client: Optional[Store] = None)
 ```
 
 Initialize static template attack.
@@ -54,13 +61,16 @@ Initialize static template attack.
 
 - `config` - Configuration override dictionary merged into
   :data:`~hackagent.attacks.techniques.static_template.config.DEFAULT_TEMPLATE_CONFIG`.
-- `client` - Authenticated HackAgent API client.
-- `agent_router` - Router for the victim model.
+- `ctx` - :class:`~hackagent.attacks.ports.RunContext`. Positional
+  or ``ctx=``. Tests use ``make_ctx()``.
+- `client` - Obsolete. Storage backend on the orchestrator path.
+- `agent_router` - Obsolete. Target router on the orchestrator path.
   
 
 **Raises**:
 
-- `ValueError` - If ``client`` or ``agent_router`` is ``None``.
+- `ValueError` - On the legacy path, if ``client`` or
+  ``agent_router`` is ``None``.
 
 #### run
 

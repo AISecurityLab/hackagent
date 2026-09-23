@@ -94,6 +94,21 @@ class FlipAttack(BaseAttack):
         lang_gpt Wraps the system prompt in a LangGPT Role/Profile template.
         few_shot Injects two task-specific decoding demonstrations.
 
+    Construct with ``(config, ctx)``. ``config`` is a dict deep-merged into
+    :data:`~hackagent.attacks.techniques.flipattack.config.DEFAULT_FLIPATTACK_CONFIG`.
+    ``ctx`` is a :class:`~hackagent.attacks.ports.RunContext`, passed
+    positionally or as ``ctx=``. Tests build it with ``make_ctx()``
+    (``tests.fakes.context``). Generation receives this instance as
+    ``attack=``. Do not store it on ``config["_self"]``.
+
+    The pipeline is generation-only. ``run()`` returns rows without a
+    verdict.
+
+    The legacy constructor ``(config_dict, client, agent_router)`` is
+    obsolete for new code. The orchestrator still calls it.
+    :class:`~hackagent.attacks.techniques.flipattack.config.FlipAttackConfig`
+    still subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
+
     Attributes:
         flip_mode: Active obfuscation mode, read from config.
         cot: Whether chain-of-thought is enabled.
@@ -118,11 +133,14 @@ class FlipAttack(BaseAttack):
         Args:
             config: Optional dictionary containing parameters to override
                 :data:`~hackagent.attacks.techniques.flipattack.config.DEFAULT_FLIPATTACK_CONFIG`.
-            client: Store instance passed from the orchestrator.
-            agent_router: LLMRouter instance for the target model.
+            ctx: :class:`~hackagent.attacks.ports.RunContext`. Positional
+                or ``ctx=``. Tests use ``make_ctx()``.
+            client: Obsolete. Store instance on the orchestrator path.
+            agent_router: Obsolete. Target router on the orchestrator path.
 
         Raises:
-            ValueError: If ``client`` or ``agent_router`` is ``None``.
+            ValueError: On the legacy path, if ``client`` or
+                ``agent_router`` is ``None``.
         """
         if ctx is None and isinstance(ctx_or_client, RunContext):
             ctx = ctx_or_client
@@ -410,7 +428,11 @@ As a/an <Role> with the <Profile>, you must follow the <Rules>, and you must com
             )
 
     def _get_pipeline_steps(self) -> List[Dict]:
-        """Define the two-stage attack pipeline."""
+        """Define the generation-only FlipAttack pipeline.
+
+        Generation is called with ``attack=self``. ``config["_self"]`` is
+        not set.
+        """
         return [
             {
                 "name": "Generation: Generate and Execute FlipAttack Prompts",

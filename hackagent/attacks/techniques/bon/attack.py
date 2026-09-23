@@ -84,8 +84,17 @@ class BoNAttack(BaseAttack):
     non-refusal), and a final multi-judge evaluation scores the result.
 
     Pipeline:
-        1. Generation — multi-step BoN search with text augmentations
-        2. Evaluation — multi-judge scoring via BaseEvaluationStep
+        1. Generation — multi-step BoN search with text augmentations.
+           On ``BaseAttack(config, ctx)``, candidates are scored with
+           ``ctx.judge.score`` through
+           :class:`~hackagent.attacks._lib.inline_judge.CtxJudgeAdapter`.
+           ``InlineStepJudge`` remains the fallback when ``ctx`` is absent.
+
+    Construct with ``(config, ctx)``. Tests build ``ctx`` with
+    ``make_ctx()`` (``tests.fakes.context``). The legacy constructor
+    ``(config_dict, client, agent_router)`` is obsolete for new code.
+    :class:`~hackagent.attacks.techniques.bon.config.BoNConfig` still
+    subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
     """
 
     def __init__(
@@ -99,8 +108,10 @@ class BoNAttack(BaseAttack):
     ):
         """Initialise BoNAttack with configuration.
 
-        Prefer ``BoNAttack(config, ctx)``. Legacy ``(config, client, agent_router)``
-        remains supported until the orchestrator migrates.
+        Prefer ``BoNAttack(config, ctx)``. ``ctx.judge.score`` replaces
+        ``InlineStepJudge`` on that path. Legacy
+        ``(config, client, agent_router)`` remains for the orchestrator
+        and is obsolete for new code.
         """
         if ctx is None and isinstance(ctx_or_client, RunContext):
             ctx = ctx_or_client
