@@ -8,7 +8,7 @@ import logging
 import unittest
 from unittest.mock import MagicMock
 
-from hackagent.storage._http.api.models import EvalStatus, RunStatus
+from hackagent.core.contracts import EvalStatus, RunStatus
 from hackagent.tracking.audit import AuditPersistenceError
 from hackagent.tracking.context import TrackingContext
 from hackagent.tracking.step import StepTracker

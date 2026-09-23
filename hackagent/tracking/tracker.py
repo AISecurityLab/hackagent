@@ -888,16 +888,20 @@ class Tracker:
     @contextmanager
     def step(self, name: str, kind: str = ""):
         """Open a step scope and emit step_started / step_ended."""
-        self._emit("step_started", step_name=name, kind=kind)
+        self._emit("step_started", step_name=name, step_type=kind)
         try:
             yield None
         except Exception as exc:
             self._emit(
-                "step_ended", step_name=name, kind=kind, success=False, error=str(exc)
+                "step_ended",
+                step_name=name,
+                step_type=kind,
+                success=False,
+                error=str(exc),
             )
             raise
         else:
-            self._emit("step_ended", step_name=name, kind=kind, success=True)
+            self._emit("step_ended", step_name=name, step_type=kind, success=True)
 
     @contextmanager
     def goal(self, goal: Goal):

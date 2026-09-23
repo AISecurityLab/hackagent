@@ -3,7 +3,7 @@
 
 import unittest
 
-from hackagent.tracking.listeners import Fanout
+from hackagent.tracking.listeners import BusListener, Fanout
 
 
 class _Recorder:
@@ -34,6 +34,24 @@ class TestFanout(unittest.TestCase):
         fanout = Fanout([_Boom(), keeper])
         fanout.emit("log", message="hi")
         self.assertEqual(keeper.events, [("log", {"message": "hi"})])
+
+
+class _Bus:
+    def __init__(self) -> None:
+        self.events = []
+
+    def emit(self, kind, **payload):
+        self.events.append((kind, payload))
+
+
+class TestBusListener(unittest.TestCase):
+    def test_forwards_to_emit(self):
+        bus = _Bus()
+        BusListener(bus).on_event("goal_started", goal_index=0)
+        self.assertEqual(bus.events, [("goal_started", {"goal_index": 0})])
+
+    def test_ignores_a_bus_without_emit(self):
+        BusListener(object()).on_event("log", message="hi")
 
 
 if __name__ == "__main__":

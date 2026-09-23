@@ -352,7 +352,9 @@ class TestExecute(unittest.TestCase):
         execute(
             ["g"],
             _router(),
-            self._config(judges=[{"identifier": "j"}], _judge=port, _client=MagicMock()),
+            self._config(
+                judges=[{"identifier": "j"}], _judge=port, _client=MagicMock()
+            ),
             LOGGER,
         )
 
