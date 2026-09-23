@@ -34,7 +34,7 @@ attack methodologies.
 ```python
 def __init__(endpoint: str,
              name: Optional[str] = None,
-             agent_type: Union[AgentTypeEnum, str] = AgentTypeEnum.UNKNOWN,
+             agent_type: Union[AgentType, str] = AgentType.UNKNOWN,
              base_url: Optional[str] = None,
              api_key: Optional[str] = None,
              raise_on_unexpected_status: bool = False,
@@ -64,10 +64,10 @@ attack strategies.
   If not provided, a default name might be assigned or behavior might
   depend on the specific backend agent management policies.
 - `agent_type` - Specifies the type of the agent. This can be provided
-  as an `AgentTypeEnum` member (e.g., `AgentTypeEnum.GOOGLE_ADK`) or
+  as an `AgentType` member (e.g., `AgentType.GOOGLE_ADK`) or
   as a string identifier (e.g., &quot;google-adk&quot;, &quot;litellm&quot;).
   String values are automatically converted to the corresponding
-  `AgentTypeEnum` member. Defaults to `AgentTypeEnum.UNKNOWN` if
+  `AgentType` member. Defaults to `AgentType.UNKNOWN` if
   not specified or if an invalid string is provided.
 - `raise_on_unexpected_status` - If set to `True`, the API client will
   raise an exception for any HTTP status codes that are not typically
@@ -88,7 +88,7 @@ attack strategies.
   When set to `False`, requests sent through the target OLLAMA adapter
   include `think: false` to disable thinking output. Ignored for
   non-OLLAMA target agent types.
-- `backend` - Optional pre-built ``StorageBackend`` to persist runs and
+- `backend` - Optional pre-built ``Store`` to persist runs and
   results through. When omitted, a backend is selected from the
   resolved API key (remote) or a default local SQLite database.
   Supplying one lets an embedding host — e.g. the local dashboard
@@ -193,7 +193,7 @@ that step are judged successful.
   Defaults to ``None``, which resolves to the Jailbreak
   evaluation campaign&#x27;s primary attacks, in order — ``h4rm3l``
   → ``TAP`` → ``PAIR`` (see
-  ``hackagent.risks.jailbreak.JAILBREAK_PROFILE``). A goal
+  ``hackagent.catalog.risks.jailbreak.JAILBREAK_PROFILE``). A goal
   source is still required either way, via ``goals`` or a
   ``dataset``/``goals``/``intents`` key on the first step.
 - `goals` - Optional explicit list of goal strings to use for the

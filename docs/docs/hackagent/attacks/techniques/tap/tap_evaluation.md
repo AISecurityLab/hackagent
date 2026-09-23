@@ -19,7 +19,7 @@ shared multi-judge evaluation pipeline.
 #### \_\_init\_\_
 
 ```python
-def __init__(config: Dict[str, Any], logger, client: AuthenticatedClient)
+def __init__(config: Dict[str, Any], logger, client: Store)
 ```
 
 Initialize the evaluation helper.
@@ -149,8 +149,7 @@ Extract numeric scores from evaluation output with fallback.
 
 ```python
 def execute(input_data: List[Dict[str, Any]], config: Dict[str, Any],
-            client: AuthenticatedClient,
-            logger: logging.Logger) -> List[Dict[str, Any]]
+            client: Store, logger: logging.Logger) -> List[Dict[str, Any]]
 ```
 
 Pipeline entry point for TAP evaluation.

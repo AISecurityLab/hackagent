@@ -21,7 +21,7 @@ lightweight ``_ChatRegistration`` (for every chat AgentType).
 
 **Attributes**:
 
-- `backend` - The StorageBackend.
+- `backend` - The Store.
 - `organization_id` - The UUID of the organization associated with the backend.
 - `user_id_str` - The string user ID associated with the backend context.
 - `backend_agent` - The `AgentRecord` representing this agent in storage.
@@ -30,9 +30,9 @@ lightweight ``_ChatRegistration`` (for every chat AgentType).
 #### \_\_init\_\_
 
 ```python
-def __init__(backend: StorageBackend,
+def __init__(backend: Store,
              name: str,
-             agent_type: AgentTypeEnum,
+             agent_type: AgentType,
              endpoint: str,
              metadata=None,
              adapter_operational_config=None,
@@ -43,9 +43,9 @@ Initializes the AgentRouter and configures a single agent.
 
 **Arguments**:
 
-- `backend` - StorageBackend.
+- `backend` - Store.
 - `name` - Name for the agent in storage.
-- `agent_type` - The type of agent (e.g., AgentTypeEnum.LITELLM).
+- `agent_type` - The type of agent (e.g., AgentType.LITELLM).
 - `endpoint` - API endpoint URL for the agent service.
 - `metadata` - Optional metadata to store with the agent record.
 - `adapter_operational_config` - Runtime config for the adapter.

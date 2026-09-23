@@ -23,8 +23,8 @@ and keep the best branches across depths.
 #### \_\_init\_\_
 
 ```python
-def __init__(config: Dict[str, Any], client: AuthenticatedClient,
-             agent_router: AgentRouter, logger: logging.Logger)
+def __init__(config: Dict[str, Any], client: Store, agent_router: AgentRouter,
+             logger: logging.Logger)
 ```
 
 Prepare routers and judge configuration used in the search.
@@ -70,9 +70,9 @@ scoring branches for the next depth.
 #### execute
 
 ```python
-def execute(goals: List[str], agent_router: AgentRouter,
-            config: Dict[str, Any], logger: logging.Logger,
-            client: AuthenticatedClient) -> List[Dict[str, Any]]
+def execute(goals: List[str], agent_router: AgentRouter, config: Dict[str,
+                                                                      Any],
+            logger: logging.Logger, client: Store) -> List[Dict[str, Any]]
 ```
 
 Pipeline entry point for TAP generation and search.

@@ -111,7 +111,7 @@ Factory method to create a fully-initialized coordinator.
 
 **Arguments**:
 
-- `backend` - StorageBackend, or None to disable.
+- `backend` - Store, or None to disable.
 - `run_id` - Server-side run record ID (or None to disable)
 - `logger` - Logger instance
 - `attack_type` - Attack identifier (e.g., &quot;advprefix&quot;, &quot;pair&quot;)

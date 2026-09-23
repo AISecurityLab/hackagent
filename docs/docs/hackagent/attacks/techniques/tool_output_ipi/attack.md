@@ -15,7 +15,7 @@ Pipeline:
 1. Generation — craft poisoned tool observations, query target, inline judge
 2. Evaluation — post-processing (server sync, tracker, ASR)
 
-Taxonomy: primary **adaptive**, tag **indirect** (registered defensively when ``hackagent.attacks.taxonomy`` is present; add a permanent ``ATTACK_TAXONOMY`` entry when `603` merges).
+Taxonomy: primary **adaptive**, tag **indirect** (registered defensively when ``hackagent.catalog.taxonomy`` is present; add a permanent ``ATTACK_TAXONOMY`` entry when `603` merges).
 
 ## ToolOutputIPIAttack Objects
 

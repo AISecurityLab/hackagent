@@ -97,7 +97,7 @@ a complete attack attempt on a single goal/datapoint.
 
 ```python
 def __init__(
-        backend: StorageBackend,
+        backend: Store,
         run_id: str,
         logger: Optional[logging.Logger] = None,
         attack_type: Optional[str] = None,
@@ -160,7 +160,7 @@ def add_interaction_trace(ctx: Context,
                           request: Dict[str, Any],
                           response: Any,
                           step_name: str = "Agent Interaction",
-                          step_type: StepTypeEnum = StepTypeEnum.OTHER,
+                          step_type: StepKind = StepKind.OTHER,
                           metadata: Optional[Dict[str, Any]] = None) -> None
 ```
 
@@ -203,7 +203,7 @@ Add a trace for an evaluation step.
 def add_custom_trace(ctx: Context,
                      step_name: str,
                      content: Dict[str, Any],
-                     step_type: StepTypeEnum = StepTypeEnum.OTHER) -> None
+                     step_type: StepKind = StepKind.OTHER) -> None
 ```
 
 Add a custom trace with arbitrary content.

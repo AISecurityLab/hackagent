@@ -11,7 +11,7 @@ evaluation pipeline stages across attack techniques (AdvPrefix, FlipAttack, etc.
 It centralises the common logic that was previously duplicated:
 - Multi-judge evaluation orchestration
 - Judge type inference from model identifiers
-- Agent type resolution (string / enum → ``AgentTypeEnum``)
+- Agent type resolution (string / enum → ``AgentType``)
 - ``EvaluatorConfig`` construction from raw judge config dicts
 - Single evaluator instantiation and execution
 - Result merging via lookup keys ``(goal, prefix, completion)``
@@ -99,8 +99,7 @@ Convert the canonical threshold to a judge&#x27;s native score range.
 #### \_\_init\_\_
 
 ```python
-def __init__(config: Dict[str, Any], logger: logging.Logger,
-             client: AuthenticatedClient)
+def __init__(config: Dict[str, Any], logger: logging.Logger, client: Store)
 ```
 
 Extract common tracking context and dependencies.
@@ -110,7 +109,7 @@ Extract common tracking context and dependencies.
 - `config` - Step configuration dictionary (may contain ``_run_id``,
   ``_client``, ``_tracker`` internal keys).
 - `logger` - Logger instance.
-- `client` - ``AuthenticatedClient`` for backend API calls.
+- `client` - ``Store`` for backend API calls.
 
 #### infer\_judge\_type
 
@@ -128,10 +127,10 @@ Checks for known substrings (``harmbench``, ``nuanced``,
 #### resolve\_agent\_type
 
 ```python
-def resolve_agent_type(agent_type_value: Any) -> AgentTypeEnum
+def resolve_agent_type(agent_type_value: Any) -> AgentType
 ```
 
-Convert a string, enum, or ``None`` into an ``AgentTypeEnum``.
+Convert a string, enum, or ``None`` into an ``AgentType``.
 
 #### compute\_best\_score
 

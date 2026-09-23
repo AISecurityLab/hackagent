@@ -57,7 +57,7 @@ Configuration class for response evaluators using AgentRouter framework.
 
 #### agent\_type
 
-AgentTypeEnum from hackagent.router.types
+AgentType from hackagent.core.contracts
 
 #### coerce\_agent\_type
 
@@ -67,5 +67,5 @@ AgentTypeEnum from hackagent.router.types
 def coerce_agent_type(cls, values: Any) -> Any
 ```
 
-Coerce agent_type strings to AgentTypeEnum on construction.
+Coerce agent_type strings to AgentType on construction.
 

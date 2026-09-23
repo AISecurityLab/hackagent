@@ -11,7 +11,7 @@ fire pre-call, on success, and on failure. We register a single
 attach ``metadata`` to every call so the logger can correlate the I/O
 back to the originating HackAgent registration.
 
-The logger only emits structured records to ``hackagent.logger``; it
+The logger only emits structured records to the ``hackagent`` loggers; it
 does not write to the backend storage directly. Downstream sinks (TUI
 event bus, dashboard, file logs) can pick the records up from there.
 
