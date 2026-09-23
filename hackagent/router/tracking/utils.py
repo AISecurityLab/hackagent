@@ -41,6 +41,7 @@ _TOKEN_COUNT_ALLOWLIST: frozenset = frozenset(
         "prompt_tokens_details",
         "completion_tokens_details",
         "reasoning_tokens",
+        "audio_tokens",
     }
 )
 
