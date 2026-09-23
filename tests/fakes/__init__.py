@@ -7,12 +7,14 @@ Use these instead of defining per-file dummies. Each fake records what it
 was asked to do so tests can assert on calls rather than on internals.
 """
 
+from tests.fakes.llm import FakeLLM
 from tests.fakes.router import FakeRouter
 from tests.fakes.settings import isolated_settings
 from tests.fakes.storage import in_memory_store
 from tests.fakes.tracking import RecordingCoordinator, RecordingStepTracker
 
 __all__ = [
+    "FakeLLM",
     "FakeRouter",
     "RecordingCoordinator",
     "RecordingStepTracker",
