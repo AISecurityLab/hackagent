@@ -12,12 +12,12 @@ import logging
 import time
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
-from hackagent.attacks.shared.response_utils import (
+from hackagent.attacks._lib.response import (
     get_guardrail_info,
     is_guardrail_response,
 )
-from hackagent.attacks.shared.llm_router import connect_role
-from hackagent.attacks.shared.llm_router import LLMRouter
+from hackagent.attacks._lib.llm_router import connect_role
+from hackagent.attacks._lib.llm_router import LLMRouter
 
 from .config import PRESET_PROGRAMS
 from .decorators import (
@@ -36,6 +36,9 @@ def _build_prompting_interface(
     config: Dict[str, Any],
     agent_router: LLMRouter,
     logger: logging.Logger,
+    *,
+    decorator_llm_router: Optional[LLMRouter] = None,
+    decorator_llm_key: Optional[str] = None,
 ) -> Optional[Callable]:
     """Build an LLM prompting function for LLM-assisted decorators.
 
@@ -54,12 +57,15 @@ def _build_prompting_interface(
     # An explicitly configured decorator LLM must be used or fail loudly;
     # silently decorating with the target model changes the attack.
     if identifier:
-        try:
-            llm_router, llm_key = connect_role(decorator_llm, name="decorator_llm")
-        except Exception as e:
-            raise ValueError(
-                f"decorator_llm '{identifier}' could not be initialised: {e}"
-            ) from e
+        if decorator_llm_router is not None and decorator_llm_key is not None:
+            llm_router, llm_key = decorator_llm_router, decorator_llm_key
+        else:
+            try:
+                llm_router, llm_key = connect_role(decorator_llm, name="decorator_llm")
+            except Exception as e:
+                raise ValueError(
+                    f"decorator_llm '{identifier}' could not be initialised: {e}"
+                ) from e
 
         def _prompt(
             prompt_text: str, maxtokens: int = 500, temperature: float = 1.0
@@ -115,6 +121,9 @@ def execute(
     agent_router: LLMRouter,
     config: Dict[str, Any],
     logger: logging.Logger,
+    *,
+    decorator_llm_router: Optional[LLMRouter] = None,
+    decorator_llm_key: Optional[str] = None,
 ) -> List[Dict]:
     """
     Generate decorated prompts and execute them against the target model.
@@ -157,7 +166,13 @@ def execute(
     decoration_llm_endpoint = None
 
     if needs_llm:
-        prompting_fn = _build_prompting_interface(config, agent_router, logger)
+        prompting_fn = _build_prompting_interface(
+            config,
+            agent_router,
+            logger,
+            decorator_llm_router=decorator_llm_router,
+            decorator_llm_key=decorator_llm_key,
+        )
         if prompting_fn:
             set_prompting_interface(prompting_fn)
             decoration_llm_identifier = getattr(prompting_fn, "_llm_identifier", None)

@@ -27,17 +27,17 @@ import string
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional, Tuple
 
-from hackagent.attacks.shared.progress import create_progress_bar
+from hackagent.attacks._lib.progress import create_progress_bar
 from hackagent.attacks.shared.prompt_parser import extract_prompt_and_improvement
-from hackagent.attacks.shared.response_utils import (
+from hackagent.attacks._lib.response import (
     extract_response_content,
     get_guardrail_info,
     is_guardrail_response,
 )
-from hackagent.attacks.shared.llm_router import connect_role
+from hackagent.attacks._lib.llm_router import connect_role
 from hackagent.storage.store import Store
 from hackagent.core.contracts import StepKind
-from hackagent.attacks.shared.llm_router import LLMRouter
+from hackagent.attacks._lib.llm_router import LLMRouter
 from hackagent.router.tracking import Context, Tracker
 
 from .config import ATTACKER_SYSTEM_PROMPT

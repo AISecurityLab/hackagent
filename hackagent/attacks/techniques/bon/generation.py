@@ -43,11 +43,11 @@ from hackagent.attacks.evaluator.inline_step_judge import (
     InlineStepJudge,
     build_inline_judge_base_config,
 )
-from hackagent.attacks.shared.response_utils import (
+from hackagent.attacks._lib.response import (
     get_guardrail_info,
     is_guardrail_response,
 )
-from hackagent.attacks.shared.llm_router import LLMRouter
+from hackagent.attacks._lib.llm_router import LLMRouter
 
 if TYPE_CHECKING:
     from hackagent.storage.store import Store

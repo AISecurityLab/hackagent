@@ -51,7 +51,7 @@ from typing import Any, Dict, List, Optional
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.storage.store import Store
-from hackagent.attacks.shared.llm_router import LLMRouter
+from hackagent.attacks._lib.llm_router import LLMRouter
 
 from . import tap_evaluation as evaluation, generation
 from .config import DEFAULT_TAP_CONFIG

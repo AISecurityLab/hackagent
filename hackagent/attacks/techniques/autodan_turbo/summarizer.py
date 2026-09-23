@@ -6,7 +6,7 @@ import json
 import re
 
 from hackagent.core.defaults import DEFAULT_MAX_OUTPUT_TOKENS
-from hackagent.attacks.shared.response_utils import extract_response_content
+from hackagent.attacks._lib.response import extract_response_content
 
 from .config import (
     SUMMARIZER_SYSTEM_PROMPT,

@@ -20,7 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional, Tuple
 
 from hackagent.storage.store import Store
-from hackagent.attacks.shared.llm_router import LLMRouter, connect_role
+from hackagent.attacks._lib.llm_router import LLMRouter, connect_role
 
 from .config import (
     DEFAULT_ADVPREFIX_GENERATOR_SYSTEM_PROMPT,

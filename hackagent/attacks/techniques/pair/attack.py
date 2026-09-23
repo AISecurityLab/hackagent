@@ -34,18 +34,18 @@ from hackagent.core.defaults import (
     DEFAULT_JUDGE_IDENTIFIER,
     DEFAULT_LOCAL_MODEL_ENDPOINT,
 )
-from hackagent.attacks.objectives import OBJECTIVES
-from hackagent.attacks.shared.progress import create_progress_bar
+from hackagent.attacks._lib.objectives import OBJECTIVES
+from hackagent.attacks._lib.progress import create_progress_bar
 from hackagent.attacks.shared.prompt_parser import extract_prompt_and_improvement
-from hackagent.attacks.shared.response_utils import (
+from hackagent.attacks._lib.response import (
     extract_response_content,
     get_guardrail_info,
     is_guardrail_response,
 )
-from hackagent.attacks.shared.llm_router import connect_role
+from hackagent.attacks._lib.llm_router import connect_role
 from hackagent.storage.store import Store
 from hackagent.core.contracts import StepKind
-from hackagent.attacks.shared.llm_router import LLMRouter
+from hackagent.attacks._lib.llm_router import LLMRouter
 from hackagent.router.tracking import Tracker, Context
 
 from .config import (
@@ -400,7 +400,7 @@ class PAIRAttack(BaseAttack):
 
     def _translate_complete(self, prompt: str) -> str:
         """Single-prompt completion via the attacker router (for translation)."""
-        from hackagent.attacks.shared.response_utils import extract_response_content
+        from hackagent.attacks._lib.response import extract_response_content
 
         keys = list(self.attacker_router._agent_registry.keys())
         if not keys:

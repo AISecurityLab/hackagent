@@ -27,14 +27,14 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional
 
 # --- Import LLMRouter and related components ---
-from hackagent.attacks.shared.response_utils import (
+from hackagent.attacks._lib.response import (
     get_guardrail_info,
     is_guardrail_response,
 )
-from hackagent.attacks.shared.llm_router import LLMRouter
+from hackagent.attacks._lib.llm_router import LLMRouter
 
 # --- Import shared progress bar ---
-from hackagent.attacks.shared.progress import create_progress_bar
+from hackagent.attacks._lib.progress import create_progress_bar
 
 # --- Import utilities ---
 from .utils import (

@@ -12,7 +12,7 @@ from typing import Mapping, Any, Dict, List, Optional
 
 from pydantic import ConfigDict, Field, model_validator
 
-from hackagent.attacks.generator import AttackTemplates
+from hackagent.attacks._lib.templates import AttackTemplates
 from hackagent.attacks.techniques.config import (
     DEFAULT_CONFIG_BASE,
     DEFAULT_STANDARD_TARGET_CONFIG,

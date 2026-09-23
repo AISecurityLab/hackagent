@@ -157,6 +157,27 @@ class BaseAttack(abc.ABC):
         self._validate_config()
         self._setup()
 
+    @staticmethod
+    def _goal_texts(
+        goals: Optional[Sequence[Union[Goal, str]]] = None,
+    ) -> List[str]:
+        """Normalize ``Goal`` / string goals to plain text strings."""
+        out: List[str] = []
+        for goal in goals or []:
+            if isinstance(goal, Goal):
+                out.append(goal.text)
+            else:
+                out.append(str(goal))
+        return out
+
+    def _wire_workspace_cache(self, cache_key: str = "flowchart") -> None:
+        """Expose ``ctx.workspace`` cache paths on the config dict for steps."""
+        if self.ctx is None:
+            return
+        cache_path = self.ctx.workspace.path("cache", cache_key)
+        cache_path.mkdir(parents=True, exist_ok=True)
+        self.config["_workspace_cache_dir"] = str(cache_path)
+
     def _validate_config(self):
         """Validate configuration.
 
@@ -429,18 +450,28 @@ class BaseAttack(abc.ABC):
             progress = int(50 + (i / len(pipeline_steps)) * 40)
             self.logger.info(f"━━━ Progress: {progress}% ━━━")
 
-            # Execute step with tracking
-            with self.tracker.track_step(
-                step_name, step_type, input_sample, step_config
-            ):
-                if "function" in step_info:
-                    step_function = step_info["function"]
-                    step_args = self._build_step_args(
-                        step_info, step_config, current_output
+            # Execute step with tracking (tracker) or ctx.events when present.
+            def _run_step() -> Any:
+                nonlocal current_output
+                if "function" not in step_info:
+                    self.logger.warning(
+                        f"No function defined for {step_name}. Skipping."
                     )
-                    current_output = step_function(**step_args)
+                    return None
+                step_function = step_info["function"]
+                step_args = self._build_step_args(
+                    step_info, step_config, current_output
+                )
+                return step_function(**step_args)
 
-                    # Track output metrics
+            if self.tracker is not None:
+                with self.tracker.track_step(
+                    step_name, step_type, input_sample, step_config
+                ):
+                    result = _run_step()
+                    if result is None and "function" not in step_info:
+                        continue
+                    current_output = result
                     if current_output is None:
                         self.tracker.add_step_metadata("output_type", "None")
                         self.tracker.add_step_metadata("warning", "Step returned None")
@@ -455,11 +486,21 @@ class BaseAttack(abc.ABC):
                         self.tracker.add_step_metadata(
                             "output_type", type(current_output).__name__
                         )
-                else:
-                    self.logger.warning(
-                        f"No function defined for {step_name}. Skipping."
+            elif self.ctx is not None:
+                with self.ctx.events.step(step_name, step_type):
+                    result = _run_step()
+                    if result is None and "function" not in step_info:
+                        continue
+                    current_output = result
+                    self.ctx.events.progress(
+                        (i + 1) / max(len(pipeline_steps), 1),
+                        step_name,
                     )
+            else:
+                result = _run_step()
+                if result is None and "function" not in step_info:
                     continue
+                current_output = result
 
             self.logger.info(f"✅ Completed: {step_name}")
 

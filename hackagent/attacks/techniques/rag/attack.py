@@ -27,9 +27,9 @@ import numpy as np
 
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
-from hackagent.attacks.shared.llm_router import connect_role
-from hackagent.attacks.shared.response_utils import extract_response_content
-from hackagent.attacks.shared.llm_router import LLMRouter
+from hackagent.attacks._lib.llm_router import connect_role
+from hackagent.attacks._lib.response import extract_response_content
+from hackagent.attacks._lib.llm_router import LLMRouter
 from hackagent.router.tracking.tracker import Tracker
 from hackagent.storage.store import Store
 from hackagent.core.contracts import EvalStatus, StepKind

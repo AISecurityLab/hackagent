@@ -23,13 +23,13 @@ import copy
 import logging
 from typing import Any, Dict, List, Optional
 
+from hackagent.attacks.ports import RunContext
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.core.defaults import DEFAULT_JUDGE_IDENTIFIER
-from hackagent.attacks.shared.llm_router import LLMRouter
+from hackagent.attacks._lib.llm_router import LLMRouter
 from hackagent.storage.store import Store
 
-from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
 
 from .generation import execute_fc, execute_tfc
 from .config import DEFAULT_FC_CONFIG, DEFAULT_TFC_CONFIG
@@ -81,8 +81,11 @@ class FCAttack(BaseAttack):
     def __init__(
         self,
         config: Optional[Dict[str, Any]] = None,
-        client: Optional[Store] = None,
+        ctx_or_client: Any = None,
         agent_router: Optional[LLMRouter] = None,
+        *,
+        ctx: Optional[RunContext] = None,
+        client: Optional[Store] = None,
     ):
         """
         Initialize FlowchartAttack with configuration.
@@ -96,10 +99,19 @@ class FCAttack(BaseAttack):
         Raises:
             ValueError: If ``client`` or ``agent_router`` is ``None``.
         """
-        if client is None:
-            raise ValueError("A storage backend must be provided to FCAttack.")
-        if agent_router is None:
-            raise ValueError("Victim LLMRouter instance must be provided to FCAttack.")
+        if ctx is None and isinstance(ctx_or_client, RunContext):
+            ctx = ctx_or_client
+        resolved_client = (
+            client
+            if client is not None
+            else (None if isinstance(ctx_or_client, RunContext) else ctx_or_client)
+        )
+        if ctx is None:
+            if resolved_client is None:
+                raise ValueError("A storage backend must be provided")
+            if agent_router is None:
+                raise ValueError("LLMRouter must be provided")
+            client = resolved_client
 
         # Merge config with defaults
         current_config = copy.deepcopy(DEFAULT_FC_CONFIG)
@@ -107,7 +119,10 @@ class FCAttack(BaseAttack):
             _recursive_update(current_config, config)
 
         self.logger = logging.getLogger("hackagent.attacks.FC")
-        super().__init__(current_config, client, agent_router)
+        if ctx is not None:
+            super().__init__(current_config, ctx)
+        else:
+            super().__init__(current_config, client, agent_router)
 
     def _setup(self) -> None:
         """Run standard setup then initialise algorithm-specific state."""
@@ -218,33 +233,7 @@ class FCAttack(BaseAttack):
                 ],
                 "input_data_arg_name": "goals",
                 "required_args": ["logger", "agent_router", "config"],
-            },
-            {
-                "name": "Evaluation: Evaluate Responses with LLM Judge",
-                "function": BaseEvaluationStep.make_execute(
-                    prefix_fn=lambda item: (
-                        item.get("full_prompt") or item.get("text_prompt", "")
-                    ),
-                    technique_params_key="fc_params",
-                ),
-                "step_type_enum": "EVALUATION",
-                "config_keys": [
-                    "fc_params",
-                    "_run_id",
-                    "_backend",
-                    "_client",
-                    "_tracker",
-                    "judges",
-                    "judge_concurrency",
-                    "max_tokens_eval",
-                    "filter_len",
-                    "judge_timeout",
-                    "judge_temperature",
-                    "max_judge_retries",
-                ],
-                "input_data_arg_name": "input_data",
-                "required_args": ["logger", "config", "client"],
-            },
+            }
         ]
 
     def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
@@ -275,6 +264,7 @@ class FCAttack(BaseAttack):
             initial_metadata=goal_metadata,
         )
 
+        self._wire_workspace_cache("flowchart")
         pipeline_steps = self._get_pipeline_steps()
         start_step = self.config.get("start_step", 1) - 1
 
@@ -317,20 +307,37 @@ class tFCAttack(BaseAttack):
     def __init__(
         self,
         config: Optional[Dict[str, Any]] = None,
-        client: Optional[Store] = None,
+        ctx_or_client: Any = None,
         agent_router: Optional[LLMRouter] = None,
+        *,
+        ctx: Optional[RunContext] = None,
+        client: Optional[Store] = None,
     ):
-        if client is None:
-            raise ValueError("A storage backend must be provided to tFCAttack.")
-        if agent_router is None:
-            raise ValueError("Victim LLMRouter instance must be provided to tFCAttack.")
+        if ctx is None and isinstance(ctx_or_client, RunContext):
+            ctx = ctx_or_client
+        resolved_client = (
+            client
+            if client is not None
+            else (None if isinstance(ctx_or_client, RunContext) else ctx_or_client)
+        )
+        if ctx is None:
+            if resolved_client is None:
+                raise ValueError("A storage backend must be provided to tFCAttack.")
+            if agent_router is None:
+                raise ValueError(
+                    "Victim LLMRouter instance must be provided to tFCAttack."
+                )
+            client = resolved_client
 
         current_config = copy.deepcopy(DEFAULT_TFC_CONFIG)
         if config:
             _recursive_update(current_config, config)
 
         self.logger = logging.getLogger("hackagent.attacks.tFC")
-        super().__init__(current_config, client, agent_router)
+        if ctx is not None:
+            super().__init__(current_config, ctx)
+        else:
+            super().__init__(current_config, client, agent_router)
 
     def _setup(self) -> None:
         """Run standard setup then initialise algorithm-specific state."""
@@ -392,33 +399,7 @@ class tFCAttack(BaseAttack):
                 ],
                 "input_data_arg_name": "goals",
                 "required_args": ["logger", "agent_router", "config"],
-            },
-            {
-                "name": "Evaluation: Evaluate Responses with LLM Judge",
-                "function": BaseEvaluationStep.make_execute(
-                    prefix_fn=lambda item: (
-                        item.get("full_prompt") or item.get("text_prompt", "")
-                    ),
-                    technique_params_key="tfc_params",
-                ),
-                "step_type_enum": "EVALUATION",
-                "config_keys": [
-                    "tfc_params",
-                    "_run_id",
-                    "_backend",
-                    "_client",
-                    "_tracker",
-                    "judges",
-                    "judge_concurrency",
-                    "max_tokens_eval",
-                    "filter_len",
-                    "judge_timeout",
-                    "judge_temperature",
-                    "max_judge_retries",
-                ],
-                "input_data_arg_name": "input_data",
-                "required_args": ["logger", "config", "client"],
-            },
+            }
         ]
 
     def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
@@ -450,6 +431,7 @@ class tFCAttack(BaseAttack):
             initial_metadata=goal_metadata,
         )
 
+        self._wire_workspace_cache("flowchart")
         pipeline_steps = self._get_pipeline_steps()
         start_step = self.config.get("start_step", 1) - 1
 

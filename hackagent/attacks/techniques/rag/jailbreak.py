@@ -13,8 +13,8 @@ poisoned documents; judging still uses the original goal.
 import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from hackagent.attacks.generator import AttackTemplates
-from hackagent.attacks.shared.response_utils import extract_response_content
+from hackagent.attacks._lib.templates import AttackTemplates
+from hackagent.attacks._lib.response import extract_response_content
 from hackagent.attacks.techniques.bon.generation import augment_text
 from hackagent.attacks.techniques.cipherchat.encode_experts import encode_expert_dict
 from hackagent.attacks.techniques.fc.flowchart_renderer import TEXT_FORMAT_SERIALIZERS
@@ -34,7 +34,7 @@ from hackagent.attacks.techniques.pap.taxonomy import (
     extract_mutated_text,
     get_technique_names,
 )
-from hackagent.attacks.shared.llm_router import LLMRouter
+from hackagent.attacks._lib.llm_router import LLMRouter
 
 SUPPORTED_JAILBREAK_TECHNIQUES = (
     "static_template",

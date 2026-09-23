@@ -13,11 +13,12 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from hackagent.storage.store import Store
-from hackagent.attacks.shared.llm_router import LLMRouter
+from hackagent.attacks._lib.llm_router import LLMRouter
+from hackagent.attacks.ports import RunContext
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 
-from . import generation, static_eval as evaluation
+from . import generation
 from .config import DEFAULT_TEMPLATE_CONFIG, validate_template_config
 from hackagent.attacks.techniques.static_template.config import TemplateAttackConfig
 
@@ -55,8 +56,11 @@ class StaticTemplateAttack(BaseAttack):
     def __init__(
         self,
         config: Optional[Dict[str, Any]] = None,
-        client: Optional[Store] = None,
+        ctx_or_client: Any = None,
         agent_router: Optional[LLMRouter] = None,
+        *,
+        ctx: Optional[RunContext] = None,
+        client: Optional[Store] = None,
     ):
         """
         Initialize static template attack.
@@ -70,10 +74,19 @@ class StaticTemplateAttack(BaseAttack):
         Raises:
             ValueError: If ``client`` or ``agent_router`` is ``None``.
         """
-        if client is None:
-            raise ValueError("A storage backend must be provided")
-        if agent_router is None:
-            raise ValueError("LLMRouter must be provided")
+        if ctx is None and isinstance(ctx_or_client, RunContext):
+            ctx = ctx_or_client
+        resolved_client = (
+            client
+            if client is not None
+            else (None if isinstance(ctx_or_client, RunContext) else ctx_or_client)
+        )
+        if ctx is None:
+            if resolved_client is None:
+                raise ValueError("A storage backend must be provided")
+            if agent_router is None:
+                raise ValueError("LLMRouter must be provided")
+            client = resolved_client
 
         # Merge config with defaults
         current_config = copy.deepcopy(DEFAULT_TEMPLATE_CONFIG)
@@ -84,7 +97,10 @@ class StaticTemplateAttack(BaseAttack):
         self.logger = logging.getLogger("hackagent.attacks.static_template")
 
         # Call parent - handles all setup
-        super().__init__(current_config, client, agent_router)
+        if ctx is not None:
+            super().__init__(current_config, ctx)
+        else:
+            super().__init__(current_config, client, agent_router)
 
     def _validate_config(self):
         """
@@ -115,7 +131,7 @@ class StaticTemplateAttack(BaseAttack):
         validate_template_config(self.config)
 
         # Validate objective exists
-        from hackagent.attacks.objectives import OBJECTIVES
+        from hackagent.attacks._lib.objectives import OBJECTIVES
 
         objective = self.config.get("objective")
         if objective not in OBJECTIVES:
@@ -164,34 +180,7 @@ class StaticTemplateAttack(BaseAttack):
                 ],
                 "input_data_arg_name": "goals",
                 "required_args": ["logger", "agent_router", "config"],
-            },
-            {
-                "name": "Evaluation: Evaluate Responses and Aggregate Results",
-                "function": evaluation.execute,
-                "step_type_enum": "EVALUATION",
-                "config_keys": [
-                    "objective",
-                    "judges",
-                    "judge",
-                    "judge_config",
-                    "min_response_length",
-                    "judge_concurrency",
-                    "judge_parallelism",
-                    "max_tokens_eval",
-                    "judge_timeout",
-                    "judge_request_timeout",
-                    "judge_temperature",
-                    "max_judge_retries",
-                    "organization_id",
-                    "_goal_index_offset",  # Global goal index offset in batched runs
-                    "_tracker",  # Shared goal tracker from coordinator
-                    "_run_id",  # For real-time result tracking
-                    "_backend",  # For real-time result tracking (Store)
-                    "_client",  # Legacy fallback
-                ],
-                "input_data_arg_name": "input_data",
-                "required_args": ["logger", "config", "client"],
-            },
+            }
         ]
 
     def _build_step_args(
@@ -241,14 +230,12 @@ class StaticTemplateAttack(BaseAttack):
 
             # Custom success check for static_template (checks dict structure)
             def success_check(output):
-                return output and isinstance(output, dict)
+                return bool(output) and isinstance(output, (dict, list))
 
             # Finalize pipeline-level tracking via coordinator
             coordinator.finalize_pipeline(results, success_check)
 
-            return rows_to_attack_results(
-                results if results else {"evaluated": [], "summary": []}
-            )
+            return rows_to_attack_results(results if results else [])
 
         except Exception as e:
             self.logger.error(f"Pipeline failed: {e}", exc_info=True)

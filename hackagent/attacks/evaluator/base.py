@@ -33,8 +33,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from hackagent.core.async_utils import run_coroutine_blocking
-from hackagent.attacks.shared.progress import create_progress_bar
-from hackagent.attacks.shared.llm_router import connect_role
+from hackagent.attacks._lib.progress import create_progress_bar
+from hackagent.attacks._lib.llm_router import connect_role
 from hackagent.storage.store import Store
 
 if TYPE_CHECKING:

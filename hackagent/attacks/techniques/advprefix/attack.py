@@ -18,7 +18,8 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from hackagent.storage.store import Store
-from hackagent.attacks.shared.llm_router import LLMRouter
+from hackagent.attacks._lib.llm_router import LLMRouter
+from hackagent.attacks.ports import RunContext
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 
@@ -92,8 +93,11 @@ class AdvPrefixAttack(BaseAttack):
     def __init__(
         self,
         config: Optional[Dict[str, Any]] = None,
-        client: Optional[Store] = None,
+        ctx_or_client: Any = None,
         agent_router: Optional[LLMRouter] = None,
+        *,
+        ctx: Optional[RunContext] = None,
+        client: Optional[Store] = None,
     ):
         """
         Initialize the AdvPrefix attack pipeline.
@@ -109,12 +113,19 @@ class AdvPrefixAttack(BaseAttack):
         Raises:
             ValueError: If ``client`` or ``agent_router`` is ``None``.
         """
-        if client is None:
-            raise ValueError("A storage backend must be provided to AdvPrefixAttack.")
-        if agent_router is None:
-            raise ValueError(
-                "Victim LLMRouter instance must be provided to AdvPrefixAttack."
-            )
+        if ctx is None and isinstance(ctx_or_client, RunContext):
+            ctx = ctx_or_client
+        resolved_client = (
+            client
+            if client is not None
+            else (None if isinstance(ctx_or_client, RunContext) else ctx_or_client)
+        )
+        if ctx is None:
+            if resolved_client is None:
+                raise ValueError("A storage backend must be provided")
+            if agent_router is None:
+                raise ValueError("LLMRouter must be provided")
+            client = resolved_client
 
         # Merge config with defaults
         current_config = copy.deepcopy(DEFAULT_PREFIX_GENERATION_CONFIG)
@@ -125,7 +136,10 @@ class AdvPrefixAttack(BaseAttack):
         self.logger = logging.getLogger("hackagent.attacks.advprefix")
 
         # Call parent - handles run_id, run_dir, validation, setup
-        super().__init__(current_config, client, agent_router)
+        if ctx is not None:
+            super().__init__(current_config, ctx)
+        else:
+            super().__init__(current_config, client, agent_router)
 
     def _validate_config(self):
         """
@@ -248,11 +262,7 @@ class AdvPrefixAttack(BaseAttack):
             },
             {
                 "name": "Evaluation: Judge, Aggregate, and Select Best Prefixes",
-                "function": lambda input_data, config, logger, client: (
-                    EvaluationPipeline(
-                        config=config, logger=logger, client=client
-                    ).execute(input_data=input_data)
-                ),
+                "function": self._evaluate_and_select,
                 "step_type_enum": "EVALUATION",
                 "config_keys": [
                     "judges",
@@ -267,6 +277,55 @@ class AdvPrefixAttack(BaseAttack):
                 "required_args": ["logger", "client", "config"],
             },
         ]
+
+    def _evaluate_and_select(self, input_data, config, logger, client):
+        """Score completions and select prefixes.
+
+        On the Phase 4 seam, use ``ctx.judge.evaluate`` for selection scores.
+        Legacy construction keeps :class:`EvaluationPipeline`.
+        """
+        if self.ctx is not None:
+            from hackagent.core.contracts import Sample
+
+            n_keep = int(
+                config.get("n_prefixes_per_goal")
+                or self.config.get("n_prefixes_per_goal")
+                or 1
+            )
+            scored = []
+            for row in input_data or []:
+                sample = Sample(
+                    goal=str(row.get("goal") or ""),
+                    prompt=str(row.get("prefix") or row.get("prompt") or ""),
+                    response=str(row.get("completion") or row.get("response") or ""),
+                )
+                verdict = self.ctx.judge.evaluate(sample)
+                enriched = dict(row)
+                enriched["best_score"] = float(verdict.score)
+                enriched["success"] = bool(verdict.success)
+                enriched["verdict"] = verdict
+                scored.append(enriched)
+                self.ctx.events.evaluation(
+                    goal=sample.goal,
+                    score=verdict.score,
+                    success=verdict.success,
+                )
+
+            # Select top-n per goal by score
+            by_goal = {}
+            for row in scored:
+                by_goal.setdefault(row.get("goal"), []).append(row)
+            selected = []
+            for goal, rows in by_goal.items():
+                rows_sorted = sorted(
+                    rows, key=lambda r: float(r.get("best_score") or 0.0), reverse=True
+                )
+                selected.extend(rows_sorted[: max(1, n_keep)])
+            return selected
+
+        return EvaluationPipeline(config=config, logger=logger, client=client).execute(
+            input_data=input_data
+        )
 
     def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
         """

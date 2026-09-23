@@ -46,17 +46,17 @@ from hackagent.core.defaults import (
 )
 from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
 from hackagent.attacks.evaluator.judge_evaluators import EVALUATOR_MAP
-from hackagent.attacks.objectives import OBJECTIVES
-from hackagent.attacks.shared.progress import create_progress_bar
-from hackagent.attacks.shared.response_utils import (
+from hackagent.attacks._lib.objectives import OBJECTIVES
+from hackagent.attacks._lib.progress import create_progress_bar
+from hackagent.attacks._lib.response import (
     extract_response_content,
     get_guardrail_info,
     is_guardrail_response,
 )
-from hackagent.attacks.shared.llm_router import connect_role
+from hackagent.attacks._lib.llm_router import connect_role
 from hackagent.storage.store import Store
 from hackagent.core.contracts import StepKind
-from hackagent.attacks.shared.llm_router import LLMRouter
+from hackagent.attacks._lib.llm_router import LLMRouter
 from hackagent.router.tracking import Tracker, Context
 
 from .config import (

@@ -41,7 +41,7 @@ from uuid import UUID
 
 
 from hackagent.core.errors import HackAgentError
-from hackagent.attacks.shared.embedding_utils import request_embedding
+from hackagent.attacks._lib.embedding_utils import request_embedding
 from hackagent.router.tracking.audit import record_run_audit_failure
 from hackagent.core.defaults import (
     DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE,
@@ -1209,7 +1209,7 @@ class AttackOrchestrator:
             return self._probe_router_registration(router, registration_key)
 
         if kind == "router_config":
-            from hackagent.attacks.shared.llm_router import connect_role
+            from hackagent.attacks._lib.llm_router import connect_role
 
             try:
                 temp_router, registration_key = connect_role(

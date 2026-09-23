@@ -8,64 +8,75 @@ Sends goals directly to the target model without any transformation,
 serving as a control condition for measuring default refusal rates.
 """
 
+from __future__ import annotations
+
 import copy
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence, Union
 
-from hackagent.storage.store import Store
-from hackagent.attacks.shared.llm_router import LLMRouter
+from hackagent.attacks._lib.llm_router import LLMRouter
+from hackagent.attacks._lib.objectives import OBJECTIVES
+from hackagent.attacks.config import AttackConfig
+from hackagent.attacks.ports import RunContext
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
+from hackagent.core.contracts import Goal
+from hackagent.storage.store import Store
 
 from . import generation
 from .config import DEFAULT_BASELINE_CONFIG
 
-# Reuse evaluation from static_template (same interface)
-from hackagent.attacks.techniques.static_template import static_eval as evaluation
-
 
 class BaselineAttack(BaseAttack):
-    """
-    Baseline attack that sends goals directly to the target.
-
-    No prompt transformation is applied — goals are sent as-is.
-    This provides a control condition to compare against actual
-    attack techniques (PAIR, TAP, DrAttack, etc.).
-
-    Pipeline stages
-    ---------------
-    1. **Generation** — sends each goal verbatim to the target model.
-    2. **Evaluation** — scores responses using the configured evaluator.
-    """
+    """Baseline attack that sends goals directly to the target."""
 
     def __init__(
         self,
-        config: Optional[Dict[str, Any]] = None,
-        client: Optional[Store] = None,
+        config: Optional[Union[AttackConfig, Dict[str, Any]]] = None,
+        ctx_or_client: Any = None,
         agent_router: Optional[LLMRouter] = None,
+        *,
+        ctx: Optional[RunContext] = None,
+        client: Optional[Store] = None,
     ):
-        if client is None:
-            raise ValueError("A storage backend must be provided")
-        if agent_router is None:
-            raise ValueError("LLMRouter must be provided")
+        if ctx is None and isinstance(ctx_or_client, RunContext):
+            ctx = ctx_or_client
 
         current_config = copy.deepcopy(DEFAULT_BASELINE_CONFIG)
-        if config:
+        if isinstance(config, AttackConfig):
+            current_config.update(config.model_dump())
+        elif config:
             current_config.update(config)
 
         self.logger = logging.getLogger("hackagent.attacks.baseline")
 
-        super().__init__(current_config, client, agent_router)
+        if ctx is not None:
+            super().__init__(current_config, ctx)
+            return
+
+        resolved_client = client if client is not None else ctx_or_client
+        if resolved_client is None:
+            raise ValueError("A storage backend must be provided")
+        if agent_router is None:
+            raise ValueError("LLMRouter must be provided")
+
+        super().__init__(current_config, resolved_client, agent_router)
 
     def _validate_config(self):
         super()._validate_config()
+
+        if self.ctx is not None and self.attack_config is not None:
+            objective = self.config.get("objective")
+            if objective and objective not in OBJECTIVES:
+                raise ValueError(
+                    f"Unknown objective: {objective}. Available: {list(OBJECTIVES.keys())}"
+                )
+            return
 
         required_keys = ["output_dir", "objective"]
         missing = [k for k in required_keys if k not in self.config]
         if missing:
             raise ValueError(f"Missing required config keys: {missing}")
-
-        from hackagent.attacks.objectives import OBJECTIVES
 
         objective = self.config.get("objective")
         if objective not in OBJECTIVES:
@@ -98,6 +109,7 @@ class BaselineAttack(BaseAttack):
         return []
 
     def _get_pipeline_steps(self) -> List[Dict]:
+        # Post-hoc: generation only; orchestrator / Panel judges later.
         return [
             {
                 "name": "Generation: Send Goals Directly to Target",
@@ -116,33 +128,6 @@ class BaselineAttack(BaseAttack):
                 "input_data_arg_name": "goals",
                 "required_args": ["logger", "agent_router", "config"],
             },
-            {
-                "name": "Evaluation: Evaluate Responses",
-                "function": evaluation.execute,
-                "step_type_enum": "EVALUATION",
-                "config_keys": [
-                    "objective",
-                    "judges",
-                    "judge",
-                    "judge_config",
-                    "min_response_length",
-                    "judge_concurrency",
-                    "judge_parallelism",
-                    "max_tokens_eval",
-                    "judge_timeout",
-                    "judge_request_timeout",
-                    "judge_temperature",
-                    "max_judge_retries",
-                    "organization_id",
-                    "_goal_index_offset",
-                    "_tracker",
-                    "_run_id",
-                    "_backend",
-                    "_client",
-                ],
-                "input_data_arg_name": "input_data",
-                "required_args": ["logger", "config", "client"],
-            },
         ]
 
     def _build_step_args(
@@ -158,38 +143,31 @@ class BaselineAttack(BaseAttack):
             args["config"]["_tracker"] = self.coordinator.goal_tracker
         return args
 
-    def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
-        """
-        Execute baseline attack (direct goal submission).
-
-        Args:
-            goals: List of goal strings to send directly.
-
-        Returns:
-            A list of :class:`~hackagent.attacks.types.AttackResult` instances.
-        """
-        goals = goals or []
-        if not goals:
+    def run(
+        self,
+        goals: Optional[Sequence[Union[Goal, str]]] = None,
+        **kwargs: Any,
+    ) -> List[AttackResult]:
+        goal_texts = self._goal_texts(goals)
+        if not goal_texts:
             return []
 
         coordinator = self._initialize_coordinator(
             attack_type="Baseline",
-            goals=goals,
+            goals=goal_texts,
             initial_metadata={"objective": self.config.get("objective")},
         )
 
         self.config["_tracker"] = coordinator.goal_tracker
 
         try:
-            results = self._execute_pipeline(self._get_pipeline_steps(), goals)
+            results = self._execute_pipeline(self._get_pipeline_steps(), goal_texts)
 
             def success_check(output):
-                return output and isinstance(output, dict)
+                return output and isinstance(output, (dict, list))
 
             coordinator.finalize_pipeline(results, success_check)
-            return rows_to_attack_results(
-                results if results else {"evaluated": [], "summary": []}
-            )
+            return rows_to_attack_results(results if results else [])
 
         except Exception as e:
             self.logger.error(f"Pipeline failed: {e}", exc_info=True)

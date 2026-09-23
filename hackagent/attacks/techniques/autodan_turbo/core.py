@@ -5,12 +5,12 @@
 import re
 
 from hackagent.core.defaults import DEFAULT_MAX_OUTPUT_TOKENS
-from hackagent.attacks.shared.response_utils import (
+from hackagent.attacks._lib.response import (
     extract_response_content,
     get_guardrail_info,
     is_guardrail_response,
 )
-from hackagent.attacks.shared.llm_router import connect_role
+from hackagent.attacks._lib.llm_router import connect_role
 
 from .config import (
     ATTACKER_USER_PROMPT,

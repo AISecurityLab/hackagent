@@ -3,8 +3,14 @@
 
 """Compatibility shim — prefer ``hackagent.attacks._lib.objectives``."""
 
-from hackagent.attacks._lib.objectives import *  # noqa: F403
-from hackagent.attacks._lib.objectives import OBJECTIVES  # noqa: F401
+from hackagent.attacks._lib.objectives import (
+    HARMFUL_BEHAVIOR,
+    JAILBREAK,
+    JAILBREAK_REFUSAL_PATTERNS,
+    OBJECTIVES,
+    POLICY_VIOLATION,
+    ObjectiveConfig,
+)
 
 __all__ = [
     "ObjectiveConfig",

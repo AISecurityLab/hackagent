@@ -124,7 +124,7 @@ class TestCreateStepGeneratorRouter(unittest.TestCase):
         generator = MagicMock()
 
         with patch(
-            "hackagent.attacks.shared.llm_router.connect_role",
+            "hackagent.attacks._lib.llm_router.connect_role",
             return_value=(generator, "gen-key"),
         ) as factory:
             result = _create_step_generator_router(

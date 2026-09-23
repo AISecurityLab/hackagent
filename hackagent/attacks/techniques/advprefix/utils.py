@@ -29,7 +29,7 @@ from typing import (
 )
 
 # Re-export shared progress bar for backward compatibility
-from hackagent.attacks.shared.progress import create_progress_bar  # noqa: F401
+from hackagent.attacks._lib.progress import create_progress_bar  # noqa: F401
 
 # Use hierarchical logger name for TUI handler inheritance
 logger = logging.getLogger("hackagent.attacks.advprefix.utils")

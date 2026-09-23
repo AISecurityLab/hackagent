@@ -4,7 +4,7 @@
 from hackagent.core.logging import get_logger
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
-from hackagent.attacks.shared.llm_router import LLMRouter
+from hackagent.attacks._lib.llm_router import LLMRouter
 from hackagent.core.contracts import AgentType, ModelSpec
 from hackagent.core.errors import HackAgentError
 from hackagent.core.settings import Settings
