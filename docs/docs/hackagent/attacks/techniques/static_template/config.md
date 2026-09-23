@@ -8,6 +8,14 @@ Configuration for static template attacks.
 Static template attacks use predefined prompt patterns to attempt jailbreaks,
 combining templates with goals to generate attack prompts.
 
+#### validate\_template\_config
+
+```python
+def validate_template_config(config: Dict[str, Any]) -> None
+```
+
+Validate selected categories and substitutions without calling a model.
+
 ## TemplateAttackConfig Objects
 
 ```python

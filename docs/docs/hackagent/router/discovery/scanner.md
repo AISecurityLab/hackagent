@@ -98,9 +98,10 @@ def build_attack_catalog(*,
 Serialize the registered attack specs into a compact catalog.
 
 The catalog is what the planner is shown and constrained to: it lists every
-technique and its tunable parameters. Advanced/auth fields (attacker model,
-API keys…) are excluded by default — the planner picks the *strategy*, while
-model credentials come from the run config.
+technique, its primary taxonomy category/tags, and its tunable parameters.
+Advanced/auth fields (attacker model, API keys…) are excluded by default —
+the planner picks the *strategy*, while model credentials come from the run
+config.
 
 #### plan\_attack
 

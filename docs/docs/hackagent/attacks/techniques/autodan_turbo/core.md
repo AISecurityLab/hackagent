@@ -114,10 +114,11 @@ def score_response(scorer_router,
                    logger,
                    max_retries=5,
                    scorer_max_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
-                   role_label="scorer")
+                   role_label="scorer",
+                   thinking=False)
 ```
 
-Score target output using the two-step scorer/wrapper protocol.
+Score target output, using a wrapper only for unstructured assessments.
 
 Paper mapping: this is the Scorer LLM component (analysis + numeric score)
 from AutoDAN-Turbo, with robust fallbacks for production providers.
@@ -137,6 +138,8 @@ from AutoDAN-Turbo, with robust fallbacks for production providers.
 
   Tuple ``(score, assessment_text)`` where ``score`` is float in ``[1,10]``
   and ``assessment_text`` is the scorer&#x27;s natural-language reasoning.
+  Explicit assessment scores take precedence over model-based extraction.
+  Exhausted retries return ``(1.0, &quot;Score extraction failed&quot;)``.
 
 #### extract\_jailbreak\_prompt
 

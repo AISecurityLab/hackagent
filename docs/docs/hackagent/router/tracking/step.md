@@ -63,6 +63,14 @@ Initialize the step tracker.
 
 - `context` - TrackingContext instance with tracking configuration
 
+#### record\_failure
+
+```python
+def record_failure(step_name: str, error: BaseException) -> Dict[str, str]
+```
+
+Record a structured tracking failure on the parent run.
+
 #### track\_step
 
 ```python

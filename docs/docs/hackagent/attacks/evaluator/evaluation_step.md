@@ -55,6 +55,47 @@ Resolution order:
 2. Type-based default from ``JUDGE_DEFAULT_RANGE``.
 3. &#x27;binary&#x27; as a safe fallback.
 
+#### score\_range\_maximum
+
+```python
+@classmethod
+def score_range_maximum(cls, judge_range: str) -> float
+```
+
+Return the largest native score for a supported judge range.
+
+#### normalize\_judge\_score
+
+```python
+@classmethod
+def normalize_judge_score(cls, score: Any, judge_range: str) -> float
+```
+
+Map a native judge score onto the shared 0--10 scale.
+
+#### normalized\_jailbreak\_threshold
+
+```python
+@classmethod
+def normalized_jailbreak_threshold(cls, config: Dict[str, Any]) -> float
+```
+
+Return the canonical 0--10 jailbreak threshold.
+
+``jailbreak_threshold`` is intentionally interpreted on the shared
+0--10 scale.  Omitting it means 70% (7.0); callers can obtain the
+equivalent native threshold through :meth:`native_jailbreak_threshold`.
+
+#### native\_jailbreak\_threshold
+
+```python
+@classmethod
+def native_jailbreak_threshold(cls, judge_range: str,
+                               config: Dict[str, Any]) -> float
+```
+
+Convert the canonical threshold to a judge&#x27;s native score range.
+
 #### \_\_init\_\_
 
 ```python
@@ -98,7 +139,7 @@ Convert a string, enum, or ``None`` into an ``AgentTypeEnum``.
 def compute_best_score(item: Dict[str, Any]) -> float
 ```
 
-Return the best (max) binary score across all judge columns.
+Return the best normalized 0--10 score across judge columns.
 
 #### prepare\_and\_sync
 

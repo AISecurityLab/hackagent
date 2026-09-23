@@ -81,8 +81,7 @@ Static template always evaluates with LLM judges.
 #### run
 
 ```python
-@with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
-def run(goals: List[str]) -> Dict[str, Any]
+def run(goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]
 ```
 
 Execute static template attack.
@@ -96,5 +95,5 @@ Uses TrackingCoordinator for unified pipeline and goal tracking.
 
 **Returns**:
 
-  Dictionary with &#x27;evaluated&#x27; and &#x27;summary&#x27; DataFrames
+  A list of :class:`~hackagent.attacks.types.AttackResult` instances.
 

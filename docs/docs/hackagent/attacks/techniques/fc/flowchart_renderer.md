@@ -11,6 +11,22 @@ Supports three layout modes: vertical, horizontal, and tortuous (S-shaped).
 Based on: Zhang et al., &quot;FC-Attack: Jailbreaking Multimodal Large
 Language Models via Auto-Generated Flowcharts&quot; (EMNLP 2025 Findings)
 
+#### ensure\_graphviz\_dot\_available
+
+```python
+def ensure_graphviz_dot_available(
+        allow_download: bool | None = None) -> str | None
+```
+
+Ensure Graphviz ``dot`` is available and return its resolved path.
+
+This function is safe to call during setup flows (e.g. ``hackagent init``).
+It may trigger automatic local binary download when enabled.
+
+**Arguments**:
+
+- `allow_download` - See ``_resolve_dot_binary``.
+
 #### steps\_to\_mermaid
 
 ```python
@@ -73,7 +89,9 @@ def render_flowchart(steps: List[str],
 
 Render steps as a flowchart image using Graphviz.
 
-Requires the ``dot`` binary to be available on the system.
+Tries the system ``dot`` first. If unavailable, it can auto-download
+portable Graphviz binaries (macOS/Windows) from the latest official
+release unless ``HACKAGENT_GRAPHVIZ_AUTO_DOWNLOAD=0`` is set.
 
 **Arguments**:
 

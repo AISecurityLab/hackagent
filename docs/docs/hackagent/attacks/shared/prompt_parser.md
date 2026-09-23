@@ -8,7 +8,10 @@ Helpers for parsing attacker outputs into prompt data.
 #### extract\_prompt\_and\_improvement
 
 ```python
-def extract_prompt_and_improvement(content: str) -> Optional[Dict[str, str]]
+def extract_prompt_and_improvement(
+        content: str,
+        *,
+        allow_plaintext: bool = True) -> Optional[Dict[str, str]]
 ```
 
 Extract a prompt (+ optional improvement) from attacker output.
@@ -19,7 +22,9 @@ plain-text fallback when no JSON structure is present.
 #### extract\_prompt
 
 ```python
-def extract_prompt(content: str) -> Optional[str]
+def extract_prompt(content: str,
+                   *,
+                   allow_plaintext: bool = True) -> Optional[str]
 ```
 
 Extract just the prompt string from attacker output.

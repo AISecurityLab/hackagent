@@ -91,7 +91,7 @@ Pipeline:
 #### run
 
 ```python
-def run(goals: Optional[List[str]] = None, **kwargs) -> List[Dict[str, Any]]
+def run(goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]
 ```
 
 Execute the RAG Attack (indirect prompt injection).
