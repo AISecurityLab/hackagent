@@ -36,8 +36,8 @@ import threading
 from typing import Any, Dict, List, Optional
 
 from hackagent.core.logging import get_logger
-from hackagent.router import envelope as _envelope
-from hackagent.router.agent import (
+from hackagent.models import envelope as _envelope
+from hackagent.models.adapters.base import (
     Agent,
     AdapterConfigurationError,
     AdapterInteractionError,
@@ -314,7 +314,7 @@ def _get_web_agent_custom_llm_class():
         # ---- lifecycle ---------------------------------------------------
 
         def _start(self) -> None:
-            from hackagent.router.discovery.browser import (
+            from hackagent.models.adapters.browser import (
                 _dismiss_consent,
                 _find_input,
                 _open_chat_launcher,
@@ -614,7 +614,7 @@ def _get_web_agent_custom_llm_class():
                 return self._run(lambda: self._send_locked(prompt))
 
         def _send_locked(self, prompt: str) -> str:
-            from hackagent.router.discovery.browser import (
+            from hackagent.models.adapters.browser import (
                 _find_send_button,
                 _type_into,
             )

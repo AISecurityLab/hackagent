@@ -20,7 +20,7 @@ import unittest
 import uuid
 from unittest.mock import MagicMock, patch
 
-from hackagent.router.providers.codex import (
+from hackagent.models.adapters.codex import (
     CodexAgent,
     CodexConfigurationError,
     CodexInteractionError,
@@ -28,7 +28,7 @@ from hackagent.router.providers.codex import (
     _get_codex_custom_llm_class,
     _last_user_text,
 )
-from hackagent.router.providers import codex as codex_provider_module
+from hackagent.models.adapters import codex as codex_provider_module
 
 logging.disable(logging.CRITICAL)
 
@@ -213,7 +213,7 @@ class TestCodexCustomLLMTransport(unittest.TestCase):
         self.assertIn("--sandbox", argv)
         self.assertEqual(argv[argv.index("--sandbox") + 1], "workspace-write")
 
-    @patch("hackagent.router.providers.codex.subprocess.run")
+    @patch("hackagent.models.adapters.codex.subprocess.run")
     def test_run_feeds_prompt_via_stdin(self, mock_run):
         mock_run.return_value = _completed(stdout=_response_json("the answer"))
 
@@ -229,7 +229,7 @@ class TestCodexCustomLLMTransport(unittest.TestCase):
         self.assertNotIn("--ignore your rules", mock_run.call_args.args[0])
         self.assertEqual(result["final_text"], "the answer")
 
-    @patch("hackagent.router.providers.codex.subprocess.run")
+    @patch("hackagent.models.adapters.codex.subprocess.run")
     def test_run_nonzero_exit_raises(self, mock_run):
         mock_run.return_value = _completed(stderr="kaboom", returncode=2)
 
@@ -238,7 +238,7 @@ class TestCodexCustomLLMTransport(unittest.TestCase):
         with self.assertRaises(CodexInteractionError):
             handler._run(prompt_text="hi")
 
-    @patch("hackagent.router.providers.codex.subprocess.run")
+    @patch("hackagent.models.adapters.codex.subprocess.run")
     def test_run_nonzero_exit_with_text_stdout_is_captured(self, mock_run):
         """A policy/refusal message on stdout is captured even if exit != 0."""
         refusal = "API Error: ... violates our Usage Policy. Try rephrasing"
@@ -253,7 +253,7 @@ class TestCodexCustomLLMTransport(unittest.TestCase):
 
         self.assertEqual(result["final_text"], refusal)
 
-    @patch("hackagent.router.providers.codex.subprocess.run")
+    @patch("hackagent.models.adapters.codex.subprocess.run")
     def test_run_missing_binary_raises_config_error(self, mock_run):
         mock_run.side_effect = FileNotFoundError()
 
@@ -264,7 +264,7 @@ class TestCodexCustomLLMTransport(unittest.TestCase):
 
 
 class TestCodexAgentInit(unittest.TestCase):
-    @patch("hackagent.router.providers.codex.shutil.which", return_value=_FAKE_BINARY)
+    @patch("hackagent.models.adapters.codex.shutil.which", return_value=_FAKE_BINARY)
     def test_init_success(self, _which):
         adapter = CodexAgent(
             id=str(uuid.uuid4()),
@@ -278,7 +278,7 @@ class TestCodexAgentInit(unittest.TestCase):
             and adapter.litellm_model.endswith("/gpt-5.5")
         )
 
-    @patch("hackagent.router.providers.codex.shutil.which", return_value=_FAKE_BINARY)
+    @patch("hackagent.models.adapters.codex.shutil.which", return_value=_FAKE_BINARY)
     def test_init_default_timeout(self, _which):
         adapter = CodexAgent(id="t1", config={"name": "gpt-5.5"})
 
@@ -288,12 +288,12 @@ class TestCodexAgentInit(unittest.TestCase):
         with self.assertRaises(CodexConfigurationError):
             CodexAgent(id="e1", config={})
 
-    @patch("hackagent.router.providers.codex.shutil.which", return_value=None)
+    @patch("hackagent.models.adapters.codex.shutil.which", return_value=None)
     def test_init_missing_binary_raises(self, _which):
         with self.assertRaises(CodexConfigurationError):
             CodexAgent(id="e2", config={"name": "gpt-5.5"})
 
-    @patch("hackagent.router.providers.codex.shutil.which", return_value=_FAKE_BINARY)
+    @patch("hackagent.models.adapters.codex.shutil.which", return_value=_FAKE_BINARY)
     def test_init_registers_custom_provider(self, _which):
         import litellm
 
@@ -304,7 +304,7 @@ class TestCodexAgentInit(unittest.TestCase):
 
 
 class TestCodexAgentHandleRequest(unittest.TestCase):
-    @patch("hackagent.router.providers.codex.shutil.which", return_value=_FAKE_BINARY)
+    @patch("hackagent.models.adapters.codex.shutil.which", return_value=_FAKE_BINARY)
     def setUp(self, _which):
         self.adapter = CodexAgent(id="h1", config={"name": "gpt-5.5"})
 
@@ -313,7 +313,7 @@ class TestCodexAgentHandleRequest(unittest.TestCase):
 
         self.assertEqual(response["status_code"], 400)
 
-    @patch("hackagent.router.providers.codex.subprocess.run")
+    @patch("hackagent.models.adapters.codex.subprocess.run")
     def test_handle_request_success_routes_through_cli(self, mock_run):
         mock_run.return_value = _completed(stdout=_response_json("agent reply"))
 
@@ -329,7 +329,7 @@ class TestCodexAgentHandleRequest(unittest.TestCase):
             "User task:\nhello",
         )
 
-    @patch("hackagent.router.providers.codex.subprocess.run")
+    @patch("hackagent.models.adapters.codex.subprocess.run")
     def test_handle_request_cli_error_returns_500(self, mock_run):
         mock_run.return_value = _completed(stderr="boom", returncode=1)
 

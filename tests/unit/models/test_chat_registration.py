@@ -8,8 +8,8 @@ import os
 import unittest
 from unittest.mock import patch
 
-from hackagent.router._chat_registration import _ChatRegistration
-from hackagent.router.provider_config import get_provider_config
+from hackagent.models.adapters.litellm import _ChatRegistration
+from hackagent.models.provider_config import get_provider_config
 from hackagent.core.contracts import AgentType
 
 logging.disable(logging.CRITICAL)

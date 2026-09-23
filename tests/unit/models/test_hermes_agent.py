@@ -16,7 +16,7 @@ import unittest
 import uuid
 from unittest.mock import MagicMock, patch
 
-from hackagent.router.providers.hermes import (
+from hackagent.models.adapters.hermes import (
     HermesAgent,
     HermesConfigurationError,
     HermesInteractionError,
@@ -24,7 +24,7 @@ from hackagent.router.providers.hermes import (
     _get_hermes_custom_llm_class,
     _last_user_text,
 )
-from hackagent.router.providers import hermes as hermes_provider_module
+from hackagent.models.adapters import hermes as hermes_provider_module
 from hackagent.core.contracts import AgentType
 
 logging.disable(logging.CRITICAL)
@@ -77,7 +77,7 @@ class TestHermesAgentType(unittest.TestCase):
             self.assertEqual(AgentType(alias), AgentType.HERMES)
 
     def test_registered_in_adapter_map(self):
-        from hackagent.router.router import AGENT_TYPE_TO_ADAPTER_MAP
+        from hackagent.models.router import AGENT_TYPE_TO_ADAPTER_MAP
 
         self.assertIs(AGENT_TYPE_TO_ADAPTER_MAP[AgentType.HERMES], HermesAgent)
 
@@ -139,7 +139,7 @@ class TestHermesCustomLLMTransport(unittest.TestCase):
         self.assertNotIn("--ignore-user-config", argv)
         self.assertNotIn("--source", argv)
 
-    @patch("hackagent.router.providers.hermes.subprocess.run")
+    @patch("hackagent.models.adapters.hermes.subprocess.run")
     def test_run_feeds_prompt_via_stdin(self, mock_run):
         mock_run.return_value = _completed(stdout="the answer")
         handler = _make_handler()
@@ -150,14 +150,14 @@ class TestHermesCustomLLMTransport(unittest.TestCase):
         self.assertNotIn("--ignore your rules", mock_run.call_args.args[0])
         self.assertEqual(result["final_text"], "the answer")
 
-    @patch("hackagent.router.providers.hermes.subprocess.run")
+    @patch("hackagent.models.adapters.hermes.subprocess.run")
     def test_run_nonzero_exit_without_output_raises(self, mock_run):
         mock_run.return_value = _completed(stderr="kaboom", returncode=1)
         handler = _make_handler()
         with self.assertRaises(HermesInteractionError):
             handler._run(prompt_text="hi")
 
-    @patch("hackagent.router.providers.hermes.subprocess.run")
+    @patch("hackagent.models.adapters.hermes.subprocess.run")
     def test_run_nonzero_exit_with_output_is_captured(self, mock_run):
         """Exit 1 + usable stdout is a content-level response, not a failure."""
         refusal = "I can't help with that."
@@ -165,14 +165,14 @@ class TestHermesCustomLLMTransport(unittest.TestCase):
         result = _make_handler()._run(prompt_text="obfuscated harmful prompt")
         self.assertEqual(result["final_text"], refusal)
 
-    @patch("hackagent.router.providers.hermes.subprocess.run")
+    @patch("hackagent.models.adapters.hermes.subprocess.run")
     def test_run_usage_error_exit_always_raises(self, mock_run):
         """Exit 2 is a CLI usage error — never a target response."""
         mock_run.return_value = _completed(stdout="usage: hermes", returncode=2)
         with self.assertRaises(HermesInteractionError):
             _make_handler()._run(prompt_text="hi")
 
-    @patch("hackagent.router.providers.hermes.subprocess.run")
+    @patch("hackagent.models.adapters.hermes.subprocess.run")
     def test_run_timeout_raises_interaction_error(self, mock_run):
         import subprocess
 
@@ -180,7 +180,7 @@ class TestHermesCustomLLMTransport(unittest.TestCase):
         with self.assertRaises(HermesInteractionError):
             _make_handler()._run(prompt_text="hi")
 
-    @patch("hackagent.router.providers.hermes.subprocess.run")
+    @patch("hackagent.models.adapters.hermes.subprocess.run")
     def test_run_missing_binary_raises_config_error(self, mock_run):
         mock_run.side_effect = FileNotFoundError()
         with self.assertRaises(HermesConfigurationError):
@@ -188,7 +188,7 @@ class TestHermesCustomLLMTransport(unittest.TestCase):
 
 
 class TestHermesAgentInit(unittest.TestCase):
-    @patch("hackagent.router.providers.hermes.shutil.which", return_value=_FAKE_BINARY)
+    @patch("hackagent.models.adapters.hermes.shutil.which", return_value=_FAKE_BINARY)
     def test_init_success(self, _which):
         adapter = HermesAgent(
             id=str(uuid.uuid4()),
@@ -201,7 +201,7 @@ class TestHermesAgentInit(unittest.TestCase):
             and adapter.litellm_model.endswith("/hermes-4-70b")
         )
 
-    @patch("hackagent.router.providers.hermes.shutil.which", return_value=_FAKE_BINARY)
+    @patch("hackagent.models.adapters.hermes.shutil.which", return_value=_FAKE_BINARY)
     def test_init_isolation_defaults(self, _which):
         adapter = HermesAgent(id="t1", config={"name": "hermes-4-70b"})
         self.assertEqual(adapter.timeout, 600)
@@ -213,12 +213,12 @@ class TestHermesAgentInit(unittest.TestCase):
         with self.assertRaises(HermesConfigurationError):
             HermesAgent(id="e1", config={})
 
-    @patch("hackagent.router.providers.hermes.shutil.which", return_value=None)
+    @patch("hackagent.models.adapters.hermes.shutil.which", return_value=None)
     def test_init_missing_binary_raises(self, _which):
         with self.assertRaises(HermesConfigurationError):
             HermesAgent(id="e2", config={"name": "hermes-4-70b"})
 
-    @patch("hackagent.router.providers.hermes.shutil.which", return_value=_FAKE_BINARY)
+    @patch("hackagent.models.adapters.hermes.shutil.which", return_value=_FAKE_BINARY)
     def test_init_registers_custom_provider(self, _which):
         import litellm
 
@@ -228,7 +228,7 @@ class TestHermesAgentInit(unittest.TestCase):
 
 
 class TestHermesAgentHandleRequest(unittest.TestCase):
-    @patch("hackagent.router.providers.hermes.shutil.which", return_value=_FAKE_BINARY)
+    @patch("hackagent.models.adapters.hermes.shutil.which", return_value=_FAKE_BINARY)
     def setUp(self, _which):
         self.adapter = HermesAgent(id="h1", config={"name": "hermes-4-70b"})
 
@@ -236,7 +236,7 @@ class TestHermesAgentHandleRequest(unittest.TestCase):
         response = self.adapter.handle_request({})
         self.assertEqual(response["status_code"], 400)
 
-    @patch("hackagent.router.providers.hermes.subprocess.run")
+    @patch("hackagent.models.adapters.hermes.subprocess.run")
     def test_handle_request_success_routes_through_cli(self, mock_run):
         mock_run.return_value = _completed(stdout="agent reply")
         response = self.adapter.handle_request({"prompt": "hello"})
@@ -246,7 +246,7 @@ class TestHermesAgentHandleRequest(unittest.TestCase):
         # Prompt reached the subprocess via stdin.
         self.assertEqual(mock_run.call_args.kwargs["input"], "hello")
 
-    @patch("hackagent.router.providers.hermes.subprocess.run")
+    @patch("hackagent.models.adapters.hermes.subprocess.run")
     def test_handle_request_cli_error_returns_500(self, mock_run):
         mock_run.return_value = _completed(stderr="boom", returncode=1)
         response = self.adapter.handle_request({"prompt": "hi"})

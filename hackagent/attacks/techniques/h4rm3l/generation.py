@@ -17,7 +17,7 @@ from hackagent.attacks.shared.response_utils import (
     is_guardrail_response,
 )
 from hackagent.attacks.shared.router_factory import create_router
-from hackagent.router.router import AgentRouter
+from hackagent.models.router import AgentRouter
 
 from .config import PRESET_PROGRAMS
 from .decorators import (

@@ -25,9 +25,9 @@ from typing import Any, Dict
 
 import pytest
 
-from hackagent.router._chat_registration import _ChatRegistration
-from hackagent.router.router import AgentRouter
-from hackagent.router.tracking_logger import HACKAGENT_METADATA_KEY
+from hackagent.models.adapters.litellm import _ChatRegistration
+from hackagent.models.router import AgentRouter
+from hackagent.models.adapters.litellm_callbacks import HACKAGENT_METADATA_KEY
 from hackagent.core.contracts import AgentType
 
 logger = logging.getLogger(__name__)

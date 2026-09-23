@@ -7,7 +7,7 @@ import logging
 import unittest
 from unittest.mock import MagicMock
 
-from hackagent.router import envelope
+from hackagent.models import envelope
 
 logging.disable(logging.CRITICAL)
 

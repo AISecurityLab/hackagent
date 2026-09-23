@@ -15,7 +15,7 @@ import os
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple
 
-from hackagent.router import envelope as _envelope
+from hackagent.models import envelope as _envelope
 
 
 # --- Common Exception Classes ---
@@ -270,7 +270,7 @@ class Agent(ABC):
     ) -> Dict[str, Any]:
         """Construct HackAgent's standardised error-response dict.
 
-        Delegates to :func:`hackagent.router.envelope.build_error_envelope`
+        Delegates to :func:`hackagent.models.envelope.build_error_envelope`
         so the dict shape lives in one place (see
         ``LITELLM_ROUTER_REFACTOR_PLAN.md`` Phase A).
         """
@@ -297,7 +297,7 @@ class Agent(ABC):
     ) -> Dict[str, Any]:
         """Construct HackAgent's standardised success-response dict.
 
-        Delegates to :func:`hackagent.router.envelope.build_success_envelope`.
+        Delegates to :func:`hackagent.models.envelope.build_success_envelope`.
         """
         return _envelope.build_success_envelope(
             agent_id=self.id,
@@ -486,7 +486,7 @@ class ChatCompletionsAgent(Agent):
         """Build the standard ``agent_specific_data`` block.
 
         Delegates to
-        :func:`hackagent.router.envelope.build_agent_specific_data`.
+        :func:`hackagent.models.envelope.build_agent_specific_data`.
         Subclasses override to add adapter-specific metadata.
         """
         return _envelope.build_agent_specific_data(

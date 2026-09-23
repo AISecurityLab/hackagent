@@ -16,7 +16,7 @@ from hackagent.attacks.shared.response_utils import (
     extract_response_content,
     is_guardrail_response,
 )
-from hackagent.router.router import AgentRouter
+from hackagent.models.router import AgentRouter
 from hackagent.router.tracking import Tracker
 
 

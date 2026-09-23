@@ -29,7 +29,7 @@ from hackagent.core.logging import get_logger
 # importable, so we annotate it as ``Optional[Any]`` here.
 _REGISTERED: bool = False
 _LOGGER_INSTANCE: Optional[Any] = None
-_TRACKING_LOGGER = get_logger("hackagent.router.tracking_logger")
+_TRACKING_LOGGER = get_logger("hackagent.models.adapters.litellm_callbacks")
 
 # Sentinel metadata namespace that the logger uses to identify
 # HackAgent-owned calls. Nesting under a single ``"hackagent"`` key in

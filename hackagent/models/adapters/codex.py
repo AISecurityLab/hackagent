@@ -27,8 +27,8 @@ import subprocess
 from typing import Any, Dict, List, Optional
 
 from hackagent.core.logging import get_logger
-from hackagent.router import envelope as _envelope
-from hackagent.router.agent import (
+from hackagent.models import envelope as _envelope
+from hackagent.models.adapters.base import (
     Agent,
     AdapterConfigurationError,
     AdapterInteractionError,

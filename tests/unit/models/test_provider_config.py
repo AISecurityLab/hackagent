@@ -6,7 +6,7 @@
 import logging
 import unittest
 
-from hackagent.router.provider_config import (
+from hackagent.models.provider_config import (
     PROVIDER_CONFIGS,
     default_thinking_translator,
     get_provider_config,

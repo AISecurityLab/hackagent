@@ -36,7 +36,7 @@ import logging
 import os
 from typing import Any, Dict, Optional, Tuple
 
-from hackagent.router.router import AgentRouter
+from hackagent.models.router import AgentRouter
 from hackagent.core.contracts import AgentType
 
 logger = logging.getLogger("hackagent.attacks.shared.router_factory")

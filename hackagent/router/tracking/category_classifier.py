@@ -10,7 +10,7 @@ import os
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-from hackagent.router.router import AgentRouter
+from hackagent.models.router import AgentRouter
 from hackagent.core.contracts import AgentType
 from hackagent.storage.store import Store
 

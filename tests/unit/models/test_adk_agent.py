@@ -17,7 +17,7 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 
-from hackagent.router.providers.adk import (
+from hackagent.models.adapters.adk import (
     ADKAgent,
     AgentConfigurationError,
     AgentInteractionError,
@@ -25,7 +25,7 @@ from hackagent.router.providers.adk import (
     _get_adk_custom_llm_class,
     _last_user_text,
 )
-from hackagent.router.providers import adk as adk_provider_module
+from hackagent.models.adapters import adk as adk_provider_module
 
 logging.disable(logging.CRITICAL)
 

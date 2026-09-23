@@ -7,7 +7,7 @@ Playwright helpers for the ``web`` provider.
 Shared utilities for driving a real Chromium: ensuring the browser binary is
 installed (fetched on first use), and locating the chat input / send button on a
 loaded page. The ``web`` provider
-(:mod:`hackagent.router.providers.web`) uses these to type prompts into a live
+(:mod:`hackagent.models.adapters.web`) uses these to type prompts into a live
 chat widget and read the replies.
 
 Playwright is a core dependency. The Chromium *binary* it drives is not a pip

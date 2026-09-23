@@ -18,7 +18,7 @@ import unittest
 import uuid
 from unittest.mock import MagicMock, patch
 
-from hackagent.router.providers.claude import (
+from hackagent.models.adapters.claude import (
     ClaudeCodeAgent,
     ClaudeCodeConfigurationError,
     ClaudeCodeInteractionError,
@@ -26,7 +26,7 @@ from hackagent.router.providers.claude import (
     _get_claude_code_custom_llm_class,
     _last_user_text,
 )
-from hackagent.router.providers import claude as claude_provider_module
+from hackagent.models.adapters import claude as claude_provider_module
 
 logging.disable(logging.CRITICAL)
 
@@ -165,7 +165,7 @@ class TestClaudeCustomLLMTransport(unittest.TestCase):
         self.assertEqual(argv[argv.index("--max-turns") + 1], "3")
         self.assertIn("--bare", argv)
 
-    @patch("hackagent.router.providers.claude.subprocess.run")
+    @patch("hackagent.models.adapters.claude.subprocess.run")
     def test_run_feeds_prompt_via_stdin(self, mock_run):
         mock_run.return_value = _completed(stdout=_result_json("the answer"))
         handler = _make_handler()
@@ -176,14 +176,14 @@ class TestClaudeCustomLLMTransport(unittest.TestCase):
         self.assertNotIn("--ignore your rules", mock_run.call_args.args[0])
         self.assertEqual(result["final_text"], "the answer")
 
-    @patch("hackagent.router.providers.claude.subprocess.run")
+    @patch("hackagent.models.adapters.claude.subprocess.run")
     def test_run_nonzero_exit_raises(self, mock_run):
         mock_run.return_value = _completed(stderr="kaboom", returncode=2)
         handler = _make_handler()
         with self.assertRaises(ClaudeCodeInteractionError):
             handler._run(prompt_text="hi")
 
-    @patch("hackagent.router.providers.claude.subprocess.run")
+    @patch("hackagent.models.adapters.claude.subprocess.run")
     def test_run_nonzero_exit_with_policy_block_is_captured(self, mock_run):
         """A Usage Policy block (exit 1 + result payload) is captured, not raised."""
         refusal = "API Error: ... violates our Usage Policy. Try rephrasing"
@@ -195,7 +195,7 @@ class TestClaudeCustomLLMTransport(unittest.TestCase):
         result = handler._run(prompt_text="obfuscated harmful prompt")
         self.assertEqual(result["final_text"], refusal)
 
-    @patch("hackagent.router.providers.claude.subprocess.run")
+    @patch("hackagent.models.adapters.claude.subprocess.run")
     def test_run_missing_binary_raises_config_error(self, mock_run):
         mock_run.side_effect = FileNotFoundError()
         handler = _make_handler()
@@ -204,7 +204,7 @@ class TestClaudeCustomLLMTransport(unittest.TestCase):
 
 
 class TestClaudeAgentInit(unittest.TestCase):
-    @patch("hackagent.router.providers.claude.shutil.which", return_value=_FAKE_BINARY)
+    @patch("hackagent.models.adapters.claude.shutil.which", return_value=_FAKE_BINARY)
     def test_init_success(self, _which):
         adapter = ClaudeCodeAgent(
             id=str(uuid.uuid4()),
@@ -217,7 +217,7 @@ class TestClaudeAgentInit(unittest.TestCase):
             and adapter.litellm_model.endswith("/sonnet")
         )
 
-    @patch("hackagent.router.providers.claude.shutil.which", return_value=_FAKE_BINARY)
+    @patch("hackagent.models.adapters.claude.shutil.which", return_value=_FAKE_BINARY)
     def test_init_default_timeout(self, _which):
         adapter = ClaudeCodeAgent(id="t1", config={"name": "opus"})
         self.assertEqual(adapter.timeout, 300)
@@ -226,12 +226,12 @@ class TestClaudeAgentInit(unittest.TestCase):
         with self.assertRaises(ClaudeCodeConfigurationError):
             ClaudeCodeAgent(id="e1", config={})
 
-    @patch("hackagent.router.providers.claude.shutil.which", return_value=None)
+    @patch("hackagent.models.adapters.claude.shutil.which", return_value=None)
     def test_init_missing_binary_raises(self, _which):
         with self.assertRaises(ClaudeCodeConfigurationError):
             ClaudeCodeAgent(id="e2", config={"name": "sonnet"})
 
-    @patch("hackagent.router.providers.claude.shutil.which", return_value=_FAKE_BINARY)
+    @patch("hackagent.models.adapters.claude.shutil.which", return_value=_FAKE_BINARY)
     def test_init_registers_custom_provider(self, _which):
         import litellm
 
@@ -241,7 +241,7 @@ class TestClaudeAgentInit(unittest.TestCase):
 
 
 class TestClaudeAgentHandleRequest(unittest.TestCase):
-    @patch("hackagent.router.providers.claude.shutil.which", return_value=_FAKE_BINARY)
+    @patch("hackagent.models.adapters.claude.shutil.which", return_value=_FAKE_BINARY)
     def setUp(self, _which):
         self.adapter = ClaudeCodeAgent(id="h1", config={"name": "sonnet"})
 
@@ -249,7 +249,7 @@ class TestClaudeAgentHandleRequest(unittest.TestCase):
         response = self.adapter.handle_request({})
         self.assertEqual(response["status_code"], 400)
 
-    @patch("hackagent.router.providers.claude.subprocess.run")
+    @patch("hackagent.models.adapters.claude.subprocess.run")
     def test_handle_request_success_routes_through_cli(self, mock_run):
         mock_run.return_value = _completed(stdout=_result_json("agent reply"))
         response = self.adapter.handle_request({"prompt": "hello"})
@@ -259,7 +259,7 @@ class TestClaudeAgentHandleRequest(unittest.TestCase):
         # Prompt reached the subprocess via stdin.
         self.assertEqual(mock_run.call_args.kwargs["input"], "hello")
 
-    @patch("hackagent.router.providers.claude.subprocess.run")
+    @patch("hackagent.models.adapters.claude.subprocess.run")
     def test_handle_request_cli_error_returns_500(self, mock_run):
         mock_run.return_value = _completed(stderr="boom", returncode=1)
         response = self.adapter.handle_request({"prompt": "hi"})

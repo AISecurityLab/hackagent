@@ -23,7 +23,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from hackagent.router.router import AgentRouter
+from hackagent.models.router import AgentRouter
 
 from .flowchart_renderer import (
     TEXT_FORMAT_SERIALIZERS,

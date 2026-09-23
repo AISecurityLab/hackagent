@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 from hackagent.core.settings import Settings
 from hackagent.core.errors import HackAgentError
-from hackagent.router import AgentRouter
+from hackagent.models.router import AgentRouter
 from hackagent.core.contracts import AgentType
 
 # Lazy import for attack orchestrators to avoid ~0.5s startup delay

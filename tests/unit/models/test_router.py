@@ -5,7 +5,7 @@ import uuid
 from unittest.mock import MagicMock, patch
 from hackagent.storage.records import OrganizationContext
 from hackagent.core.contracts import AgentType
-from hackagent.router.router import AgentRouter
+from hackagent.models.router import AgentRouter
 
 
 def _make_context(org_id=None, user_id="test_user"):
@@ -42,8 +42,8 @@ def _make_backend(org_id=None, user_id="test_user"):
 
 
 class TestAgentRouterInitialization(unittest.TestCase):
-    @patch("hackagent.router.router.ADKAgent", autospec=True)
-    @patch("hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
+    @patch("hackagent.models.router.ADKAgent", autospec=True)
+    @patch("hackagent.models.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
     def test_agent_router_init_creates_new_agent_if_not_exists(
         self,
         MockAgentMap,
@@ -107,8 +107,8 @@ class TestAgentRouterInitialization(unittest.TestCase):
             router._agent_registry[str(mock_created_agent_id)], mock_adk_instance
         )
 
-    @patch("hackagent.router.router.ADKAgent", autospec=True)
-    @patch("hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
+    @patch("hackagent.models.router.ADKAgent", autospec=True)
+    @patch("hackagent.models.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
     def test_agent_router_init_updates_existing_agent_if_metadata_differs(
         self,
         MockAgentMap,
@@ -155,8 +155,8 @@ class TestAgentRouterInitialization(unittest.TestCase):
         self.assertEqual(router.backend_agent.metadata, new_metadata)
         self.assertIn(str(existing_agent_id), router._agent_registry)
 
-    @patch("hackagent.router.router.ADKAgent", autospec=True)
-    @patch("hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
+    @patch("hackagent.models.router.ADKAgent", autospec=True)
+    @patch("hackagent.models.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
     def test_agent_router_init_existing_agent_metadata_matches_overwrite_true(
         self,
         MockAgentMap,
@@ -190,8 +190,8 @@ class TestAgentRouterInitialization(unittest.TestCase):
         mock_backend.create_or_update_agent.assert_called_once()
         self.assertEqual(router.backend_agent.id, existing_agent_id)
 
-    @patch("hackagent.router.router.ADKAgent", autospec=True)
-    @patch("hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
+    @patch("hackagent.models.router.ADKAgent", autospec=True)
+    @patch("hackagent.models.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
     def test_agent_router_init_existing_agent_metadata_matches_overwrite_false(
         self,
         MockAgentMap,
@@ -231,8 +231,8 @@ class TestAgentRouterInitialization(unittest.TestCase):
         )
         self.assertEqual(router.backend_agent.id, existing_agent_id)
 
-    @patch("hackagent.router.router.ADKAgent", autospec=True)
-    @patch("hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
+    @patch("hackagent.models.router.ADKAgent", autospec=True)
+    @patch("hackagent.models.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
     def test_agent_router_init_existing_agent_metadata_differs_overwrite_false(
         self,
         MockAgentMap,
@@ -277,7 +277,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
 
     def test_agent_router_init_creates_new_litellm_agent(self):
         """Chat AgentTypes now register a ``_ChatRegistration`` (Phase E.2b)."""
-        from hackagent.router._chat_registration import _ChatRegistration
+        from hackagent.models.adapters.litellm import _ChatRegistration
 
         mock_org_id = uuid.uuid4()
         mock_backend = _make_backend(org_id=mock_org_id, user_id="789")
@@ -321,8 +321,8 @@ class TestAgentRouterInitialization(unittest.TestCase):
 
 
 class TestAnyUrlEndpointConversion(unittest.TestCase):
-    @patch("hackagent.router.router.ADKAgent", autospec=True)
-    @patch("hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
+    @patch("hackagent.models.router.ADKAgent", autospec=True)
+    @patch("hackagent.models.router.AGENT_TYPE_TO_ADAPTER_MAP", new_callable=dict)
     def test_adk_adapter_receives_str_endpoint_when_backend_returns_anyurl(
         self,
         MockAgentMap,

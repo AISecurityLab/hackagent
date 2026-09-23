@@ -13,7 +13,7 @@ import logging
 import unittest
 from unittest.mock import MagicMock
 
-from hackagent.router.providers.web import (
+from hackagent.models.adapters.web import (
     WebAgent,
     WebAgentConfigurationError,
     _last_user_text,
@@ -141,7 +141,7 @@ class TestWebAgentHandleRequest(unittest.TestCase):
         self.agent._custom_handler.session.send.assert_called_once_with("hello bot")
 
     def test_handle_request_session_error_returns_500(self):
-        from hackagent.router.providers.web import WebAgentInteractionError
+        from hackagent.models.adapters.web import WebAgentInteractionError
 
         self.agent._custom_handler.session.send = MagicMock(
             side_effect=WebAgentInteractionError("no reply")
@@ -167,14 +167,14 @@ class TestOpenChatLauncher(unittest.TestCase):
         return page, handle
 
     def test_clicks_visible_launcher(self):
-        from hackagent.router.discovery.browser import _open_chat_launcher
+        from hackagent.models.adapters.browser import _open_chat_launcher
 
         page, handle = self._page_with_handle()
         self.assertTrue(_open_chat_launcher(page))
         handle.click.assert_called_once()
 
     def test_skips_navigational_link_in_heuristic_mode(self):
-        from hackagent.router.discovery.browser import _open_chat_launcher
+        from hackagent.models.adapters.browser import _open_chat_launcher
 
         # A "chat" link that navigates elsewhere must not be clicked by the
         # heuristics (would leave the page).
@@ -185,7 +185,7 @@ class TestOpenChatLauncher(unittest.TestCase):
     def test_matches_widget_open_button_launcher(self):
         # A widget launcher: <div role=button class="chat-widget-open-button">.
         # The heuristics must catch widget-open-style launchers automatically.
-        from hackagent.router.discovery.browser import _open_chat_launcher
+        from hackagent.models.adapters.browser import _open_chat_launcher
 
         handle = MagicMock()
         handle.is_visible.return_value = True
@@ -211,7 +211,7 @@ class TestOpenChatLauncher(unittest.TestCase):
     def test_falls_back_to_dom_click_when_actionable_click_fails(self):
         # A launcher covered by a cookie overlay fails the normal (actionable)
         # click; we must fall back to a direct DOM click.
-        from hackagent.router.discovery.browser import _open_chat_launcher
+        from hackagent.models.adapters.browser import _open_chat_launcher
 
         handle = MagicMock()
         handle.is_visible.return_value = True
@@ -230,7 +230,7 @@ class TestOpenChatLauncher(unittest.TestCase):
         handle.evaluate.assert_called_once()  # DOM-click fallback fired
 
     def test_explicit_selector_clicks_even_links(self):
-        from hackagent.router.discovery.browser import _open_chat_launcher
+        from hackagent.models.adapters.browser import _open_chat_launcher
 
         handle = MagicMock()
         handle.is_visible.return_value = True
@@ -246,7 +246,7 @@ class TestOpenChatLauncher(unittest.TestCase):
 
 
 def _make_session():
-    from hackagent.router.providers.web import _get_web_agent_custom_llm_class
+    from hackagent.models.adapters.web import _get_web_agent_custom_llm_class
 
     session_cls = _get_web_agent_custom_llm_class()._session_cls
     return session_cls(
@@ -292,7 +292,7 @@ class TestMessageTexts(unittest.TestCase):
         # Common widget markup: bot reply = chat-item-response-text-wrapper
         # (response), user turn = chat-item-request-* (request). The extractor
         # must select 'response' bubbles and treat 'request' as a user marker.
-        from hackagent.router.providers.web import (
+        from hackagent.models.adapters.web import (
             _MESSAGE_EXTRACT_JS,
             _MESSAGE_SELECTORS,
         )
@@ -321,7 +321,7 @@ class TestDismissConsent(unittest.TestCase):
     the chat launcher click."""
 
     def test_clicks_known_cmp_accept_button(self):
-        from hackagent.router.discovery.browser import _dismiss_consent
+        from hackagent.models.adapters.browser import _dismiss_consent
 
         handle = MagicMock()
         handle.is_visible.return_value = True
@@ -336,7 +336,7 @@ class TestDismissConsent(unittest.TestCase):
         self.assertTrue(handle.click.called or handle.evaluate.called)
 
     def test_returns_false_when_no_banner(self):
-        from hackagent.router.discovery.browser import _dismiss_consent
+        from hackagent.models.adapters.browser import _dismiss_consent
 
         frame = MagicMock()
         frame.query_selector_all.return_value = []
@@ -433,7 +433,7 @@ class TestBrowserSessionThreadAffinity(unittest.TestCase):
 
 class TestRouterRegistration(unittest.TestCase):
     def test_web_agent_in_adapter_map(self):
-        from hackagent.router.router import AGENT_TYPE_TO_ADAPTER_MAP
+        from hackagent.models.router import AGENT_TYPE_TO_ADAPTER_MAP
 
         self.assertIs(AGENT_TYPE_TO_ADAPTER_MAP[AgentType.WEB], WebAgent)
 

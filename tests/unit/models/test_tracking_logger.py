@@ -8,7 +8,7 @@ import logging
 import unittest
 from unittest.mock import MagicMock, patch
 
-from hackagent.router import tracking_logger
+from hackagent.models.adapters import litellm_callbacks as tracking_logger
 
 logging.disable(logging.CRITICAL)
 

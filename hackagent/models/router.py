@@ -7,16 +7,16 @@ from typing import Any, Dict, List, Optional, Tuple, Type
 
 from hackagent.storage.records import AgentRecord
 from hackagent.storage.store import Store
-from hackagent.router import envelope as _envelope
-from hackagent.router import tracking_logger as _tracking_logger
-from hackagent.router._chat_registration import _ChatRegistration
-from hackagent.router.agent import Agent
-from hackagent.router.providers.adk import ADKAgent, _get_litellm
-from hackagent.router.providers.claude import ClaudeCodeAgent
-from hackagent.router.providers.codex import CodexAgent
-from hackagent.router.providers.hermes import HermesAgent
-from hackagent.router.providers.web import WebAgent
-from hackagent.router.provider_config import ProviderConfig, get_provider_config
+from hackagent.models import envelope as _envelope
+from hackagent.models.adapters import litellm_callbacks as _tracking_logger
+from hackagent.models.adapters.litellm import _ChatRegistration
+from hackagent.models.adapters.base import Agent
+from hackagent.models.adapters.adk import ADKAgent, _get_litellm
+from hackagent.models.adapters.claude import ClaudeCodeAgent
+from hackagent.models.adapters.codex import CodexAgent
+from hackagent.models.adapters.hermes import HermesAgent
+from hackagent.models.adapters.web import WebAgent
+from hackagent.models.provider_config import ProviderConfig, get_provider_config
 from hackagent.core.contracts import AgentType
 
 # Use explicit hierarchical logger name for clarity
@@ -45,7 +45,7 @@ def _extract_prompt_text(request_data: Dict[str, Any]) -> str:
 # --- Agent Type to Adapter Mapping ---
 # Phase E.2c deleted the chat adapter classes. Chat AgentTypes
 # (LITELLM, OPENAI_SDK, OLLAMA, LANGCHAIN) are now driven entirely by
-# ``hackagent.router.provider_config.get_provider_config`` plus a
+# ``hackagent.models.provider_config.get_provider_config`` plus a
 # ``_ChatRegistration``. The map only carries adapter classes for agent
 # types that need a custom Python object (ADK has a per-instance
 # CustomLLM registration side-effect).
@@ -137,7 +137,7 @@ class AgentRouter:
             and agent_type not in AGENT_TYPE_TO_ADAPTER_MAP
         ):
             supported = list(AGENT_TYPE_TO_ADAPTER_MAP.keys())
-            from hackagent.router.provider_config import PROVIDER_CONFIGS as _PC
+            from hackagent.models.provider_config import PROVIDER_CONFIGS as _PC
 
             supported.extend(_PC.keys())
             raise ValueError(

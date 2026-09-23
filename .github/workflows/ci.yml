@@ -201,7 +201,7 @@ jobs:
           retention-days: 1
 
   # ── Integration (Ollama) ──────────────────────────────────────────────────
-  # Covers tests/integration/router/ and tests/integration/attacks/.
+  # Covers tests/integration/models/ and tests/integration/attacks/.
   # Requires a running Ollama instance with tinyllama.
   #
   # Sharded across two runners (real CPUs, real parallelism):
@@ -275,7 +275,7 @@ jobs:
         # bottlenecking the rest of the suite.
         run: >
           uv run pytest
-          tests/integration/router/
+          tests/integration/models/
           tests/integration/attacks/
           --run-integration
           -n auto

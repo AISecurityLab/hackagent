@@ -25,8 +25,8 @@ from typing import Any, Dict, Optional
 
 from hackagent.core.settings import resolve_ollama_base_url
 from hackagent.core.logging import get_logger
-from hackagent.router import envelope as _envelope
-from hackagent.router.provider_config import ProviderConfig
+from hackagent.models import envelope as _envelope
+from hackagent.models.provider_config import ProviderConfig
 from hackagent.core.contracts import AgentType
 
 logger = get_logger(__name__)

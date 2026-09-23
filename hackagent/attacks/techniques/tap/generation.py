@@ -37,7 +37,7 @@ from hackagent.attacks.shared.response_utils import (
 from hackagent.attacks.shared.router_factory import create_router
 from hackagent.storage.store import Store
 from hackagent.core.contracts import StepKind
-from hackagent.router.router import AgentRouter
+from hackagent.models.router import AgentRouter
 from hackagent.router.tracking import Context, Tracker
 
 from .config import ATTACKER_SYSTEM_PROMPT

@@ -16,7 +16,7 @@ import unittest
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from hackagent.router.router import AgentRouter
+from hackagent.models.router import AgentRouter
 from hackagent.core.contracts import AgentType
 from hackagent.storage.records import OrganizationContext
 

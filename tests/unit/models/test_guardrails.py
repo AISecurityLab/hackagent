@@ -12,7 +12,7 @@ from hackagent.attacks.shared.guardrail import (
     LLMGuardrail,
     create_guardrail_from_config,
 )
-from hackagent.router.router import AgentRouter, _extract_prompt_text
+from hackagent.models.router import AgentRouter, _extract_prompt_text
 from hackagent.core.contracts import AgentType
 
 
@@ -33,10 +33,10 @@ def _make_backend(org_id=None, user_id="test_user"):
 
 def _make_router_with_guardrails(before_guardrail=None, after_guardrail=None):
     """Build an AgentRouter with mocked internals, attaching guardrails."""
-    with patch("hackagent.router.router.ADKAgent", autospec=True) as MockADK:
+    with patch("hackagent.models.router.ADKAgent", autospec=True) as MockADK:
         MockADK.__name__ = "ADKAgent"
         with patch(
-            "hackagent.router.router.AGENT_TYPE_TO_ADAPTER_MAP",
+            "hackagent.models.router.AGENT_TYPE_TO_ADAPTER_MAP",
             {AgentType.GOOGLE_ADK: MockADK},
         ):
             backend = _make_backend()

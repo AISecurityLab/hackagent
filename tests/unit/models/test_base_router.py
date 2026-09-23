@@ -3,7 +3,7 @@
 
 import unittest
 from typing import Any, Dict
-from hackagent.router.router import Agent
+from hackagent.models.router import Agent
 
 
 # A minimal concrete implementation of the abstract Agent class for testing
