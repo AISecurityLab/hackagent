@@ -1,6 +1,6 @@
 ---
 sidebar_label: hermes
-title: hackagent.router.providers.hermes
+title: hackagent.models.adapters.hermes
 ---
 
 Hermes Agent provider built on top of LiteLLM.
@@ -24,34 +24,10 @@ own Hermes state. The adapter therefore forces isolation flags by default
 (``--ignore-user-config``, optional ``--safe-mode``) and never passes
 ``-r/--resume`` or ``-c/--continue``, so every attack turn is a fresh session.
 
-## HermesConfigurationError Objects
-
-```python
-class HermesConfigurationError(AdapterConfigurationError)
-```
-
-Hermes adapter configuration issues (e.g. binary not found).
-
-## HermesInteractionError Objects
-
-```python
-class HermesInteractionError(AdapterInteractionError)
-```
-
-Errors invoking the ``hermes`` CLI.
-
-## HermesResponseParsingError Objects
-
-```python
-class HermesResponseParsingError(AdapterResponseParsingError)
-```
-
-Errors parsing the ``hermes -z`` output.
-
 ## HermesAgent Objects
 
 ```python
-class HermesAgent(Agent)
+class HermesAgent(SubprocessCLIAgent)
 ```
 
 Adapter for a locally-installed Hermes Agent CLI.
@@ -85,18 +61,4 @@ logs are attributable to hackagent runs.
 
 Note: ``endpoint`` is accepted for interface symmetry but ignored — the
 Hermes CLI is local and has no endpoint URL.
-
-#### handle\_request
-
-```python
-def handle_request(request_data: Dict[str, Any]) -> Dict[str, Any]
-```
-
-Send a single Hermes turn via ``litellm.completion``.
-
-Flow mirrors :class:`ClaudeCodeAgent`::
-
-    request_data → litellm.completion(model=&quot;hackagent_hermes_&lt;id&gt;/&lt;model&gt;&quot;,
-                                      messages=…)
-                  → _HermesCustomLLM.completion → ``hermes -z``
 

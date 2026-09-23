@@ -1,6 +1,6 @@
 ---
 sidebar_label: router
-title: hackagent.router.router
+title: hackagent.models.router
 ---
 
 ## AgentRouter Objects

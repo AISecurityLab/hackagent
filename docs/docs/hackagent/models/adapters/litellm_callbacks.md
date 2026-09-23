@@ -1,6 +1,6 @@
 ---
-sidebar_label: tracking_logger
-title: hackagent.router.tracking_logger
+sidebar_label: litellm_callbacks
+title: hackagent.models.adapters.litellm_callbacks
 ---
 
 LiteLLM callback that captures every ``litellm.completion`` call.

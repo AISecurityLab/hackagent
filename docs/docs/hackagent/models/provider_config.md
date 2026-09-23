@@ -1,6 +1,6 @@
 ---
 sidebar_label: provider_config
-title: hackagent.router.provider_config
+title: hackagent.models.provider_config
 ---
 
 ``AgentType`` → ``ProviderConfig`` table.

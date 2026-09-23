@@ -1,6 +1,6 @@
 ---
 sidebar_label: codex
-title: hackagent.router.providers.codex
+title: hackagent.models.adapters.codex
 ---
 
 Codex provider built on top of LiteLLM.
@@ -21,34 +21,10 @@ Ollama mode mirrors the Claude Code provider style: set ``binary`` to an
 ``ollama`` executable and the adapter will invoke Codex through
 ``ollama launch codex`` while passing the Codex arguments after ``--``.
 
-## CodexConfigurationError Objects
-
-```python
-class CodexConfigurationError(AdapterConfigurationError)
-```
-
-Codex adapter configuration issues (e.g. binary not found).
-
-## CodexInteractionError Objects
-
-```python
-class CodexInteractionError(AdapterInteractionError)
-```
-
-Errors invoking the ``codex`` CLI.
-
-## CodexResponseParsingError Objects
-
-```python
-class CodexResponseParsingError(AdapterResponseParsingError)
-```
-
-Errors parsing the ``codex exec --json`` output.
-
 ## CodexAgent Objects
 
 ```python
-class CodexAgent(Agent)
+class CodexAgent(SubprocessCLIAgent)
 ```
 
 Adapter for a locally-installed Codex CLI.
@@ -76,18 +52,4 @@ installed Codex CLI version.
 
 Note: ``endpoint`` is accepted for interface symmetry but ignored — Codex
 is local here and has no endpoint URL in this adapter.
-
-#### handle\_request
-
-```python
-def handle_request(request_data: Dict[str, Any]) -> Dict[str, Any]
-```
-
-Send a single Codex turn via ``litellm.completion``.
-
-Flow mirrors :class:`ADKAgent`::
-
-    request_data → litellm.completion(model=&quot;hackagent_codex_&lt;id&gt;/&lt;model&gt;&quot;,
-                                      messages=…)
-                  → _CodexCustomLLM.completion → ``codex exec``
 

@@ -1,6 +1,6 @@
 ---
 sidebar_label: web
-title: hackagent.router.providers.web
+title: hackagent.models.adapters.web
 ---
 
 The ``web`` provider — red-teams a website&#x27;s chatbot by driving the live page.

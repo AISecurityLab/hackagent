@@ -1,6 +1,6 @@
 ---
-sidebar_label: agent
-title: hackagent.router.agent
+sidebar_label: base
+title: hackagent.models.adapters.base
 ---
 
 Base classes and common utilities for all agent adapters.
@@ -9,6 +9,14 @@ This module provides:
 - Common exception classes for adapter errors
 - Abstract base class `Agent` with shared functionality
 - Utility methods for request validation, response building, and API key resolution
+
+#### get\_litellm
+
+```python
+def get_litellm()
+```
+
+Import litellm lazily. Returns ``(module, is_available)``.
 
 ## AdapterConfigurationError Objects
 

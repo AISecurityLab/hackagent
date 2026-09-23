@@ -1,6 +1,6 @@
 ---
 sidebar_label: envelope
-title: hackagent.router.envelope
+title: hackagent.models.envelope
 ---
 
 Envelope helpers — pure functions that translate between LiteLLM&#x27;s

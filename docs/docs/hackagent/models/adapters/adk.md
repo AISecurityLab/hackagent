@@ -1,6 +1,6 @@
 ---
 sidebar_label: adk
-title: hackagent.router.providers.adk
+title: hackagent.models.adapters.adk
 ---
 
 Google ADK (Agent Development Kit) provider built on top of LiteLLM.
