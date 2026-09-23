@@ -39,6 +39,14 @@ def test_result_row_carries_eval_columns_from_the_verdict():
     assert evaluation_status(result) == EvalStatus.SUCCESSFUL_JAILBREAK.value
 
 
+def test_unjudged_result_has_no_eval_columns():
+    result = AttackResult(goal="g", prompt="p", response="r")
+    assert evaluation_status(result) is None
+    assert evaluation_metrics(result) == {}
+    row = result_to_row(result)
+    assert not any(key.startswith("eval_") for key in row)
+
+
 def test_only_mapping_names_eval_columns():
     root = Path(__file__).resolve().parents[3] / "hackagent" / "orchestrator"
     offenders = []
