@@ -541,61 +541,36 @@ class AttackOrchestrator:
         Extract parameters for attack execution.
 
         Override this method for custom parameter handling.
-        Default implementation extracts 'goals' from config, either directly
-        as a list or by loading them from a dataset source.
+        Default implementation resolves 'goals', 'intents', or 'dataset' from
+        config into typed Goal values via ``resolve_goals``.
 
         Args:
             attack_config: Full attack configuration. Can contain either:
                 - goals: Direct list of goal strings
                 - dataset: Configuration for loading goals from a dataset source
+                - intents: Configuration for loading goals from intents taxonomy
 
         Returns:
             Parameters to pass to technique's run() method
 
         Raises:
-            ValueError: If neither 'goals' nor 'dataset' is provided, or if format is invalid
+            ValueError: If no goal source is provided, or if format is invalid
         """
-        # Check for direct goals first
-        goals = attack_config.get("goals")
-        dataset_config = attack_config.get("dataset")
-        intents_config = attack_config.get("intents")
-        goal_labels_by_index: Optional[Dict[int, Dict[str, str]]] = None
-        goal_extra_fields_by_index: Optional[Dict[int, Dict[str, Any]]] = None
-        goal_extra_fields_by_goal: Optional[Dict[str, Dict[str, Any]]] = None
+        from hackagent.datasets.goals import resolve_goals
 
-        if goals is not None and dataset_config is not None:
-            logger.warning(
-                "Both 'goals' and 'dataset' provided. Using 'goals' directly."
-            )
-            dataset_config = None
-        if goals is not None and intents_config is not None:
-            logger.warning(
-                "Both 'goals' and 'intents' provided. Using 'goals' directly."
-            )
-            intents_config = None
+        resolved = resolve_goals(
+            goals=attack_config.get("goals"),
+            dataset=attack_config.get("dataset"),
+            intents=attack_config.get("intents"),
+        )
 
-        if intents_config is not None and dataset_config is not None:
-            logger.warning("Both 'intents' and 'dataset' provided. Using 'intents'.")
-            dataset_config = None
-
-        if intents_config is not None:
-            goals, goal_labels_by_index = self._load_goals_from_intents(intents_config)
-        elif dataset_config is not None:
-            # Load goals from dataset source
-            goals, goal_extra_fields_by_index = self._load_goals_from_dataset(
-                dataset_config
-            )
-        elif goals is None:
-            raise ValueError(
-                f"'{self.attack_type}' requires either 'goals' (list), "
-                "'dataset' (config), or 'intents' (config)"
-            )
-
-        if not isinstance(goals, list):
-            raise ValueError(f"'goals' must be a list for {self.attack_type}")
-
-        if len(goals) == 0:
-            raise ValueError(f"'goals' list is empty for {self.attack_type}")
+        goals = [goal.text for goal in resolved]
+        goal_labels_by_index = {
+            goal.index: dict(goal.labels) for goal in resolved if goal.labels
+        }
+        goal_extra_fields_by_index = {
+            goal.index: dict(goal.extra) for goal in resolved if goal.extra
+        }
 
         logger.info(f"Prepared {len(goals)} goals for {self.attack_type} attack")
         params: Dict[str, Any] = {"goals": goals}
@@ -604,22 +579,13 @@ class AttackOrchestrator:
         if goal_extra_fields_by_index:
             params["_goal_extra_fields_by_index"] = goal_extra_fields_by_index
             by_goal: Dict[str, Dict[str, Any]] = {}
-            for idx, metadata in goal_extra_fields_by_index.items():
-                if not isinstance(idx, int) or not isinstance(metadata, dict):
+            for goal in resolved:
+                if not goal.extra:
                     continue
-                if idx < 0 or idx >= len(goals):
-                    continue
-                goal_text = goals[idx]
-                if (
-                    isinstance(goal_text, str)
-                    and goal_text
-                    and goal_text not in by_goal
-                ):
-                    by_goal[goal_text] = metadata
+                if goal.text and goal.text not in by_goal:
+                    by_goal[goal.text] = dict(goal.extra)
             if by_goal:
-                goal_extra_fields_by_goal = by_goal
-        if goal_extra_fields_by_goal:
-            params["_goal_extra_fields_by_goal"] = goal_extra_fields_by_goal
+                params["_goal_extra_fields_by_goal"] = by_goal
         return params
 
     @staticmethod
@@ -1370,71 +1336,6 @@ class AttackOrchestrator:
             )
 
         return None
-
-    def _load_goals_from_dataset(
-        self, dataset_config: Dict[str, Any]
-    ) -> Tuple[List[str], Dict[int, Dict[str, Any]]]:
-        """
-        Load goals from a dataset configuration.
-
-        Supports loading from:
-        - Pre-configured presets (e.g., "agentharm", "strongreject")
-        - HuggingFace datasets
-        - Local files (JSON, CSV, JSONL, TXT)
-
-        Args:
-            dataset_config: Dataset configuration dictionary with keys:
-                - preset (str, optional): Name of a pre-configured preset
-                - provider (str, optional): "huggingface" or "file"
-                - path (str, optional): Dataset path or file path
-                - goal_field (str, optional): Field containing goal text
-                - split (str, optional): Dataset split (for HuggingFace)
-                - limit (int, optional): Maximum goals to load
-                - shuffle (bool, optional): Shuffle before selecting
-                - seed (int, optional): Random seed for shuffling
-
-        Returns:
-            Tuple of:
-                - List of goal strings
-                - Per-goal metadata map (index -> metadata dict)
-
-        Raises:
-            ValueError: If dataset configuration is invalid
-            ImportError: If required dependencies are not available
-        """
-        from hackagent.datasets import load_goals_and_extra_fields_from_config
-
-        logger.info(f"Loading goals from dataset: {dataset_config}")
-
-        try:
-            goals, goal_extra_fields_by_index = load_goals_and_extra_fields_from_config(
-                dataset_config
-            )
-            logger.info(f"Loaded {len(goals)} goals from dataset")
-            return goals, goal_extra_fields_by_index
-        except Exception as e:
-            logger.error(f"Failed to load goals from dataset: {e}", exc_info=True)
-            raise ValueError(f"Failed to load goals from dataset: {e}") from e
-
-    def _load_goals_from_intents(
-        self, intents_config: Any
-    ) -> Tuple[List[str], Dict[int, Dict[str, str]]]:
-        """Load goals from intent taxonomy labels and sample selectors."""
-        from hackagent.datasets.intents import load_goals_from_intents_config
-
-        logger.info("Loading goals from intents taxonomy config")
-
-        try:
-            goals, goal_labels_by_index = load_goals_from_intents_config(intents_config)
-            logger.info(
-                "Loaded %s goals from intents across %s labeled entries",
-                len(goals),
-                len(goal_labels_by_index),
-            )
-            return goals, goal_labels_by_index
-        except Exception as e:
-            logger.error(f"Failed to load goals from intents: {e}", exc_info=True)
-            raise ValueError(f"Failed to load goals from intents: {e}") from e
 
     def _get_attack_impl_kwargs(
         self,

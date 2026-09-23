@@ -32,6 +32,7 @@ Example usage:
 """
 
 from hackagent.datasets.base import DatasetProvider
+from hackagent.datasets.goals import resolve_goals
 from hackagent.datasets.intents import (
     IntentCategory,
     IntentSubcategory,
@@ -61,4 +62,5 @@ __all__ = [
     "load_goals_from_config",
     "load_goals_and_extra_fields_from_config",
     "register_provider",
+    "resolve_goals",
 ]
