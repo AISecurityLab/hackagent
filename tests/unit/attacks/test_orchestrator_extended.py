@@ -250,8 +250,9 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
         return_value=None,
     )
     @patch.object(AttackOrchestrator, "_execute_local_attack", return_value=["result"])
-    @patch(
-        "hackagent.attacks.evaluator.evaluation_step.BaseEvaluationStep.run_full_evaluation",
+    @patch.object(
+        AttackOrchestrator,
+        "_finalize_with_panel",
         side_effect=RuntimeError("judge unavailable"),
     )
     def test_evaluation_failure_is_recorded_and_run_stays_failed(
@@ -306,12 +307,8 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
         "_validate_required_models_availability",
         return_value=None,
     )
-    @patch(
-        "hackagent.attacks.evaluator.evaluation_step.BaseEvaluationStep.prepare_and_sync",
-        return_value=None,
-    )
     def test_pair_evaluation_dispatch_normalizes_is_success_to_success(
-        self, mock_sync, mock_validate_models, mock_create_atk, mock_create_run
+        self, mock_validate_models, mock_create_atk, mock_create_run
     ):
         """PAIR's evaluation-pipeline branch must not depend on the deleted
         pair.evaluation module, and must preserve each row's inline
@@ -327,7 +324,7 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
         with patch.object(
             AttackOrchestrator, "_execute_local_attack", return_value=pair_results
         ):
-            orch.execute(
+            final_results = orch.execute(
                 attack_config={
                     "attack_type": "pair",
                     "goals": ["g1", "g2"],
@@ -343,11 +340,6 @@ class TestAttackOrchestratorExecuteFlow(unittest.TestCase):
                 fail_on_run_error=False,
             )
 
-        # If the deleted-module import regressed, an exception would be
-        # swallowed by the evaluation try/except and prepare_and_sync would
-        # never run.
-        self.assertTrue(mock_sync.called)
-        final_results = mock_sync.call_args[0][0]
         self.assertEqual(final_results[0]["success"], False)
         self.assertEqual(final_results[1]["success"], True)
 

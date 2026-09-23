@@ -409,27 +409,27 @@ class TestExecute(unittest.TestCase):
         self.assertFalse(kwargs["word_scrambling"])
         self.assertEqual(kwargs["candidate_workers"], 3)
 
-    def test_inline_judge_is_created_when_judges_and_client_are_present(self):
-        client = MagicMock()
-        judge = MagicMock()
-        judge.available = True
-        judge.judge_count = 2
+    def test_inline_judge_is_created_when_ctx_judge_is_present(self):
+        from hackagent.attacks._lib.inline_judge import CtxJudgeAdapter
+        from tests.fakes.judge import FakeJudge
 
-        with patch.object(bongen, "_StepJudge", return_value=judge) as judge_cls:
-            execute(
-                ["g"],
-                _victim_router(),
-                {
-                    "judges": [{"identifier": "j"}],
-                    "_backend": client,
-                    "_run_id": "run-1",
-                },
-                LOGGER,
-            )
+        port = FakeJudge(score=10.0, success=True)
+        execute(
+            ["g"],
+            _victim_router(),
+            {
+                "judges": [{"identifier": "j"}],
+                "_judge": port,
+                "_backend": MagicMock(),
+                "_run_id": "run-1",
+            },
+            LOGGER,
+        )
 
-        self.assertIs(judge_cls.call_args.kwargs["client"], client)
-        self.assertEqual(judge_cls.call_args.kwargs["run_id"], "run-1")
-        self.assertIs(self.search.call_args.kwargs["step_judge"], judge)
+        step_judge = self.search.call_args.kwargs["step_judge"]
+        self.assertIsInstance(step_judge, CtxJudgeAdapter)
+        self.assertTrue(step_judge.available)
+        self.assertIs(step_judge._judge, port)
 
     def test_unavailable_judge_is_dropped(self):
         judge = MagicMock()

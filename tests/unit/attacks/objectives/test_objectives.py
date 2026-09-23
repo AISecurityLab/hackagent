@@ -5,7 +5,7 @@
 
 import unittest
 
-from hackagent.attacks.evaluator.pattern_evaluators import PatternEvaluator
+from hackagent.evaluation.patterns import PatternEvaluator
 from hackagent.attacks.objectives import (
     HARMFUL_BEHAVIOR,
     JAILBREAK,

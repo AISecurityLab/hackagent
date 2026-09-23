@@ -48,6 +48,26 @@ Return a step-judge for generation loops.
 Prefers ``config[&quot;_judge&quot;]`` (a :class:`~hackagent.attacks.ports.Judge`)
 when present; otherwise builds the legacy ``InlineStepJudge``.
 
+#### postprocess\_inline\_results
+
+```python
+def postprocess_inline_results(input_data: List[Dict[str,
+                                                     Any]], attack_label: str,
+                               logger: logging.Logger) -> List[Dict[str, Any]]
+```
+
+Fill default success fields for rows already scored during generation.
+
+Does not sync results or talk to storage. Server writes belong to tracking.
+
+#### make\_postprocess\_execute
+
+```python
+def make_postprocess_execute(attack_label: str)
+```
+
+Pipeline step that only normalises inline-judge rows.
+
 #### attach\_ctx\_judge
 
 ```python

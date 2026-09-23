@@ -16,8 +16,7 @@ Result Tracking:
 ```python
 def evaluate_responses_with_llm_judges(
         data: List[Dict[str, Any]], config: Dict[str, Any],
-        evaluator_step: BaseEvaluationStep,
-        logger: logging.Logger) -> List[Dict[str, Any]]
+        evaluator_step: Any, logger: logging.Logger) -> List[Dict[str, Any]]
 ```
 
 Evaluate static template responses with configured LLM judges.
@@ -58,13 +57,14 @@ Aggregate results by goal and template category.
 ## StaticTemplateEvaluation Objects
 
 ```python
-class StaticTemplateEvaluation(BaseEvaluationStep)
+class StaticTemplateEvaluation()
 ```
 
 Evaluation step for static template attacks.
 
-Wrapper around ``BaseEvaluationStep`` for static-template/baseline summary
-aggregation and tracker finalization.
+Aggregates baseline results and finalizes tracker goals. Judge calls stay
+on the injected ``evaluator_step`` (or ``ctx.judge``); this class does not
+sync metrics or sniff already-evaluated rows.
 
 #### execute
 

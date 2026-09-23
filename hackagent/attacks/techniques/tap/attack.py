@@ -105,9 +105,9 @@ class TAPAttack(BaseAttack):
       evaluation type.
 
     The :meth:`run` method manages the full pipeline via
-    :class:`~hackagent.router.tracking.TrackingCoordinator`:
-    a coordinator handles per-goal :class:`~hackagent.router.tracking.Tracker`
-    lifecycle and pipeline-level :class:`~hackagent.router.tracking.StepTracker`
+    :class:`~hackagent.tracking.TrackingCoordinator`:
+    a coordinator handles per-goal :class:`~hackagent.tracking.Tracker`
+    lifecycle and pipeline-level :class:`~hackagent.tracking.StepTracker`
     checkpointing.
 
     Attributes:

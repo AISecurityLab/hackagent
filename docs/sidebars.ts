@@ -144,6 +144,16 @@ const sidebars: SidebarsConfig = {
       ],
     },
     {
+      type: 'doc',
+      id: 'evaluation/index',
+      label: 'Evaluation',
+    },
+    {
+      type: 'doc',
+      id: 'tracking/index',
+      label: 'Tracking',
+    },
+    {
       type: 'category',
       label: 'Datasets',
       className: 'sidebar-icon sidebar-icon-database',
@@ -274,14 +284,28 @@ const sidebars: SidebarsConfig = {
         },
         {
           type: 'category',
+          label: 'Evaluation',
+          items: [
+            'hackagent/evaluation/base',
+            'hackagent/evaluation/panel',
+            'hackagent/evaluation/judges',
+            'hackagent/evaluation/patterns',
+            'hackagent/evaluation/metrics',
+          ],
+        },
+        {
+          type: 'category',
           label: 'Tracking',
           items: [
-            'hackagent/router/tracking/tracker',
-            'hackagent/router/tracking/coordinator',
-            'hackagent/router/tracking/context',
-            'hackagent/router/tracking/step',
-            'hackagent/router/tracking/decorators',
-            'hackagent/router/tracking/utils',
+            'hackagent/tracking/tracker',
+            'hackagent/tracking/sink',
+            'hackagent/tracking/listeners',
+            'hackagent/tracking/step',
+            'hackagent/tracking/context',
+            'hackagent/tracking/coordinator',
+            'hackagent/tracking/decorators',
+            'hackagent/tracking/audit',
+            'hackagent/tracking/utils',
           ],
         },
         {
@@ -312,19 +336,6 @@ const sidebars: SidebarsConfig = {
             'hackagent/attacks/orchestrator',
             'hackagent/attacks/registry',
             'hackagent/orchestrator/run_spec',
-            {
-              type: 'category',
-              label: 'Evaluator',
-              items: [
-                'hackagent/attacks/evaluator/base',
-                'hackagent/attacks/evaluator/evaluation_step',
-                'hackagent/attacks/evaluator/inline_step_judge',
-                'hackagent/attacks/evaluator/judge_evaluators',
-                'hackagent/attacks/evaluator/pattern_evaluators',
-                'hackagent/attacks/evaluator/metrics',
-                'hackagent/attacks/evaluator/sync',
-              ],
-            },
             {
               type: 'category',
               label: 'Techniques',

@@ -44,7 +44,7 @@ ctx = RunContext(
 
 ## Ports
 
-`Judge`, `Events`, and `Workspace` are method-only protocols. `evaluation.Panel` and `tracking` implement `Judge` and `Events` in later phases.
+`Judge`, `Events`, and `Workspace` are method-only protocols. [`evaluation.Panel`](../evaluation/index.md) implements `Judge`. [`tracking.Tracker`](../tracking/index.md) implements `Events`.
 
 **`Judge`**
 

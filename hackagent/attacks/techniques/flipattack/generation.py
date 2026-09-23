@@ -37,7 +37,7 @@ from hackagent.attacks._lib.response import (
 from hackagent.attacks._lib.llm_router import LLMRouter
 
 if TYPE_CHECKING:
-    from hackagent.router.tracking import Tracker
+    from hackagent.tracking import Tracker
 
 
 def execute(

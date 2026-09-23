@@ -3,10 +3,10 @@
 
 """Unit tests for TAP evaluation helpers.
 
-The actual judge calls live in ``BaseEvaluationStep._run_evaluation``; these
-tests stub that out and focus on TAP's own logic: on-topic defaulting, score
-extraction, judge-type inference, binary-score normalisation, judge-config
-resolution, and the ``execute`` pipeline (scoring + tracker tracing).
+Judge calls go through ``config["_judge"]``. These tests cover TAP's own
+logic: on-topic defaulting, score extraction, judge-type inference,
+binary-score normalisation, judge-config resolution, and the ``execute``
+pipeline (scoring + tracker tracing).
 """
 
 import logging
@@ -23,12 +23,7 @@ logging.disable(logging.CRITICAL)
 
 
 def _ev(config=None):
-    e = TapEvaluation(config=config or {}, logger=MagicMock(), client=MagicMock())
-    # Stub the inherited evaluation machinery so no model is called.
-    e._build_base_eval_config = MagicMock(return_value={})
-    e._run_evaluation = MagicMock(side_effect=lambda rows, judges, base: rows)
-    e._enrich_items_with_scores = MagicMock()
-    return e
+    return TapEvaluation(config=config or {}, logger=MagicMock(), client=MagicMock())
 
 
 class TestOnTopic(unittest.TestCase):
@@ -37,12 +32,24 @@ class TestOnTopic(unittest.TestCase):
         rows = e.evaluate_on_topic([{"goal": "g"}], on_topic_judges=None)
         self.assertEqual(rows[0]["eval_on_topic"], 1)
         self.assertIn("skipped", rows[0]["explanation_on_topic"])
-        e._run_evaluation.assert_not_called()
 
     def test_runs_evaluation_when_judges_present(self):
-        e = _ev()
-        e.evaluate_on_topic([{"goal": "g"}], on_topic_judges=[{"type": "on_topic"}])
-        e._run_evaluation.assert_called_once()
+        from hackagent.core.contracts import Verdict
+
+        class _Judge:
+            def evaluate(self, sample):
+                return Verdict(success=True, score=10.0, explanation="on topic")
+
+            def score(self, sample):
+                return 10.0
+
+        e = _ev({"_judge": _Judge()})
+        rows = e.evaluate_on_topic(
+            [{"goal": "g", "prefix": "p", "completion": "c"}],
+            on_topic_judges=[{"type": "on_topic"}],
+        )
+        self.assertEqual(rows[0]["eval_on_topic"], 1)
+        self.assertEqual(rows[0]["explanation_on_topic"], "on topic")
 
     def test_score_on_topic_extracts_scores(self):
         e = _ev()
@@ -136,10 +143,11 @@ class TestScoreCandidates(unittest.TestCase):
         )
         self.assertEqual(scores, [7, 3])
 
-    def test_evaluate_judge_enriches_scores(self):
+    def test_evaluate_judge_without_port_defaults_to_zero(self):
         e = _ev()
-        e.evaluate_judge([{"goal": "g"}], [{"type": "nuanced"}])
-        e._enrich_items_with_scores.assert_called_once()
+        rows = e.evaluate_judge([{"goal": "g"}], [{"type": "nuanced"}])
+        self.assertEqual(rows[0]["best_score"], 0)
+        self.assertFalse(rows[0]["success"])
 
 
 class TestResolveJudgesConfig(unittest.TestCase):

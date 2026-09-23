@@ -24,10 +24,6 @@ import time
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
-from hackagent.attacks.evaluator.inline_step_judge import (
-    InlineStepJudge,
-    build_inline_judge_base_config,
-)
 from hackagent.attacks._lib.response import (
     extract_response_content,
     get_guardrail_info,
@@ -43,7 +39,7 @@ from .config import (
     DEFAULT_TOOL_NAME,
 )
 
-_StepJudge = InlineStepJudge
+_StepJudge = Any
 
 
 _SUCCESS_SETTING_FRAMING = {
@@ -477,19 +473,8 @@ def execute(
             step_judge = None
             logger.warning("ctx.judge unavailable — heuristic success signals only")
     elif isinstance(judges_config, list) and judges_config and client is not None:
-        base_eval_cfg = build_inline_judge_base_config(config)
-        step_judge = _StepJudge(
-            judges_config=judges_config,
-            base_eval_config=base_eval_cfg,
-            client=client,
-            logger=logger,
-            run_id=config.get("_run_id"),
-        )
-        if step_judge.available:
-            logger.info(f"Inline judge enabled ({step_judge.judge_count} judge(s))")
-        else:
-            step_judge = None
-            logger.warning("No valid judges — heuristic success signals only")
+        step_judge = None
+        logger.warning("No ctx.judge — heuristic success signals only")
     else:
         logger.warning("No judges configured — heuristic success signals only")
 

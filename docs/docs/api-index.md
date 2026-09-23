@@ -10,8 +10,11 @@ in the HackAgent Python SDK, auto-generated from source-code docstrings.
 ## What's Included
 
 - **Core**: `HackAgent` agent class, errors, and utilities
-- **Router**: Adapters for OpenAI, Ollama, LiteLLM, Google ADK, and call tracking
-- **Attack Framework**: Base classes, objectives, evaluators, and techniques
+- **Evaluation**: Depth-0 `hackagent.evaluation`. `Panel` scores a `Sample`
+  into a `Verdict`. Judges, pattern evaluators, and verdict metrics live here.
+- **Tracking**: Depth-0 `hackagent.tracking`. `Tracker` implements the
+  `Events` port and writes through `RunSink`.
+- **Attack Framework**: Base classes, objectives, and techniques
   (AdvPrefix, PAIR, TAP, BON, FlipAttack, AutoDAN-Turbo, Baseline).
   The attack seam (`hackagent.attacks.ports`, `AttackConfig`, `BaseAttack`)
   is documented alongside `RunSpec` and `TargetParams`.

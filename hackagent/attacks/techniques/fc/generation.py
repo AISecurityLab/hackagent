@@ -32,7 +32,7 @@ from .flowchart_renderer import (
 from .prompts import FEW_SHOT_STEP_DECOMPOSITION, SYSTEM_PROMPT, USER_PROMPT
 
 if TYPE_CHECKING:
-    from hackagent.router.tracking import Tracker
+    from hackagent.tracking import Tracker
 
 
 # ─── Step Decomposition ──────────────────────────────────────────────────────

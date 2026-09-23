@@ -44,6 +44,15 @@ def native_jailbreak_threshold(judge_range: str,
 
 Convert the canonical threshold to a judge&#x27;s native score range.
 
+#### infer\_judge\_type
+
+```python
+def infer_judge_type(identifier: Optional[str],
+                     default: Optional[str] = None) -> Optional[str]
+```
+
+Infer a judge type key from a model identifier.
+
 #### get\_judge\_range
 
 ```python

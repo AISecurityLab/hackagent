@@ -84,11 +84,8 @@ class TestPAPAttack(unittest.TestCase):
                 agent_router=MagicMock(),
             )
 
-    @patch(
-        "hackagent.attacks.evaluator.evaluation_step.BaseEvaluationStep._postprocess_inline_judge_results"
-    )
     @patch("hackagent.attacks.techniques.pap.attack.generation.execute")
-    def test_run_pipeline(self, mock_gen, mock_eval):
+    def test_run_pipeline(self, mock_gen):
         client = MagicMock()
         agent_router = MagicMock()
         attack = PAPAttack(
@@ -115,13 +112,10 @@ class TestPAPAttack(unittest.TestCase):
                 "success": True,
             }
         ]
-        mock_eval.return_value = mock_gen.return_value
-
         with patch.object(attack, "_initialize_coordinator", side_effect=_init_coord):
             results = attack.run(["test goal"])
 
         mock_gen.assert_called_once()
-        mock_eval.assert_called_once()
         self.assertEqual(len(results), 1)
         from hackagent.attacks.types import AttackResult
 

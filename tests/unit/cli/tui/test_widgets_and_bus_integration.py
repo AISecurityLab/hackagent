@@ -7,9 +7,9 @@ Unit tests for the post-event-bus TUI changes:
 - Filtering / search helpers on :class:`AttackLogViewer`.
 - :class:`AgentActionsViewer` event-bus translation
   (``trace_added``, ``goal_started``, ``goal_finalized``).
-- :class:`hackagent.router.tracking.Tracker` emits structured events when
+- :class:`hackagent.tracking.Tracker` emits structured events when
   given an ``event_bus``.
-- :class:`hackagent.router.tracking.StepTracker` emits ``step_started`` /
+- :class:`hackagent.tracking.StepTracker` emits ``step_started`` /
   ``step_ended`` even when backend tracking is disabled.
 """
 
@@ -241,7 +241,7 @@ class TestTrackerEmitsEvents:
     """`Tracker` should publish goal lifecycle events on the bus."""
 
     def test_create_goal_result_emits_goal_started_without_backend(self) -> None:
-        from hackagent.router.tracking.tracker import Tracker
+        from hackagent.tracking.tracker import Tracker
 
         bus = TUIEventBus()
         received: List[TUIEvent] = []
@@ -263,7 +263,7 @@ class TestTrackerEmitsEvents:
         assert payload["attack_type"] == "advprefix"
 
     def test_finalize_goal_emits_goal_finalized(self) -> None:
-        from hackagent.router.tracking.tracker import Tracker
+        from hackagent.tracking.tracker import Tracker
 
         bus = TUIEventBus()
         received: List[TUIEvent] = []
@@ -287,7 +287,7 @@ class TestTrackerEmitsEvents:
 
     def test_tracker_without_bus_does_not_raise(self) -> None:
         """Backwards compat: omitting event_bus must keep working."""
-        from hackagent.router.tracking.tracker import Tracker
+        from hackagent.tracking.tracker import Tracker
 
         tracker = Tracker(
             backend=None,
@@ -303,8 +303,8 @@ class TestStepTrackerEmitsEvents:
     """`StepTracker.track_step` should emit step_started/step_ended."""
 
     def test_track_step_emits_lifecycle_when_disabled(self) -> None:
-        from hackagent.router.tracking.context import TrackingContext
-        from hackagent.router.tracking.step import StepTracker
+        from hackagent.tracking.context import TrackingContext
+        from hackagent.tracking.step import StepTracker
 
         bus = TUIEventBus()
         received: List[TUIEvent] = []
@@ -323,8 +323,8 @@ class TestStepTrackerEmitsEvents:
         assert received[1].payload["success"] is True
 
     def test_track_step_emits_step_ended_on_failure(self) -> None:
-        from hackagent.router.tracking.context import TrackingContext
-        from hackagent.router.tracking.step import StepTracker
+        from hackagent.tracking.context import TrackingContext
+        from hackagent.tracking.step import StepTracker
 
         bus = TUIEventBus()
         received: List[TUIEvent] = []

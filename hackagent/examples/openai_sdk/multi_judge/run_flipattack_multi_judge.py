@@ -11,8 +11,8 @@ Run:
 import os
 
 from hackagent import HackAgent
-from hackagent.attacks.evaluator.metrics import generate_summary_report
-from hackagent.core.contracts import AgentType
+from hackagent.core.contracts import AgentType, Verdict
+from hackagent.evaluation.metrics import summary as summarize_verdicts
 
 HACKAGENT_API_KEY = os.getenv("HACKAGENT_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -91,11 +91,19 @@ def main() -> None:
     results = agent.hack(attack_config=config)
 
     rows = results if isinstance(results, list) else []
-    summary = generate_summary_report(rows)
+    verdicts = [
+        Verdict(
+            success=bool(row.get("success") or row.get("is_success")),
+            score=float(row.get("best_score") or 0.0),
+        )
+        for row in rows
+        if isinstance(row, dict)
+    ]
+    summary = summarize_verdicts(verdicts)
 
     print("\n=== Multi-Judge Summary ===")
     print(f"Total results: {len(rows)}")
-    print(f"Majority Vote ASR: {summary.get('majority_vote_asr', 0.0) * 100:.2f}%")
+    print(f"Majority Vote ASR: {summary.get('majority_vote_rate', 0.0) * 100:.2f}%")
     print(f"Fleiss' kappa: {summary.get('fleiss_kappa', 0.0):.4f}")
 
     strictness = summary.get("per_judge_strictness", {})

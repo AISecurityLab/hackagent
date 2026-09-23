@@ -8,14 +8,13 @@ AutoDAN-Turbo evaluation wrapper using the shared LLM-judge pipeline.
 ## AutoDANTurboEvaluation Objects
 
 ```python
-class AutoDANTurboEvaluation(BaseEvaluationStep)
+class AutoDANTurboEvaluation()
 ```
 
-Finalize AutoDAN-Turbo outputs with the shared multi-judge flow.
+Finalize AutoDAN-Turbo outputs.
 
-AutoDAN generation still produces an internal attack score
-(``autodan_score``/``attack_score``), but jailbreak success is always
-computed by configured LLM judge(s) via :class:`BaseEvaluationStep`.
+When ``config[&quot;_judge&quot;]`` is set, scores come from that judge. Otherwise
+success follows the internal AutoDAN score against ``break_score``.
 
 #### execute
 

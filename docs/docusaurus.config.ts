@@ -93,7 +93,74 @@ const config: Config = {
     ],
   ],
 
-  plugins: [],
+  plugins: [
+    [
+      '@docusaurus/plugin-client-redirects',
+      {
+        redirects: [
+          {
+            from: '/hackagent/attacks/evaluator/base',
+            to: '/hackagent/evaluation/base',
+          },
+          {
+            from: '/hackagent/attacks/evaluator/judge_evaluators',
+            to: '/hackagent/evaluation/judges',
+          },
+          {
+            from: '/hackagent/attacks/evaluator/pattern_evaluators',
+            to: '/hackagent/evaluation/patterns',
+          },
+          {
+            from: '/hackagent/attacks/evaluator/metrics',
+            to: '/hackagent/evaluation/metrics',
+          },
+          {
+            from: [
+              '/hackagent/attacks/evaluator/evaluation_step',
+              '/hackagent/attacks/evaluator/sync',
+            ],
+            to: '/evaluation',
+          },
+          {
+            from: '/hackagent/attacks/evaluator/inline_step_judge',
+            to: '/hackagent/attacks/_lib/inline_judge',
+          },
+          {
+            from: '/hackagent/router/tracking/tracker',
+            to: '/hackagent/tracking/tracker',
+          },
+          {
+            from: '/hackagent/router/tracking/coordinator',
+            to: '/hackagent/tracking/coordinator',
+          },
+          {
+            from: '/hackagent/router/tracking/context',
+            to: '/hackagent/tracking/context',
+          },
+          {
+            from: '/hackagent/router/tracking/step',
+            to: '/hackagent/tracking/step',
+          },
+          {
+            from: '/hackagent/router/tracking/decorators',
+            to: '/hackagent/tracking/decorators',
+          },
+          {
+            from: '/hackagent/router/tracking/utils',
+            to: '/hackagent/tracking/utils',
+          },
+          {
+            from: '/hackagent/router/tracking/audit',
+            to: '/hackagent/tracking/audit',
+          },
+          {
+            from: '/hackagent/router/tracking/category_classifier',
+            to: '/tracking',
+          },
+        ],
+      },
+    ],
+  ],
 
   themeConfig: {
     // Color mode configuration

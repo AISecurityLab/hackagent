@@ -344,22 +344,24 @@ class TestExecute(unittest.TestCase):
         self.assertEqual(kwargs["target_temperature"], 0.2)
         self.assertEqual(kwargs["target_timeout"], 45)
 
-    def test_inline_judge_is_wired_when_judges_and_client_exist(self):
-        judge = MagicMock()
-        judge.available = True
-        judge.judge_count = 1
-        client = MagicMock()
+    def test_inline_judge_is_wired_when_ctx_judge_is_present(self):
+        from hackagent.attacks._lib.inline_judge import CtxJudgeAdapter
+        from tests.fakes.judge import FakeJudge
 
-        with patch.object(papgen, "_StepJudge", return_value=judge) as judge_cls:
-            execute(
-                ["g"],
-                _router(),
-                self._config(judges=[{"identifier": "j"}], _client=client),
-                LOGGER,
-            )
+        port = FakeJudge(score=10.0, success=True)
+        execute(
+            ["g"],
+            _router(),
+            self._config(
+                judges=[{"identifier": "j"}], _judge=port, _client=MagicMock()
+            ),
+            LOGGER,
+        )
 
-        self.assertIs(judge_cls.call_args.kwargs["client"], client)
-        self.assertIs(self.attack.call_args.kwargs["step_judge"], judge)
+        step_judge = self.attack.call_args.kwargs["step_judge"]
+        self.assertIsInstance(step_judge, CtxJudgeAdapter)
+        self.assertTrue(step_judge.available)
+        self.assertIs(step_judge._judge, port)
 
     def test_unavailable_judge_is_dropped(self):
         judge = MagicMock()

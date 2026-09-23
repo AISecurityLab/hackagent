@@ -23,19 +23,38 @@ The module provides functionality for:
 
 import logging
 from collections import defaultdict
-from typing import Any, Dict, List
 
-from hackagent.attacks.evaluator.evaluation_step import (
-    BaseEvaluationStep,
-    JUDGE_MEAN_COLUMN_MAP,
-)
+from typing import Any, Dict, List, Optional
+
+from hackagent.attacks._lib.inline_judge import verdict_from_judge
+from hackagent.attacks._lib.scoring import JUDGE_DEFAULT_RANGE, normalize_judge_score
 from hackagent.storage.store import Store
 
 from .config import EvaluationPipelineConfig
 from .utils import handle_empty_input, log_errors
 
+JUDGE_AGG_COLUMN_MAP: Dict[str, str] = {
+    "nuanced": "eval_nj",
+    "jailbreakbench": "eval_jb",
+    "harmbench": "eval_hb",
+    "harmbench_variant": "eval_hbv",
+    "on_topic": "eval_on_topic",
+    "scorer": "eval_scorer",
+    "rag_outcome": "eval_rag",
+}
+JUDGE_MEAN_COLUMN_MAP: Dict[str, str] = {
+    "nuanced": "eval_nj_mean",
+    "jailbreakbench": "eval_jb_mean",
+    "harmbench": "eval_hb_mean",
+    "harmbench_variant": "eval_hbv_mean",
+    "strongreject": "eval_sj_binary_mean",
+    "on_topic": "eval_on_topic_mean",
+    "scorer": "eval_scorer_mean",
+    "rag_outcome": "eval_rag_mean",
+}
+
 # ============================================================================
-# CONSTANTS (technique-specific; shared ones live in BaseEvaluationStep)
+# CONSTANTS (technique-specific aggregation keys)
 # ============================================================================
 
 GROUP_KEYS = ["goal", "prefix"]
@@ -46,7 +65,7 @@ GROUP_KEYS = ["goal", "prefix"]
 # ============================================================================
 
 
-class EvaluationPipeline(BaseEvaluationStep):
+class EvaluationPipeline:
     """
     Evaluation pipeline for the AdvPrefix attack.
 
@@ -74,7 +93,10 @@ class EvaluationPipeline(BaseEvaluationStep):
         logger: logging.Logger,
         client: Store,
     ):
-        super().__init__(config, logger, client)
+        self._raw_config = config if isinstance(config, dict) else {}
+        self.logger = logger
+        self.client = client
+        self._active_judge_ranges: Dict[str, str] = {}
 
         # Convert raw config dict to typed dataclass
         self.config = (
@@ -83,13 +105,14 @@ class EvaluationPipeline(BaseEvaluationStep):
             else config
         )
 
-        # Extend statistics for aggregation/selection stages
-        self._statistics.update(
-            {
-                "aggregated_count": 0,
-                "selected_count": 0,
-            }
-        )
+        self._statistics: Dict[str, Any] = {
+            "input_count": 0,
+            "evaluated_count": 0,
+            "aggregated_count": 0,
+            "selected_count": 0,
+            "successful_judges": [],
+            "failed_judges": [],
+        }
 
         self.logger.info("EvaluationPipeline initialized")
 
@@ -129,30 +152,12 @@ class EvaluationPipeline(BaseEvaluationStep):
 
         self._statistics["input_count"] = len(input_data)
 
-        # Judge Evaluation (via inherited multi-judge pipeline)
-        self.logger.info(
-            f"Judge Evaluation: Starting evaluation for {len(input_data)} completions"
-        )
-        judges_config = self.config.judges
-        base_eval_config = self._build_base_eval_config()
-        evaluated_data = self._run_evaluation(
-            input_data, judges_config, base_eval_config
-        )
+        evaluated_data = self._score_with_judge(input_data)
         self._statistics["evaluated_count"] = len(evaluated_data)
 
         if not evaluated_data:
             self.logger.warning("No data after evaluation")
             return []
-
-        # Sync evaluation results to server
-        judge_keys = self._build_judge_keys_from_data(evaluated_data)
-        self._sync_to_server(evaluated_data, judge_keys)
-
-        # Enrich items with best_score/success, then record per-prefix evaluation
-        # traces on the goal tracker so the dashboard can attribute jailbreaks to
-        # specific prefixes.
-        self._enrich_items_with_scores(evaluated_data)
-        self._update_tracker(evaluated_data)
 
         # Aggregation
         self.logger.info(
@@ -178,6 +183,66 @@ class EvaluationPipeline(BaseEvaluationStep):
     # ========================================================================
     # AGGREGATION METHODS
     # ========================================================================
+
+    def _score_with_judge(self, input_data: List[Dict]) -> List[Dict]:
+        """Score rows with ``config['_judge']`` when the run has one."""
+        judge = self._raw_config.get("_judge")
+        if judge is None:
+            return input_data
+        scored = []
+        for row in input_data:
+            item = dict(row)
+            score, success, explanation = verdict_from_judge(
+                judge,
+                goal=str(item.get("goal") or ""),
+                prompt=str(item.get("prefix") or item.get("prompt") or ""),
+                response=str(item.get("completion") or item.get("response") or ""),
+            )
+            item["best_score"] = score
+            item["success"] = success
+            item["explanation"] = explanation
+            scored.append(item)
+        return scored
+
+    def _get_available_judge_agg_cols(
+        self,
+        data: List[Dict[str, Any]],
+        config_judges: List[Optional[str]],
+    ) -> Dict[str, str]:
+        available: Dict[str, str] = {}
+        if not data:
+            return available
+        sample_keys = set(data[0].keys())
+        for judge_type, col_name in JUDGE_AGG_COLUMN_MAP.items():
+            if col_name in sample_keys:
+                available[judge_type] = col_name
+            elif judge_type in config_judges:
+                self.logger.warning(
+                    "Expected key '%s' for judge '%s' not found",
+                    col_name,
+                    judge_type,
+                )
+        return available
+
+    def _calculate_combined_pasr(
+        self, item: Dict[str, Any], judge_types: List[str]
+    ) -> float:
+        judge_scores: List[float] = []
+        for judge_type in judge_types:
+            key = JUDGE_MEAN_COLUMN_MAP.get(judge_type)
+            if not key or key not in item or item[key] is None:
+                continue
+            try:
+                score = float(item[key])
+            except (TypeError, ValueError):
+                continue
+            judge_range = self._active_judge_ranges.get(
+                judge_type, JUDGE_DEFAULT_RANGE.get(judge_type, "binary")
+            )
+            judge_scores.append(normalize_judge_score(score, judge_range))
+        if not judge_scores:
+            return 0.0
+        return sum(judge_scores) / len(judge_scores)
 
     def _run_aggregation(self, input_data: List[Dict]) -> List[Dict]:
         """

@@ -1,0 +1,985 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+"""
+Goal-based result tracking for attack techniques.
+
+This module provides the main Tracker class which creates one Result per
+goal/datapoint and accumulates traces for each interaction during the attack.
+This addresses the issue of having too many Results (one per LLM call) with
+only 1-2 traces each.
+
+Architecture:
+    Attack → Tracker → Result per goal → Multiple Traces per Result
+
+Each attack creates one Result per goal/datapoint via Tracker,
+then accumulates traces for each interaction during the attack.
+
+For step-level tracking (pipeline steps like "Generation", "Evaluation"),
+use the StepTracker class from step.py instead.
+"""
+
+import logging
+import threading
+import time
+from hackagent.core.logging import get_logger
+from contextlib import contextmanager
+from contextvars import ContextVar, Token
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Union
+from uuid import UUID
+
+from hackagent.core.contracts import EvalStatus, Goal, StepKind
+
+from .audit import record_run_audit_failure
+from .listeners import EventListener, Fanout
+from .sink import RunSink
+from .utils import deep_clean, sanitize_for_json
+
+# Labels stored on result metadata when a goal was not pre-labelled.
+# Classification itself lives outside tracking.
+UNKNOWN_CATEGORY = "Z. Unclassified Risk"
+UNKNOWN_SUBCATEGORY = "Z0. Unclassified Subcategory"
+
+_current_goal: ContextVar[Optional["Context"]] = ContextVar(
+    "hackagent_tracking_goal", default=None
+)
+
+
+@dataclass
+class Context:
+    """Context for tracking a single goal's attack execution."""
+
+    goal: str
+    goal_index: int
+    result_id: Optional[str] = None
+    sequence_counter: int = 0
+    traces: List[Dict[str, Any]] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    is_finalized: bool = False
+    final_success: Optional[bool] = None
+    _start_time: float = field(default_factory=time.perf_counter)
+    _end_time: Optional[float] = None
+    _trace_lock: threading.RLock = field(
+        default_factory=threading.RLock,
+        init=False,
+        repr=False,
+        compare=False,
+    )
+
+    def increment_sequence(self) -> int:
+        """Atomically increment and return the next sequence number."""
+        self.sequence_counter += 1
+        return self.sequence_counter
+
+    @property
+    def elapsed_s(self) -> float:
+        """Wall-clock seconds since context creation (or until finalized)."""
+        end = self._end_time if self._end_time is not None else time.perf_counter()
+        return end - self._start_time
+
+
+class Tracker:
+    """
+    Tracks attack execution on a per-goal basis.
+
+    Creates one Result per goal, with multiple Traces capturing:
+    - Attack attempts (prompts sent, responses received)
+    - Intermediate steps (judge evaluations, refinements)
+    - Final evaluation status
+
+    This provides better organization of results where each Result represents
+    a complete attack attempt on a single goal/datapoint.
+
+    Attributes:
+        client: Authenticated client for API calls
+        run_id: Server-side run record ID
+        logger: Logger instance
+
+    Example:
+        >>> tracker = Tracker(client=client, run_id=run_id)
+        >>>
+        >>> for goal in goals:
+        ...     # Create result for this goal
+        ...     goal_ctx = tracker.create_goal_result(goal, goal_index=i)
+        ...
+        ...     # Add traces for each attack attempt
+        ...     for iteration in range(n_iterations):
+        ...         response = query_target(prompt)
+        ...         tracker.add_interaction_trace(
+        ...             goal_ctx,
+        ...             request={"prompt": prompt},
+        ...             response={"content": response},
+        ...             step_name="Attack Attempt"
+        ...         )
+        ...
+        ...     # Finalize with evaluation
+        ...     tracker.finalize_goal(
+        ...         goal_ctx,
+        ...         success=is_success,
+        ...         evaluation_notes="Attack succeeded with score 10/10"
+        ...     )
+    """
+
+    def __init__(
+        self,
+        backend: Optional[RunSink] = None,
+        run_id: str = "",
+        logger: Optional[logging.Logger] = None,
+        attack_type: Optional[str] = None,
+        category_classifier_config: Optional[Dict[str, Any]] = None,
+        preclassified_goal_labels_by_index: Optional[Dict[Any, Dict[str, str]]] = None,
+        disable_goal_category_classifier: bool = False,
+        event_bus: Optional[Any] = None,
+        listeners: Optional[List[EventListener]] = None,
+        *,
+        sink: Optional[RunSink] = None,
+    ):
+        """
+        Initialize tracker.
+
+        Args:
+            client: Authenticated client for API calls
+            run_id: Server-side run record ID
+            logger: Optional logger instance
+            attack_type: Optional attack type identifier for metadata
+            event_bus: Optional :class:`hackagent.cli.tui.events.TUIEventBus`.
+                When provided, the tracker emits structured events
+                (``goal_started``, ``goal_finalized``, ``evaluation``, ...)
+                so the TUI can render execution live without parsing logs.
+        """
+        self.backend = sink if sink is not None else backend
+        self.sink = self.backend
+        self.run_id = run_id
+        self.logger = logger or get_logger(__name__)
+        self.attack_type = attack_type
+        self.event_bus = event_bus
+        self.listeners = Fanout(listeners)
+        self._result_ids: Dict[int, str] = {}
+        self._result_ids_by_goal: Dict[str, str] = {}
+        # Accepted so existing callers keep working. Tracking does not classify.
+        _ = (category_classifier_config, disable_goal_category_classifier)
+        self._preclassified_goal_labels_by_index: Dict[int, Dict[str, str]] = {}
+        raw_preclassified = preclassified_goal_labels_by_index or {}
+        if isinstance(raw_preclassified, dict):
+            for key, value in raw_preclassified.items():
+                try:
+                    idx = int(key)
+                except (TypeError, ValueError):
+                    continue
+
+                if not isinstance(value, dict):
+                    continue
+
+                category = value.get("category")
+                subcategory = value.get("subcategory")
+                if category and subcategory:
+                    self._preclassified_goal_labels_by_index[idx] = {
+                        "category": str(category),
+                        "subcategory": str(subcategory),
+                    }
+
+        self._goal_contexts: Dict[int, Context] = {}
+
+    def _record_failure(self, step: str, error: BaseException) -> Dict[str, str]:
+        """Make a goal-tracking failure visible on the run record."""
+        return record_run_audit_failure(
+            backend=self.backend,
+            run_id=self.run_id,
+            step=step,
+            error=error,
+            logger=self.logger,
+        )
+
+    def _emit(self, event_type: str, **payload: Any) -> None:
+        """Fan the event out to listeners and the optional interface bus."""
+        self.listeners.emit(event_type, **payload)
+        bus = self.event_bus
+        if bus is None:
+            return
+        try:
+            bus.emit(event_type, **payload)
+        except Exception:
+            self.logger.debug("Tracker event emit failed", exc_info=True)
+
+    @property
+    def is_enabled(self) -> bool:
+        """Check if tracking is enabled (has backend and run_id)."""
+        return self.backend is not None and self.run_id is not None
+
+    def _get_run_uuid(self) -> Optional[UUID]:
+        """Get run_id as UUID."""
+        if self.run_id:
+            try:
+                return UUID(self.run_id)
+            except (ValueError, AttributeError):
+                self.logger.warning(f"Invalid UUID format for run_id: {self.run_id}")
+        return None
+
+    def create_goal_result(
+        self,
+        goal: str,
+        goal_index: int,
+        initial_metadata: Optional[Dict[str, Any]] = None,
+    ) -> Context:
+        """
+        Create a Result record for a goal and return its tracking context.
+
+        Args:
+            goal: The goal/datapoint text
+            goal_index: Index of this goal in the batch
+            initial_metadata: Optional initial metadata to store
+
+        Returns:
+            Context for tracking this goal's attack execution
+        """
+        ctx = Context(
+            goal=goal,
+            goal_index=goal_index,
+            metadata=initial_metadata or {},
+        )
+
+        if not self.is_enabled:
+            self.logger.debug(f"Tracking disabled - goal {goal_index} won't be tracked")
+            self._goal_contexts[goal_index] = ctx
+            # Bus delivery is independent of backend tracking — surface the
+            # event so the TUI still sees the goal even in headless mode.
+            self._emit(
+                "goal_started",
+                goal=goal,
+                goal_index=goal_index,
+                attack_type=self.attack_type,
+                result_id=None,
+            )
+            return ctx
+
+        try:
+            run_uuid = self._get_run_uuid()
+            if not run_uuid:
+                self._goal_contexts[goal_index] = ctx
+                self._emit(
+                    "goal_started",
+                    goal=goal,
+                    goal_index=goal_index,
+                    attack_type=self.attack_type,
+                    result_id=None,
+                )
+                return ctx
+
+            # Classify each goal as soon as its result record is created.
+            classification = self._classify_goal_labels(goal, goal_index)
+            ctx.metadata.update(classification)
+
+            # Create result via backend
+            record = self.backend.create_result(
+                run_uuid,
+                goal=goal,
+                goal_index=goal_index,
+                request_payload={
+                    "goal": goal,
+                    "goal_index": goal_index,
+                    "attack_type": self.attack_type,
+                },
+                agent_specific_data={
+                    "goal": goal,
+                    "goal_index": goal_index,
+                    **(initial_metadata or {}),
+                    **classification,
+                },
+            )
+            ctx.result_id = str(record.id)
+            self.logger.info(f"Created result for goal {goal_index}: {ctx.result_id}")
+
+            # Add initial trace with goal info
+            self._add_trace(
+                ctx,
+                step_name="Goal Setup",
+                step_type=StepKind.OTHER,
+                content={
+                    "goal": goal,
+                    "goal_index": goal_index,
+                    "attack_type": self.attack_type,
+                },
+            )
+
+        except Exception as e:
+            self.logger.error(
+                f"Exception creating result for goal {goal_index}: {e}", exc_info=True
+            )
+            self._record_failure(f"Goal {goal_index}: create result", e)
+
+        self._goal_contexts[goal_index] = ctx
+        self._remember_result(ctx)
+        self._emit(
+            "goal_started",
+            goal=goal,
+            goal_index=goal_index,
+            attack_type=self.attack_type,
+            result_id=ctx.result_id,
+        )
+        return ctx
+
+    def _remember_result(self, ctx: Context) -> None:
+        """Record the goal → result-id map owned by this tracker."""
+        if not ctx.result_id:
+            return
+        self._result_ids[ctx.goal_index] = ctx.result_id
+        self._result_ids_by_goal.setdefault(ctx.goal, ctx.result_id)
+
+    def result_id_for(self, goal: Union[Goal, int, str]) -> Optional[str]:
+        """Return the result id for a goal index, goal text, or ``Goal``."""
+        if isinstance(goal, int) and not isinstance(goal, bool):
+            return self._result_ids.get(goal)
+        if isinstance(goal, str):
+            return self._result_ids_by_goal.get(goal)
+        index = getattr(goal, "index", None)
+        text = getattr(goal, "text", None)
+        if isinstance(index, int) and index in self._result_ids:
+            return self._result_ids[index]
+        if isinstance(text, str):
+            return self._result_ids_by_goal.get(text)
+        return None
+
+    def _classify_goal_labels(self, goal: str, goal_index: int) -> Dict[str, str]:
+        """Return pre-labelled categories, or the unclassified placeholders."""
+        _ = goal
+        preclassified = self._preclassified_goal_labels_by_index.get(goal_index)
+        if preclassified:
+            return {
+                "category": preclassified["category"],
+                "subcategory": preclassified["subcategory"],
+            }
+        return {
+            "category": UNKNOWN_CATEGORY,
+            "subcategory": UNKNOWN_SUBCATEGORY,
+        }
+
+    def add_interaction_trace(
+        self,
+        ctx: Context,
+        request: Dict[str, Any],
+        response: Any,
+        step_name: str = "Agent Interaction",
+        step_type: StepKind = StepKind.OTHER,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """
+        Add a trace for an agent interaction (request/response pair).
+
+        Args:
+            ctx: Context from create_goal_result
+            request: Request data sent to the agent
+            response: Response received from the agent
+            step_name: Human-readable step name
+            step_type: Type of step for categorization
+            metadata: Optional additional metadata
+        """
+        # Extract response content
+        response_content = self._extract_response_content(response)
+
+        content = {
+            "step_name": step_name,
+            "request": sanitize_for_json(request),
+            "response": response_content,
+        }
+
+        if metadata:
+            content["metadata"] = metadata
+
+        self._add_trace(ctx, step_name, step_type, content)
+
+    def add_evaluation_trace(
+        self,
+        ctx: Context,
+        evaluation_result: Any,
+        score: Optional[float] = None,
+        explanation: Optional[str] = None,
+        evaluator_name: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """
+        Add a trace for an evaluation step.
+
+        Args:
+            ctx: Context from create_goal_result
+            evaluation_result: Result from the evaluator
+            score: Optional numeric score
+            explanation: Optional explanation text
+            evaluator_name: Name of the evaluator used
+            metadata: Optional additional metadata
+        """
+        evaluator_norm = (evaluator_name or "").strip().lower()
+        if evaluator_norm in {"ontopicevaluator", "on_topic", "ontopic"}:
+            return
+
+        content = {
+            "step_name": "Evaluation",
+            "evaluator": evaluator_name,
+            "result": sanitize_for_json(evaluation_result),
+        }
+
+        if score is not None:
+            content["score"] = score
+        if explanation:
+            content["explanation"] = explanation
+        if metadata:
+            content["metadata"] = sanitize_for_json(metadata)
+
+        self._add_trace(ctx, "Evaluation", StepKind.OTHER, content)
+
+    def add_custom_trace(
+        self,
+        ctx: Context,
+        step_name: str,
+        content: Dict[str, Any],
+        step_type: StepKind = StepKind.OTHER,
+    ) -> None:
+        """
+        Add a custom trace with arbitrary content.
+
+        Args:
+            ctx: Context from create_goal_result
+            step_name: Human-readable step name
+            content: Trace content dictionary
+            step_type: Type of step for categorization
+        """
+        self._add_trace(ctx, step_name, step_type, content)
+
+    def _add_trace(
+        self,
+        ctx: Context,
+        step_name: str,
+        step_type: StepKind,
+        content: Dict[str, Any],
+    ) -> Optional[str]:
+        """
+        Internal method to add a trace to a goal's result.
+
+        Args:
+            ctx: Context
+            step_name: Step name
+            step_type: Step type enum
+            content: Trace content
+
+        Returns:
+            Trace ID if successful, None otherwise
+        """
+
+        try:
+            content = deep_clean(content)
+        except Exception as e:
+            self.logger.warning(f"Deep clean failed: {e}")
+            content["serialization_error"] = str(e)
+
+        sanitized_content = sanitize_for_json(content)
+
+        # A PAIR goal may emit traces from parallel stream workers. Keep the
+        # sequence assignment, local append, event emission, and persistence in
+        # one critical section so sequence order remains stable everywhere.
+        with ctx._trace_lock:
+            seq = ctx.increment_sequence()
+            trace_record = {
+                "sequence": seq,
+                "step_name": step_name,
+                "step_type": (
+                    step_type.value if hasattr(step_type, "value") else str(step_type)
+                ),
+                "content": sanitized_content,
+                "timestamp": time.time(),
+                "elapsed_s": round(ctx.elapsed_s, 3),
+            }
+            ctx.traces.append(trace_record)
+
+            # Surface the trace as a structured TUI event. Subscribers translate
+            # the step_type / step_name into "tool_call", "evaluation", etc.
+            self._emit(
+                "trace_added",
+                goal_index=ctx.goal_index,
+                sequence=seq,
+                step_name=step_name,
+                step_type=trace_record["step_type"],
+                content=sanitized_content,
+                elapsed_s=trace_record["elapsed_s"],
+            )
+
+            # Send to backend if enabled and we have a result_id
+            if not self.is_enabled or not ctx.result_id:
+                return None
+
+            try:
+                result_uuid = UUID(ctx.result_id)
+                step_type_str = (
+                    step_type.value if hasattr(step_type, "value") else str(step_type)
+                )
+                persisted_trace = self.backend.create_trace(
+                    result_uuid,
+                    sequence=seq,
+                    step_type=step_type_str,
+                    content=sanitized_content,
+                )
+                trace_id = str(persisted_trace.id)
+                self.logger.debug(
+                    f"Created trace {seq} for goal {ctx.goal_index}: {trace_id}"
+                )
+                return trace_id
+
+            except Exception as e:
+                self.logger.error(
+                    f"Exception creating trace for goal {ctx.goal_index}: {e}",
+                    exc_info=True,
+                )
+                self._record_failure(f"Goal {ctx.goal_index}: create trace", e)
+
+            return None
+
+    def finalize_goal(
+        self,
+        ctx: Context,
+        success: bool,
+        evaluation_notes: Optional[str] = None,
+        final_metadata: Optional[Dict[str, Any]] = None,
+        evaluation_status: Optional[Any] = None,
+    ) -> bool:
+        """
+        Finalize a goal's result with evaluation status.
+
+        Args:
+            ctx: Context from create_goal_result
+            success: Whether the attack was successful
+            evaluation_notes: Optional evaluation notes
+            final_metadata: Optional final metadata to merge
+
+        Returns:
+            True if update was successful, False otherwise
+        """
+        if ctx.is_finalized:
+            self.logger.warning(f"Goal {ctx.goal_index} already finalized")
+            return False
+
+        requested_success = bool(success)
+        final_success = requested_success
+        preserved_prior_success = False
+
+        # Some attacks (e.g. AdvPrefix) may sync per-goal evaluation status during
+        # execution. Preserve an already successful backend status to avoid
+        # downgrading the final state at run completion.
+        if not requested_success and self.is_enabled and ctx.result_id:
+            try:
+                existing = self.backend.get_result(UUID(ctx.result_id))
+                existing_status = str(
+                    getattr(existing, "evaluation_status", "") or ""
+                ).upper()
+                if EvalStatus.SUCCESSFUL_JAILBREAK.value in existing_status:
+                    final_success = True
+                    preserved_prior_success = True
+                    self.logger.info(
+                        "Preserving SUCCESSFUL_JAILBREAK for goal "
+                        f"{ctx.goal_index} ({ctx.result_id}) during finalization"
+                    )
+            except Exception as e:
+                self.logger.debug(
+                    "Could not check existing evaluation status for goal "
+                    f"{ctx.goal_index}: {e}",
+                    exc_info=True,
+                )
+                self._record_failure(
+                    f"Goal {ctx.goal_index}: read evaluation status", e
+                )
+
+        ctx.is_finalized = True
+        ctx.final_success = bool(final_success)
+        ctx._end_time = time.perf_counter()
+
+        # Update local metadata
+        if final_metadata:
+            ctx.metadata.update(final_metadata)
+        ctx.metadata["success"] = bool(final_success)
+        if preserved_prior_success:
+            ctx.metadata["preserved_prior_success"] = True
+        ctx.metadata["total_traces"] = len(ctx.traces)
+        ctx.metadata["elapsed_s"] = round(ctx.elapsed_s, 3)
+
+        # Emit goal_finalized regardless of backend tracking so the TUI can
+        # tick progress even when running without a server-side run record.
+        self._emit(
+            "goal_finalized",
+            goal_index=ctx.goal_index,
+            goal=ctx.goal,
+            success=bool(final_success),
+            total_traces=len(ctx.traces),
+            elapsed_s=ctx.metadata["elapsed_s"],
+            evaluation_notes=evaluation_notes,
+            result_id=ctx.result_id,
+        )
+
+        if not self.is_enabled or not ctx.result_id:
+            return False
+
+        try:
+            result_uuid = UUID(ctx.result_id)
+
+            # Map success to evaluation status string, allowing explicit override.
+            if evaluation_status is not None:
+                if hasattr(evaluation_status, "value"):
+                    eval_status_value = str(evaluation_status.value)
+                else:
+                    eval_status_value = str(evaluation_status)
+            elif final_success:
+                eval_status_value = EvalStatus.SUCCESSFUL_JAILBREAK.value
+            else:
+                eval_status_value = EvalStatus.FAILED_JAILBREAK.value
+
+            # Backend requires non-null evaluation_notes
+            if preserved_prior_success:
+                base_note = evaluation_notes or "Goal previously marked as successful"
+                notes = f"Success preserved from prior evaluation sync. {base_note}"
+            else:
+                notes = (
+                    evaluation_notes
+                    if evaluation_notes
+                    else (
+                        "Goal completed successfully"
+                        if final_success
+                        else "Goal evaluation failed"
+                    )
+                )
+
+            self.backend.update_result(
+                result_uuid,
+                evaluation_status=eval_status_value,
+                evaluation_notes=notes,
+                agent_specific_data={
+                    **ctx.metadata,
+                    "goal": ctx.goal,
+                    "goal_index": ctx.goal_index,
+                    "total_traces": len(ctx.traces),
+                },
+            )
+            self.logger.info(
+                f"Finalized goal {ctx.goal_index} (result {ctx.result_id}): "
+                f"{'SUCCESS' if final_success else 'FAILED'}"
+            )
+            return True
+
+        except Exception as e:
+            self.logger.error(
+                f"Exception finalizing goal {ctx.goal_index}: {e}", exc_info=True
+            )
+            self._record_failure(f"Goal {ctx.goal_index}: finalize", e)
+            return False
+
+    def get_goal_context(self, goal_index: int) -> Optional[Context]:
+        """Get the Context for a specific goal index."""
+        return self._goal_contexts.get(goal_index)
+
+    def get_goal_context_by_goal(self, goal: str) -> Optional[Context]:
+        """
+        Get the Context for a specific goal string.
+
+        Searches all contexts to find one matching the goal text.
+        Use this when you have the goal string but not the index.
+
+        Args:
+            goal: The goal text to find
+
+        Returns:
+            Context if found, None otherwise
+        """
+        for ctx in self._goal_contexts.values():
+            if ctx.goal == goal:
+                return ctx
+        return None
+
+    def get_result_id(self, goal_index: int) -> Optional[str]:
+        """Get the result ID for a specific goal index."""
+        ctx = self._goal_contexts.get(goal_index)
+        return ctx.result_id if ctx else None
+
+    def get_all_contexts(self) -> Dict[int, Context]:
+        """Get all goal contexts."""
+        return self._goal_contexts.copy()
+
+    def get_summary(self) -> Dict[str, Any]:
+        """Get summary statistics for all tracked goals."""
+        total = len(self._goal_contexts)
+
+        def _to_success_bool(value: Any) -> bool:
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, (int, float)):
+                return value > 0
+            if isinstance(value, str):
+                return value.strip().lower() in {
+                    "true",
+                    "1",
+                    "yes",
+                    "success",
+                    "successful",
+                }
+            return False
+
+        successful = sum(
+            1
+            for ctx in self._goal_contexts.values()
+            if _to_success_bool(
+                ctx.final_success
+                if ctx.final_success is not None
+                else ctx.metadata.get("success", False)
+            )
+        )
+        finalized = sum(1 for ctx in self._goal_contexts.values() if ctx.is_finalized)
+        total_traces = sum(len(ctx.traces) for ctx in self._goal_contexts.values())
+
+        # Latency stats
+        goal_durations = [
+            ctx.elapsed_s for ctx in self._goal_contexts.values() if ctx.is_finalized
+        ]
+        trace_durations = [
+            t.get("elapsed_s", 0.0)
+            for ctx in self._goal_contexts.values()
+            for t in ctx.traces
+            if "elapsed_s" in t
+        ]
+
+        latency: Dict[str, Any] = {}
+        if goal_durations:
+            latency["goal_avg_s"] = round(sum(goal_durations) / len(goal_durations), 3)
+            latency["goal_min_s"] = round(min(goal_durations), 3)
+            latency["goal_max_s"] = round(max(goal_durations), 3)
+            latency["goal_total_s"] = round(sum(goal_durations), 3)
+        if trace_durations:
+            latency["trace_avg_s"] = round(
+                sum(trace_durations) / len(trace_durations), 3
+            )
+            latency["trace_min_s"] = round(min(trace_durations), 3)
+            latency["trace_max_s"] = round(max(trace_durations), 3)
+
+        return {
+            "total_goals": total,
+            "successful_attacks": successful,
+            "finalized": finalized,
+            "total_traces": total_traces,
+            "success_rate": (successful / total * 100) if total > 0 else 0,
+            "avg_traces_per_goal": (total_traces / total) if total > 0 else 0,
+            "latency": latency,
+        }
+
+    @contextmanager
+    def track_goal(
+        self,
+        goal: str,
+        goal_index: int,
+        initial_metadata: Optional[Dict[str, Any]] = None,
+    ):
+        """
+        Context manager for tracking a single goal's attack execution.
+
+        Creates result on entry, yields context for adding traces,
+        and auto-finalizes on exit (with failure status if exception occurs).
+
+        Args:
+            goal: The goal/datapoint text
+            goal_index: Index of this goal
+            initial_metadata: Optional initial metadata
+
+        Yields:
+            Context for adding traces during execution
+
+        Example:
+            >>> with tracker.track_goal(goal, i) as ctx:
+            ...     response = attack(goal)
+            ...     tracker.add_interaction_trace(ctx, request, response)
+            ...     # Finalize manually or let context manager handle it
+        """
+        ctx = self.create_goal_result(goal, goal_index, initial_metadata)
+
+        try:
+            yield ctx
+        except Exception as e:
+            # Finalize with failure on exception
+            if not ctx.is_finalized:
+                self.finalize_goal(
+                    ctx,
+                    success=False,
+                    evaluation_notes=f"Attack failed with exception: {str(e)[:200]}",
+                )
+            raise
+        finally:
+            # Auto-finalize if the caller forgot to call finalize_goal().
+            # Using FAILED_JAILBREAK with an explanatory note is safer than
+            # leaving the backend result in NOT_EVALUATED indefinitely.
+            if not ctx.is_finalized:
+                self.logger.warning(
+                    f"Goal {goal_index} not explicitly finalized — "
+                    "marking as NOT_EVALUATED on backend"
+                )
+                self.finalize_goal(
+                    ctx,
+                    success=False,
+                    evaluation_notes="Goal exited context manager without explicit finalization",
+                )
+
+    def _extract_id(self, response) -> Optional[str]:
+        """Extract ID from API response."""
+        if response.parsed and hasattr(response.parsed, "id"):
+            return str(response.parsed.id)
+        return None
+
+    def _extract_response_content(self, response: Any) -> Any:
+        """Extract content from various response formats."""
+        if response is None:
+            return None
+
+        # OpenAI-style response
+        if hasattr(response, "choices") and response.choices:
+            try:
+                return response.choices[0].message.content
+            except (AttributeError, IndexError):
+                pass
+
+        # Dictionary response
+        if isinstance(response, dict):
+            # Guardrail-blocked response: adapter_type == "guardrail".
+            # Preserve the agent_specific_data dict so the dashboard can
+            # render it as a dedicated visual block.
+            if response.get("adapter_type") == "guardrail":
+                return response.get("agent_specific_data") or {
+                    "side": "unknown",
+                    "message": "Blocked by guardrail",
+                }
+
+            # Guardrail-event dict passed directly (e.g. AdvPrefix passes the event
+            # dict as the response payload rather than the full router response).
+            if response.get("side") in ("before", "after", "unknown") and (
+                "explanation" in response or "message" in response
+            ):
+                return response
+
+            # Guardrail block detected from error_message — attacks that extract
+            # only generated_text/error_message before calling add_interaction_trace.
+            _err = str(response.get("error_message") or "")
+            if _err:
+                if "before_guardrail" in _err or "before guardrail" in _err.lower():
+                    return {"side": "before", "message": _err}
+                if "after_guardrail" in _err or "after guardrail" in _err.lower():
+                    return {"side": "after", "message": _err}
+
+            return (
+                response.get("generated_text")
+                or response.get("processed_response")
+                or response.get("content")
+            )
+
+        # String response
+        if isinstance(response, str):
+            return response
+
+        # Fallback: convert to string
+        return str(response)
+
+    # ------------------------------------------------------------------
+    # Events port (attacks.ports.Events). Structural; tracking does not
+    # import attacks.
+    # ------------------------------------------------------------------
+
+    def _active_goal(self) -> Optional[Context]:
+        return _current_goal.get()
+
+    @contextmanager
+    def step(self, name: str, kind: str = ""):
+        """Open a step scope and emit step_started / step_ended."""
+        self._emit("step_started", step_name=name, step_type=kind)
+        try:
+            yield None
+        except Exception as exc:
+            self._emit(
+                "step_ended",
+                step_name=name,
+                step_type=kind,
+                success=False,
+                error=str(exc),
+            )
+            raise
+        else:
+            self._emit("step_ended", step_name=name, step_type=kind, success=True)
+
+    @contextmanager
+    def goal(self, goal: Goal):
+        """Open a goal scope and remember its result id."""
+        labels = dict(getattr(goal, "labels", None) or {})
+        ctx = self.create_goal_result(
+            getattr(goal, "text", str(goal)),
+            int(getattr(goal, "index", 0) or 0),
+            initial_metadata=labels or None,
+        )
+        token: Token = _current_goal.set(ctx)
+        try:
+            yield ctx
+        finally:
+            _current_goal.reset(token)
+
+    def interaction(self, **payload: Any) -> None:
+        ctx = self._active_goal()
+        if ctx is None:
+            self.log("interaction without an open goal", level="debug")
+            return
+        request = payload.get(
+            "request", {k: v for k, v in payload.items() if k != "response"}
+        )
+        self.add_interaction_trace(
+            ctx,
+            request=request if isinstance(request, dict) else {"request": request},
+            response=payload.get("response"),
+            step_name=str(payload.get("step_name") or "Agent Interaction"),
+            metadata=payload.get("metadata"),
+        )
+
+    def evaluation(self, **payload: Any) -> None:
+        ctx = self._active_goal()
+        if ctx is None:
+            self._emit("evaluation", **payload)
+            return
+        self.add_evaluation_trace(
+            ctx,
+            evaluation_result=payload.get("result", payload),
+            score=payload.get("score"),
+            explanation=payload.get("explanation"),
+            evaluator_name=payload.get("evaluator") or payload.get("evaluator_name"),
+            metadata=payload.get("metadata"),
+        )
+        self._emit("evaluation", goal_index=ctx.goal_index, **payload)
+
+    def trace(self, **payload: Any) -> None:
+        ctx = self._active_goal()
+        if ctx is None:
+            self._emit("trace", **payload)
+            return
+        content = dict(payload)
+        step_name = str(content.pop("step_name", "Trace"))
+        self.add_custom_trace(ctx, step_name, content)
+
+    def finalize(self, **payload: Any) -> None:
+        ctx = self._active_goal()
+        if ctx is None:
+            self._emit("finalize", **payload)
+            return
+        success = bool(payload.get("success", False))
+        self.finalize_goal(
+            ctx,
+            success=success,
+            evaluation_notes=payload.get("evaluation_notes")
+            or payload.get("explanation"),
+            final_metadata=payload.get("metadata"),
+            evaluation_status=payload.get("evaluation_status"),
+        )
+
+    def progress(self, fraction: float, message: str = "") -> None:
+        self._emit("progress", fraction=float(fraction), message=message)
+
+    def log(self, message: str, *, level: str = "info") -> None:
+        self._emit("log", message=message, level=level)
+        log_fn = getattr(self.logger, level, None)
+        if callable(log_fn):
+            log_fn(message)
+        else:
+            self.logger.info(message)

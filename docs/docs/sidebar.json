@@ -30,19 +30,6 @@
             },
             {
               "items": [
-                "reference/hackagent/attacks/evaluator/base",
-                "reference/hackagent/attacks/evaluator/evaluation_step",
-                "reference/hackagent/attacks/evaluator/inline_step_judge",
-                "reference/hackagent/attacks/evaluator/judge_evaluators",
-                "reference/hackagent/attacks/evaluator/metrics",
-                "reference/hackagent/attacks/evaluator/pattern_evaluators",
-                "reference/hackagent/attacks/evaluator/sync"
-              ],
-              "label": "hackagent.attacks.evaluator",
-              "type": "category"
-            },
-            {
-              "items": [
                 {
                   "items": [
                     "reference/hackagent/attacks/techniques/advprefix/attack",
@@ -372,6 +359,17 @@
         },
         {
           "items": [
+            "reference/hackagent/evaluation/base",
+            "reference/hackagent/evaluation/judges",
+            "reference/hackagent/evaluation/metrics",
+            "reference/hackagent/evaluation/panel",
+            "reference/hackagent/evaluation/patterns"
+          ],
+          "label": "hackagent.evaluation",
+          "type": "category"
+        },
+        {
+          "items": [
             {
               "items": [
                 "reference/hackagent/examples/claude/hack_claude"
@@ -522,20 +520,6 @@
               ],
               "label": "hackagent.router.discovery",
               "type": "category"
-            },
-            {
-              "items": [
-                "reference/hackagent/router/tracking/audit",
-                "reference/hackagent/router/tracking/category_classifier",
-                "reference/hackagent/router/tracking/context",
-                "reference/hackagent/router/tracking/coordinator",
-                "reference/hackagent/router/tracking/decorators",
-                "reference/hackagent/router/tracking/step",
-                "reference/hackagent/router/tracking/tracker",
-                "reference/hackagent/router/tracking/utils"
-              ],
-              "label": "hackagent.router.tracking",
-              "type": "category"
             }
           ],
           "label": "hackagent.router",
@@ -550,6 +534,21 @@
             "reference/hackagent/storage/store"
           ],
           "label": "hackagent.storage",
+          "type": "category"
+        },
+        {
+          "items": [
+            "reference/hackagent/tracking/audit",
+            "reference/hackagent/tracking/context",
+            "reference/hackagent/tracking/coordinator",
+            "reference/hackagent/tracking/decorators",
+            "reference/hackagent/tracking/listeners",
+            "reference/hackagent/tracking/sink",
+            "reference/hackagent/tracking/step",
+            "reference/hackagent/tracking/tracker",
+            "reference/hackagent/tracking/utils"
+          ],
+          "label": "hackagent.tracking",
           "type": "category"
         },
         "reference/hackagent/_version",

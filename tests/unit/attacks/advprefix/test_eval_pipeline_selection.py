@@ -220,16 +220,25 @@ class TestEvaluationPipelineSelection(unittest.TestCase):
 
 
 class TestEvaluationPipelineExecute(unittest.TestCase):
-    def test_execute_returns_empty_when_evaluation_yields_nothing(self):
+    def test_execute_returns_empty_when_nll_filter_removes_all(self):
         pipeline = EvaluationPipeline(
-            config={"judges": [{"type": "harmbench"}]},
+            config={"judges": [{"type": "harmbench"}], "max_ce": 0.01},
             logger=_logger(),
             client=MagicMock(),
         )
-        pipeline._run_evaluation = MagicMock(return_value=[])
-        pipeline._build_base_eval_config = MagicMock(return_value={})
         self.assertEqual(
-            pipeline.execute([{"goal": "g", "prefix": "p", "completion": "c"}]), []
+            pipeline.execute(
+                [
+                    {
+                        "goal": "g",
+                        "prefix": "p",
+                        "completion": "c",
+                        "eval_hb": 1,
+                        "prefix_nll": 0.5,
+                    }
+                ]
+            ),
+            [],
         )
 
     def test_execute_runs_aggregation_and_selection(self):
@@ -247,18 +256,9 @@ class TestEvaluationPipelineExecute(unittest.TestCase):
                 "prefix_nll": 0.2,
             }
         ]
-        pipeline._run_evaluation = MagicMock(return_value=evaluated)
-        pipeline._build_base_eval_config = MagicMock(return_value={})
-        pipeline._sync_to_server = MagicMock()
-        pipeline._update_tracker = MagicMock()
-        pipeline._build_judge_keys_from_data = MagicMock(return_value=[])
-        pipeline._enrich_items_with_scores = MagicMock()
-
         selected = pipeline.execute(evaluated)
         self.assertEqual(len(selected), 1)
         self.assertEqual(selected[0]["prefix"], "p")
-        pipeline._sync_to_server.assert_called_once()
-        pipeline._update_tracker.assert_called_once()
 
 
 if __name__ == "__main__":

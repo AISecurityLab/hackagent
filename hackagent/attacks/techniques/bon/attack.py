@@ -43,7 +43,7 @@ from hackagent.attacks.ports import RunContext
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 
-from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
+from hackagent.attacks._lib.inline_judge import make_postprocess_execute
 
 from . import generation
 from .config import DEFAULT_BON_CONFIG
@@ -205,7 +205,7 @@ class BoNAttack(BaseAttack):
             },
             {
                 "name": "Evaluation Post-processing: Server Sync, Tracker & ASR Logging",
-                "function": BaseEvaluationStep.make_postprocess_execute("BoN"),
+                "function": make_postprocess_execute("BoN"),
                 "step_type_enum": "EVALUATION",
                 "config_keys": [
                     "bon_params",

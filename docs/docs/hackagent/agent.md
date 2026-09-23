@@ -179,7 +179,7 @@ of their results in one call, rather than escalating only failures.
 
 Success/mitigation is determined per goal from the evaluated result
 rows returned by each step (see
-``hackagent.attacks.evaluator.metrics.is_successful_result``): a goal
+``_is_successful_result``): a goal
 is considered successful for a step if *any* of its result rows for
 that step are judged successful.
 

@@ -3,10 +3,29 @@
 
 import unittest
 from contextlib import contextmanager
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from hackagent.attacks.techniques.crescendo.attack import CrescendoAttack, _deep_update
+from hackagent.core.contracts import Verdict
 from tests.fakes import RecordingStepTracker
+
+
+class _ScriptedJudge:
+    def __init__(self, score: float, success: bool, explanation: str) -> None:
+        self._score = score
+        self._success = success
+        self._explanation = explanation
+
+    def score(self, sample) -> float:
+        return self._score
+
+    def evaluate(self, sample) -> Verdict:
+        return Verdict(
+            success=self._success,
+            score=self._score,
+            explanation=self._explanation,
+        )
 
 
 class TestDeepUpdate(unittest.TestCase):
@@ -125,13 +144,10 @@ class TestCrescendoAttack(unittest.TestCase):
                 agent_router=MagicMock(),
             )
 
-        with patch(
-            "hackagent.attacks.techniques.crescendo.attack.BaseEvaluationStep._run_evaluation",
-            return_value=[{"eval_hb": 1, "explanation_hb": "progress"}],
-        ):
-            score, refused, explanation = attack._judge_turn(
-                "goal", "question", "response"
-            )
+        attack.ctx = SimpleNamespace(
+            judge=_ScriptedJudge(10.0, True, "progress"),
+        )
+        score, refused, explanation = attack._judge_turn("goal", "question", "response")
 
         self.assertEqual(score, 10.0)
         self.assertFalse(refused)
@@ -154,13 +170,12 @@ class TestCrescendoAttack(unittest.TestCase):
                 agent_router=MagicMock(),
             )
 
-        with patch(
-            "hackagent.attacks.techniques.crescendo.attack.BaseEvaluationStep._run_evaluation",
-            return_value=[{"eval_hb": 0, "explanation_hb": "declined"}],
-        ):
-            score, refused, explanation = attack._judge_turn(
-                "goal", "question", "I cannot assist with that request."
-            )
+        attack.ctx = SimpleNamespace(
+            judge=_ScriptedJudge(0.0, False, "declined"),
+        )
+        score, refused, explanation = attack._judge_turn(
+            "goal", "question", "I cannot assist with that request."
+        )
 
         self.assertEqual(score, 0.0)
         self.assertTrue(refused)
@@ -183,13 +198,12 @@ class TestCrescendoAttack(unittest.TestCase):
                 agent_router=MagicMock(),
             )
 
-        with patch(
-            "hackagent.attacks.techniques.crescendo.attack.BaseEvaluationStep._run_evaluation",
-            return_value=[{"eval_scorer": 42, "explanation_scorer": "high"}],
-        ):
-            score, _refused, _explanation = attack._judge_turn(
-                "goal", "question", "response"
-            )
+        attack.ctx = SimpleNamespace(
+            judge=_ScriptedJudge(10.0, True, "high"),
+        )
+        score, _refused, _explanation = attack._judge_turn(
+            "goal", "question", "response"
+        )
         self.assertEqual(score, 10.0)
 
     def test_run_uses_global_goal_index_offset_for_tracking_context(self):

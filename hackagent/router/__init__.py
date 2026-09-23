@@ -6,7 +6,7 @@
 Model access lives in :mod:`hackagent.models`.
 """
 
-from .tracking import StepTracker, TrackingContext, track_operation
+from hackagent.tracking import StepTracker, TrackingContext, track_operation
 
 __all__ = [
     "StepTracker",

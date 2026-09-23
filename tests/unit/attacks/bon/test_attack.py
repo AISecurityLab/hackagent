@@ -105,11 +105,8 @@ class TestBoNAttack(unittest.TestCase):
         self.assertIn("Generation", steps[0]["name"])
         self.assertIn("Evaluation", steps[1]["name"])
 
-    @patch(
-        "hackagent.attacks.evaluator.evaluation_step.BaseEvaluationStep._postprocess_inline_judge_results"
-    )
     @patch("hackagent.attacks.techniques.bon.attack.generation.execute")
-    def test_run_pipeline(self, mock_gen, mock_eval):
+    def test_run_pipeline(self, mock_gen):
         client = MagicMock()
         agent_router = MagicMock()
         attack = BoNAttack(
@@ -130,15 +127,8 @@ class TestBoNAttack(unittest.TestCase):
                 "augmented_prompt": "tset",
                 "response": "ok",
                 "error": None,
-            }
-        ]
-        mock_eval.return_value = [
-            {
-                "goal": "test",
-                "augmented_prompt": "tset",
-                "response": "ok",
-                "error": None,
                 "best_score": 1.0,
+                "success": True,
             }
         ]
 
@@ -146,7 +136,6 @@ class TestBoNAttack(unittest.TestCase):
             results = attack.run(["test"])
 
         mock_gen.assert_called_once()
-        mock_eval.assert_called_once()
         self.assertEqual(len(results), 1)
         from hackagent.attacks.types import AttackResult
 

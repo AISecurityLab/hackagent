@@ -63,7 +63,7 @@ class TestPAIRScorerPrecedence(unittest.TestCase):
         return attack
 
     def test_assessment_score_drives_threshold_and_traces(self):
-        from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
+        from hackagent.attacks._lib.inline_judge import postprocess_inline_results
         from hackagent.attacks.techniques.autodan_turbo.config import (
             SCORER_WRAPPER_SYSTEM_PROMPT,
         )
@@ -116,9 +116,8 @@ class TestPAIRScorerPrecedence(unittest.TestCase):
                     self.assertEqual(evaluation["is_success"], success)
                     self.assertEqual(evaluation["scorer_explanation"], assessment)
 
-                step = BaseEvaluationStep({}, MagicMock(), MagicMock())
-                rows = step._postprocess_inline_judge_results(
-                    [result], attack_label="PAIR"
+                rows = postprocess_inline_results(
+                    [result], attack_label="PAIR", logger=MagicMock()
                 )
                 self.assertEqual(rows[0]["success"], success)
                 self.assertEqual(rows[0]["best_score"], score)

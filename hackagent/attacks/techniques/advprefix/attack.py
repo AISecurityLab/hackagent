@@ -79,9 +79,9 @@ class AdvPrefixAttack(BaseAttack):
       :class:`EvaluationPipeline` on the legacy constructor).
 
     Tracking is managed by
-    :class:`~hackagent.router.tracking.TrackingCoordinator`; goal
-    :class:`~hackagent.router.tracking.Tracker` instances and a pipeline
-    :class:`~hackagent.router.tracking.StepTracker` are created upfront so
+    :class:`~hackagent.tracking.TrackingCoordinator`; goal
+    :class:`~hackagent.tracking.Tracker` instances and a pipeline
+    :class:`~hackagent.tracking.StepTracker` are created upfront so
     the dashboard shows all goals from the moment the run starts.
 
     Construct with ``(config, ctx)``. ``config`` is a dict deep-merged into

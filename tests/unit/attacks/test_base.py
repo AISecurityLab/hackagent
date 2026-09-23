@@ -74,7 +74,7 @@ class TestBaseAttackInfrastructure(unittest.TestCase):
         attack._setup_logging()
         self.assertEqual(list(attack.logger.handlers), before)
 
-    @patch("hackagent.router.tracking.coordinator.TrackingCoordinator.create")
+    @patch("hackagent.tracking.coordinator.TrackingCoordinator.create")
     def test_initialize_coordinator_creates_coordinator(self, mock_create):
         """Test that coordinator is properly initialized."""
 

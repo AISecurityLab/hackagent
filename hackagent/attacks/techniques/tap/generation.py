@@ -38,7 +38,7 @@ from hackagent.attacks._lib.llm_router import connect_role
 from hackagent.storage.store import Store
 from hackagent.core.contracts import StepKind
 from hackagent.attacks._lib.llm_router import LLMRouter
-from hackagent.router.tracking import Context, Tracker
+from hackagent.tracking import Context, Tracker
 
 from .config import ATTACKER_SYSTEM_PROMPT
 from .tap_evaluation import TapEvaluation

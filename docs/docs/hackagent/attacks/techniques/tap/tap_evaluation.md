@@ -8,7 +8,7 @@ Evaluation helpers for TAP using the shared evaluator framework.
 ## TapEvaluation Objects
 
 ```python
-class TapEvaluation(BaseEvaluationStep)
+class TapEvaluation()
 ```
 
 Evaluation wrapper for TAP judge and on-topic scoring.
