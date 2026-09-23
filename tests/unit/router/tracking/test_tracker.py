@@ -228,6 +228,7 @@ class TestStepTrackerSanitizeConfig(unittest.TestCase):
                 "total_tokens": 15,
             },
             "prompt_tokens_details": {"cached_tokens": 3},
+            "completion_tokens_details": {"reasoning_tokens": 7},
             "api_token": "secret-should-be-redacted",
             "api_key": "key-should-be-redacted",
         }
@@ -244,25 +245,47 @@ class TestStepTrackerSanitizeConfig(unittest.TestCase):
         self.assertEqual(sanitized["usage"]["prompt_tokens"], 10)
         self.assertEqual(sanitized["usage"]["total_tokens"], 15)
         self.assertEqual(sanitized["prompt_tokens_details"]["cached_tokens"], 3)
+        self.assertEqual(sanitized["completion_tokens_details"]["reasoning_tokens"], 7)
         # Secrets still redacted
         self.assertEqual(sanitized["api_token"], "***REDACTED***")
         self.assertEqual(sanitized["api_key"], "***REDACTED***")
 
-    def test_sanitize_preserves_token_counts_case_insensitive_and_suffix(self):
-        """Allowlist is case-insensitive and suffix '*_tokens' is preserved."""
+    def test_sanitize_preserves_token_counts_case_insensitive(self):
+        """Allowlist is case-insensitive for token-count metrics."""
         config = {
             "PROMPT_TOKENS": 10,
             "Prompt_Tokens_Details": {"CACHED_TOKENS": 5},
-            "reasoning_tokens": 7,
-            "audio_tokens": 2,
+            "REASONING_TOKENS": 7,
         }
 
         sanitized = sanitize_for_json(config)
 
         self.assertEqual(sanitized["PROMPT_TOKENS"], 10)
         self.assertEqual(sanitized["Prompt_Tokens_Details"]["CACHED_TOKENS"], 5)
+        self.assertEqual(sanitized["REASONING_TOKENS"], 7)
+
+    def test_sanitize_still_redacts_sensitive_tokens_suffix(self):
+        """Sensitive keys ending in _tokens must still be redacted."""
+        config = {
+            "api_tokens": "should-be-redacted",
+            "secret_tokens": "should-be-redacted",
+            "password_tokens": "should-be-redacted",
+            "API_TOKENS": "should-be-redacted",
+            "my_secret_tokens": "should-be-redacted",
+            # Legit metric nearby must stay visible to ensure allowlist is precise
+            "prompt_tokens": 10,
+            "reasoning_tokens": 7,
+        }
+
+        sanitized = sanitize_for_json(config)
+
+        self.assertEqual(sanitized["api_tokens"], "***REDACTED***")
+        self.assertEqual(sanitized["secret_tokens"], "***REDACTED***")
+        self.assertEqual(sanitized["password_tokens"], "***REDACTED***")
+        self.assertEqual(sanitized["API_TOKENS"], "***REDACTED***")
+        self.assertEqual(sanitized["my_secret_tokens"], "***REDACTED***")
+        self.assertEqual(sanitized["prompt_tokens"], 10)
         self.assertEqual(sanitized["reasoning_tokens"], 7)
-        self.assertEqual(sanitized["audio_tokens"], 2)
 
 
 class TestStepTrackerUpdateRunStatus(unittest.TestCase):

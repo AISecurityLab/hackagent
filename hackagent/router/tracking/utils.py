@@ -23,8 +23,12 @@ _SKIP_KEYS: frozenset = frozenset({"_client", "client"})
 # Substrings that mark a key as containing sensitive data
 _SENSITIVE_SUBSTRINGS: tuple = ("key", "token", "secret", "password")
 
-# Exact-match allowlist for operational token-count metrics that contain the
-# substring ``token`` but are not secrets and must not be redacted.
+# Exact-match allowlist for legitimate numeric token-count metrics that contain
+# the substring ``token`` but are not secrets. Only these keys are exempt from
+# the sensitive-substring redaction; everything else with ``token`` stays
+# redacted (e.g. ``api_token``, ``api_tokens``, ``secret_tokens``).
+# ``reasoning_tokens`` is included because ``completion_tokens_details``
+# may contain it as a numeric sub-field.
 _TOKEN_COUNT_ALLOWLIST: frozenset = frozenset(
     {
         "prompt_tokens",
@@ -36,6 +40,7 @@ _TOKEN_COUNT_ALLOWLIST: frozenset = frozenset(
         "token_count",
         "prompt_tokens_details",
         "completion_tokens_details",
+        "reasoning_tokens",
     }
 )
 
@@ -76,10 +81,13 @@ def sanitize_for_json(obj: Any) -> Any:
         - Keys in ``_SKIP_KEYS`` (``_client``, ``client``) → ``"<TypeName>"``
         - Keys whose lowercase form is in ``_TOKEN_COUNT_ALLOWLIST``
           (e.g. ``prompt_tokens``, ``total_tokens``, ``token_count``) are
-          preserved — they contain ``token`` but are operational metrics, not
-          secrets.
+          preserved — they contain ``token`` but are numeric usage metrics, not
+          secrets. This allowlist is checked *before* the sensitive-substring
+          test so only explicitly safe metric names are exempt.
         - Keys whose lowercase form contains a sensitive substring
           (``key``, ``token``, ``secret``, ``password``) → ``"***REDACTED***"``
+          (including ``api_tokens``/``secret_tokens``/``password_tokens`` which
+          are *not* in the allowlist)
         - All other values recurse.
     - ``list`` / ``tuple`` → recurse element-wise, preserving type.
     - ``float``: ``inf``/``-inf`` → ``"Infinity"``/``"-Infinity"``,
@@ -102,11 +110,11 @@ def sanitize_for_json(obj: Any) -> Any:
             if k in _SKIP_KEYS:
                 sanitized[k] = f"<{type(v).__name__}>"
                 continue
-            # Preserve operational token-count metrics even though they contain
-            # the substring ``token``. Allowlist covers known keys; suffix check
-            # handles any future ``*_tokens`` metric (e.g. ``reasoning_tokens``).
-            kl = k.lower()
-            if kl in _TOKEN_COUNT_ALLOWLIST or kl.endswith("_tokens"):
+            # Preserve explicitly allowlisted numeric token-count metrics even
+            # though they contain the substring ``token``. This runs before the
+            # generic sensitive check so only the enumerated metric names are
+            # exempt; ``api_tokens`` etc. remain redacted.
+            if k.lower() in _TOKEN_COUNT_ALLOWLIST:
                 sanitized[k] = sanitize_for_json(v)
                 continue
             if any(s in k.lower() for s in _SENSITIVE_SUBSTRINGS):
