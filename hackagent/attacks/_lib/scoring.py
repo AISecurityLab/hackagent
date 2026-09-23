@@ -76,6 +76,32 @@ def native_jailbreak_threshold(
     )
 
 
+def infer_judge_type(
+    identifier: Optional[str], default: Optional[str] = None
+) -> Optional[str]:
+    """Infer a judge type key from a model identifier."""
+    if not identifier:
+        return default
+    text = identifier.lower()
+    if (
+        "harmclassifier" in text
+        or "harmbenchvariant" in text
+        or "harmbench_variant" in text
+    ):
+        return "harmbench_variant"
+    if "harmbench" in text:
+        return "harmbench"
+    if "nuanced" in text:
+        return "nuanced"
+    if "jailbreak" in text:
+        return "jailbreakbench"
+    if "scorer" in text:
+        return "scorer"
+    if "rag" in text:
+        return "rag_outcome"
+    return default
+
+
 def get_judge_range(judge_config: Mapping[str, Any]) -> str:
     """Return ``binary`` or ``decimal`` for the given judge config."""
     explicit = judge_config.get("range")

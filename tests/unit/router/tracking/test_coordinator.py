@@ -7,7 +7,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from hackagent.router.tracking.coordinator import TrackingCoordinator
+from hackagent.tracking.coordinator import TrackingCoordinator
 
 
 class _FakeGoalTracker:

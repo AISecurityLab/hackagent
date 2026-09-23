@@ -90,11 +90,11 @@ class TestAutoDANTurboConfig(unittest.TestCase):
         infer_judge_type(), so the judge role must carry an explicit
         type/range or evaluation silently skips the judge entirely and
         falls back to legacy (non-judge) scoring."""
-        from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
+        from hackagent.attacks._lib.scoring import get_judge_range
 
         judge_cfg = autodan_config.DEFAULT_AUTODAN_TURBO_CONFIG["judge"]
         self.assertEqual(judge_cfg.get("type"), "scorer")
-        self.assertEqual(BaseEvaluationStep.get_judge_range(judge_cfg), "decimal")
+        self.assertEqual(get_judge_range(judge_cfg), "decimal")
 
         # Must survive the AutoDANTurboConfig round-trip attack.py performs.
         dumped = autodan_config.AutoDANTurboConfig.from_dict(

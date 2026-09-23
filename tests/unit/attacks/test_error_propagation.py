@@ -12,7 +12,7 @@ treated as failed attacks.
 
 import logging
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 from hackagent.storage._http.api.models import EvalStatus
@@ -96,77 +96,7 @@ class TestNormalizeAttackResults(unittest.TestCase):
 
 
 # ============================================================================
-# 2. BaseEvaluationStep: error-row detection
-# ============================================================================
-
-
-class TestEvaluationStepErrorDetection(unittest.TestCase):
-    """Test that error rows are detected and excluded from scoring."""
-
-    def _make_step(self):
-        from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
-
-        return BaseEvaluationStep(
-            config={"_run_id": str(uuid4()), "_backend": MagicMock()},
-            logger=logging.getLogger("test"),
-            client=MagicMock(),
-        )
-
-    def test_detect_error_rows(self):
-        step = self._make_step()
-        data = [
-            {"completion": "hello", "goal": "g1"},
-            {"completion": "", "error": "timeout", "goal": "g2"},
-            {"completion": "", "error_message": "connection refused", "goal": "g3"},
-            {"completion": "real answer", "error": "stale", "goal": "g4"},
-        ]
-        indices = step._detect_error_indices(data)
-        # Row 0: no error → not detected
-        # Row 1: error + empty completion → detected
-        # Row 2: error_message + empty completion → detected
-        # Row 3: error but has real completion → not detected
-        self.assertEqual(indices, {1, 2})
-
-    def test_mark_error_rows(self):
-        step = self._make_step()
-        data = [
-            {"completion": "", "error": "timeout", "goal": "g1"},
-        ]
-        step._mark_error_rows(data, {0})
-        row = data[0]
-        self.assertTrue(row["is_error"])
-        self.assertEqual(row["best_score"], 0.0)
-        self.assertFalse(row["success"])
-        self.assertIn("timeout", row["evaluation_notes"])
-
-    def test_enrich_skips_error_rows(self):
-        step = self._make_step()
-        data = [
-            {"eval_hb": 1, "goal": "g1"},  # normal row
-            {"is_error": True, "goal": "g2"},  # error row
-        ]
-        step._enrich_items_with_scores(data, error_indices={1})
-        self.assertGreater(data[0]["best_score"], 0)
-        self.assertTrue(data[0]["success"])
-        # Error row keeps defaults
-        self.assertEqual(data[1].get("best_score", 0.0), 0.0)
-        self.assertFalse(data[1].get("success", False))
-
-    def test_enrich_respects_is_error_flag(self):
-        """Even without error_indices, is_error flag is honoured."""
-        step = self._make_step()
-        data = [
-            {"eval_hb": 1, "goal": "g1"},
-            {"is_error": True, "goal": "g2"},
-        ]
-        step._enrich_items_with_scores(data, error_indices=None)
-        self.assertGreater(data[0]["best_score"], 0)
-        # is_error row still skipped
-        self.assertEqual(data[1].get("best_score", 0.0), 0.0)
-
-
-# ============================================================================
-# 3. Baseline evaluate_responses: error-row handling
+# 2. Baseline evaluate_responses: error-row handling
 # ============================================================================
 
 
@@ -228,7 +158,7 @@ class TestBaselineFinalizeErrors(unittest.TestCase):
     """Test that all-error goals finalize with ERROR_AGENT_RESPONSE."""
 
     def _make_tracker(self):
-        from hackagent.router.tracking import Tracker
+        from hackagent.tracking import Tracker
 
         mock_backend = MagicMock()
         result_record = MagicMock()
@@ -337,7 +267,7 @@ class TestTrackerFinalizeGoalOverride(unittest.TestCase):
     """Test the evaluation_status override parameter."""
 
     def _make_tracker(self):
-        from hackagent.router.tracking import Tracker
+        from hackagent.tracking import Tracker
 
         mock_backend = MagicMock()
         result_record = MagicMock()
@@ -391,84 +321,7 @@ class TestTrackerFinalizeGoalOverride(unittest.TestCase):
 
 
 # ============================================================================
-# 6. BaseJudgeEvaluator: error rows preserved
-# ============================================================================
-
-
-class TestJudgeEvaluatorErrorRows(unittest.TestCase):
-    """Test that the judge evaluator doesn't overwrite error info."""
-
-    def test_error_rows_get_error_explanation(self):
-        """Error rows should get eval=0 with the error message, not 'trivial'."""
-        from hackagent.attacks.evaluator.base import BaseJudgeEvaluator
-
-        class FakeJudge(BaseJudgeEvaluator):
-            eval_column = "eval_test"
-            explanation_column = "explanation_test"
-
-            def _get_request_data_for_row(self, row):
-                return {}
-
-            def _parse_response_content(self, content, index):
-                return 0, "parsed"
-
-        # Create minimal config
-        config = MagicMock()
-        config.model_id = "test-model"
-        config.agent_endpoint = None
-        config.agent_type = "OPENAI_SDK"
-        config.max_tokens_eval = 100
-        config.temperature = 0.0
-        config.timeout = 30
-        config.agent_metadata = {}
-        config.agent_name = "test"
-        config.filter_len = 10
-        config.max_judge_retries = 0
-
-        with patch(
-            "hackagent.attacks.evaluator.base.connect_role"
-        ) as mock_connect_role:
-            mock_connect_role.return_value = (MagicMock(), "key")
-            judge = FakeJudge(client=MagicMock(), config=config, run_id=str(uuid4()))
-
-        data = [
-            {
-                "goal": "g1",
-                "prefix": "",
-                "completion": "real response",
-                "result_id": str(uuid4()),
-            },
-            {
-                "goal": "g2",
-                "prefix": "",
-                "completion": "",
-                "is_error": True,
-                "error": "Ollama timed out",
-                "result_id": str(uuid4()),
-            },
-        ]
-
-        # Mock _process_rows_with_router to return results for non-error rows
-        with patch.object(
-            judge,
-            "_process_rows_with_router",
-            return_value=([1], ["jailbreak detected"], [0], ["raw"]),
-        ):
-            result = judge.evaluate(data)
-
-        # Error row should have error explanation, NOT "trivial/placeholder"
-        error_row = result[1]
-        self.assertEqual(error_row["eval_test"], 0)
-        self.assertIn("Ollama timed out", error_row["explanation_test"])
-        self.assertNotIn("trivial", error_row["explanation_test"])
-
-        # Normal row should be evaluated by judge
-        normal_row = result[0]
-        self.assertEqual(normal_row["eval_test"], 1)
-
-
-# ============================================================================
-# 7. Baseline generation: adapter error detection
+# 5. Baseline generation: adapter error detection
 # ============================================================================
 
 

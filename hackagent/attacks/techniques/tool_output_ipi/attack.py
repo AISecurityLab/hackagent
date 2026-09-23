@@ -25,11 +25,13 @@ from typing import Any, Dict, List, Optional
 
 from hackagent.storage.store import Store
 from hackagent.attacks._lib.llm_router import LLMRouter
-from hackagent.attacks._lib.inline_judge import attach_ctx_judge
+from hackagent.attacks._lib.inline_judge import (
+    attach_ctx_judge,
+    make_postprocess_execute,
+)
 from hackagent.attacks.ports import RunContext
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
-from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
 
 from . import generation
 from .config import DEFAULT_TOOL_OUTPUT_IPI_CONFIG
@@ -177,9 +179,7 @@ class ToolOutputIPIAttack(BaseAttack):
             },
             {
                 "name": "Evaluation Post-processing: Server Sync, Tracker & ASR Logging",
-                "function": BaseEvaluationStep.make_postprocess_execute(
-                    "tool_output_ipi"
-                ),
+                "function": make_postprocess_execute("tool_output_ipi"),
                 "step_type_enum": "EVALUATION",
                 "config_keys": [
                     "tool_output_ipi_params",

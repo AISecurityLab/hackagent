@@ -7,14 +7,14 @@ import json
 import unittest
 from unittest.mock import MagicMock, patch
 
-from hackagent.router.tracking.decorators import (
+from hackagent.tracking.decorators import (
     track_operation,
     track_method,
     track_pipeline,
     _default_extract_input,
 )
-from hackagent.router.tracking.step import StepTracker
-from hackagent.router.tracking.context import TrackingContext
+from hackagent.tracking.step import StepTracker
+from hackagent.tracking.context import TrackingContext
 
 
 class TestTrackOperation(unittest.TestCase):

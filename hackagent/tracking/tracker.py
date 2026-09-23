@@ -24,20 +24,26 @@ import threading
 import time
 from hackagent.core.logging import get_logger
 from contextlib import contextmanager
+from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
-from hackagent.storage.store import Store
-from hackagent.core.contracts import EvalStatus, StepKind
+from hackagent.core.contracts import EvalStatus, Goal, StepKind
 
-from .category_classifier import (
-    GoalCategoryClassifier,
-    UNKNOWN_CATEGORY,
-    UNKNOWN_SUBCATEGORY,
-)
 from .audit import record_run_audit_failure
+from .listeners import EventListener, Fanout
+from .sink import RunSink
 from .utils import deep_clean, sanitize_for_json
+
+# Labels stored on result metadata when a goal was not pre-labelled.
+# Classification itself lives outside tracking.
+UNKNOWN_CATEGORY = "Z. Unclassified Risk"
+UNKNOWN_SUBCATEGORY = "Z0. Unclassified Subcategory"
+
+_current_goal: ContextVar[Optional["Context"]] = ContextVar(
+    "hackagent_tracking_goal", default=None
+)
 
 
 @dataclass
@@ -117,14 +123,17 @@ class Tracker:
 
     def __init__(
         self,
-        backend: Store,
-        run_id: str,
+        backend: Optional[RunSink] = None,
+        run_id: str = "",
         logger: Optional[logging.Logger] = None,
         attack_type: Optional[str] = None,
         category_classifier_config: Optional[Dict[str, Any]] = None,
         preclassified_goal_labels_by_index: Optional[Dict[Any, Dict[str, str]]] = None,
         disable_goal_category_classifier: bool = False,
         event_bus: Optional[Any] = None,
+        listeners: Optional[List[EventListener]] = None,
+        *,
+        sink: Optional[RunSink] = None,
     ):
         """
         Initialize tracker.
@@ -139,11 +148,17 @@ class Tracker:
                 (``goal_started``, ``goal_finalized``, ``evaluation``, ...)
                 so the TUI can render execution live without parsing logs.
         """
-        self.backend = backend
+        self.backend = sink if sink is not None else backend
+        self.sink = self.backend
         self.run_id = run_id
         self.logger = logger or get_logger(__name__)
         self.attack_type = attack_type
         self.event_bus = event_bus
+        self.listeners = Fanout(listeners)
+        self._result_ids: Dict[int, str] = {}
+        self._result_ids_by_goal: Dict[str, str] = {}
+        # Accepted so existing callers keep working. Tracking does not classify.
+        _ = (category_classifier_config, disable_goal_category_classifier)
         self._preclassified_goal_labels_by_index: Dict[int, Dict[str, str]] = {}
         raw_preclassified = preclassified_goal_labels_by_index or {}
         if isinstance(raw_preclassified, dict):
@@ -164,14 +179,6 @@ class Tracker:
                         "subcategory": str(subcategory),
                     }
 
-        if disable_goal_category_classifier:
-            self._goal_category_classifier = None
-        else:
-            self._goal_category_classifier = GoalCategoryClassifier(
-                backend=backend,
-                config=category_classifier_config,
-                logger=self.logger,
-            )
         self._goal_contexts: Dict[int, Context] = {}
 
     def _record_failure(self, step: str, error: BaseException) -> Dict[str, str]:
@@ -185,7 +192,8 @@ class Tracker:
         )
 
     def _emit(self, event_type: str, **payload: Any) -> None:
-        """Emit on ``event_bus`` if present; swallow any error."""
+        """Fan the event out to listeners and the optional interface bus."""
+        self.listeners.emit(event_type, **payload)
         bus = self.event_bus
         if bus is None:
             return
@@ -301,6 +309,7 @@ class Tracker:
             self._record_failure(f"Goal {goal_index}: create result", e)
 
         self._goal_contexts[goal_index] = ctx
+        self._remember_result(ctx)
         self._emit(
             "goal_started",
             goal=goal,
@@ -310,43 +319,40 @@ class Tracker:
         )
         return ctx
 
-    def _classify_goal_labels(self, goal: str, goal_index: int) -> Dict[str, str]:
-        """Return normalized category labels for goal metadata."""
-        fallback = {
-            "category": UNKNOWN_CATEGORY,
-            "subcategory": UNKNOWN_SUBCATEGORY,
-        }
+    def _remember_result(self, ctx: Context) -> None:
+        """Record the goal → result-id map owned by this tracker."""
+        if not ctx.result_id:
+            return
+        self._result_ids[ctx.goal_index] = ctx.result_id
+        self._result_ids_by_goal.setdefault(ctx.goal, ctx.result_id)
 
+    def result_id_for(self, goal: Union[Goal, int, str]) -> Optional[str]:
+        """Return the result id for a goal index, goal text, or ``Goal``."""
+        if isinstance(goal, int) and not isinstance(goal, bool):
+            return self._result_ids.get(goal)
+        if isinstance(goal, str):
+            return self._result_ids_by_goal.get(goal)
+        index = getattr(goal, "index", None)
+        text = getattr(goal, "text", None)
+        if isinstance(index, int) and index in self._result_ids:
+            return self._result_ids[index]
+        if isinstance(text, str):
+            return self._result_ids_by_goal.get(text)
+        return None
+
+    def _classify_goal_labels(self, goal: str, goal_index: int) -> Dict[str, str]:
+        """Return pre-labelled categories, or the unclassified placeholders."""
+        _ = goal
         preclassified = self._preclassified_goal_labels_by_index.get(goal_index)
         if preclassified:
             return {
                 "category": preclassified["category"],
                 "subcategory": preclassified["subcategory"],
             }
-
-        classifier = self._goal_category_classifier
-        if not classifier:
-            return fallback
-
-        try:
-            labels = classifier.classify_goal(goal)
-            category = labels.get("category")
-            subcategory = labels.get("subcategory")
-            if category and subcategory:
-                return {
-                    "category": category,
-                    "subcategory": subcategory,
-                }
-        except Exception as e:
-            self.logger.warning(
-                "Goal classification failed for goal %s: %s",
-                goal[:80],
-                e,
-                exc_info=True,
-            )
-            self._record_failure(f"Goal {goal_index}: classify", e)
-
-        return fallback
+        return {
+            "category": UNKNOWN_CATEGORY,
+            "subcategory": UNKNOWN_SUBCATEGORY,
+        }
 
     def add_interaction_trace(
         self,
@@ -870,3 +876,106 @@ class Tracker:
 
         # Fallback: convert to string
         return str(response)
+
+    # ------------------------------------------------------------------
+    # Events port (attacks.ports.Events). Structural; tracking does not
+    # import attacks.
+    # ------------------------------------------------------------------
+
+    def _active_goal(self) -> Optional[Context]:
+        return _current_goal.get()
+
+    @contextmanager
+    def step(self, name: str, kind: str = ""):
+        """Open a step scope and emit step_started / step_ended."""
+        self._emit("step_started", step_name=name, kind=kind)
+        try:
+            yield None
+        except Exception as exc:
+            self._emit(
+                "step_ended", step_name=name, kind=kind, success=False, error=str(exc)
+            )
+            raise
+        else:
+            self._emit("step_ended", step_name=name, kind=kind, success=True)
+
+    @contextmanager
+    def goal(self, goal: Goal):
+        """Open a goal scope and remember its result id."""
+        labels = dict(getattr(goal, "labels", None) or {})
+        ctx = self.create_goal_result(
+            getattr(goal, "text", str(goal)),
+            int(getattr(goal, "index", 0) or 0),
+            initial_metadata=labels or None,
+        )
+        token: Token = _current_goal.set(ctx)
+        try:
+            yield ctx
+        finally:
+            _current_goal.reset(token)
+
+    def interaction(self, **payload: Any) -> None:
+        ctx = self._active_goal()
+        if ctx is None:
+            self.log("interaction without an open goal", level="debug")
+            return
+        request = payload.get(
+            "request", {k: v for k, v in payload.items() if k != "response"}
+        )
+        self.add_interaction_trace(
+            ctx,
+            request=request if isinstance(request, dict) else {"request": request},
+            response=payload.get("response"),
+            step_name=str(payload.get("step_name") or "Agent Interaction"),
+            metadata=payload.get("metadata"),
+        )
+
+    def evaluation(self, **payload: Any) -> None:
+        ctx = self._active_goal()
+        if ctx is None:
+            self._emit("evaluation", **payload)
+            return
+        self.add_evaluation_trace(
+            ctx,
+            evaluation_result=payload.get("result", payload),
+            score=payload.get("score"),
+            explanation=payload.get("explanation"),
+            evaluator_name=payload.get("evaluator") or payload.get("evaluator_name"),
+            metadata=payload.get("metadata"),
+        )
+        self._emit("evaluation", goal_index=ctx.goal_index, **payload)
+
+    def trace(self, **payload: Any) -> None:
+        ctx = self._active_goal()
+        if ctx is None:
+            self._emit("trace", **payload)
+            return
+        content = dict(payload)
+        step_name = str(content.pop("step_name", "Trace"))
+        self.add_custom_trace(ctx, step_name, content)
+
+    def finalize(self, **payload: Any) -> None:
+        ctx = self._active_goal()
+        if ctx is None:
+            self._emit("finalize", **payload)
+            return
+        success = bool(payload.get("success", False))
+        self.finalize_goal(
+            ctx,
+            success=success,
+            evaluation_notes=payload.get("evaluation_notes")
+            or payload.get("explanation"),
+            final_metadata=payload.get("metadata"),
+            evaluation_status=payload.get("evaluation_status"),
+        )
+
+    def progress(self, fraction: float, message: str = "") -> None:
+        self._emit("progress", fraction=float(fraction), message=message)
+
+    def log(self, message: str, *, level: str = "info") -> None:
+        self._emit("log", message=message, level=level)
+        log_fn = getattr(self.logger, level, None)
+        if callable(log_fn):
+            log_fn(message)
+        else:
+            self.logger.info(message)

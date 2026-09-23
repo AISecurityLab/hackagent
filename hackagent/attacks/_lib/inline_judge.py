@@ -157,28 +157,52 @@ def resolve_inline_step_judge(
             return adapter
         return None
 
-    judges_config = config.get("judges")
-    resolved_client = client or config.get("_backend") or config.get("_client")
-    if not (isinstance(judges_config, list) and judges_config and resolved_client):
-        return None
-
-    from hackagent.attacks.evaluator.inline_step_judge import (
-        InlineStepJudge,
-        build_inline_judge_base_config,
+    _ = client
+    logger.warning(
+        "No ctx.judge on this run — inline judging is skipped "
+        "(legacy InlineStepJudge was removed)"
     )
-
-    step_judge = InlineStepJudge(
-        judges_config=judges_config,
-        base_eval_config=build_inline_judge_base_config(dict(config)),
-        client=resolved_client,
-        logger=logger,
-        run_id=config.get("_run_id"),
-    )
-    if step_judge.available:
-        logger.info("⚖️  Inline judge enabled (%s judge(s))", step_judge.judge_count)
-        return step_judge
-    logger.warning("No valid judges — falling back to heuristic only")
     return None
+
+
+def postprocess_inline_results(
+    input_data: List[Dict[str, Any]],
+    attack_label: str,
+    logger: logging.Logger,
+) -> List[Dict[str, Any]]:
+    """Fill default success fields for rows already scored during generation.
+
+    Does not sync results or talk to storage. Server writes belong to tracking.
+    """
+    _ = attack_label
+    for item in input_data:
+        if item.get("error") and not item.get("response"):
+            item.setdefault("best_score", 0.0)
+            item.setdefault("success", False)
+            item.setdefault("evaluation_notes", f"Execution error: {item['error']}")
+        else:
+            item.setdefault("best_score", 0.0)
+            item.setdefault(
+                "success",
+                item.get("is_success", item.get("best_score", 0) > 0),
+            )
+    n_success = sum(1 for item in input_data if item.get("success"))
+    logger.info(
+        "Post-processing %s results (%s jailbreaks from inline judge)",
+        len(input_data),
+        n_success,
+    )
+    return input_data
+
+
+def make_postprocess_execute(attack_label: str):
+    """Pipeline step that only normalises inline-judge rows."""
+
+    def execute(input_data, config, logger, client):
+        _ = (config, client)
+        return postprocess_inline_results(input_data or [], attack_label, logger)
+
+    return execute
 
 
 def attach_ctx_judge(config: Dict[str, Any], ctx: Any) -> None:
@@ -192,6 +216,8 @@ __all__ = [
     "CtxJudgeAdapter",
     "CtxTapEvaluator",
     "attach_ctx_judge",
+    "make_postprocess_execute",
+    "postprocess_inline_results",
     "resolve_inline_step_judge",
     "verdict_from_judge",
 ]

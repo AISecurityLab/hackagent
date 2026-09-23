@@ -13,7 +13,7 @@ Classes:
     LengthEvaluator: Response length-based evaluation
 
 Usage:
-    from hackagent.attacks.evaluator.pattern_evaluators import (
+    from hackagent.evaluation.patterns import (
         PatternEvaluator,
         KeywordEvaluator,
         LengthEvaluator,

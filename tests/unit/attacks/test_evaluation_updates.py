@@ -24,7 +24,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 from hackagent.storage._http.api.models import EvalStatus
-from hackagent.router.tracking import Tracker
+from hackagent.tracking import Tracker
 from tests.fakes import FakeRouter
 
 
@@ -42,7 +42,7 @@ class TestEvaluationStatusUpdates(unittest.TestCase):
         FIXED: PatternEvaluator.evaluate() returns bool, and evaluation.py
         now correctly handles this.
         """
-        from hackagent.attacks.evaluator import PatternEvaluator
+        from hackagent.evaluation.patterns import PatternEvaluator
 
         evaluator = PatternEvaluator(
             success_patterns=[r"harmful content"],

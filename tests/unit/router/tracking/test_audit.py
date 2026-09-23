@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import MagicMock
 from uuid import uuid4
 
-from hackagent.router.tracking.audit import (
+from hackagent.tracking.audit import (
     AuditPersistenceError,
     record_run_audit_failure,
 )

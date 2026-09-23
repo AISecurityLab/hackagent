@@ -30,7 +30,7 @@ from hackagent.attacks.ports import RunContext
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 
-from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
+from hackagent.attacks._lib.inline_judge import make_postprocess_execute
 
 from . import generation
 from .config import DEFAULT_PAP_CONFIG
@@ -176,7 +176,7 @@ class PAPAttack(BaseAttack):
             },
             {
                 "name": "Evaluation Post-processing: Server Sync, Tracker & ASR Logging",
-                "function": BaseEvaluationStep.make_postprocess_execute("PAP"),
+                "function": make_postprocess_execute("PAP"),
                 "step_type_enum": "EVALUATION",
                 "config_keys": [
                     "pap_params",

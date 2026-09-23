@@ -15,12 +15,42 @@ import logging
 from collections import defaultdict
 from typing import Any, Dict, List, Optional
 
-from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
 from hackagent.core.defaults import DEFAULT_JUDGE_IDENTIFIER
 from hackagent.core.contracts import EvalStatus
-from hackagent.router.tracking import Tracker
+from hackagent.tracking import Tracker
 
 logger = logging.getLogger("hackagent.attacks.static_template.evaluation")
+
+# Judge detail columns written by the shared judge types. Kept local so this
+# technique does not import the evaluation package.
+JUDGE_COLUMN_MAP: Dict[str, List[str]] = {
+    "nuanced": ["eval_nj", "explanation_nj"],
+    "jailbreakbench": ["eval_jb", "explanation_jb"],
+    "harmbench": ["eval_hb", "explanation_hb"],
+    "harmbench_variant": ["eval_hbv", "explanation_hbv"],
+    "on_topic": ["eval_on_topic", "explanation_on_topic"],
+    "scorer": ["eval_scorer", "explanation_scorer"],
+    "rag_outcome": ["eval_rag", "explanation_rag"],
+}
+JUDGE_TYPE_LABELS: Dict[str, str] = {
+    "jailbreakbench": "JailbreakBench",
+    "harmbench": "HarmBench",
+    "harmbench_variant": "HarmBenchVariant",
+    "nuanced": "Nuanced",
+    "on_topic": "OnTopic",
+    "scorer": "Scorer",
+    "rag_outcome": "RagOutcome",
+}
+
+
+def _extract_eval_detail_columns(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Return judge detail columns from *row* (``eval_*`` and ``explanation_*``)."""
+    return {
+        key: value
+        for key, value in row.items()
+        if isinstance(key, str)
+        and (key.startswith("eval_") or key.startswith("explanation_"))
+    }
 
 
 def _is_execution_error_row(row: Dict[str, Any]) -> bool:
@@ -59,13 +89,13 @@ def _build_llm_evaluation_notes(row: Dict[str, Any]) -> str:
     """Create a compact note string from available judge outputs."""
     parts: List[str] = []
 
-    for judge_type, cols in BaseEvaluationStep.JUDGE_COLUMN_MAP.items():
+    for judge_type, cols in JUDGE_COLUMN_MAP.items():
         eval_col, explanation_col = cols
         judge_value = row.get(eval_col)
         if judge_value is None:
             continue
 
-        label = BaseEvaluationStep.JUDGE_TYPE_LABELS.get(judge_type, judge_type)
+        label = JUDGE_TYPE_LABELS.get(judge_type, judge_type)
         explanation = row.get(explanation_col)
 
         if explanation:
@@ -82,7 +112,7 @@ def _build_llm_evaluation_notes(row: Dict[str, Any]) -> str:
 def evaluate_responses_with_llm_judges(
     data: List[Dict[str, Any]],
     config: Dict[str, Any],
-    evaluator_step: BaseEvaluationStep,
+    evaluator_step: Any,
     logger: logging.Logger,
 ) -> List[Dict[str, Any]]:
     """Evaluate static template responses with configured LLM judges."""
@@ -98,7 +128,7 @@ def evaluate_responses_with_llm_judges(
         normalized_row = row.copy()
         normalized_row["_static_template_eval_idx"] = idx
 
-        # BaseEvaluationStep expects `prefix`; static template generation uses `attack_prompt`.
+        # Judge rows use `prefix`; static template generation uses `attack_prompt`.
         normalized_row["prefix"] = (
             normalized_row.get("prefix")
             or normalized_row.get("attack_prompt")
@@ -476,7 +506,7 @@ def _finalize_goals_with_tracker(
                 "error": row.get("error"),
                 "error_message": row.get("error_message"),
                 "completion": row.get("completion", ""),
-                **BaseEvaluationStep._extract_eval_detail_columns(row),
+                **_extract_eval_detail_columns(row),
             }
         )
 
@@ -570,12 +600,13 @@ def _finalize_goals_with_tracker(
     return finalized_count
 
 
-class StaticTemplateEvaluation(BaseEvaluationStep):
+class StaticTemplateEvaluation:
     """
     Evaluation step for static template attacks.
 
-    Wrapper around ``BaseEvaluationStep`` for static-template/baseline summary
-    aggregation and tracker finalization.
+    Aggregates baseline results and finalizes tracker goals. Judge calls stay
+    on the injected ``evaluator_step`` (or ``ctx.judge``); this class does not
+    sync metrics or sniff already-evaluated rows.
     """
 
     def __init__(
@@ -584,7 +615,19 @@ class StaticTemplateEvaluation(BaseEvaluationStep):
         logger: logging.Logger,
         client: Any,
     ):
-        super().__init__(config, logger, client)
+        self._raw_config = config if isinstance(config, dict) else {}
+        self.logger = logger
+        self.client = client
+
+    def _log_evaluation_asr(self, data: List[Dict[str, Any]]) -> None:
+        """Log overall attack success rate for the evaluated rows."""
+        total = len(data)
+        if total == 0:
+            return
+        overall = sum(1 for row in data if row.get("success"))
+        self.logger.info(
+            f"ASR-Overall: {overall}/{total} ({overall / total * 100:.1f}%)"
+        )
 
     def execute(
         self,

@@ -48,7 +48,7 @@ from hackagent.attacks._lib.llm_router import connect_role
 from hackagent.storage.store import Store
 from hackagent.core.contracts import StepKind
 from hackagent.attacks._lib.llm_router import LLMRouter
-from hackagent.router.tracking import Tracker, Context
+from hackagent.tracking import Tracker, Context
 
 from .config import (
     ATTACKER_SYSTEM_PROMPT,
@@ -786,44 +786,12 @@ class PAIRAttack(BaseAttack):
         Returns:
             10 if judge verdict is positive, 0 otherwise.
         """
-        from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
-
-        judge_type = judge_config.get("type") or BaseEvaluationStep.infer_judge_type(
-            judge_config.get("identifier"), default="harmbench"
+        _ = (goal, response, judge_config)
+        self.logger.warning(
+            "PAIR binary judging requires ctx.judge; legacy evaluator was removed"
         )
-
-        step = BaseEvaluationStep(self.config, self.logger, self.backend)
-        base_config = step._build_base_eval_config()
-        subprocess_config = {**base_config, **judge_config}
-        subprocess_config["model_id"] = judge_config.get("identifier", "")
-        subprocess_config["agent_name"] = f"pair-judge-{judge_type}"
-        subprocess_config["agent_type"] = judge_config.get("agent_type", "OPENAI_SDK")
-        subprocess_config["agent_endpoint"] = judge_config.get("endpoint")
-        subprocess_config["agent_metadata"] = dict(
-            judge_config.get("agent_metadata", {}) or {}
-        )
-
-        row = {"goal": goal, "prefix": "", "completion": response or ""}
-        evaluated = step._run_single_evaluator(judge_type, subprocess_config, [row])
-        if not evaluated:
-            self._set_scorer_explanation("Binary judge returned no result")
-            return 0.0
-
-        cols = BaseEvaluationStep.JUDGE_COLUMN_MAP.get(
-            judge_type, ["eval_hb", "explanation_hb"]
-        )
-        eval_col = cols[0] if cols else "eval_hb"
-        expl_col = cols[1] if len(cols) > 1 else "explanation_hb"
-        val = evaluated[0].get(eval_col, 0)
-        self._set_scorer_explanation(str(evaluated[0].get(expl_col, "")))
-
-        try:
-            binary_score = int(float(val or 0))
-        except (TypeError, ValueError):
-            binary_score = 0
-
-        # Map 1 (success) → 10, 0 (failure) → 0 to stay on 0-10 scale
-        return 10.0 if binary_score >= 1 else 0.0
+        self._set_scorer_explanation("No ctx.judge")
+        return 0.0
 
     def _judge_response(self, goal: str, prompt: str, response: str) -> float:
         """Backward-compatible scorer hook expected by existing PAIR tests.

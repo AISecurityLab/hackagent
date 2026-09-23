@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import MagicMock
 from uuid import UUID
 
-from hackagent.router.tracking.context import TrackingContext
+from hackagent.tracking.context import TrackingContext
 
 
 class TestTrackingContextInitialization(unittest.TestCase):

@@ -25,58 +25,50 @@ class TestAutoDANTurboEvaluation(unittest.TestCase):
             evaluation.AutoDANTurboEvaluation._extract_autodan_score({}), 0.0
         )
 
-    def test_execute_runs_shared_llm_judge_pipeline(self):
+    def test_execute_uses_ctx_judge_when_present(self):
+        from hackagent.core.contracts import Verdict
+
+        class _Judge:
+            def evaluate(self, sample):
+                return Verdict(success=True, score=8.0, explanation="mocked")
+
+            def score(self, sample):
+                return 8.0
+
         step = evaluation.AutoDANTurboEvaluation(
-            config={"autodan_turbo_params": {"break_score": 7.0}},
+            config={
+                "autodan_turbo_params": {"break_score": 7.0},
+                "_judge": _Judge(),
+            },
             logger=MagicMock(),
             client=MagicMock(),
-        )
-        step.run_full_evaluation = MagicMock(
-            side_effect=lambda rows: [
-                {
-                    **rows[0],
-                    "eval_hb": 1,
-                    "explanation_hb": "mocked",
-                    "best_score": 1.0,
-                    "success": True,
-                }
-            ]
         )
 
         out = step.execute(
             [{"goal": "g", "prompt": "p", "response": "r", "score": 7.5}]
         )
 
-        step.run_full_evaluation.assert_called_once()
         self.assertEqual(out[0]["autodan_score"], 7.5)
         self.assertEqual(out[0]["attack_score"], 7.5)
-        self.assertEqual(out[0]["best_score"], 1.0)
+        self.assertEqual(out[0]["best_score"], 8.0)
         self.assertTrue(out[0]["success"])
+        self.assertEqual(out[0]["explanation"], "mocked")
 
     def test_module_execute_entrypoint(self):
         out = evaluation.execute([], config={}, client=MagicMock(), logger=MagicMock())
         self.assertEqual(out, [])
 
-    def test_execute_with_only_errors_passes_through_shared_evaluation(self):
+    def test_execute_without_judge_uses_break_score(self):
         step = evaluation.AutoDANTurboEvaluation(
-            config={}, logger=MagicMock(), client=MagicMock()
-        )
-        step.run_full_evaluation = MagicMock(
-            return_value=[
-                {
-                    "goal": "g",
-                    "autodan_score": 0.0,
-                    "attack_score": 0.0,
-                    "success": False,
-                    "best_score": 0.0,
-                }
-            ]
+            config={"autodan_turbo_params": {"break_score": 7.0}},
+            logger=MagicMock(),
+            client=MagicMock(),
         )
 
-        out = step.execute([{"goal": "g", "error": "x"}])
-        step.run_full_evaluation.assert_called_once()
+        out = step.execute([{"goal": "g", "error": "x", "score": 0.0}])
         self.assertFalse(out[0]["success"])
         self.assertEqual(out[0]["autodan_score"], 0.0)
+        self.assertEqual(out[0]["best_score"], 0.0)
 
 
 if __name__ == "__main__":

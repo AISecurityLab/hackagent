@@ -41,17 +41,12 @@ from typing import Any, Dict, List, Optional, Tuple
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.ports import RunContext
 from hackagent.attacks._lib.inline_judge import verdict_from_judge
-from hackagent.attacks._lib.scoring import (
-    normalize_judge_score,
-    normalized_jailbreak_threshold,
-)
+from hackagent.attacks._lib.scoring import normalized_jailbreak_threshold
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.core.defaults import (
     DEFAULT_ATTACKER_IDENTIFIER,
     DEFAULT_LOCAL_MODEL_ENDPOINT,
 )
-from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
-from hackagent.attacks.evaluator.judge_evaluators import EVALUATOR_MAP
 from hackagent.attacks._lib.objectives import OBJECTIVES
 from hackagent.attacks._lib.progress import create_progress_bar
 from hackagent.attacks._lib.response import (
@@ -63,7 +58,7 @@ from hackagent.attacks._lib.llm_router import connect_role
 from hackagent.storage.store import Store
 from hackagent.core.contracts import StepKind
 from hackagent.attacks._lib.llm_router import LLMRouter
-from hackagent.router.tracking import Tracker, Context
+from hackagent.tracking import Tracker, Context
 
 from .config import (
     ATTACKER_SYSTEM_PROMPT,
@@ -444,7 +439,6 @@ class CrescendoAttack(BaseAttack):
             already use the shared 0-10 scale. Refusal detection remains independent of
             jailbreak success so Crescendo can backtrack and rephrase.
         """
-        judge_config = dict(self.config.get("judge", {}) or {})
         response_limit = int(self.config.get("judge_response_max_chars", 3500))
         response_for_judge = _truncate_text(response or "", response_limit)
         refused = any(
@@ -452,84 +446,19 @@ class CrescendoAttack(BaseAttack):
             for pattern in self.objective.failure_patterns
         )
 
-        if self.ctx is not None:
-            try:
-                score, _success, explanation = verdict_from_judge(
-                    self.ctx.judge,
-                    goal=goal,
-                    prompt=question,
-                    response=response_for_judge,
-                )
-                return float(score), refused, explanation
-            except Exception as exc:
-                self.logger.warning("Crescendo ctx.judge failed: %s", exc)
-                return 0.0, refused, "Judge evaluation failed"
-
-        judge_type = (
-            judge_config.get("type")
-            or judge_config.get("evaluator_type")
-            or BaseEvaluationStep.infer_judge_type(
-                judge_config.get("identifier"), default="harmbench"
-            )
-        )
-        judge_type = str(judge_type or "").lower()
-        if judge_type not in EVALUATOR_MAP:
-            self.logger.warning(
-                "Crescendo judge type '%s' is unsupported; treating the turn as "
-                "unevaluated.",
-                judge_type or "<missing>",
-            )
-            return 0.0, refused, "Unsupported judge type"
-
+        if self.ctx is None:
+            self.logger.warning("Crescendo has no ctx.judge; turn left unevaluated")
+            return 0.0, refused, "No judge"
         try:
-            evaluator = BaseEvaluationStep(self.config, self.logger, self.backend)
-            evaluator_config = evaluator._build_base_eval_config()
-            evaluator_config["max_tokens_eval"] = judge_config.get(
-                "max_tokens", evaluator_config["max_tokens_eval"]
+            score, _success, explanation = verdict_from_judge(
+                self.ctx.judge,
+                goal=goal,
+                prompt=question,
+                response=response_for_judge,
             )
-            evaluator_config["timeout"] = judge_config.get(
-                "timeout",
-                judge_config.get("request_timeout", evaluator_config["timeout"]),
-            )
-            # Preserve Crescendo's legacy retry setting when a shared evaluator
-            # retry count has not been supplied explicitly.
-            evaluator_config["max_judge_retries"] = judge_config.get(
-                "max_judge_retries",
-                self.config.get(
-                    "max_judge_retries", self.config.get("max_parse_retries", 5)
-                ),
-            )
-
-            rows = evaluator._run_evaluation(
-                [
-                    {
-                        "goal": goal,
-                        "prefix": question,
-                        "completion": response_for_judge,
-                    }
-                ],
-                [judge_config],
-                evaluator_config,
-            )
-            row = rows[0] if rows else {}
-            eval_columns = BaseEvaluationStep.JUDGE_COLUMN_MAP[judge_type]
-            raw_score = row.get(eval_columns[0])
-            explanation = str(row.get(eval_columns[1], "") or "")
-            judge_range = BaseEvaluationStep.get_judge_range(judge_config)
-
-            try:
-                numeric_score = float(raw_score)
-            except (TypeError, ValueError):
-                self.logger.warning("Crescendo judge returned no parseable score")
-                return 0.0, refused, explanation or "No parseable judge score"
-
-            return (
-                normalize_judge_score(numeric_score, judge_range),
-                refused,
-                explanation,
-            )
+            return float(score), refused, explanation
         except Exception as exc:
-            self.logger.warning("Crescendo shared judge evaluation failed: %s", exc)
+            self.logger.warning("Crescendo ctx.judge failed: %s", exc)
             return 0.0, refused, "Judge evaluation failed"
 
     def _run_single_goal(

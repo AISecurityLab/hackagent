@@ -22,10 +22,6 @@ import logging
 import time
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from hackagent.attacks.evaluator.inline_step_judge import (
-    InlineStepJudge,
-    build_inline_judge_base_config,
-)
 from hackagent.attacks._lib.response import (
     get_guardrail_info,
     is_guardrail_response,
@@ -39,12 +35,11 @@ from .taxonomy import build_mutation_prompt, extract_mutated_text
 
 if TYPE_CHECKING:
     from hackagent.storage.store import Store
-    from hackagent.router.tracking import Tracker
-    from hackagent.router.tracking.tracker import Context
+    from hackagent.tracking import Tracker
+    from hackagent.tracking.tracker import Context
 
 
-# Re-export alias keeps local type hints/readability in this module.
-_StepJudge = InlineStepJudge
+_StepJudge = Any
 
 
 # ---------------------------------------------------------------------------
@@ -164,19 +159,8 @@ def execute(
             step_judge = None
             logger.warning("ctx.judge unavailable — no inline jailbreak detection")
     elif isinstance(judges_config, list) and judges_config and client is not None:
-        base_eval_cfg = build_inline_judge_base_config(config)
-        step_judge = _StepJudge(
-            judges_config=judges_config,
-            base_eval_config=base_eval_cfg,
-            client=client,
-            logger=logger,
-            run_id=config.get("_run_id"),
-        )
-        if step_judge.available:
-            logger.info(f"⚖️  Inline judge enabled ({step_judge.judge_count} judge(s))")
-        else:
-            step_judge = None
-            logger.warning("No valid judges — no inline jailbreak detection")
+        step_judge = None
+        logger.warning("No ctx.judge — no inline jailbreak detection")
     else:
         logger.warning("No judges configured — no inline jailbreak detection")
 

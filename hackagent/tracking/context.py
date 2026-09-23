@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 from uuid import UUID
 
-from hackagent.storage.store import Store
+from hackagent.tracking.sink import RunSink
 
 
 @dataclass
@@ -46,7 +46,7 @@ class TrackingContext:
         ...     tracker = StepTracker(context)
     """
 
-    backend: "Optional[Store]" = None
+    backend: Optional[RunSink] = None
     run_id: Optional[str] = None
     parent_result_id: Optional[str] = None
     logger: Optional[logging.Logger] = None

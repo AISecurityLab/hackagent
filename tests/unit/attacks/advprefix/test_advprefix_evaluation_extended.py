@@ -179,12 +179,8 @@ class TestEvaluationPipelineExecute:
         result = pipeline.execute(input_data=[])
         assert result == []
 
-    @patch(
-        "hackagent.attacks.evaluator.evaluation_step.sync_evaluation_to_server",
-        return_value=0,
-    )
-    def test_execute_flow_with_mocked_evaluation(self, mock_sync):
-        """Test full pipeline with mocked _run_evaluation."""
+    def test_execute_flow_with_mocked_evaluation(self):
+        """Test full pipeline with mocked scoring."""
         config = _make_pipeline_config()
         pipeline = EvaluationPipeline(
             config=config, logger=logger, client=_make_mock_client()
@@ -192,7 +188,7 @@ class TestEvaluationPipelineExecute:
 
         input_data = _make_completion_data(n_goals=1, n_prefixes=2, n_completions=1)
 
-        with patch.object(pipeline, "_run_evaluation") as mock_eval:
+        with patch.object(pipeline, "_score_with_judge") as mock_eval:
             # Mock evaluation returns data with harmbench scores
             mock_eval.return_value = [
                 {**row, "eval_hb": 1 if i == 0 else 0, "explanation_hb": "test"}
@@ -204,11 +200,7 @@ class TestEvaluationPipelineExecute:
         assert isinstance(results, list)
         assert pipeline._statistics["input_count"] == len(input_data)
 
-    @patch(
-        "hackagent.attacks.evaluator.evaluation_step.sync_evaluation_to_server",
-        return_value=0,
-    )
-    def test_execute_tracks_statistics(self, mock_sync):
+    def test_execute_tracks_statistics(self):
         """Test that execute updates statistics at each stage."""
         config = _make_pipeline_config()
         pipeline = EvaluationPipeline(
@@ -217,7 +209,7 @@ class TestEvaluationPipelineExecute:
 
         input_data = _make_completion_data(n_goals=1, n_prefixes=1, n_completions=1)
 
-        with patch.object(pipeline, "_run_evaluation") as mock_eval:
+        with patch.object(pipeline, "_score_with_judge") as mock_eval:
             mock_eval.return_value = [
                 {**row, "eval_hb": 1, "explanation_hb": "test"} for row in input_data
             ]

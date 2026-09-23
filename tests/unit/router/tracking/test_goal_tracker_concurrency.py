@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 from uuid import uuid4
 
-from hackagent.router.tracking.tracker import Context, Tracker
+from hackagent.tracking.tracker import Context, Tracker
 
 
 class _SlowFirstTraceBackend:

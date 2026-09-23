@@ -3,11 +3,11 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
+from hackagent.attacks._lib.scoring import get_judge_range, infer_judge_type
 from hackagent.storage.store import Store
 
 
-class TapEvaluation(BaseEvaluationStep):
+class TapEvaluation:
     """
     Evaluation wrapper for TAP judge and on-topic scoring.
 
@@ -29,7 +29,9 @@ class TapEvaluation(BaseEvaluationStep):
             logger: Logger instance used by evaluation utilities.
             client: Authenticated API client for evaluation requests.
         """
-        super().__init__(config, logger, client)
+        self._raw_config = config if isinstance(config, dict) else {}
+        self.logger = logger
+        self.client = client
 
     def evaluate_judge(
         self,
@@ -46,10 +48,25 @@ class TapEvaluation(BaseEvaluationStep):
         Returns:
             Evaluated rows enriched with judge outputs and best_score.
         """
-        base_config = self._build_base_eval_config()
-        evaluated = self._run_evaluation(input_data, judges_config, base_config)
-        self._enrich_items_with_scores(evaluated)
-        return evaluated
+        judge = self._raw_config.get("_judge")
+        if judge is None:
+            for row in input_data:
+                row.setdefault("best_score", 0)
+                row.setdefault("success", False)
+            return input_data
+        from hackagent.attacks._lib.inline_judge import verdict_from_judge
+
+        for row in input_data:
+            score, success, explanation = verdict_from_judge(
+                judge,
+                goal=str(row.get("goal") or ""),
+                prompt=str(row.get("prefix") or ""),
+                response=str(row.get("completion") or ""),
+            )
+            row["best_score"] = score
+            row["success"] = success
+            row["explanation"] = explanation
+        return input_data
 
     def evaluate_on_topic(
         self,
@@ -72,8 +89,17 @@ class TapEvaluation(BaseEvaluationStep):
                 row["explanation_on_topic"] = "On-topic check skipped"
             return input_data
 
-        base_config = self._build_base_eval_config()
-        return self._run_evaluation(input_data, on_topic_judges, base_config)
+        judge = self._raw_config.get("_judge")
+        if judge is None:
+            for row in input_data:
+                row["eval_on_topic"] = 1
+                row["explanation_on_topic"] = "On-topic check skipped (no ctx.judge)"
+            return input_data
+        evaluated = self.evaluate_judge(input_data, on_topic_judges or [])
+        for row in evaluated:
+            row["eval_on_topic"] = 1 if row.get("success") else 0
+            row["explanation_on_topic"] = row.get("explanation", "")
+        return evaluated
 
     def score_on_topic(
         self,
@@ -155,7 +181,7 @@ class TapEvaluation(BaseEvaluationStep):
         t = (judge.get("type") or judge.get("evaluator_type") or "").lower()
         if t:
             return t
-        inferred = BaseEvaluationStep.infer_judge_type(judge.get("identifier"))
+        inferred = infer_judge_type(judge.get("identifier"))
         return inferred or ""
 
     @classmethod
@@ -165,7 +191,7 @@ class TapEvaluation(BaseEvaluationStep):
         Explicit ``range`` field takes precedence; falls back to the
         type-based default from ``JUDGE_DEFAULT_RANGE``.
         """
-        return BaseEvaluationStep.get_judge_range(judge)
+        return get_judge_range(judge)
 
     @classmethod
     def _judges_are_binary(cls, judges_config: List[Dict[str, Any]]) -> bool:

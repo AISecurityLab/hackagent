@@ -29,7 +29,7 @@ from .decorators import (
 )
 
 if TYPE_CHECKING:
-    from hackagent.router.tracking import Tracker
+    from hackagent.tracking import Tracker
 
 
 def _build_prompting_interface(
