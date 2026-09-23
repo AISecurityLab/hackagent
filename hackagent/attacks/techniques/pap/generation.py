@@ -151,10 +151,19 @@ def execute(
 
     attacker_key = str(attacker_router.backend_agent.id)
 
-    # Initialise inline judge
+    # Initialise inline judge (ctx.judge preferred; legacy InlineStepJudge fallback)
     step_judge: Optional[_StepJudge] = None
     judges_config = config.get("judges")
-    if isinstance(judges_config, list) and judges_config and client is not None:
+    if config.get("_judge") is not None:
+        from hackagent.attacks._lib.inline_judge import CtxJudgeAdapter
+
+        step_judge = CtxJudgeAdapter(config["_judge"], config=config, logger=logger)
+        if step_judge.available:
+            logger.info("⚖️  Inline judge enabled via ctx.judge")
+        else:
+            step_judge = None
+            logger.warning("ctx.judge unavailable — no inline jailbreak detection")
+    elif isinstance(judges_config, list) and judges_config and client is not None:
         base_eval_cfg = build_inline_judge_base_config(config)
         step_judge = _StepJudge(
             judges_config=judges_config,

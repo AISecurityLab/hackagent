@@ -13,12 +13,19 @@ from hackagent.attacks._lib.response import (
     get_guardrail_info,
     is_guardrail_response,
 )
+from hackagent.attacks._lib.inline_judge import (
+    CtxJudgeAdapter,
+    attach_ctx_judge,
+    resolve_inline_step_judge,
+)
 from hackagent.attacks._lib.scoring import (
     normalize_judge_score,
     normalized_jailbreak_threshold,
 )
 
 __all__ = [
+    "CtxJudgeAdapter",
+    "attach_ctx_judge",
     "create_progress_bar",
     "extract_response_content",
     "get_guardrail_info",
@@ -26,4 +33,5 @@ __all__ = [
     "normalize_judge_score",
     "normalized_jailbreak_threshold",
     "report_progress",
+    "resolve_inline_step_judge",
 ]

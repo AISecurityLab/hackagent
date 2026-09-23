@@ -38,6 +38,8 @@ from typing import Any, Dict, List, Optional
 
 from hackagent.storage.store import Store
 from hackagent.attacks._lib.llm_router import LLMRouter
+from hackagent.attacks._lib.inline_judge import attach_ctx_judge
+from hackagent.attacks.ports import RunContext
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 
@@ -89,32 +91,45 @@ class BoNAttack(BaseAttack):
     def __init__(
         self,
         config: Optional[Dict[str, Any]] = None,
-        client: Optional[Store] = None,
+        ctx_or_client: Any = None,
         agent_router: Optional[LLMRouter] = None,
+        *,
+        ctx: Optional[RunContext] = None,
+        client: Optional[Store] = None,
     ):
         """Initialise BoNAttack with configuration.
 
-        Args:
-            config: Optional dictionary overriding
-                :data:`~hackagent.attacks.techniques.bon.config.DEFAULT_BON_CONFIG`.
-            client: Store instance from the orchestrator.
-            agent_router: LLMRouter instance for the target model.
-
-        Raises:
-            ValueError: If *client* or *agent_router* is ``None``.
+        Prefer ``BoNAttack(config, ctx)``. Legacy ``(config, client, agent_router)``
+        remains supported until the orchestrator migrates.
         """
-        if client is None:
-            raise ValueError("A storage backend must be provided to BoNAttack.")
-        if agent_router is None:
-            raise ValueError("Victim LLMRouter instance must be provided to BoNAttack.")
+        if ctx is None and isinstance(ctx_or_client, RunContext):
+            ctx = ctx_or_client
+        resolved_client = (
+            client
+            if client is not None
+            else (None if isinstance(ctx_or_client, RunContext) else ctx_or_client)
+        )
+        if ctx is None:
+            if resolved_client is None:
+                raise ValueError("A storage backend must be provided to BoNAttack.")
+            if agent_router is None:
+                raise ValueError(
+                    "Victim LLMRouter instance must be provided to BoNAttack."
+                )
+            client = resolved_client
 
         # Merge user config with defaults
         current_config = copy.deepcopy(DEFAULT_BON_CONFIG)
         if config:
             _recursive_update(current_config, config)
 
+        attach_ctx_judge(current_config, ctx)
+
         self.logger = logging.getLogger("hackagent.attacks.bon")
-        super().__init__(current_config, client, agent_router)
+        if ctx is not None:
+            super().__init__(current_config, ctx)
+        else:
+            super().__init__(current_config, client, agent_router)
 
     # ------------------------------------------------------------------
     # Validation
@@ -166,6 +181,7 @@ class BoNAttack(BaseAttack):
                     "_tracker",
                     # Judge config keys — used by inline _StepJudge
                     "judges",
+                    "_judge",
                     "judge_concurrency",
                     "max_tokens_eval",
                     "filter_len",
@@ -187,6 +203,7 @@ class BoNAttack(BaseAttack):
                     "_client",
                     "_tracker",
                     "judges",
+                    "_judge",
                     "judge_concurrency",
                     "max_tokens_eval",
                     "filter_len",

@@ -247,7 +247,12 @@ def execute(
     if not input_data:
         return input_data
 
-    evaluator = TapEvaluation(config=config, logger=logger, client=client)
+    if config.get("_judge") is not None:
+        from hackagent.attacks._lib.inline_judge import CtxTapEvaluator
+
+        evaluator = CtxTapEvaluator(config["_judge"], logger=logger)
+    else:
+        evaluator = TapEvaluation(config=config, logger=logger, client=client)
     judges_config = _resolve_judges_config(config)
     tap_params = config.get("tap_params", {})
     success_threshold = tap_params.get("success_score_threshold", 10)

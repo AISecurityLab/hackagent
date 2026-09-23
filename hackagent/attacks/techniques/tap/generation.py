@@ -261,11 +261,16 @@ class TapExecutor:
             self.judges_config,
         )
 
-        self.evaluator = TapEvaluation(
-            config=config,
-            logger=logger,
-            client=client,
-        )
+        if config.get("_judge") is not None:
+            from hackagent.attacks._lib.inline_judge import CtxTapEvaluator
+
+            self.evaluator = CtxTapEvaluator(config["_judge"], logger=logger)
+        else:
+            self.evaluator = TapEvaluation(
+                config=config,
+                logger=logger,
+                client=client,
+            )
 
     def _query_attacker(
         self, messages: List[Dict[str, str]]

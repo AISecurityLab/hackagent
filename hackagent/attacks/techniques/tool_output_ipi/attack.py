@@ -25,6 +25,8 @@ from typing import Any, Dict, List, Optional
 
 from hackagent.storage.store import Store
 from hackagent.attacks._lib.llm_router import LLMRouter
+from hackagent.attacks._lib.inline_judge import attach_ctx_judge
+from hackagent.attacks.ports import RunContext
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
@@ -63,24 +65,41 @@ class ToolOutputIPIAttack(BaseAttack):
     def __init__(
         self,
         config: Optional[Dict[str, Any]] = None,
-        client: Optional[Store] = None,
+        ctx_or_client: Any = None,
         agent_router: Optional[LLMRouter] = None,
+        *,
+        ctx: Optional[RunContext] = None,
+        client: Optional[Store] = None,
     ):
-        if client is None:
-            raise ValueError(
-                "A storage backend must be provided to ToolOutputIPIAttack."
-            )
-        if agent_router is None:
-            raise ValueError(
-                "Victim LLMRouter instance must be provided to ToolOutputIPIAttack."
-            )
+        if ctx is None and isinstance(ctx_or_client, RunContext):
+            ctx = ctx_or_client
+        resolved_client = (
+            client
+            if client is not None
+            else (None if isinstance(ctx_or_client, RunContext) else ctx_or_client)
+        )
+        if ctx is None:
+            if resolved_client is None:
+                raise ValueError(
+                    "A storage backend must be provided to ToolOutputIPIAttack."
+                )
+            if agent_router is None:
+                raise ValueError(
+                    "Victim LLMRouter instance must be provided to ToolOutputIPIAttack."
+                )
+            client = resolved_client
 
         current_config = copy.deepcopy(DEFAULT_TOOL_OUTPUT_IPI_CONFIG)
         if config:
             _recursive_update(current_config, config)
 
+        attach_ctx_judge(current_config, ctx)
+
         self.logger = logging.getLogger("hackagent.attacks.tool_output_ipi")
-        super().__init__(current_config, client, agent_router)
+        if ctx is not None:
+            super().__init__(current_config, ctx)
+        else:
+            super().__init__(current_config, client, agent_router)
 
     def _validate_config(self) -> None:
         super()._validate_config()
@@ -135,6 +154,7 @@ class ToolOutputIPIAttack(BaseAttack):
                     "_tracker",
                     "_goal_index_offset",
                     "judges",
+                    "_judge",
                     "judge_concurrency",
                     "max_tokens_eval",
                     "filter_len",
@@ -162,6 +182,7 @@ class ToolOutputIPIAttack(BaseAttack):
                     "_tracker",
                     "_goal_index_offset",
                     "judges",
+                    "_judge",
                     "judge_concurrency",
                     "max_tokens_eval",
                     "filter_len",
