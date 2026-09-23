@@ -31,7 +31,7 @@ from hackagent.attacks.shared.response_utils import (
     is_guardrail_response,
 )
 from hackagent.attacks.shared.router_factory import create_router
-from hackagent.attacks.techniques.config import DEFAULT_MAX_OUTPUT_TOKENS
+from hackagent.core.defaults import DEFAULT_MAX_OUTPUT_TOKENS
 from hackagent.router.router import AgentRouter
 
 from .config import ALL_TECHNIQUES, TOP_5_TECHNIQUES

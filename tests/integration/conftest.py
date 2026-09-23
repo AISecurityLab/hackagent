@@ -39,7 +39,7 @@ from typing import Any, Dict, Generator, Optional
 import httpx
 import pytest
 
-from hackagent.attacks.techniques.config import (
+from hackagent.core.defaults import (
     DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
     DEFAULT_LOCAL_MODEL_ENDPOINT,
 )

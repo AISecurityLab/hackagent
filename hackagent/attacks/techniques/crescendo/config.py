@@ -13,9 +13,9 @@ from hackagent.attacks.techniques.config import (
     AttackerConfig,
     ConfigBase,
     DEFAULT_CONFIG_BASE,
-    DEFAULT_JUDGE_IDENTIFIER,
     JudgeConfig,
 )
+from hackagent.core.defaults import DEFAULT_JUDGE_IDENTIFIER
 
 
 def _default_role_config(identifier: str) -> Dict[str, Any]:

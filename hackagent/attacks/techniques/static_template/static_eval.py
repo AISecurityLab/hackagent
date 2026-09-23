@@ -16,7 +16,7 @@ from collections import defaultdict
 from typing import Any, Dict, List, Optional
 
 from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
-from hackagent.attacks.techniques.config import DEFAULT_JUDGE_IDENTIFIER
+from hackagent.core.defaults import DEFAULT_JUDGE_IDENTIFIER
 from hackagent.server.storage.enums import EvaluationStatusEnum
 from hackagent.router.tracking import Tracker
 

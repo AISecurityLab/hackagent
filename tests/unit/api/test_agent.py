@@ -6,7 +6,7 @@ import uuid  # For generating mock UUIDs
 from http import HTTPStatus
 from unittest.mock import MagicMock, patch
 
-from hackagent import errors
+from hackagent.core import errors
 from hackagent.server.api.agent import (
     agent_create,
     agent_destroy,

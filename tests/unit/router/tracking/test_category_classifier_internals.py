@@ -210,9 +210,7 @@ class TestFormatTaxonomy(unittest.TestCase):
 
 class TestResolveConfig(unittest.TestCase):
     def test_defaults_when_none(self):
-        from hackagent.attacks.techniques.config import (
-            DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
-        )
+        from hackagent.core.defaults import DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER
 
         cfg = GoalCategoryClassifier._resolve_config(None)
         self.assertEqual(cfg["identifier"], DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER)

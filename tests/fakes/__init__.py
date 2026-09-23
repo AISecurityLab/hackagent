@@ -8,6 +8,7 @@ was asked to do so tests can assert on calls rather than on internals.
 """
 
 from tests.fakes.router import FakeRouter
+from tests.fakes.settings import isolated_settings
 from tests.fakes.storage import in_memory_store
 from tests.fakes.tracking import RecordingCoordinator, RecordingStepTracker
 
@@ -16,4 +17,5 @@ __all__ = [
     "RecordingCoordinator",
     "RecordingStepTracker",
     "in_memory_store",
+    "isolated_settings",
 ]

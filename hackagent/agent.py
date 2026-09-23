@@ -1,12 +1,12 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from hackagent.logger import get_logger
+from hackagent.core.logging import get_logger
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 from hackagent import utils
-from hackagent.config import resolve_remote_base_url
-from hackagent.errors import HackAgentError
+from hackagent.core.settings import Settings
+from hackagent.core.errors import HackAgentError
 from hackagent.router import AgentRouter
 from hackagent.router.types import AgentTypeEnum
 
@@ -119,37 +119,35 @@ class HackAgent:
                 — reuse its own already-open backend.
         """
 
-        resolved_auth_token = utils.resolve_api_token(direct_api_key_param=api_key)
+        self.settings = Settings.resolve(api_key=api_key, base_url=base_url)
 
         if backend is not None:
             self.backend = backend
             logger.info(
                 "HackAgent using caller-provided backend %s", type(backend).__name__
             )
-        elif resolved_auth_token:
+        elif self.settings.api_key:
             from hackagent.server.client import AuthenticatedClient
             from hackagent.server.storage.remote import RemoteBackend
 
-            _base_url = base_url or resolve_remote_base_url()
             _client = AuthenticatedClient(
-                base_url=_base_url,
-                token=resolved_auth_token,
+                base_url=self.settings.base_url,
+                token=self.settings.api_key,
                 prefix="Bearer",
                 raise_on_unexpected_status=raise_on_unexpected_status,
                 timeout=timeout,
             )
             self.backend = RemoteBackend(_client)
-            logger.info("HackAgent using remote backend → %s", _base_url)
+            logger.info("HackAgent using remote backend → %s", self.settings.base_url)
         else:
             from hackagent.server.storage.local import LocalBackend
 
-            self.backend = LocalBackend()
+            self.backend = LocalBackend(db_path=self.settings.db_path)
             logger.info(
-                "HackAgent using local backend → ~/.local/share/hackagent/hackagent.db"
+                "HackAgent using local backend → %s. Set HACKAGENT_API_KEY or "
+                "pass api_key= to enable remote tracking.",
+                self.settings.db_path,
             )
-
-        # Backward compatible raw HTTP client reference.
-        self.client = getattr(self.backend, "_client", None)
 
         processed_agent_type = utils.resolve_agent_type(agent_type)
         self.target_config = _resolve_target_config(target_config)

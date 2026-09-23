@@ -40,7 +40,7 @@ from hackagent.attacks.evaluator.evaluation_step import (
     JUDGE_TYPE_LABELS,
     MERGE_KEYS,
 )
-from hackagent.attacks.techniques.config import DEFAULT_JUDGE_IDENTIFIER
+from hackagent.core.defaults import DEFAULT_JUDGE_IDENTIFIER
 from hackagent.router.types import AgentTypeEnum
 
 logger = logging.getLogger(__name__)

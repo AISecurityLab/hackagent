@@ -26,8 +26,8 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
-from hackagent.config import DEFAULT_LOCAL_LITELLM_MODEL
-from hackagent.logger import get_logger
+from hackagent.core.defaults import DEFAULT_LOCAL_LITELLM_MODEL
+from hackagent.core.logging import get_logger
 
 logger = get_logger(__name__)
 

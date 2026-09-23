@@ -13,7 +13,7 @@ from rich.table import Table
 
 from hackagent.cli.config import CLIConfig
 from hackagent.cli.utils import display_info, display_success, handle_errors
-from hackagent.config import resolve_remote_base_url
+from hackagent.core.settings import resolve_remote_base_url
 
 console = Console()
 

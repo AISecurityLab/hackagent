@@ -8,7 +8,7 @@ from httpx import Response
 
 from hackagent.server.api.apilogs import apilogs_list, apilogs_retrieve
 from hackagent.server.client import AuthenticatedClient
-from hackagent.errors import UnexpectedStatus
+from hackagent.core.errors import UnexpectedStatus
 from hackagent.server.api.models import APITokenLog
 from hackagent.server.api.models import PaginatedAPITokenLogList
 

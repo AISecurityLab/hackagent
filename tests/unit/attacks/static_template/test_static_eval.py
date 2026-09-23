@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from uuid import UUID, uuid4
 
-from hackagent.attacks.techniques.config import DEFAULT_JUDGE_IDENTIFIER
+from hackagent.core.defaults import DEFAULT_JUDGE_IDENTIFIER
 from hackagent.attacks.techniques.static_template import static_eval
 from hackagent.attacks.techniques.static_template.static_eval import (
     StaticTemplateEvaluation,

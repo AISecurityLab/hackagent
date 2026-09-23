@@ -23,11 +23,8 @@ from typing import Any, Dict, List, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-from hackagent.attacks.techniques.config import (
-    DEFAULT_CONFIG_BASE,
-    DEFAULT_MAX_OUTPUT_TOKENS,
-    ConfigBase,
-)
+from hackagent.attacks.techniques.config import DEFAULT_CONFIG_BASE, ConfigBase
+from hackagent.core.defaults import DEFAULT_MAX_OUTPUT_TOKENS
 
 # Default benign tasks used when ``benign_tasks`` is empty.
 DEFAULT_BENIGN_TASKS: List[str] = [

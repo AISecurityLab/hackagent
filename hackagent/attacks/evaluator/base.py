@@ -32,7 +32,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from hackagent.async_utils import run_coroutine_blocking
+from hackagent.core.async_utils import run_coroutine_blocking
 from hackagent.attacks.shared.progress import create_progress_bar
 from hackagent.attacks.shared.router_factory import create_router
 from hackagent.server.client import AuthenticatedClient

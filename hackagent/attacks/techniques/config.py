@@ -41,12 +41,10 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
-# Canonical scalar service defaults now live in ``hackagent.config`` (the
-# dependency-free leaf module that is the single source of truth). They are
-# re-exported here so existing ``from hackagent.attacks.techniques.config
-# import DEFAULT_*`` callers keep working. Pydantic-model-derived defaults
-# (DEFAULT_TIMEOUT, DEFAULT_BATCH_SIZE, …) stay below, next to their models.
-from hackagent.config import (
+# Scalar service defaults live in ``hackagent.core.defaults``. Pydantic-model-
+# derived defaults (DEFAULT_TIMEOUT, DEFAULT_BATCH_SIZE, …) stay below, next to
+# their models.
+from hackagent.core.defaults import (
     DEFAULT_ATTACKER_IDENTIFIER,
     DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE,
     DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT,
@@ -54,13 +52,8 @@ from hackagent.config import (
     DEFAULT_CATEGORY_CLASSIFIER_MAX_TOKENS,
     DEFAULT_JUDGE_IDENTIFIER,
     DEFAULT_LOCAL_AGENT_TYPE,
-    DEFAULT_LOCAL_MODEL,
     DEFAULT_LOCAL_MODEL_ENDPOINT,
     DEFAULT_MAX_OUTPUT_TOKENS,
-    DEFAULT_REMOTE_AGENT_TYPE,
-    DEFAULT_REMOTE_ATTACKER_IDENTIFIER,
-    DEFAULT_REMOTE_JUDGE_IDENTIFIER,
-    DEFAULT_REMOTE_ROLE_ENDPOINT,
     DEFAULT_EMBEDDER_IDENTIFIER,
     DEFAULT_EMBEDDER_ENDPOINT,
     DEFAULT_EMBEDDER_AGENT_TYPE,
@@ -389,25 +382,6 @@ DEFAULT_MAX_JUDGE_RETRIES: int = JudgeEvalConfig.model_fields[
 ].default
 
 __all__ = [
-    "DEFAULT_LOCAL_MODEL_ENDPOINT",
-    "DEFAULT_LOCAL_AGENT_TYPE",
-    "DEFAULT_ATTACKER_IDENTIFIER",
-    "DEFAULT_JUDGE_IDENTIFIER",
-    "DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER",
-    "DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT",
-    "DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE",
-    "DEFAULT_CATEGORY_CLASSIFIER_MAX_TOKENS",
-    "DEFAULT_MAX_OUTPUT_TOKENS",
-    "DEFAULT_REMOTE_ROLE_ENDPOINT",
-    "DEFAULT_REMOTE_AGENT_TYPE",
-    "DEFAULT_REMOTE_ATTACKER_IDENTIFIER",
-    "DEFAULT_REMOTE_JUDGE_IDENTIFIER",
-    "DEFAULT_LOCAL_MODEL",
-    "DEFAULT_EMBEDDER_IDENTIFIER",
-    "DEFAULT_EMBEDDER_ENDPOINT",
-    "DEFAULT_EMBEDDER_AGENT_TYPE",
-    "DEFAULT_EMBEDDER_OPENAI_ENDPOINT",
-    "DEFAULT_EMBEDDER_OPENAI_API_KEY",
     "AttackerConfig",
     "CategoryClassifierConfig",
     "JudgeConfig",

@@ -284,7 +284,7 @@ class GoalCategoryClassifier:
     @staticmethod
     def _resolve_config(config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         # Imported lazily to avoid a router↔attacks import cycle at load time.
-        from hackagent.attacks.techniques.config import (
+        from hackagent.core.defaults import (
             DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
             DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT,
         )

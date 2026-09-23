@@ -20,7 +20,7 @@ from rich.table import Table
 from rich.text import Text
 from rich.traceback import Traceback
 
-from hackagent.errors import ApiError, HackAgentError
+from hackagent.core.errors import ApiError, HackAgentError
 
 console = Console()
 

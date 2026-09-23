@@ -269,11 +269,7 @@ DEFAULT_CONFIG = {
 The SDK provides a comprehensive exception hierarchy:
 
 ```python
-from hackagent.errors import (
-    HackAgentError,      # Base exception
-    ApiError,            # API communication errors  
-    UnexpectedStatusError # Unexpected HTTP status codes
-)
+from hackagent.core.errors import HackAgentError, ApiError, UnexpectedStatusError
 
 try:
     results = agent.hack(attack_config=attack_config)

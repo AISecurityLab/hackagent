@@ -22,7 +22,7 @@ use the StepTracker class from step.py instead.
 import logging
 import threading
 import time
-from hackagent.logger import get_logger
+from hackagent.core.logging import get_logger
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional

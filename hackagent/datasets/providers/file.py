@@ -5,7 +5,7 @@
 
 import csv
 import json
-from hackagent.logger import get_logger
+from hackagent.core.logging import get_logger
 import random
 from pathlib import Path
 from typing import Any, Dict, List, Optional

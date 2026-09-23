@@ -7,7 +7,7 @@ import json
 import urllib.request
 import random
 from typing import Any, Dict, List, Optional, Union
-from hackagent.logger import get_logger
+from hackagent.core.logging import get_logger
 from hackagent.datasets.base import DatasetProvider
 
 logger = get_logger(__name__)

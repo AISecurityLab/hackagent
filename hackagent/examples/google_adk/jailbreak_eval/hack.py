@@ -25,7 +25,7 @@ import time
 import httpx
 
 from hackagent import HackAgent
-from hackagent.config import resolve_remote_role_endpoint
+from hackagent.core.settings import resolve_remote_role_endpoint
 
 # ---------------------------------------------------------------------------
 # 1. Target agent — the Gemini ADK agent

@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from rich.console import Console
 
-from hackagent.config import resolve_ollama_base_url
+from hackagent.core.settings import resolve_ollama_base_url
 
 console = Console()
 

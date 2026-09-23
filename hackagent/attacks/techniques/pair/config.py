@@ -12,8 +12,10 @@ from pydantic import Field, model_validator
 from hackagent.attacks.techniques.config import (
     AttackerConfig,
     ConfigBase,
-    DEFAULT_ATTACKER_IDENTIFIER,
     DEFAULT_CONFIG_BASE,
+)
+from hackagent.core.defaults import (
+    DEFAULT_ATTACKER_IDENTIFIER,
     DEFAULT_JUDGE_IDENTIFIER,
 )
 

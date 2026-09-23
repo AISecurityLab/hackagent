@@ -28,7 +28,7 @@ allowing techniques to focus solely on attack algorithms.
 
 import abc
 import logging
-from hackagent.logger import get_logger
+from hackagent.core.logging import get_logger
 from typing import Any, Dict, List, Optional
 
 from hackagent.attacks.types import AttackResult

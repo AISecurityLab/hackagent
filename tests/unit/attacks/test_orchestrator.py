@@ -9,7 +9,7 @@ from uuid import uuid4
 
 from hackagent.attacks.orchestrator import AttackOrchestrator
 from hackagent.attacks.techniques.base import BaseAttack
-from hackagent.errors import HackAgentError
+from hackagent.core.errors import HackAgentError
 
 
 class TestAttackOrchestratorInitialization(unittest.TestCase):

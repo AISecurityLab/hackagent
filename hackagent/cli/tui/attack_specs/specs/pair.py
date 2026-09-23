@@ -5,9 +5,7 @@
 
 from __future__ import annotations
 
-from hackagent.attacks.techniques.config import (
-    DEFAULT_ATTACKER_IDENTIFIER,
-)
+from hackagent.core.defaults import DEFAULT_ATTACKER_IDENTIFIER
 from hackagent.cli.tui.attack_specs.types import (
     AttackConfigSpec,
     ConfigField,

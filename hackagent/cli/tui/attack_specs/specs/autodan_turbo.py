@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from hackagent.attacks.techniques.config import (
+from hackagent.core.defaults import (
     DEFAULT_ATTACKER_IDENTIFIER,
     DEFAULT_JUDGE_IDENTIFIER,
 )

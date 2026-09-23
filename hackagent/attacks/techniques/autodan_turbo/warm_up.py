@@ -5,7 +5,7 @@
 from collections import defaultdict
 from typing import Dict, List, Tuple
 
-from hackagent.attacks.techniques.config import DEFAULT_MAX_OUTPUT_TOKENS
+from hackagent.core.defaults import DEFAULT_MAX_OUTPUT_TOKENS
 
 from .config import ATTACKER_CONDITION, WARM_UP_SYSTEM_PROMPT
 from .core import (

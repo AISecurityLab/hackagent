@@ -40,7 +40,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
-from hackagent.attacks.techniques.config import (
+from hackagent.core.defaults import (
     DEFAULT_ATTACKER_IDENTIFIER,
     DEFAULT_LOCAL_MODEL_ENDPOINT,
 )

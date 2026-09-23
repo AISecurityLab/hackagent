@@ -35,6 +35,7 @@ from hackagent.cli.bootstrap import (
 )
 from hackagent.cli.config import CLIConfig
 from hackagent.cli.help_page import _help_option_callback
+from hackagent.cli.logging_setup import setup_package_logging
 from hackagent.cli.safe_stdio import configure_safe_stdio, install_on_click_command
 from hackagent.cli.utils import display_info, handle_errors
 
@@ -126,7 +127,7 @@ def init(ctx):
             display_info("Setup cancelled")
             return
         # Reload config from file to get the latest saved values
-        cli_config._load_default_config()
+        cli_config.reload()
 
     # Mode and API key setup
     console.print("\n[cyan]☁️ Mode Configuration[/cyan]")
@@ -422,6 +423,7 @@ install_on_click_command(cli)
 def main() -> None:
     """Process entry for the ``hackagent`` console script and frozen binary."""
     configure_safe_stdio()
+    setup_package_logging()
     cli()
 
 

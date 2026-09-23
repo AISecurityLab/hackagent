@@ -20,12 +20,14 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from hackagent.attacks.techniques.config import (
     AttackerConfig,
     ConfigBase,
-    DEFAULT_ATTACKER_IDENTIFIER,
     DEFAULT_CONFIG_BASE,
-    DEFAULT_JUDGE_IDENTIFIER,
-    DEFAULT_MAX_OUTPUT_TOKENS,
     default_embedder,
     resolve_embedder_config,
+)
+from hackagent.core.defaults import (
+    DEFAULT_ATTACKER_IDENTIFIER,
+    DEFAULT_JUDGE_IDENTIFIER,
+    DEFAULT_MAX_OUTPUT_TOKENS,
 )
 
 

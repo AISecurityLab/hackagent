@@ -8,7 +8,7 @@ from rich.console import Console
 from rich.panel import Panel
 
 from hackagent._version import get_version
-from hackagent.config import resolve_remote_base_url
+from hackagent.core.settings import resolve_remote_base_url
 
 console = Console()
 

@@ -119,7 +119,7 @@ class TestAttackErrorHandling:
     ):
         """Test that invalid attack type raises appropriate error."""
         from hackagent import AgentTypeEnum
-        from hackagent.errors import HackAgentError
+        from hackagent.core.errors import HackAgentError
 
         agent = hackagent_client_factory(
             name=ollama_model,
@@ -145,7 +145,7 @@ class TestAttackErrorHandling:
     ):
         """Test that missing attack type raises appropriate error."""
         from hackagent import AgentTypeEnum
-        from hackagent.errors import HackAgentError
+        from hackagent.core.errors import HackAgentError
 
         agent = hackagent_client_factory(
             name=ollama_model,

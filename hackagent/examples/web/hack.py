@@ -30,7 +30,7 @@ import os
 import sys
 
 from hackagent import HackAgent
-from hackagent.config import DEFAULT_LOCAL_LITELLM_MODEL
+from hackagent.core.defaults import DEFAULT_LOCAL_LITELLM_MODEL
 
 TARGET_URL = os.environ.get("TARGET_URL", "")
 # Local, abliterated Ollama model for attacker/judge — no API key required.

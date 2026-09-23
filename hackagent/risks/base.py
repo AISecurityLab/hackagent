@@ -16,7 +16,7 @@ Each concrete vulnerability:
 """
 
 import abc
-from hackagent.logger import get_logger
+from hackagent.core.logging import get_logger
 from enum import Enum
 from typing import Any, Dict, List, Optional, Type
 

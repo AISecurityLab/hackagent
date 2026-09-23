@@ -7,7 +7,7 @@ Registry and factory functions for dataset providers.
 This module provides the main entry point for loading goals from various sources.
 """
 
-from hackagent.logger import get_logger
+from hackagent.core.logging import get_logger
 from typing import Any, Dict, List, Optional, Type
 
 from hackagent.datasets.base import DatasetProvider

@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
+"""Rich console logging for the CLI and TUI.
+
+The library never installs handlers; the command-line entry point calls
+:func:`setup_package_logging` once at startup.
+"""
+
 import logging
 import os
 
@@ -57,20 +63,8 @@ def suppress_noisy_libraries(*names: str) -> None:
     by their own library loggers being muted.
 
     Example:
-        >>> from hackagent.logger import suppress_noisy_libraries
+        >>> from hackagent.cli.logging_setup import suppress_noisy_libraries
         >>> suppress_noisy_libraries("httpx", "litellm", "urllib3")
     """
     for name in names:
         logging.getLogger(name).setLevel(logging.WARNING)
-
-
-def get_logger(name: str) -> logging.Logger:
-    """
-    Retrieves a logger instance.
-    If the logger is 'hackagent' or starts with 'hackagent.',
-    it ensures the package logging is set up.
-    """
-    if name == "hackagent" or name.startswith("hackagent."):
-        # Ensure base "hackagent" logger is configured first
-        setup_package_logging(logger_name="hackagent")
-    return logging.getLogger(name)

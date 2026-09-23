@@ -4,11 +4,11 @@
 """
 Compatibility re-export of canonical HackAgent errors.
 
-All symbols are forwarded from ``hackagent.errors`` so imports that resolve
+All symbols are forwarded from ``hackagent.core.errors`` so imports that resolve
 through ``hackagent.server.errors`` continue to work.
 """
 
-from hackagent.errors import (  # noqa: F401
+from hackagent.core.errors import (
     ApiError,
     HackAgentError,
     UnexpectedStatus,

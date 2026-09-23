@@ -35,15 +35,15 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from io import StringIO
-from hackagent.logger import get_logger
+from hackagent.core.logging import get_logger
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 
-from hackagent.errors import HackAgentError
+from hackagent.core.errors import HackAgentError
 from hackagent.attacks.shared.embedding_utils import request_embedding
 from hackagent.router.tracking.audit import record_run_audit_failure
-from hackagent.attacks.techniques.config import (
+from hackagent.core.defaults import (
     DEFAULT_CATEGORY_CLASSIFIER_AGENT_TYPE,
     DEFAULT_CATEGORY_CLASSIFIER_ENDPOINT,
     DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,

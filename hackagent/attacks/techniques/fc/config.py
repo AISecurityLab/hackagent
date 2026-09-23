@@ -23,11 +23,10 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from hackagent.attacks.techniques.config import (
-    DEFAULT_CONFIG_BASE,
+from hackagent.attacks.techniques.config import DEFAULT_CONFIG_BASE, ConfigBase
+from hackagent.core.defaults import (
     DEFAULT_LOCAL_AGENT_TYPE,
     DEFAULT_LOCAL_MODEL_ENDPOINT,
-    ConfigBase,
 )
 
 DEFAULT_STEP_GENERATOR_IDENTIFIER = "gemma3:4b"

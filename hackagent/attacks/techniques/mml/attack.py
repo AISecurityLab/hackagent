@@ -27,7 +27,7 @@ from typing import Any, Dict, List, Optional
 
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
-from hackagent.attacks.techniques.config import DEFAULT_JUDGE_IDENTIFIER
+from hackagent.core.defaults import DEFAULT_JUDGE_IDENTIFIER
 from hackagent.router.router import AgentRouter
 from hackagent.server.client import AuthenticatedClient
 from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep

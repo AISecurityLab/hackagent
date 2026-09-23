@@ -29,7 +29,7 @@ from hackagent.attacks.techniques.autodan_turbo.core import (
     _parse_score_value,
     score_response,
 )
-from hackagent.attacks.techniques.config import (
+from hackagent.core.defaults import (
     DEFAULT_ATTACKER_IDENTIFIER,
     DEFAULT_JUDGE_IDENTIFIER,
     DEFAULT_LOCAL_MODEL_ENDPOINT,

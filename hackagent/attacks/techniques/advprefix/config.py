@@ -17,11 +17,13 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field, model_validator
 
-from hackagent.attacks.techniques.config import (
+from hackagent.core.defaults import (
     DEFAULT_ATTACKER_IDENTIFIER,
-    DEFAULT_FILTER_LEN,
     DEFAULT_JUDGE_IDENTIFIER,
     DEFAULT_LOCAL_MODEL_ENDPOINT,
+)
+from hackagent.attacks.techniques.config import (
+    DEFAULT_FILTER_LEN,
     DEFAULT_OUTPUT_DIR,
     DEFAULT_TIMEOUT,
     DEFAULT_RUN_ID,

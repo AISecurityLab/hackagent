@@ -44,8 +44,8 @@ Usage:
 import asyncio
 import logging
 import time
-from hackagent.async_utils import run_coroutine_blocking
-from hackagent.logger import get_logger
+from hackagent.core.async_utils import run_coroutine_blocking
+from hackagent.core.logging import get_logger
 from typing import Any, Callable, Dict, List, Optional
 
 from hackagent.server.storage.enums import StatusEnum

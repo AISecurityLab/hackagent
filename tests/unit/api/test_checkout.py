@@ -9,7 +9,7 @@ from httpx import Response
 
 from hackagent.server.api.checkout import checkout_create
 from hackagent.server.client import AuthenticatedClient
-from hackagent.errors import UnexpectedStatus
+from hackagent.core.errors import UnexpectedStatus
 from hackagent.server.api.models import (
     CheckoutSessionRequestRequest,
 )

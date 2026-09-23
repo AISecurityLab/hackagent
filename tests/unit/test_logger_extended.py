@@ -8,8 +8,9 @@ import os
 import unittest
 from unittest.mock import patch
 
-import hackagent.logger as logger_module
-from hackagent.logger import get_logger, setup_package_logging, suppress_noisy_libraries
+import hackagent.cli.logging_setup as logger_module
+from hackagent.core.logging import get_logger
+from hackagent.cli.logging_setup import setup_package_logging, suppress_noisy_libraries
 
 
 class TestSetupPackageLoggingExtended(unittest.TestCase):
@@ -111,17 +112,34 @@ class TestGetLoggerExtended(unittest.TestCase):
         """Clean up after each test."""
         logger_module._rich_handler_configured_for_package = False
 
-    def test_get_logger_base_hackagent(self):
-        """Test get_logger for 'hackagent' triggers setup."""
+    def test_get_logger_base_hackagent_installs_no_handler(self):
+        """get_logger never configures logging, even for 'hackagent'."""
         logger = get_logger("hackagent")
         self.assertEqual(logger.name, "hackagent")
-        self.assertTrue(logger_module._rich_handler_configured_for_package)
+        self.assertEqual(logger.handlers, [])
+        self.assertFalse(logger_module._rich_handler_configured_for_package)
 
-    def test_get_logger_hackagent_submodule(self):
-        """Test get_logger for 'hackagent.sub' triggers setup."""
+    def test_get_logger_hackagent_submodule_installs_no_handler(self):
+        """get_logger for 'hackagent.sub' does not configure the package logger."""
         logger = get_logger("hackagent.some.module")
         self.assertEqual(logger.name, "hackagent.some.module")
-        self.assertTrue(logger_module._rich_handler_configured_for_package)
+        self.assertEqual(logging.getLogger("hackagent").handlers, [])
+        self.assertFalse(logger_module._rich_handler_configured_for_package)
+
+    def test_importing_hackagent_installs_no_handler(self):
+        """A fresh ``import hackagent`` leaves logging configuration alone."""
+        import subprocess
+        import sys
+
+        code = (
+            "import logging, hackagent; "
+            "assert logging.getLogger('hackagent').handlers == [], "
+            "logging.getLogger('hackagent').handlers"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", code], capture_output=True, text=True
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_get_logger_non_hackagent(self):
         """Test get_logger for non-hackagent name doesn't trigger setup."""

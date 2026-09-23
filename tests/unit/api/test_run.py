@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 from dateutil.parser import isoparse
 
-from hackagent import errors
+from hackagent.core import errors
 from hackagent.server.api.run import (
     run_create,
     run_destroy,

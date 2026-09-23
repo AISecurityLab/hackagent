@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 
 import numpy as np
 
-from hackagent.config import DEFAULT_EMBEDDER_ENDPOINT
+from hackagent.core.defaults import DEFAULT_EMBEDDER_ENDPOINT
 
 
 def normalize_embedding_endpoint(endpoint: str, *, ollama: bool = False) -> str:

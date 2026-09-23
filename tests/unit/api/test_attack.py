@@ -8,7 +8,7 @@ import uuid
 from http import HTTPStatus
 from unittest.mock import MagicMock, patch
 
-from hackagent import errors
+from hackagent.core import errors
 from hackagent.server.api.attack import (
     attack_create,
     attack_destroy,

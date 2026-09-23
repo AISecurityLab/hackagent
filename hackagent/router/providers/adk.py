@@ -17,7 +17,7 @@ classes can be deleted in Phase E.2c without affecting ADK.
 
 import json
 import uuid
-from hackagent.logger import get_logger
+from hackagent.core.logging import get_logger
 from typing import Any, Dict, List, Optional
 
 import httpx

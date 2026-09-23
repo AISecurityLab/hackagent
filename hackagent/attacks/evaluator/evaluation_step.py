@@ -52,7 +52,7 @@ from hackagent.attacks.evaluator.judge_evaluators import EVALUATOR_MAP
 from hackagent.attacks.shared.router_factory import extract_passthrough_request_config
 from hackagent.attacks.evaluator.sync import sync_evaluation_to_server
 from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
-from hackagent.attacks.techniques.config import (
+from hackagent.core.defaults import (
     DEFAULT_JUDGE_IDENTIFIER,
     DEFAULT_LOCAL_AGENT_TYPE,
     DEFAULT_LOCAL_MODEL_ENDPOINT,

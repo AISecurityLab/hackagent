@@ -107,23 +107,22 @@ class TestCLIConfig:
             Path(config_file).unlink()
 
     # NEW TESTS FOR STANDARDIZED PRIORITY ORDER
-    def test_standardized_priority_config_over_env(self):
-        """Test NEW behavior: Config file takes priority over environment variable"""
+    def test_env_beats_config_file(self):
+        """Environment variables take priority over the config file."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             config_data = {"api_key": "config-file-key"}
             json.dump(config_data, f)
             config_file = f.name
 
         try:
-            # Set environment variable that should be overridden by config file
             with patch.dict(
                 "os.environ",
-                {"HACKAGENT_API_KEY": "env-key-should-lose"},
+                {"HACKAGENT_API_KEY": "env-key-wins"},
             ):
                 config = CLIConfig(config_file=config_file)
 
-                # Config file should win over environment
-                assert config.api_key == "config-file-key"
+                assert config.api_key == "env-key-wins"
+                assert config.source_of("api_key") == "Environment"
         finally:
             Path(config_file).unlink()
 
@@ -147,12 +146,9 @@ class TestCLIConfig:
             config_file = f.name
 
         try:
-            with (
-                patch.object(CLIConfig, "_load_default_config"),
-                patch.dict(
-                    "os.environ",
-                    {"HACKAGENT_API_KEY": "env-key"},
-                ),
+            with patch.dict(
+                "os.environ",
+                {"HACKAGENT_API_KEY": "env-key"},
             ):
                 config = CLIConfig(config_file=config_file, api_key="cli-wins")
 
@@ -161,8 +157,8 @@ class TestCLIConfig:
         finally:
             Path(config_file).unlink()
 
-    def test_standardized_priority_default_config_over_env(self):
-        """Test default config file takes priority over environment"""
+    def test_env_beats_default_config_file(self):
+        """The environment also beats the default config file."""
         config_data = {"api_key": "default-config-key"}
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -175,20 +171,17 @@ class TestCLIConfig:
             config_dir.mkdir(parents=True, exist_ok=True)
             (config_dir / "config.json").write_text(json.dumps(config_data))
 
-            with (
-                patch("pathlib.Path.home") as mock_home,
-                patch.dict(
-                    "os.environ",
-                    {"HACKAGENT_API_KEY": "env-should-lose"},
-                ),
+            with patch.dict(
+                "os.environ",
+                {"HOME": str(fake_home), "HACKAGENT_API_KEY": "env-wins"},
             ):
-                # Mock home directory to point to our writable fake home
-                mock_home.return_value = fake_home
-
                 config = CLIConfig()
 
-                # Default config file should win over environment
-                assert config.api_key == "default-config-key"
+                assert config.default_config_path == config_dir / "config.json"
+                assert config.api_key == "env-wins"
+
+            with patch.dict("os.environ", {"HOME": str(fake_home)}, clear=True):
+                assert CLIConfig().api_key == "default-config-key"
 
     def test_env_only_when_no_config_and_no_cli(self):
         """Test environment variables work when no config file or CLI args"""
@@ -215,9 +208,9 @@ class TestCLIConfig:
             with patch.dict(
                 "os.environ",
                 {
-                    "HACKAGENT_API_KEY": "env-api-key-ignored",
                     "HACKAGENT_BASE_URL": "https://env.example.com",
                 },
+                clear=True,
             ):
                 config = CLIConfig(config_file=config_file)
 
@@ -289,20 +282,15 @@ class TestCLIConfig:
             # Should NOT raise — running locally without API key is valid
             config.validate()
 
-    def test_validate_missing_base_url(self):
-        """Test validation failure with missing base URL"""
-        config = CLIConfig(api_key="test-key", base_url="")
-
+    def test_empty_base_url_is_rejected(self):
+        """An explicitly empty base URL is a configuration error."""
         with pytest.raises(ValueError, match="Base URL is required"):
-            config.validate()
+            CLIConfig(api_key="test-key", base_url="")
 
     def test_default_config_path(self):
         """Test default configuration path"""
         fake_home = Path("/fake/home")
-        with (
-            patch("pathlib.Path.home", return_value=fake_home),
-            patch.dict("os.environ", {}, clear=True),
-        ):
+        with patch.dict("os.environ", {"HOME": str(fake_home)}, clear=True):
             config = CLIConfig()
 
             expected_path = fake_home / ".config" / "hackagent" / "config.json"
@@ -386,10 +374,7 @@ base_url: https://yaml.example.com
             config_file = f.name
 
         try:
-            with (
-                patch.object(CLIConfig, "_load_default_config"),
-                patch.dict("os.environ", {"HACKAGENT_API_KEY": "env-fallback"}),
-            ):
+            with patch.dict("os.environ", {"HACKAGENT_API_KEY": "env-fallback"}):
                 config = CLIConfig(config_file=config_file)
 
                 # Should fallback to environment for None api_key
@@ -425,7 +410,8 @@ base_url: https://yaml.example.com
         scenarios = [
             # (cli_arg, config_value, env_value, expected, description)
             ("cli-key", "config-key", "env-key", "cli-key", "CLI beats all"),
-            (None, "config-key", "env-key", "config-key", "Config beats env"),
+            (None, "config-key", "env-key", "env-key", "Env beats config"),
+            (None, "config-key", None, "config-key", "Config when no env"),
             (None, None, "env-key", "env-key", "Env as fallback"),
             (None, None, None, None, "No sources"),
             ("cli-key", None, "env-key", "cli-key", "CLI beats env when no config"),

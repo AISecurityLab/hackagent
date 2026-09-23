@@ -23,8 +23,8 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, Optional
 
-from hackagent.config import resolve_ollama_base_url
-from hackagent.logger import get_logger
+from hackagent.core.settings import resolve_ollama_base_url
+from hackagent.core.logging import get_logger
 from hackagent.router import envelope as _envelope
 from hackagent.router.provider_config import ProviderConfig
 from hackagent.router.types import AgentTypeEnum

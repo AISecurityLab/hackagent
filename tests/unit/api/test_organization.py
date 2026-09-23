@@ -19,7 +19,7 @@ from hackagent.server.api.organization import (
     organization_update,
 )
 from hackagent.server.client import AuthenticatedClient
-from hackagent.errors import UnexpectedStatus
+from hackagent.core.errors import UnexpectedStatus
 from hackagent.server.api.models import Organization
 from hackagent.server.api.models import OrganizationRequest
 from hackagent.server.api.models import PaginatedOrganizationList

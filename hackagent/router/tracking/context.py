@@ -10,7 +10,7 @@ configuration and state that can be passed between components.
 """
 
 import logging
-from hackagent.logger import get_logger
+from hackagent.core.logging import get_logger
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 from uuid import UUID
