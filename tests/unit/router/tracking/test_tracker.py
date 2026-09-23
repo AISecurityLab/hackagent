@@ -212,6 +212,58 @@ class TestStepTrackerSanitizeConfig(unittest.TestCase):
         self.assertEqual(sanitized["ApiToken"], "***REDACTED***")
         self.assertEqual(sanitized["PASSWORD"], "***REDACTED***")
 
+    def test_sanitize_preserves_token_counts(self):
+        """Token-count metrics must not be redacted even though they contain 'token'."""
+        config = {
+            "prompt_tokens": 10,
+            "completion_tokens": 5,
+            "total_tokens": 15,
+            "input_tokens": 100,
+            "output_tokens": 50,
+            "cached_tokens": 3,
+            "token_count": 42,
+            "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 5,
+                "total_tokens": 15,
+            },
+            "prompt_tokens_details": {"cached_tokens": 3},
+            "api_token": "secret-should-be-redacted",
+            "api_key": "key-should-be-redacted",
+        }
+
+        sanitized = sanitize_for_json(config)
+
+        self.assertEqual(sanitized["prompt_tokens"], 10)
+        self.assertEqual(sanitized["completion_tokens"], 5)
+        self.assertEqual(sanitized["total_tokens"], 15)
+        self.assertEqual(sanitized["input_tokens"], 100)
+        self.assertEqual(sanitized["output_tokens"], 50)
+        self.assertEqual(sanitized["cached_tokens"], 3)
+        self.assertEqual(sanitized["token_count"], 42)
+        self.assertEqual(sanitized["usage"]["prompt_tokens"], 10)
+        self.assertEqual(sanitized["usage"]["total_tokens"], 15)
+        self.assertEqual(sanitized["prompt_tokens_details"]["cached_tokens"], 3)
+        # Secrets still redacted
+        self.assertEqual(sanitized["api_token"], "***REDACTED***")
+        self.assertEqual(sanitized["api_key"], "***REDACTED***")
+
+    def test_sanitize_preserves_token_counts_case_insensitive_and_suffix(self):
+        """Allowlist is case-insensitive and suffix '*_tokens' is preserved."""
+        config = {
+            "PROMPT_TOKENS": 10,
+            "Prompt_Tokens_Details": {"CACHED_TOKENS": 5},
+            "reasoning_tokens": 7,
+            "audio_tokens": 2,
+        }
+
+        sanitized = sanitize_for_json(config)
+
+        self.assertEqual(sanitized["PROMPT_TOKENS"], 10)
+        self.assertEqual(sanitized["Prompt_Tokens_Details"]["CACHED_TOKENS"], 5)
+        self.assertEqual(sanitized["reasoning_tokens"], 7)
+        self.assertEqual(sanitized["audio_tokens"], 2)
+
 
 class TestStepTrackerUpdateRunStatus(unittest.TestCase):
     """Test update_run_status method."""

@@ -23,6 +23,22 @@ _SKIP_KEYS: frozenset = frozenset({"_client", "client"})
 # Substrings that mark a key as containing sensitive data
 _SENSITIVE_SUBSTRINGS: tuple = ("key", "token", "secret", "password")
 
+# Exact-match allowlist for operational token-count metrics that contain the
+# substring ``token`` but are not secrets and must not be redacted.
+_TOKEN_COUNT_ALLOWLIST: frozenset = frozenset(
+    {
+        "prompt_tokens",
+        "completion_tokens",
+        "total_tokens",
+        "input_tokens",
+        "output_tokens",
+        "cached_tokens",
+        "token_count",
+        "prompt_tokens_details",
+        "completion_tokens_details",
+    }
+)
+
 
 def deep_clean(obj: Any) -> Any:
     """
@@ -58,6 +74,10 @@ def sanitize_for_json(obj: Any) -> Any:
     - ``None`` → ``None``
     - ``dict``:
         - Keys in ``_SKIP_KEYS`` (``_client``, ``client``) → ``"<TypeName>"``
+        - Keys whose lowercase form is in ``_TOKEN_COUNT_ALLOWLIST``
+          (e.g. ``prompt_tokens``, ``total_tokens``, ``token_count``) are
+          preserved — they contain ``token`` but are operational metrics, not
+          secrets.
         - Keys whose lowercase form contains a sensitive substring
           (``key``, ``token``, ``secret``, ``password``) → ``"***REDACTED***"``
         - All other values recurse.
@@ -81,6 +101,13 @@ def sanitize_for_json(obj: Any) -> Any:
         for k, v in obj.items():
             if k in _SKIP_KEYS:
                 sanitized[k] = f"<{type(v).__name__}>"
+                continue
+            # Preserve operational token-count metrics even though they contain
+            # the substring ``token``. Allowlist covers known keys; suffix check
+            # handles any future ``*_tokens`` metric (e.g. ``reasoning_tokens``).
+            kl = k.lower()
+            if kl in _TOKEN_COUNT_ALLOWLIST or kl.endswith("_tokens"):
+                sanitized[k] = sanitize_for_json(v)
                 continue
             if any(s in k.lower() for s in _SENSITIVE_SUBSTRINGS):
                 sanitized[k] = "***REDACTED***"
