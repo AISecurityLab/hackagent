@@ -210,7 +210,9 @@
               "label": "hackagent.attacks.techniques",
               "type": "category"
             },
+            "reference/hackagent/attacks/config",
             "reference/hackagent/attacks/orchestrator",
+            "reference/hackagent/attacks/ports",
             "reference/hackagent/attacks/registry",
             "reference/hackagent/attacks/types"
           ],
@@ -502,9 +504,17 @@
             "reference/hackagent/models/envelope",
             "reference/hackagent/models/factory",
             "reference/hackagent/models/guardrail",
-            "reference/hackagent/models/provider_config"
+            "reference/hackagent/models/provider_config",
+            "reference/hackagent/models/target_params"
           ],
           "label": "hackagent.models",
+          "type": "category"
+        },
+        {
+          "items": [
+            "reference/hackagent/orchestrator/run_spec"
+          ],
+          "label": "hackagent.orchestrator",
           "type": "category"
         },
         {

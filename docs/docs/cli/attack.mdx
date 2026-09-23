@@ -225,7 +225,7 @@ hackagent eval pair \
 | Config key | Required | Notes |
 |------------|----------|-------|
 | `goals` or `dataset` | ✅ | No usable default (`goals=[]`, `dataset=None`), must be provided |
-| `objective`, `attacker`, `n_iterations`, `output_dir` | ❌ | Required at runtime but defaulted in `DEFAULT_PAIR_CONFIG` |
+| `objective`, `attacker`, `n_iterations`, `output_dir` | ❌ | Required at runtime but defaulted on `PairConfig` (alias `DEFAULT_PAIR_CONFIG`) |
 | `judge`, `n_streams`, `early_stop_on_success`, `jailbreak_threshold` | ❌ | Optional PAIR settings (`range: binary|decimal`) |
 
 ### Example `pair.json`

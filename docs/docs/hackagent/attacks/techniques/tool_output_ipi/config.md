@@ -35,6 +35,15 @@ class ToolOutputIPIConfig(ConfigBase)
 
 Full typed configuration for the tool_output_ipi attack.
 
+#### roles\_from\_mapping
+
+```python
+@classmethod
+def roles_from_mapping(cls, data: Mapping[str, Any]) -> List[Dict[str, Any]]
+```
+
+Attacker only when ``use_attacker_llm`` is enabled; judges always.
+
 #### from\_dict
 
 ```python

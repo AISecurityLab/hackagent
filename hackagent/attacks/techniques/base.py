@@ -11,6 +11,16 @@ and evaluation, without knowledge of server integration.
 Architecture:
     HackAgent → AttackOrchestrator → BaseAttack → Pipeline stages
 
+Forward construction is ``BaseAttack(config, ctx)`` with
+``run(goals) -> list[AttackResult]``. ``config`` is an
+:class:`~hackagent.attacks.config.AttackConfig` (or a plain dict). ``ctx``
+is a :class:`~hackagent.attacks.ports.RunContext`. Pipeline stages may be
+typed :class:`~hackagent.attacks.ports.Step` values or legacy dicts.
+
+The orchestrator still instantiates shipped techniques as
+``(config_dict, client, agent_router)`` until they migrate. That legacy
+path, including ``client=`` as a keyword, remains supported.
+
 Attack techniques are organized in:
     techniques/advprefix/attack.py    - AdvPrefixAttack
     techniques/static_template/attack.py - StaticTemplateAttack
@@ -18,9 +28,8 @@ Attack techniques are organized in:
 
 Each technique:
 - Extends BaseAttack
-- Implements run() method with attack logic
-- Uses objectives from attacks/objectives/ for evaluation
-- Returns results in appropriate format (DataFrame, dict, etc.)
+- Implements run(goals)
+- Returns list[AttackResult]
 
 The orchestration layer (attacks/orchestrator.py) handles server integration,
 allowing techniques to focus solely on attack algorithms.
@@ -44,28 +53,35 @@ class BaseAttack(abc.ABC):
     Abstract base class for attack technique implementations.
 
     Provides common infrastructure that all attacks need:
-    - Configuration management (merging with defaults)
-    - Logging setup
+    - Configuration handling (typed :class:`~hackagent.attacks.config.AttackConfig` or dict)
     - Run directory management
     - Tracking initialization
-    - Parent result creation
-    - Pipeline execution framework
+    - Pipeline execution (typed :class:`~hackagent.attacks.ports.Step` or legacy dicts)
 
-    Subclasses only need to:
-    1. Define DEFAULT_CONFIG in their module
-    2. Implement _validate_config() for specific validation
-    3. Implement _get_pipeline_steps() to define their attack pipeline
-    4. Implement _build_step_args() if custom argument handling needed
+    Prefer ``BaseAttack(config, ctx)``. Logging handlers are not installed
+    here; interfaces own logging.
+
+    Subclasses:
+    1. Optionally set ``config_model`` to an AttackConfig subclass
+    2. Implement ``_validate_config()`` when extra validation is required
+    3. Implement ``_get_pipeline_steps()`` (``Step`` or legacy dict)
+    4. Implement ``run(goals)``
+
+    Shipped techniques still use the legacy ``(config, client, agent_router)``
+    constructor. Do not treat every technique as already migrated.
 
     Attributes:
-        config: Merged configuration dictionary
-        backend: Storage backend used for result tracking
-        agent_router: Target agent router for queries
-        logger: Logger instance for this attack
-        run_id: Unique run identifier
-        run_dir: Output directory for this run
-        coordinator: TrackingCoordinator for unified tracking
-        tracker: StepTracker for execution tracking (alias for coordinator.step_tracker)
+        config: Plain dict view of the attack config (``model_dump()`` when
+            an AttackConfig was passed).
+        attack_config: The AttackConfig instance, or None when a dict was passed.
+        ctx: RunContext on the new seam, otherwise None.
+        backend: Storage backend on the legacy path; None when ``ctx`` is set.
+        agent_router: Target router. On the new seam this is ``ctx.target``.
+        logger: Logger instance for this attack.
+        run_id: Unique run identifier (``ctx.run_id``, else the config dict).
+        run_dir: Output directory (``ctx.workspace.root``, else ``output_dir``).
+        coordinator: TrackingCoordinator for unified tracking.
+        tracker: StepTracker for execution tracking (alias for coordinator.step_tracker).
     """
 
     #: Optional typed config model for the technique (Phase 4+).
@@ -454,13 +470,17 @@ class BaseAttack(abc.ABC):
         """
         Define the attack pipeline configuration.
 
-        Returns a list of step configurations, each containing:
+        ``_execute_pipeline`` accepts a typed :class:`~hackagent.attacks.ports.Step`
+        or a legacy dict. Dict steps contain:
         - name: Human-readable step name
         - function: Callable to execute
         - step_type_enum: Type for tracking (GENERATION, EXECUTION, EVALUATION)
         - config_keys: List of config keys needed by this step
         - input_data_arg_name: Parameter name for input data
         - required_args: List of required arguments (logger, client, agent_router, etc.)
+
+        A ``Step`` maps ``name``, ``kind`` → ``step_type_enum``, ``fn`` →
+        ``function``, ``config_keys``, and ``input_arg`` → ``input_data_arg_name``.
 
         Example:
             return [

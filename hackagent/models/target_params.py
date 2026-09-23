@@ -4,8 +4,9 @@
 """Target generation parameters (moved out of attack configs).
 
 Preferred runtime source remains ``HackAgent(..., target_config=...)``.
-This typed model is the home for those knobs once Phase 5+ stops putting
-them on :class:`~hackagent.attacks.config.AttackConfig`.
+This typed model is the home for those knobs once technique configs stop
+inheriting them from
+:class:`~hackagent.attacks.techniques.config.ConfigBase`.
 """
 
 from __future__ import annotations

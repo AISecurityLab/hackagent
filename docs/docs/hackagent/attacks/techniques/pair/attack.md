@@ -71,7 +71,7 @@ Initialize PAIR attack.
 **Arguments**:
 
 - `config` - Optional configuration overrides merged into
-  :data:`~hackagent.attacks.techniques.pair.config.DEFAULT_PAIR_CONFIG`.
+  :class:`~hackagent.attacks.techniques.pair.config.PairConfig`.
 - `client` - Authenticated HackAgent API client.
 - `agent_router` - Router for the victim model.
   
