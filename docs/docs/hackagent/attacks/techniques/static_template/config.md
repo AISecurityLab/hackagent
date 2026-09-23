@@ -28,6 +28,15 @@ Configuration for static template attack pipeline.
 
 Deprecated compatibility field
 
+#### roles\_from\_mapping
+
+```python
+@classmethod
+def roles_from_mapping(cls, data: Mapping[str, Any]) -> List[Dict[str, Any]]
+```
+
+Static template always needs judge models for LLM-judge evaluation.
+
 #### from\_dict
 
 ```python

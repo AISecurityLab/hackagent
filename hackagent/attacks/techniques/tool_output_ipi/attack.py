@@ -31,6 +31,7 @@ from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
 
 from . import generation
 from .config import DEFAULT_TOOL_OUTPUT_IPI_CONFIG
+from hackagent.attacks.techniques.tool_output_ipi.config import ToolOutputIPIConfig
 
 
 def _recursive_update(target_dict: Dict[str, Any], source_dict: Dict[str, Any]) -> None:
@@ -56,6 +57,8 @@ class ToolOutputIPIAttack(BaseAttack):
     4. Judges whether the response or subsequent tool call follows the
        injected instructions (direct harm and/or data stealing).
     """
+
+    config_model = ToolOutputIPIConfig
 
     def __init__(
         self,
@@ -115,29 +118,6 @@ class ToolOutputIPIAttack(BaseAttack):
             raise ValueError(
                 "use_attacker_llm=True requires attacker.identifier in the attack config"
             )
-
-    @classmethod
-    def get_effective_model_roles(
-        cls,
-        attack_config: Dict[str, Any],
-        *,
-        goal_labels_by_index: Optional[Dict[int, Dict[str, str]]] = None,
-    ) -> List[Dict[str, Any]]:
-        """Declare attacker (optional) and judge model roles for preflight."""
-        _ = goal_labels_by_index
-        roles: List[Dict[str, Any]] = []
-
-        params = attack_config.get("tool_output_ipi_params") or {}
-        if params.get("use_attacker_llm"):
-            attacker = attack_config.get("attacker")
-            if isinstance(attacker, dict):
-                roles.append({"role": "attacker", "config": attacker, "required": True})
-
-        judges = attack_config.get("judges")
-        if isinstance(judges, list) and judges:
-            for judge in judges:
-                roles.append({"role": "judge", "config": judge, "required": False})
-        return roles
 
     def _get_pipeline_steps(self) -> List[Dict]:
         return [

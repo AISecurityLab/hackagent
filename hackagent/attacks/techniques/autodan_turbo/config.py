@@ -13,7 +13,7 @@ two phases:
 Based on: https://arxiv.org/abs/2410.05295
 """
 
-from typing import Any, Dict
+from typing import Mapping, Any, Dict, List
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -92,6 +92,45 @@ class AutoDANTurboConfig(ConfigBase):
         if isinstance(values, dict) and "scorer" in values and "judge" not in values:
             values["judge"] = values.pop("scorer")
         return values
+
+    @classmethod
+    def roles_from_mapping(cls, data: Mapping[str, Any]) -> List[Dict[str, Any]]:
+        """Attacker/judge/summarizer plus resolved embedder."""
+        from hackagent.attacks.techniques.config import resolve_embedder_config
+
+        roles: List[Dict[str, Any]] = []
+        for role_name in ("attacker", "judge", "summarizer"):
+            role_config = data.get(role_name) or (
+                data.get("scorer") if role_name == "judge" else None
+            )
+            if isinstance(role_config, dict) and role_config:
+                roles.append(
+                    {"role": role_name, "config": dict(role_config), "required": True}
+                )
+            elif hasattr(role_config, "model_dump"):
+                roles.append(
+                    {
+                        "role": role_name,
+                        "config": role_config.model_dump(),
+                        "required": True,
+                    }
+                )
+
+        # Embedder is always present via defaults for AutoDAN, matching prior
+        # get_effective_model_roles behaviour.
+        embedder = resolve_embedder_config(data.get("embedder"))
+        if isinstance(embedder, dict) and embedder:
+            roles.append(
+                {
+                    "role": "embedder",
+                    "config": embedder,
+                    "required": bool(data.get("_preflight_require_embedder", False)),
+                }
+            )
+        return roles
+
+    def roles(self) -> List[Dict[str, Any]]:
+        return self.roles_from_mapping(self.model_dump(exclude_unset=True))
 
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> "AutoDANTurboConfig":

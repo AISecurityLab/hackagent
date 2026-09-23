@@ -89,6 +89,7 @@ const sidebars: SidebarsConfig = {
       },
       items: [
         'attacks/taxonomy',
+        'attacks/seam',
         'attacks/shared-args',
         {
           type: 'category',
@@ -253,6 +254,7 @@ const sidebars: SidebarsConfig = {
             'hackagent/models/guardrail',
             'hackagent/models/envelope',
             'hackagent/models/provider_config',
+            'hackagent/models/target_params',
             {
               type: 'category',
               label: 'Adapters',
@@ -286,8 +288,12 @@ const sidebars: SidebarsConfig = {
           type: 'category',
           label: 'Attacks',
           items: [
+            'hackagent/attacks/ports',
+            'hackagent/attacks/config',
+            'hackagent/attacks/types',
             'hackagent/attacks/orchestrator',
             'hackagent/attacks/registry',
+            'hackagent/orchestrator/run_spec',
             {
               type: 'category',
               label: 'Evaluator',
@@ -306,6 +312,7 @@ const sidebars: SidebarsConfig = {
               label: 'Techniques',
               items: [
                 'hackagent/attacks/techniques/base',
+                'hackagent/attacks/techniques/config',
                 'hackagent/attacks/techniques/baseline/attack',
                 'hackagent/attacks/techniques/static_template/attack',
                 'hackagent/attacks/techniques/flipattack/attack',

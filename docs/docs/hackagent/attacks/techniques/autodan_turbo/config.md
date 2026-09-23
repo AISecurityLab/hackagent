@@ -29,6 +29,15 @@ class AutoDANTurboConfig(ConfigBase)
 
 Complete typed configuration for AutoDAN-Turbo.
 
+#### roles\_from\_mapping
+
+```python
+@classmethod
+def roles_from_mapping(cls, data: Mapping[str, Any]) -> List[Dict[str, Any]]
+```
+
+Attacker/judge/summarizer plus resolved embedder.
+
 #### from\_dict
 
 ```python

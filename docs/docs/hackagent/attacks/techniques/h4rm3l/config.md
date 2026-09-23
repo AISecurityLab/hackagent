@@ -80,6 +80,15 @@ Mirrors ``DEFAULT_H4RM3L_CONFIG`` as a typed alternative.  Call
 :meth:`model_dump` (or :meth:`to_dict`) to obtain the plain dict expected
 by the pipeline.
 
+#### roles\_from\_mapping
+
+```python
+@classmethod
+def roles_from_mapping(cls, data: Mapping[str, Any]) -> List[Dict[str, Any]]
+```
+
+Judges plus decorator_llm when the program uses LLM-assisted decorators.
+
 #### from\_dict
 
 ```python

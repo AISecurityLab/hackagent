@@ -8,7 +8,7 @@ Static template attacks use predefined prompt patterns to attempt jailbreaks,
 combining templates with goals to generate attack prompts.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Mapping, Any, Dict, List, Optional
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -123,6 +123,27 @@ class TemplateAttackConfig(ConfigBase):
             }
         )
         return self
+
+    @classmethod
+    def roles_from_mapping(cls, data: Mapping[str, Any]) -> List[Dict[str, Any]]:
+        """Static template always needs judge models for LLM-judge evaluation."""
+        judges = data.get("judges")
+        if isinstance(judges, list) and judges:
+            return [
+                {"role": "judge", "config": j, "required": False}
+                for j in judges
+                if isinstance(j, dict)
+            ]
+        judge = data.get("judge")
+        if isinstance(judge, dict) and judge:
+            return [{"role": "judge", "config": judge, "required": False}]
+        judge_config = data.get("judge_config")
+        if isinstance(judge_config, dict) and judge_config:
+            return [{"role": "judge", "config": judge_config, "required": False}]
+        return []
+
+    def roles(self) -> List[Dict[str, Any]]:
+        return self.roles_from_mapping(self.model_dump(exclude_unset=True))
 
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> "TemplateAttackConfig":

@@ -5,14 +5,21 @@ title: hackagent.attacks.techniques.config
 
 Shared Pydantic configuration primitives for attack techniques.
 
-This module is the single source of truth for the pieces that are genuinely
-standard across attacks:
+This module holds the shared pieces that shipped technique configs still use:
 
 * attacker routing defaults
 * judge routing defaults
 * judge-evaluation scalars
 * goals/dataset input shape
 * run/output bookkeeping
+
+The forward technique seam is :class:`hackagent.attacks.config.AttackConfig`
+(technique parameters and role fields only, ``extra=&quot;forbid&quot;``). Run
+bookkeeping belongs on :class:`hackagent.orchestrator.run_spec.RunSpec` and
+target generation knobs on :class:`hackagent.models.target_params.TargetParams`.
+Those types exist; shipped technique configs still subclass :class:`ConfigBase`,
+which mixes the concerns, until they migrate. ``HackAgent.hack`` callers still
+pass the plain ``attack_config`` dict described here.
 
 Technique-specific modules should extend these building blocks with their own
 algorithm parameters, but they should not redefine the shared defaults.

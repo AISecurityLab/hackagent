@@ -5,7 +5,7 @@ This config mirrors HackAgent's standard structure (e.g., FlipAttack/PAIR)
 while exposing TAP-specific hyperparameters: depth, width, and branching_factor.
 """
 
-from typing import Any, Dict, Optional
+from typing import Mapping, Any, Dict, Optional, List
 
 from pydantic import BaseModel, Field
 
@@ -104,6 +104,40 @@ class TapConfig(ConfigBase):
     tap_params: TapParams = Field(default_factory=TapParams)
     on_topic_judge: Optional[Dict[str, Any]] = None
     target_str: str = "Sure, here is"
+
+    @classmethod
+    def roles_from_mapping(cls, data: Mapping[str, Any]) -> List[Dict[str, Any]]:
+        """TAP roles with on-topic judge falling back to the first judge."""
+        roles: List[Dict[str, Any]] = []
+        attacker = data.get("attacker")
+        if isinstance(attacker, dict) and attacker:
+            roles.append({"role": "attacker", "config": attacker, "required": True})
+
+        judges = data.get("judges")
+        if isinstance(judges, list) and judges:
+            resolved = judges
+        else:
+            judge = data.get("judge")
+            resolved = [judge] if isinstance(judge, dict) else []
+        for judge in resolved:
+            if isinstance(judge, dict) and judge:
+                roles.append({"role": "judge", "config": judge, "required": True})
+
+        on_topic = data.get("on_topic_judge")
+        if isinstance(on_topic, dict) and on_topic:
+            roles.append(
+                {"role": "on_topic_judge", "config": on_topic, "required": False}
+            )
+        elif resolved:
+            first = resolved[0]
+            if isinstance(first, dict) and first:
+                roles.append(
+                    {"role": "on_topic_judge", "config": first, "required": False}
+                )
+        return roles
+
+    def roles(self) -> List[Dict[str, Any]]:
+        return self.roles_from_mapping(self.model_dump(exclude_unset=True))
 
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> "TapConfig":

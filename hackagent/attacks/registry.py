@@ -12,7 +12,9 @@ The factory dynamically creates orchestrator classes that configure:
 - attack_impl_class: BaseAttack subclass implementing the algorithm
 
 To add a new attack:
-1. Implement BaseAttack subclass in techniques/your_attack/
+1. Implement a BaseAttack subclass in techniques/your_attack/.
+   Prefer ``BaseAttack(config, ctx)`` and ``run(goals)``. The orchestrator
+   still constructs shipped techniques with ``(config_dict, client, agent_router)``.
 2. Register here using create_orchestrator()
 3. Add to ATTACK_REGISTRY dict
 4. Assign exactly one primary category (and any tags) in taxonomy.py

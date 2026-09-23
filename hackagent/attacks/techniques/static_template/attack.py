@@ -19,6 +19,7 @@ from hackagent.attacks.types import AttackResult, rows_to_attack_results
 
 from . import generation, static_eval as evaluation
 from .config import DEFAULT_TEMPLATE_CONFIG, validate_template_config
+from hackagent.attacks.techniques.static_template.config import TemplateAttackConfig
 
 
 class StaticTemplateAttack(BaseAttack):
@@ -48,6 +49,8 @@ class StaticTemplateAttack(BaseAttack):
         agent_router: Router for the victim model.
         logger: Hierarchical logger at ``hackagent.attacks.static_template``.
     """
+
+    config_model = TemplateAttackConfig
 
     def __init__(
         self,
@@ -119,33 +122,6 @@ class StaticTemplateAttack(BaseAttack):
             raise ValueError(
                 f"Unknown objective: {objective}. Available: {list(OBJECTIVES.keys())}"
             )
-
-    @classmethod
-    def get_effective_model_roles(
-        cls,
-        attack_config: Dict[str, Any],
-        *,
-        goal_labels_by_index: Optional[Dict[int, Dict[str, str]]] = None,
-    ) -> List[Dict[str, Any]]:
-        """Return model roles needed by static template evaluation.
-
-        Static template always evaluates with LLM judges.
-        """
-        _ = goal_labels_by_index
-
-        judges = attack_config.get("judges")
-        if isinstance(judges, list) and judges:
-            return [{"role": "judge", "config": judge} for judge in judges]
-
-        judge = attack_config.get("judge")
-        if isinstance(judge, dict):
-            return [{"role": "judge", "config": judge}]
-
-        judge_config = attack_config.get("judge_config")
-        if isinstance(judge_config, dict):
-            return [{"role": "judge", "config": judge_config}]
-
-        return []
 
     def _get_pipeline_steps(self) -> List[Dict]:
         """

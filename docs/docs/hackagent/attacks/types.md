@@ -34,6 +34,9 @@ Every attack technique returns ``list[AttackResult]`` from ``run()``
 instead of ad-hoc dicts/DataFrames/objects, so downstream orchestration
 code no longer has to guess field names.
 
+``verdict`` is an optional aggregate
+:class:`~hackagent.core.contracts.Verdict` when the technique produced one.
+
 #### from\_row
 
 ```python

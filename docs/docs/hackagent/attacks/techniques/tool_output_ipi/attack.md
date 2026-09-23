@@ -33,20 +33,6 @@ For each malicious goal the attack:
 4. Judges whether the response or subsequent tool call follows the
    injected instructions (direct harm and/or data stealing).
 
-#### get\_effective\_model\_roles
-
-```python
-@classmethod
-def get_effective_model_roles(
-    cls,
-    attack_config: Dict[str, Any],
-    *,
-    goal_labels_by_index: Optional[Dict[int, Dict[str, str]]] = None
-) -> List[Dict[str, Any]]
-```
-
-Declare attacker (optional) and judge model roles for preflight.
-
 #### run
 
 ```python

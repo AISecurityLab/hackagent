@@ -104,7 +104,9 @@ One growing conversation with the target.
 :::tip Shared configuration
 Keys such as `goals`, `dataset`, `intents`, `objective`, `attacker`, `judges`, batching (`batch_size`, `goal_batch_size`, `goal_batch_workers`, `judge_concurrency`), `output_dir`, and `category_classifier` are documented on **[Shared Attack Config](./shared-args.md)**. Attack pages cover technique-specific options and say exactly whether those live in a `*_params` block or at the top level.
 
-Crescendo, PAIR, and AdvPrefix still put many attack-specific keys at the top level (`max_turns`, `n_iterations`, `meta_prefixes`). AutoDAN-Turbo, PAP, CipherChat, MML, and others already nest theirs under `*_params`. The long-term convention is one nested `*_params` field per attack; that API change is **not** in this docs-only update.
+Crescendo, PAIR, and AdvPrefix still put many attack-specific keys at the top level (`max_turns`, `n_iterations`, `meta_prefixes`). AutoDAN-Turbo, PAP, CipherChat, MML, and others already nest theirs under `*_params`. The long-term convention is one nested `*_params` field per attack; that layout change is still ahead.
+
+Technique authors: the forward constructor is [`BaseAttack(config, ctx)`](./seam.md). The attacks on this page are still launched with the `attack_config` dict above.
 :::
 
 :::tip Dataset Support

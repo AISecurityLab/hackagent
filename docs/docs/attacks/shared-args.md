@@ -4,7 +4,9 @@ sidebar_position: 0
 
 # Shared Attack Config
 
-Most keys in `attack_config` are **shared** across attacks. Technique-specific options live in a nested `*_params` block (or, for a few older attacks, at the top level). This page is the source of truth for the shared layer. Individual attack pages document only their own keys and point here for the rest.
+Most keys in `attack_config` are **shared** across attacks. Technique-specific options live in a nested `*_params` block (or, for a few older attacks, at the top level). This page is the source of truth for the shared layer that `HackAgent.hack`, the CLI, and shipped techniques still read. Individual attack pages document only their own keys and point here for the rest.
+
+Technique authors building on the forward seam use [`AttackConfig`](./seam.md) plus [`RunContext`](./seam.md#runcontext) and `BaseAttack(config, ctx)`. [`RunSpec`](../hackagent/orchestrator/run_spec.md) and [`TargetParams`](../hackagent/models/target_params.md) are the typed homes for run bookkeeping and target generation. Shipped technique models still subclass `ConfigBase` (goals, batching, output, and target knobs together) until that migration. Use this page for the dict those techniques read today.
 
 ---
 

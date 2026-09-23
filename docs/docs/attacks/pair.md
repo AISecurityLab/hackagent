@@ -172,7 +172,7 @@ advanced_config = {
 
 ### Configuration Parameters
 
-These keys are **top-level** on `attack_config` (not inside a `pair_params` block). Defaults below are from `DEFAULT_PAIR_CONFIG`. Shared keys: [Shared Attack Config](./shared-args.md).
+These keys are **top-level** on `attack_config` (not inside a `pair_params` block). Defaults below come from `PairConfig` (attacker `max_tokens=500`). `DEFAULT_PAIR_CONFIG` is still the dict alias of `PairConfig().to_dict()`. Shared keys: [Shared Attack Config](./shared-args.md). The forward constructor is [Attack seam](./seam.md).
 
 | Parameter | Description | Default | Range |
 |-----------|-------------|---------|-------|

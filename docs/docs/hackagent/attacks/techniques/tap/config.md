@@ -24,6 +24,15 @@ class TapConfig(ConfigBase)
 
 Complete TAP configuration for use with HackAgent.hack().
 
+#### roles\_from\_mapping
+
+```python
+@classmethod
+def roles_from_mapping(cls, data: Mapping[str, Any]) -> List[Dict[str, Any]]
+```
+
+TAP roles with on-topic judge falling back to the first judge.
+
 #### from\_dict
 
 ```python

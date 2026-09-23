@@ -53,7 +53,7 @@ v2 (``.then()`` chaining)::
     "Base64Decorator().then(RefusalSuppressionDecorator())"
 """
 
-from typing import Any, Dict, Literal
+from typing import Mapping, Any, Dict, Literal, List
 
 from pydantic import BaseModel, Field
 
@@ -172,6 +172,45 @@ class H4rm3lConfig(ConfigBase):
 
     attack_type: str = "h4rm3l"
     h4rm3l_params: H4rm3lParams = Field(default_factory=H4rm3lParams)
+
+    @classmethod
+    def roles_from_mapping(cls, data: Mapping[str, Any]) -> List[Dict[str, Any]]:
+        """Judges plus decorator_llm when the program uses LLM-assisted decorators."""
+        from hackagent.attacks.techniques.h4rm3l.decorators import (
+            program_uses_llm_assisted_decorators,
+        )
+
+        roles: List[Dict[str, Any]] = []
+        judges = data.get("judges")
+        if isinstance(judges, list) and judges:
+            for judge in judges:
+                if isinstance(judge, dict) and judge:
+                    roles.append({"role": "judge", "config": judge, "required": False})
+        else:
+            judge = data.get("judge")
+            if isinstance(judge, dict) and judge:
+                roles.append({"role": "judge", "config": judge, "required": False})
+
+        params = data.get("h4rm3l_params") or {}
+        if not isinstance(params, dict):
+            params = {}
+        program_ref = params.get("program", "IdentityDecorator()")
+        syntax_version = params.get("syntax_version", 2)
+        resolved_program = PRESET_PROGRAMS.get(program_ref, program_ref)
+        if program_uses_llm_assisted_decorators(resolved_program, syntax_version):
+            decorator_llm = data.get("decorator_llm")
+            if isinstance(decorator_llm, dict) and decorator_llm:
+                roles.append(
+                    {
+                        "role": "decorator_llm",
+                        "config": decorator_llm,
+                        "required": False,
+                    }
+                )
+        return roles
+
+    def roles(self) -> List[Dict[str, Any]]:
+        return self.roles_from_mapping(self.model_dump(exclude_unset=True))
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "H4rm3lConfig":
