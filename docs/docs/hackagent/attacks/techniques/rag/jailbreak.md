@@ -37,7 +37,7 @@ Return the jailbreak-framed goal and its metadata.
 def build_jailbreak_framer(
         config: Optional[Dict[str, Any]],
         logger: logging.Logger,
-        attacker_router: Optional[AgentRouter] = None,
+        attacker_router: Optional[LLMRouter] = None,
         attacker_reg_key: Optional[str] = None) -> Optional[JailbreakFramer]
 ```
 

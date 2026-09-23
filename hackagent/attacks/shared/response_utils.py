@@ -44,7 +44,7 @@ def extract_response_content(
     4. **None / empty** — returns None
 
     Args:
-        response: The raw response from an AgentRouter or LLM call.
+        response: The raw response envelope from a model call.
             Can be an OpenAI ChatCompletion object, a dict from a
             custom adapter, a plain string, or None.
         logger: Optional logger for warnings. Falls back to module logger.

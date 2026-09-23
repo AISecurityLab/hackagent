@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.storage.store import Store
-from hackagent.models.router import AgentRouter
+from hackagent.attacks.shared.llm_router import LLMRouter
 
 from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
 
@@ -46,12 +46,12 @@ class CipherChatAttack(BaseAttack):
         self,
         config: Optional[Dict[str, Any]] = None,
         client: Optional[Store] = None,
-        agent_router: Optional[AgentRouter] = None,
+        agent_router: Optional[LLMRouter] = None,
     ):
         if client is None:
             raise ValueError("A storage backend must be provided to CipherChat.")
         if agent_router is None:
-            raise ValueError("Victim AgentRouter must be provided to CipherChat.")
+            raise ValueError("Victim LLMRouter must be provided to CipherChat.")
 
         current_config = copy.deepcopy(DEFAULT_CIPHERCHAT_CONFIG)
         if config:

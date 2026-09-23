@@ -10,20 +10,11 @@ objectives and techniques.
 
 from .progress import create_progress_bar
 from .response_utils import extract_response_content
-from .router_factory import create_router
-from .guardrail import (
-    BaseGuardrail,
-    GuardrailResult,
-    LLMGuardrail,
-    create_guardrail_from_config,
-)
+from .llm_router import LLMRouter, connect_role
 
 __all__ = [
     "create_progress_bar",
-    "create_router",
+    "connect_role",
     "extract_response_content",
-    "BaseGuardrail",
-    "GuardrailResult",
-    "LLMGuardrail",
-    "create_guardrail_from_config",
+    "LLMRouter",
 ]

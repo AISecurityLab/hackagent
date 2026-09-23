@@ -27,14 +27,13 @@ class TestGoalClassificationCache(unittest.TestCase):
         """Build a classifier with a stubbed router that records calls."""
         clf = GoalCategoryClassifier(backend=None)
         clf._config["identifier"] = identifier
-        clf._router = MagicMock()
-        clf._router.route_request.return_value = {
+        clf._llm = MagicMock()
+        clf._llm.send.return_value = {
             "generated_text": (
                 "CATEGORY: D. Criminal and Economic Risks\n"
                 "SUBCATEGORY: D1. Fraud or Scams"
             )
         }
-        clf._registration_key = "k"
         clf._enabled = True
         return clf
 
@@ -47,7 +46,7 @@ class TestGoalClassificationCache(unittest.TestCase):
 
         self.assertEqual(first, second)
         self.assertEqual(first["subcategory"], "D1. Fraud or Scams")
-        clf._router.route_request.assert_called_once()
+        clf._llm.send.assert_called_once()
 
     def test_cache_shared_across_classifier_instances(self):
         # Each attack builds its own classifier; the cache must survive that.
@@ -58,7 +57,7 @@ class TestGoalClassificationCache(unittest.TestCase):
         second = self._make_classifier()
         second.classify_goal(goal)
 
-        second._router.route_request.assert_not_called()
+        second._llm.send.assert_not_called()
 
     def test_different_identifier_does_not_collide(self):
         a = self._make_classifier(identifier="model-a")
@@ -68,7 +67,7 @@ class TestGoalClassificationCache(unittest.TestCase):
         a.classify_goal(goal)
         b.classify_goal(goal)
 
-        b._router.route_request.assert_called_once()
+        b._llm.send.assert_called_once()
 
 
 class TestTrackerGoalClassification(unittest.TestCase):

@@ -3,12 +3,8 @@
 
 """
 Envelope helpers — pure functions that translate between LiteLLM's
-``ModelResponse`` and HackAgent's standardized response dict.
-
-This module exists as the Phase A landing zone of the
-``LITELLM_ROUTER_REFACTOR_PLAN.md`` plan: extract the response-shaping
-logic out of the adapter classes so it can be reused by
-``AgentRouter`` once the call path is hoisted in Phase C.
+``ModelResponse``, HackAgent's standardized response dict (the
+"envelope") and the typed :class:`~hackagent.core.contracts.Completion`.
 
 The functions here are intentionally:
 - pure: no I/O, no logging side effects, no LiteLLM imports at module
@@ -20,7 +16,17 @@ The functions here are intentionally:
   seeing exactly the same dict shape.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence, Union
+
+from hackagent.core.contracts import (
+    Completion,
+    GuardrailInfo,
+    LLMError,
+    Message,
+    RawExchange,
+    ToolCall,
+    Usage,
+)
 
 
 # Provider prefixes that LiteLLM recognises natively. When a model string
@@ -342,3 +348,185 @@ def extract_litellm_call_id(response: Any) -> Optional[str]:
     if response_id:
         return str(response_id)
     return None
+
+
+# ---- requests ------------------------------------------------------------
+
+
+def prompt_text(request_data: Dict[str, Any]) -> str:
+    """Return the text a guardrail should classify for ``request_data``.
+
+    That is the last user message, else every message's content joined,
+    else the plain ``prompt`` field some techniques send (e.g. h4rm3l).
+    """
+    messages = request_data.get("messages") or []
+    for msg in reversed(messages):
+        if isinstance(msg, dict) and msg.get("role") == "user":
+            return str(msg.get("content") or "")
+    if messages:
+        return " ".join(
+            str(m.get("content") or "") for m in messages if isinstance(m, dict)
+        )
+    prompt = request_data.get("prompt")
+    if prompt:
+        return str(prompt)
+    return ""
+
+
+def _message_to_dict(message: Message) -> Dict[str, Any]:
+    out: Dict[str, Any] = {"role": message.role, "content": message.content}
+    if message.tool_calls:
+        out["tool_calls"] = [
+            {
+                "id": call.id,
+                "type": "function",
+                "function": {"name": call.name, "arguments": call.arguments},
+            }
+            for call in message.tool_calls
+        ]
+    if message.tool_call_id is not None:
+        out["tool_call_id"] = message.tool_call_id
+    return out
+
+
+def request_from_messages(
+    messages: Union[str, Sequence[Message]], params: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Build the request dict adapters take from messages and call params."""
+    if isinstance(messages, str):
+        chat = [{"role": "user", "content": messages}]
+    else:
+        chat = [_message_to_dict(m) for m in messages]
+    return {**params, "messages": chat}
+
+
+# ---- envelopes -> Completion --------------------------------------------
+
+
+def _tool_calls_from(raw: Any) -> List[ToolCall]:
+    calls: List[ToolCall] = []
+    for item in raw or []:
+        if not isinstance(item, dict):
+            continue
+        function = item.get("function") or {}
+        name = function.get("name")
+        if not name:
+            continue
+        calls.append(
+            ToolCall(
+                id=item.get("id"),
+                name=name,
+                arguments=function.get("arguments") or "",
+            )
+        )
+    return calls
+
+
+def _usage_from(raw: Any) -> Optional[Usage]:
+    if not isinstance(raw, dict):
+        return None
+    return Usage(
+        prompt_tokens=raw.get("prompt_tokens"),
+        completion_tokens=raw.get("completion_tokens"),
+        total_tokens=raw.get("total_tokens"),
+    )
+
+
+def to_completion(envelope: Dict[str, Any]) -> Completion:
+    """Convert a response envelope into a :class:`Completion`."""
+    data = envelope.get("agent_specific_data") or {}
+    if not isinstance(data, dict):
+        data = {}
+
+    guardrail = None
+    if data.get("guardrail"):
+        guardrail = GuardrailInfo(
+            side=data.get("side") or "before",
+            message=data.get("message") or "",
+            categories=list(data.get("categories") or []),
+            reasoning=data.get("reasoning") or "",
+        )
+
+    status_code = envelope.get("status_code", envelope.get("raw_response_status"))
+    error = None
+    if envelope.get("error_message"):
+        error = LLMError(
+            message=str(envelope["error_message"]),
+            category=envelope.get("error_category"),
+            status_code=status_code,
+        )
+
+    text = envelope.get("processed_response")
+    if text is None:
+        text = envelope.get("generated_text")
+
+    extra = {
+        key: data[key]
+        for key in ("model_name", "response_cost", "litellm_call_id")
+        if data.get(key) is not None
+    }
+    if envelope.get("adapter_type"):
+        extra["adapter_type"] = envelope["adapter_type"]
+
+    return Completion(
+        text=text,
+        tool_calls=_tool_calls_from(data.get("tool_calls")),
+        usage=_usage_from(data.get("usage")),
+        finish_reason=data.get("finish_reason"),
+        provider_model=data.get("provider_model"),
+        invoked_parameters=dict(data.get("invoked_parameters") or {}),
+        raw=RawExchange(
+            request=dict(envelope.get("raw_request") or {}),
+            status_code=status_code,
+            headers=envelope.get("raw_response_headers"),
+            body=envelope.get("raw_response_body"),
+        ),
+        error=error,
+        guardrail=guardrail,
+        extra=extra,
+    )
+
+
+# ---- guardrail envelopes -------------------------------------------------
+
+_GUARDRAIL_OUTCOMES = {
+    "before": (
+        "before_guardrail_blocked",
+        "Request blocked: flagged as unsafe by guardrail.",
+    ),
+    "after": (
+        "after_guardrail_censored",
+        "Response censored: flagged as unsafe by guardrail.",
+    ),
+}
+
+
+def build_guardrail_envelope(
+    *,
+    side: str,
+    agent_id: str,
+    request_data: Dict[str, Any],
+    categories: List[str],
+    reasoning: str,
+) -> Dict[str, Any]:
+    """Construct the envelope returned when a guardrail blocks a call."""
+    guardrail, message = _GUARDRAIL_OUTCOMES[side]
+    return {
+        "raw_request": request_data,
+        "processed_response": None,
+        "generated_text": None,
+        "raw_response_status": 200,
+        "raw_response_headers": None,
+        "raw_response_body": None,
+        "agent_specific_data": {
+            "guardrail": guardrail,
+            "side": side,
+            "message": message,
+            "categories": categories,
+            "reasoning": reasoning,
+        },
+        "error_message": None,
+        "error_category": None,
+        "agent_id": agent_id,
+        "adapter_type": "guardrail",
+    }

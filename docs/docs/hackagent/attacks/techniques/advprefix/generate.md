@@ -54,7 +54,7 @@ Key Benefits:
 def __init__(config: Dict[str, Any],
              logger: logging.Logger,
              client: Store,
-             agent_router: Optional[AgentRouter] = None)
+             agent_router: Optional[LLMRouter] = None)
 ```
 
 Initialize the pipeline with configuration and dependencies.

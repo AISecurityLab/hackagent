@@ -37,7 +37,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from hackagent.storage.store import Store
-from hackagent.models.router import AgentRouter
+from hackagent.attacks.shared.llm_router import LLMRouter
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 
@@ -90,7 +90,7 @@ class BoNAttack(BaseAttack):
         self,
         config: Optional[Dict[str, Any]] = None,
         client: Optional[Store] = None,
-        agent_router: Optional[AgentRouter] = None,
+        agent_router: Optional[LLMRouter] = None,
     ):
         """Initialise BoNAttack with configuration.
 
@@ -98,7 +98,7 @@ class BoNAttack(BaseAttack):
             config: Optional dictionary overriding
                 :data:`~hackagent.attacks.techniques.bon.config.DEFAULT_BON_CONFIG`.
             client: Store instance from the orchestrator.
-            agent_router: AgentRouter instance for the target model.
+            agent_router: LLMRouter instance for the target model.
 
         Raises:
             ValueError: If *client* or *agent_router* is ``None``.
@@ -106,9 +106,7 @@ class BoNAttack(BaseAttack):
         if client is None:
             raise ValueError("A storage backend must be provided to BoNAttack.")
         if agent_router is None:
-            raise ValueError(
-                "Victim AgentRouter instance must be provided to BoNAttack."
-            )
+            raise ValueError("Victim LLMRouter instance must be provided to BoNAttack.")
 
         # Merge user config with defaults
         current_config = copy.deepcopy(DEFAULT_BON_CONFIG)

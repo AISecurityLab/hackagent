@@ -23,7 +23,7 @@ def ensure_registered() -> bool
 
 Register the tracking logger on ``litellm.callbacks`` exactly once.
 
-Idempotent — safe to call from every ``AgentRouter.__init__``.
+Idempotent — safe to call from every ``connect``.
 Returns ``True`` when registration is in effect (either because we
 just registered or because we already had).
 

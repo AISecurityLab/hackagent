@@ -433,9 +433,9 @@ class TestBrowserSessionThreadAffinity(unittest.TestCase):
 
 class TestRouterRegistration(unittest.TestCase):
     def test_web_agent_in_adapter_map(self):
-        from hackagent.models.router import AGENT_TYPE_TO_ADAPTER_MAP
+        from hackagent.models.dispatch import ADAPTER_CLASSES
 
-        self.assertIs(AGENT_TYPE_TO_ADAPTER_MAP[AgentType.WEB], WebAgent)
+        self.assertIs(ADAPTER_CLASSES[AgentType.WEB], WebAgent)
 
 
 if __name__ == "__main__":

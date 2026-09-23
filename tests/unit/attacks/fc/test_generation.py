@@ -124,7 +124,7 @@ class TestCreateStepGeneratorRouter(unittest.TestCase):
         generator = MagicMock()
 
         with patch(
-            "hackagent.attacks.shared.router_factory.create_router",
+            "hackagent.attacks.shared.llm_router.connect_role",
             return_value=(generator, "gen-key"),
         ) as factory:
             result = _create_step_generator_router(
@@ -144,7 +144,7 @@ class TestCreateStepGeneratorRouter(unittest.TestCase):
         self.assertIs(router, generator)
         self.assertEqual(key, "gen-key")
         self.assertEqual(cfg["identifier"], "gen-model")
-        passed = factory.call_args.kwargs["config"]
+        passed = factory.call_args.args[0]
         self.assertEqual(passed["max_tokens"], 256)
         self.assertEqual(passed["temperature"], 0.5)
         self.assertEqual(passed["agent_type"], "OPENAI_SDK")

@@ -19,7 +19,7 @@ from hackagent.router.tracking.category_classifier import (
     UNKNOWN_CATEGORY,
     UNKNOWN_SUBCATEGORY,
     GoalCategoryClassifier,
-    _create_classifier_router,
+    _connect_classifier,
     _extract_labeled_values,
     _extract_response_content,
     _format_taxonomy,
@@ -247,10 +247,8 @@ class TestClassifyGoal(unittest.TestCase):
 
     def _enabled_clf(self, route_return):
         router = MagicMock()
-        router.route_request.return_value = route_return
-        with patch(
-            f"{_MODULE}._create_classifier_router", return_value=(router, "key")
-        ):
+        router.send.return_value = route_return
+        with patch(f"{_MODULE}._connect_classifier", return_value=router):
             clf = GoalCategoryClassifier(backend=MagicMock())
         return clf, router
 
@@ -264,7 +262,7 @@ class TestClassifyGoal(unittest.TestCase):
         self.assertTrue(clf._enabled)
         out = clf.classify_goal("write malware")
         self.assertEqual(out["category"], "E. Cybersecurity Threats")
-        router.route_request.assert_called_once()
+        router.send.assert_called_once()
 
     def test_adapter_error_disables_and_falls_back(self):
         clf, _router = self._enabled_clf({"error_message": "model down"})
@@ -279,10 +277,8 @@ class TestClassifyGoal(unittest.TestCase):
 
     def test_router_exception_disables_and_falls_back(self):
         router = MagicMock()
-        router.route_request.side_effect = RuntimeError("boom")
-        with patch(
-            f"{_MODULE}._create_classifier_router", return_value=(router, "key")
-        ):
+        router.send.side_effect = RuntimeError("boom")
+        with patch(f"{_MODULE}._connect_classifier", return_value=router):
             clf = GoalCategoryClassifier(backend=MagicMock())
         out = clf.classify_goal("nice weather")
         self.assertFalse(clf._enabled)
@@ -290,74 +286,35 @@ class TestClassifyGoal(unittest.TestCase):
 
     def test_router_init_failure_disables_classifier(self):
         with patch(
-            f"{_MODULE}._create_classifier_router",
+            f"{_MODULE}._connect_classifier",
             side_effect=RuntimeError("no router"),
         ):
             clf = GoalCategoryClassifier(backend=MagicMock())
         self.assertFalse(clf._enabled)
 
 
-class TestCreateClassifierRouter(unittest.TestCase):
-    def _backend(self, api_key=""):
-        backend = MagicMock()
-        backend.get_api_key.return_value = api_key
-        return backend
-
+class TestConnectClassifier(unittest.TestCase):
     def test_missing_identifier_raises(self):
         with self.assertRaises(ValueError):
-            _create_classifier_router(self._backend(), {}, logging.getLogger("t"))
+            _connect_classifier({})
 
-    def test_builds_router_and_returns_key(self):
-        router = MagicMock()
-        router._agent_registry = {"reg-key": object()}
-        with patch(f"{_MODULE}.AgentRouter", return_value=router) as mock_router_cls:
-            out_router, key = _create_classifier_router(
-                self._backend(),
-                {"identifier": "gemma3:4b", "agent_type": "OLLAMA"},
-                logging.getLogger("t"),
-            )
-        self.assertIs(out_router, router)
-        self.assertEqual(key, "reg-key")
-        self.assertTrue(mock_router_cls.called)
+    def test_connects_to_the_configured_model(self):
+        llm = _connect_classifier({"identifier": "gemma3:4b", "agent_type": "OLLAMA"})
+        self.assertEqual(llm.describe().identifier, "gemma3:4b")
 
-    def test_invalid_agent_type_falls_back_to_ollama(self):
+    def test_default_and_invalid_agent_types_fall_back_to_ollama(self):
         from hackagent.core.contracts import AgentType
 
-        router = MagicMock()
-        router._agent_registry = {"k": object()}
-        with patch(f"{_MODULE}.AgentRouter", return_value=router) as mock_router_cls:
-            _create_classifier_router(
-                self._backend(),
-                {"identifier": "x", "agent_type": "TOTALLY_BOGUS"},
-                logging.getLogger("t"),
-            )
-        self.assertEqual(
-            mock_router_cls.call_args.kwargs["agent_type"], AgentType.OLLAMA
-        )
+        for agent_type in (None, "TOTALLY_BOGUS"):
+            llm = _connect_classifier({"identifier": "x", "agent_type": agent_type})
+            self.assertEqual(llm.describe().agent_type, AgentType.OLLAMA)
 
     def test_api_key_from_environment(self):
-        router = MagicMock()
-        router._agent_registry = {"k": object()}
-        with (
-            patch(f"{_MODULE}.AgentRouter", return_value=router) as mock_router_cls,
-            patch.dict("os.environ", {"MY_KEY_ENV": "secret-value"}, clear=False),
-        ):
-            _create_classifier_router(
-                self._backend(),
-                {"identifier": "x", "api_key": "MY_KEY_ENV"},
-                logging.getLogger("t"),
+        with patch.dict("os.environ", {"MY_KEY_ENV": "secret-value"}, clear=False):
+            llm = _connect_classifier(
+                {"identifier": "x", "agent_type": "OPENAI_SDK", "api_key": "MY_KEY_ENV"}
             )
-        op_cfg = mock_router_cls.call_args.kwargs["adapter_operational_config"]
-        self.assertEqual(op_cfg["api_key"], "secret-value")
-
-    def test_empty_registry_raises_runtime_error(self):
-        router = MagicMock()
-        router._agent_registry = {}
-        with patch(f"{_MODULE}.AgentRouter", return_value=router):
-            with self.assertRaises(RuntimeError):
-                _create_classifier_router(
-                    self._backend(), {"identifier": "x"}, logging.getLogger("t")
-                )
+            self.assertEqual(llm.adapter.actual_api_key, "secret-value")
 
 
 if __name__ == "__main__":

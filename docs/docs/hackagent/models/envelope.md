@@ -4,12 +4,8 @@ title: hackagent.models.envelope
 ---
 
 Envelope helpers — pure functions that translate between LiteLLM&#x27;s
-``ModelResponse`` and HackAgent&#x27;s standardized response dict.
-
-This module exists as the Phase A landing zone of the
-``LITELLM_ROUTER_REFACTOR_PLAN.md`` plan: extract the response-shaping
-logic out of the adapter classes so it can be reused by
-``AgentRouter`` once the call path is hoisted in Phase C.
+``ModelResponse``, HackAgent&#x27;s standardized response dict (the
+&quot;envelope&quot;) and the typed :class:`~hackagent.core.contracts.Completion`.
 
 The functions here are intentionally:
 - pure: no I/O, no logging side effects, no LiteLLM imports at module
@@ -159,4 +155,43 @@ def extract_litellm_call_id(response: Any) -> Optional[str]
 ```
 
 Pull ``litellm_call_id`` (or ``x-litellm-call-id``) off a response.
+
+#### prompt\_text
+
+```python
+def prompt_text(request_data: Dict[str, Any]) -> str
+```
+
+Return the text a guardrail should classify for ``request_data``.
+
+That is the last user message, else every message&#x27;s content joined,
+else the plain ``prompt`` field some techniques send (e.g. h4rm3l).
+
+#### request\_from\_messages
+
+```python
+def request_from_messages(messages: Union[str, Sequence[Message]],
+                          params: Dict[str, Any]) -> Dict[str, Any]
+```
+
+Build the request dict adapters take from messages and call params.
+
+#### to\_completion
+
+```python
+def to_completion(envelope: Dict[str, Any]) -> Completion
+```
+
+Convert a response envelope into a :class:`Completion`.
+
+#### build\_guardrail\_envelope
+
+```python
+def build_guardrail_envelope(*, side: str, agent_id: str,
+                             request_data: Dict[str,
+                                                Any], categories: List[str],
+                             reasoning: str) -> Dict[str, Any]
+```
+
+Construct the envelope returned when a guardrail blocks a call.
 

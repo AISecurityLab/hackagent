@@ -379,7 +379,7 @@ uv run ruff check .
 ### Core Components
 
 1. **HackAgent**: Main client class
-2. **AgentRouter**: Manages agent registration and requests
+2. **Models** (`hackagent.models`): `connect(spec)` returns the model you call; guardrails wrap it
 3. **Adapters**: Framework-specific implementations (ADK, LiteLLM, etc.)
 4. **AttackStrategy**: Attack implementation framework
 5. **HTTP Clients**: Authenticated API clients with multipart support
@@ -387,7 +387,7 @@ uv run ruff check .
 ### Data Flow
 
 1. Initialize `HackAgent` with target agent details
-2. `AgentRouter` registers agent with backend
+2. `HackAgent` registers the target agent with the backend and connects to it
 3. Configure attack with an attacker model and judges
 4. `AttackStrategy` executes multi-step attack process
 5. Results automatically uploaded to platform

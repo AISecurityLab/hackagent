@@ -42,10 +42,10 @@ from hackagent.attacks.shared.response_utils import (
     get_guardrail_info,
     is_guardrail_response,
 )
-from hackagent.attacks.shared.router_factory import create_router
+from hackagent.attacks.shared.llm_router import connect_role
 from hackagent.storage.store import Store
 from hackagent.core.contracts import StepKind
-from hackagent.models.router import AgentRouter
+from hackagent.attacks.shared.llm_router import LLMRouter
 from hackagent.router.tracking import Tracker, Context
 
 from .config import (
@@ -195,7 +195,7 @@ class PAIRAttack(BaseAttack):
         self,
         config: Optional[Dict[str, Any]] = None,
         client: Optional[Store] = None,
-        agent_router: Optional[AgentRouter] = None,
+        agent_router: Optional[LLMRouter] = None,
     ):
         """
         Initialize PAIR attack.
@@ -215,7 +215,7 @@ class PAIRAttack(BaseAttack):
         if client is None:
             raise ValueError("A storage backend must be provided.")
         if agent_router is None:
-            raise ValueError("Target AgentRouter must be provided.")
+            raise ValueError("Target LLMRouter must be provided.")
 
         # Merge config
         current_config = copy.deepcopy(DEFAULT_PAIR_CONFIG)
@@ -275,12 +275,9 @@ class PAIRAttack(BaseAttack):
         """Return judge feedback produced by the current PAIR worker thread."""
         return str(getattr(self._scorer_explanation_local, "value", ""))
 
-    def _initialize_attacker_router(self) -> Optional[AgentRouter]:
+    def _initialize_attacker_router(self) -> Optional[LLMRouter]:
         """
-        Initialize and configure the AgentRouter for the attacker LLM.
-
-        Uses the shared ``create_router`` factory to eliminate duplicated
-        router initialization logic.
+        Connect to the attacker LLM through ``connect_role``.
         """
         try:
             attacker_config = self.config.get("attacker", {})
@@ -310,11 +307,9 @@ class PAIRAttack(BaseAttack):
             if api_key_config:
                 router_config["agent_metadata"]["api_key"] = api_key_config
 
-            router, _reg_key = create_router(
-                backend=self.backend,
-                config=router_config,
-                logger=self.logger,
-                router_name=attacker_config.get("model", router_config["identifier"]),
+            router, _reg_key = connect_role(
+                router_config,
+                name=attacker_config.get("model", router_config["identifier"]),
             )
 
             self.logger.debug(
@@ -328,9 +323,9 @@ class PAIRAttack(BaseAttack):
             )
             return None
 
-    def _initialize_judge_router(self) -> Optional[AgentRouter]:
+    def _initialize_judge_router(self) -> Optional[LLMRouter]:
         """
-        Initialize and configure the AgentRouter for the judge LLM.
+        Initialize and configure the LLMRouter for the judge LLM.
 
         Used for both decimal (1-10 AutoDAN scorer+wrapper) and binary
         (harmbench/nuanced/jailbreakbench) judge configurations.
@@ -358,11 +353,9 @@ class PAIRAttack(BaseAttack):
             if api_key_config:
                 router_config["agent_metadata"]["api_key"] = api_key_config
 
-            router, _reg_key = create_router(
-                backend=self.backend,
-                config=router_config,
-                logger=self.logger,
-                router_name=judge_config.get("model", router_config["identifier"]),
+            router, _reg_key = connect_role(
+                router_config,
+                name=judge_config.get("model", router_config["identifier"]),
             )
 
             self.logger.debug(

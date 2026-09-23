@@ -23,7 +23,7 @@ from hackagent.attacks.shared.response_utils import (
 )
 from hackagent.attacks.generator import AttackTemplates
 from hackagent.attacks.shared.progress import create_progress_bar
-from hackagent.models.router import AgentRouter
+from hackagent.attacks.shared.llm_router import LLMRouter
 from hackagent.router.tracking import Tracker
 
 from .config import DEFAULT_TEMPLATE_CONFIG, validate_template_config
@@ -138,7 +138,7 @@ def generate_prompts(
 
 def execute_prompts(
     data: List[Dict[str, Any]],
-    agent_router: AgentRouter,
+    agent_router: LLMRouter,
     config: Dict[str, Any],
     logger: logging.Logger,
     goal_tracker: Optional[Tracker] = None,
@@ -327,7 +327,7 @@ def execute_prompts(
 
 def execute(
     goals: List[str],
-    agent_router: AgentRouter,
+    agent_router: LLMRouter,
     config: Dict[str, Any],
     logger: logging.Logger,
     goal_tracker: Optional[Tracker] = None,

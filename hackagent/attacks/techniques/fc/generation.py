@@ -23,7 +23,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from hackagent.models.router import AgentRouter
+from hackagent.attacks.shared.llm_router import LLMRouter
 
 from .flowchart_renderer import (
     TEXT_FORMAT_SERIALIZERS,
@@ -95,7 +95,7 @@ def _parse_steps_from_response(response_text: str, num_steps: int) -> List[str]:
 
 
 def _create_step_generator_router(
-    agent_router: AgentRouter,
+    agent_router: LLMRouter,
     config: Dict[str, Any],
     logger: logging.Logger,
 ) -> Optional[tuple]:
@@ -114,7 +114,7 @@ def _create_step_generator_router(
     if not generator_model:
         return None
 
-    from hackagent.attacks.shared.router_factory import create_router
+    from hackagent.attacks.shared.llm_router import connect_role
 
     generator_config = {
         "identifier": generator_model,
@@ -124,19 +124,14 @@ def _create_step_generator_router(
         "max_tokens": int(step_generator.get("max_tokens", 512)),
         "temperature": float(step_generator.get("temperature", 0.3)),
     }
-    router, reg_key = create_router(
-        backend=agent_router.backend,
-        config=generator_config,
-        logger=logger,
-        router_name="fc_step_generator",
-    )
+    router, reg_key = connect_role(generator_config, name="fc_step_generator")
     return router, reg_key, step_generator
 
 
 def _generate_steps_with_model(
     goal: str,
     num_steps: int,
-    generator_router: AgentRouter,
+    generator_router: LLMRouter,
     gen_key: str,
     step_generator: Dict[str, Any],
     logger: logging.Logger,
@@ -247,7 +242,7 @@ def _build_text_only_messages(
 
 def _send_to_target(
     messages: List[Dict[str, Any]],
-    agent_router: AgentRouter,
+    agent_router: LLMRouter,
     victim_key: str,
     config: Dict[str, Any],
     logger: logging.Logger,
@@ -293,7 +288,7 @@ def _send_to_target(
 
 def execute_fc(
     goals: List[str],
-    agent_router: AgentRouter,
+    agent_router: LLMRouter,
     config: Dict[str, Any],
     logger: logging.Logger,
 ) -> List[Dict[str, Any]]:
@@ -457,7 +452,7 @@ def execute_fc(
 
 def execute_tfc(
     goals: List[str],
-    agent_router: AgentRouter,
+    agent_router: LLMRouter,
     config: Dict[str, Any],
     logger: logging.Logger,
 ) -> List[Dict[str, Any]]:

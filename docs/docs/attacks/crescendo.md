@@ -21,7 +21,7 @@ Crescendo is based on the paper:
 > [arXiv:2404.01833](https://arxiv.org/abs/2404.01833)
 > [crescendo-the-multiturn-jailbreak.github.io](https://crescendo-the-multiturn-jailbreak.github.io)
 
-This is HackAgent's first multi-turn attack. No router changes were required to support it: `AgentRouter` already forwards an arbitrary `messages` history verbatim to the target adapter on every call.
+This is HackAgent's first multi-turn attack. No model-layer changes were required to support it: the target model already forwards an arbitrary `messages` history verbatim to its adapter on every call.
 
 Crescendo-specific knobs (`max_turns`, `max_backtracks`, `jailbreak_threshold`, `early_stop_on_success`, `keep_last_n`, payload-size caps, `max_parse_retries`) currently live at the **top level** of `attack_config`. There is **no** `crescendo_params` block — passing one is ignored. Contrast with [AutoDAN-Turbo](./autodan_turbo.md) / [PAP](./pap.md), which nest algorithm knobs under `*_params`. See [Attack-specific params convention](./shared-args.md#attack-specific-params-vs-top-level).
 

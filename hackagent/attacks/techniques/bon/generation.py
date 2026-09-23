@@ -47,7 +47,7 @@ from hackagent.attacks.shared.response_utils import (
     get_guardrail_info,
     is_guardrail_response,
 )
-from hackagent.models.router import AgentRouter
+from hackagent.attacks.shared.llm_router import LLMRouter
 
 if TYPE_CHECKING:
     from hackagent.storage.store import Store
@@ -197,7 +197,7 @@ def augment_text(
 
 def execute(
     goals: List[str],
-    agent_router: AgentRouter,
+    agent_router: LLMRouter,
     config: Dict[str, Any],
     logger: logging.Logger,
 ) -> List[Dict]:
@@ -348,7 +348,7 @@ def _search_single_goal(
     ascii_perturbation: bool,
     candidate_workers: int,
     victim_key: str,
-    agent_router: AgentRouter,
+    agent_router: LLMRouter,
     tracker: Optional["Tracker"],
     step_judge: Optional[_StepJudge],
     logger: logging.Logger,

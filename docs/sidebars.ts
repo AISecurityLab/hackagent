@@ -247,7 +247,10 @@ const sidebars: SidebarsConfig = {
           type: 'category',
           label: 'Models',
           items: [
-            'hackagent/models/router',
+            'hackagent/models/client',
+            'hackagent/models/dispatch',
+            'hackagent/models/factory',
+            'hackagent/models/guardrail',
             'hackagent/models/envelope',
             'hackagent/models/provider_config',
             {

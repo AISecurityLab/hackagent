@@ -34,10 +34,10 @@ from hackagent.attacks.shared.response_utils import (
     get_guardrail_info,
     is_guardrail_response,
 )
-from hackagent.attacks.shared.router_factory import create_router
+from hackagent.attacks.shared.llm_router import connect_role
 from hackagent.storage.store import Store
 from hackagent.core.contracts import StepKind
-from hackagent.models.router import AgentRouter
+from hackagent.attacks.shared.llm_router import LLMRouter
 from hackagent.router.tracking import Context, Tracker
 
 from .config import ATTACKER_SYSTEM_PROMPT
@@ -118,30 +118,9 @@ def _resolve_on_topic_judges_config(
     return [on_topic_config]
 
 
-def _initialize_attacker_router(
-    client: Store,
-    config: Dict[str, Any],
-    logger: logging.Logger,
-) -> Tuple[AgentRouter, str]:
-    """
-    Create the attacker router and return its registration key.
-
-    Args:
-        client: Authenticated API client for router construction.
-        config: Attacker router configuration.
-        logger: Logger for router creation diagnostics.
-
-    Returns:
-        Tuple of (AgentRouter instance, registration key string).
-    """
-    merged = dict(config)
-    router, key = create_router(
-        backend=client,
-        config=merged,
-        logger=logger,
-        router_name="attacker",
-    )
-    return router, key
+def _initialize_attacker_router(config: Dict[str, Any]) -> Tuple[LLMRouter, str]:
+    """Connect to the attacker model and return its router and registration key."""
+    return connect_role(dict(config), name="attacker")
 
 
 def _prune_by_score(
@@ -250,7 +229,7 @@ class TapExecutor:
         self,
         config: Dict[str, Any],
         client: Store,
-        agent_router: AgentRouter,
+        agent_router: LLMRouter,
         logger: logging.Logger,
     ):
         """
@@ -270,9 +249,7 @@ class TapExecutor:
         attacker_config = dict(config.get("attacker", {}))
         attacker_config.setdefault("timeout", config.get("timeout"))
         self.attacker_router, self.attacker_key = _initialize_attacker_router(
-            client=self.client,
-            config=attacker_config,
-            logger=self.logger,
+            attacker_config
         )
 
         self.judges_config = _resolve_judges_config(
@@ -867,7 +844,7 @@ class TapExecutor:
 
 def execute(
     goals: List[str],
-    agent_router: AgentRouter,
+    agent_router: LLMRouter,
     config: Dict[str, Any],
     logger: logging.Logger,
     client: Store,

@@ -170,20 +170,20 @@ class TestCoreHelpers(unittest.TestCase):
                     core._parse_score_value(assessment, allow_fallback=False)
                 )
 
-    @patch("hackagent.attacks.techniques.autodan_turbo.core.create_router")
-    def test_init_routers(self, mock_create_router):
-        mock_create_router.side_effect = [
+    @patch("hackagent.attacks.techniques.autodan_turbo.core.connect_role")
+    def test_init_routers(self, mock_connect_role):
+        mock_connect_role.side_effect = [
             ("att-router", "att-key"),
             ("sc-router", "sc-key"),
             ("sum-router", "sum-key"),
         ]
         cfg = {"attacker": {}, "scorer": {}, "summarizer": {}}
-        out = core.init_routers(cfg, client=MagicMock(), logger=MagicMock())
+        out = core.init_routers(cfg, logger=MagicMock())
         self.assertEqual(
             out,
             ("att-router", "att-key", "sc-router", "sc-key", "sum-router", "sum-key"),
         )
-        self.assertEqual(mock_create_router.call_count, 3)
+        self.assertEqual(mock_connect_role.call_count, 3)
 
 
 class TestCoreGenerationAndScoring(unittest.TestCase):

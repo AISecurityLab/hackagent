@@ -24,7 +24,7 @@ from hackagent.core.logging import get_logger
 
 # Singleton — one logger per process so we don't double-register on
 # ``litellm.callbacks``. ``ensure_registered`` is idempotent and is
-# called from :meth:`AgentRouter.__init__`. The instance type is
+# called from :func:`hackagent.models.connect`. The instance type is
 # dynamically built by ``_build_handler_class`` once litellm is
 # importable, so we annotate it as ``Optional[Any]`` here.
 _REGISTERED: bool = False
@@ -199,7 +199,7 @@ def _build_handler_class():
 def ensure_registered() -> bool:
     """Register the tracking logger on ``litellm.callbacks`` exactly once.
 
-    Idempotent — safe to call from every ``AgentRouter.__init__``.
+    Idempotent — safe to call from every ``connect``.
     Returns ``True`` when registration is in effect (either because we
     just registered or because we already had).
     """

@@ -4,7 +4,7 @@
 """Tests for shared judge_evaluators module.
 
 Focuses on the shared yes/no parser and the template-method evaluate()
-since the full evaluator pipeline requires AgentRouter integration.
+since the full evaluator pipeline requires LLMRouter integration.
 """
 
 import logging
@@ -434,7 +434,7 @@ class TestRequestWithAssertions:
 
     @pytest.fixture
     def evaluator_with_router(self):
-        """Create an evaluator with a mocked AgentRouter."""
+        """Create an evaluator with a mocked LLMRouter."""
         with patch.multiple(
             HarmBenchEvaluator,
             __abstractmethods__=set(),

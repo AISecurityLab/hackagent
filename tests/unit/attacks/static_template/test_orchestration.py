@@ -22,10 +22,11 @@ TRANSLATIONS = {
 def public_agent():
     backend = MagicMock()
     backend._client = None
-    with patch("hackagent.agent.AgentRouter"):
+    with patch("hackagent.agent.connect"):
         agent = HackAgent(
             name="weather-summary",
             endpoint="http://localhost:11434",
+            agent_type="ollama",
             backend=backend,
         )
     return agent
@@ -108,7 +109,7 @@ def test_invalid_public_config_fails_before_probes_and_records(
     public_agent.backend.create_attack.assert_not_called()
     public_agent.backend.create_run.assert_not_called()
     public_agent.backend.update_run.assert_not_called()
-    public_agent.router.route_request.assert_not_called()
+    public_agent.target.send.assert_not_called()
 
 
 @pytest.mark.parametrize("in_override", [False, True])
@@ -131,7 +132,7 @@ def test_unknown_placeholder_fails_at_public_entrypoint(
         stage.assert_not_called()
     public_agent.backend.create_attack.assert_not_called()
     public_agent.backend.create_run.assert_not_called()
-    public_agent.router.route_request.assert_not_called()
+    public_agent.target.send.assert_not_called()
 
 
 @pytest.mark.parametrize(

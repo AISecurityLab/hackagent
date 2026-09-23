@@ -1,72 +1,40 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import asyncio
 import json
 import unittest
-import uuid
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-from hackagent.attacks.shared.guardrail import (
-    BaseGuardrail,
+from hackagent.models.envelope import prompt_text, to_completion
+from hackagent.models.guardrail import (
+    Guarded,
     GuardrailResult,
+    GuardrailSpec,
     LLMGuardrail,
-    create_guardrail_from_config,
+    parse_verdict,
 )
-from hackagent.models.router import AgentRouter, _extract_prompt_text
-from hackagent.core.contracts import AgentType
+from tests.fakes import FakeLLM
+
+
+def _guardrail(is_safe: bool, explanation: str = "ok", categories=None):
+    guardrail = MagicMock()
+    guardrail.check.return_value = GuardrailResult(
+        is_safe=is_safe, explanation=explanation, categories=categories or []
+    )
+    return guardrail
+
+
+def _chat(text: str):
+    return {"messages": [{"role": "user", "content": text}]}
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# prompt_text
 # ---------------------------------------------------------------------------
 
 
-def _make_backend(org_id=None, user_id="test_user"):
-    backend = MagicMock()
-    ctx = MagicMock()
-    ctx.org_id = org_id or uuid.uuid4()
-    ctx.user_id = user_id
-    backend.get_context.return_value = ctx
-    backend.get_api_key.return_value = None
-    return backend
-
-
-def _make_router_with_guardrails(before_guardrail=None, after_guardrail=None):
-    """Build an AgentRouter with mocked internals, attaching guardrails."""
-    with patch("hackagent.models.router.ADKAgent", autospec=True) as MockADK:
-        MockADK.__name__ = "ADKAgent"
-        with patch(
-            "hackagent.models.router.AGENT_TYPE_TO_ADAPTER_MAP",
-            {AgentType.GOOGLE_ADK: MockADK},
-        ):
-            backend = _make_backend()
-            agent_id = uuid.uuid4()
-            backend.create_or_update_agent.return_value = MagicMock(
-                id=agent_id,
-                name="TestAgent",
-                agent_type="GOOGLE_ADK",
-                endpoint="http://fake.com/",
-                metadata={},
-                organization=uuid.uuid4(),
-                owner="local",
-            )
-            router = AgentRouter(
-                backend=backend,
-                name="TestAgent",
-                agent_type=AgentType.GOOGLE_ADK,
-                endpoint="http://fake.com/",
-            )
-    router.before_guardrail = before_guardrail
-    router.after_guardrail = after_guardrail
-    return router, str(agent_id)
-
-
-# ---------------------------------------------------------------------------
-# Tests: _extract_prompt_text
-# ---------------------------------------------------------------------------
-
-
-class TestExtractPromptText(unittest.TestCase):
+class TestPromptText(unittest.TestCase):
     def test_returns_last_user_message(self):
         data = {
             "messages": [
@@ -76,7 +44,7 @@ class TestExtractPromptText(unittest.TestCase):
                 {"role": "user", "content": "How are you?"},
             ]
         }
-        self.assertEqual(_extract_prompt_text(data), "How are you?")
+        self.assertEqual(prompt_text(data), "How are you?")
 
     def test_fallback_concatenation_when_no_user_role(self):
         data = {
@@ -85,27 +53,24 @@ class TestExtractPromptText(unittest.TestCase):
                 {"role": "assistant", "content": "resp"},
             ]
         }
-        result = _extract_prompt_text(data)
+        result = prompt_text(data)
         self.assertIn("sys", result)
         self.assertIn("resp", result)
 
     def test_fallback_to_prompt_key(self):
-        data = {"prompt": "Tell me a joke"}
-        self.assertEqual(_extract_prompt_text(data), "Tell me a joke")
+        self.assertEqual(prompt_text({"prompt": "Tell me a joke"}), "Tell me a joke")
 
     def test_returns_empty_string_when_no_data(self):
-        self.assertEqual(_extract_prompt_text({}), "")
-
-    def test_returns_empty_string_when_messages_empty(self):
-        self.assertEqual(_extract_prompt_text({"messages": []}), "")
+        self.assertEqual(prompt_text({}), "")
+        self.assertEqual(prompt_text({"messages": []}), "")
 
     def test_handles_none_content(self):
         data = {"messages": [{"role": "user", "content": None}]}
-        self.assertEqual(_extract_prompt_text(data), "")
+        self.assertEqual(prompt_text(data), "")
 
 
 # ---------------------------------------------------------------------------
-# Tests: GuardrailResult
+# GuardrailResult and parse_verdict
 # ---------------------------------------------------------------------------
 
 
@@ -113,19 +78,8 @@ class TestGuardrailResult(unittest.TestCase):
     def test_basic_construction(self):
         r = GuardrailResult(is_safe=True, explanation="All good")
         self.assertTrue(r.is_safe)
-        self.assertEqual(r.explanation, "All good")
         self.assertEqual(r.categories, [])
         self.assertIsNone(r.raw_response)
-
-    def test_unsafe_with_categories(self):
-        r = GuardrailResult(
-            is_safe=False,
-            explanation="Harmful",
-            categories=["violence", "hate"],
-            raw_response='{"safe": false}',
-        )
-        self.assertFalse(r.is_safe)
-        self.assertEqual(r.categories, ["violence", "hate"])
 
     def test_frozen_immutability(self):
         r = GuardrailResult(is_safe=True, explanation="ok")
@@ -133,309 +87,189 @@ class TestGuardrailResult(unittest.TestCase):
             r.is_safe = False  # type: ignore[misc]
 
 
-# ---------------------------------------------------------------------------
-# Tests: LLMGuardrail._parse (static method)
-# ---------------------------------------------------------------------------
-
-
-class TestLLMGuardrailParse(unittest.TestCase):
+class TestParseVerdict(unittest.TestCase):
     def test_valid_safe_json(self):
         raw = json.dumps({"safe": True, "categories": [], "reasoning": "Looks fine"})
-        result = LLMGuardrail._parse(raw)
+        result = parse_verdict(raw)
         self.assertTrue(result.is_safe)
         self.assertEqual(result.explanation, "Looks fine")
-        self.assertEqual(result.categories, [])
 
     def test_valid_unsafe_json(self):
         raw = json.dumps(
-            {
-                "safe": False,
-                "categories": ["violence"],
-                "reasoning": "Contains threats",
-            }
+            {"safe": False, "categories": ["violence"], "reasoning": "Threats"}
         )
-        result = LLMGuardrail._parse(raw)
+        result = parse_verdict(raw)
         self.assertFalse(result.is_safe)
         self.assertEqual(result.categories, ["violence"])
-        self.assertEqual(result.explanation, "Contains threats")
+        self.assertEqual(result.explanation, "Threats")
 
-    def test_empty_string_fails_open(self):
-        result = LLMGuardrail._parse("")
-        self.assertTrue(result.is_safe)
-
-    def test_whitespace_only_fails_open(self):
-        result = LLMGuardrail._parse("   \n  ")
-        self.assertTrue(result.is_safe)
+    def test_empty_or_whitespace_fails_open(self):
+        self.assertTrue(parse_verdict("").is_safe)
+        self.assertTrue(parse_verdict("   \n  ").is_safe)
 
     def test_invalid_json_with_unsafe_keyword(self):
-        raw = "This content is UNSAFE and should be blocked"
-        result = LLMGuardrail._parse(raw)
-        self.assertFalse(result.is_safe)
-
-    def test_invalid_json_with_safe_false_keyword(self):
-        raw = 'Blah blah "safe": false blah'
-        result = LLMGuardrail._parse(raw)
-        self.assertFalse(result.is_safe)
+        self.assertFalse(parse_verdict("This content is UNSAFE").is_safe)
+        self.assertFalse(parse_verdict('Blah "safe": false blah').is_safe)
 
     def test_invalid_json_without_unsafe_keyword_fails_open(self):
-        raw = "I cannot evaluate this text properly"
-        result = LLMGuardrail._parse(raw)
-        self.assertTrue(result.is_safe)
+        self.assertTrue(parse_verdict("I cannot evaluate this").is_safe)
 
     def test_json_missing_fields_defaults(self):
-        raw = json.dumps({"safe": True})
-        result = LLMGuardrail._parse(raw)
+        result = parse_verdict(json.dumps({"safe": True}))
         self.assertTrue(result.is_safe)
         self.assertEqual(result.explanation, "")
         self.assertEqual(result.categories, [])
 
 
 # ---------------------------------------------------------------------------
-# Tests: LLMGuardrail.check
+# LLMGuardrail
 # ---------------------------------------------------------------------------
 
 
 class TestLLMGuardrailCheck(unittest.TestCase):
-    @patch("hackagent.attacks.shared.guardrail.create_router")
-    def _make_guardrail(self, mock_create_router, router_response=None):
-        mock_router = MagicMock()
-        mock_create_router.return_value = (mock_router, "guardrail-key")
-        config = {
-            "identifier": "test-model",
-            "endpoint": "http://fake.com/v1",
-            "agent_type": "OPENAI_SDK",
-        }
-        guardrail = LLMGuardrail(config=config, backend=MagicMock())
-        if router_response is not None:
-            mock_router.route_request.return_value = router_response
-        return guardrail, mock_router
+    def test_empty_text_fails_open_without_calling_the_model(self):
+        llm = FakeLLM()
+        guardrail = LLMGuardrail(llm)
+        self.assertTrue(guardrail.check("").is_safe)
+        self.assertTrue(guardrail.check("   ").is_safe)
+        self.assertEqual(llm.requests, [])
 
-    def test_empty_text_fails_open(self):
-        guardrail, _ = self._make_guardrail()
-        result = guardrail.check("")
-        self.assertTrue(result.is_safe)
+    def test_sends_system_prompt_and_text(self):
+        llm = FakeLLM([json.dumps({"safe": True})])
+        LLMGuardrail(llm, system_prompt="classify").check("Hello world")
 
-    def test_whitespace_text_fails_open(self):
-        guardrail, _ = self._make_guardrail()
-        result = guardrail.check("   ")
-        self.assertTrue(result.is_safe)
-
-    def test_safe_response(self):
-        safe_json = json.dumps({"safe": True, "categories": [], "reasoning": "ok"})
-        guardrail, mock_router = self._make_guardrail(
-            router_response={"processed_response": safe_json, "error_message": None}
+        request = llm.requests[0]
+        self.assertEqual(
+            request["messages"],
+            [
+                {"role": "system", "content": "classify"},
+                {"role": "user", "content": "Hello world"},
+            ],
         )
-        result = guardrail.check("Hello world")
-        self.assertTrue(result.is_safe)
-        mock_router.route_request.assert_called_once()
+        self.assertEqual(request["max_tokens"], 256)
+        self.assertEqual(request["temperature"], 0)
 
     def test_unsafe_response(self):
-        unsafe_json = json.dumps(
-            {"safe": False, "categories": ["harm"], "reasoning": "Bad content"}
+        llm = FakeLLM(
+            [json.dumps({"safe": False, "categories": ["harm"], "reasoning": "Bad"})]
         )
-        guardrail, _ = self._make_guardrail(
-            router_response={
-                "processed_response": unsafe_json,
-                "error_message": None,
-            }
-        )
-        result = guardrail.check("Harmful request")
+        result = LLMGuardrail(llm).check("Harmful request")
         self.assertFalse(result.is_safe)
         self.assertEqual(result.categories, ["harm"])
 
-    def test_router_error_fails_open(self):
-        guardrail, _ = self._make_guardrail(
-            router_response={
-                "processed_response": None,
-                "error_message": "Connection timeout",
-            }
+    def test_model_error_fails_open(self):
+        llm = FakeLLM(
+            [{"processed_response": None, "error_message": "Connection timeout"}]
         )
-        result = guardrail.check("Some text")
+        result = LLMGuardrail(llm).check("Some text")
         self.assertTrue(result.is_safe)
         self.assertIn("Connection timeout", result.explanation)
 
 
-# ---------------------------------------------------------------------------
-# Tests: create_guardrail_from_config
-# ---------------------------------------------------------------------------
-
-
-class TestCreateGuardrailFromConfig(unittest.TestCase):
-    @patch("hackagent.attacks.shared.guardrail.create_router")
-    def test_returns_llm_guardrail(self, mock_create_router):
-        mock_create_router.return_value = (MagicMock(), "key")
-        config = {"identifier": "model", "endpoint": "http://e.com/v1"}
-        guardrail = create_guardrail_from_config(config=config, backend=MagicMock())
-        self.assertIsInstance(guardrail, LLMGuardrail)
-        self.assertIsInstance(guardrail, BaseGuardrail)
+class TestGuardrailSpec(unittest.TestCase):
+    def test_system_prompt_is_a_field(self):
+        spec = GuardrailSpec(identifier="m", system_prompt="custom")
+        self.assertEqual(spec.system_prompt, "custom")
 
 
 # ---------------------------------------------------------------------------
-# Tests: Before guardrail in AgentRouter.route_request
+# Guarded
 # ---------------------------------------------------------------------------
 
 
-class TestBeforeGuardrailRouting(unittest.TestCase):
+class TestGuardedBefore(unittest.TestCase):
     def test_no_guardrail_passes_through(self):
-        router, reg_key = _make_router_with_guardrails(before_guardrail=None)
-        expected = {"processed_response": "Hello!", "error_message": None}
-        router._agent_registry[reg_key].handle_request.return_value = expected
-
-        result = router.route_request(
-            registration_key=reg_key,
-            request_data={"messages": [{"role": "user", "content": "Hi"}]},
-        )
+        inner = FakeLLM(["Hello!"])
+        result = Guarded(inner).send(_chat("Hi"))
         self.assertEqual(result["processed_response"], "Hello!")
 
     def test_safe_prompt_passes_through(self):
-        mock_guardrail = MagicMock(spec=BaseGuardrail)
-        mock_guardrail.check.return_value = GuardrailResult(
-            is_safe=True, explanation="ok"
-        )
-        router, reg_key = _make_router_with_guardrails(before_guardrail=mock_guardrail)
-        expected = {"processed_response": "Answer", "error_message": None}
-        router._agent_registry[reg_key].handle_request.return_value = expected
-
-        result = router.route_request(
-            registration_key=reg_key,
-            request_data={"messages": [{"role": "user", "content": "Legit question"}]},
-        )
-        mock_guardrail.check.assert_called_once_with("Legit question")
+        before = _guardrail(True)
+        inner = FakeLLM(["Answer"])
+        result = Guarded(inner, before=before).send(_chat("Legit question"))
+        before.check.assert_called_once_with("Legit question")
         self.assertEqual(result["processed_response"], "Answer")
 
-    def test_unsafe_prompt_is_blocked(self):
-        mock_guardrail = MagicMock(spec=BaseGuardrail)
-        mock_guardrail.check.return_value = GuardrailResult(
-            is_safe=False, explanation="Violent content", categories=["violence"]
-        )
-        router, reg_key = _make_router_with_guardrails(before_guardrail=mock_guardrail)
+    def test_unsafe_prompt_is_blocked_before_the_model(self):
+        before = _guardrail(False, "Violent content", ["violence"])
+        inner = FakeLLM()
 
-        result = router.route_request(
-            registration_key=reg_key,
-            request_data={"messages": [{"role": "user", "content": "Bad stuff"}]},
-        )
+        result = Guarded(inner, before=before).send(_chat("Bad stuff"))
+
         self.assertIsNone(result["processed_response"])
-        self.assertEqual(
-            result["agent_specific_data"]["guardrail"], "before_guardrail_blocked"
-        )
-        self.assertEqual(result["agent_specific_data"]["side"], "before")
-        self.assertEqual(result["agent_specific_data"]["categories"], ["violence"])
-        self.assertEqual(result["agent_specific_data"]["reasoning"], "Violent content")
-        # Adapter should NOT be called
-        router._agent_registry[reg_key].handle_request.assert_not_called()
+        data = result["agent_specific_data"]
+        self.assertEqual(data["guardrail"], "before_guardrail_blocked")
+        self.assertEqual(data["side"], "before")
+        self.assertEqual(data["categories"], ["violence"])
+        self.assertEqual(data["reasoning"], "Violent content")
+        self.assertEqual(inner.requests, [])
 
     def test_empty_prompt_skips_guardrail(self):
-        mock_guardrail = MagicMock(spec=BaseGuardrail)
-        router, reg_key = _make_router_with_guardrails(before_guardrail=mock_guardrail)
-        expected = {"processed_response": "Answer", "error_message": None}
-        router._agent_registry[reg_key].handle_request.return_value = expected
-
-        result = router.route_request(
-            registration_key=reg_key,
-            request_data={"messages": [{"role": "user", "content": ""}]},
-        )
-        mock_guardrail.check.assert_not_called()
+        before = _guardrail(False)
+        result = Guarded(FakeLLM(["Answer"]), before=before).send(_chat(""))
+        before.check.assert_not_called()
         self.assertEqual(result["processed_response"], "Answer")
 
 
-# ---------------------------------------------------------------------------
-# Tests: After guardrail in AgentRouter.route_request
-# ---------------------------------------------------------------------------
-
-
-class TestAfterGuardrailRouting(unittest.TestCase):
-    def test_no_guardrail_passes_through(self):
-        router, reg_key = _make_router_with_guardrails(after_guardrail=None)
-        expected = {"processed_response": "Hello!", "error_message": None}
-        router._agent_registry[reg_key].handle_request.return_value = expected
-
-        result = router.route_request(
-            registration_key=reg_key,
-            request_data={"messages": [{"role": "user", "content": "Hi"}]},
-        )
-        self.assertEqual(result["processed_response"], "Hello!")
-
+class TestGuardedAfter(unittest.TestCase):
     def test_safe_response_passes_through(self):
-        mock_guardrail = MagicMock(spec=BaseGuardrail)
-        mock_guardrail.check.return_value = GuardrailResult(
-            is_safe=True, explanation="ok"
-        )
-        router, reg_key = _make_router_with_guardrails(after_guardrail=mock_guardrail)
-        expected = {
-            "processed_response": "Safe answer",
-            "generated_text": None,
-            "error_message": None,
-        }
-        router._agent_registry[reg_key].handle_request.return_value = expected
-
-        result = router.route_request(
-            registration_key=reg_key,
-            request_data={"messages": [{"role": "user", "content": "Question"}]},
-        )
-        mock_guardrail.check.assert_called_once_with("Safe answer")
+        after = _guardrail(True)
+        result = Guarded(FakeLLM(["Safe answer"]), after=after).send(_chat("Q"))
+        after.check.assert_called_once_with("Safe answer")
         self.assertEqual(result["processed_response"], "Safe answer")
 
     def test_unsafe_response_is_censored(self):
-        mock_guardrail = MagicMock(spec=BaseGuardrail)
-        mock_guardrail.check.return_value = GuardrailResult(
-            is_safe=False,
-            explanation="Contains PII",
-            categories=["privacy"],
-        )
-        router, reg_key = _make_router_with_guardrails(after_guardrail=mock_guardrail)
-        expected = {
-            "processed_response": "Here is your SSN: 123-45-6789",
-            "generated_text": None,
-            "error_message": None,
-        }
-        router._agent_registry[reg_key].handle_request.return_value = expected
-
-        result = router.route_request(
-            registration_key=reg_key,
-            request_data={"messages": [{"role": "user", "content": "My SSN?"}]},
-        )
+        after = _guardrail(False, "Contains PII", ["privacy"])
+        result = Guarded(FakeLLM(["SSN: 123-45-6789"]), after=after).send(_chat("Q"))
         self.assertIsNone(result["processed_response"])
+        data = result["agent_specific_data"]
+        self.assertEqual(data["guardrail"], "after_guardrail_censored")
+        self.assertEqual(data["side"], "after")
+        self.assertEqual(data["categories"], ["privacy"])
+
+    def test_empty_response_skips_guardrail(self):
+        after = _guardrail(False)
+        Guarded(FakeLLM([""]), after=after).send(_chat("Hi"))
+        after.check.assert_not_called()
+
+    def test_falls_back_to_generated_text(self):
+        after = _guardrail(True)
+        inner = FakeLLM(
+            [{"processed_response": None, "generated_text": "Fallback text"}]
+        )
+        Guarded(inner, after=after).send(_chat("Hi"))
+        after.check.assert_called_once_with("Fallback text")
+
+
+class TestGuardedAsLLM(unittest.TestCase):
+    def test_complete_reports_a_blocked_prompt(self):
+        before = _guardrail(False, "nope", ["harm"])
+        completion = Guarded(FakeLLM(), before=before).complete("Bad stuff")
+        self.assertFalse(completion.ok)
+        self.assertEqual(completion.guardrail.side, "before")
+        self.assertEqual(completion.guardrail.categories, ["harm"])
+        self.assertIsNone(completion.text)
+
+    def test_async_send_applies_both_guardrails(self):
+        after = _guardrail(False, "leak")
+        result = asyncio.run(
+            Guarded(FakeLLM(["secret"]), before=_guardrail(True), after=after).asend(
+                _chat("Q")
+            )
+        )
         self.assertEqual(
             result["agent_specific_data"]["guardrail"], "after_guardrail_censored"
         )
-        self.assertEqual(result["agent_specific_data"]["side"], "after")
-        self.assertEqual(result["agent_specific_data"]["categories"], ["privacy"])
-        self.assertEqual(result["agent_specific_data"]["reasoning"], "Contains PII")
 
-    def test_empty_response_skips_guardrail(self):
-        mock_guardrail = MagicMock(spec=BaseGuardrail)
-        router, reg_key = _make_router_with_guardrails(after_guardrail=mock_guardrail)
-        expected = {
-            "processed_response": "",
-            "generated_text": None,
-            "error_message": None,
-        }
-        router._agent_registry[reg_key].handle_request.return_value = expected
-
-        router.route_request(
-            registration_key=reg_key,
-            request_data={"messages": [{"role": "user", "content": "Hi"}]},
+    def test_with_params_keeps_the_guardrails(self):
+        before = _guardrail(False)
+        guarded = Guarded(FakeLLM(), before=before).with_params(max_tokens=5)
+        self.assertIs(guarded.before, before)
+        result = guarded.send(_chat("x"))
+        self.assertEqual(
+            to_completion(result).guardrail.side,
+            "before",
         )
-        mock_guardrail.check.assert_not_called()
-
-    def test_falls_back_to_generated_text(self):
-        mock_guardrail = MagicMock(spec=BaseGuardrail)
-        mock_guardrail.check.return_value = GuardrailResult(
-            is_safe=True, explanation="ok"
-        )
-        router, reg_key = _make_router_with_guardrails(after_guardrail=mock_guardrail)
-        expected = {
-            "processed_response": None,
-            "generated_text": "Fallback text",
-            "error_message": None,
-        }
-        router._agent_registry[reg_key].handle_request.return_value = expected
-
-        router.route_request(
-            registration_key=reg_key,
-            request_data={"messages": [{"role": "user", "content": "Hi"}]},
-        )
-        mock_guardrail.check.assert_called_once_with("Fallback text")
 
 
 if __name__ == "__main__":

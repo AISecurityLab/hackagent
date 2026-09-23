@@ -17,9 +17,9 @@ Integration tests for FlipAttack generation module (generation.py).
 
 Tests the generation.execute() function which creates flipped prompts
 using the FlipAttackAlgorithm and executes them against a target model
-via AgentRouter.
+via LLMRouter.
 
-These tests mock the AgentRouter to test the generation logic
+These tests mock the LLMRouter to test the generation logic
 in isolation from real LLM backends, while still exercising the
 full integration path through config parsing, FlipAttack algorithm,
 and result construction.
@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 
 def _make_mock_router(response_text="This is a mocked LLM response."):
-    """Create a mock AgentRouter that returns a canned response."""
+    """Create a mock LLMRouter that returns a canned response."""
     mock_router = MagicMock()
     mock_router.backend_agent = MagicMock()
     mock_router.backend_agent.id = "test-agent-id"
@@ -87,7 +87,7 @@ def _make_config(flip_mode="FCS", cot=False, lang_gpt=False, few_shot=False):
 
 
 class TestFlipAttackGenerationExecute:
-    """Test generation.execute() function with mocked AgentRouter."""
+    """Test generation.execute() function with mocked LLMRouter."""
 
     def test_single_goal_fcs(self):
         """Test generation with a single goal using FCS mode."""

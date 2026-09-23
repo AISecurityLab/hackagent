@@ -296,7 +296,7 @@ class TestExecute(unittest.TestCase):
         router_patch = patch.object(
             papgen, "_create_attacker_router", return_value=_router(agent_id="att-id")
         )
-        self.create_router = router_patch.start()
+        self.create_attacker = router_patch.start()
         self.addCleanup(router_patch.stop)
 
     def _config(self, **extra):
@@ -316,7 +316,7 @@ class TestExecute(unittest.TestCase):
             execute(["g"], _router(), {"attacker": {}}, LOGGER)
 
     def test_attacker_router_failures_propagate(self):
-        self.create_router.side_effect = RuntimeError("bad endpoint")
+        self.create_attacker.side_effect = RuntimeError("bad endpoint")
 
         with self.assertRaises(RuntimeError):
             execute(["g"], _router(), self._config(), LOGGER)
@@ -383,13 +383,10 @@ class TestExecute(unittest.TestCase):
 
         self.assertEqual(results[0]["result_id"], "res-3")
 
-    def test_router_backend_is_used_when_no_backend_is_configured(self):
-        router = _router()
-        router.backend = MagicMock()
+    def test_attacker_is_built_without_a_storage_backend(self):
+        execute(["g"], _router(), {"attacker": {"identifier": "m"}}, LOGGER)
 
-        execute(["g"], router, {"attacker": {"identifier": "m"}}, LOGGER)
-
-        self.assertIs(self.create_router.call_args.args[1], router.backend)
+        self.create_attacker.assert_called_once_with({"identifier": "m"})
 
 
 if __name__ == "__main__":

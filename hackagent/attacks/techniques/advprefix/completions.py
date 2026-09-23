@@ -26,12 +26,12 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional
 
-# --- Import AgentRouter and related components ---
+# --- Import LLMRouter and related components ---
 from hackagent.attacks.shared.response_utils import (
     get_guardrail_info,
     is_guardrail_response,
 )
-from hackagent.models.router import AgentRouter
+from hackagent.attacks.shared.llm_router import LLMRouter
 
 # --- Import shared progress bar ---
 from hackagent.attacks.shared.progress import create_progress_bar
@@ -120,7 +120,7 @@ SURROGATE_ATTACK_PROMPTS = {
 
 
 def _get_completion_via_router(
-    agent_router: AgentRouter,
+    agent_router: LLMRouter,
     agent_reg_key: str,
     prefix_text: str,
     surrogate_prompt_template: str,  # The resolved template or suffix string
@@ -140,7 +140,7 @@ def _get_completion_via_router(
     ADKAgent.
 
     Args:
-        agent_router: AgentRouter instance configured for the target agent.
+        agent_router: LLMRouter instance configured for the target agent.
         agent_reg_key: Registration key for the specific agent instance.
         prefix_text: The adversarial prefix to use for completion generation.
         surrogate_prompt_template: Template or suffix string to combine with
@@ -280,7 +280,7 @@ def _get_completion_via_router(
 @require_agent_router("Get Completions")
 @log_errors("Get Completions")
 def execute(
-    agent_router: AgentRouter,
+    agent_router: LLMRouter,
     input_data: List[Dict],
     config: Dict[str, Any],
     logger: logging.Logger,
@@ -294,7 +294,7 @@ def execute(
     for evaluation.
 
     Args:
-        agent_router: AgentRouter instance configured for the target agent (validated by decorator).
+        agent_router: LLMRouter instance configured for the target agent (validated by decorator).
         input_data: List of dictionaries containing adversarial prefixes.
             Each dict should have key: 'prefix', and optionally 'goal'.
         config: Configuration dictionary containing completion parameters including:

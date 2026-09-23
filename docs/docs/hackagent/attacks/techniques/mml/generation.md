@@ -7,7 +7,7 @@ MML attack generation and execution module.
 
 Encodes harmful prompts into images using the configured MML encoding mode,
 constructs multimodal messages (text + image), and sends them to the target
-Vision-Language Model via HackAgent&#x27;s AgentRouter.
+Vision-Language Model via HackAgent&#x27;s LLMRouter.
 
 Result Tracking:
     Uses Tracker (passed via config[&quot;_tracker&quot;]) to add interaction traces
@@ -16,8 +16,8 @@ Result Tracking:
 #### execute
 
 ```python
-def execute(goals: List[str], agent_router: AgentRouter,
-            config: Dict[str, Any], logger: logging.Logger) -> List[Dict]
+def execute(goals: List[str], agent_router: LLMRouter, config: Dict[str, Any],
+            logger: logging.Logger) -> List[Dict]
 ```
 
 Generate MML-encoded images and execute attacks against target model.

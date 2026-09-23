@@ -57,17 +57,17 @@ def _make_attack(config=None):
         "generated_text": "Sure, here is the requested harmful content with steps."
     }
 
-    def _fake_create_router(backend, config, logger, router_name):
+    def _fake_connect_role(config, name):
         router = MagicMock()
-        if router_name == "judge":
+        if name == "judge":
             router.route_request.side_effect = _judge_side_effect
         else:
             router.route_request.side_effect = _attacker_side_effect
-        return router, f"{router_name}_key"
+        return router, f"{name}_key"
 
     with patch(
-        "hackagent.attacks.techniques.rag.attack.create_router",
-        side_effect=_fake_create_router,
+        "hackagent.attacks.techniques.rag.attack.connect_role",
+        side_effect=_fake_connect_role,
     ):
         attack = RagAttack(config=cfg, client=client, agent_router=agent_router)
     return attack, agent_router

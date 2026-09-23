@@ -426,9 +426,9 @@ class TestJudgeEvaluatorErrorRows(unittest.TestCase):
         config.max_judge_retries = 0
 
         with patch(
-            "hackagent.attacks.evaluator.base.create_router"
-        ) as mock_create_router:
-            mock_create_router.return_value = (MagicMock(), "key")
+            "hackagent.attacks.evaluator.base.connect_role"
+        ) as mock_connect_role:
+            mock_connect_role.return_value = (MagicMock(), "key")
             judge = FakeJudge(client=MagicMock(), config=config, run_id=str(uuid4()))
 
         data = [

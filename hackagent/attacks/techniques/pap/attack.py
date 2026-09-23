@@ -24,7 +24,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from hackagent.storage.store import Store
-from hackagent.models.router import AgentRouter
+from hackagent.attacks.shared.llm_router import LLMRouter
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 
@@ -73,14 +73,12 @@ class PAPAttack(BaseAttack):
         self,
         config: Optional[Dict[str, Any]] = None,
         client: Optional[Store] = None,
-        agent_router: Optional[AgentRouter] = None,
+        agent_router: Optional[LLMRouter] = None,
     ):
         if client is None:
             raise ValueError("A storage backend must be provided to PAPAttack.")
         if agent_router is None:
-            raise ValueError(
-                "Victim AgentRouter instance must be provided to PAPAttack."
-            )
+            raise ValueError("Victim LLMRouter instance must be provided to PAPAttack.")
 
         current_config = copy.deepcopy(DEFAULT_PAP_CONFIG)
         if config:

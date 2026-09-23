@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 from hackagent.attacks.orchestrator import AttackOrchestrator
+from hackagent.attacks.shared.llm_router import LLMRouter
 from hackagent.attacks.techniques.autodan_turbo.attack import AutoDANTurboAttack
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.techniques.baseline.attack import BaselineAttack
@@ -23,6 +24,7 @@ from hackagent.core.defaults import (
     DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
     DEFAULT_LOCAL_MODEL,
 )
+from tests.fakes import FakeLLM
 
 
 def _make_orchestrator():
@@ -1559,6 +1561,114 @@ class TestAutoPullOllamaModels(unittest.TestCase):
                 ) as mock_pull:
                     orch._autopull_missing_ollama_targets(targets)
         mock_pull.assert_called_once_with("gemma3:4b")
+
+
+class TestGatewayApiKeys(unittest.TestCase):
+    """The storage key reaches role models on the HackAgent gateway only."""
+
+    def _remote(self):
+        orch, hack_agent, _ = _make_orchestrator()
+        orch.attack_type = "h4rm3l"
+        hack_agent.backend.get_api_key.return_value = "hk_key"
+        return orch
+
+    def test_partial_judge_on_another_provider_does_not_get_the_key(self):
+        resolved = self._remote()._apply_mode_based_role_defaults(
+            {
+                "attack_type": "h4rm3l",
+                "goals": ["g"],
+                "judges": [
+                    {"identifier": "gpt-4", "endpoint": "https://openrouter.ai/api/v1"}
+                ],
+            }
+        )
+        self.assertNotIn("api_key", resolved["judges"][0])
+
+    def test_role_outside_the_defaults_on_the_gateway_gets_the_key(self):
+        resolved = self._remote()._apply_mode_based_role_defaults(
+            {
+                "attack_type": "h4rm3l",
+                "goals": ["g"],
+                "decorator_llm": {
+                    "identifier": "hackagent-attacker",
+                    "endpoint": "https://api.hackagent.dev/v1/",
+                },
+            }
+        )
+        self.assertEqual(resolved["decorator_llm"]["api_key"], "hk_key")
+
+    def test_explicit_key_on_the_gateway_is_kept(self):
+        resolved = self._remote()._apply_mode_based_role_defaults(
+            {
+                "attack_type": "h4rm3l",
+                "goals": ["g"],
+                "decorator_llm": {
+                    "identifier": "m",
+                    "endpoint": "https://api.hackagent.dev/v1",
+                    "api_key": "MY_KEY_ENV",
+                },
+            }
+        )
+        self.assertEqual(resolved["decorator_llm"]["api_key"], "MY_KEY_ENV")
+
+    def test_local_mode_adds_no_key(self):
+        orch, hack_agent, _ = _make_orchestrator()
+        orch.attack_type = "h4rm3l"
+        hack_agent.backend.get_api_key.return_value = None
+        resolved = orch._apply_mode_based_role_defaults(
+            {
+                "attack_type": "h4rm3l",
+                "goals": ["g"],
+                "decorator_llm": {
+                    "identifier": "m",
+                    "endpoint": "https://api.hackagent.dev/v1",
+                },
+            }
+        )
+        self.assertIsNone(resolved["decorator_llm"].get("api_key"))
+
+
+class TestRunScopedTargetParams(unittest.TestCase):
+    """A run-level max_tokens scopes the target; the shared target is untouched."""
+
+    def _run(self, attack_config):
+        orch, hack_agent, TestAttack = _make_orchestrator()
+        target = LLMRouter(FakeLLM(instance_id="t"), agent=MagicMock(id="t"))
+        hack_agent.router = target
+        seen = []
+
+        def _init(self, config=None, client=None, agent_router=None):
+            seen.append(agent_router)
+            self.config = config
+
+        with (
+            patch.object(TestAttack, "__init__", _init),
+            patch.object(TestAttack, "run", return_value=[]),
+        ):
+            orch._execute_local_attack(
+                "atk",
+                "run",
+                {"goals": ["g1", "g2"]},
+                {"output_dir": "/tmp/test", **attack_config},
+                None,
+            )
+        return target, seen
+
+    def test_max_tokens_scopes_the_target_for_the_run(self):
+        target, seen = self._run(
+            {"max_tokens": 64, "goal_batch_size": 2, "goal_batch_workers": 2}
+        )
+
+        self.assertTrue(seen)
+        for router in seen:
+            self.assertIsNot(router, target)
+            self.assertEqual(router.llm.params, {"max_tokens": 64})
+            self.assertIs(router.backend_agent, target.backend_agent)
+        self.assertEqual(target.llm.params, {})
+
+    def test_without_max_tokens_the_shared_target_is_passed(self):
+        target, seen = self._run({})
+        self.assertEqual(seen, [target])
 
 
 if __name__ == "__main__":

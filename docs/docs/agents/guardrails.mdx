@@ -55,7 +55,7 @@ agent = HackAgent(
 )
 ```
 
-Once set, the guardrails are wired onto the agent's internal router and apply **transparently to every attack** run against this target — no per-attack configuration needed.
+Once set, the guardrails wrap the target model (`hackagent.models.Guarded`) and apply **transparently to every attack** run against this target — no per-attack configuration needed.
 
 ### Configuration Fields
 

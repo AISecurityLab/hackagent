@@ -2,19 +2,14 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Lightweight per-registration config used by ``AgentRouter`` for
-chat-completion AgentTypes.
+Per-model config for chat-completion AgentTypes.
 
-Phase E.2 of the LiteLLM router refactor (issue #379) replaces the
-``LiteLLMAgent`` / ``OpenAIAgent`` / ``OllamaAgent`` adapter instances
-in ``AgentRouter._agent_registry`` with instances of this class. The
-router's ``_dispatch_via_litellm`` reads the same attributes off either
-object (``litellm_model``, ``api_base_url``, ``actual_api_key``,
-``default_*``…), so consumers that mutate ``adapter.default_max_tokens``
-or similar keep working.
+Chat types need no adapter object: :mod:`hackagent.models.dispatch` builds
+a ``_ChatRegistration`` and reads its attributes (``litellm_model``,
+``api_base_url``, ``actual_api_key``, ``default_*``…) to drive LiteLLM.
 
-``ADKAgent`` is unaffected — it stays as an :class:`Agent` subclass
-because its custom-LLM registration with LiteLLM is per-instance and
+``ADKAgent`` and the CLI adapters are :class:`Agent` subclasses instead,
+because their custom-LLM registration with LiteLLM is per-instance and
 needs construction-time side effects.
 """
 
@@ -79,7 +74,7 @@ def _default_api_key_env_var(
 
 
 class _ChatRegistration:
-    """Mutable config holder consumed by ``AgentRouter._dispatch_via_litellm``.
+    """Config holder read by :func:`hackagent.models.dispatch.send`.
 
     Exposes exactly the attributes the dispatch path and external code
     used to read off ``LiteLLMAgent`` / ``OpenAIAgent`` / ``OllamaAgent``

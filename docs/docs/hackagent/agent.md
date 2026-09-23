@@ -18,14 +18,17 @@ a high-level interface for:
 - Executing automated security tests against the configured agents.
 - Retrieving and handling test results.
 
-It encapsulates complexities such as agent registration
-with the local backend (via `AgentRouter`), and the dynamic dispatch of various
-attack methodologies.
+It registers the target as an Agent record in the storage backend,
+connects to it (applying any guardrails), and dispatches to the attack
+strategies.
 
 **Attributes**:
 
-- `router` - An `AgentRouter` instance managing the agent&#x27;s representation
-  in the HackAgent backend.
+- `target` - The connected target model, with guardrails applied.
+- `agent_record` - The target&#x27;s Agent record in the storage backend.
+- `router` - ``target`` behind the ``route_request`` surface the attack
+  techniques call.
+- `models` - Builds role models (attacker, judges, guardrails).
 - `attack_strategies` - A dictionary mapping strategy names to their
   `AttackStrategy` implementations.
 
@@ -51,8 +54,8 @@ def __init__(endpoint: str,
 Initializes the HackAgent client and prepares it for interaction.
 
 This constructor sets up the local storage backend, loads default
-prompts, resolves the agent type, and initializes the agent router
-to ensure the agent is known to the backend. It also prepares available
+prompts, resolves the agent type, registers the target with the
+backend and connects to it. It also prepares available
 attack strategies.
 
 **Arguments**:

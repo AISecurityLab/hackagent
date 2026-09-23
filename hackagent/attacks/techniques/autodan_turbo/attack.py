@@ -78,7 +78,7 @@ class AutoDANTurboAttack(BaseAttack):
         if not client:
             raise ValueError("A storage backend required")
         if not agent_router:
-            raise ValueError("AgentRouter required")
+            raise ValueError("LLMRouter required")
 
         cfg = copy.deepcopy(DEFAULT_AUTODAN_TURBO_CONFIG)
         internal_config: Dict[str, Any] = {}

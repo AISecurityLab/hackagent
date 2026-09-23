@@ -49,7 +49,7 @@ from uuid import UUID, uuid4
 from hackagent.attacks.evaluator.metrics import generate_summary_report
 
 from hackagent.attacks.evaluator.judge_evaluators import EVALUATOR_MAP
-from hackagent.attacks.shared.router_factory import extract_passthrough_request_config
+from hackagent.models.factory import passthrough_params
 from hackagent.attacks.evaluator.sync import sync_evaluation_to_server
 from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
 from hackagent.core.defaults import (
@@ -910,7 +910,7 @@ class BaseEvaluationStep:
                 judge_config_item.get("agent_metadata", {}) or {}
             )
             subprocess_config["agent_metadata"].update(
-                extract_passthrough_request_config(judge_config_item)
+                passthrough_params(judge_config_item)
             )
 
             # Inject API key into metadata

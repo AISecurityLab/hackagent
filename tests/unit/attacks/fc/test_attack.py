@@ -52,7 +52,7 @@ class TestFCAttack(unittest.TestCase):
     def test_requires_agent_router(self):
         with self.assertRaises(ValueError) as cm:
             FCAttack(config={}, client=MagicMock(), agent_router=None)
-        self.assertIn("AgentRouter", str(cm.exception))
+        self.assertIn("LLMRouter", str(cm.exception))
 
     def test_default_config_applied(self):
         attack = FCAttack(
@@ -139,7 +139,7 @@ class TesttFCAttack(unittest.TestCase):
     def test_requires_agent_router(self):
         with self.assertRaises(ValueError) as cm:
             tFCAttack(config={}, client=MagicMock(), agent_router=None)
-        self.assertIn("AgentRouter", str(cm.exception))
+        self.assertIn("LLMRouter", str(cm.exception))
 
     def test_default_config_applied(self):
         attack = tFCAttack(

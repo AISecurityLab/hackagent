@@ -11,7 +11,7 @@ Sends each goal directly to the target model without any transformation.
 
 ```python
 def execute(goals: List[str],
-            agent_router: AgentRouter,
+            agent_router: LLMRouter,
             config: Dict[str, Any],
             logger: logging.Logger,
             goal_tracker: Optional[Tracker] = None) -> List[Dict[str, Any]]

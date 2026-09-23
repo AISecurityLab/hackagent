@@ -17,7 +17,7 @@ class TestGeneration(unittest.TestCase):
     """Test generation.execute() with mocked agent router."""
 
     def _make_agent_router(self, response_text="Generated response"):
-        """Create a mocked AgentRouter."""
+        """Create a mocked LLMRouter."""
         router = MagicMock()
         router.backend_agent.id = "test-agent-id"
         router.route_request.return_value = {
@@ -160,9 +160,9 @@ class TestBuildPromptingInterface(unittest.TestCase):
             "generated_text": "from decorator"
         }
 
-    @patch("hackagent.attacks.techniques.h4rm3l.generation.create_router")
-    def test_configured_decorator_llm_is_used(self, mock_create_router):
-        mock_create_router.return_value = (self.decorator_router, "decorator-key")
+    @patch("hackagent.attacks.techniques.h4rm3l.generation.connect_role")
+    def test_configured_decorator_llm_is_used(self, mock_connect_role):
+        mock_connect_role.return_value = (self.decorator_router, "decorator-key")
         backend = MagicMock()
         config = {
             "decorator_llm": {
@@ -179,10 +179,8 @@ class TestBuildPromptingInterface(unittest.TestCase):
 
         self.assertEqual(text, "from decorator")
         self.assertEqual(prompt._llm_role, "decorator_llm")
-        mock_create_router.assert_called_once()
-        self.assertIs(mock_create_router.call_args.kwargs["backend"], backend)
-        self.assertEqual(
-            mock_create_router.call_args.kwargs["config"], config["decorator_llm"]
+        mock_connect_role.assert_called_once_with(
+            config["decorator_llm"], name="decorator_llm"
         )
         self.decorator_router.route_request.assert_called_once_with(
             registration_key="decorator-key",
@@ -194,9 +192,9 @@ class TestBuildPromptingInterface(unittest.TestCase):
         )
         self.target.route_request.assert_not_called()
 
-    @patch("hackagent.attacks.techniques.h4rm3l.generation.create_router")
-    def test_decorator_llm_without_api_key_is_used(self, mock_create_router):
-        mock_create_router.return_value = (self.decorator_router, "decorator-key")
+    @patch("hackagent.attacks.techniques.h4rm3l.generation.connect_role")
+    def test_decorator_llm_without_api_key_is_used(self, mock_connect_role):
+        mock_connect_role.return_value = (self.decorator_router, "decorator-key")
         config = {"decorator_llm": {"identifier": "ollama/llama3"}}
 
         prompt = _build_prompting_interface(config, self.target, self.logger)
@@ -205,10 +203,10 @@ class TestBuildPromptingInterface(unittest.TestCase):
         self.target.route_request.assert_not_called()
 
     @patch(
-        "hackagent.attacks.techniques.h4rm3l.generation.create_router",
+        "hackagent.attacks.techniques.h4rm3l.generation.connect_role",
         side_effect=RuntimeError("unreachable endpoint"),
     )
-    def test_decorator_llm_failure_raises(self, _mock_create_router):
+    def test_decorator_llm_failure_raises(self, _mock_connect_role):
         config = {"decorator_llm": {"identifier": "ollama/llama3"}}
 
         with self.assertRaises(ValueError) as ctx:

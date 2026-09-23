@@ -34,11 +34,10 @@
             {
               "items": [
                 "reference/hackagent/attacks/shared/embedding_utils",
-                "reference/hackagent/attacks/shared/guardrail",
+                "reference/hackagent/attacks/shared/llm_router",
                 "reference/hackagent/attacks/shared/progress",
                 "reference/hackagent/attacks/shared/prompt_parser",
                 "reference/hackagent/attacks/shared/response_utils",
-                "reference/hackagent/attacks/shared/router_factory",
                 "reference/hackagent/attacks/shared/translation",
                 "reference/hackagent/attacks/shared/utils"
               ],
@@ -498,9 +497,12 @@
               "label": "hackagent.models.adapters",
               "type": "category"
             },
+            "reference/hackagent/models/client",
+            "reference/hackagent/models/dispatch",
             "reference/hackagent/models/envelope",
-            "reference/hackagent/models/provider_config",
-            "reference/hackagent/models/router"
+            "reference/hackagent/models/factory",
+            "reference/hackagent/models/guardrail",
+            "reference/hackagent/models/provider_config"
           ],
           "label": "hackagent.models",
           "type": "category"
