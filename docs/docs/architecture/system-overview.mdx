@@ -101,8 +101,8 @@ import Link from '@docusaurus/Link';
 **CLI (`hackagent/cli/`)**
 - A Click-based CLI (`hackagent init`, `agent`, `eval`, `scan`, `claude`, `codex`, `web`, `datasets`, `results`, `config`, `examples`) that wraps the SDK for interactive and scripted use. See [CLI Reference](../cli/overview.md).
 
-**Local Dashboard (`hackagent/server/dashboard/`)**
-- A [NiceGUI](https://nicegui.io/) app (`hackagent web`) that reads directly from the local SQLite database to visualize runs, results, and attack traces — no separate backend process required.
+**Web UI (`hackagent/server/webui/`)**
+- A Flask app (`hackagent web`) that serves the HackAgent web app bundle. In local mode it answers the app's API calls from the local SQLite database to show runs, results, and attack traces; with an API key it proxies them to the HackAgent API. No separate backend process is required.
 
 ### Router
 
@@ -131,9 +131,9 @@ import Link from '@docusaurus/Link';
 - SQLite database at `~/.local/share/hackagent/hackagent.db`. No network access or account required — this is what most SDK/CLI usage runs against.
 
 **`RemoteBackend` (optional)**
-- Used automatically once a HackAgent Cloud API key is resolved. Talks to `https://api.hackagent.dev` through the generated OpenAPI client in `hackagent/server/`, enabling team dashboards and hosted result storage.
+- Used automatically once a HackAgent Cloud API key is resolved. Talks to `https://api.hackagent.dev` through the generated OpenAPI client in `hackagent/storage/_http/`, enabling team dashboards and hosted result storage.
 
-Both backends implement the same `StorageBackend` protocol (`hackagent/server/storage/base.py`), so the router, attack orchestrator, tracker, and TUI/dashboard code are fully decoupled from where results are actually persisted.
+Both backends implement the same `Store` protocol (`hackagent/storage/store.py`), so the router, attack orchestrator, tracker, and TUI/dashboard code are fully decoupled from where results are actually persisted.
 
 ## Attack Execution Flow
 

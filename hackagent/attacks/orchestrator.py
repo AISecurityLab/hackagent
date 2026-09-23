@@ -1474,7 +1474,7 @@ class AttackOrchestrator:
                 **run_config_for_attack,
                 "_run_id": run_id,
                 "_client": backend,  # backend expected by evaluator/router factory
-                "_backend": backend,  # StorageBackend for result tracking
+                "_backend": backend,  # Store for result tracking
             },
             "client": backend,  # pass backend as 'client' for BaseAttack compat
             "agent_router": agent_router,

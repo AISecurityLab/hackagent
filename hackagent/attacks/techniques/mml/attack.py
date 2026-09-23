@@ -29,7 +29,7 @@ from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.core.defaults import DEFAULT_JUDGE_IDENTIFIER
 from hackagent.router.router import AgentRouter
-from hackagent.server.client import AuthenticatedClient
+from hackagent.storage.store import Store
 from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
 
 from . import generation
@@ -106,7 +106,7 @@ class MMLAttack(BaseAttack):
     def __init__(
         self,
         config: Optional[Dict[str, Any]] = None,
-        client: Optional[AuthenticatedClient] = None,
+        client: Optional[Store] = None,
         agent_router: Optional[AgentRouter] = None,
     ):
         """
@@ -115,14 +115,14 @@ class MMLAttack(BaseAttack):
         Args:
             config: Optional dictionary containing parameters to override
                 :data:`~hackagent.attacks.techniques.mml.config.DEFAULT_MML_CONFIG`.
-            client: AuthenticatedClient instance passed from the orchestrator.
+            client: Store instance passed from the orchestrator.
             agent_router: AgentRouter instance for the target model.
 
         Raises:
             ValueError: If ``client`` or ``agent_router`` is ``None``.
         """
         if client is None:
-            raise ValueError("AuthenticatedClient must be provided to MMLAttack.")
+            raise ValueError("A storage backend must be provided to MMLAttack.")
         if agent_router is None:
             raise ValueError(
                 "Victim AgentRouter instance must be provided to MMLAttack."

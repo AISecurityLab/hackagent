@@ -213,11 +213,11 @@ class TestConfigValidate(unittest.TestCase):
         response.status_code = status_code
         with (
             patch(
-                "hackagent.server.api.agent.agent_list.sync_detailed",
+                "hackagent.storage._http.api.agent.agent_list.sync_detailed",
                 side_effect=list_side_effect,
                 return_value=response,
             ) as agent_list,
-            patch("hackagent.server.client.AuthenticatedClient") as client_cls,
+            patch("hackagent.storage.remote.AuthenticatedClient") as client_cls,
         ):
             result = self.runner.invoke(validate, [], obj={"config": cfg})
         return result, agent_list, client_cls
@@ -231,7 +231,11 @@ class TestConfigValidate(unittest.TestCase):
         cfg.validate.assert_called_once()
         agent_list.assert_called_once()
         client_cls.assert_called_once_with(
-            base_url=cfg.base_url, token=cfg.api_key, prefix="Bearer"
+            base_url=cfg.base_url,
+            token=cfg.api_key,
+            prefix="Bearer",
+            raise_on_unexpected_status=False,
+            timeout=120.0,
         )
         self.assertIn("API connection successful", result.output)
 

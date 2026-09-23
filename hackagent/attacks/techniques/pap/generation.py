@@ -38,7 +38,7 @@ from .config import ALL_TECHNIQUES, TOP_5_TECHNIQUES
 from .taxonomy import build_mutation_prompt, extract_mutated_text
 
 if TYPE_CHECKING:
-    from hackagent.server.client import AuthenticatedClient
+    from hackagent.storage.store import Store
     from hackagent.router.tracking import Tracker
     from hackagent.router.tracking.tracker import Context
 
@@ -118,7 +118,7 @@ def execute(
     attacker_cfg = config.get("attacker", {})
 
     tracker: Optional["Tracker"] = config.get("_tracker")
-    client: Optional["AuthenticatedClient"] = config.get("_client")
+    client: Optional["Store"] = config.get("_client")
     backend = config.get("_backend") or getattr(agent_router, "backend", None)
 
     techniques = _resolve_techniques(pap_params)

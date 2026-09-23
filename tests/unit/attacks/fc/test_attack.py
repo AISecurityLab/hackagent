@@ -47,7 +47,7 @@ class TestFCAttack(unittest.TestCase):
     def test_requires_client(self):
         with self.assertRaises(ValueError) as cm:
             FCAttack(config={}, client=None, agent_router=MagicMock())
-        self.assertIn("AuthenticatedClient", str(cm.exception))
+        self.assertIn("storage backend", str(cm.exception))
 
     def test_requires_agent_router(self):
         with self.assertRaises(ValueError) as cm:
@@ -134,7 +134,7 @@ class TesttFCAttack(unittest.TestCase):
     def test_requires_client(self):
         with self.assertRaises(ValueError) as cm:
             tFCAttack(config={}, client=None, agent_router=MagicMock())
-        self.assertIn("AuthenticatedClient", str(cm.exception))
+        self.assertIn("storage backend", str(cm.exception))
 
     def test_requires_agent_router(self):
         with self.assertRaises(ValueError) as cm:

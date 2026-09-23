@@ -83,7 +83,7 @@ class TestUpdateSingleResult(unittest.TestCase):
             backend=mock_client,
         )
 
-        from hackagent.server.api.models import EvalStatus
+        from hackagent.storage._http.api.models import EvalStatus
 
         call_kwargs = mock_client.update_result.call_args
         evaluation_status = call_kwargs.kwargs.get("evaluation_status") or call_kwargs[
@@ -101,7 +101,7 @@ class TestUpdateSingleResult(unittest.TestCase):
             backend=mock_client,
         )
 
-        from hackagent.server.api.models import EvalStatus
+        from hackagent.storage._http.api.models import EvalStatus
 
         call_kwargs = mock_client.update_result.call_args
         evaluation_status = call_kwargs.kwargs.get("evaluation_status") or call_kwargs[

@@ -27,7 +27,7 @@ from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.core.defaults import DEFAULT_JUDGE_IDENTIFIER
 from hackagent.router.router import AgentRouter
-from hackagent.server.client import AuthenticatedClient
+from hackagent.storage.store import Store
 
 from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
 
@@ -81,7 +81,7 @@ class FCAttack(BaseAttack):
     def __init__(
         self,
         config: Optional[Dict[str, Any]] = None,
-        client: Optional[AuthenticatedClient] = None,
+        client: Optional[Store] = None,
         agent_router: Optional[AgentRouter] = None,
     ):
         """
@@ -90,14 +90,14 @@ class FCAttack(BaseAttack):
         Args:
             config: Optional dictionary containing parameters to override
                 :data:`DEFAULT_FC_CONFIG`.
-            client: AuthenticatedClient instance passed from the orchestrator.
+            client: Store instance passed from the orchestrator.
             agent_router: AgentRouter instance for the target model.
 
         Raises:
             ValueError: If ``client`` or ``agent_router`` is ``None``.
         """
         if client is None:
-            raise ValueError("AuthenticatedClient must be provided to FCAttack.")
+            raise ValueError("A storage backend must be provided to FCAttack.")
         if agent_router is None:
             raise ValueError(
                 "Victim AgentRouter instance must be provided to FCAttack."
@@ -319,11 +319,11 @@ class tFCAttack(BaseAttack):
     def __init__(
         self,
         config: Optional[Dict[str, Any]] = None,
-        client: Optional[AuthenticatedClient] = None,
+        client: Optional[Store] = None,
         agent_router: Optional[AgentRouter] = None,
     ):
         if client is None:
-            raise ValueError("AuthenticatedClient must be provided to tFCAttack.")
+            raise ValueError("A storage backend must be provided to tFCAttack.")
         if agent_router is None:
             raise ValueError(
                 "Victim AgentRouter instance must be provided to tFCAttack."

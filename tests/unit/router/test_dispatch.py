@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from hackagent.router.router import AgentRouter
 from hackagent.core.contracts import AgentType
-from hackagent.server.storage.base import OrganizationContext
+from hackagent.storage.records import OrganizationContext
 
 logging.disable(logging.CRITICAL)
 

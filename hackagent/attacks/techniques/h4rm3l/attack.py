@@ -22,7 +22,7 @@ import copy
 import logging
 from typing import Any, Dict, List, Optional
 
-from hackagent.server.client import AuthenticatedClient
+from hackagent.storage.store import Store
 from hackagent.router.router import AgentRouter
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
@@ -113,11 +113,11 @@ class H4rm3lAttack(BaseAttack):
     def __init__(
         self,
         config: Optional[Dict[str, Any]] = None,
-        client: Optional[AuthenticatedClient] = None,
+        client: Optional[Store] = None,
         agent_router: Optional[AgentRouter] = None,
     ):
         if client is None:
-            raise ValueError("AuthenticatedClient must be provided.")
+            raise ValueError("A storage backend must be provided.")
         if agent_router is None:
             raise ValueError("AgentRouter must be provided.")
 

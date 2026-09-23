@@ -23,7 +23,7 @@ from hackagent.attacks.shared.router_factory import extract_passthrough_request_
 from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
 
 if TYPE_CHECKING:
-    from hackagent.server.client import AuthenticatedClient
+    from hackagent.storage.store import Store
 
 
 def build_inline_judge_base_config(config: Dict[str, Any]) -> Dict[str, Any]:
@@ -62,7 +62,7 @@ class InlineStepJudge:
         self,
         judges_config: List[Dict[str, Any]],
         base_eval_config: Dict[str, Any],
-        client: "AuthenticatedClient",
+        client: "Store",
         logger: logging.Logger,
         run_id: Optional[str] = None,
     ):

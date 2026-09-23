@@ -43,7 +43,7 @@ class TestWebCommand(unittest.TestCase):
 
         with (
             patch("hackagent.server.webui.create_app", return_value=app) as mock_create,
-            patch("hackagent.server.storage.local.LocalBackend") as mock_local_cls,
+            patch("hackagent.storage.local.LocalBackend") as mock_local_cls,
             patch("socket.socket", return_value=self._free_port_socket()),
         ):
             result = runner.invoke(web, ["--no-browser"], obj={"config": config})
@@ -69,7 +69,7 @@ class TestWebCommand(unittest.TestCase):
 
         with (
             patch(
-                "hackagent.server.storage.local.LocalBackend",
+                "hackagent.storage.local.LocalBackend",
                 return_value=local_backend,
             ) as mock_local_cls,
             patch("hackagent.server.webui.create_app", return_value=app) as mock_create,
@@ -102,7 +102,7 @@ class TestWebCommand(unittest.TestCase):
 
         with (
             patch(
-                "hackagent.server.storage.local.LocalBackend",
+                "hackagent.storage.local.LocalBackend",
                 return_value=local_backend,
             ),
             patch("hackagent.server.webui.create_app", return_value=app) as mock_create,
@@ -125,7 +125,7 @@ class TestWebCommand(unittest.TestCase):
 
         with (
             patch(
-                "hackagent.server.storage.local.LocalBackend",
+                "hackagent.storage.local.LocalBackend",
                 return_value=_DummyLocalBackend(),
             ),
             patch(
@@ -231,7 +231,7 @@ class TestFreePort(unittest.TestCase):
         app = MagicMock()
         with (
             patch(
-                "hackagent.server.storage.local.LocalBackend",
+                "hackagent.storage.local.LocalBackend",
                 return_value=_DummyLocalBackend(),
             ),
             patch("hackagent.server.webui.create_app", return_value=app),

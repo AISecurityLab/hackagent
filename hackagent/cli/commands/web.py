@@ -161,7 +161,7 @@ def web(ctx, host, port, db_path, force_local, no_browser):
 
     backend = None
     if api_key is None:
-        from hackagent.server.storage.local import LocalBackend
+        from hackagent.storage.local import LocalBackend
 
         backend = LocalBackend(db_path=db_path)
 

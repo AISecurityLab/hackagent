@@ -3,7 +3,7 @@
 import unittest
 import uuid
 from unittest.mock import MagicMock, patch
-from hackagent.server.storage.base import OrganizationContext
+from hackagent.storage.records import OrganizationContext
 from hackagent.core.contracts import AgentType
 from hackagent.router.router import AgentRouter
 

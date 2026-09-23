@@ -57,7 +57,7 @@ from hackagent.core.defaults import (
     DEFAULT_LOCAL_AGENT_TYPE,
     DEFAULT_LOCAL_MODEL_ENDPOINT,
 )
-from hackagent.server.client import AuthenticatedClient
+from hackagent.storage.store import Store
 from hackagent.core.contracts import AgentType
 
 if TYPE_CHECKING:
@@ -226,7 +226,7 @@ class BaseEvaluationStep:
         self,
         config: Dict[str, Any],
         logger: logging.Logger,
-        client: AuthenticatedClient,
+        client: Store,
     ):
         """
         Extract common tracking context and dependencies.
@@ -235,7 +235,7 @@ class BaseEvaluationStep:
             config: Step configuration dictionary (may contain ``_run_id``,
                      ``_client``, ``_tracker`` internal keys).
             logger: Logger instance.
-            client: ``AuthenticatedClient`` for backend API calls.
+            client: ``Store`` for backend API calls.
         """
         # Store raw config for subclass access
         self._raw_config: Dict[str, Any] = config if isinstance(config, dict) else {}

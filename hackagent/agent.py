@@ -111,7 +111,7 @@ class HackAgent:
                 When set to `False`, requests sent through the target OLLAMA adapter
                 include `think: false` to disable thinking output. Ignored for
                 non-OLLAMA target agent types.
-            backend: Optional pre-built ``StorageBackend`` to persist runs and
+            backend: Optional pre-built ``Store`` to persist runs and
                 results through. When omitted, a backend is selected from the
                 resolved API key (remote) or a default local SQLite database.
                 Supplying one lets an embedding host — e.g. the local dashboard
@@ -126,20 +126,17 @@ class HackAgent:
                 "HackAgent using caller-provided backend %s", type(backend).__name__
             )
         elif self.settings.api_key:
-            from hackagent.server.client import AuthenticatedClient
-            from hackagent.server.storage.remote import RemoteBackend
+            from hackagent.storage.remote import RemoteBackend
 
-            _client = AuthenticatedClient(
-                base_url=self.settings.base_url,
-                token=self.settings.api_key,
-                prefix="Bearer",
-                raise_on_unexpected_status=raise_on_unexpected_status,
+            self.backend = RemoteBackend.connect(
+                self.settings.base_url,
+                self.settings.api_key,
                 timeout=timeout,
+                raise_on_unexpected_status=raise_on_unexpected_status,
             )
-            self.backend = RemoteBackend(_client)
             logger.info("HackAgent using remote backend → %s", self.settings.base_url)
         else:
-            from hackagent.server.storage.local import LocalBackend
+            from hackagent.storage.local import LocalBackend
 
             self.backend = LocalBackend(db_path=self.settings.db_path)
             logger.info(

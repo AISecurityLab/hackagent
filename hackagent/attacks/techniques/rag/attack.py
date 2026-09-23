@@ -31,7 +31,7 @@ from hackagent.attacks.shared.router_factory import create_router
 from hackagent.attacks.shared.response_utils import extract_response_content
 from hackagent.router.router import AgentRouter
 from hackagent.router.tracking.tracker import Tracker
-from hackagent.server.client import AuthenticatedClient
+from hackagent.storage.store import Store
 from hackagent.core.contracts import EvalStatus, StepKind
 
 from .config import (
@@ -298,11 +298,11 @@ class RagAttack(BaseAttack):
     def __init__(
         self,
         config: Optional[Dict[str, Any]] = None,
-        client: Optional[AuthenticatedClient] = None,
+        client: Optional[Store] = None,
         agent_router: Optional[AgentRouter] = None,
     ):
         if client is None:
-            raise ValueError("AuthenticatedClient must be provided.")
+            raise ValueError("A storage backend must be provided.")
         if agent_router is None:
             raise ValueError("Target AgentRouter must be provided.")
 

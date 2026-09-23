@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from hackagent.server.storage.base import StorageBackend
+from hackagent.storage.store import Store
 from hackagent.core.contracts import EvalStatus, StepKind
 
 from .category_classifier import (
@@ -117,7 +117,7 @@ class Tracker:
 
     def __init__(
         self,
-        backend: StorageBackend,
+        backend: Store,
         run_id: str,
         logger: Optional[logging.Logger] = None,
         attack_type: Optional[str] = None,

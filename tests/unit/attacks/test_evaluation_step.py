@@ -52,7 +52,7 @@ logger = logging.getLogger(__name__)
 
 
 def _make_mock_client():
-    """Create a mock AuthenticatedClient."""
+    """Create a mock storage backend."""
     return MagicMock()
 
 

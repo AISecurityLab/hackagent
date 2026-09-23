@@ -15,7 +15,7 @@ from hackagent.attacks.techniques.pap.generation import (
 )
 from hackagent.attacks.techniques.pap.config import TOP_5_TECHNIQUES
 from hackagent.core.contracts import AgentType
-from hackagent.server.storage.local import LocalBackend
+from hackagent.storage.local import LocalBackend
 
 
 class TestCreateAttackerRouter(unittest.TestCase):

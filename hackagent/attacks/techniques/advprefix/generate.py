@@ -20,7 +20,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional, Tuple
 
-from hackagent.server.client import AuthenticatedClient
+from hackagent.storage.store import Store
 from hackagent.router.router import AgentRouter
 from hackagent.core.contracts import AgentType
 
@@ -71,7 +71,7 @@ class PrefixGenerationPipeline:
         self,
         config: Dict[str, Any],
         logger: logging.Logger,
-        client: AuthenticatedClient,
+        client: Store,
         agent_router: Optional[AgentRouter] = None,
     ):
         """
@@ -324,7 +324,7 @@ class PrefixGenerationPipeline:
             endpoint = self.config.attacker.get("endpoint")
             model_name = self.config.attacker.get("identifier")
 
-            # Handle API key (supports both AuthenticatedClient and StorageBackend)
+            # Handle API key (supports both Store and Store)
             api_key = (
                 self.client.get_api_key()
                 if hasattr(self.client, "get_api_key")

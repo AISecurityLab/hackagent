@@ -76,7 +76,7 @@ class AutoDANTurboAttack(BaseAttack):
             ValueError: If ``client`` or ``agent_router`` are missing.
         """
         if not client:
-            raise ValueError("AuthenticatedClient required")
+            raise ValueError("A storage backend required")
         if not agent_router:
             raise ValueError("AgentRouter required")
 

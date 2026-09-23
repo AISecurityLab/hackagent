@@ -15,7 +15,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from hackagent.server.api.models import EvalStatus
+from hackagent.storage._http.api.models import EvalStatus
 
 
 # ============================================================================

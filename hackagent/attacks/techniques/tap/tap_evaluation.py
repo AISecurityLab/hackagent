@@ -4,7 +4,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
-from hackagent.server.client import AuthenticatedClient
+from hackagent.storage.store import Store
 
 
 class TapEvaluation(BaseEvaluationStep):
@@ -19,7 +19,7 @@ class TapEvaluation(BaseEvaluationStep):
         self,
         config: Dict[str, Any],
         logger,
-        client: AuthenticatedClient,
+        client: Store,
     ):
         """
         Initialize the evaluation helper.
@@ -226,7 +226,7 @@ def _resolve_judges_config(config: Dict[str, Any]) -> List[Dict[str, Any]]:
 def execute(
     input_data: List[Dict[str, Any]],
     config: Dict[str, Any],
-    client: AuthenticatedClient,
+    client: Store,
     logger: logging.Logger,
 ) -> List[Dict[str, Any]]:
     """

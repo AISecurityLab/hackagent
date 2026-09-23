@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from hackagent.router.router import AgentRouter
 from hackagent.core.contracts import AgentType
-from hackagent.server.storage.base import StorageBackend
+from hackagent.storage.store import Store
 
 UNKNOWN_CATEGORY = "Z. Unclassified Risk"
 UNKNOWN_SUBCATEGORY = "Z0. Unclassified Subcategory"
@@ -197,7 +197,7 @@ def _extract_response_content(response: Any) -> Optional[str]:
 
 
 def _create_classifier_router(
-    backend: StorageBackend,
+    backend: Store,
     config: Dict[str, Any],
     logger: logging.Logger,
 ) -> Tuple[AgentRouter, str]:
@@ -254,7 +254,7 @@ class GoalCategoryClassifier:
 
     def __init__(
         self,
-        backend: Optional[StorageBackend],
+        backend: Optional[Store],
         config: Optional[Dict[str, Any]] = None,
         logger: Optional[logging.Logger] = None,
     ):

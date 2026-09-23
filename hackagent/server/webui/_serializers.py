@@ -7,7 +7,7 @@ The bundled web UI is the same single-page app that runs against
 ``api.hackagent.dev``; its generated client expects Django REST Framework
 payloads (snake_case keys, ``{count, next, previous, results}`` pages). These
 functions are the offline-mode adapter: they translate the SQLite-backed
-records of ``hackagent.server.storage.base`` into exactly those shapes so the
+records of ``hackagent.storage.records`` into exactly those shapes so the
 SPA cannot tell the difference.
 
 Fields the local store has no equivalent for (per-request HTTP metadata,
@@ -21,14 +21,14 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from hackagent.server.storage.base import (
+from hackagent.storage.records import (
     AgentRecord,
     AttackRecord,
     ResultRecord,
     RunRecord,
     TraceRecord,
 )
-from hackagent.server.storage.buckets import (
+from hackagent.storage.buckets import (
     ERROR,
     JAILBREAK,
     MITIGATED,

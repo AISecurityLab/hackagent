@@ -36,11 +36,11 @@ class TestPackageImports:
 
         assert HackAgent is not None
 
-    def test_client_import(self):
-        """Test that the Client class can be imported."""
-        from hackagent import Client
+    def test_storage_exports(self):
+        """Test that the storage types are exported from the package root."""
+        from hackagent import LocalBackend, RemoteBackend, Store
 
-        assert Client is not None
+        assert Store is not None and LocalBackend and RemoteBackend
 
     def test_router_import(self):
         """Test that the AgentRouter can be imported."""
@@ -54,13 +54,13 @@ class TestPackageImports:
         This specifically tests for the python-dateutil dependency
         which is used in model serialization.
         """
-        from hackagent.server.api.models import Agent
+        from hackagent.storage._http.api.models import Agent
 
         assert Agent is not None
 
     def test_api_modules_import(self):
         """Test that API modules can be imported."""
-        from hackagent.server import api
+        from hackagent.storage._http import api
 
         assert api is not None
 

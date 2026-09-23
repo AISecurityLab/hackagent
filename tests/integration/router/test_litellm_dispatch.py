@@ -47,8 +47,8 @@ class TestRouterLiteLLMDispatchIntegration:
         openai_config: Dict[str, Any],
         openai_base_url: str,
     ):
-        from hackagent.server.client import AuthenticatedClient
-        from hackagent.server.storage.remote import RemoteBackend
+        from hackagent.storage._http.client import AuthenticatedClient
+        from hackagent.storage.remote import RemoteBackend
 
         backend = RemoteBackend(
             AuthenticatedClient(
@@ -111,8 +111,8 @@ class TestRouterLiteLLMDispatchIntegration:
         openai_base_url: str,
     ):
         """Backwards-compatible ``prompt`` shorthand should still work."""
-        from hackagent.server.client import AuthenticatedClient
-        from hackagent.server.storage.remote import RemoteBackend
+        from hackagent.storage._http.client import AuthenticatedClient
+        from hackagent.storage.remote import RemoteBackend
 
         backend = RemoteBackend(
             AuthenticatedClient(
@@ -150,8 +150,8 @@ class TestRouterLiteLLMDispatchIntegration:
         """Phase F.2 — every dispatched call carries ``metadata['hackagent']``."""
         import litellm
 
-        from hackagent.server.client import AuthenticatedClient
-        from hackagent.server.storage.remote import RemoteBackend
+        from hackagent.storage._http.client import AuthenticatedClient
+        from hackagent.storage.remote import RemoteBackend
 
         # Spy on litellm.completion to capture the kwargs without disabling it.
         captured: Dict[str, Any] = {}

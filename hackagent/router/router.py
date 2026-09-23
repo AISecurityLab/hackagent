@@ -5,7 +5,8 @@ import asyncio
 import logging
 from typing import Any, Dict, List, Optional, Tuple, Type
 
-from hackagent.server.storage.base import AgentRecord, StorageBackend
+from hackagent.storage.records import AgentRecord
+from hackagent.storage.store import Store
 from hackagent.router import envelope as _envelope
 from hackagent.router import tracking_logger as _tracking_logger
 from hackagent.router._chat_registration import _ChatRegistration
@@ -70,7 +71,7 @@ class AgentRouter:
     4.  Storing this adapter for subsequent request routing.
 
     Attributes:
-        backend: The StorageBackend.
+        backend: The Store.
         organization_id: The UUID of the organization associated with the backend.
         user_id_str: The string user ID associated with the backend context.
         backend_agent: The `AgentRecord` representing this agent in storage.
@@ -79,7 +80,7 @@ class AgentRouter:
 
     def __init__(
         self,
-        backend: StorageBackend,
+        backend: Store,
         name: str,
         agent_type: AgentType,
         endpoint: str,
@@ -91,7 +92,7 @@ class AgentRouter:
         Initializes the AgentRouter and configures a single agent.
 
         Args:
-            backend: StorageBackend.
+            backend: Store.
             name: Name for the agent in storage.
             agent_type: The type of agent (e.g., AgentType.LITELLM).
             endpoint: API endpoint URL for the agent service.

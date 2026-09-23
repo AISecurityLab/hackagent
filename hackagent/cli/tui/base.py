@@ -14,7 +14,7 @@ from textual.containers import Container
 from textual.widgets import Static
 
 from hackagent.cli.config import CLIConfig
-from hackagent.server.storage.base import StorageBackend
+from hackagent.storage.store import Store
 
 
 class HackAgentHeader(Container):
@@ -70,13 +70,13 @@ class BaseTab(Container):
         self._refresh_interval = None
         self._did_initial_refresh = False
 
-    def create_backend(self) -> StorageBackend:
+    def create_backend(self) -> Store:
         """Return a LocalBackend for local storage.
 
         Returns:
-            StorageBackend instance ready for use.
+            Store instance ready for use.
         """
-        from hackagent.server.storage.local import LocalBackend
+        from hackagent.storage.local import LocalBackend
 
         return LocalBackend()
 

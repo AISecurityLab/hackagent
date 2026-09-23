@@ -92,7 +92,7 @@ def update_single_result(
         result_id: UUID string of the result to update.
         success: Whether the attack was successful.
         evaluation_notes: Explanation of the evaluation outcome.
-        backend: StorageBackend instance.
+        backend: Store instance.
         logger: Optional logger instance.
 
     Returns:

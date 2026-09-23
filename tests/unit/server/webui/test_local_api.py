@@ -13,7 +13,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from hackagent.server.storage.local import LocalBackend
+from hackagent.storage.local import LocalBackend
 from hackagent.server.webui import _static, create_app
 
 

@@ -21,7 +21,7 @@ from textual.app import App, ComposeResult
 from hackagent.cli.config import CLIConfig
 from hackagent.cli.tui.theme import css_variables
 from hackagent.cli.tui.views.results import ResultsTab
-from hackagent.server.storage.local import LocalBackend
+from hackagent.storage.local import LocalBackend
 
 
 def _stub_config() -> CLIConfig:

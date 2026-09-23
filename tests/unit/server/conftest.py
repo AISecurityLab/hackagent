@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-conftest.py for server/storage unit tests.
+conftest.py for server/webui unit tests.
 
 Pre-registers stub modules for optional heavy dependencies (rich, attrs, etc.)
 so the storage modules can be imported and tested without a full dev install.

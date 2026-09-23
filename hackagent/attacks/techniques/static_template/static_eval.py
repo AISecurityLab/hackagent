@@ -20,11 +20,6 @@ from hackagent.core.defaults import DEFAULT_JUDGE_IDENTIFIER
 from hackagent.core.contracts import EvalStatus
 from hackagent.router.tracking import Tracker
 
-# Kept for backward-compatibility checks in unit tests that verify legacy
-# sync intent is still represented in this module.
-from hackagent.server.api.result import result_partial_update  # noqa: F401
-
-
 logger = logging.getLogger("hackagent.attacks.static_template.evaluation")
 
 
@@ -335,7 +330,7 @@ def _update_result_status(
         result_id: UUID of the result to update
         success: Whether the attack was successful
         evaluation_notes: Notes explaining the evaluation
-        backend: StorageBackend used for persistence
+        backend: Store used for persistence
         logger: Logger instance
 
     Returns:

@@ -362,7 +362,7 @@ class TestGoogleADKRouterIntegration:
         google_adk_agent_url: str,
     ):
         """Test that AgentRouter correctly creates ADKAgent adapter."""
-        from hackagent.server.client import AuthenticatedClient
+        from hackagent.storage._http.client import AuthenticatedClient
         from hackagent.router.router import AgentRouter
         from hackagent.core.contracts import AgentType
         from hackagent.router.providers.adk import ADKAgent
@@ -372,7 +372,7 @@ class TestGoogleADKRouterIntegration:
             token=hackagent_api_key,
             prefix="Bearer",
         )
-        from hackagent.server.storage.remote import RemoteBackend
+        from hackagent.storage.remote import RemoteBackend
 
         backend = RemoteBackend(client)
 
@@ -400,7 +400,7 @@ class TestGoogleADKRouterIntegration:
         google_adk_agent_url: str,
     ):
         """Test that router can handle requests through ADK adapter."""
-        from hackagent.server.client import AuthenticatedClient
+        from hackagent.storage._http.client import AuthenticatedClient
         from hackagent.router.router import AgentRouter
         from hackagent.core.contracts import AgentType
 
@@ -409,7 +409,7 @@ class TestGoogleADKRouterIntegration:
             token=hackagent_api_key,
             prefix="Bearer",
         )
-        from hackagent.server.storage.remote import RemoteBackend
+        from hackagent.storage.remote import RemoteBackend
 
         backend = RemoteBackend(client)
 
