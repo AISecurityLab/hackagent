@@ -82,13 +82,13 @@ Three enhancements can be combined independently:
 ### Simple Configuration
 
 ```python
-from hackagent import HackAgent, AgentTypeEnum
+from hackagent import HackAgent, AgentType
 
 # Initialize HackAgent
 agent = HackAgent(
     name="target_agent",
     endpoint="http://localhost:8000",
-    agent_type=AgentTypeEnum.GOOGLE_ADK
+    agent_type=AgentType.GOOGLE_ADK
 )
 
 # Basic FlipAttack configuration (FCS mode, default)

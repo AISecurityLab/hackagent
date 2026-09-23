@@ -18,7 +18,7 @@ The SDK supports both modes:
 ## Import the SDK
 
 ```python
-from hackagent import HackAgent, AgentTypeEnum
+from hackagent import HackAgent, AgentType
 ```
 
 ## Basic Usage
@@ -26,20 +26,20 @@ from hackagent import HackAgent, AgentTypeEnum
 ### Your First Security Test
 
 ```python
-from hackagent import HackAgent, AgentTypeEnum
+from hackagent import HackAgent, AgentType
 
 # Default: local mode (SQLite in ~/.local/share/hackagent/hackagent.db)
 agent = HackAgent(
     name="multi_tool_agent",
     endpoint="http://localhost:8000",
-    agent_type=AgentTypeEnum.GOOGLE_ADK,
+    agent_type=AgentType.GOOGLE_ADK,
 )
 
 # Remote mode example (cloud sync)
 remote_agent = HackAgent(
     name="multi_tool_agent",
     endpoint="http://localhost:8000",
-    agent_type=AgentTypeEnum.GOOGLE_ADK,
+    agent_type=AgentType.GOOGLE_ADK,
     api_key=os.getenv("HACKAGENT_API_KEY"),
     base_url=os.getenv("HACKAGENT_BASE_URL", "https://api.hackagent.dev"),
 )
@@ -72,14 +72,14 @@ results = agent.hack(attack_config=attack_config)
 
 ```python
 import os
-from hackagent import HackAgent, AgentTypeEnum
+from hackagent import HackAgent, AgentType
 
 def test_adk_attack_scenario():
     # Initialize HackAgent client
     agent = HackAgent(
         name="multi_tool_agent",
         endpoint=os.getenv("AGENT_URL"),
-        agent_type=AgentTypeEnum.GOOGLE_ADK,
+        agent_type=AgentType.GOOGLE_ADK,
     )
 
     # Configure AdvPrefix attack
@@ -108,16 +108,16 @@ def test_adk_attack_scenario():
 ### Supported Agent Types
 
 ```python
-from hackagent import AgentTypeEnum
+from hackagent import AgentType
 
 # Available agent types
-AgentTypeEnum.GOOGLE_ADK    # Google Agent Development Kit
-AgentTypeEnum.LITELLM       # LiteLLM multi-provider interface
-AgentTypeEnum.OPENAI_SDK    # OpenAI-compatible endpoints
-AgentTypeEnum.LANGCHAIN     # LangChain (uses LiteLLM adapter)
-AgentTypeEnum.MCP           # Model Context Protocol
-AgentTypeEnum.A2A           # Agent-to-Agent protocol
-AgentTypeEnum.UNKNOWN       # Unknown/fallback type
+AgentType.GOOGLE_ADK    # Google Agent Development Kit
+AgentType.LITELLM       # LiteLLM multi-provider interface
+AgentType.OPENAI_SDK    # OpenAI-compatible endpoints
+AgentType.LANGCHAIN     # LangChain (uses LiteLLM adapter)
+AgentType.MCP           # Model Context Protocol
+AgentType.A2A           # Agent-to-Agent protocol
+AgentType.UNKNOWN       # Unknown/fallback type
 ```
 
 ### Google ADK Configuration
@@ -128,7 +128,7 @@ For Google ADK agents, the SDK automatically handles session management:
 agent = HackAgent(
     name="multi_tool_agent",           # ADK app name
     endpoint="http://localhost:8000",   # ADK server endpoint
-    agent_type=AgentTypeEnum.GOOGLE_ADK,
+    agent_type=AgentType.GOOGLE_ADK,
     # Optional parameters:
     timeout=120,                       # HackAgent backend API client timeout (not the ADK request timeout)
     raise_on_unexpected_status=False   # Handle HTTP errors gracefully
@@ -143,7 +143,7 @@ For LiteLLM-based agents supporting multiple LLM providers:
 agent = HackAgent(
     name="litellm_agent",
     endpoint="http://localhost:8000/v1/chat/completions",
-    agent_type=AgentTypeEnum.LITELLM,
+    agent_type=AgentType.LITELLM,
 )
 ```
 
@@ -155,7 +155,7 @@ For OpenAI API compatible agents:
 agent = HackAgent(
     name="openai_agent",
     endpoint="https://api.openai.com/v1/chat/completions",
-    agent_type=AgentTypeEnum.OPENAI_SDK,
+    agent_type=AgentType.OPENAI_SDK,
 )
 ```
 

@@ -32,7 +32,7 @@ from hackagent.attacks.shared.response_utils import extract_response_content
 from hackagent.router.router import AgentRouter
 from hackagent.router.tracking.tracker import Tracker
 from hackagent.server.client import AuthenticatedClient
-from hackagent.server.storage.enums import EvaluationStatusEnum, StepTypeEnum
+from hackagent.core.contracts import EvalStatus, StepKind
 
 from .config import (
     APPEND_HIDDEN_DIRECTIVE_POISONER_SYSTEM_PROMPT,
@@ -629,7 +629,7 @@ class RagAttack(BaseAttack):
                             "original_length": doc.get("original_length"),
                             "poisoned_length": doc.get("poisoned_length"),
                         },
-                        step_type=StepTypeEnum.OTHER,
+                        step_type=StepKind.OTHER,
                     )
 
         # Step 4: Chunk and embed into FAISS
@@ -842,9 +842,9 @@ class RagAttack(BaseAttack):
                     "total_chunks": len(all_chunks),
                 },
                 evaluation_status=(
-                    EvaluationStatusEnum.SUCCESSFUL_JAILBREAK
+                    EvalStatus.SUCCESSFUL_JAILBREAK
                     if n_success > 0
-                    else EvaluationStatusEnum.FAILED_JAILBREAK
+                    else EvalStatus.FAILED_JAILBREAK
                 ),
             )
 

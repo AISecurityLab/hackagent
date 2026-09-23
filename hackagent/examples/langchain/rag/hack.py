@@ -21,7 +21,7 @@ Usage (TUI — two terminals):
 
 import os
 from hackagent import HackAgent
-from hackagent.router.types import AgentTypeEnum
+from hackagent.core.contracts import AgentType
 
 HACKAGENT_API_KEY = os.getenv("HACKAGENT_API_KEY")
 ENDPOINT_LMSTUDIO = "http://localhost:1234/v1"
@@ -39,14 +39,14 @@ GOALS = [
 ATTACKER = {
     "identifier": "nidum-gemma-2b-uncensored",
     "endpoint": ENDPOINT_LMSTUDIO,
-    "agent_type": AgentTypeEnum.OPENAI_SDK,
+    "agent_type": AgentType.OPENAI_SDK,
 }
 
 
 agent = HackAgent(
     name="corpbot_rag",
     endpoint="http://localhost:8000/v1",
-    agent_type=AgentTypeEnum.OPENAI_SDK,
+    agent_type=AgentType.OPENAI_SDK,
     api_key=HACKAGENT_API_KEY,
 )
 

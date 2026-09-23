@@ -15,7 +15,7 @@ from hackagent.server.api.agent import (
     agent_retrieve,
     agent_update,
 )  # Added agent_partial_update
-from hackagent.router.types import AgentTypeEnum  # For AgentRequest body
+from hackagent.core.contracts import AgentType  # For AgentRequest body
 from hackagent.server.api.models import (
     Agent,
 )  # For agent_create, agent_retrieve, agent_update
@@ -43,7 +43,7 @@ class TestAgentListAPI(unittest.TestCase):
             "id": mock_agent_id,
             "name": "Test Agent",
             "endpoint": "http://example.com/agent",
-            "agent_type": AgentTypeEnum.GOOGLE_ADK.value,
+            "agent_type": AgentType.GOOGLE_ADK.value,
             "organization": mock_org_id,
             "organization_detail": {
                 "id": mock_org_id,
@@ -149,7 +149,7 @@ class TestAgentCreateAPI(unittest.TestCase):
         agent_id_for_request = uuid.uuid4()
         agent_request_data = AgentRequest(
             name="New Test Agent",
-            agent_type=AgentTypeEnum.GOOGLE_ADK.value,
+            agent_type=AgentType.GOOGLE_ADK.value,
             endpoint="http://example.com/adk",
         )
 
@@ -217,7 +217,7 @@ class TestAgentCreateAPI(unittest.TestCase):
 
         agent_request_data = AgentRequest(
             name="Error Agent",
-            agent_type=AgentTypeEnum.GOOGLE_ADK.value,
+            agent_type=AgentType.GOOGLE_ADK.value,
             endpoint="http://error-test.example.com",
         )
 
@@ -246,7 +246,7 @@ class TestAgentCreateAPI(unittest.TestCase):
 
         agent_request_data = AgentRequest(
             name="Error Agent False",
-            agent_type=AgentTypeEnum.GOOGLE_ADK.value,
+            agent_type=AgentType.GOOGLE_ADK.value,
             endpoint="http://error-false-test.example.com",
         )
 
@@ -275,7 +275,7 @@ class TestAgentRetrieveAPI(unittest.TestCase):
         mock_response_content = {
             "id": str(agent_id_to_retrieve),
             "name": "Retrieved Agent",
-            "agent_type": AgentTypeEnum.LITELLM.value,
+            "agent_type": AgentType.LITELLM.value,
             "endpoint": "http://example.com/retrieved",
             "organization": str(uuid.uuid4()),
             "organization_detail": {
@@ -378,7 +378,7 @@ class TestAgentUpdateAPI(unittest.TestCase):
         agent_id_to_update = uuid.uuid4()
         agent_update_request_data = AgentRequest(
             name="Updated Test Agent",
-            agent_type=AgentTypeEnum.LITELLM.value,
+            agent_type=AgentType.LITELLM.value,
             endpoint="http://example.com/updated-litellm",
             description="Updated description",
         )
@@ -453,7 +453,7 @@ class TestAgentUpdateAPI(unittest.TestCase):
         agent_id_not_found = uuid.uuid4()
         agent_update_request_data = AgentRequest(
             name="NonExistent Update",
-            agent_type=AgentTypeEnum.GOOGLE_ADK.value,
+            agent_type=AgentType.GOOGLE_ADK.value,
             endpoint="http://error-test.example.com",
         )
 
@@ -485,7 +485,7 @@ class TestAgentUpdateAPI(unittest.TestCase):
         agent_id_error = uuid.uuid4()
         agent_update_request_data = AgentRequest(
             name="Update Error False",
-            agent_type=AgentTypeEnum.LITELLM.value,
+            agent_type=AgentType.LITELLM.value,
             endpoint="http://error-false-test.example.com",
         )
 
@@ -597,7 +597,7 @@ class TestAgentPartialUpdateAPI(unittest.TestCase):
         mock_patched_agent_response_content = {
             "id": str(agent_id_to_patch),
             "name": "Existing Agent Name",
-            "agent_type": AgentTypeEnum.GOOGLE_ADK.value,
+            "agent_type": AgentType.GOOGLE_ADK.value,
             "endpoint": "http://example.com/existing-adk",
             "organization": mock_org_id_patch,
             "organization_detail": {

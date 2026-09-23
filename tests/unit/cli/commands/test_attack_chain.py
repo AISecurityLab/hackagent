@@ -20,7 +20,7 @@ class TestChainCommand(unittest.TestCase):
         self.runner = CliRunner()
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        splash = patch("hackagent.utils.display_hackagent_splash")
+        splash = patch("hackagent.cli.banner.display_hackagent_splash")
         splash.start()
         self.addCleanup(splash.stop)
 

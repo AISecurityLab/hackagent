@@ -71,7 +71,7 @@ class TestCrossFrameworkAttacks:
         openai_base_url: str,
     ):
         """Test running the same attack on different frameworks."""
-        from hackagent import AgentTypeEnum
+        from hackagent import AgentType
 
         attack_config = {
             "attack_type": "static_template",
@@ -86,7 +86,7 @@ class TestCrossFrameworkAttacks:
         ollama_agent = hackagent_client_factory(
             name=ollama_model,
             endpoint=ollama_base_url,
-            agent_type=AgentTypeEnum.OLLAMA,
+            agent_type=AgentType.OLLAMA,
         )
         logger.info("Running attack on Ollama...")
         ollama_results = ollama_agent.hack(attack_config=attack_config)
@@ -96,7 +96,7 @@ class TestCrossFrameworkAttacks:
         openai_agent = hackagent_client_factory(
             name=openai_model,
             endpoint=openai_base_url,
-            agent_type=AgentTypeEnum.OPENAI_SDK,
+            agent_type=AgentType.OPENAI_SDK,
         )
         logger.info("Running attack on OpenAI...")
         openai_results = openai_agent.hack(attack_config=attack_config)
@@ -118,13 +118,13 @@ class TestAttackErrorHandling:
         ollama_model: str,
     ):
         """Test that invalid attack type raises appropriate error."""
-        from hackagent import AgentTypeEnum
+        from hackagent import AgentType
         from hackagent.core.errors import HackAgentError
 
         agent = hackagent_client_factory(
             name=ollama_model,
             endpoint=ollama_base_url,
-            agent_type=AgentTypeEnum.OLLAMA,
+            agent_type=AgentType.OLLAMA,
         )
 
         attack_config = {
@@ -144,13 +144,13 @@ class TestAttackErrorHandling:
         ollama_model: str,
     ):
         """Test that missing attack type raises appropriate error."""
-        from hackagent import AgentTypeEnum
+        from hackagent import AgentType
         from hackagent.core.errors import HackAgentError
 
         agent = hackagent_client_factory(
             name=ollama_model,
             endpoint=ollama_base_url,
-            agent_type=AgentTypeEnum.OLLAMA,
+            agent_type=AgentType.OLLAMA,
         )
 
         attack_config = {
@@ -178,12 +178,12 @@ class TestAttackWithCustomJudges:
         ollama_model: str,
     ):
         """Test advprefix attack with Ollama-based judges."""
-        from hackagent import AgentTypeEnum
+        from hackagent import AgentType
 
         agent = hackagent_client_factory(
             name=ollama_model,
             endpoint=ollama_base_url,
-            agent_type=AgentTypeEnum.OLLAMA,
+            agent_type=AgentType.OLLAMA,
         )
 
         attack_config = {
@@ -227,12 +227,12 @@ class TestAttackStrategies:
         ollama_model: str,
     ):
         """Test that all expected attack strategies are loaded."""
-        from hackagent import AgentTypeEnum
+        from hackagent import AgentType
 
         agent = hackagent_client_factory(
             name=ollama_model,
             endpoint=ollama_base_url,
-            agent_type=AgentTypeEnum.OLLAMA,
+            agent_type=AgentType.OLLAMA,
         )
 
         strategies = agent.attack_strategies
@@ -255,12 +255,12 @@ class TestAttackStrategies:
         ollama_model: str,
     ):
         """Test that attack strategies are lazy-loaded."""
-        from hackagent import AgentTypeEnum
+        from hackagent import AgentType
 
         agent = hackagent_client_factory(
             name=ollama_model,
             endpoint=ollama_base_url,
-            agent_type=AgentTypeEnum.OLLAMA,
+            agent_type=AgentType.OLLAMA,
         )
 
         # Before accessing, _attack_strategies should be None

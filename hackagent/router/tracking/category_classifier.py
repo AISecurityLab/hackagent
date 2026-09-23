@@ -11,7 +11,7 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from hackagent.router.router import AgentRouter
-from hackagent.router.types import AgentTypeEnum
+from hackagent.core.contracts import AgentType
 from hackagent.server.storage.base import StorageBackend
 
 UNKNOWN_CATEGORY = "Z. Unclassified Risk"
@@ -222,15 +222,15 @@ def _create_classifier_router(
         "timeout": config.get("timeout", config.get("request_timeout")),
     }
 
-    agent_type_raw = (config.get("agent_type") or AgentTypeEnum.OLLAMA.value).upper()
+    agent_type_raw = (config.get("agent_type") or AgentType.OLLAMA.value).upper()
     try:
-        agent_type = AgentTypeEnum(agent_type_raw)
+        agent_type = AgentType(agent_type_raw)
     except ValueError:
         logger.warning(
             "Invalid category classifier agent_type '%s'. Falling back to OLLAMA.",
             agent_type_raw,
         )
-        agent_type = AgentTypeEnum.OLLAMA
+        agent_type = AgentType.OLLAMA
 
     router = AgentRouter(
         backend=backend,

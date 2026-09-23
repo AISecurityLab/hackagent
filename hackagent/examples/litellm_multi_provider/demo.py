@@ -56,13 +56,13 @@ from typing import Any, Dict
 
 try:
     from hackagent import HackAgent
-    from hackagent.router.types import AgentTypeEnum
+    from hackagent.core.contracts import AgentType
 except ModuleNotFoundError:
     project_root = Path(__file__).resolve().parents[2]
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
     from hackagent import HackAgent
-    from hackagent.router.types import AgentTypeEnum
+    from hackagent.core.contracts import AgentType
 
 
 # ---------------------------------------------------------------------------
@@ -141,7 +141,7 @@ def build_demo_config(provider: str) -> dict:
     """Return the HackAgent config for the chosen provider.
 
     The structure is identical to ``examples/ollama/demo.py``; only the
-    ``agent_type`` becomes ``AgentTypeEnum.LITELLM`` and the model
+    ``agent_type`` becomes ``AgentType.LITELLM`` and the model
     strings carry a provider prefix (``anthropic/…``, ``gemini/…``…).
     """
     if provider not in _PROVIDERS:
@@ -158,7 +158,7 @@ def build_demo_config(provider: str) -> dict:
 
     target_kwargs: Dict[str, Any] = {
         "name": f"{provider}-target",
-        "agent_type": AgentTypeEnum.LITELLM,
+        "agent_type": AgentType.LITELLM,
         # LiteLLM resolves the endpoint from the provider prefix; no
         # need to pass a base URL unless you're routing through a proxy.
         "endpoint": "",
@@ -172,13 +172,13 @@ def build_demo_config(provider: str) -> dict:
     attacker_block: Dict[str, Any] = {
         "identifier": settings["attacker_model"],
         "type": "harmbench",
-        "agent_type": AgentTypeEnum.LITELLM,
+        "agent_type": AgentType.LITELLM,
         "endpoint": "",
     }
     judge_block: Dict[str, Any] = {
         "identifier": settings["judge_model"],
         "type": "harmbench",
-        "agent_type": AgentTypeEnum.LITELLM,
+        "agent_type": AgentType.LITELLM,
         "endpoint": "",
     }
     if api_key_env:

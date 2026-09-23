@@ -37,12 +37,12 @@ import os
 from typing import Any, Dict, Optional, Tuple
 
 from hackagent.router.router import AgentRouter
-from hackagent.router.types import AgentTypeEnum
+from hackagent.core.contracts import AgentType
 
 logger = logging.getLogger("hackagent.attacks.shared.router_factory")
 
 # Common aliases for agent_type strings accepted in configs.  These are mapped
-# to the canonical AgentTypeEnum value before enum lookup so that e.g.
+# to the canonical AgentType value before enum lookup so that e.g.
 # ``"agent_type": "openai"`` (the most natural shorthand) works without warnings.
 _AGENT_TYPE_ALIASES: Dict[str, str] = {
     "OPENAI": "OPENAI_SDK",
@@ -125,7 +125,7 @@ def create_router(
 
     # ---- Agent type resolution ----
     raw_agent_type = config.get("agent_type", "openai")
-    if isinstance(raw_agent_type, AgentTypeEnum):
+    if isinstance(raw_agent_type, AgentType):
         agent_type = raw_agent_type
     else:
         agent_type_str = str(raw_agent_type)
@@ -133,13 +133,13 @@ def create_router(
             agent_type_str.upper(), agent_type_str.upper()
         )
         try:
-            agent_type = AgentTypeEnum(normalized)
+            agent_type = AgentType(normalized)
         except ValueError:
             log.warning(
                 f"Invalid agent_type '{agent_type_str}' for {name}, "
                 "defaulting to OPENAI_SDK"
             )
-            agent_type = AgentTypeEnum.OPENAI_SDK
+            agent_type = AgentType.OPENAI_SDK
 
     # ---- Operational config ----
     operational_config: Dict[str, Any] = {
@@ -158,7 +158,7 @@ def create_router(
         if key not in operational_config or operational_config[key] is None:
             operational_config[key] = value
 
-    if agent_type != AgentTypeEnum.OLLAMA:
+    if agent_type != AgentType.OLLAMA:
         operational_config.pop("thinking", None)
 
     # ---- Create router ----

@@ -72,7 +72,7 @@ def _display_welcome():
     """Display welcome message and basic usage info"""
 
     # Display HackAgent splash
-    from hackagent.utils import display_hackagent_splash
+    from hackagent.cli.banner import display_hackagent_splash
 
     display_hackagent_splash()
 

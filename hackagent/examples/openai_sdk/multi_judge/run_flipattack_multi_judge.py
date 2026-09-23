@@ -12,7 +12,7 @@ import os
 
 from hackagent import HackAgent
 from hackagent.attacks.evaluator.metrics import generate_summary_report
-from hackagent.router.types import AgentTypeEnum
+from hackagent.core.contracts import AgentType
 
 HACKAGENT_API_KEY = os.getenv("HACKAGENT_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -38,7 +38,7 @@ def main() -> None:
     agent = HackAgent(
         name=TARGET_MODEL,
         endpoint=TARGET_ENDPOINT,
-        agent_type=AgentTypeEnum.OPENAI_SDK,
+        agent_type=AgentType.OPENAI_SDK,
         api_key=HACKAGENT_API_KEY,
         adapter_operational_config={
             "name": TARGET_MODEL,
@@ -64,21 +64,21 @@ def main() -> None:
             {
                 "identifier": JUDGE_MODEL,
                 "type": "harmbench_variant",
-                "agent_type": AgentTypeEnum.OPENAI_SDK,
+                "agent_type": AgentType.OPENAI_SDK,
                 "api_key": OPENROUTER_API_KEY,
                 "endpoint": JUDGE_ENDPOINT,
             },
             {
                 "identifier": JUDGE_MODEL,
                 "type": "harmbench",
-                "agent_type": AgentTypeEnum.OPENAI_SDK,
+                "agent_type": AgentType.OPENAI_SDK,
                 "api_key": OPENROUTER_API_KEY,
                 "endpoint": JUDGE_ENDPOINT,
             },
             {
                 "identifier": JUDGE_MODEL,
                 "type": "jailbreakbench",
-                "agent_type": AgentTypeEnum.OPENAI_SDK,
+                "agent_type": AgentType.OPENAI_SDK,
                 "api_key": OPENROUTER_API_KEY,
                 "endpoint": JUDGE_ENDPOINT,
             },

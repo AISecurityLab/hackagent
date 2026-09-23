@@ -109,7 +109,7 @@ def init(ctx):
     """
 
     # Show the awesome logo first
-    from hackagent.utils import display_hackagent_splash
+    from hackagent.cli.banner import display_hackagent_splash
 
     display_hackagent_splash()
 
@@ -259,7 +259,7 @@ def version(ctx):
     """📋 Show version information"""
 
     # Display the awesome ASCII logo
-    from hackagent.utils import display_hackagent_splash
+    from hackagent.cli.banner import display_hackagent_splash
 
     display_hackagent_splash()
 

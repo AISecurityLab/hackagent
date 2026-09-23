@@ -20,7 +20,7 @@ def _render_rich_help(ctx: click.Context) -> None:
     from rich.table import Table
     from rich.text import Text
 
-    from hackagent.utils import HACKAGENT_BANNER
+    from hackagent.cli.banner import HACKAGENT_BANNER
 
     c = Console()
     version = get_version()

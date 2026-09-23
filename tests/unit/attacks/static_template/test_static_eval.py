@@ -24,7 +24,7 @@ from hackagent.attacks.techniques.static_template.static_eval import (
     evaluate_responses_with_llm_judges,
     execute,
 )
-from hackagent.server.storage.enums import EvaluationStatusEnum
+from hackagent.core.contracts import EvalStatus
 
 LOGGER = logging.getLogger("test.static_template.eval")
 LOGGER.addHandler(logging.NullHandler())
@@ -349,7 +349,7 @@ class TestUpdateResultStatus(unittest.TestCase):
         self.assertTrue(ok)
         backend.update_result.assert_called_once_with(
             result_id=UUID(result_id),
-            evaluation_status=EvaluationStatusEnum.SUCCESSFUL_JAILBREAK.value,
+            evaluation_status=EvalStatus.SUCCESSFUL_JAILBREAK.value,
             evaluation_notes="notes",
         )
 
@@ -360,7 +360,7 @@ class TestUpdateResultStatus(unittest.TestCase):
 
         self.assertEqual(
             backend.update_result.call_args.kwargs["evaluation_status"],
-            EvaluationStatusEnum.FAILED_JAILBREAK.value,
+            EvalStatus.FAILED_JAILBREAK.value,
         )
 
     def test_invalid_uuid_is_reported_as_failure(self):
@@ -500,9 +500,7 @@ class TestFinalizeGoalsWithTracker(unittest.TestCase):
         _finalize_goals_with_tracker(rows, tracker, LOGGER)
 
         call = tracker.finalize_goal.call_args.kwargs
-        self.assertEqual(
-            call["evaluation_status"], EvaluationStatusEnum.ERROR_AGENT_RESPONSE
-        )
+        self.assertEqual(call["evaluation_status"], EvalStatus.ERROR_AGENT_RESPONSE)
         self.assertFalse(call["success"])
         self.assertIn("execution/adapter errors", call["evaluation_notes"])
 

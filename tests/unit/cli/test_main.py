@@ -161,7 +161,7 @@ class TestLogoIntegration:
         """Test logo is displayed when attack commands are used"""
         # In a real test:
         # runner = CliRunner()
-        # with patch('hackagent.utils.display_hackagent_splash') as mock_splash:
+        # with patch('hackagent.cli.banner.display_hackagent_splash') as mock_splash:
         #     result = runner.invoke(cli, ['attack', 'list'])
         #     mock_splash.assert_called_once()
 

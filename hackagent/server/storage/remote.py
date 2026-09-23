@@ -43,14 +43,14 @@ from hackagent.server.api.result import (
 from hackagent.server.api.models import (
     AgentRequest,
     AttackRequest,
-    EvaluationStatusEnum,
+    EvalStatus,
     PatchedAgentRequest,
     PatchedResultRequest,
     PatchedRunRequest,
     ResultRequest,
     RunRequest,
-    StatusEnum,
-    StepTypeEnum,
+    RunStatus,
+    StepKind,
     TraceRequest,
 )
 from hackagent.server.storage.base import (
@@ -494,7 +494,7 @@ class RemoteBackend:
         kwargs: Dict[str, Any] = {}
         if status is not None:
             try:
-                kwargs["status"] = StatusEnum(status)
+                kwargs["status"] = RunStatus(status)
             except ValueError:
                 kwargs["status"] = status
         if run_notes is not None:
@@ -633,7 +633,7 @@ class RemoteBackend:
         body = ResultRequest(
             run=run_id,
             request_payload=request_payload,
-            evaluation_status=EvaluationStatusEnum.NOT_EVALUATED,
+            evaluation_status=EvalStatus.NOT_EVALUATED,
             agent_specific_data=agent_specific_data,
         )
         resp = result_create.sync_detailed(client=self._client, body=body)
@@ -644,7 +644,7 @@ class RemoteBackend:
                 run_id=run_id,
                 goal=goal,
                 goal_index=goal_index,
-                evaluation_status=EvaluationStatusEnum.NOT_EVALUATED.value,
+                evaluation_status=EvalStatus.NOT_EVALUATED.value,
                 evaluation_notes=None,
                 evaluation_metrics={},
                 metadata=agent_specific_data,
@@ -697,7 +697,7 @@ class RemoteBackend:
         kwargs: Dict[str, Any] = {}
         if evaluation_status is not None:
             try:
-                kwargs["evaluation_status"] = EvaluationStatusEnum(evaluation_status)
+                kwargs["evaluation_status"] = EvalStatus(evaluation_status)
             except ValueError:
                 kwargs["evaluation_status"] = evaluation_status
         if evaluation_notes is not None:
@@ -899,9 +899,9 @@ class RemoteBackend:
     ) -> None:
         """Background worker body for create_trace: issue the POST."""
         try:
-            step_type_enum = StepTypeEnum(step_type)
+            step_type_enum = StepKind(step_type)
         except ValueError:
-            step_type_enum = StepTypeEnum.OTHER
+            step_type_enum = StepKind.OTHER
         body = TraceRequest(
             sequence=sequence, step_type=step_type_enum, content=content
         )

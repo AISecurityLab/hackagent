@@ -10,7 +10,7 @@ import httpx
 
 from hackagent.core.errors import HackAgentError
 from tests.fakes import isolated_settings
-from hackagent.router.types import AgentTypeEnum
+from hackagent.core.contracts import AgentType
 
 
 class TestHackAgentInitialization(unittest.TestCase):
@@ -20,7 +20,7 @@ class TestHackAgentInitialization(unittest.TestCase):
     @patch(
         "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
     )
-    @patch("hackagent.agent.utils.resolve_agent_type")
+    @patch("hackagent.agent.AgentType.parse")
     def test_basic_initialization(
         self, mock_resolve_type, mock_resolve_token, mock_router
     ):
@@ -40,7 +40,7 @@ class TestHackAgentInitialization(unittest.TestCase):
     @patch(
         "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
     )
-    @patch("hackagent.agent.utils.resolve_agent_type")
+    @patch("hackagent.agent.AgentType.parse")
     def test_default_base_url(self, mock_resolve_type, mock_resolve_token, mock_router):
         """Test default base_url is used when not provided."""
         from hackagent.agent import HackAgent
@@ -56,7 +56,7 @@ class TestHackAgentInitialization(unittest.TestCase):
     @patch(
         "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
     )
-    @patch("hackagent.agent.utils.resolve_agent_type")
+    @patch("hackagent.agent.AgentType.parse")
     def test_custom_base_url(self, mock_resolve_type, mock_resolve_token, mock_router):
         """Test custom base_url."""
         from hackagent.agent import HackAgent
@@ -73,7 +73,7 @@ class TestHackAgentInitialization(unittest.TestCase):
     @patch(
         "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
     )
-    @patch("hackagent.agent.utils.resolve_agent_type")
+    @patch("hackagent.agent.AgentType.parse")
     def test_default_timeout_is_120_seconds(
         self, mock_resolve_type, mock_resolve_token, mock_router
     ):
@@ -92,7 +92,7 @@ class TestHackAgentInitialization(unittest.TestCase):
     @patch(
         "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
     )
-    @patch("hackagent.agent.utils.resolve_agent_type")
+    @patch("hackagent.agent.AgentType.parse")
     def test_custom_timeout_is_passed_to_client(
         self, mock_resolve_type, mock_resolve_token, mock_router
     ):
@@ -111,7 +111,7 @@ class TestHackAgentInitialization(unittest.TestCase):
     @patch(
         "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
     )
-    @patch("hackagent.agent.utils.resolve_agent_type")
+    @patch("hackagent.agent.AgentType.parse")
     def test_explicit_none_timeout_disables_it(
         self, mock_resolve_type, mock_resolve_token, mock_router
     ):
@@ -131,7 +131,7 @@ class TestHackAgentInitialization(unittest.TestCase):
     @patch(
         "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
     )
-    @patch("hackagent.agent.utils.resolve_agent_type")
+    @patch("hackagent.agent.AgentType.parse")
     def test_attack_strategies_lazy_loaded(
         self, mock_resolve_type, mock_resolve_token, mock_router
     ):
@@ -149,7 +149,7 @@ class TestHackAgentInitialization(unittest.TestCase):
     @patch(
         "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
     )
-    @patch("hackagent.agent.utils.resolve_agent_type")
+    @patch("hackagent.agent.AgentType.parse")
     def test_with_metadata(self, mock_resolve_type, mock_resolve_token, mock_router):
         """Test initialization with metadata."""
         from hackagent.agent import HackAgent
@@ -169,7 +169,7 @@ class TestHackAgentInitialization(unittest.TestCase):
     @patch(
         "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
     )
-    @patch("hackagent.agent.utils.resolve_agent_type")
+    @patch("hackagent.agent.AgentType.parse")
     def test_target_config_is_merged_into_router_defaults(
         self, mock_resolve_type, mock_resolve_token, mock_router
     ):
@@ -194,14 +194,14 @@ class TestHackAgentInitialization(unittest.TestCase):
     @patch(
         "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
     )
-    @patch("hackagent.agent.utils.resolve_agent_type")
+    @patch("hackagent.agent.AgentType.parse")
     def test_constructor_thinking_is_forwarded_for_ollama(
         self, mock_resolve_type, mock_resolve_token, mock_router
     ):
         """Constructor thinking is forwarded only when target type is OLLAMA."""
         from hackagent.agent import HackAgent
 
-        mock_resolve_type.return_value = AgentTypeEnum.OLLAMA
+        mock_resolve_type.return_value = AgentType.OLLAMA
 
         HackAgent(
             endpoint="http://localhost:11434",
@@ -217,14 +217,14 @@ class TestHackAgentInitialization(unittest.TestCase):
     @patch(
         "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
     )
-    @patch("hackagent.agent.utils.resolve_agent_type")
+    @patch("hackagent.agent.AgentType.parse")
     def test_constructor_thinking_is_ignored_for_non_ollama(
         self, mock_resolve_type, mock_resolve_token, mock_router
     ):
         """Constructor thinking is stripped for non-OLLAMA target types."""
         from hackagent.agent import HackAgent
 
-        mock_resolve_type.return_value = AgentTypeEnum.OPENAI_SDK
+        mock_resolve_type.return_value = AgentType.OPENAI_SDK
 
         HackAgent(
             endpoint="http://localhost:8000",
@@ -243,7 +243,7 @@ class TestHackAgentAttackStrategies(unittest.TestCase):
     @patch(
         "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
     )
-    @patch("hackagent.agent.utils.resolve_agent_type")
+    @patch("hackagent.agent.AgentType.parse")
     def test_attack_strategies_loaded_on_access(
         self, mock_resolve_type, mock_resolve_token, mock_router
     ):
@@ -266,7 +266,7 @@ class TestHackAgentAttackStrategies(unittest.TestCase):
     @patch(
         "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
     )
-    @patch("hackagent.agent.utils.resolve_agent_type")
+    @patch("hackagent.agent.AgentType.parse")
     def test_attack_strategies_cached(
         self, mock_resolve_type, mock_resolve_token, mock_router
     ):
@@ -291,7 +291,7 @@ class TestHackAgentHack(unittest.TestCase):
     @patch(
         "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
     )
-    @patch("hackagent.agent.utils.resolve_agent_type")
+    @patch("hackagent.agent.AgentType.parse")
     def setUp(self, mock_resolve_type, mock_resolve_token, mock_router):
         """Set up HackAgent for hack tests."""
         from hackagent.agent import HackAgent
@@ -421,7 +421,7 @@ class TestHackAgentHackChain(unittest.TestCase):
     @patch(
         "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
     )
-    @patch("hackagent.agent.utils.resolve_agent_type")
+    @patch("hackagent.agent.AgentType.parse")
     def setUp(self, mock_resolve_type, mock_resolve_token, mock_router):
         """Set up HackAgent for hack_chain tests."""
         from hackagent.agent import HackAgent

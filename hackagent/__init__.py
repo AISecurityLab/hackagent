@@ -5,13 +5,13 @@
 
 from .agent import HackAgent
 from .server.client import AuthenticatedClient, Client
-from .router.types import AgentTypeEnum
+from .core.contracts import AgentType
 from .server.storage.base import StorageBackend
 from .server.storage.local import LocalBackend
 from .server.storage.remote import RemoteBackend
 
 __all__ = (
-    "AgentTypeEnum",
+    "AgentType",
     "AuthenticatedClient",
     "Client",
     "HackAgent",

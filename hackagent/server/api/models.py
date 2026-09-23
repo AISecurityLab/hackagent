@@ -154,7 +154,7 @@ class ChoiceMessage(BaseModel):
     """
 
 
-class EvaluationStatusEnum(Enum):
+class EvalStatus(Enum):
     NOT_EVALUATED = "NOT_EVALUATED"
     SUCCESSFUL_JAILBREAK = "SUCCESSFUL_JAILBREAK"
     FAILED_JAILBREAK = "FAILED_JAILBREAK"
@@ -350,7 +350,7 @@ class PatchedResultRequest(BaseModel):
         int | None, Field(ge=0, le=2147483647, title="Latency (ms)")
     ] = None
     detected_tool_calls: Any | None = None
-    evaluation_status: EvaluationStatusEnum | None = None
+    evaluation_status: EvalStatus | None = None
     evaluation_notes: str | None = None
     evaluation_metrics: Any | None = None
     agent_specific_data: Any | None = None
@@ -383,13 +383,13 @@ class ResultRequest(BaseModel):
         int | None, Field(ge=0, le=2147483647, title="Latency (ms)")
     ] = None
     detected_tool_calls: Any | None = None
-    evaluation_status: EvaluationStatusEnum | None = None
+    evaluation_status: EvalStatus | None = None
     evaluation_notes: str | None = None
     evaluation_metrics: Any | None = None
     agent_specific_data: Any | None = None
 
 
-class StatusEnum(Enum):
+class RunStatus(Enum):
     PENDING = "PENDING"
     RUNNING = "RUNNING"
     COMPLETED = "COMPLETED"
@@ -397,7 +397,7 @@ class StatusEnum(Enum):
     CANCELLED = "CANCELLED"
 
 
-class StepTypeEnum(Enum):
+class StepKind(Enum):
     TOOL_CALL = "TOOL_CALL"
     TOOL_RESPONSE = "TOOL_RESPONSE"
     AGENT_THOUGHT = "AGENT_THOUGHT"
@@ -414,7 +414,7 @@ class Trace(BaseModel):
     id: int
     result: UUID
     sequence: Annotated[int, Field(ge=0, le=2147483647)]
-    step_type: StepTypeEnum | None = None
+    step_type: StepKind | None = None
     timestamp: AwareDatetime
     content: Any | None = None
 
@@ -424,7 +424,7 @@ class TraceRequest(BaseModel):
         frozen=True,
     )
     sequence: Annotated[int, Field(ge=0, le=2147483647)]
-    step_type: StepTypeEnum | None = None
+    step_type: StepKind | None = None
     content: Any | None = None
 
 
@@ -652,7 +652,7 @@ class PatchedRunRequest(BaseModel):
     """
     JSON containing specific settings for this run. If linked to an Attack, this might be a copy or subset of its configuration.
     """
-    status: StatusEnum | None = None
+    status: RunStatus | None = None
     run_notes: str | None = None
 
 
@@ -678,7 +678,7 @@ class Result(BaseModel):
         int | None, Field(ge=0, le=2147483647, title="Latency (ms)")
     ] = None
     detected_tool_calls: Any | None = None
-    evaluation_status: EvaluationStatusEnum | None = None
+    evaluation_status: EvalStatus | None = None
     evaluation_notes: str | None = None
     evaluation_metrics: Any | None = None
     agent_specific_data: Any | None = None
@@ -706,7 +706,7 @@ class Run(BaseModel):
     JSON containing specific settings for this run. If linked to an Attack, this might be a copy or subset of its configuration.
     """
     timestamp: AwareDatetime
-    status: StatusEnum | None = None
+    status: RunStatus | None = None
     run_notes: str | None = None
     is_client_executed: bool
     """
@@ -728,7 +728,7 @@ class RunRequest(BaseModel):
     """
     JSON containing specific settings for this run. If linked to an Attack, this might be a copy or subset of its configuration.
     """
-    status: StatusEnum | None = None
+    status: RunStatus | None = None
     run_notes: str | None = None
 
 
@@ -807,10 +807,10 @@ class PaginatedUserAPIKeyList(BaseModel):
 # ---------------------------------------------------------------------------
 
 #: Alias used by api/result/result_list.py for the evaluation_status filter.
-ResultListEvaluationStatus = EvaluationStatusEnum
+ResultListEvaluationStatus = EvalStatus
 
 #: Alias used by api/run/run_list.py for the status filter.
-RunListStatus = StatusEnum
+RunListStatus = RunStatus
 
 
 # ---------------------------------------------------------------------------

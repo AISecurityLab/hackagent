@@ -4,7 +4,7 @@ import unittest
 import uuid
 from unittest.mock import MagicMock, patch
 from hackagent.server.storage.base import OrganizationContext
-from hackagent.router.types import AgentTypeEnum
+from hackagent.core.contracts import AgentType
 from hackagent.router.router import AgentRouter
 
 
@@ -49,7 +49,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
         MockAgentMap,
         MockADKAdapter,
     ):
-        MockAgentMap[AgentTypeEnum.GOOGLE_ADK] = MockADKAdapter
+        MockAgentMap[AgentType.GOOGLE_ADK] = MockADKAdapter
         MockADKAdapter.__name__ = "ADKAgent"
 
         mock_org_id = uuid.uuid4()
@@ -72,7 +72,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
         router = AgentRouter(
             backend=mock_backend,
             name=agent_name,
-            agent_type=AgentTypeEnum.GOOGLE_ADK,
+            agent_type=AgentType.GOOGLE_ADK,
             endpoint=agent_endpoint,
             metadata=agent_metadata,
             adapter_operational_config=adapter_op_config,
@@ -81,7 +81,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
 
         mock_backend.create_or_update_agent.assert_called_once_with(
             name=agent_name,
-            agent_type=AgentTypeEnum.GOOGLE_ADK.value,
+            agent_type=AgentType.GOOGLE_ADK.value,
             endpoint=agent_endpoint,
             metadata=agent_metadata,
             overwrite_metadata=True,
@@ -114,7 +114,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
         MockAgentMap,
         MockADKAdapter,
     ):
-        MockAgentMap[AgentTypeEnum.GOOGLE_ADK] = MockADKAdapter
+        MockAgentMap[AgentType.GOOGLE_ADK] = MockADKAdapter
         MockADKAdapter.__name__ = "ADKAgent"
 
         mock_org_id = uuid.uuid4()
@@ -136,7 +136,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
         router = AgentRouter(
             backend=mock_backend,
             name=agent_name,
-            agent_type=AgentTypeEnum.GOOGLE_ADK,
+            agent_type=AgentType.GOOGLE_ADK,
             endpoint=agent_endpoint,
             metadata=new_metadata,
             adapter_operational_config={"user_id": "test_user_existing"},
@@ -145,7 +145,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
 
         mock_backend.create_or_update_agent.assert_called_once_with(
             name=agent_name,
-            agent_type=AgentTypeEnum.GOOGLE_ADK.value,
+            agent_type=AgentType.GOOGLE_ADK.value,
             endpoint=agent_endpoint,
             metadata=new_metadata,
             overwrite_metadata=True,
@@ -162,7 +162,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
         MockAgentMap,
         MockADKAdapter,
     ):
-        MockAgentMap[AgentTypeEnum.GOOGLE_ADK] = MockADKAdapter
+        MockAgentMap[AgentType.GOOGLE_ADK] = MockADKAdapter
         MockADKAdapter.__name__ = "ADKAgent"
 
         mock_org_id = uuid.uuid4()
@@ -180,7 +180,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
         router = AgentRouter(
             backend=mock_backend,
             name="ADKAgentMetaMatch",
-            agent_type=AgentTypeEnum.GOOGLE_ADK,
+            agent_type=AgentType.GOOGLE_ADK,
             endpoint="http://current-endpoint.com/",
             metadata={"feature_flag": True, "version": "1.0.0"},
             adapter_operational_config={"user_id": "test_user_meta_match"},
@@ -197,7 +197,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
         MockAgentMap,
         MockADKAdapter,
     ):
-        MockAgentMap[AgentTypeEnum.GOOGLE_ADK] = MockADKAdapter
+        MockAgentMap[AgentType.GOOGLE_ADK] = MockADKAdapter
         MockADKAdapter.__name__ = "ADKAgent"
 
         mock_org_id = uuid.uuid4()
@@ -215,7 +215,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
         router = AgentRouter(
             backend=mock_backend,
             name="ADKAgentMetaMatchOverwriteFalse",
-            agent_type=AgentTypeEnum.GOOGLE_ADK,
+            agent_type=AgentType.GOOGLE_ADK,
             endpoint="http://current-endpoint-ow-false.com/",
             metadata={"feature_flag": True, "version": "1.0.1"},
             adapter_operational_config={"user_id": "test_user_meta_match_ow_false"},
@@ -224,7 +224,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
 
         mock_backend.create_or_update_agent.assert_called_once_with(
             name="ADKAgentMetaMatchOverwriteFalse",
-            agent_type=AgentTypeEnum.GOOGLE_ADK.value,
+            agent_type=AgentType.GOOGLE_ADK.value,
             endpoint="http://current-endpoint-ow-false.com/",
             metadata={"feature_flag": True, "version": "1.0.1"},
             overwrite_metadata=False,
@@ -238,7 +238,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
         MockAgentMap,
         MockADKAdapter,
     ):
-        MockAgentMap[AgentTypeEnum.GOOGLE_ADK] = MockADKAdapter
+        MockAgentMap[AgentType.GOOGLE_ADK] = MockADKAdapter
         MockADKAdapter.__name__ = "ADKAgent"
 
         mock_org_id = uuid.uuid4()
@@ -259,7 +259,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
         router = AgentRouter(
             backend=mock_backend,
             name="ExistingADKAgentDiffMetaOverwriteFalse",
-            agent_type=AgentTypeEnum.GOOGLE_ADK,
+            agent_type=AgentType.GOOGLE_ADK,
             endpoint="http://new-endpoint-for-router.com/",
             metadata={"new_key": "new_value", "common_key": "router_version"},
             adapter_operational_config={"user_id": "test_user_diff_meta_ow_false"},
@@ -299,7 +299,7 @@ class TestAgentRouterInitialization(unittest.TestCase):
         router = AgentRouter(
             backend=mock_backend,
             name=agent_name,
-            agent_type=AgentTypeEnum.LITELLM,
+            agent_type=AgentType.LITELLM,
             endpoint=agent_endpoint,
             metadata=agent_metadata,
             adapter_operational_config=adapter_op_config,
@@ -330,7 +330,7 @@ class TestAnyUrlEndpointConversion(unittest.TestCase):
     ):
         from pydantic import AnyUrl
 
-        MockAgentMap[AgentTypeEnum.GOOGLE_ADK] = MockADKAdapter
+        MockAgentMap[AgentType.GOOGLE_ADK] = MockADKAdapter
         MockADKAdapter.__name__ = "ADKAgent"
         mock_backend = _make_backend()
         mock_backend.create_or_update_agent.return_value = _make_agent_rec(
@@ -340,7 +340,7 @@ class TestAnyUrlEndpointConversion(unittest.TestCase):
         _ = AgentRouter(
             backend=mock_backend,
             name="TestADKAgent",
-            agent_type=AgentTypeEnum.GOOGLE_ADK,
+            agent_type=AgentType.GOOGLE_ADK,
             endpoint="http://adk-endpoint.com/",
             metadata={},
             adapter_operational_config={"user_id": "uid-123"},
@@ -364,7 +364,7 @@ class TestAnyUrlEndpointConversion(unittest.TestCase):
         router = AgentRouter(
             backend=mock_backend,
             name="TestLiteLLMAgent",
-            agent_type=AgentTypeEnum.LITELLM,
+            agent_type=AgentType.LITELLM,
             endpoint="http://litellm-endpoint.com/",
             metadata={"name": "gpt-4"},
         )
@@ -386,7 +386,7 @@ class TestAnyUrlEndpointConversion(unittest.TestCase):
         router = AgentRouter(
             backend=mock_backend,
             name="TestOpenAIAgent",
-            agent_type=AgentTypeEnum.OPENAI_SDK,
+            agent_type=AgentType.OPENAI_SDK,
             endpoint="http://openai-endpoint.com/v1/",
             metadata={"name": "gpt-4o"},
         )
@@ -409,7 +409,7 @@ class TestAnyUrlEndpointConversion(unittest.TestCase):
         router = AgentRouter(
             backend=mock_backend,
             name="TestOllamaAgent",
-            agent_type=AgentTypeEnum.OLLAMA,
+            agent_type=AgentType.OLLAMA,
             endpoint="http://ollama-endpoint.com/",
             metadata={"name": "llama3"},
         )
@@ -441,7 +441,7 @@ class TestMetadataNoneStripping(unittest.TestCase):
         _ = AgentRouter(
             backend=mock_backend,
             name="llama2-uncensored",
-            agent_type=AgentTypeEnum.OLLAMA,
+            agent_type=AgentType.OLLAMA,
             endpoint="http://localhost:11434",
             metadata=metadata_with_nones,
             adapter_operational_config={"name": "llama2-uncensored"},
@@ -470,7 +470,7 @@ class TestMetadataNoneStripping(unittest.TestCase):
         _ = AgentRouter(
             backend=mock_backend,
             name="llama2-uncensored",
-            agent_type=AgentTypeEnum.OLLAMA,
+            agent_type=AgentType.OLLAMA,
             endpoint="http://localhost:11434",
             metadata=metadata_with_nones,
             adapter_operational_config={"name": "llama2-uncensored"},
@@ -499,7 +499,7 @@ class TestAgentPagination(unittest.TestCase):
         router = AgentRouter(
             backend=mock_backend,
             name=agent_name,
-            agent_type=AgentTypeEnum.LITELLM,
+            agent_type=AgentType.LITELLM,
             endpoint="http://localhost:11434",
             metadata={"name": agent_name},
             adapter_operational_config={"name": agent_name},

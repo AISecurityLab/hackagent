@@ -30,7 +30,7 @@ def results():
 def _show_logo_once():
     """Show the logo once per session"""
     if not hasattr(_show_logo_once, "_shown"):
-        from hackagent.utils import display_hackagent_splash
+        from hackagent.cli.banner import display_hackagent_splash
 
         display_hackagent_splash()
         _show_logo_once._shown = True

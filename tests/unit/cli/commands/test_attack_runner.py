@@ -93,7 +93,7 @@ class TestDirectExecution(unittest.TestCase):
         self.config.api_key = "hk_key"
         self.config.base_url = "https://api.hackagent.dev"
         self.ctx = _Ctx(self.config)
-        splash = patch("hackagent.utils.display_hackagent_splash")
+        splash = patch("hackagent.cli.banner.display_hackagent_splash")
         splash.start()
         self.addCleanup(splash.stop)
 

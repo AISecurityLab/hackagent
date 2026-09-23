@@ -153,57 +153,6 @@ def confirm_action(message: str, default: bool = False) -> bool:
     return click.confirm(f"⚠️ {message}", default=default)
 
 
-def get_agent_type_enum(agent_type: str):
-    """Convert string agent type to AgentTypeEnum"""
-    from hackagent.router.types import AgentTypeEnum
-
-    # Normalize the input
-    normalized = agent_type.upper().replace("-", "_").replace(" ", "_")
-
-    # Map common variations
-    type_mapping = {
-        "GOOGLE_ADK": AgentTypeEnum.GOOGLE_ADK,
-        "GOOGLE-ADK": AgentTypeEnum.GOOGLE_ADK,
-        "ADK": AgentTypeEnum.GOOGLE_ADK,
-        "CLAUDE_CODE": AgentTypeEnum.CLAUDE_CODE,
-        "CLAUDE-CODE": AgentTypeEnum.CLAUDE_CODE,
-        "CLAUDE": AgentTypeEnum.CLAUDE_CODE,
-        "CODEX": AgentTypeEnum.CODEX,
-        "HERMES": AgentTypeEnum.HERMES,
-        "HERMES_AGENT": AgentTypeEnum.HERMES,
-        "HERMES_CLI": AgentTypeEnum.HERMES,
-        "WEB": AgentTypeEnum.WEB,
-        "WEB_AGENT": AgentTypeEnum.WEB,
-        "WEB-AGENT": AgentTypeEnum.WEB,
-        "BROWSER": AgentTypeEnum.WEB,
-        "WEB_CHATBOT": AgentTypeEnum.WEB,
-        "WEB-CHATBOT": AgentTypeEnum.WEB,
-        "CHATBOT": AgentTypeEnum.WEB,
-        "LANGCHAIN": AgentTypeEnum.LANGCHAIN,
-        "LANG_CHAIN": AgentTypeEnum.LANGCHAIN,
-        "LITELLM": AgentTypeEnum.LITELLM,
-        "LITE_LLM": AgentTypeEnum.LITELLM,
-        "OPENAI_SDK": AgentTypeEnum.OPENAI_SDK,
-        "OPENAI-SDK": AgentTypeEnum.OPENAI_SDK,
-        "OPENAI": AgentTypeEnum.OPENAI_SDK,
-        "OLLAMA": AgentTypeEnum.OLLAMA,
-        "OTHER": AgentTypeEnum.UNKNOWN,
-        "UNKNOWN": AgentTypeEnum.UNKNOWN,
-    }
-
-    if normalized in type_mapping:
-        return type_mapping[normalized]
-
-    try:
-        return AgentTypeEnum(normalized)
-    except ValueError:
-        # If the type is not recognized, fallback to UNKNOWN
-        console.print(
-            f"[yellow]⚠️ Agent type '{agent_type}' not recognized, using 'UNKNOWN'[/yellow]"
-        )
-        return AgentTypeEnum.UNKNOWN
-
-
 def format_duration(seconds: float) -> str:
     """Format duration in seconds to human readable format"""
     if seconds < 60:

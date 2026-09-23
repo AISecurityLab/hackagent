@@ -19,9 +19,6 @@ from hackagent.cli.utils import (
 )
 
 # Import the new utils functions for testing
-from hackagent.utils import (
-    resolve_agent_type,
-)
 
 
 class TestErrorHandling:
@@ -210,47 +207,6 @@ class TestInteractiveElements:
 
 
 # NEW COMPREHENSIVE TESTS FOR STANDARDIZED API TOKEN RESOLUTION
-
-
-class TestAgentTypeResolution:
-    """Test agent type resolution functionality"""
-
-    def test_resolve_agent_type_enum_input(self):
-        """Test agent type resolution with enum input"""
-        from hackagent.router.types import AgentTypeEnum
-
-        result = resolve_agent_type(AgentTypeEnum.GOOGLE_ADK)
-        assert result == AgentTypeEnum.GOOGLE_ADK
-
-    def test_resolve_agent_type_string_input(self):
-        """Test agent type resolution with string input"""
-        from hackagent.router.types import AgentTypeEnum
-
-        # Test various string formats
-        test_cases = [
-            ("google-adk", AgentTypeEnum.GOOGLE_ADK),
-            ("GOOGLE_ADK", AgentTypeEnum.GOOGLE_ADK),
-            ("litellm", AgentTypeEnum.LITELLM),
-            ("unknown", AgentTypeEnum.UNKNOWN),
-        ]
-
-        for input_str, expected in test_cases:
-            result = resolve_agent_type(input_str)
-            assert result == expected
-
-    def test_resolve_agent_type_invalid_string(self):
-        """Test agent type resolution with invalid string"""
-        from hackagent.router.types import AgentTypeEnum
-
-        result = resolve_agent_type("invalid-type")
-        assert result == AgentTypeEnum.UNKNOWN
-
-    def test_resolve_agent_type_invalid_type(self):
-        """Test agent type resolution with invalid type"""
-        from hackagent.router.types import AgentTypeEnum
-
-        result = resolve_agent_type(123)  # Invalid type
-        assert result == AgentTypeEnum.UNKNOWN
 
 
 class TestUtilityIntegration:

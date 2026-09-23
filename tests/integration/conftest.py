@@ -561,10 +561,10 @@ def hackagent_client_factory(
     hackagent_api_base_url: str, hackagent_api_key: Optional[str]
 ):
     """Factory fixture to create HackAgent instances for different frameworks."""
-    from hackagent import HackAgent, AgentTypeEnum
+    from hackagent import HackAgent, AgentType
 
     def _create_hackagent(
-        name: str, endpoint: str, agent_type: AgentTypeEnum, **kwargs
+        name: str, endpoint: str, agent_type: AgentType, **kwargs
     ) -> HackAgent:
         """Create a HackAgent instance with the given configuration."""
         return HackAgent(

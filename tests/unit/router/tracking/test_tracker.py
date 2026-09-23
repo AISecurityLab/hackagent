@@ -8,7 +8,7 @@ import logging
 import unittest
 from unittest.mock import MagicMock
 
-from hackagent.server.api.models import EvaluationStatusEnum, StatusEnum
+from hackagent.server.api.models import EvalStatus, RunStatus
 from hackagent.router.tracking.audit import AuditPersistenceError
 from hackagent.router.tracking.context import TrackingContext
 from hackagent.router.tracking.step import StepTracker
@@ -83,7 +83,7 @@ class TestStepTrackerTrackStep(unittest.TestCase):
         mock_backend.update_result.assert_called()
         audit_call = mock_backend.update_run.call_args
         audit_failure = json.loads(audit_call.kwargs["run_notes"])["audit_failure"]
-        self.assertEqual(audit_call.kwargs["status"], StatusEnum.FAILED.value)
+        self.assertEqual(audit_call.kwargs["status"], RunStatus.FAILED.value)
         self.assertEqual(audit_failure["step"], "Test Step")
         self.assertEqual(audit_failure["status"], "failed")
         self.assertIn("Test error", audit_failure["error"])
@@ -108,7 +108,7 @@ class TestStepTrackerTrackStep(unittest.TestCase):
 
         audit_call = mock_backend.update_run.call_args
         audit_failure = json.loads(audit_call.kwargs["run_notes"])["audit_failure"]
-        self.assertEqual(audit_call.kwargs["status"], StatusEnum.FAILED.value)
+        self.assertEqual(audit_call.kwargs["status"], RunStatus.FAILED.value)
         self.assertEqual(
             audit_failure,
             {
@@ -221,7 +221,7 @@ class TestStepTrackerUpdateRunStatus(unittest.TestCase):
         context = TrackingContext.create_disabled()
         tracker = StepTracker(context)
 
-        result = tracker.update_run_status(StatusEnum.COMPLETED)
+        result = tracker.update_run_status(RunStatus.COMPLETED)
 
         self.assertFalse(result)
 
@@ -234,7 +234,7 @@ class TestStepTrackerUpdateRunStatus(unittest.TestCase):
         )
         tracker = StepTracker(context)
 
-        result = tracker.update_run_status(StatusEnum.COMPLETED)
+        result = tracker.update_run_status(RunStatus.COMPLETED)
 
         self.assertTrue(result)
         mock_backend.update_run.assert_called_once()
@@ -248,7 +248,7 @@ class TestStepTrackerUpdateRunStatus(unittest.TestCase):
         )
         tracker = StepTracker(context)
 
-        result = tracker.update_run_status(StatusEnum.COMPLETED)
+        result = tracker.update_run_status(RunStatus.COMPLETED)
 
         self.assertFalse(result)
         mock_backend.update_run.assert_not_called()
@@ -265,7 +265,7 @@ class TestStepTrackerUpdateRunStatus(unittest.TestCase):
         mock_backend.update_run.side_effect = RuntimeError("Server error")
 
         with self.assertRaises(RuntimeError):
-            tracker.update_run_status(StatusEnum.COMPLETED)
+            tracker.update_run_status(RunStatus.COMPLETED)
 
 
 class TestStepTrackerUpdateResultStatus(unittest.TestCase):
@@ -276,7 +276,7 @@ class TestStepTrackerUpdateResultStatus(unittest.TestCase):
         context = TrackingContext.create_disabled()
         tracker = StepTracker(context)
 
-        result = tracker.update_result_status(EvaluationStatusEnum.PASSED_CRITERIA)
+        result = tracker.update_result_status(EvalStatus.PASSED_CRITERIA)
 
         self.assertFalse(result)
 
@@ -291,7 +291,7 @@ class TestStepTrackerUpdateResultStatus(unittest.TestCase):
         tracker = StepTracker(context)
 
         result = tracker.update_result_status(
-            EvaluationStatusEnum.PASSED_CRITERIA,
+            EvalStatus.PASSED_CRITERIA,
             evaluation_notes="Test notes",
             agent_specific_data={"key": "value"},
         )
@@ -309,7 +309,7 @@ class TestStepTrackerUpdateResultStatus(unittest.TestCase):
         )
         tracker = StepTracker(context)
 
-        result = tracker.update_result_status(EvaluationStatusEnum.PASSED_CRITERIA)
+        result = tracker.update_result_status(EvalStatus.PASSED_CRITERIA)
 
         self.assertFalse(result)
         mock_backend.update_result.assert_not_called()
@@ -428,7 +428,7 @@ class TestStepTrackerHandleStepError(unittest.TestCase):
         call_args = mock_backend.update_result.call_args
         self.assertEqual(
             call_args.kwargs["evaluation_status"],
-            EvaluationStatusEnum.ERROR_TEST_FRAMEWORK.value,
+            EvalStatus.ERROR_TEST_FRAMEWORK.value,
         )
         self.assertIn("Test Step", call_args.kwargs["evaluation_notes"])
         self.assertIn("Something went wrong", call_args.kwargs["evaluation_notes"])

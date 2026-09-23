@@ -36,7 +36,7 @@ class HackAgentHeader(Container):
     """
 
     def compose(self) -> ComposeResult:
-        from hackagent.utils import HACKAGENT_BANNER
+        from hackagent.cli.banner import HACKAGENT_BANNER
 
         # Display the ASCII logo as-is (now side-by-side format)
         logo_text = Text(HACKAGENT_BANNER, style="bold red")

@@ -21,7 +21,7 @@ evaluation pipeline stages across attack techniques (AdvPrefix, FlipAttack, etc.
 It centralises the common logic that was previously duplicated:
 - Multi-judge evaluation orchestration
 - Judge type inference from model identifiers
-- Agent type resolution (string / enum → ``AgentTypeEnum``)
+- Agent type resolution (string / enum → ``AgentType``)
 - ``EvaluatorConfig`` construction from raw judge config dicts
 - Single evaluator instantiation and execution
 - Result merging via lookup keys ``(goal, prefix, completion)``
@@ -58,7 +58,7 @@ from hackagent.core.defaults import (
     DEFAULT_LOCAL_MODEL_ENDPOINT,
 )
 from hackagent.server.client import AuthenticatedClient
-from hackagent.router.types import AgentTypeEnum
+from hackagent.core.contracts import AgentType
 
 if TYPE_CHECKING:
     from hackagent.router.tracking import Tracker
@@ -415,19 +415,19 @@ class BaseEvaluationStep:
                 exc_info=True,
             )
 
-    def resolve_agent_type(self, agent_type_value: Any) -> AgentTypeEnum:
-        """Convert a string, enum, or ``None`` into an ``AgentTypeEnum``."""
-        if isinstance(agent_type_value, AgentTypeEnum):
+    def resolve_agent_type(self, agent_type_value: Any) -> AgentType:
+        """Convert a string, enum, or ``None`` into an ``AgentType``."""
+        if isinstance(agent_type_value, AgentType):
             return agent_type_value
         if not agent_type_value:
-            return AgentTypeEnum.OPENAI_SDK
+            return AgentType.OPENAI_SDK
         try:
-            return AgentTypeEnum(str(agent_type_value).upper())
+            return AgentType(str(agent_type_value).upper())
         except ValueError:
             self.logger.warning(
                 f"Invalid agent_type '{agent_type_value}', defaulting to OPENAI_SDK"
             )
-            return AgentTypeEnum.OPENAI_SDK
+            return AgentType.OPENAI_SDK
 
     # ====================================================================
     # CONFIGURATION HELPERS

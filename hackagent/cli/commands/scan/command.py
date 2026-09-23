@@ -17,7 +17,6 @@ from hackagent.cli.config import CLIConfig
 from hackagent.cli.utils import (
     display_info,
     display_success,
-    get_agent_type_enum,
     handle_errors,
     load_config_file,
 )
@@ -33,6 +32,7 @@ from hackagent.cli.commands.scan.helpers import (
     _AUTH_REMINDER,
     _provider_endpoint,
 )
+from hackagent.core.contracts import AgentType
 
 console = Console()
 
@@ -411,7 +411,7 @@ def scan(
         console.print("[dim]Drop --dry-run to execute the attack[/dim]")
         return
 
-    agent_type_enum = get_agent_type_enum(agent_type)
+    agent_type_enum = AgentType.parse(agent_type)
     with console.status("[bold green]Initializing HackAgent..."):
         try:
             agent = HackAgent(

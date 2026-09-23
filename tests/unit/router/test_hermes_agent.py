@@ -25,7 +25,7 @@ from hackagent.router.providers.hermes import (
     _last_user_text,
 )
 from hackagent.router.providers import hermes as hermes_provider_module
-from hackagent.router.types import AgentTypeEnum
+from hackagent.core.contracts import AgentType
 
 logging.disable(logging.CRITICAL)
 
@@ -72,14 +72,14 @@ class TestHermesModuleLayout(unittest.TestCase):
 
 class TestHermesAgentType(unittest.TestCase):
     def test_enum_and_aliases_resolve(self):
-        self.assertEqual(AgentTypeEnum("HERMES"), AgentTypeEnum.HERMES)
+        self.assertEqual(AgentType("HERMES"), AgentType.HERMES)
         for alias in ("hermes", "hermes_agent", "HERMES_CLI", "hermes-agent"):
-            self.assertEqual(AgentTypeEnum(alias), AgentTypeEnum.HERMES)
+            self.assertEqual(AgentType(alias), AgentType.HERMES)
 
     def test_registered_in_adapter_map(self):
         from hackagent.router.router import AGENT_TYPE_TO_ADAPTER_MAP
 
-        self.assertIs(AGENT_TYPE_TO_ADAPTER_MAP[AgentTypeEnum.HERMES], HermesAgent)
+        self.assertIs(AGENT_TYPE_TO_ADAPTER_MAP[AgentType.HERMES], HermesAgent)
 
 
 class TestHermesHelpers(unittest.TestCase):

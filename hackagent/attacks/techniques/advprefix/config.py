@@ -235,7 +235,7 @@ class EvaluatorConfig(BaseModel):
     """
 
     agent_name: str
-    agent_type: Any  # AgentTypeEnum from hackagent.router.types
+    agent_type: Any  # AgentType from hackagent.core.contracts
     model_id: str
     agent_endpoint: Optional[str] = None
     organization_id: Optional[int] = None
@@ -256,11 +256,11 @@ class EvaluatorConfig(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def coerce_agent_type(cls, values: Any) -> Any:
-        """Coerce agent_type strings to AgentTypeEnum on construction."""
+        """Coerce agent_type strings to AgentType on construction."""
         if isinstance(values, dict) and isinstance(values.get("agent_type"), str):
-            from hackagent.router.types import AgentTypeEnum
+            from hackagent.core.contracts import AgentType
 
-            values["agent_type"] = AgentTypeEnum(values["agent_type"])
+            values["agent_type"] = AgentType(values["agent_type"])
         return values
 
 

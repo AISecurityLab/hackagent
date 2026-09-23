@@ -46,13 +46,13 @@ OpenAI SDK is the official Python library for interacting with OpenAI's API, inc
 ### Initialize HackAgent Client
 
 ```python
-from hackagent import HackAgent, AgentTypeEnum
+from hackagent import HackAgent, AgentType
 
 # Configure for OpenAI SDK
 agent = HackAgent(
     name="my_openai_agent",
     endpoint="https://api.openai.com/v1",
-    agent_type=AgentTypeEnum.OPENAI_SDK,
+    agent_type=AgentType.OPENAI_SDK,
 )
 ```
 
@@ -96,7 +96,7 @@ If your agent uses OpenAI's function calling feature:
 agent = HackAgent(
     name="weather_assistant",
     endpoint="https://api.openai.com/v1",
-    agent_type=AgentTypeEnum.OPENAI_SDK,
+    agent_type=AgentType.OPENAI_SDK,
 )
 
 # Test for tool abuse vulnerabilities
@@ -123,7 +123,7 @@ for agent_name in agents:
     agent = HackAgent(
         name=agent_name,
         endpoint="https://api.openai.com/v1",
-        agent_type=AgentTypeEnum.OPENAI_SDK,
+        agent_type=AgentType.OPENAI_SDK,
     )
 
     print(f"Testing {agent_name}...")
@@ -139,7 +139,7 @@ HackAgent supports Azure OpenAI Service out of the box:
 agent = HackAgent(
     name="azure_openai_agent",
     endpoint="https://your-resource.openai.azure.com",
-    agent_type=AgentTypeEnum.OPENAI_SDK,
+    agent_type=AgentType.OPENAI_SDK,
     target_config={"api_key": "your-azure-api-key"},
 )
 ```
@@ -173,7 +173,7 @@ attack_config = {
 agent = HackAgent(
     name="cost_effective_agent",
     endpoint="https://api.openai.com/v1",
-    agent_type=AgentTypeEnum.OPENAI_SDK,
+    agent_type=AgentType.OPENAI_SDK,
     metadata={
         "name": "gpt-3.5-turbo",  # Cheaper than GPT-4
         "max_tokens": 100,         # Limit token usage

@@ -29,7 +29,7 @@ import logging
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from hackagent.server.storage.enums import EvaluationStatusEnum
+from hackagent.core.contracts import EvalStatus
 
 logger = logging.getLogger("hackagent.attacks.evaluator.sync")
 if not logger.handlers:
@@ -122,9 +122,9 @@ def update_single_result(
             return False
 
         eval_status = (
-            EvaluationStatusEnum.SUCCESSFUL_JAILBREAK.value
+            EvalStatus.SUCCESSFUL_JAILBREAK.value
             if success
-            else EvaluationStatusEnum.FAILED_JAILBREAK.value
+            else EvalStatus.FAILED_JAILBREAK.value
         )
 
         merged_metadata: Optional[Dict[str, Any]] = None

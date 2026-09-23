@@ -28,7 +28,7 @@ import pytest
 from hackagent.router._chat_registration import _ChatRegistration
 from hackagent.router.router import AgentRouter
 from hackagent.router.tracking_logger import HACKAGENT_METADATA_KEY
-from hackagent.router.types import AgentTypeEnum
+from hackagent.core.contracts import AgentType
 
 logger = logging.getLogger(__name__)
 
@@ -58,12 +58,12 @@ class TestRouterLiteLLMDispatchIntegration:
             )
         )
 
-        # Use AgentTypeEnum.LITELLM so the model string carries the
+        # Use AgentType.LITELLM so the model string carries the
         # provider prefix already supplied via openai_config["name"].
         router = AgentRouter(
             backend=backend,
             name=openai_config["name"],
-            agent_type=AgentTypeEnum.OPENAI_SDK,
+            agent_type=AgentType.OPENAI_SDK,
             endpoint=openai_base_url,
             metadata={"name": openai_config["name"]},
             adapter_operational_config=openai_config,
@@ -124,7 +124,7 @@ class TestRouterLiteLLMDispatchIntegration:
         router = AgentRouter(
             backend=backend,
             name=openai_config["name"],
-            agent_type=AgentTypeEnum.OPENAI_SDK,
+            agent_type=AgentType.OPENAI_SDK,
             endpoint=openai_base_url,
             metadata={"name": openai_config["name"]},
             adapter_operational_config=openai_config,
@@ -171,7 +171,7 @@ class TestRouterLiteLLMDispatchIntegration:
         router = AgentRouter(
             backend=backend,
             name=openai_config["name"],
-            agent_type=AgentTypeEnum.OPENAI_SDK,
+            agent_type=AgentType.OPENAI_SDK,
             endpoint=openai_base_url,
             metadata={"name": openai_config["name"]},
             adapter_operational_config=openai_config,

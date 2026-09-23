@@ -13,7 +13,7 @@ import threading
 import time
 
 from hackagent import HackAgent
-from hackagent.router.types import AgentTypeEnum
+from hackagent.core.contracts import AgentType
 
 from agent import app, PORT, TARGET_MODEL, ensure_seed_database
 
@@ -32,7 +32,7 @@ GOALS = [
 def _ollama_role(model: str, *, max_tokens: int, temperature: float) -> dict:
     return {
         "identifier": model,
-        "agent_type": AgentTypeEnum.OLLAMA,
+        "agent_type": AgentType.OLLAMA,
         "endpoint": OLLAMA_ENDPOINT,
         "max_tokens": max_tokens,
         "temperature": temperature,
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     target = HackAgent(
         name=TARGET_MODEL,
         endpoint=TARGET_ENDPOINT,
-        agent_type=AgentTypeEnum.OPENAI_SDK,
+        agent_type=AgentType.OPENAI_SDK,
         adapter_operational_config={
             "name": TARGET_MODEL,
             "endpoint": TARGET_ENDPOINT,
@@ -80,7 +80,7 @@ if __name__ == "__main__":
         "judge": _ollama_role(JUDGE_MODEL, max_tokens=120, temperature=0.0),
         "category_classifier": {
             "identifier": JUDGE_MODEL,
-            "agent_type": AgentTypeEnum.OLLAMA,
+            "agent_type": AgentType.OLLAMA,
             "endpoint": OLLAMA_ENDPOINT,
             "max_tokens": 100,
             "temperature": 0.0,

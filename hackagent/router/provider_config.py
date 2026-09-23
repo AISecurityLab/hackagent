@@ -14,7 +14,7 @@ types LiteLLM cannot speak natively (ADK, future MCP/A2A).
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional, Tuple
 
-from hackagent.router.types import AgentTypeEnum
+from hackagent.core.contracts import AgentType
 
 
 # ---- thinking translators -----------------------------------------------
@@ -120,25 +120,25 @@ class ProviderConfig:
 # from the adapter config). It stays driven by ``ADKAgent`` for now and
 # moves into ``router/providers/`` in Phase E.
 
-PROVIDER_CONFIGS: Dict[AgentTypeEnum, ProviderConfig] = {
-    AgentTypeEnum.LITELLM: ProviderConfig(
+PROVIDER_CONFIGS: Dict[AgentType, ProviderConfig] = {
+    AgentType.LITELLM: ProviderConfig(
         provider_prefix=None,
         thinking_translator=default_thinking_translator,
         adapter_label="LiteLLMAgent",
     ),
-    AgentTypeEnum.OPENAI_SDK: ProviderConfig(
+    AgentType.OPENAI_SDK: ProviderConfig(
         provider_prefix="openai",
         thinking_translator=openai_thinking_translator,
         adapter_label="OpenAIAgent",
         extra_passthrough_keys=("tools", "tool_choice", "extra_body"),
     ),
-    AgentTypeEnum.OLLAMA: ProviderConfig(
+    AgentType.OLLAMA: ProviderConfig(
         provider_prefix="ollama_chat",
         thinking_translator=ollama_thinking_translator,
         adapter_label="OllamaAgent",
         extra_passthrough_keys=("top_k", "num_ctx", "stream"),
     ),
-    AgentTypeEnum.LANGCHAIN: ProviderConfig(
+    AgentType.LANGCHAIN: ProviderConfig(
         # LangServe endpoints are OpenAI-compatible by convention; the
         # generic LiteLLM passthrough already handles them.
         provider_prefix=None,
@@ -148,6 +148,6 @@ PROVIDER_CONFIGS: Dict[AgentTypeEnum, ProviderConfig] = {
 }
 
 
-def get_provider_config(agent_type: AgentTypeEnum) -> Optional[ProviderConfig]:
+def get_provider_config(agent_type: AgentType) -> Optional[ProviderConfig]:
     """Return the ``ProviderConfig`` for ``agent_type``, or ``None``."""
     return PROVIDER_CONFIGS.get(agent_type)

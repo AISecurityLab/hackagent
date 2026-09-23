@@ -192,7 +192,7 @@ class TestCLINoCommand(unittest.TestCase):
 class TestCLIInit(unittest.TestCase):
     """Test the init setup wizard."""
 
-    @patch("hackagent.utils.display_hackagent_splash")
+    @patch("hackagent.cli.banner.display_hackagent_splash")
     @patch("hackagent.cli.main.click.prompt")
     @patch("hackagent.cli.main.click.confirm")
     @patch("hackagent.cli.main.CLIConfig")
@@ -228,7 +228,7 @@ class TestCLIInit(unittest.TestCase):
         mock_config.save.assert_called_once()
         mock_splash.assert_called_once()
 
-    @patch("hackagent.utils.display_hackagent_splash")
+    @patch("hackagent.cli.banner.display_hackagent_splash")
     @patch("hackagent.cli.main.click.prompt")
     @patch("hackagent.cli.main.click.confirm")
     @patch("hackagent.cli.main.CLIConfig")

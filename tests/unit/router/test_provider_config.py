@@ -13,7 +13,7 @@ from hackagent.router.provider_config import (
     ollama_thinking_translator,
     openai_thinking_translator,
 )
-from hackagent.router.types import AgentTypeEnum
+from hackagent.core.contracts import AgentType
 
 logging.disable(logging.CRITICAL)
 
@@ -129,14 +129,14 @@ class TestOllamaThinkingTranslator(unittest.TestCase):
 
 class TestProviderConfigsTable(unittest.TestCase):
     def test_openai_config_present_and_correct(self):
-        cfg = get_provider_config(AgentTypeEnum.OPENAI_SDK)
+        cfg = get_provider_config(AgentType.OPENAI_SDK)
         self.assertIsNotNone(cfg)
         self.assertEqual(cfg.provider_prefix, "openai")
         self.assertEqual(cfg.adapter_label, "OpenAIAgent")
         self.assertIn("tools", cfg.extra_passthrough_keys)
 
     def test_ollama_config_present_and_correct(self):
-        cfg = get_provider_config(AgentTypeEnum.OLLAMA)
+        cfg = get_provider_config(AgentType.OLLAMA)
         self.assertIsNotNone(cfg)
         self.assertEqual(cfg.provider_prefix, "ollama_chat")
         self.assertEqual(cfg.adapter_label, "OllamaAgent")
@@ -144,12 +144,12 @@ class TestProviderConfigsTable(unittest.TestCase):
         self.assertIn("num_ctx", cfg.extra_passthrough_keys)
 
     def test_litellm_passthrough_has_no_prefix(self):
-        cfg = get_provider_config(AgentTypeEnum.LITELLM)
+        cfg = get_provider_config(AgentType.LITELLM)
         self.assertIsNotNone(cfg)
         self.assertIsNone(cfg.provider_prefix)
 
     def test_langchain_uses_default_passthrough(self):
-        cfg = get_provider_config(AgentTypeEnum.LANGCHAIN)
+        cfg = get_provider_config(AgentType.LANGCHAIN)
         self.assertIsNotNone(cfg)
         self.assertIsNone(cfg.provider_prefix)
 
@@ -157,18 +157,18 @@ class TestProviderConfigsTable(unittest.TestCase):
         # ADK still uses per-instance custom-LLM registration; it's not
         # in the static table yet. See LITELLM_ROUTER_REFACTOR_PLAN.md
         # Phase E for the move into router/providers/.
-        self.assertIsNone(get_provider_config(AgentTypeEnum.GOOGLE_ADK))
+        self.assertIsNone(get_provider_config(AgentType.GOOGLE_ADK))
 
     def test_unknown_agent_type_returns_none(self):
-        self.assertIsNone(get_provider_config(AgentTypeEnum.UNKNOWN))
+        self.assertIsNone(get_provider_config(AgentType.UNKNOWN))
 
     def test_provider_configs_dict_is_complete(self):
         """All chat-completion agent types appear in the table."""
         expected = {
-            AgentTypeEnum.LITELLM,
-            AgentTypeEnum.OPENAI_SDK,
-            AgentTypeEnum.OLLAMA,
-            AgentTypeEnum.LANGCHAIN,
+            AgentType.LITELLM,
+            AgentType.OPENAI_SDK,
+            AgentType.OLLAMA,
+            AgentType.LANGCHAIN,
         }
         self.assertEqual(expected, set(PROVIDER_CONFIGS.keys()))
 

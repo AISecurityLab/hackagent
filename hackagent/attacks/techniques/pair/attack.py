@@ -44,7 +44,7 @@ from hackagent.attacks.shared.response_utils import (
 )
 from hackagent.attacks.shared.router_factory import create_router
 from hackagent.server.client import AuthenticatedClient
-from hackagent.server.storage.enums import StepTypeEnum
+from hackagent.core.contracts import StepKind
 from hackagent.router.router import AgentRouter
 from hackagent.router.tracking import Tracker, Context
 
@@ -1121,7 +1121,7 @@ class PAIRAttack(BaseAttack):
                         request={"prompt": adversarial_prompt[:500]},
                         response=response_preview,
                         step_name=f"Iteration {iteration + 1}, Stream {stream_index + 1}",
-                        step_type=StepTypeEnum.OTHER,
+                        step_type=StepKind.OTHER,
                         metadata={
                             "iteration": iteration + 1,
                             "stream": stream_index + 1,

@@ -8,7 +8,7 @@ import logging
 from typing import Any, Dict
 from uuid import UUID
 
-from hackagent.server.storage.enums import StatusEnum
+from hackagent.core.contracts import RunStatus
 
 
 class AuditPersistenceError(RuntimeError):
@@ -50,7 +50,7 @@ def record_run_audit_failure(
     try:
         backend.update_run(
             run_uuid,
-            status=StatusEnum.FAILED.value,
+            status=RunStatus.FAILED.value,
             run_notes=json.dumps({"audit_failure": entry}, sort_keys=True),
         )
     except Exception as exc:

@@ -36,7 +36,7 @@ from hackagent.attacks.shared.response_utils import (
 )
 from hackagent.attacks.shared.router_factory import create_router
 from hackagent.server.client import AuthenticatedClient
-from hackagent.server.storage.enums import StepTypeEnum
+from hackagent.core.contracts import StepKind
 from hackagent.router.router import AgentRouter
 from hackagent.router.tracking import Context, Tracker
 
@@ -731,7 +731,7 @@ class TapExecutor:
                         request={"prompt": prompt[:500]},
                         response=response_text,
                         step_name=f"Depth {iteration} Candidate",
-                        step_type=StepTypeEnum.OTHER,
+                        step_type=StepKind.OTHER,
                         metadata={
                             "iteration": iteration,
                             "on_topic_score": on_score,
@@ -770,7 +770,7 @@ class TapExecutor:
                 goal_tracker.add_custom_trace(
                     ctx=goal_ctx,
                     step_name=f"Depth {iteration} Summary",
-                    step_type=StepTypeEnum.OTHER,
+                    step_type=StepKind.OTHER,
                     content={
                         "depth": iteration,
                         "branches": depth_summary,

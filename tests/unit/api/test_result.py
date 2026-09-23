@@ -19,13 +19,13 @@ from hackagent.server.api.result import (
     result_trace_create,
     result_update,
 )
-from hackagent.server.api.models import EvaluationStatusEnum
+from hackagent.server.api.models import EvalStatus
 from hackagent.server.api.models import PaginatedResultList
 from hackagent.server.api.models import PatchedResultRequest
 from hackagent.server.api.models import Result
 from hackagent.server.api.models import ResultRequest
 from hackagent.server.api.models import (
-    StepTypeEnum,
+    StepKind,
 )  # Ensuring this import is present
 from hackagent.server.api.models import Trace
 from hackagent.server.api.models import TraceRequest  # For creating traces
@@ -70,7 +70,7 @@ class TestResultListAPI(unittest.TestCase):
             "response_body": "Agent response here.",
             "latency_ms": 150,
             "detected_tool_calls": [],
-            "evaluation_status": EvaluationStatusEnum.NOT_EVALUATED.value,  # Use enum value
+            "evaluation_status": EvalStatus.NOT_EVALUATED.value,  # Use enum value
             "evaluation_notes": "Initial result, not evaluated.",
             "evaluation_metrics": {"accuracy": 0.9},
             "agent_specific_data": {"mood": "happy"},
@@ -97,7 +97,7 @@ class TestResultListAPI(unittest.TestCase):
             response = result_list.sync_detailed(
                 client=mock_client_instance,
                 run=mock_run_id,
-                evaluation_status=EvaluationStatusEnum.NOT_EVALUATED,
+                evaluation_status=EvalStatus.NOT_EVALUATED,
                 page=1,
             )
 
@@ -122,14 +122,14 @@ class TestResultListAPI(unittest.TestCase):
                 retrieved_result.traces[0].id, mock_trace_data_id_int
             )  # Compare with int ID
             self.assertEqual(
-                retrieved_result.evaluation_status, EvaluationStatusEnum.NOT_EVALUATED
+                retrieved_result.evaluation_status, EvalStatus.NOT_EVALUATED
             )
 
             mock_model_validate.assert_called_once_with(mock_response_content)
 
             expected_params = {
                 "run": str(mock_run_id),
-                "evaluation_status": EvaluationStatusEnum.NOT_EVALUATED.value,
+                "evaluation_status": EvalStatus.NOT_EVALUATED.value,
                 "page": 1,
             }
             # Remove UNSET params as they are not sent if default
@@ -197,7 +197,7 @@ class TestResultCreateAPI(unittest.TestCase):
             request_payload={"data": "sample request"},
             response_body="Sample agent response for creation.",
             latency_ms=200,
-            evaluation_status=EvaluationStatusEnum.PASSED_CRITERIA,
+            evaluation_status=EvalStatus.PASSED_CRITERIA,
             evaluation_notes="Created and passed.",
         )
 
@@ -355,7 +355,7 @@ class TestResultRetrieveAPI(unittest.TestCase):
             "timestamp": timestamp_retrieve_str,
             "traces": [mock_trace_data_retrieve],
             "prompt": str(uuid.uuid4()),  # Example prompt ID
-            "evaluation_status": EvaluationStatusEnum.SUCCESSFUL_JAILBREAK.value,
+            "evaluation_status": EvalStatus.SUCCESSFUL_JAILBREAK.value,
             "response_body": "Successfully jailbroken!",
             # ... other fields can be populated as needed for assertion
         }
@@ -382,7 +382,7 @@ class TestResultRetrieveAPI(unittest.TestCase):
             self.assertEqual(response.parsed.run_id, mock_run_id_retrieve)
             self.assertEqual(
                 response.parsed.evaluation_status,
-                EvaluationStatusEnum.SUCCESSFUL_JAILBREAK,
+                EvalStatus.SUCCESSFUL_JAILBREAK,
             )
             self.assertTrue(len(response.parsed.traces) > 0)
 
@@ -454,7 +454,7 @@ class TestResultUpdateAPI(unittest.TestCase):
 
         result_update_request_data = ResultRequest(
             run=mock_run_id_update,  # Mandatory
-            evaluation_status=EvaluationStatusEnum.FAILED_JAILBREAK,
+            evaluation_status=EvalStatus.FAILED_JAILBREAK,
             evaluation_notes="Updated: Now considered a failed jailbreak.",
             response_body="Agent refused after update.",
             # Other fields like prompt, request_payload can be included if they are updatable
@@ -615,7 +615,7 @@ class TestResultPartialUpdateAPI(unittest.TestCase):
         result_id_to_patch = uuid.uuid4()
 
         result_patch_request_data = PatchedResultRequest(
-            evaluation_status=EvaluationStatusEnum.ERROR_AGENT_RESPONSE,
+            evaluation_status=EvalStatus.ERROR_AGENT_RESPONSE,
             evaluation_notes="Patched: Agent response was an error.",
             evaluation_metrics={"error_code": 502},
         )
@@ -859,7 +859,7 @@ class TestResultTraceCreateAPI(unittest.TestCase):
         result_id_for_trace = uuid.uuid4()
         trace_request_data = TraceRequest(
             sequence=1,
-            step_type=StepTypeEnum.AGENT_THOUGHT,
+            step_type=StepKind.AGENT_THOUGHT,
             content={"thought": "I should call a tool."},
         )
 
@@ -958,7 +958,7 @@ class TestResultTraceCreateAPI(unittest.TestCase):
 
         result_id_for_bad_trace = uuid.uuid4()
         # Missing mandatory 'sequence' field in TraceRequest
-        bad_trace_request_data = TraceRequest(step_type=StepTypeEnum.OTHER, sequence=1)
+        bad_trace_request_data = TraceRequest(step_type=StepKind.OTHER, sequence=1)
 
         mock_httpx_response = MagicMock()
         mock_httpx_response.status_code = 400

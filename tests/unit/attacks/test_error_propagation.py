@@ -15,7 +15,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from hackagent.server.api.models import EvaluationStatusEnum
+from hackagent.server.api.models import EvalStatus
 
 
 # ============================================================================
@@ -278,7 +278,7 @@ class TestBaselineFinalizeErrors(unittest.TestCase):
         last_call = finalize_calls[-1]
         self.assertEqual(
             last_call.kwargs["evaluation_status"],
-            EvaluationStatusEnum.ERROR_AGENT_RESPONSE.value,
+            EvalStatus.ERROR_AGENT_RESPONSE.value,
         )
 
     def test_mixed_goal_gets_normal_status(self):
@@ -324,7 +324,7 @@ class TestBaselineFinalizeErrors(unittest.TestCase):
         # Mixed: not all errors → should be FAILED_JAILBREAK (not ERROR)
         self.assertEqual(
             last_call.kwargs["evaluation_status"],
-            EvaluationStatusEnum.FAILED_JAILBREAK.value,
+            EvalStatus.FAILED_JAILBREAK.value,
         )
 
 
@@ -358,7 +358,7 @@ class TestTrackerFinalizeGoalOverride(unittest.TestCase):
             ctx=ctx,
             success=False,
             evaluation_notes="All timed out",
-            evaluation_status=EvaluationStatusEnum.ERROR_AGENT_RESPONSE,
+            evaluation_status=EvalStatus.ERROR_AGENT_RESPONSE,
         )
 
         finalize_calls = [
@@ -369,7 +369,7 @@ class TestTrackerFinalizeGoalOverride(unittest.TestCase):
         self.assertTrue(len(finalize_calls) >= 1)
         self.assertEqual(
             finalize_calls[-1].kwargs["evaluation_status"],
-            EvaluationStatusEnum.ERROR_AGENT_RESPONSE.value,
+            EvalStatus.ERROR_AGENT_RESPONSE.value,
         )
 
     def test_no_override_uses_success(self):
@@ -386,7 +386,7 @@ class TestTrackerFinalizeGoalOverride(unittest.TestCase):
         self.assertTrue(len(finalize_calls) >= 1)
         self.assertEqual(
             finalize_calls[-1].kwargs["evaluation_status"],
-            EvaluationStatusEnum.SUCCESSFUL_JAILBREAK.value,
+            EvalStatus.SUCCESSFUL_JAILBREAK.value,
         )
 
 

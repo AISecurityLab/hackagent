@@ -70,11 +70,11 @@ class TestPackageImports:
 
         assert attacks is not None
 
-    def test_utils_import(self):
-        """Test that utils module can be imported."""
-        from hackagent import utils
+    def test_core_import(self):
+        """Test that the core package can be imported."""
+        from hackagent.core import contracts, settings
 
-        assert utils is not None
+        assert contracts is not None and settings is not None
 
     def test_dateutil_dependency(self):
         """Test that python-dateutil is available.

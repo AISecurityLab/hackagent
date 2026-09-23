@@ -16,7 +16,7 @@ from hackagent.router.providers.codex import CodexAgent
 from hackagent.router.providers.hermes import HermesAgent
 from hackagent.router.providers.web import WebAgent
 from hackagent.router.provider_config import ProviderConfig, get_provider_config
-from hackagent.router.types import AgentTypeEnum
+from hackagent.core.contracts import AgentType
 
 # Use explicit hierarchical logger name for clarity
 logger = logging.getLogger("hackagent.router")
@@ -48,12 +48,12 @@ def _extract_prompt_text(request_data: Dict[str, Any]) -> str:
 # ``_ChatRegistration``. The map only carries adapter classes for agent
 # types that need a custom Python object (ADK has a per-instance
 # CustomLLM registration side-effect).
-AGENT_TYPE_TO_ADAPTER_MAP: Dict[AgentTypeEnum, Type[Agent]] = {
-    AgentTypeEnum.GOOGLE_ADK: ADKAgent,
-    AgentTypeEnum.CLAUDE_CODE: ClaudeCodeAgent,
-    AgentTypeEnum.CODEX: CodexAgent,
-    AgentTypeEnum.HERMES: HermesAgent,
-    AgentTypeEnum.WEB: WebAgent,
+AGENT_TYPE_TO_ADAPTER_MAP: Dict[AgentType, Type[Agent]] = {
+    AgentType.GOOGLE_ADK: ADKAgent,
+    AgentType.CLAUDE_CODE: ClaudeCodeAgent,
+    AgentType.CODEX: CodexAgent,
+    AgentType.HERMES: HermesAgent,
+    AgentType.WEB: WebAgent,
 }
 
 
@@ -81,7 +81,7 @@ class AgentRouter:
         self,
         backend: StorageBackend,
         name: str,
-        agent_type: AgentTypeEnum,
+        agent_type: AgentType,
         endpoint: str,
         metadata=None,
         adapter_operational_config=None,
@@ -93,7 +93,7 @@ class AgentRouter:
         Args:
             backend: StorageBackend.
             name: Name for the agent in storage.
-            agent_type: The type of agent (e.g., AgentTypeEnum.LITELLM).
+            agent_type: The type of agent (e.g., AgentType.LITELLM).
             endpoint: API endpoint URL for the agent service.
             metadata: Optional metadata to store with the agent record.
             adapter_operational_config: Runtime config for the adapter.
@@ -105,11 +105,11 @@ class AgentRouter:
         """
         self.backend = backend
         self._agent_registry: dict = {}
-        # Tracks the AgentTypeEnum each registration was created under, so
+        # Tracks the AgentType each registration was created under, so
         # ``route_request`` can pick the right dispatch path (chat
         # AgentTypes go through ``_dispatch_via_litellm`` directly;
         # everything else still calls ``adapter.handle_request``).
-        self._agent_types: Dict[str, AgentTypeEnum] = {}
+        self._agent_types: Dict[str, AgentType] = {}
 
         # Phase D: register the LiteLLM CustomLogger that captures input
         # and output for every HackAgent-owned call. Idempotent.
@@ -149,7 +149,7 @@ class AgentRouter:
             adapter_operational_config.copy() if adapter_operational_config else {}
         )
 
-        if agent_type == AgentTypeEnum.GOOGLE_ADK:
+        if agent_type == AgentType.GOOGLE_ADK:
             if "user_id" not in current_adapter_op_config:
                 current_adapter_op_config["user_id"] = self.user_id_str
                 logger.info(
@@ -181,7 +181,7 @@ class AgentRouter:
     def _configure_and_instantiate_adapter(
         self,
         name: str,
-        agent_type: AgentTypeEnum,
+        agent_type: AgentType,
         registration_key: str,
         adapter_operational_config: Optional[Dict[str, Any]],
     ) -> None:
@@ -197,7 +197,7 @@ class AgentRouter:
 
         Args:
             name: The name of the agent (primarily for logging/identification).
-            agent_type: The `AgentTypeEnum` of the agent.
+            agent_type: The `AgentType` of the agent.
             registration_key: The backend ID of the agent, used as the key for
                 storing the adapter in the registry.
             adapter_operational_config: The base operational configuration for the
@@ -261,7 +261,7 @@ class AgentRouter:
                 ):
                     adapter_instance_config[key] = self.backend_agent.metadata[key]
 
-        if agent_type == AgentTypeEnum.GOOGLE_ADK:
+        if agent_type == AgentType.GOOGLE_ADK:
             # ADK uses the agent name as the app_name in its run payload.
             adapter_instance_config["name"] = self.backend_agent.name
             if "user_id" not in adapter_instance_config:

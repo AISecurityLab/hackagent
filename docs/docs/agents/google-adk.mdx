@@ -54,13 +54,13 @@ Google Agent Development Kit (ADK) is a framework for building conversational AI
 ### Initialize HackAgent Client
 
 ```python
-from hackagent import HackAgent, AgentTypeEnum
+from hackagent import HackAgent, AgentType
 
 # No API key — results stored locally in ~/.local/share/hackagent/hackagent.db
 agent = HackAgent(
     name="multi_tool_agent",
     endpoint="http://localhost:8000",
-    agent_type=AgentTypeEnum.GOOGLE_ADK,
+    agent_type=AgentType.GOOGLE_ADK,
 )
 ```
 
@@ -109,7 +109,7 @@ Here's the actual working example from the test suite:
 
 ```python
 import os
-from hackagent import HackAgent, AgentTypeEnum
+from hackagent import HackAgent, AgentType
 
 def test_adk_security():
     """Test ADK agent security with HackAgent"""
@@ -118,7 +118,7 @@ def test_adk_security():
     agent = HackAgent(
         name="multi_tool_agent",
         endpoint=os.getenv("AGENT_URL"),
-        agent_type=AgentTypeEnum.GOOGLE_ADK,
+        agent_type=AgentType.GOOGLE_ADK,
     )
 
     # Configure comprehensive security test
@@ -190,7 +190,7 @@ multi_turn_goals = [
 agent = HackAgent(
     name="complex_adk_agent",
     endpoint="http://localhost:8000",
-    agent_type=AgentTypeEnum.GOOGLE_ADK,
+    agent_type=AgentType.GOOGLE_ADK,
     timeout=120,                         # HackAgent backend API client timeout (not the ADK request timeout)
     target_config={"timeout": 60},       # Timeout for requests sent to the target ADK agent
     raise_on_unexpected_status=False,    # Handle errors gracefully
@@ -251,7 +251,7 @@ Then check the endpoint configuration:
 agent = HackAgent(
     name="multi_tool_agent",
     endpoint="http://localhost:8000",  # Ensure correct port
-    agent_type=AgentTypeEnum.GOOGLE_ADK,
+    agent_type=AgentType.GOOGLE_ADK,
 )
 ```
 
@@ -285,7 +285,7 @@ logging.getLogger('hackagent').setLevel(logging.DEBUG)
 agent = HackAgent(
     name="debug_adk_agent",
     endpoint="http://localhost:8000",
-    agent_type=AgentTypeEnum.GOOGLE_ADK
+    agent_type=AgentType.GOOGLE_ADK
 )
 ```
 

@@ -48,7 +48,7 @@ from hackagent.core.async_utils import run_coroutine_blocking
 from hackagent.core.logging import get_logger
 from typing import Any, Callable, Dict, List, Optional
 
-from hackagent.server.storage.enums import StatusEnum
+from hackagent.core.contracts import RunStatus
 
 from .category_classifier import GoalCategoryClassifier
 from .context import TrackingContext
@@ -210,7 +210,7 @@ class TrackingCoordinator:
         )
         tracking_context.add_metadata("attack_type", attack_type)
         step_tracker = StepTracker(tracking_context)
-        step_tracker.update_run_status(StatusEnum.RUNNING)
+        step_tracker.update_run_status(RunStatus.RUNNING)
 
         coordinator = cls(
             step_tracker=step_tracker,
@@ -669,7 +669,7 @@ class TrackingCoordinator:
                     )
 
         # Also update step-level tracking
-        self.step_tracker.update_run_status(StatusEnum.FAILED)
+        self.step_tracker.update_run_status(RunStatus.FAILED)
 
     def finalize_pipeline(
         self,
@@ -689,17 +689,15 @@ class TrackingCoordinator:
         if success_check is not None:
             try:
                 status = (
-                    StatusEnum.COMPLETED
-                    if success_check(results)
-                    else StatusEnum.FAILED
+                    RunStatus.COMPLETED if success_check(results) else RunStatus.FAILED
                 )
             except Exception as e:
                 self.logger.warning(
                     f"success_check raised an exception, marking FAILED: {e}"
                 )
-                status = StatusEnum.FAILED
+                status = RunStatus.FAILED
         else:
-            status = StatusEnum.COMPLETED
+            status = RunStatus.COMPLETED
         self.step_tracker.update_run_status(status)
 
     # ========================================================================

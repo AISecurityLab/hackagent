@@ -55,7 +55,7 @@ from hackagent.core.defaults import (
     DEFAULT_REMOTE_JUDGE_IDENTIFIER,
     DEFAULT_REMOTE_ROLE_ENDPOINT,
 )
-from hackagent.server.storage.enums import StatusEnum
+from hackagent.core.contracts import RunStatus
 from hackagent.attacks.types import (
     AttackResult,
     attack_results_to_rows,
@@ -1843,7 +1843,7 @@ class AttackOrchestrator:
                 logger.info(f"Updating run {run_id} status to RUNNING")
                 self.hackagent_agent.backend.update_run(
                     UUID(run_id),
-                    status=StatusEnum.RUNNING.value,
+                    status=RunStatus.RUNNING.value,
                 )
             except Exception as e:
                 logger.error(
@@ -2012,11 +2012,11 @@ class AttackOrchestrator:
             # remote audit writes, so COMPLETED is only possible after all
             # audit artifacts have been persisted successfully.
             final_status = (
-                StatusEnum.FAILED
+                RunStatus.FAILED
                 if evaluation_error is not None
-                else StatusEnum.COMPLETED
+                else RunStatus.COMPLETED
             )
-            if final_status is StatusEnum.COMPLETED:
+            if final_status is RunStatus.COMPLETED:
                 try:
                     run_uuid = UUID(run_id)
                 except (AttributeError, TypeError, ValueError):
@@ -2033,8 +2033,8 @@ class AttackOrchestrator:
                         persisted_status = str(
                             getattr(persisted_run, "status", "") or ""
                         ).upper()
-                        if persisted_status == StatusEnum.FAILED.value:
-                            final_status = StatusEnum.FAILED
+                        if persisted_status == RunStatus.FAILED.value:
+                            final_status = RunStatus.FAILED
                 except Exception as status_error:
                     logger.error(
                         "Failed to verify final audit status for run %s: %s",
@@ -2049,13 +2049,13 @@ class AttackOrchestrator:
                         error=status_error,
                         logger=logger,
                     )
-                    final_status = StatusEnum.FAILED
+                    final_status = RunStatus.FAILED
 
             if _tui_event_bus is not None:
                 _tui_event_bus.emit(
                     "step_ended",
                     step_name="Attack Execution",
-                    success=final_status is StatusEnum.COMPLETED,
+                    success=final_status is RunStatus.COMPLETED,
                     elapsed_s=_total_elapsed,
                     error=(
                         str(evaluation_error) if evaluation_error is not None else None
@@ -2092,7 +2092,7 @@ class AttackOrchestrator:
                 logger.error(f"Attack execution failed: {e}")
                 self.hackagent_agent.backend.update_run(
                     UUID(run_id),
-                    status=StatusEnum.FAILED.value,
+                    status=RunStatus.FAILED.value,
                     run_notes=f"Execution failed: {str(e)}",
                 )
             except Exception as update_error:

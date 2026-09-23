@@ -55,7 +55,7 @@ from hackagent.attacks.shared.response_utils import (
 )
 from hackagent.attacks.shared.router_factory import create_router
 from hackagent.server.client import AuthenticatedClient
-from hackagent.server.storage.enums import StepTypeEnum
+from hackagent.core.contracts import StepKind
 from hackagent.router.router import AgentRouter
 from hackagent.router.tracking import Tracker, Context
 
@@ -644,7 +644,7 @@ class CrescendoAttack(BaseAttack):
                         request={"prompt": question[:500]},
                         response=response_preview,
                         step_name=f"Turn {turn + 1} (backtrack {backtracks_used}/{max_backtracks})",
-                        step_type=StepTypeEnum.OTHER,
+                        step_type=StepKind.OTHER,
                         metadata={
                             "turn": turn + 1,
                             "backtrack": backtracks_used,
@@ -695,7 +695,7 @@ class CrescendoAttack(BaseAttack):
                     request={"prompt": question[:500]},
                     response=response_preview,
                     step_name=f"Turn {turn + 1}",
-                    step_type=StepTypeEnum.OTHER,
+                    step_type=StepKind.OTHER,
                     metadata={
                         "turn": turn + 1,
                         "score": score,

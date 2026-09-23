@@ -258,12 +258,12 @@ class TestGoogleADKHackAgentIntegration:
         google_adk_agent_url: str,
     ):
         """Test HackAgent initialization with Google ADK agent type."""
-        from hackagent import AgentTypeEnum
+        from hackagent import AgentType
 
         agent = hackagent_client_factory(
             name="multi_tool_agent",
             endpoint=google_adk_agent_url,
-            agent_type=AgentTypeEnum.GOOGLE_ADK,
+            agent_type=AgentType.GOOGLE_ADK,
         )
 
         assert agent is not None
@@ -282,12 +282,12 @@ class TestGoogleADKHackAgentIntegration:
         basic_attack_config: Dict[str, Any],
     ):
         """Test running a static template attack against Google ADK agent."""
-        from hackagent import AgentTypeEnum
+        from hackagent import AgentType
 
         agent = hackagent_client_factory(
             name="multi_tool_agent",
             endpoint=google_adk_agent_url,
-            agent_type=AgentTypeEnum.GOOGLE_ADK,
+            agent_type=AgentType.GOOGLE_ADK,
         )
 
         logger.info("Starting static template attack against Google ADK agent...")
@@ -307,12 +307,12 @@ class TestGoogleADKHackAgentIntegration:
         advprefix_attack_config: Dict[str, Any],
     ):
         """Test running an advprefix attack against Google ADK agent."""
-        from hackagent import AgentTypeEnum
+        from hackagent import AgentType
 
         agent = hackagent_client_factory(
             name="multi_tool_agent",
             endpoint=google_adk_agent_url,
-            agent_type=AgentTypeEnum.GOOGLE_ADK,
+            agent_type=AgentType.GOOGLE_ADK,
         )
 
         logger.info("Starting advprefix attack against Google ADK agent...")
@@ -333,12 +333,12 @@ class TestGoogleADKHackAgentIntegration:
         advprefix_attack_config_with_ollama_judges: Dict[str, Any],
     ):
         """Test advprefix attack with Ollama-based judges against Google ADK."""
-        from hackagent import AgentTypeEnum
+        from hackagent import AgentType
 
         agent = hackagent_client_factory(
             name="multi_tool_agent",
             endpoint=google_adk_agent_url,
-            agent_type=AgentTypeEnum.GOOGLE_ADK,
+            agent_type=AgentType.GOOGLE_ADK,
         )
 
         logger.info("Starting advprefix attack with Ollama judges...")
@@ -364,7 +364,7 @@ class TestGoogleADKRouterIntegration:
         """Test that AgentRouter correctly creates ADKAgent adapter."""
         from hackagent.server.client import AuthenticatedClient
         from hackagent.router.router import AgentRouter
-        from hackagent.router.types import AgentTypeEnum
+        from hackagent.core.contracts import AgentType
         from hackagent.router.providers.adk import ADKAgent
 
         client = AuthenticatedClient(
@@ -379,7 +379,7 @@ class TestGoogleADKRouterIntegration:
         router = AgentRouter(
             backend=backend,
             name="multi_tool_agent",
-            agent_type=AgentTypeEnum.GOOGLE_ADK,
+            agent_type=AgentType.GOOGLE_ADK,
             endpoint=google_adk_agent_url,
             adapter_operational_config={"timeout": ADK_TEST_TIMEOUT_SECONDS},
         )
@@ -402,7 +402,7 @@ class TestGoogleADKRouterIntegration:
         """Test that router can handle requests through ADK adapter."""
         from hackagent.server.client import AuthenticatedClient
         from hackagent.router.router import AgentRouter
-        from hackagent.router.types import AgentTypeEnum
+        from hackagent.core.contracts import AgentType
 
         client = AuthenticatedClient(
             base_url=hackagent_api_base_url,
@@ -416,7 +416,7 @@ class TestGoogleADKRouterIntegration:
         router = AgentRouter(
             backend=backend,
             name="multi_tool_agent",
-            agent_type=AgentTypeEnum.GOOGLE_ADK,
+            agent_type=AgentType.GOOGLE_ADK,
             endpoint=google_adk_agent_url,
             adapter_operational_config={"timeout": ADK_TEST_TIMEOUT_SECONDS},
         )

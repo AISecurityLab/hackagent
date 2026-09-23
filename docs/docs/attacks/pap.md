@@ -55,12 +55,12 @@ graph TD
 ## Basic Usage
 
 ```python
-from hackagent import HackAgent, AgentTypeEnum
+from hackagent import HackAgent, AgentType
 
 agent = HackAgent(
     name="target_agent",
     endpoint="http://localhost:8000",
-    agent_type=AgentTypeEnum.OPENAI_SDK
+    agent_type=AgentType.OPENAI_SDK
 )
 
 attack_config = {

@@ -79,12 +79,12 @@ Set via `cipherchat_params.encode_method`. All ciphers from the original CipherC
 ## Basic Usage
 
 ```python
-from hackagent import HackAgent, AgentTypeEnum
+from hackagent import HackAgent, AgentType
 
 agent = HackAgent(
     name="target_agent",
     endpoint="https://openrouter.ai/api/v1",
-    agent_type=AgentTypeEnum.OPENAI_SDK,
+    agent_type=AgentType.OPENAI_SDK,
     adapter_operational_config={
         "name": "google/gemma-3n-e4b-it",
         "api_key": "${OPENROUTER_API_KEY}",

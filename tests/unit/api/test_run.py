@@ -21,7 +21,7 @@ from hackagent.server.api.run import (
     run_update,
 )  # Added run_run_tests_create
 from hackagent.server.api.models import (
-    EvaluationStatusEnum,
+    EvalStatus,
 )  # For nested Result.evaluation_status
 from hackagent.server.api.models import PaginatedRunList
 from hackagent.server.api.models import PatchedRunRequest  # Added
@@ -30,7 +30,7 @@ from hackagent.server.api.models import (
     ResultRequest as RunResultCreateRequest,
 )  # Alias to avoid confusion with main ResultRequest
 from hackagent.server.api.models import Run
-from hackagent.server.api.models import StatusEnum  # For run_list filter
+from hackagent.server.api.models import RunStatus  # For run_list filter
 from hackagent.server.api.models import RunRequest  # Added
 from hackagent.server.types import UNSET
 
@@ -66,7 +66,7 @@ class TestRunListAPI(unittest.TestCase):
             "timestamp": timestamp_str,
             "traces": [mock_trace_data_in_result],
             "prompt": str(uuid.uuid4()),
-            "evaluation_status": EvaluationStatusEnum.NOT_EVALUATED.value,
+            "evaluation_status": EvalStatus.NOT_EVALUATED.value,
             "response_body": "Response in Run's Result",
         }
 
@@ -83,7 +83,7 @@ class TestRunListAPI(unittest.TestCase):
             "results": [mock_result_data_in_run],
             "attack": str(mock_attack_id),
             "run_config": {"detail": "run_specific_config"},
-            "status": StatusEnum.COMPLETED.value,
+            "status": RunStatus.COMPLETED.value,
             "run_notes": "Run completed successfully.",
         }
         mock_response_content = {
@@ -110,7 +110,7 @@ class TestRunListAPI(unittest.TestCase):
                 agent=mock_agent_id,
                 attack=mock_attack_id,
                 organization=mock_org_id,
-                status=StatusEnum.COMPLETED,  # Use StatusEnum for filter
+                status=RunStatus.COMPLETED,  # Use RunStatus for filter
                 page=1,
             )
 
@@ -127,8 +127,8 @@ class TestRunListAPI(unittest.TestCase):
             self.assertEqual(retrieved_run.agent, mock_agent_id)
             self.assertEqual(retrieved_run.organization, mock_org_id)
             self.assertEqual(
-                retrieved_run.status, StatusEnum.COMPLETED
-            )  # Run.status is StatusEnum
+                retrieved_run.status, RunStatus.COMPLETED
+            )  # Run.status is RunStatus
             self.assertEqual(retrieved_run.timestamp, isoparse(timestamp_str))
             self.assertTrue(
                 isinstance(retrieved_run.results, list)
@@ -145,7 +145,7 @@ class TestRunListAPI(unittest.TestCase):
                 "agent": str(mock_agent_id),
                 "attack": str(mock_attack_id),
                 "organization": str(mock_org_id),
-                "status": StatusEnum.COMPLETED.value,
+                "status": RunStatus.COMPLETED.value,
                 "page": 1,
                 # is_client_executed is not passed if UNSET (default) but we can test it if needed
             }
@@ -214,7 +214,7 @@ class TestRunCreateAPI(unittest.TestCase):
             agent=mock_agent_id_create,
             attack=mock_attack_id_create,
             run_config={"setting": "value"},
-            status=StatusEnum.PENDING,
+            status=RunStatus.PENDING,
             run_notes="Initial notes for run creation.",
         )
 
@@ -317,7 +317,7 @@ class TestRunCreateAPI(unittest.TestCase):
         mock_client_instance.raise_on_unexpected_status = False
 
         error_request_data_false = RunRequest(
-            agent=uuid.uuid4(), status=StatusEnum.RUNNING
+            agent=uuid.uuid4(), status=RunStatus.RUNNING
         )  # Example
 
         mock_httpx_response = MagicMock()
@@ -364,7 +364,7 @@ class TestRunRetrieveAPI(unittest.TestCase):
             "timestamp": timestamp_retrieve_str,
             "traces": [mock_trace_data_retrieve],
             "prompt": str(uuid.uuid4()),
-            "evaluation_status": EvaluationStatusEnum.PASSED_CRITERIA.value,
+            "evaluation_status": EvalStatus.PASSED_CRITERIA.value,
             "response_body": "Response in Retrieved Run's Result",
         }
 
@@ -381,7 +381,7 @@ class TestRunRetrieveAPI(unittest.TestCase):
             "results": [mock_result_data_retrieve],
             "attack": None,  # Can be None
             "run_config": {"config_key": "retrieved_value"},
-            "status": StatusEnum.RUNNING.value,
+            "status": RunStatus.RUNNING.value,
             "run_notes": "Run failed during execution.",
         }
         mock_httpx_response = MagicMock()
@@ -405,7 +405,7 @@ class TestRunRetrieveAPI(unittest.TestCase):
             self.assertIsNotNone(response.parsed)
             self.assertEqual(response.parsed.id, run_id_to_retrieve)
             self.assertEqual(response.parsed.agent, mock_agent_id_retrieve)
-            self.assertEqual(response.parsed.status, StatusEnum.RUNNING)
+            self.assertEqual(response.parsed.status, RunStatus.RUNNING)
             self.assertEqual(
                 response.parsed.timestamp, isoparse(timestamp_retrieve_str)
             )
@@ -479,7 +479,7 @@ class TestRunUpdateAPI(unittest.TestCase):
 
         run_update_request_data = RunRequest(
             agent=mock_agent_id_for_update_body,  # Mandatory for RunRequest
-            status=StatusEnum.FAILED,
+            status=RunStatus.FAILED,
             run_notes="Updated: Run has failed.",
             run_config={"new_setting": "updated_value"},
         )
@@ -512,7 +512,7 @@ class TestRunUpdateAPI(unittest.TestCase):
             "timestamp": original_run_timestamp_str,  # Result timestamp is its own creation time
             "traces": [mock_trace_data_update],
             "prompt": str(uuid.uuid4()),
-            "evaluation_status": EvaluationStatusEnum.ERROR_AGENT_RESPONSE.value,
+            "evaluation_status": EvalStatus.ERROR_AGENT_RESPONSE.value,
             "response_body": "Updated response in Run's Result",
         }
 
@@ -621,7 +621,7 @@ class TestRunUpdateAPI(unittest.TestCase):
 
         run_id_error_update = uuid.uuid4()
         # RunRequest agent field is mandatory for PUT body
-        update_data_error = RunRequest(agent=uuid.uuid4(), status=StatusEnum.COMPLETED)
+        update_data_error = RunRequest(agent=uuid.uuid4(), status=RunStatus.COMPLETED)
 
         mock_httpx_response = MagicMock()
         mock_httpx_response.status_code = 400  # Bad Request
@@ -649,7 +649,7 @@ class TestRunPartialUpdateAPI(unittest.TestCase):
         run_id_to_patch = uuid.uuid4()
 
         run_patch_request_data = PatchedRunRequest(
-            status=StatusEnum.RUNNING,
+            status=RunStatus.RUNNING,
             run_notes="Run is now actively running after patch.",
         )
 
@@ -770,7 +770,7 @@ class TestRunPartialUpdateAPI(unittest.TestCase):
 
         run_id_error_patch = uuid.uuid4()
         patch_data_error = PatchedRunRequest(
-            status=StatusEnum.FAILED
+            status=RunStatus.FAILED
         )  # Example valid patch data
 
         mock_httpx_response = MagicMock()
@@ -878,7 +878,7 @@ class TestRunResultCreateAPI(unittest.TestCase):
             prompt=mock_prompt_id_for_result,
             request_payload={"input_data": "test input for new result"},
             response_body="Agent response for new result under run.",
-            evaluation_status=EvaluationStatusEnum.PASSED_CRITERIA,
+            evaluation_status=EvalStatus.PASSED_CRITERIA,
             evaluation_notes="New result passed criteria.",
         )
 

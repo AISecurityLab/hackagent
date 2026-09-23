@@ -27,7 +27,7 @@ from hackagent.core.settings import resolve_ollama_base_url
 from hackagent.core.logging import get_logger
 from hackagent.router import envelope as _envelope
 from hackagent.router.provider_config import ProviderConfig
-from hackagent.router.types import AgentTypeEnum
+from hackagent.core.contracts import AgentType
 
 logger = get_logger(__name__)
 
@@ -99,7 +99,7 @@ class _ChatRegistration:
         self,
         *,
         id: str,
-        agent_type: AgentTypeEnum,
+        agent_type: AgentType,
         provider_config: ProviderConfig,
         config: Dict[str, Any],
     ):
@@ -112,7 +112,7 @@ class _ChatRegistration:
         # OpenAI custom-endpoint quirk: if endpoint is set but no model
         # name, default to ``"default"`` so the server decides.
         if "name" not in self.config:
-            if agent_type == AgentTypeEnum.OPENAI_SDK and self.config.get("endpoint"):
+            if agent_type == AgentType.OPENAI_SDK and self.config.get("endpoint"):
                 self.model_name = "default"
             else:
                 raise ValueError(
@@ -123,7 +123,7 @@ class _ChatRegistration:
             self.model_name = self.config["name"]
 
         # Ollama special-cases the endpoint default + normalisation.
-        if agent_type == AgentTypeEnum.OLLAMA:
+        if agent_type == AgentType.OLLAMA:
             self.api_base_url: Optional[str] = _normalise_ollama_endpoint(
                 self.config.get("endpoint")
             )
@@ -149,13 +149,13 @@ class _ChatRegistration:
         # send an ``Authorization: Bearer <hackagent-token>`` header to
         # the local Ollama server, which is misleading at best and a
         # credential leak at worst.
-        if agent_type == AgentTypeEnum.OLLAMA:
+        if agent_type == AgentType.OLLAMA:
             self.actual_api_key = None
         # OpenAI custom-endpoint quirk: when no key is configured but an
         # endpoint is, use a placeholder so the OpenAI client (under
         # LiteLLM) doesn't choke.
         if (
-            agent_type == AgentTypeEnum.OPENAI_SDK
+            agent_type == AgentType.OPENAI_SDK
             and not self.actual_api_key
             and self.api_base_url
         ):
@@ -168,7 +168,7 @@ class _ChatRegistration:
         # OpenAI's default temperature historically was 1.0; everyone else is 0.8.
         self.default_temperature: float = self.config.get(
             "temperature",
-            1.0 if agent_type == AgentTypeEnum.OPENAI_SDK else self.DEFAULT_TEMPERATURE,
+            1.0 if agent_type == AgentType.OPENAI_SDK else self.DEFAULT_TEMPERATURE,
         )
         self.default_top_p: float = self.config.get("top_p", self.DEFAULT_TOP_P)
         self.default_thinking = self.config.get("thinking")

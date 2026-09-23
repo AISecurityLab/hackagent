@@ -4,11 +4,10 @@
 from hackagent.core.logging import get_logger
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
-from hackagent import utils
 from hackagent.core.settings import Settings
 from hackagent.core.errors import HackAgentError
 from hackagent.router import AgentRouter
-from hackagent.router.types import AgentTypeEnum
+from hackagent.core.contracts import AgentType
 
 # Lazy import for attack orchestrators to avoid ~0.5s startup delay
 if TYPE_CHECKING:
@@ -59,7 +58,7 @@ class HackAgent:
         self,
         endpoint: str,
         name: Optional[str] = None,
-        agent_type: Union[AgentTypeEnum, str] = AgentTypeEnum.UNKNOWN,
+        agent_type: Union[AgentType, str] = AgentType.UNKNOWN,
         base_url: Optional[str] = None,
         api_key: Optional[str] = None,
         raise_on_unexpected_status: bool = False,
@@ -88,10 +87,10 @@ class HackAgent:
                 If not provided, a default name might be assigned or behavior might
                 depend on the specific backend agent management policies.
             agent_type: Specifies the type of the agent. This can be provided
-                as an `AgentTypeEnum` member (e.g., `AgentTypeEnum.GOOGLE_ADK`) or
+                as an `AgentType` member (e.g., `AgentType.GOOGLE_ADK`) or
                 as a string identifier (e.g., "google-adk", "litellm").
                 String values are automatically converted to the corresponding
-                `AgentTypeEnum` member. Defaults to `AgentTypeEnum.UNKNOWN` if
+                `AgentType` member. Defaults to `AgentType.UNKNOWN` if
                 not specified or if an invalid string is provided.
             raise_on_unexpected_status: If set to `True`, the API client will
                 raise an exception for any HTTP status codes that are not typically
@@ -149,7 +148,7 @@ class HackAgent:
                 self.settings.db_path,
             )
 
-        processed_agent_type = utils.resolve_agent_type(agent_type)
+        processed_agent_type = AgentType.parse(agent_type)
         self.target_config = _resolve_target_config(target_config)
         explicit_target_config = (
             {
@@ -171,7 +170,7 @@ class HackAgent:
             **(adapter_operational_config or {}),
         }
 
-        if processed_agent_type == AgentTypeEnum.OLLAMA:
+        if processed_agent_type == AgentType.OLLAMA:
             if (
                 thinking is not None
                 and router_operational_config.get("thinking") is None

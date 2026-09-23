@@ -23,7 +23,7 @@ from unittest.mock import MagicMock
 from types import SimpleNamespace
 from uuid import uuid4
 
-from hackagent.server.api.models import EvaluationStatusEnum
+from hackagent.server.api.models import EvalStatus
 from hackagent.router.tracking import Tracker
 from tests.fakes import FakeRouter
 
@@ -116,8 +116,8 @@ class TestEvaluationStatusUpdates(unittest.TestCase):
 
         # Expected: result_partial_update should be called for each result
         expected_updates = [
-            (evaluated_data[0]["result_id"], EvaluationStatusEnum.FAILED_CRITERIA),
-            (evaluated_data[1]["result_id"], EvaluationStatusEnum.PASSED_CRITERIA),
+            (evaluated_data[0]["result_id"], EvalStatus.FAILED_CRITERIA),
+            (evaluated_data[1]["result_id"], EvalStatus.PASSED_CRITERIA),
         ]
 
         # NOTE: Currently the code does NOT do this!
