@@ -50,7 +50,6 @@ from hackagent.router.tracking import Tracker, Context
 
 from .config import (
     ATTACKER_SYSTEM_PROMPT,
-    DEFAULT_PAIR_CONFIG,
     JUDGE_SYSTEM_PROMPT,
     PairConfig,
 )
@@ -202,7 +201,7 @@ class PAIRAttack(BaseAttack):
 
         Args:
             config: Optional configuration overrides merged into
-                :data:`~hackagent.attacks.techniques.pair.config.DEFAULT_PAIR_CONFIG`.
+                :class:`~hackagent.attacks.techniques.pair.config.PairConfig`.
             client: Authenticated HackAgent API client.
             agent_router: Router for the victim model.
 
@@ -218,7 +217,7 @@ class PAIRAttack(BaseAttack):
             raise ValueError("Target LLMRouter must be provided.")
 
         # Merge config
-        current_config = copy.deepcopy(DEFAULT_PAIR_CONFIG)
+        current_config = PairConfig().to_dict()
         internal_config: Dict[str, Any] = {}
         user_config: Dict[str, Any] = {}
         if config:
