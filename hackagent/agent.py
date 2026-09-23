@@ -97,8 +97,8 @@ class HackAgent:
     - Retrieving and handling test results.
 
     It registers the target as an Agent record in the storage backend,
-    connects to it (applying any guardrails), and dispatches to the attack
-    strategies.
+    connects to it (applying any guardrails), and dispatches ``hack`` to
+    :func:`hackagent.orchestrator.runner.run`.
 
     Attributes:
         target: The connected target model, with guardrails applied.
@@ -106,8 +106,6 @@ class HackAgent:
         router: ``target`` behind the ``route_request`` surface the attack
             techniques call.
         models: Builds role models (attacker, judges, guardrails).
-        attack_strategies: A dictionary mapping strategy names to their
-            `AttackStrategy` implementations.
     """
 
     def __init__(
@@ -132,8 +130,7 @@ class HackAgent:
 
         This constructor sets up the local storage backend, loads default
         prompts, resolves the agent type, registers the target with the
-        backend and connects to it. It also prepares available
-        attack strategies.
+        backend and connects to it.
 
         Args:
             endpoint: The target application's endpoint URL. This is the primary
@@ -296,33 +293,32 @@ class HackAgent:
         _tui_event_bus: Optional[Any] = None,
     ) -> Any:
         """
-        Executes a specified attack strategy against the configured victim agent.
+        Executes one attack against the configured victim agent.
 
-        This method serves as the primary action command for initiating an attack.
-        It identifies the appropriate attack strategy based on `attack_config`,
-        ensures the victim agent (managed by `self.router`) is ready, and then
-        delegates the execution to the chosen strategy.
+        This method is the primary action for initiating an attack.
+        ``attack_config`` must include ``attack_type``. Execution is
+        delegated to :func:`hackagent.orchestrator.runner.run`.
 
         Args:
             attack_config: A dictionary containing parameters specific to the
                 chosen attack type. Must include an 'attack_type' key that maps
-                to a registered strategy (e.g., "advprefix"). Other keys provide
-                configuration for that strategy (e.g., 'category', 'prompt_text').
+                to a registered technique (e.g., "advprefix"). Other keys provide
+                configuration for that technique.
             run_config_override: An optional dictionary that can override default
-                run configurations. The specifics depend on the attack strategy
+                run configurations. The specifics depend on the technique
                 and backend capabilities.
             fail_on_run_error: If `True` (the default), an exception will be
                 raised if the attack run encounters an error and fails. If `False`,
-                errors might be suppressed or handled differently by the strategy.
+                errors might be suppressed or handled differently by the run.
 
         Returns:
-            The result returned by the `execute` method of the chosen attack
-            strategy. The nature of this result is strategy-dependent.
+            Result rows for the run. Each row is the dict produced by
+            :func:`hackagent.orchestrator.mapping.result_to_row`.
 
         Raises:
             ValueError: If the 'attack_type' is missing from `attack_config` or
                 if the specified 'attack_type' is not a supported/registered
-                strategy.
+                technique.
             HackAgentError: For issues during backend
                 agent operations, or other unexpected errors during the attack process.
         """

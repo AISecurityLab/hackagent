@@ -254,8 +254,9 @@ def load_goals_from_config(config: Dict[str, Any]) -> List[str]:
     """
     Load goals from a configuration dictionary.
 
-    This function is designed to be called from the AttackOrchestrator
-    when a 'dataset' key is present in the attack configuration.
+    Callers that already have a dataset configuration dictionary use this
+    helper directly. A run resolves goals through
+    :func:`hackagent.orchestrator.goals.resolve_run_goals`.
 
     Args:
         config: Dataset configuration dictionary with keys:

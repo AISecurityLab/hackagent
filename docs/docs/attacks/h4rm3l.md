@@ -319,7 +319,7 @@ attack = H4rm3lAttack(
 results = attack.run(["Explain how to pick a lock"])
 ```
 
-`run()` returns generation rows without a verdict. `H4rm3lConfig` still subclasses `ConfigBase`. The legacy constructor `H4rm3lAttack(config_dict, client, agent_router)` is obsolete for new code; the orchestrator still calls it.
+`run()` returns generation rows without a verdict. `H4rm3lConfig` still subclasses `ConfigBase`. The legacy constructor `H4rm3lAttack(config_dict, client, agent_router)` is obsolete for new code. The runner constructs `(config, ctx)`.
 
 ### Custom Program
 

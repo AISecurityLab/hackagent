@@ -5,7 +5,7 @@
 Base vulnerability class for all hackagent risk assessments.
 
 Architecture (mirrors the attack layer):
-    HackAgent.hack() → AttackOrchestrator → BaseAttack (technique)
+    HackAgent.hack() → hackagent.orchestrator.run → BaseAttack (technique)
                                               ↕
                      BaseVulnerability ← vulnerability.assess()
 

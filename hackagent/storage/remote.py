@@ -5,7 +5,7 @@
 RemoteBackend — Store implementation backed by api.hackagent.dev.
 
 This backend centralises all HTTP calls that were previously scattered across
-the model router, AttackOrchestrator, Tracker, and StepTracker.  It is instantiated
+the model router, the run orchestrator, Tracker, and StepTracker.  It is instantiated
 when an API key is available and selected automatically by HackAgent.__init__.
 """
 

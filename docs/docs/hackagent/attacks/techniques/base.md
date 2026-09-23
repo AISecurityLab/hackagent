@@ -10,7 +10,7 @@ technique implementations. Techniques focus purely on attack algorithms
 and evaluation, without knowledge of server integration.
 
 Architecture:
-    HackAgent → AttackOrchestrator → BaseAttack → Pipeline stages
+    HackAgent.hack() → hackagent.orchestrator.run → BaseAttack → Pipeline stages
 
 Forward construction is ``BaseAttack(config, ctx)`` with
 ``run(goals) -&gt; list[AttackResult]``. ``config`` is an
@@ -34,12 +34,12 @@ Every shipped technique accepts that constructor.
   ``ctx.models``, scores from ``ctx.judge``, artifacts under
   ``ctx.workspace``. They do not read ``_suppress_run_status_updates``.
 
-The orchestrator still instantiates every shipped technique as
-``(config_dict, client, agent_router)``. That legacy path, including
-``client=`` as a keyword, remains supported and is obsolete for new
-technique code. Shared helpers live in ``hackagent.attacks._lib``;
-compatibility shims remain at ``attacks.shared``, ``attacks.generator``,
-and ``attacks.objectives``.
+``hackagent.orchestrator.runner`` instantiates every shipped technique as
+``(config, ctx)``. The legacy ``(config_dict, client, agent_router)``
+constructor, including ``client=`` as a keyword, remains supported and is
+obsolete for new technique code. Shared helpers live in
+``hackagent.attacks._lib``; compatibility shims remain at
+``attacks.shared``, ``attacks.generator``, and ``attacks.objectives``.
 
 Attack techniques are organized in:
     techniques/advprefix/attack.py    - AdvPrefixAttack
@@ -51,8 +51,10 @@ Each technique:
 - Implements run(goals)
 - Returns list[AttackResult]
 
-The orchestration layer (attacks/orchestrator.py) handles server integration,
-allowing techniques to focus solely on attack algorithms.
+``hackagent.orchestrator`` composes one run (records, context, scheduling,
+and a single judge pass). Techniques focus on the attack algorithm.
+``AttackOrchestrator`` and ``hackagent.attacks.registry`` are gone. There
+is no import shim.
 
 ## BaseAttack Objects
 
@@ -79,9 +81,10 @@ Subclasses:
 
 Every shipped technique accepts ``(config, ctx)``: post-hoc,
 inline-judge (``ctx.judge.score``), and custom-loop
-(``ctx.models`` / ``ctx.judge`` / ``ctx.workspace``). The orchestrator
-still constructs them as ``(config, client, agent_router)``. That
-legacy constructor is obsolete for new technique code.
+(``ctx.models`` / ``ctx.judge`` / ``ctx.workspace``).
+``hackagent.orchestrator.runner`` constructs them that way. The legacy
+``(config, client, agent_router)`` constructor remains supported and
+is obsolete for new technique code.
 
 **Attributes**:
 
@@ -115,11 +118,12 @@ def __init__(config: Union[AttackConfig, Dict[str, Any]],
 Initialize with ``(config, ctx)`` or legacy ``(config, client, agent_router)``.
 
 Prefer ``BaseAttack(config, ctx)``. Every shipped technique accepts
-``ctx`` positionally or as ``ctx=``. The orchestrator still passes
-``(config_dict, client, agent_router)`` (including ``client=`` as a
-keyword). That legacy constructor is obsolete for new technique
-code and remains supported. Logging handlers are no longer
-installed here — interfaces own logging (D12).
+``ctx`` positionally or as ``ctx=``. ``hackagent.orchestrator.runner``
+passes ``(config, ctx)``. The legacy
+``(config_dict, client, agent_router)`` constructor (including
+``client=`` as a keyword) remains supported and is obsolete for new
+technique code. Logging handlers are no longer installed here —
+interfaces own logging (D12).
 
 #### get\_effective\_model\_roles
 

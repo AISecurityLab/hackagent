@@ -10,7 +10,7 @@ Objectives define WHAT vulnerability we're testing for, providing:
 - Objective-specific context for attack generation
 
 Note: Objectives are metadata providers, not execution classes.
-Actual attacks follow: AttackStrategy → BaseAttack → Pipeline stages
+Actual attacks follow: hackagent.orchestrator.run → BaseAttack → Pipeline stages
 """
 
 from typing import Dict, List

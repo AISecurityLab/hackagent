@@ -5,11 +5,11 @@ title: hackagent.attacks.types
 
 Typed models for attack technique results.
 
-This module replaces the historical ``_normalize_attack_results()``
-duck-typing helper in :mod:`hackagent.attacks.orchestrator`, which used to
-flatten heterogeneous technique outputs by probing for ``.evaluated``,
-``.rows``, ``.results``, ``.data``, ``.items`` in turn. Any new technique
-naming its output field differently would silently mis-normalize.
+This module replaces a removed ``_normalize_attack_results()`` duck-typing
+helper, which used to flatten heterogeneous technique outputs by probing
+for ``.evaluated``, ``.rows``, ``.results``, ``.data``, ``.items`` in turn.
+Any new technique naming its output field differently would silently
+mis-normalize.
 
 Instead, every attack technique&#x27;s ``run()`` method returns
 ``list[AttackResult]``: an explicit, frozen (immutable) Pydantic v2 model.

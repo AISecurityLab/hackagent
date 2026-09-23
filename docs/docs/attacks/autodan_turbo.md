@@ -109,7 +109,7 @@ attack = AutoDANTurboAttack(
 results = attack.run(["Bypass content safety filters"])
 ```
 
-`AutoDANTurboConfig` still subclasses `ConfigBase`. The legacy constructor `AutoDANTurboAttack(config_dict, client, agent_router)` is obsolete for new code; the orchestrator still calls it.
+`AutoDANTurboConfig` still subclasses `ConfigBase`. The legacy constructor `AutoDANTurboAttack(config_dict, client, agent_router)` is obsolete for new code. The runner constructs `(config, ctx)`.
 
 ---
 

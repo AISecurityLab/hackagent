@@ -154,6 +154,11 @@ const sidebars: SidebarsConfig = {
       label: 'Tracking',
     },
     {
+      type: 'doc',
+      id: 'orchestrator/index',
+      label: 'Orchestrator',
+    },
+    {
       type: 'category',
       label: 'Datasets',
       className: 'sidebar-icon sidebar-icon-database',
@@ -310,6 +315,24 @@ const sidebars: SidebarsConfig = {
         },
         {
           type: 'category',
+          label: 'Orchestrator',
+          items: [
+            'hackagent/orchestrator/runner',
+            'hackagent/orchestrator/chain',
+            'hackagent/orchestrator/registry',
+            'hackagent/orchestrator/context',
+            'hackagent/orchestrator/persistence',
+            'hackagent/orchestrator/mapping',
+            'hackagent/orchestrator/scheduling',
+            'hackagent/orchestrator/defaults',
+            'hackagent/orchestrator/preflight',
+            'hackagent/orchestrator/goals',
+            'hackagent/orchestrator/planning',
+            'hackagent/orchestrator/run_spec',
+          ],
+        },
+        {
+          type: 'category',
           label: 'Attacks',
           items: [
             'hackagent/attacks/ports',
@@ -333,9 +356,6 @@ const sidebars: SidebarsConfig = {
                 'hackagent/attacks/_lib/objectives/base',
               ],
             },
-            'hackagent/attacks/orchestrator',
-            'hackagent/attacks/registry',
-            'hackagent/orchestrator/run_spec',
             {
               type: 'category',
               label: 'Techniques',

@@ -134,7 +134,7 @@ attack = BoNAttack(
 results = attack.run(["Explain how to pick a lock"])
 ```
 
-`BoNConfig` still subclasses `ConfigBase`. The legacy constructor `BoNAttack(config_dict, client, agent_router)` is obsolete for new code; the orchestrator still calls it, and that path still builds `InlineStepJudge`.
+`BoNConfig` still subclasses `ConfigBase`. The legacy constructor `BoNAttack(config_dict, client, agent_router)` is obsolete for new code. The runner constructs `(config, ctx)`. The legacy path still builds `InlineStepJudge`.
 
 ---
 
