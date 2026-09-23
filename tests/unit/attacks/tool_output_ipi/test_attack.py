@@ -6,8 +6,8 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from hackagent.attacks.registry import ATTACK_REGISTRY, ToolOutputIPIOrchestrator
 from hackagent.attacks.techniques.tool_output_ipi.attack import ToolOutputIPIAttack
+from hackagent.orchestrator.registry import ATTACK_REGISTRY, load_attack
 from hackagent.attacks.types import AttackResult
 from hackagent.catalog.attacks import ATTACK_CATALOG
 from hackagent.cli.tui.attack_specs import get_attack_config_spec
@@ -16,9 +16,7 @@ from hackagent.cli.tui.attack_specs import get_attack_config_spec
 class TestRegistryAndDiscovery(unittest.TestCase):
     def test_registry_entry(self):
         self.assertIn("tool_output_ipi", ATTACK_REGISTRY)
-        self.assertIs(ATTACK_REGISTRY["tool_output_ipi"], ToolOutputIPIOrchestrator)
-        self.assertEqual(ToolOutputIPIOrchestrator.attack_type, "tool_output_ipi")
-        self.assertIs(ToolOutputIPIOrchestrator.attack_impl_class, ToolOutputIPIAttack)
+        self.assertIs(load_attack("tool_output_ipi"), ToolOutputIPIAttack)
 
     def test_catalog_entry(self):
         self.assertIn("tool_output_ipi", ATTACK_CATALOG)

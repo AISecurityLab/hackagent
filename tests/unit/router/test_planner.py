@@ -16,7 +16,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from hackagent.cli.tui.attack_specs import ConfigField, FieldType
-from hackagent.router.discovery.scanner import (
+from hackagent.orchestrator.planning import (
     AttackPlan,
     AutoPlanResult,
     PlannerError,
@@ -101,7 +101,7 @@ class TestHelpers(unittest.TestCase):
 class TestPlanAttack(unittest.TestCase):
     def _plan_with(self, content: str, **kwargs) -> AttackPlan:
         with patch(
-            "hackagent.router.discovery.scanner.get_litellm",
+            "hackagent.orchestrator.planning.get_litellm",
             return_value=_fake_litellm(content),
         ):
             return plan_attack(_TARGET, **kwargs)
@@ -129,16 +129,18 @@ class TestPlanAttack(unittest.TestCase):
         )
 
     def test_out_of_range_param_is_clamped(self):
+        # Bounds come from the technique JSON schema. PAIR's
+        # jailbreak_threshold is le=10; TAP depth has no schema maximum.
         content = json.dumps(
             {
-                "attack_type": "tap",
+                "attack_type": "pair",
                 "goals": ["g1"],
-                "parameters": {"tap_params.depth": 999},
+                "parameters": {"jailbreak_threshold": 999},
                 "confidence": 0.5,
             }
         )
         plan = self._plan_with(content)
-        self.assertEqual(plan.parameters["tap_params"]["depth"], 10)  # clamped to max
+        self.assertEqual(plan.parameters["jailbreak_threshold"], 10)
         self.assertTrue(any("clamped" in w for w in plan.warnings))
 
     def test_invented_param_is_dropped(self):
@@ -175,7 +177,7 @@ class TestPlanAttack(unittest.TestCase):
 
     def test_litellm_unavailable_raises(self):
         with patch(
-            "hackagent.router.discovery.scanner.get_litellm",
+            "hackagent.orchestrator.planning.get_litellm",
             return_value=(None, False),
         ):
             with self.assertRaises(PlannerError):
@@ -230,7 +232,7 @@ class TestAutoPlan(unittest.TestCase):
             }
         )
         with patch(
-            "hackagent.router.discovery.scanner.get_litellm",
+            "hackagent.orchestrator.planning.get_litellm",
             return_value=_fake_litellm(content),
         ):
             out = auto_plan("https://www.example.it/chat")
@@ -245,7 +247,7 @@ class TestAutoPlan(unittest.TestCase):
             {"attack_type": "pair", "goals": ["g"], "parameters": {}, "confidence": 0.5}
         )
         with patch(
-            "hackagent.router.discovery.scanner.get_litellm",
+            "hackagent.orchestrator.planning.get_litellm",
             return_value=_fake_litellm(content),
         ):
             out = auto_plan(

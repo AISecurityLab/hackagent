@@ -332,7 +332,6 @@ def test_embedding_transport_isolates_concurrent_cost_map_refresh(
 def test_compatible_transport_preserves_server_model_names(
     consumer, endpoint, model, embedding_http_transport
 ):
-    from hackagent.attacks.orchestrator import AttackOrchestrator
     from hackagent.attacks.techniques.autodan_turbo.strategy_library import (
         StrategyLibrary,
     )
@@ -358,8 +357,9 @@ def test_compatible_transport_preserves_server_model_names(
         ).embed("text to embed")
         np.testing.assert_array_equal(vector, [0.25, 0.75])
     else:
-        orchestrator = object.__new__(AttackOrchestrator)
-        assert orchestrator._probe_embedding_target({"config": config}) is None
+        from hackagent.orchestrator.preflight import probe_embedding_target
+
+        assert probe_embedding_target({"config": config}) is None
 
     assert len(embedding_http_transport) == 1
     request = embedding_http_transport[0]

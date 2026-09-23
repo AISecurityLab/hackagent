@@ -235,15 +235,14 @@ class TestAttackStrategies:
             agent_type=AgentType.OLLAMA,
         )
 
-        strategies = agent.attack_strategies
+        from hackagent.orchestrator.registry import ATTACK_REGISTRY, load_attack
 
-        # Verify expected strategies are available
+        _ = agent
         expected_strategies = ["advprefix", "static_template", "pair"]
         for strategy in expected_strategies:
-            assert strategy in strategies, f"Missing strategy: {strategy}"
-            logger.info(
-                f"Strategy '{strategy}' available: {type(strategies[strategy])}"
-            )
+            assert strategy in ATTACK_REGISTRY, f"Missing strategy: {strategy}"
+            assert load_attack(strategy).__name__
+            logger.info("Strategy '%s' available", strategy)
 
     @pytest.mark.ollama
     def test_attack_strategies_lazy_loading(
@@ -263,9 +262,9 @@ class TestAttackStrategies:
             agent_type=AgentType.OLLAMA,
         )
 
-        # Before accessing, _attack_strategies should be None
-        # (This tests the lazy loading implementation)
-        # After accessing, strategies should be loaded
-        _ = agent.attack_strategies
-        assert agent._attack_strategies is not None
-        logger.info("Attack strategies lazy loading verified")
+        from hackagent.orchestrator.registry import load_attack
+
+        _ = agent
+        # The registry stores module paths and imports the class on demand.
+        assert load_attack("pair").__name__ == "PAIRAttack"
+        logger.info("Attack registry lazy loading verified")

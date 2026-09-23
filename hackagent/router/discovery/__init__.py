@@ -12,7 +12,7 @@ Agentic attack planning + browser helpers for the ``web`` provider.
         attack_config = result.plan.to_attack_config()
 """
 
-from hackagent.router.discovery.scanner import (
+from hackagent.orchestrator.planning import (
     DEFAULT_PLANNER_MODEL,
     AttackPlan,
     AutoPlanResult,

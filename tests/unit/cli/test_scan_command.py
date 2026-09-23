@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 from click.testing import CliRunner
 
 from hackagent.cli.commands.scan import run_quick_scan, scan
-from hackagent.router.discovery.scanner import AttackPlan, PlannerError
+from hackagent.orchestrator.planning import AttackPlan, PlannerError
 
 _URL = "https://x.it/chat"
 
@@ -232,8 +232,8 @@ class TestRunQuickScan(unittest.TestCase):
         with patch("hackagent.cli.commands.scan.quick.HackAgent") as mock_agent:
             mock_agent.return_value.hack.return_value = []
             run_quick_scan(self._ctx(), **self._args(dataset_preset="my-dataset"))
-        attack_config = mock_agent.return_value.hack.call_args.kwargs["attack_config"]
-        self.assertEqual(attack_config["dataset"]["preset"], "my-dataset")
+        first = mock_agent.return_value.hack.call_args_list[0].kwargs["attack_config"]
+        self.assertEqual(first["dataset"]["preset"], "my-dataset")
 
 
 class TestProviderEndpoint(unittest.TestCase):

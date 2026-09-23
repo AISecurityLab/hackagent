@@ -158,24 +158,6 @@ class TestHackAgentInitialization(unittest.TestCase):
         "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
     )
     @patch("hackagent.agent.AgentType.parse", return_value=AgentType.OPENAI_SDK)
-    def test_attack_strategies_lazy_loaded(
-        self, mock_resolve_type, mock_resolve_token, mock_connect
-    ):
-        """Test attack strategies are None initially (lazy-loaded)."""
-        from hackagent.agent import HackAgent
-
-        agent = HackAgent(
-            endpoint="http://localhost:8000",
-            api_key="test-key",
-        )
-
-        self.assertIsNone(agent._attack_strategies)
-
-    @patch("hackagent.agent.connect")
-    @patch(
-        "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
-    )
-    @patch("hackagent.agent.AgentType.parse", return_value=AgentType.OPENAI_SDK)
     def test_with_metadata(self, mock_resolve_type, mock_resolve_token, mock_connect):
         """Test initialization with metadata."""
         from hackagent.agent import HackAgent
@@ -261,54 +243,6 @@ class TestHackAgentInitialization(unittest.TestCase):
         self.assertIsNone(spec.thinking)
 
 
-class TestHackAgentAttackStrategies(unittest.TestCase):
-    """Test HackAgent.attack_strategies lazy loading."""
-
-    @patch("hackagent.agent.connect")
-    @patch(
-        "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
-    )
-    @patch("hackagent.agent.AgentType.parse", return_value=AgentType.OPENAI_SDK)
-    def test_attack_strategies_loaded_on_access(
-        self, mock_resolve_type, mock_resolve_token, mock_connect
-    ):
-        """Test that attack_strategies are loaded on first access."""
-        from hackagent.agent import HackAgent
-
-        agent = HackAgent(
-            endpoint="http://localhost:8000",
-            api_key="test-key",
-        )
-
-        strategies = agent.attack_strategies
-
-        self.assertIn("advprefix", strategies)
-        self.assertIn("static_template", strategies)
-        self.assertIn("pair", strategies)
-        self.assertIn("crescendo", strategies)
-
-    @patch("hackagent.agent.connect")
-    @patch(
-        "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
-    )
-    @patch("hackagent.agent.AgentType.parse", return_value=AgentType.OPENAI_SDK)
-    def test_attack_strategies_cached(
-        self, mock_resolve_type, mock_resolve_token, mock_connect
-    ):
-        """Test that attack_strategies are cached after first access."""
-        from hackagent.agent import HackAgent
-
-        agent = HackAgent(
-            endpoint="http://localhost:8000",
-            api_key="test-key",
-        )
-
-        strategies1 = agent.attack_strategies
-        strategies2 = agent.attack_strategies
-
-        self.assertIs(strategies1, strategies2)
-
-
 class TestHackAgentHack(unittest.TestCase):
     """Test HackAgent.hack method."""
 
@@ -345,97 +279,77 @@ class TestHackAgentHack(unittest.TestCase):
             self.agent.hack(attack_config={"attack_type": "nonexistent"})
         self.assertIn("Unsupported", str(ctx.exception))
 
-    def test_hack_delegates_to_strategy(self):
-        """Test that hack delegates to the correct strategy."""
-        mock_strategy = MagicMock()
-        mock_strategy.execute.return_value = [{"result": "test"}]
-        self.agent._attack_strategies = {"test_attack": mock_strategy}
+    @patch("hackagent.orchestrator.runner.run")
+    def test_hack_delegates_to_runner(self, mock_run):
+        """Test that hack delegates to the orchestrator runner."""
+        mock_run.return_value = [{"result": "test"}]
 
         result = self.agent.hack(
-            attack_config={"attack_type": "test_attack", "goals": ["test"]}
+            attack_config={"attack_type": "baseline", "goals": ["test"]}
         )
 
-        mock_strategy.execute.assert_called_once()
+        mock_run.assert_called_once()
         self.assertEqual(result, [{"result": "test"}])
+        self.assertIs(mock_run.call_args.args[0], self.agent)
 
-    def test_hack_passes_run_config_override(self):
-        """Test that run_config_override is passed to strategy."""
-        mock_strategy = MagicMock()
-        mock_strategy.execute.return_value = []
-        self.agent._attack_strategies = {"test_attack": mock_strategy}
-
+    @patch("hackagent.orchestrator.runner.run")
+    def test_hack_passes_run_config_override(self, mock_run):
+        """Test that run_config_override is passed to the runner."""
+        mock_run.return_value = []
         run_config = {"custom": "override"}
         self.agent.hack(
-            attack_config={"attack_type": "test_attack"},
+            attack_config={"attack_type": "baseline"},
             run_config_override=run_config,
         )
+        self.assertEqual(mock_run.call_args.kwargs["run_config_override"], run_config)
 
-        call_kwargs = mock_strategy.execute.call_args.kwargs
-        self.assertEqual(call_kwargs["run_config_override"], run_config)
-
-    def test_hack_passes_fail_on_run_error(self):
-        """Test that fail_on_run_error is passed to strategy."""
-        mock_strategy = MagicMock()
-        mock_strategy.execute.return_value = []
-        self.agent._attack_strategies = {"test_attack": mock_strategy}
-
+    @patch("hackagent.orchestrator.runner.run")
+    def test_hack_passes_fail_on_run_error(self, mock_run):
+        """Test that fail_on_run_error is passed to the runner."""
+        mock_run.return_value = []
         self.agent.hack(
-            attack_config={"attack_type": "test_attack"},
+            attack_config={"attack_type": "baseline"},
             fail_on_run_error=False,
         )
+        self.assertFalse(mock_run.call_args.kwargs["fail_on_run_error"])
 
-        call_kwargs = mock_strategy.execute.call_args.kwargs
-        self.assertFalse(call_kwargs["fail_on_run_error"])
-
-    def test_hack_wraps_value_error(self):
+    @patch("hackagent.orchestrator.runner.run")
+    def test_hack_wraps_value_error(self, mock_run):
         """Test that ValueError is wrapped in HackAgentError."""
-        mock_strategy = MagicMock()
-        mock_strategy.execute.side_effect = ValueError("Bad config")
-        self.agent._attack_strategies = {"test_attack": mock_strategy}
-
+        mock_run.side_effect = ValueError("Bad config")
         with self.assertRaises(HackAgentError) as ctx:
-            self.agent.hack(attack_config={"attack_type": "test_attack"})
+            self.agent.hack(attack_config={"attack_type": "baseline"})
         self.assertIn("Configuration error", str(ctx.exception))
 
-    def test_hack_wraps_runtime_error(self):
+    @patch("hackagent.orchestrator.runner.run")
+    def test_hack_wraps_runtime_error(self, mock_run):
         """Test that RuntimeError is wrapped in HackAgentError."""
-        mock_strategy = MagicMock()
-        mock_strategy.execute.side_effect = RuntimeError("Something broke")
-        self.agent._attack_strategies = {"test_attack": mock_strategy}
-
+        mock_run.side_effect = RuntimeError("Something broke")
         with self.assertRaises(HackAgentError) as ctx:
-            self.agent.hack(attack_config={"attack_type": "test_attack"})
+            self.agent.hack(attack_config={"attack_type": "baseline"})
         self.assertIn("unexpected runtime error", str(ctx.exception).lower())
 
-    def test_hack_wraps_backend_runtime_error(self):
+    @patch("hackagent.orchestrator.runner.run")
+    def test_hack_wraps_backend_runtime_error(self, mock_run):
         """Test backend-specific RuntimeErrors are wrapped."""
-        mock_strategy = MagicMock()
-        mock_strategy.execute.side_effect = RuntimeError(
-            "Failed to create backend agent"
-        )
-        self.agent._attack_strategies = {"test_attack": mock_strategy}
-
+        mock_run.side_effect = RuntimeError("Failed to create backend agent")
         with self.assertRaises(HackAgentError) as ctx:
-            self.agent.hack(attack_config={"attack_type": "test_attack"})
+            self.agent.hack(attack_config={"attack_type": "baseline"})
         self.assertIn("Backend agent operation failed", str(ctx.exception))
 
-    def test_hack_wraps_generic_exception(self):
+    @patch("hackagent.orchestrator.runner.run")
+    def test_hack_wraps_generic_exception(self, mock_run):
         """Test that generic exceptions are wrapped in HackAgentError."""
-        mock_strategy = MagicMock()
-        mock_strategy.execute.side_effect = Exception("Unknown error")
-        self.agent._attack_strategies = {"test_attack": mock_strategy}
-
+        mock_run.side_effect = Exception("Unknown error")
         with self.assertRaises(HackAgentError):
-            self.agent.hack(attack_config={"attack_type": "test_attack"})
+            self.agent.hack(attack_config={"attack_type": "baseline"})
 
-    def test_hack_reraises_hackagent_error(self):
+    @patch("hackagent.orchestrator.runner.run")
+    def test_hack_reraises_hackagent_error(self, mock_run):
         """Test that HackAgentError is re-raised as-is."""
-        mock_strategy = MagicMock()
-        mock_strategy.execute.side_effect = HackAgentError("Direct error")
-        self.agent._attack_strategies = {"test_attack": mock_strategy}
-
+        mock_run.side_effect = HackAgentError("Direct error")
         with self.assertRaises(HackAgentError) as ctx:
-            self.agent.hack(attack_config={"attack_type": "test_attack"})
+            self.agent.hack(attack_config={"attack_type": "baseline"})
         self.assertEqual(str(ctx.exception), "Direct error")
 
 
