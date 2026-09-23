@@ -21,7 +21,6 @@ from hackagent.server.client import AuthenticatedClient
 from hackagent.router.router import AgentRouter
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
-from hackagent.attacks.shared.tui import with_tui_logging
 
 # Import step execution functions from same package
 from . import completions
@@ -269,7 +268,6 @@ class AdvPrefixAttack(BaseAttack):
             },
         ]
 
-    @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
     def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
         """
         Executes the full prefix generation pipeline.

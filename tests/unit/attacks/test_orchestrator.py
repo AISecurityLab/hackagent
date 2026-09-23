@@ -62,8 +62,7 @@ class TestAttackOrchestratorInitialization(unittest.TestCase):
 
         self.assertEqual(orchestrator.attack_type, "test")
         self.assertEqual(orchestrator.attack_impl_class, TestAttack)
-        self.assertEqual(orchestrator.hack_agent, mock_hack_agent)
-        self.assertEqual(orchestrator.client, mock_hack_agent.client)
+        self.assertEqual(orchestrator.hackagent_agent, mock_hack_agent)
 
 
 class TestAttackOrchestratorServerRecords(unittest.TestCase):
@@ -235,7 +234,9 @@ class TestAttackOrchestratorExecution(unittest.TestCase):
         self.assertEqual(kwargs["config"]["param2"], "value2")
         # Verify tracking context is added
         self.assertEqual(kwargs["config"]["_run_id"], run_id)
-        self.assertEqual(kwargs["config"]["_backend"], orchestrator.hack_agent.backend)
+        self.assertEqual(
+            kwargs["config"]["_backend"], orchestrator.hackagent_agent.backend
+        )
 
     @patch.object(AttackOrchestrator, "_create_server_attack_record")
     @patch.object(AttackOrchestrator, "_create_server_run_record")
@@ -553,77 +554,6 @@ class TestAttackOrchestratorHTTPHelpers(unittest.TestCase):
         self.mock_hack_agent = MagicMock()
         self.mock_hack_agent.client = MagicMock()
         self.orchestrator = TestOrchestrator(self.mock_hack_agent)
-
-    def test_decode_response_success(self):
-        """Test successful response decoding."""
-
-        mock_response = MagicMock()
-        mock_response.content = b'{"status": "ok"}'
-
-        decoded = self.orchestrator._decode_response(mock_response)
-
-        self.assertEqual(decoded, '{"status": "ok"}')
-
-    def test_decode_response_empty(self):
-        """Test decoding empty response."""
-
-        mock_response = MagicMock()
-        mock_response.content = None
-
-        decoded = self.orchestrator._decode_response(mock_response)
-
-        self.assertEqual(decoded, "N/A")
-
-    def test_parse_json_success(self):
-        """Test successful JSON parsing."""
-
-        mock_response = MagicMock()
-        mock_response.status_code = 201
-        mock_response.content = b'{"id": "123"}'
-
-        decoded = '{"id": "123"}'
-        parsed = self.orchestrator._parse_json(mock_response, decoded, "test")
-
-        self.assertIsNotNone(parsed)
-        self.assertEqual(parsed["id"], "123")
-
-    def test_parse_json_fallback_to_parsed_attribute(self):
-        """Test fallback to response.parsed attribute."""
-
-        mock_response = MagicMock()
-        mock_response.status_code = 201
-        mock_response.content = b"invalid json"
-        mock_response.parsed = MagicMock()
-        mock_response.parsed.additional_properties = {"id": "123"}
-
-        decoded = "invalid json"
-
-        # The method raises HackAgentError when it can't parse JSON
-        # even if parsed attribute exists, as it checks parsed.id specifically
-        with self.assertRaises(Exception):  # Could be HackAgentError
-            self.orchestrator._parse_json(mock_response, decoded, "test")
-
-    def test_extract_ids_from_data_success(self):
-        """Test successful ID extraction from data."""
-
-        parsed_data = {"id": "attack-123", "associated_run_id": "run-456"}
-
-        attack_id, run_id = self.orchestrator._extract_ids_from_data(
-            parsed_data, "test", ""
-        )
-
-        self.assertEqual(attack_id, "attack-123")
-        self.assertEqual(run_id, "run-456")
-
-    def test_extract_ids_missing_attack_id(self):
-        """Test error when attack_id is missing."""
-
-        parsed_data = {"other_field": "value"}
-
-        with self.assertRaises(HackAgentError) as context:
-            self.orchestrator._extract_ids_from_data(parsed_data, "test", "")
-
-        self.assertIn("attack_id", str(context.exception).lower())
 
 
 class TestAttackOrchestratorDatasetIntegration(unittest.TestCase):

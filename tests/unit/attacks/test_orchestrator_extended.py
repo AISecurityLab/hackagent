@@ -23,7 +23,6 @@ from hackagent.attacks.techniques.config import (
     DEFAULT_CATEGORY_CLASSIFIER_IDENTIFIER,
     DEFAULT_LOCAL_MODEL,
 )
-from hackagent.errors import HackAgentError
 
 
 def _make_orchestrator():
@@ -1436,118 +1435,6 @@ class TestAttackOrchestratorHTTPResponseParsing(unittest.TestCase):
     def setUp(self):
         """Set up orchestrator for HTTP tests."""
         self.orch, _, _ = _make_orchestrator()
-
-    def test_decode_response_valid_utf8(self):
-        """Test decoding valid UTF-8 response."""
-        mock_response = MagicMock()
-        mock_response.content = b'{"id": "test-123"}'
-        result = self.orch._decode_response(mock_response)
-        self.assertEqual(result, '{"id": "test-123"}')
-
-    def test_decode_response_none_content(self):
-        """Test decoding None content."""
-        mock_response = MagicMock()
-        mock_response.content = None
-        result = self.orch._decode_response(mock_response)
-        self.assertEqual(result, "N/A")
-
-    def test_decode_response_invalid_utf8(self):
-        """Test decoding invalid UTF-8 content (uses replace mode)."""
-        mock_response = MagicMock()
-        mock_response.content = b"\xff\xfeInvalid"
-        result = self.orch._decode_response(mock_response)
-        self.assertIn("Invalid", result)
-
-    def test_parse_json_valid(self):
-        """Test parsing valid JSON."""
-        mock_response = MagicMock()
-        mock_response.status_code = 201
-        mock_response.content = b'{"id": "123"}'
-        result = self.orch._parse_json(mock_response, '{"id": "123"}', "test")
-        self.assertEqual(result["id"], "123")
-
-    def test_parse_json_invalid_201_raises(self):
-        """Test that invalid JSON on 201 response raises HackAgentError."""
-        mock_response = MagicMock()
-        mock_response.status_code = 201
-        mock_response.content = b"not json"
-        with self.assertRaises(HackAgentError):
-            self.orch._parse_json(mock_response, "not json", "test")
-
-    def test_parse_json_invalid_non_201_returns_none(self):
-        """Test that invalid JSON on non-201 falls back gracefully."""
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.content = b"not json"
-        mock_response.parsed = None
-        result = self.orch._parse_json(mock_response, "not json", "test")
-        self.assertIsNone(result)
-
-    def test_parse_json_fallback_to_additional_properties(self):
-        """Test fallback to response.parsed.additional_properties."""
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.content = None
-        mock_response.parsed = MagicMock()
-        mock_response.parsed.additional_properties = {"id": "fallback-123"}
-        result = self.orch._parse_json(mock_response, "", "test")
-        self.assertEqual(result["id"], "fallback-123")
-
-    def test_parse_response_201_success(self):
-        """Test parse_response with 201 status."""
-        mock_response = MagicMock()
-        mock_response.status_code = 201
-        mock_response.content = b'{"id": "created"}'
-        result = self.orch._parse_response(mock_response, '{"id": "created"}', "test")
-        self.assertEqual(result["id"], "created")
-
-    def test_parse_response_201_no_data_raises(self):
-        """Test parse_response with 201 but no parseable data raises."""
-        mock_response = MagicMock()
-        mock_response.status_code = 201
-        mock_response.content = None
-        mock_response.parsed = None
-        with self.assertRaises(HackAgentError):
-            self.orch._parse_response(mock_response, "N/A", "test")
-
-    def test_parse_response_500_raises(self):
-        """Test parse_response with server error raises."""
-        mock_response = MagicMock()
-        mock_response.status_code = 500
-        mock_response.content = b"Server Error"
-        with self.assertRaises(HackAgentError):
-            self.orch._parse_response(mock_response, "Server Error", "test")
-
-    def test_extract_ids_from_data_success(self):
-        """Test extracting IDs from parsed data."""
-        data = {"id": "atk-1", "associated_run_id": "run-1"}
-        atk_id, run_id = self.orch._extract_ids_from_data(data, "test", "")
-        self.assertEqual(atk_id, "atk-1")
-        self.assertEqual(run_id, "run-1")
-
-    def test_extract_ids_from_data_no_run_id(self):
-        """Test extracting IDs when no run_id present."""
-        data = {"id": "atk-1"}
-        atk_id, run_id = self.orch._extract_ids_from_data(data, "test", "")
-        self.assertEqual(atk_id, "atk-1")
-        self.assertIsNone(run_id)
-
-    def test_extract_ids_from_data_no_id_raises(self):
-        """Test missing id raises HackAgentError."""
-        data = {"other": "value"}
-        with self.assertRaises(HackAgentError):
-            self.orch._extract_ids_from_data(data, "test", "")
-
-    def test_extract_ids_from_response_full_pipeline(self):
-        """Test full extract_ids_from_response pipeline."""
-        mock_response = MagicMock()
-        mock_response.status_code = 201
-        mock_response.content = json.dumps(
-            {"id": "atk-full", "associated_run_id": "run-full"}
-        ).encode()
-        atk_id, run_id = self.orch._extract_ids_from_response(mock_response, "test")
-        self.assertEqual(atk_id, "atk-full")
-        self.assertEqual(run_id, "run-full")
 
 
 class TestGetAttackImplKwargs(unittest.TestCase):

@@ -7,7 +7,6 @@ import logging
 import os
 from typing import Any, Dict, List, Optional
 
-from hackagent.attacks.shared.tui import with_tui_logging
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.techniques.config import resolve_embedder_config
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
@@ -155,7 +154,6 @@ class AutoDANTurboAttack(BaseAttack):
         """
         return []  # Managed manually in run() (like PAIR)
 
-    @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
     def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
         """Execute full AutoDAN-Turbo pipeline.
 
@@ -268,7 +266,7 @@ class AutoDANTurboAttack(BaseAttack):
                 strategy_lib, warm_up_log = warm_up.execute(
                     goals,
                     self.config,
-                    self.client,
+                    self.backend,
                     self.agent_router,
                     self.logger,
                 )
@@ -319,7 +317,7 @@ class AutoDANTurboAttack(BaseAttack):
                 results = lifelong.execute(
                     goals,
                     self.config,
-                    self.client,
+                    self.backend,
                     self.agent_router,
                     self.logger,
                     strategy_lib,
@@ -356,7 +354,7 @@ class AutoDANTurboAttack(BaseAttack):
                 {},
             ):
                 results = evaluation.execute(
-                    results, self.config, self.client, self.logger
+                    results, self.config, self.backend, self.logger
                 )
 
             for idx, result in enumerate(results):

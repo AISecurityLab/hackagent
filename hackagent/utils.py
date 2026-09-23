@@ -25,9 +25,6 @@ HACKAGENT_BANNER = """
 ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝
 """
 
-# Backward compatible alias used by older CLI/help code.
-HACKAGENT = HACKAGENT_BANNER
-
 
 def display_hackagent_splash() -> None:
     """Display the HackAgent splash screen using the pre-defined ASCII art."""

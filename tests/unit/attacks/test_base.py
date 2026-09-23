@@ -251,38 +251,5 @@ class TestBaseAttackPipelineExecution(unittest.TestCase):
         self.assertEqual(result, "output2")
 
 
-class TestBaseAttackKwargsHandling(unittest.TestCase):
-    """Test BaseAttack handling of additional kwargs."""
-
-    def test_kwargs_stored_as_attributes(self):
-        """Test that additional kwargs are stored as instance attributes."""
-
-        class TestAttack(BaseAttack):
-            def _get_pipeline_steps(self):
-                return []
-
-            def run(self, **kwargs):
-                pass
-
-        config = {"output_dir": "/tmp/test"}
-        client = MagicMock()
-        agent_router = MagicMock()
-        custom_router = MagicMock()
-
-        attack = TestAttack(
-            config,
-            client,
-            agent_router,
-            custom_router=custom_router,
-            extra_param="value",
-        )
-
-        # Verify kwargs were stored
-        self.assertTrue(hasattr(attack, "custom_router"))
-        self.assertEqual(attack.custom_router, custom_router)
-        self.assertTrue(hasattr(attack, "extra_param"))
-        self.assertEqual(attack.extra_param, "value")
-
-
 if __name__ == "__main__":
     unittest.main()

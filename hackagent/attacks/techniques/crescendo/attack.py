@@ -54,7 +54,6 @@ from hackagent.attacks.shared.response_utils import (
     is_guardrail_response,
 )
 from hackagent.attacks.shared.router_factory import create_router
-from hackagent.attacks.shared.tui import with_tui_logging
 from hackagent.server.client import AuthenticatedClient
 from hackagent.server.storage.enums import StepTypeEnum
 from hackagent.router.router import AgentRouter
@@ -237,7 +236,7 @@ class CrescendoAttack(BaseAttack):
                 router_config["agent_metadata"]["api_key"] = api_key_config
 
             router, _reg_key = create_router(
-                backend=self.client,
+                backend=self.backend,
                 config=router_config,
                 logger=self.logger,
                 router_name=attacker_config.get("model", router_config["identifier"]),
@@ -453,7 +452,7 @@ class CrescendoAttack(BaseAttack):
             return 0.0, refused, "Unsupported judge type"
 
         try:
-            evaluator = BaseEvaluationStep(self.config, self.logger, self.client)
+            evaluator = BaseEvaluationStep(self.config, self.logger, self.backend)
             evaluator_config = evaluator._build_base_eval_config()
             evaluator_config["max_tokens_eval"] = judge_config.get(
                 "max_tokens", evaluator_config["max_tokens_eval"]
@@ -768,7 +767,6 @@ class CrescendoAttack(BaseAttack):
             "max_backtracks": max_backtracks,
         }
 
-    @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
     def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
         """
         Execute Crescendo attack on goals.

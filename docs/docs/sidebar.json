@@ -132,14 +132,6 @@
                 },
                 {
                   "items": [
-                    "reference/hackagent/attacks/techniques/indirect_prompt_injection/attack",
-                    "reference/hackagent/attacks/techniques/indirect_prompt_injection/config"
-                  ],
-                  "label": "hackagent.attacks.techniques.indirect_prompt_injection",
-                  "type": "category"
-                },
-                {
-                  "items": [
                     "reference/hackagent/attacks/techniques/mml/attack",
                     "reference/hackagent/attacks/techniques/mml/config",
                     "reference/hackagent/attacks/techniques/mml/generation",

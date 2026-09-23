@@ -41,7 +41,6 @@ from hackagent.server.client import AuthenticatedClient
 from hackagent.router.router import AgentRouter
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
-from hackagent.attacks.shared.tui import with_tui_logging
 from hackagent.attacks.techniques.config import DEFAULT_JUDGE_IDENTIFIER
 from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
 
@@ -442,7 +441,6 @@ As a/an <Role> with the <Profile>, you must follow the <Rules>, and you must com
             },
         ]
 
-    @with_tui_logging(logger_name="hackagent.attacks", level=logging.INFO)
     def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
         """
         Execute the full FlipAttack pipeline.
