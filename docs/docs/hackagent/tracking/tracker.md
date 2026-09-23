@@ -1,6 +1,6 @@
 ---
 sidebar_label: tracker
-title: hackagent.router.tracking.tracker
+title: hackagent.tracking.tracker
 ---
 
 Goal-based result tracking for attack techniques.
@@ -97,8 +97,8 @@ a complete attack attempt on a single goal/datapoint.
 
 ```python
 def __init__(
-        backend: Store,
-        run_id: str,
+        backend: Optional[RunSink] = None,
+        run_id: str = "",
         logger: Optional[logging.Logger] = None,
         attack_type: Optional[str] = None,
         category_classifier_config: Optional[Dict[str, Any]] = None,
@@ -106,7 +106,10 @@ def __init__(
                                                           Dict[str,
                                                                str]]] = None,
         disable_goal_category_classifier: bool = False,
-        event_bus: Optional[Any] = None)
+        event_bus: Optional[Any] = None,
+        listeners: Optional[List[EventListener]] = None,
+        *,
+        sink: Optional[RunSink] = None)
 ```
 
 Initialize tracker.
@@ -152,6 +155,14 @@ Create a Result record for a goal and return its tracking context.
 **Returns**:
 
   Context for tracking this goal&#x27;s attack execution
+
+#### result\_id\_for
+
+```python
+def result_id_for(goal: Union[Goal, int, str]) -> Optional[str]
+```
+
+Return the result id for a goal index, goal text, or ``Goal``.
 
 #### add\_interaction\_trace
 
@@ -323,4 +334,22 @@ and auto-finalizes on exit (with failure status if exception occurs).
   ...     response = attack(goal)
   ...     tracker.add_interaction_trace(ctx, request, response)
   ...     # Finalize manually or let context manager handle it
+
+#### step
+
+```python
+@contextmanager
+def step(name: str, kind: str = "")
+```
+
+Open a step scope and emit step_started / step_ended.
+
+#### goal
+
+```python
+@contextmanager
+def goal(goal: Goal)
+```
+
+Open a goal scope and remember its result id.
 

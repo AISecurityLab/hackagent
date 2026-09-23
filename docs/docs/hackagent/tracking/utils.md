@@ -1,6 +1,6 @@
 ---
 sidebar_label: utils
-title: hackagent.router.tracking.utils
+title: hackagent.tracking.utils
 ---
 
 Shared serialization utilities for the tracking subsystem.

@@ -1,6 +1,6 @@
 ---
 sidebar_label: coordinator
-title: hackagent.router.tracking.coordinator
+title: hackagent.tracking.coordinator
 ---
 
 Tracking coordinator for attack techniques.

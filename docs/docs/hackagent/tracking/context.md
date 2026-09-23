@@ -1,6 +1,6 @@
 ---
 sidebar_label: context
-title: hackagent.router.tracking.context
+title: hackagent.tracking.context
 ---
 
 Tracking context management.

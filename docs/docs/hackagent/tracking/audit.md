@@ -1,6 +1,6 @@
 ---
 sidebar_label: audit
-title: hackagent.router.tracking.audit
+title: hackagent.tracking.audit
 ---
 
 Helpers for making audit-pipeline failures visible in run records.

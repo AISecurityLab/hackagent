@@ -24,7 +24,7 @@ The module provides functionality for:
 ## EvaluationPipeline Objects
 
 ```python
-class EvaluationPipeline(BaseEvaluationStep)
+class EvaluationPipeline()
 ```
 
 Evaluation pipeline for the AdvPrefix attack.

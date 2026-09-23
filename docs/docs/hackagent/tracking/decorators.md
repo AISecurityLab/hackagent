@@ -1,6 +1,6 @@
 ---
 sidebar_label: decorators
-title: hackagent.router.tracking.decorators
+title: hackagent.tracking.decorators
 ---
 
 Decorators for automatic operation tracking.

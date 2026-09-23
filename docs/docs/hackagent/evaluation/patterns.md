@@ -1,6 +1,6 @@
 ---
-sidebar_label: pattern_evaluators
-title: hackagent.attacks.evaluator.pattern_evaluators
+sidebar_label: patterns
+title: hackagent.evaluation.patterns
 ---
 
 Pattern-based evaluators for attack success determination.
@@ -14,7 +14,7 @@ Classes:
     LengthEvaluator: Response length-based evaluation
 
 Usage:
-    from hackagent.attacks.evaluator.pattern_evaluators import (
+    from hackagent.evaluation.patterns import (
         PatternEvaluator,
         KeywordEvaluator,
         LengthEvaluator,

@@ -194,21 +194,26 @@ result = agent.hack(attack_config=attack_config)
 
 ### Summary Metrics
 
-Compute run-level metrics (ASR, majority-vote ASR, inter-judge agreement) from the evaluated result rows:
+Compute run-level metrics from `Verdict`s. `Panel.evaluate` produces them. `generate_summary_report` and `is_successful_result` (`hackagent.attacks.evaluator.metrics`) are removed; metrics take verdicts, not result rows. See [Evaluation](../../evaluation/index.md).
 
 ```python
-from hackagent.attacks.evaluator.metrics import generate_summary_report
+from hackagent.core.contracts import Sample
+from hackagent.evaluation import LLMJudge, Panel, summary
 
-attack_config = {
-    "attack_type": "static_template",
-    "dataset": {"preset": "strongreject"},
-}
-rows = agent.hack(attack_config=attack_config)
-summary = generate_summary_report(rows)
+panel = Panel(
+    [LLMJudge("harmbench", judge_llm)],
+    aggregation="majority",
+    threshold=7.0,
+)
+verdicts = [
+    panel.evaluate(Sample(goal=goal, prompt=prompt, response=response))
+    for goal, prompt, response in exchanges
+]
+report = summary(verdicts)
 
-print(summary["overall_success_rate"])
-print(summary["majority_vote_asr"], summary["fleiss_kappa"])
-print(summary["per_judge_asr"])
+print(report["success_rate"])
+print(report["majority_vote_rate"], report["fleiss_kappa"])
+print(report["per_judge_strictness"])
 ```
 
 ## Report Generation
