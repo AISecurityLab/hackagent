@@ -21,9 +21,8 @@ def _enabled_classifier_with(route_response):
     """Build a classifier wired to a mock router returning ``route_response``."""
     clf = GoalCategoryClassifier(backend=None)  # no real router built
     router = MagicMock()
-    router.route_request.return_value = route_response
-    clf._router = router
-    clf._registration_key = "key"
+    router.send.return_value = route_response
+    clf._llm = router
     clf._enabled = True
     clf._config = {"max_tokens": 100, "temperature": 0.0}
     return clf, router
@@ -50,7 +49,7 @@ class TestClassifyGoalsBatch(unittest.TestCase):
         labels = clf.classify_goals(goals)
 
         # One LLM call for the whole run, every index covered, parsed correctly.
-        router.route_request.assert_called_once()
+        router.send.assert_called_once()
         self.assertEqual(set(labels), {0, 1, 2})
         self.assertEqual(labels[0]["subcategory"], "A1. Bias and Discrimination")
         self.assertEqual(labels[1]["subcategory"], "E1. Malware Generation")
@@ -71,7 +70,7 @@ class TestClassifyGoalsBatch(unittest.TestCase):
         ]
         labels = clf.classify_goals(goals)
 
-        router.route_request.assert_called_once()  # only the non-heuristic goal
+        router.send.assert_called_once()  # only the non-heuristic goal
         self.assertEqual(labels[0]["subcategory"], "D4. Illegal Activity")
         self.assertEqual(labels[1]["subcategory"], "A1. Bias and Discrimination")
 

@@ -231,7 +231,7 @@ class EvaluationPipelineConfig(BaseModel):
 
 class EvaluatorConfig(BaseModel):
     """
-    Configuration class for response evaluators using AgentRouter framework.
+    Configuration class for response evaluators using LLMRouter framework.
     """
 
     agent_name: str

@@ -6,12 +6,12 @@
 from __future__ import annotations
 
 import logging
-import os
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-from hackagent.models.router import AgentRouter
 from hackagent.core.contracts import AgentType
+from hackagent.models.client import ModelClient, connect
+from hackagent.models.factory import spec_from_config
 from hackagent.storage.store import Store
 
 UNKNOWN_CATEGORY = "Z. Unclassified Risk"
@@ -196,57 +196,9 @@ def _extract_response_content(response: Any) -> Optional[str]:
     return None
 
 
-def _create_classifier_router(
-    backend: Store,
-    config: Dict[str, Any],
-    logger: logging.Logger,
-) -> Tuple[AgentRouter, str]:
-    """Create a router for goal classification without importing attacks package."""
-    model_name = config.get("identifier")
-    if not model_name:
-        raise ValueError("Category classifier config is missing 'identifier'.")
-
-    endpoint = config.get("endpoint") or ""
-    api_key = backend.get_api_key() or ""
-    api_key_config = config.get("api_key")
-    if api_key_config:
-        env_key = os.environ.get(api_key_config)
-        api_key = env_key if env_key else api_key_config
-
-    operational_config: Dict[str, Any] = {
-        "name": config.get("model", model_name),
-        "endpoint": endpoint,
-        "api_key": api_key,
-        "max_tokens": config.get("max_tokens"),
-        "temperature": config.get("temperature"),
-        "timeout": config.get("timeout", config.get("request_timeout")),
-    }
-
-    agent_type_raw = (config.get("agent_type") or AgentType.OLLAMA.value).upper()
-    try:
-        agent_type = AgentType(agent_type_raw)
-    except ValueError:
-        logger.warning(
-            "Invalid category classifier agent_type '%s'. Falling back to OLLAMA.",
-            agent_type_raw,
-        )
-        agent_type = AgentType.OLLAMA
-
-    router = AgentRouter(
-        backend=backend,
-        name=model_name,
-        agent_type=agent_type,
-        endpoint=endpoint,
-        metadata=operational_config.copy(),
-        adapter_operational_config=operational_config,
-        overwrite_metadata=True,
-    )
-
-    if not router._agent_registry:  # type: ignore[attr-defined]
-        raise RuntimeError("Category classifier router initialized with no agents.")
-
-    registration_key = next(iter(router._agent_registry.keys()))  # type: ignore[attr-defined]
-    return router, registration_key
+def _connect_classifier(config: Dict[str, Any]) -> ModelClient:
+    """Connect to the classifier model; Ollama unless the config says otherwise."""
+    return connect(spec_from_config(config, default_agent_type=AgentType.OLLAMA))
 
 
 class GoalCategoryClassifier:
@@ -261,19 +213,14 @@ class GoalCategoryClassifier:
         self.logger = logger or logging.getLogger(__name__)
         self._backend = backend
         self._config = self._resolve_config(config)
-        self._router = None
-        self._registration_key: Optional[str] = None
+        self._llm: Optional[ModelClient] = None
         self._enabled = False
 
         if backend is None:
             return
 
         try:
-            self._router, self._registration_key = _create_classifier_router(
-                backend=backend,
-                config=self._config,
-                logger=self.logger,
-            )
+            self._llm = _connect_classifier(self._config)
             self._enabled = True
         except Exception as exc:
             self.logger.warning(
@@ -322,7 +269,7 @@ class GoalCategoryClassifier:
 
         heuristic = _heuristic_classification(goal)
 
-        if not self._enabled or not self._router or not self._registration_key:
+        if not self._enabled or self._llm is None:
             return heuristic or fallback
 
         user_prompt = (
@@ -341,7 +288,7 @@ class GoalCategoryClassifier:
         }
 
         try:
-            response = self._router.route_request(self._registration_key, request_data)
+            response = self._llm.send(request_data)
             if isinstance(response, dict) and response.get("error_message"):
                 self._enabled = False
                 self.logger.warning(
@@ -390,7 +337,7 @@ class GoalCategoryClassifier:
             else:
                 pending.append((idx, goal))
 
-        if pending and self._enabled and self._router and self._registration_key:
+        if pending and self._enabled and self._llm is not None:
             for start in range(0, len(pending), _BATCH_CHUNK_SIZE):
                 chunk = pending[start : start + _BATCH_CHUNK_SIZE]
                 labels.update(self._classify_chunk(chunk))
@@ -424,7 +371,7 @@ class GoalCategoryClassifier:
         }
 
         try:
-            response = self._router.route_request(self._registration_key, request_data)
+            response = self._llm.send(request_data)
             if isinstance(response, dict) and response.get("error_message"):
                 self._enabled = False
                 self.logger.warning(

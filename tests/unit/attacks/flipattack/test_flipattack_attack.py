@@ -55,7 +55,7 @@ def _make_mock_client():
 
 
 def _make_mock_router():
-    """Create a mock AgentRouter."""
+    """Create a mock LLMRouter."""
     router = MagicMock()
     router.backend_agent = MagicMock()
     router.backend_agent.id = "test-agent-id"
@@ -135,7 +135,7 @@ class TestFlipAttackInitialization:
     def test_requires_agent_router(self):
         """Test that agent_router is required."""
         with pytest.raises(
-            ValueError, match="Victim AgentRouter instance must be provided"
+            ValueError, match="Victim LLMRouter instance must be provided"
         ):
             FlipAttack(config={}, client=_make_mock_client(), agent_router=None)
 

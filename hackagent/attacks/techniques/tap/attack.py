@@ -51,7 +51,7 @@ from typing import Any, Dict, List, Optional
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.storage.store import Store
-from hackagent.models.router import AgentRouter
+from hackagent.attacks.shared.llm_router import LLMRouter
 
 from . import tap_evaluation as evaluation, generation
 from .config import DEFAULT_TAP_CONFIG
@@ -118,7 +118,7 @@ class TAPAttack(BaseAttack):
         self,
         config: Optional[Dict[str, Any]] = None,
         client: Optional[Store] = None,
-        agent_router: Optional[AgentRouter] = None,
+        agent_router: Optional[LLMRouter] = None,
     ):
         """
         Initialize TAP with configuration and routers.
@@ -137,9 +137,7 @@ class TAPAttack(BaseAttack):
         if client is None:
             raise ValueError("A storage backend must be provided to TAPAttack.")
         if agent_router is None:
-            raise ValueError(
-                "Victim AgentRouter instance must be provided to TAPAttack."
-            )
+            raise ValueError("Victim LLMRouter instance must be provided to TAPAttack.")
 
         current_config = copy.deepcopy(DEFAULT_TAP_CONFIG)
         if config:

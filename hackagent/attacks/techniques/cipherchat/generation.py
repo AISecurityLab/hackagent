@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from hackagent.attacks.shared.response_utils import is_guardrail_response
-from hackagent.models.router import AgentRouter
+from hackagent.attacks.shared.llm_router import LLMRouter
 
 from .encode_experts import encode_expert_dict
 from .prompts_and_demonstrations import demonstration_dict, system_role_propmts
@@ -158,7 +158,7 @@ def _build_attack_prompt(system_prompt: str, user_prompt: str) -> str:
 
 def execute(
     goals: List[str],
-    agent_router: AgentRouter,
+    agent_router: LLMRouter,
     config: Dict[str, Any],
     logger: logging.Logger,
 ) -> List[Dict[str, Any]]:

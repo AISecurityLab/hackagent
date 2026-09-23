@@ -27,9 +27,9 @@ import numpy as np
 
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
-from hackagent.attacks.shared.router_factory import create_router
+from hackagent.attacks.shared.llm_router import connect_role
 from hackagent.attacks.shared.response_utils import extract_response_content
-from hackagent.models.router import AgentRouter
+from hackagent.attacks.shared.llm_router import LLMRouter
 from hackagent.router.tracking.tracker import Tracker
 from hackagent.storage.store import Store
 from hackagent.core.contracts import EvalStatus, StepKind
@@ -299,12 +299,12 @@ class RagAttack(BaseAttack):
         self,
         config: Optional[Dict[str, Any]] = None,
         client: Optional[Store] = None,
-        agent_router: Optional[AgentRouter] = None,
+        agent_router: Optional[LLMRouter] = None,
     ):
         if client is None:
             raise ValueError("A storage backend must be provided.")
         if agent_router is None:
-            raise ValueError("Target AgentRouter must be provided.")
+            raise ValueError("Target LLMRouter must be provided.")
 
         # Merge config with defaults
         current_config = copy.deepcopy(DEFAULT_RAG_CONFIG)
@@ -337,14 +337,9 @@ class RagAttack(BaseAttack):
 
     def _init_router(
         self, role_config: Dict[str, Any], name: str
-    ) -> Tuple[AgentRouter, str]:
+    ) -> Tuple[LLMRouter, str]:
         """Initialize a router for a specific role."""
-        router, reg_key = create_router(
-            backend=self.backend,
-            config=role_config,
-            logger=self.logger,
-            router_name=name,
-        )
+        router, reg_key = connect_role(role_config, name=name)
         return router, reg_key
 
     def _get_pipeline_steps(self) -> List[Dict]:

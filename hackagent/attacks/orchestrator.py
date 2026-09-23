@@ -504,7 +504,42 @@ class AttackOrchestrator:
         if is_remote_mode and self._uses_default_category_classifier(resolved):
             resolved["category_classifier"] = self._remote_classifier_defaults(api_key)
 
+        if is_remote_mode:
+            self._fill_gateway_api_keys(resolved, api_key)
+
         return resolved
+
+    def _fill_gateway_api_keys(self, config: Any, api_key: str) -> None:
+        """Give the gateway key to every role model on the gateway without one.
+
+        Role models use only the credentials their config names, so a role
+        pointed at the HackAgent LLM gateway needs the key set explicitly.
+        No other endpoint ever receives it.
+        """
+        base_url = self._backend_base_url()
+        gateways = {DEFAULT_REMOTE_ROLE_ENDPOINT.rstrip("/")}
+        if base_url:
+            gateways.add(f"{base_url}/v1")
+
+        def _visit(node: Any) -> None:
+            if isinstance(node, list):
+                for item in node:
+                    _visit(item)
+                return
+            if not isinstance(node, dict):
+                return
+            endpoint = node.get("endpoint")
+            if (
+                node.get("identifier")
+                and isinstance(endpoint, str)
+                and not node.get("api_key")
+                and endpoint.strip().rstrip("/").startswith(tuple(gateways))
+            ):
+                node["api_key"] = api_key
+            for value in node.values():
+                _visit(value)
+
+        _visit(config)
 
     def _create_server_run_record(
         self,
@@ -1261,14 +1296,12 @@ class AttackOrchestrator:
             return self._probe_router_registration(router, registration_key)
 
         if kind == "router_config":
-            from hackagent.attacks.shared.router_factory import create_router
+            from hackagent.attacks.shared.llm_router import connect_role
 
             try:
-                temp_router, registration_key = create_router(
-                    backend=self.hackagent_agent.backend,
-                    config=dict(target.get("config") or {}),
-                    logger=logger,
-                    router_name=f"preflight-{target.get('role', 'model')}",
+                temp_router, registration_key = connect_role(
+                    dict(target.get("config") or {}),
+                    name=f"preflight-{target.get('role', 'model')}",
                 )
             except Exception as exc:
                 return f"router init failed ({type(exc).__name__}): {exc}"
@@ -1417,36 +1450,24 @@ class AttackOrchestrator:
             f"Executing {self.attack_type} attack (Attack: {attack_id}, Run: {run_id})"
         )
 
-        requested_max_tokens = attack_config.get("max_tokens")
-        adapter_instance = None
-        previous_default_max_tokens = None
-        if requested_max_tokens is not None:
-            try:
-                adapter_instance = self.hackagent_agent.router.get_agent_instance(
-                    str(self.hackagent_agent.router.backend_agent.id)
-                )
-                if adapter_instance is not None and hasattr(
-                    adapter_instance, "default_max_tokens"
-                ):
-                    previous_default_max_tokens = adapter_instance.default_max_tokens
-                    adapter_instance.default_max_tokens = requested_max_tokens
-                    logger.info(
-                        "Applying max_tokens=%s to target adapter defaults for this run",
-                        requested_max_tokens,
-                    )
-            except Exception as e:
-                logger.warning(
-                    "Failed to apply max_tokens override to target adapter: %s",
-                    e,
-                    exc_info=True,
-                )
-
         # One monotonic start timestamp shared by all sub-runs/workers so
         # tracking summaries can report end-to-end run latency.
         global_run_start_time = time.perf_counter()
         impl_kwargs = self._get_attack_impl_kwargs(
             attack_config, run_config_override, run_id
         )
+        # A run-level max_tokens applies to this run's target calls only; the
+        # shared target is left untouched.
+        requested_max_tokens = attack_config.get("max_tokens")
+        target_router = impl_kwargs.get("agent_router")
+        if requested_max_tokens is not None and hasattr(target_router, "with_params"):
+            impl_kwargs["agent_router"] = target_router.with_params(
+                max_tokens=requested_max_tokens
+            )
+            logger.info(
+                "Applying max_tokens=%s to target calls for this run",
+                requested_max_tokens,
+            )
         impl_kwargs["config"] = {
             **(impl_kwargs.get("config") or {}),
             "_global_run_start_time": global_run_start_time,
@@ -1464,140 +1485,126 @@ class AttackOrchestrator:
             )
             goal_batch_workers = 1
 
-        try:
-            if goal_batch_size and isinstance(goals, list):
-                batches = [
-                    (i, goals[i : i + goal_batch_size])
-                    for i in range(0, len(goals), goal_batch_size)
-                ]
-                n_batches = len(batches)
-                logger.info(
-                    f"Batching {len(goals)} goals into {n_batches} sequential batch(es) "
-                    f"of up to {goal_batch_size}, "
-                    f"goal_batch_workers={goal_batch_workers} (parallel goals per batch)"
-                )
+        if goal_batch_size and isinstance(goals, list):
+            batches = [
+                (i, goals[i : i + goal_batch_size])
+                for i in range(0, len(goals), goal_batch_size)
+            ]
+            n_batches = len(batches)
+            logger.info(
+                f"Batching {len(goals)} goals into {n_batches} sequential batch(es) "
+                f"of up to {goal_batch_size}, "
+                f"goal_batch_workers={goal_batch_workers} (parallel goals per batch)"
+            )
 
-                all_results: List[AttackResult] = []
-                batch_timings: List[float] = []
+            all_results: List[AttackResult] = []
+            batch_timings: List[float] = []
 
-                for batch_idx, (batch_start_idx, batch_goals) in enumerate(batches):
-                    batch_label = f"B{batch_idx + 1}/{n_batches}"
-                    n_goals_in_batch = len(batch_goals)
-                    logger.info(f"[{batch_label}] Starting ({n_goals_in_batch} goals)")
-                    _batch_t0 = time.perf_counter()
+            for batch_idx, (batch_start_idx, batch_goals) in enumerate(batches):
+                batch_label = f"B{batch_idx + 1}/{n_batches}"
+                n_goals_in_batch = len(batch_goals)
+                logger.info(f"[{batch_label}] Starting ({n_goals_in_batch} goals)")
+                _batch_t0 = time.perf_counter()
 
-                    if goal_batch_workers <= 1:
-                        # Sequential: pass all goals at once to a single run()
-                        attack_impl.config["_goal_index_offset"] = batch_start_idx
-                        # This run() call is only a sub-batch within a larger run.
-                        # Global run status is finalized once in execute().
-                        attack_impl.config["_suppress_run_status_updates"] = True
-                        batch_params = {**attack_params, "goals": batch_goals}
-                        batch_results = flatten_run_result(
-                            attack_impl.run(**batch_params)
+                if goal_batch_workers <= 1:
+                    # Sequential: pass all goals at once to a single run()
+                    attack_impl.config["_goal_index_offset"] = batch_start_idx
+                    # This run() call is only a sub-batch within a larger run.
+                    # Global run status is finalized once in execute().
+                    attack_impl.config["_suppress_run_status_updates"] = True
+                    batch_params = {**attack_params, "goals": batch_goals}
+                    batch_results = flatten_run_result(attack_impl.run(**batch_params))
+                else:
+                    # Parallel: one thread per goal inside this batch
+                    effective_workers = min(goal_batch_workers, n_goals_in_batch)
+
+                    def _run_single_goal(
+                        goal_idx_goal: Tuple[int, str],
+                        _batch_label: str = batch_label,
+                        _batch_start_idx: int = batch_start_idx,
+                    ) -> Tuple[int, List[AttackResult]]:
+                        goal_idx, goal = goal_idx_goal
+
+                        # Label thread for _BatchContextFilter
+                        threading.current_thread().name = (
+                            f"{_batch_label} G{goal_idx + 1}/{n_goals_in_batch}"
                         )
-                    else:
-                        # Parallel: one thread per goal inside this batch
-                        effective_workers = min(goal_batch_workers, n_goals_in_batch)
+                        logger.info(f"Processing goal: {goal[:60]}...")
 
-                        def _run_single_goal(
-                            goal_idx_goal: Tuple[int, str],
-                            _batch_label: str = batch_label,
-                            _batch_start_idx: int = batch_start_idx,
-                        ) -> Tuple[int, List[AttackResult]]:
-                            goal_idx, goal = goal_idx_goal
+                        # Each goal gets its own attack instance to avoid
+                        # shared mutable state across threads.
+                        local_impl_kwargs = {
+                            **impl_kwargs,
+                            "config": {
+                                **impl_kwargs["config"],
+                                "_goal_index_offset": _batch_start_idx + goal_idx,
+                                # Per-goal worker is a sub-run; avoid premature
+                                # global run status updates from attack_impl.run().
+                                "_suppress_run_status_updates": True,
+                            },
+                        }
+                        local_impl = self.attack_impl_class(**local_impl_kwargs)
+                        goal_params = {**attack_params, "goals": [goal]}
+                        goal_results = flatten_run_result(local_impl.run(**goal_params))
 
-                            # Label thread for _BatchContextFilter
-                            threading.current_thread().name = (
-                                f"{_batch_label} G{goal_idx + 1}/{n_goals_in_batch}"
-                            )
-                            logger.info(f"Processing goal: {goal[:60]}...")
+                        logger.info(f"Goal done ({len(goal_results)} results)")
+                        return goal_idx, goal_results
 
-                            # Each goal gets its own attack instance to avoid
-                            # shared mutable state across threads.
-                            local_impl_kwargs = {
-                                **impl_kwargs,
-                                "config": {
-                                    **impl_kwargs["config"],
-                                    "_goal_index_offset": _batch_start_idx + goal_idx,
-                                    # Per-goal worker is a sub-run; avoid premature
-                                    # global run status updates from attack_impl.run().
-                                    "_suppress_run_status_updates": True,
-                                },
-                            }
-                            local_impl = self.attack_impl_class(**local_impl_kwargs)
-                            goal_params = {**attack_params, "goals": [goal]}
-                            goal_results = flatten_run_result(
-                                local_impl.run(**goal_params)
-                            )
+                    per_goal_results: Dict[int, List[AttackResult]] = {}
 
-                            logger.info(f"Goal done ({len(goal_results)} results)")
-                            return goal_idx, goal_results
+                    # Install a LogRecordFactory so *all* log records,
+                    # regardless of logger/handler routing, get the batch
+                    # label injected directly into the message.
+                    _previous_factory = logging.getLogRecordFactory()
 
-                        per_goal_results: Dict[int, List[AttackResult]] = {}
+                    def _batch_record_factory(*args, **kwargs):
+                        record = _previous_factory(*args, **kwargs)
+                        tname = threading.current_thread().name
+                        if tname != "MainThread":
+                            record.msg = f"[{tname}] {record.msg}"
+                        return record
 
-                        # Install a LogRecordFactory so *all* log records,
-                        # regardless of logger/handler routing, get the batch
-                        # label injected directly into the message.
-                        _previous_factory = logging.getLogRecordFactory()
+                    logging.setLogRecordFactory(_batch_record_factory)
+                    try:
+                        with ThreadPoolExecutor(max_workers=effective_workers) as pool:
+                            for goal_idx, goal_results in pool.map(
+                                _run_single_goal, enumerate(batch_goals)
+                            ):
+                                per_goal_results[goal_idx] = goal_results
+                    finally:
+                        logging.setLogRecordFactory(_previous_factory)
 
-                        def _batch_record_factory(*args, **kwargs):
-                            record = _previous_factory(*args, **kwargs)
-                            tname = threading.current_thread().name
-                            if tname != "MainThread":
-                                record.msg = f"[{tname}] {record.msg}"
-                            return record
+                    # Reassemble in original goal order
+                    batch_results = []
+                    for goal_idx in range(n_goals_in_batch):
+                        batch_results.extend(per_goal_results.get(goal_idx, []))
 
-                        logging.setLogRecordFactory(_batch_record_factory)
-                        try:
-                            with ThreadPoolExecutor(
-                                max_workers=effective_workers
-                            ) as pool:
-                                for goal_idx, goal_results in pool.map(
-                                    _run_single_goal, enumerate(batch_goals)
-                                ):
-                                    per_goal_results[goal_idx] = goal_results
-                        finally:
-                            logging.setLogRecordFactory(_previous_factory)
-
-                        # Reassemble in original goal order
-                        batch_results = []
-                        for goal_idx in range(n_goals_in_batch):
-                            batch_results.extend(per_goal_results.get(goal_idx, []))
-
-                    _batch_elapsed = round(time.perf_counter() - _batch_t0, 3)
-                    batch_timings.append(_batch_elapsed)
-                    logger.info(
-                        f"[{batch_label}] Completed in {_batch_elapsed:.1f}s "
-                        f"({len(batch_results)} results)"
-                    )
-                    all_results.extend(batch_results)
-
-                # Log goal-batch latency summary
-                if batch_timings:
-                    avg_bt = sum(batch_timings) / len(batch_timings)
-                    logger.info(
-                        f"Goal-batch latency: avg={avg_bt:.1f}s "
-                        f"[{min(batch_timings):.1f}–{max(batch_timings):.1f}s], "
-                        f"total={sum(batch_timings):.1f}s"
-                    )
-
+                _batch_elapsed = round(time.perf_counter() - _batch_t0, 3)
+                batch_timings.append(_batch_elapsed)
                 logger.info(
-                    f"{self.attack_type} attack completed "
-                    f"({len(all_results)} total results from {n_batches} batches)"
+                    f"[{batch_label}] Completed in {_batch_elapsed:.1f}s "
+                    f"({len(batch_results)} results)"
                 )
-                return all_results
+                all_results.extend(batch_results)
 
-            results = flatten_run_result(attack_impl.run(**attack_params))
-            logger.info(f"{self.attack_type} attack completed")
-            return results
-        finally:
-            if (
-                adapter_instance is not None
-                and previous_default_max_tokens is not None
-                and hasattr(adapter_instance, "default_max_tokens")
-            ):
-                adapter_instance.default_max_tokens = previous_default_max_tokens
+            # Log goal-batch latency summary
+            if batch_timings:
+                avg_bt = sum(batch_timings) / len(batch_timings)
+                logger.info(
+                    f"Goal-batch latency: avg={avg_bt:.1f}s "
+                    f"[{min(batch_timings):.1f}–{max(batch_timings):.1f}s], "
+                    f"total={sum(batch_timings):.1f}s"
+                )
+
+            logger.info(
+                f"{self.attack_type} attack completed "
+                f"({len(all_results)} total results from {n_batches} batches)"
+            )
+            return all_results
+
+        results = flatten_run_result(attack_impl.run(**attack_params))
+        logger.info(f"{self.attack_type} attack completed")
+        return results
 
     def execute(
         self,
@@ -1693,40 +1700,25 @@ class AttackOrchestrator:
             effective_run_config.setdefault("expected_total_goals", len(expected_goals))
 
         # Persist guardrail configuration so the dashboard can display it.
-        router_obj = getattr(self.hackagent_agent, "router", None)
-        if router_obj:
-            before_gr = getattr(router_obj, "before_guardrail", None)
-            after_gr = getattr(router_obj, "after_guardrail", None)
-            if before_gr is not None:
-                cfg = getattr(before_gr, "_config", None)
-                if isinstance(cfg, dict):
-                    effective_run_config["before_guardrail"] = {
-                        k: str(v)
-                        for k, v in cfg.items()
-                        if k in ("identifier", "endpoint", "agent_type")
-                    }
-            if after_gr is not None:
-                cfg = getattr(after_gr, "_config", None)
-                if isinstance(cfg, dict):
-                    effective_run_config["after_guardrail"] = {
-                        k: str(v)
-                        for k, v in cfg.items()
-                        if k in ("identifier", "endpoint", "agent_type")
-                    }
+        guardrails = getattr(self.hackagent_agent, "guardrails", None) or {}
+        for side, spec in guardrails.items():
+            effective_run_config[f"{side}_guardrail"] = {
+                "identifier": spec.identifier,
+                "endpoint": str(spec.endpoint or ""),
+                "agent_type": spec.agent_type.value,
+            }
 
         # 2. Start Attack/Run record creation in the background.  The local
         # implementation is intentionally not constructed until the run id is
         # available: constructors initialise tracking state from ``_run_id``.
         # We can still overlap these server round-trips with the remaining
         # configuration preparation below.
+        router_obj = getattr(self.hackagent_agent, "router", None)
         backend_agent = getattr(router_obj, "backend_agent", None)
         victim_agent_id = getattr(backend_agent, "id", None) or getattr(
             self.hackagent_agent, "agent_id", None
         )
-
-        organization_id = getattr(router_obj, "organization_id", None) or getattr(
-            self.hackagent_agent, "organization_id", None
-        )
+        organization_id = getattr(self.hackagent_agent, "organization_id", None)
 
         def _create_and_start_run() -> Tuple[str, str]:
             attack_id = self._create_server_attack_record(

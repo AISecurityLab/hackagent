@@ -33,9 +33,9 @@ from hackagent.attacks.shared.response_utils import (
     get_guardrail_info,
     is_guardrail_response,
 )
-from hackagent.attacks.shared.router_factory import create_router
+from hackagent.attacks.shared.llm_router import connect_role
 from hackagent.core.defaults import DEFAULT_MAX_OUTPUT_TOKENS
-from hackagent.models.router import AgentRouter
+from hackagent.attacks.shared.llm_router import LLMRouter
 
 from .config import (
     DEFAULT_BENIGN_TASKS,
@@ -293,25 +293,20 @@ def extract_tool_calls(response: Any) -> List[Dict[str, Any]]:
     return []
 
 
-def _create_attacker_router(
-    attacker_config: Dict[str, Any],
-    backend: Any,
-) -> AgentRouter:
-    router, _reg_key = create_router(
-        backend=backend,
-        router_name=(
+def _create_attacker_router(attacker_config: Dict[str, Any]) -> LLMRouter:
+    router, _reg_key = connect_role(
+        attacker_config,
+        name=(
             f"tool-output-ipi-attacker-"
             f"{attacker_config.get('identifier', 'unknown')[:30]}"
         ),
-        config=attacker_config,
-        use_backend_api_key=False,
     )
     return router
 
 
 def _refine_injection_with_attacker(
     *,
-    attacker_router: AgentRouter,
+    attacker_router: LLMRouter,
     attacker_key: str,
     goal: str,
     benign_task: str,
@@ -346,7 +341,7 @@ def _refine_injection_with_attacker(
 
 def _solicit_live_tool_call(
     *,
-    agent_router: AgentRouter,
+    agent_router: LLMRouter,
     victim_key: str,
     benign_task: str,
     tools: Optional[List[Dict[str, Any]]],
@@ -423,7 +418,7 @@ def _poison_live_messages(
 
 def execute(
     goals: List[str],
-    agent_router: AgentRouter,
+    agent_router: LLMRouter,
     config: Dict[str, Any],
     logger: logging.Logger,
 ) -> List[Dict[str, Any]]:
@@ -433,7 +428,6 @@ def execute(
 
     tracker: Optional[Any] = config.get("_tracker")
     client: Optional[Any] = config.get("_client")
-    backend = config.get("_backend") or getattr(agent_router, "backend", None)
 
     mode = str(params.get("mode", "simulated")).lower()
     max_attempts = int(params.get("max_attempts", 3) or 3)
@@ -455,11 +449,11 @@ def execute(
         f"success_setting={success_setting}"
     )
 
-    attacker_router: Optional[AgentRouter] = None
+    attacker_router: Optional[LLMRouter] = None
     attacker_key: Optional[str] = None
-    if use_attacker and backend and attacker_cfg.get("identifier"):
+    if use_attacker and attacker_cfg.get("identifier"):
         try:
-            attacker_router = _create_attacker_router(attacker_cfg, backend)
+            attacker_router = _create_attacker_router(attacker_cfg)
             attacker_key = str(attacker_router.backend_agent.id)
             logger.info(f"Attacker LLM enabled: {attacker_cfg.get('identifier')}")
         except Exception as exc:
@@ -630,9 +624,9 @@ def _attack_single_goal(
     target_max_tokens: int,
     target_temperature: float,
     target_timeout: int,
-    agent_router: AgentRouter,
+    agent_router: LLMRouter,
     victim_key: str,
-    attacker_router: Optional[AgentRouter],
+    attacker_router: Optional[LLMRouter],
     attacker_key: Optional[str],
     step_judge: Optional[_StepJudge],
     tracker: Optional[Any],

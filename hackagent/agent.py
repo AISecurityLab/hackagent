@@ -4,10 +4,14 @@
 from hackagent.core.logging import get_logger
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
-from hackagent.core.settings import Settings
+from hackagent.attacks.shared.llm_router import LLMRouter
+from hackagent.core.contracts import AgentType, ModelSpec
 from hackagent.core.errors import HackAgentError
-from hackagent.models.router import AgentRouter
-from hackagent.core.contracts import AgentType
+from hackagent.core.settings import Settings
+from hackagent.models.client import EnvelopeLLM, connect
+from hackagent.models.dispatch import check_supported
+from hackagent.models.factory import ModelFactory, spec_from_config
+from hackagent.models.guardrail import Guarded, GuardrailSpec, LLMGuardrail
 
 # Lazy import for attack orchestrators to avoid ~0.5s startup delay
 if TYPE_CHECKING:
@@ -17,7 +21,7 @@ logger = get_logger(__name__)
 
 
 def _resolve_target_config(target_config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    """Return normalized victim request defaults for the configured router."""
+    """Return normalized victim request defaults for the configured target."""
     from hackagent.attacks.techniques.config import default_target
 
     resolved = default_target()
@@ -32,6 +36,59 @@ def _resolve_target_config(target_config: Optional[Dict[str, Any]]) -> Dict[str,
     return resolved
 
 
+#: Target config keys read into :class:`ModelSpec` fields; the rest are
+#: adapter options and go to ``extra``.
+_TARGET_SPEC_FIELDS = ("max_tokens", "temperature", "top_p", "timeout", "thinking")
+
+#: Generation and provider options a target's metadata may carry.
+_TARGET_METADATA_KEYS = (
+    "api_key",
+    "max_tokens",
+    "temperature",
+    "top_p",
+    "top_k",
+    "num_ctx",
+    "stream",
+    "timeout",
+    "thinking",
+    "tools",
+    "tool_choice",
+    "extra_body",
+    "reasoning_effort",
+)
+
+
+def _target_spec(
+    *,
+    name: str,
+    endpoint: str,
+    agent_type: AgentType,
+    metadata: Dict[str, Any],
+    config: Dict[str, Any],
+) -> ModelSpec:
+    """Build the target's spec from the facade's metadata and adapter config.
+
+    The model name is the config's ``name``, else the metadata's, else the
+    agent name. ADK uses the agent name, which is its app name.
+    """
+    flat = {k: metadata[k] for k in _TARGET_METADATA_KEYS if k in metadata}
+    flat.update({k: v for k, v in config.items() if v is not None})
+    model_name = flat.pop("name", None) or metadata.get("name") or name
+    if agent_type == AgentType.GOOGLE_ADK:
+        model_name = name
+    fields: Dict[str, Any] = {
+        key: flat.pop(key) for key in _TARGET_SPEC_FIELDS if key in flat
+    }
+    return ModelSpec(
+        identifier=str(model_name),
+        endpoint=flat.pop("endpoint", None) or endpoint or None,
+        agent_type=agent_type,
+        api_key=flat.pop("api_key", None) or None,
+        extra=flat,
+        **fields,
+    )
+
+
 class HackAgent:
     """
     The primary client for orchestrating security assessments with HackAgent.
@@ -43,13 +100,16 @@ class HackAgent:
     - Executing automated security tests against the configured agents.
     - Retrieving and handling test results.
 
-    It encapsulates complexities such as agent registration
-    with the local backend (via `AgentRouter`), and the dynamic dispatch of various
-    attack methodologies.
+    It registers the target as an Agent record in the storage backend,
+    connects to it (applying any guardrails), and dispatches to the attack
+    strategies.
 
     Attributes:
-        router: An `AgentRouter` instance managing the agent's representation
-            in the HackAgent backend.
+        target: The connected target model, with guardrails applied.
+        agent_record: The target's Agent record in the storage backend.
+        router: ``target`` behind the ``route_request`` surface the attack
+            techniques call.
+        models: Builds role models (attacker, judges, guardrails).
         attack_strategies: A dictionary mapping strategy names to their
             `AttackStrategy` implementations.
     """
@@ -75,8 +135,8 @@ class HackAgent:
         Initializes the HackAgent client and prepares it for interaction.
 
         This constructor sets up the local storage backend, loads default
-        prompts, resolves the agent type, and initializes the agent router
-        to ensure the agent is known to the backend. It also prepares available
+        prompts, resolves the agent type, registers the target with the
+        backend and connects to it. It also prepares available
         attack strategies.
 
         Args:
@@ -177,33 +237,63 @@ class HackAgent:
             # Keep `thinking` strictly OLLAMA-specific.
             router_operational_config.pop("thinking", None)
 
-        self.router = AgentRouter(
-            backend=self.backend,
+        check_supported(processed_agent_type)
+        self.models = ModelFactory(self.settings)
+
+        # The target is the only model registered as an Agent record.
+        context = self.backend.get_context()
+        self.organization_id = context.org_id
+        if processed_agent_type == AgentType.GOOGLE_ADK:
+            router_operational_config.setdefault("user_id", context.user_id)
+        self.target_spec = _target_spec(
             name=name or endpoint,  # fall back to endpoint if no name provided
+            endpoint=endpoint,
             agent_type=processed_agent_type,
+            metadata=router_metadata,
+            config=router_operational_config,
+        )
+        self.agent_record = self.backend.create_or_update_agent(
+            name=name or endpoint,
+            agent_type=processed_agent_type.value,
             endpoint=endpoint,
             metadata=router_metadata,
-            adapter_operational_config=router_operational_config,
+            overwrite_metadata=True,
         )
+        self.agent_id = self.agent_record.id
 
-        # Wire guardrails onto the router once — they apply transparently to
-        # every route_request call for all attacks on this target.
-        if before_guardrail or after_guardrail:
-            from hackagent.attacks.shared.guardrail import create_guardrail_from_config
-
-            if before_guardrail:
-                self.router.before_guardrail = create_guardrail_from_config(
-                    before_guardrail, self.backend
+        # Guardrails wrap the target once and apply to every call of every
+        # attack on it.
+        self.guardrails: Dict[str, GuardrailSpec] = {}
+        for side, guardrail_config in (
+            ("before", before_guardrail),
+            ("after", after_guardrail),
+        ):
+            if guardrail_config:
+                self.guardrails[side] = spec_from_config(
+                    guardrail_config, spec_type=GuardrailSpec
                 )
-                logger.info("before_guardrail active on target router.")
-            if after_guardrail:
-                self.router.after_guardrail = create_guardrail_from_config(
-                    after_guardrail, self.backend
-                )
-                logger.info("after_guardrail active on target router.")
+                logger.info("%s guardrail active on the target.", side)
+        self.target: EnvelopeLLM = connect(
+            self.target_spec, instance_id=str(self.agent_record.id)
+        )
+        if self.guardrails:
+            self.target = Guarded(
+                self.target,
+                before=self._build_guardrail("before"),
+                after=self._build_guardrail("after"),
+            )
+        self.router = LLMRouter(self.target, agent=self.agent_record)
 
         # Attack strategies are lazy-loaded to improve startup time
         self._attack_strategies: Optional[Dict[str, Any]] = None
+
+    def _build_guardrail(self, side: str) -> Optional[LLMGuardrail]:
+        spec = self.guardrails.get(side)
+        if spec is None:
+            return None
+        return LLMGuardrail(
+            self.models.for_role(spec), system_prompt=spec.system_prompt
+        )
 
     @property
     def attack_strategies(self) -> Dict[str, Any]:
@@ -301,7 +391,7 @@ class HackAgent:
                     f"Unsupported attack_type: {attack_type}. Supported types: {supported_types}."
                 )
 
-            backend_agent = self.router.backend_agent
+            backend_agent = self.agent_record
 
             logger.info(
                 f"Preparing to attack agent '{backend_agent.name}' "

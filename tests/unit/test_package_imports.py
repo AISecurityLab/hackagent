@@ -42,11 +42,11 @@ class TestPackageImports:
 
         assert Store is not None and LocalBackend and RemoteBackend
 
-    def test_router_import(self):
-        """Test that the AgentRouter can be imported."""
-        from hackagent.models.router import AgentRouter
+    def test_models_connect_import(self):
+        """Test that model access can be imported."""
+        from hackagent.models import Guarded, ModelFactory, connect
 
-        assert AgentRouter is not None
+        assert connect and Guarded and ModelFactory
 
     def test_models_import(self):
         """Test that models can be imported.

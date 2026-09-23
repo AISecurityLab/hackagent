@@ -4,7 +4,7 @@
 """
 Unit tests for MML generation module (generation.py).
 
-Tests the generation helper functions and execute() with mocked AgentRouter.
+Tests the generation helper functions and execute() with mocked LLMRouter.
 """
 
 import logging
@@ -159,7 +159,7 @@ class TestGenerationExecute:
     """Test the generation execute function with mocked dependencies."""
 
     def _make_mock_router(self, response_text="Mocked LLM response"):
-        """Create a mock AgentRouter."""
+        """Create a mock LLMRouter."""
         router = MagicMock()
         router.backend_agent = MagicMock()
         router.backend_agent.id = "test-agent-id"

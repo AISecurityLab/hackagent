@@ -48,10 +48,10 @@ class TestNuancedEvaluatorClassAttributes(unittest.TestCase):
 class TestNuancedEvaluatorParsing(unittest.TestCase):
     """Test NuancedEvaluator._parse_response_content and _check_assertion."""
 
-    @patch("hackagent.attacks.evaluator.base.create_router")
-    def setUp(self, mock_create_router):
+    @patch("hackagent.attacks.evaluator.base.connect_role")
+    def setUp(self, mock_connect_role):
         """Set up NuancedEvaluator."""
-        mock_create_router.return_value = (MagicMock(), "test-key")
+        mock_connect_role.return_value = (MagicMock(), "test-key")
         mock_client = MagicMock()
         mock_client.token = "test-token"
         mock_config = MagicMock()
@@ -145,10 +145,10 @@ class TestJailbreakBenchEvaluatorClassAttributes(unittest.TestCase):
 class TestJailbreakBenchEvaluatorParsing(unittest.TestCase):
     """Test JailbreakBenchEvaluator._parse_response_content."""
 
-    @patch("hackagent.attacks.evaluator.base.create_router")
-    def setUp(self, mock_create_router):
+    @patch("hackagent.attacks.evaluator.base.connect_role")
+    def setUp(self, mock_connect_role):
         """Set up JailbreakBenchEvaluator."""
-        mock_create_router.return_value = (MagicMock(), "test-key")
+        mock_connect_role.return_value = (MagicMock(), "test-key")
         mock_client = MagicMock()
         mock_client.token = "test-token"
         mock_config = MagicMock()
@@ -200,10 +200,10 @@ class TestHarmBenchEvaluatorClassAttributes(unittest.TestCase):
 class TestHarmBenchEvaluatorParsing(unittest.TestCase):
     """Test HarmBenchEvaluator._parse_response_content."""
 
-    @patch("hackagent.attacks.evaluator.base.create_router")
-    def setUp(self, mock_create_router):
+    @patch("hackagent.attacks.evaluator.base.connect_role")
+    def setUp(self, mock_connect_role):
         """Set up HarmBenchEvaluator."""
-        mock_create_router.return_value = (MagicMock(), "test-key")
+        mock_connect_role.return_value = (MagicMock(), "test-key")
         mock_client = MagicMock()
         mock_client.token = "test-token"
         mock_config = MagicMock()

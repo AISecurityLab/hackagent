@@ -13,7 +13,6 @@ cross-entropy computation into a cohesive class-based design that improves:
 """
 
 import logging
-import os
 import re
 import threading
 import time
@@ -21,8 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional, Tuple
 
 from hackagent.storage.store import Store
-from hackagent.models.router import AgentRouter
-from hackagent.core.contracts import AgentType
+from hackagent.attacks.shared.llm_router import LLMRouter, connect_role
 
 from .config import (
     DEFAULT_ADVPREFIX_GENERATOR_SYSTEM_PROMPT,
@@ -72,7 +70,7 @@ class PrefixGenerationPipeline:
         config: Dict[str, Any],
         logger: logging.Logger,
         client: Store,
-        agent_router: Optional[AgentRouter] = None,
+        agent_router: Optional[LLMRouter] = None,
     ):
         """
         Initialize the pipeline with configuration and dependencies.
@@ -100,7 +98,7 @@ class PrefixGenerationPipeline:
         self.agent_router = agent_router
 
         # Initialize internal state for tracking
-        self._generation_router: Optional[AgentRouter] = None
+        self._generation_router: Optional[LLMRouter] = None
         self._statistics: Dict[str, Any] = {
             "raw_generated": 0,
             "phase1_filtered": 0,
@@ -318,59 +316,26 @@ class PrefixGenerationPipeline:
         self.logger.info(f"Generated {len(results)} raw prefixes")
         return results
 
-    def _initialize_generation_router(self) -> Optional[AgentRouter]:
-        """Initialize and configure the AgentRouter for generation."""
+    def _initialize_generation_router(self) -> Optional[LLMRouter]:
+        """Connect to the attacker model that generates prefixes."""
         try:
-            endpoint = self.config.attacker.get("endpoint")
             model_name = self.config.attacker.get("identifier")
-
-            # Handle API key (supports both Store and Store)
-            api_key = (
-                self.client.get_api_key()
-                if hasattr(self.client, "get_api_key")
-                else getattr(self.client, "token", None)
-            )
-            api_key_config = self.config.attacker.get("api_key")
-            if api_key_config:
-                env_key = os.environ.get(api_key_config)
-                api_key = env_key if env_key else api_key_config
-
-            operational_config = {
-                "name": model_name,
-                "endpoint": endpoint,
-                "api_key": api_key,
-                "max_tokens": self.config.attacker.get(
-                    "max_tokens", self.config.max_tokens
-                ),
-                "temperature": self.config.temperature,
-                "top_p": self.config.top_p,
-            }
-
-            # Use OPENAI_SDK to avoid Pydantic serialization warnings from LiteLLM
-            # Can be overridden via config.attacker["agent_type"] if needed
-            agent_type_str = self.config.attacker.get("agent_type", "OPENAI_SDK")
-            try:
-                agent_type = AgentType(agent_type_str.upper())
-            except ValueError:
-                self.logger.warning(
-                    f"Invalid agent_type '{agent_type_str}', defaulting to OPENAI_SDK"
-                )
-                agent_type = AgentType.OPENAI_SDK
-
-            router = AgentRouter(
-                backend=self.client,
+            router, _key = connect_role(
+                {
+                    "identifier": model_name,
+                    "endpoint": self.config.attacker.get("endpoint"),
+                    # OPENAI_SDK avoids Pydantic serialization warnings from
+                    # LiteLLM; config.attacker["agent_type"] overrides it.
+                    "agent_type": self.config.attacker.get("agent_type", "OPENAI_SDK"),
+                    "api_key": self.config.attacker.get("api_key"),
+                    "max_tokens": self.config.attacker.get(
+                        "max_tokens", self.config.max_tokens
+                    ),
+                    "temperature": self.config.temperature,
+                    "top_p": self.config.top_p,
+                },
                 name=model_name,
-                agent_type=agent_type,
-                endpoint=endpoint,
-                adapter_operational_config=operational_config,
-                metadata=operational_config.copy(),
-                overwrite_metadata=True,
             )
-
-            if not router._agent_registry:  # type: ignore
-                self.logger.error("Router initialized but no agent registered")
-                return None
-
             self.logger.debug(f"Generation router initialized for {model_name}")
             return router
 

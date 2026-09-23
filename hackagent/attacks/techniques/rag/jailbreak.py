@@ -34,7 +34,7 @@ from hackagent.attacks.techniques.pap.taxonomy import (
     extract_mutated_text,
     get_technique_names,
 )
-from hackagent.models.router import AgentRouter
+from hackagent.attacks.shared.llm_router import LLMRouter
 
 SUPPORTED_JAILBREAK_TECHNIQUES = (
     "static_template",
@@ -112,7 +112,7 @@ def _collect_static_templates(categories: List[str]) -> List[Tuple[str, str]]:
 def _build_static_template_framer(
     config: Dict[str, Any],
     logger: Optional[logging.Logger] = None,
-    attacker_router: Optional[AgentRouter] = None,
+    attacker_router: Optional[LLMRouter] = None,
     attacker_reg_key: Optional[str] = None,
 ) -> JailbreakFramer:
     raw_categories = config.get("template_categories") or ["role_play"]
@@ -141,7 +141,7 @@ def _build_static_template_framer(
 def _build_h4rm3l_framer(
     config: Dict[str, Any],
     logger: Optional[logging.Logger] = None,
-    attacker_router: Optional[AgentRouter] = None,
+    attacker_router: Optional[LLMRouter] = None,
     attacker_reg_key: Optional[str] = None,
 ) -> JailbreakFramer:
     program_name = str(config.get("program", "refusal_suppression"))
@@ -190,7 +190,7 @@ _FLIPATTACK_MODES: Dict[str, Callable[[str], str]] = {
 def _build_flipattack_framer(
     config: Dict[str, Any],
     logger: Optional[logging.Logger] = None,
-    attacker_router: Optional[AgentRouter] = None,
+    attacker_router: Optional[LLMRouter] = None,
     attacker_reg_key: Optional[str] = None,
 ) -> JailbreakFramer:
     raw_modes = config.get("flip_modes") or [config.get("flip_mode", "FCS")]
@@ -214,7 +214,7 @@ def _build_flipattack_framer(
 def _build_cipherchat_framer(
     config: Dict[str, Any],
     logger: Optional[logging.Logger] = None,
-    attacker_router: Optional[AgentRouter] = None,
+    attacker_router: Optional[LLMRouter] = None,
     attacker_reg_key: Optional[str] = None,
 ) -> JailbreakFramer:
     raw_methods = config.get("encode_methods") or [
@@ -240,7 +240,7 @@ def _build_cipherchat_framer(
 def _build_bon_framer(
     config: Dict[str, Any],
     logger: Optional[logging.Logger] = None,
-    attacker_router: Optional[AgentRouter] = None,
+    attacker_router: Optional[LLMRouter] = None,
     attacker_reg_key: Optional[str] = None,
 ) -> JailbreakFramer:
     raw_sigma = config.get("sigma", 0.4)
@@ -285,7 +285,7 @@ def _resolve_pap_techniques(config: Dict[str, Any]) -> List[str]:
 def _build_pap_framer(
     config: Dict[str, Any],
     logger: Optional[logging.Logger] = None,
-    attacker_router: Optional[AgentRouter] = None,
+    attacker_router: Optional[LLMRouter] = None,
     attacker_reg_key: Optional[str] = None,
 ) -> JailbreakFramer:
     if attacker_router is None or attacker_reg_key is None:
@@ -323,7 +323,7 @@ def _build_pap_framer(
 def _generate_fc_steps_via_llm(
     goal: str,
     num_steps: int,
-    attacker_router: AgentRouter,
+    attacker_router: LLMRouter,
     attacker_reg_key: str,
     logger: Optional[logging.Logger],
 ) -> Optional[List[str]]:
@@ -349,7 +349,7 @@ def _generate_fc_steps_via_llm(
 def _build_fc_framer(
     config: Dict[str, Any],
     logger: Optional[logging.Logger] = None,
-    attacker_router: Optional[AgentRouter] = None,
+    attacker_router: Optional[LLMRouter] = None,
     attacker_reg_key: Optional[str] = None,
 ) -> JailbreakFramer:
     if attacker_router is None or attacker_reg_key is None:
@@ -403,7 +403,7 @@ _TECHNIQUE_BUILDERS: Dict[str, Callable[..., JailbreakFramer]] = {
 def build_jailbreak_framer(
     config: Optional[Dict[str, Any]],
     logger: logging.Logger,
-    attacker_router: Optional[AgentRouter] = None,
+    attacker_router: Optional[LLMRouter] = None,
     attacker_reg_key: Optional[str] = None,
 ) -> Optional[JailbreakFramer]:
     """Build a :class:`JailbreakFramer` from a ``poisoning.jailbreak`` config.

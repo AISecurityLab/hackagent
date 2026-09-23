@@ -350,96 +350,49 @@ class TestGoogleADKHackAgentIntegration:
 
 @pytest.mark.integration
 @pytest.mark.google_adk
-class TestGoogleADKRouterIntegration:
-    """Integration tests for AgentRouter with Google ADK."""
+class TestGoogleADKConnectIntegration:
+    """Integration tests for connecting to a Google ADK agent."""
 
-    def test_router_creates_adk_adapter(
-        self,
-        skip_if_google_adk_unavailable,
-        skip_if_no_hackagent_key,
-        hackagent_api_base_url: str,
-        hackagent_api_key: str,
-        google_adk_agent_url: str,
+    @staticmethod
+    def _connect(google_adk_agent_url: str):
+        from hackagent.core.contracts import AgentType, ModelSpec
+        from hackagent.models import connect
+
+        return connect(
+            ModelSpec(
+                identifier="multi_tool_agent",
+                endpoint=google_adk_agent_url,
+                agent_type=AgentType.GOOGLE_ADK,
+                timeout=ADK_TEST_TIMEOUT_SECONDS,
+                extra={"user_id": "hackagent-integration"},
+            )
+        )
+
+    def test_connect_creates_adk_adapter(
+        self, skip_if_google_adk_unavailable, google_adk_agent_url: str
     ):
-        """Test that AgentRouter correctly creates ADKAgent adapter."""
-        from hackagent.storage._http.client import AuthenticatedClient
-        from hackagent.models.router import AgentRouter
-        from hackagent.core.contracts import AgentType
+        """connect() builds an ADKAgent adapter without any storage backend."""
         from hackagent.models.adapters.adk import ADKAgent
 
-        client = AuthenticatedClient(
-            base_url=hackagent_api_base_url,
-            token=hackagent_api_key,
-            prefix="Bearer",
-        )
-        from hackagent.storage.remote import RemoteBackend
+        client = self._connect(google_adk_agent_url)
 
-        backend = RemoteBackend(client)
+        assert isinstance(client.adapter, ADKAgent)
+        logger.info(f"Connected ADK adapter: {client.adapter.id}")
 
-        router = AgentRouter(
-            backend=backend,
-            name="multi_tool_agent",
-            agent_type=AgentType.GOOGLE_ADK,
-            endpoint=google_adk_agent_url,
-            adapter_operational_config={"timeout": ADK_TEST_TIMEOUT_SECONDS},
-        )
-
-        # Verify adapter was created
-        agent_id = str(router.backend_agent.id)
-        adapter = router.get_agent_instance(registration_key=agent_id)
-
-        assert isinstance(adapter, ADKAgent)
-        logger.info(f"Router created ADK adapter: {adapter.id}")
-
-    def test_router_handles_adk_request(
-        self,
-        skip_if_google_adk_unavailable,
-        skip_if_no_hackagent_key,
-        hackagent_api_base_url: str,
-        hackagent_api_key: str,
-        google_adk_agent_url: str,
+    def test_connected_adk_handles_request(
+        self, skip_if_google_adk_unavailable, google_adk_agent_url: str
     ):
-        """Test that router can handle requests through ADK adapter."""
-        from hackagent.storage._http.client import AuthenticatedClient
-        from hackagent.models.router import AgentRouter
-        from hackagent.core.contracts import AgentType
-
-        client = AuthenticatedClient(
-            base_url=hackagent_api_base_url,
-            token=hackagent_api_key,
-            prefix="Bearer",
-        )
-        from hackagent.storage.remote import RemoteBackend
-
-        backend = RemoteBackend(client)
-
-        router = AgentRouter(
-            backend=backend,
-            name="multi_tool_agent",
-            agent_type=AgentType.GOOGLE_ADK,
-            endpoint=google_adk_agent_url,
-            adapter_operational_config={"timeout": ADK_TEST_TIMEOUT_SECONDS},
-        )
-
-        # Route a request
-        agent_id = str(router.backend_agent.id)
-        request_data = {
-            "prompt": "What can you help me with?",
-            "max_tokens": 15,
-        }
-
-        response = router.route_request(
-            registration_key=agent_id, request_data=request_data
+        """A connected ADK agent answers a request."""
+        response = self._connect(google_adk_agent_url).send(
+            {"prompt": "What can you help me with?", "max_tokens": 15}
         )
 
         assert response is not None
         assert "processed_response" in response
         if response.get("error_message"):
-            logger.warning(f"Router ADK error: {response.get('error_message')}")
+            logger.warning(f"ADK error: {response.get('error_message')}")
         elif response.get("processed_response"):
-            logger.info(f"Router ADK response: {response['processed_response'][:50]}")
-        else:
-            logger.warning("Router ADK returned empty response")
+            logger.info(f"ADK response: {response['processed_response'][:50]}")
 
 
 @pytest.mark.integration

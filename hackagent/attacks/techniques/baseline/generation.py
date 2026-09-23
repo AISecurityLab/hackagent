@@ -16,7 +16,7 @@ from hackagent.attacks.shared.response_utils import (
     extract_response_content,
     is_guardrail_response,
 )
-from hackagent.models.router import AgentRouter
+from hackagent.attacks.shared.llm_router import LLMRouter
 from hackagent.router.tracking import Tracker
 
 
@@ -42,7 +42,7 @@ def _safe_positive_int(value: Any, fallback: int) -> int:
 
 def execute(
     goals: List[str],
-    agent_router: AgentRouter,
+    agent_router: LLMRouter,
     config: Dict[str, Any],
     logger: logging.Logger,
     goal_tracker: Optional[Tracker] = None,

@@ -5,7 +5,7 @@
 h4rm3l generation and execution module.
 
 Compiles the decorator program, applies it to each goal prompt, and
-sends the decorated prompt to the target model via AgentRouter.
+sends the decorated prompt to the target model via LLMRouter.
 """
 
 import logging
@@ -16,8 +16,8 @@ from hackagent.attacks.shared.response_utils import (
     get_guardrail_info,
     is_guardrail_response,
 )
-from hackagent.attacks.shared.router_factory import create_router
-from hackagent.models.router import AgentRouter
+from hackagent.attacks.shared.llm_router import connect_role
+from hackagent.attacks.shared.llm_router import LLMRouter
 
 from .config import PRESET_PROGRAMS
 from .decorators import (
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
 def _build_prompting_interface(
     config: Dict[str, Any],
-    agent_router: AgentRouter,
+    agent_router: LLMRouter,
     logger: logging.Logger,
 ) -> Optional[Callable]:
     """Build an LLM prompting function for LLM-assisted decorators.
@@ -54,14 +54,8 @@ def _build_prompting_interface(
     # An explicitly configured decorator LLM must be used or fail loudly;
     # silently decorating with the target model changes the attack.
     if identifier:
-        backend = config.get("_backend") or config.get("_client")
         try:
-            llm_router, llm_key = create_router(
-                backend=backend,
-                config=decorator_llm,
-                logger=logger,
-                router_name="decorator_llm",
-            )
+            llm_router, llm_key = connect_role(decorator_llm, name="decorator_llm")
         except Exception as e:
             raise ValueError(
                 f"decorator_llm '{identifier}' could not be initialised: {e}"
@@ -118,7 +112,7 @@ def _build_prompting_interface(
 
 def execute(
     goals: List[str],
-    agent_router: AgentRouter,
+    agent_router: LLMRouter,
     config: Dict[str, Any],
     logger: logging.Logger,
 ) -> List[Dict]:

@@ -30,9 +30,9 @@ from hackagent.attacks.shared.response_utils import (
     get_guardrail_info,
     is_guardrail_response,
 )
-from hackagent.attacks.shared.router_factory import create_router
+from hackagent.attacks.shared.llm_router import connect_role
 from hackagent.core.defaults import DEFAULT_MAX_OUTPUT_TOKENS
-from hackagent.models.router import AgentRouter
+from hackagent.attacks.shared.llm_router import LLMRouter
 
 from .config import ALL_TECHNIQUES, TOP_5_TECHNIQUES
 from .taxonomy import build_mutation_prompt, extract_mutated_text
@@ -70,17 +70,12 @@ def _resolve_techniques(pap_params: Dict[str, Any]) -> List[str]:
     return list(TOP_5_TECHNIQUES)
 
 
-def _create_attacker_router(
-    attacker_config: Dict[str, Any],
-    backend: Any,
-) -> AgentRouter:
+def _create_attacker_router(attacker_config: Dict[str, Any]) -> LLMRouter:
     """Create an attacker router with normalized type and provider credentials."""
 
-    router, _reg_key = create_router(
-        backend=backend,
-        router_name=f"pap-attacker-{attacker_config.get('identifier', 'unknown')[:30]}",
-        config=attacker_config,
-        use_backend_api_key=False,
+    router, _reg_key = connect_role(
+        attacker_config,
+        name=f"pap-attacker-{attacker_config.get('identifier', 'unknown')[:30]}",
     )
 
     return router
@@ -93,7 +88,7 @@ def _create_attacker_router(
 
 def execute(
     goals: List[str],
-    agent_router: AgentRouter,
+    agent_router: LLMRouter,
     config: Dict[str, Any],
     logger: logging.Logger,
 ) -> List[Dict]:
@@ -119,7 +114,6 @@ def execute(
 
     tracker: Optional["Tracker"] = config.get("_tracker")
     client: Optional["Store"] = config.get("_client")
-    backend = config.get("_backend") or getattr(agent_router, "backend", None)
 
     techniques = _resolve_techniques(pap_params)
     max_techniques = pap_params.get("max_techniques_per_goal", 0)
@@ -138,10 +132,10 @@ def execute(
     )
 
     # Create attacker router
-    attacker_router: Optional[AgentRouter] = None
-    if backend and attacker_cfg.get("identifier"):
+    attacker_router: Optional[LLMRouter] = None
+    if attacker_cfg.get("identifier"):
         try:
-            attacker_router = _create_attacker_router(attacker_cfg, backend)
+            attacker_router = _create_attacker_router(attacker_cfg)
             logger.info(
                 f"Attacker LLM: {attacker_cfg.get('identifier')} "
                 f"(endpoint={attacker_cfg.get('endpoint')})"
@@ -239,9 +233,9 @@ def _attack_single_goal(
     target_max_tokens: int,
     target_temperature: float,
     target_timeout: int,
-    attacker_router: AgentRouter,
+    attacker_router: LLMRouter,
     attacker_key: str,
-    agent_router: AgentRouter,
+    agent_router: LLMRouter,
     victim_key: str,
     step_judge: Optional[_StepJudge],
     tracker: Optional["Tracker"],

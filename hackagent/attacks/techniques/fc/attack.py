@@ -26,7 +26,7 @@ from typing import Any, Dict, List, Optional
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.core.defaults import DEFAULT_JUDGE_IDENTIFIER
-from hackagent.models.router import AgentRouter
+from hackagent.attacks.shared.llm_router import LLMRouter
 from hackagent.storage.store import Store
 
 from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
@@ -82,7 +82,7 @@ class FCAttack(BaseAttack):
         self,
         config: Optional[Dict[str, Any]] = None,
         client: Optional[Store] = None,
-        agent_router: Optional[AgentRouter] = None,
+        agent_router: Optional[LLMRouter] = None,
     ):
         """
         Initialize FlowchartAttack with configuration.
@@ -91,7 +91,7 @@ class FCAttack(BaseAttack):
             config: Optional dictionary containing parameters to override
                 :data:`DEFAULT_FC_CONFIG`.
             client: Store instance passed from the orchestrator.
-            agent_router: AgentRouter instance for the target model.
+            agent_router: LLMRouter instance for the target model.
 
         Raises:
             ValueError: If ``client`` or ``agent_router`` is ``None``.
@@ -99,9 +99,7 @@ class FCAttack(BaseAttack):
         if client is None:
             raise ValueError("A storage backend must be provided to FCAttack.")
         if agent_router is None:
-            raise ValueError(
-                "Victim AgentRouter instance must be provided to FCAttack."
-            )
+            raise ValueError("Victim LLMRouter instance must be provided to FCAttack.")
 
         # Merge config with defaults
         current_config = copy.deepcopy(DEFAULT_FC_CONFIG)
@@ -320,14 +318,12 @@ class tFCAttack(BaseAttack):
         self,
         config: Optional[Dict[str, Any]] = None,
         client: Optional[Store] = None,
-        agent_router: Optional[AgentRouter] = None,
+        agent_router: Optional[LLMRouter] = None,
     ):
         if client is None:
             raise ValueError("A storage backend must be provided to tFCAttack.")
         if agent_router is None:
-            raise ValueError(
-                "Victim AgentRouter instance must be provided to tFCAttack."
-            )
+            raise ValueError("Victim LLMRouter instance must be provided to tFCAttack.")
 
         current_config = copy.deepcopy(DEFAULT_TFC_CONFIG)
         if config:

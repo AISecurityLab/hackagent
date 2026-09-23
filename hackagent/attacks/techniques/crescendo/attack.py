@@ -20,7 +20,7 @@ Unlike single-turn attacks (PAIR, TAP, ...), Crescendo keeps one growing
 ``target_messages`` conversation across the whole goal: every accepted turn
 is appended to it and re-sent in full on the next request, so the target
 sees genuine multi-turn context. This is HackAgent's first attack to rely on
-that behaviour; no router changes were required because ``AgentRouter``
+that behaviour; no router changes were required because ``LLMRouter``
 already forwards an arbitrary ``messages`` history verbatim to the target
 adapter on every call.
 
@@ -53,10 +53,10 @@ from hackagent.attacks.shared.response_utils import (
     get_guardrail_info,
     is_guardrail_response,
 )
-from hackagent.attacks.shared.router_factory import create_router
+from hackagent.attacks.shared.llm_router import connect_role
 from hackagent.storage.store import Store
 from hackagent.core.contracts import StepKind
-from hackagent.models.router import AgentRouter
+from hackagent.attacks.shared.llm_router import LLMRouter
 from hackagent.router.tracking import Tracker, Context
 
 from .config import (
@@ -157,7 +157,7 @@ class CrescendoAttack(BaseAttack):
         self,
         config: Optional[Dict[str, Any]] = None,
         client: Optional[Store] = None,
-        agent_router: Optional[AgentRouter] = None,
+        agent_router: Optional[LLMRouter] = None,
     ):
         """
         Initialize Crescendo attack.
@@ -177,7 +177,7 @@ class CrescendoAttack(BaseAttack):
         if client is None:
             raise ValueError("A storage backend must be provided.")
         if agent_router is None:
-            raise ValueError("Target AgentRouter must be provided.")
+            raise ValueError("Target LLMRouter must be provided.")
 
         current_config = copy.deepcopy(DEFAULT_CRESCENDO_CONFIG)
         internal_config: Dict[str, Any] = {}
@@ -206,8 +206,8 @@ class CrescendoAttack(BaseAttack):
             raise ValueError(f"Unknown objective: {objective_name}")
         self.objective = OBJECTIVES[objective_name]
 
-    def _initialize_attacker_router(self) -> Optional[AgentRouter]:
-        """Initialize and configure the AgentRouter for the attacker LLM."""
+    def _initialize_attacker_router(self) -> Optional[LLMRouter]:
+        """Initialize and configure the LLMRouter for the attacker LLM."""
         try:
             attacker_config = self.config.get("attacker", {})
 
@@ -235,11 +235,9 @@ class CrescendoAttack(BaseAttack):
             if api_key_config:
                 router_config["agent_metadata"]["api_key"] = api_key_config
 
-            router, _reg_key = create_router(
-                backend=self.backend,
-                config=router_config,
-                logger=self.logger,
-                router_name=attacker_config.get("model", router_config["identifier"]),
+            router, _reg_key = connect_role(
+                router_config,
+                name=attacker_config.get("model", router_config["identifier"]),
             )
 
             self.logger.debug(

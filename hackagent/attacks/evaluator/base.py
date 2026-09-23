@@ -34,7 +34,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from hackagent.core.async_utils import run_coroutine_blocking
 from hackagent.attacks.shared.progress import create_progress_bar
-from hackagent.attacks.shared.router_factory import create_router
+from hackagent.attacks.shared.llm_router import connect_role
 from hackagent.storage.store import Store
 
 if TYPE_CHECKING:
@@ -155,31 +155,12 @@ class BaseJudgeEvaluator(ABC):
             "agent_metadata": config.agent_metadata or {},
         }
 
-        # Handle API key from client (supports both Store and Store)
-        api_key = (
-            self.client.get_api_key()
-            if hasattr(self.client, "get_api_key")
-            else getattr(self.client, "token", None)
-        )
-        api_key_config = (
-            config.agent_metadata.get("api_key") if config.agent_metadata else None
-        )
-        if api_key_config:
-            import os
-
-            env_key = os.environ.get(api_key_config)
-            api_key = env_key if env_key else api_key_config
-        router_config["api_key"] = api_key
-
         self.logger.info(
             f"Initializing judge '{config.agent_name}' with model '{config.model_id}'."
         )
 
-        self.agent_router, self.agent_registration_key = create_router(
-            backend=self.client,
-            config=router_config,
-            logger=self.logger,
-            router_name=f"judge-{config.agent_name}",
+        self.agent_router, self.agent_registration_key = connect_role(
+            router_config, name=f"judge-{config.agent_name}"
         )
 
         self.logger.info(
@@ -384,7 +365,7 @@ class BaseJudgeEvaluator(ABC):
         | Tuple[List[Any], List[Optional[str]], List[int], List[Optional[str]]]
     ):
         """
-        Process evaluation rows using AgentRouter backend.
+        Process evaluation rows through the judge model.
 
         Implements a DSPy-inspired assert-and-retry loop:
 
@@ -406,7 +387,7 @@ class BaseJudgeEvaluator(ABC):
 
         if not self.agent_router or not self.agent_registration_key:
             self.logger.error(
-                f"AgentRouter not available for {self.__class__.__name__}"
+                f"Judge model not available for {self.__class__.__name__}"
             )
             for idx, row in enumerate(rows_to_process):
                 results_eval.append(0)

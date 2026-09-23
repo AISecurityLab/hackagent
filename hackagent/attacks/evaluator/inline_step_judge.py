@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
 from hackagent.attacks.evaluator.judge_evaluators import EVALUATOR_MAP
-from hackagent.attacks.shared.router_factory import extract_passthrough_request_config
+from hackagent.models.factory import passthrough_params
 from hackagent.attacks.techniques.advprefix.config import EvaluatorConfig
 
 if TYPE_CHECKING:
@@ -94,7 +94,7 @@ class InlineStepJudge:
             sub_cfg["agent_type"] = jcfg.get("agent_type", "OPENAI_SDK")
             sub_cfg["agent_endpoint"] = jcfg.get("endpoint")
             sub_cfg["agent_metadata"] = dict(jcfg.get("agent_metadata", {}) or {})
-            sub_cfg["agent_metadata"].update(extract_passthrough_request_config(jcfg))
+            sub_cfg["agent_metadata"].update(passthrough_params(jcfg))
 
             api_key = jcfg.get("api_key") or jcfg.get("api_key_env")
             if api_key:

@@ -1,7 +1,7 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Scripted stand-in for ``AgentRouter``."""
+"""Scripted stand-in for the ``route_request`` surface (``LLMRouter``)."""
 
 from types import SimpleNamespace
 from typing import Any, Callable, Dict, Iterable, List, Optional, Union

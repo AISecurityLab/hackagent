@@ -286,10 +286,10 @@ class TestParseYesNoWithConfidence(unittest.TestCase):
 class TestVerifyKeys(unittest.TestCase):
     """Test BaseJudgeEvaluator._verify_keys method."""
 
-    @patch("hackagent.attacks.evaluator.base.create_router")
-    def setUp(self, mock_create_router):
+    @patch("hackagent.attacks.evaluator.base.connect_role")
+    def setUp(self, mock_connect_role):
         """Set up test evaluator."""
-        mock_create_router.return_value = (MagicMock(), "test-key")
+        mock_connect_role.return_value = (MagicMock(), "test-key")
         mock_client = MagicMock()
         mock_client.token = "test-token"
         mock_config = MagicMock()
@@ -331,10 +331,10 @@ class TestVerifyKeys(unittest.TestCase):
 class TestPrepareResponses(unittest.TestCase):
     """Test BaseJudgeEvaluator.prepare_responses method."""
 
-    @patch("hackagent.attacks.evaluator.base.create_router")
-    def setUp(self, mock_create_router):
+    @patch("hackagent.attacks.evaluator.base.connect_role")
+    def setUp(self, mock_connect_role):
         """Set up test evaluator."""
-        mock_create_router.return_value = (MagicMock(), "test-key")
+        mock_connect_role.return_value = (MagicMock(), "test-key")
         mock_client = MagicMock()
         mock_client.token = "test-token"
         mock_config = MagicMock()
@@ -384,11 +384,11 @@ class TestPrepareResponses(unittest.TestCase):
 class TestEvaluateMethod(unittest.TestCase):
     """Test BaseJudgeEvaluator.evaluate template method."""
 
-    @patch("hackagent.attacks.evaluator.base.create_router")
-    def setUp(self, mock_create_router):
+    @patch("hackagent.attacks.evaluator.base.connect_role")
+    def setUp(self, mock_connect_role):
         """Set up test evaluator with mocked router."""
         self.mock_router = MagicMock()
-        mock_create_router.return_value = (self.mock_router, "test-key")
+        mock_connect_role.return_value = (self.mock_router, "test-key")
         mock_client = MagicMock()
         mock_client.token = "test-token"
         mock_config = MagicMock()
@@ -462,10 +462,10 @@ class TestEvaluateMethod(unittest.TestCase):
 class TestBuildRetryRequest(unittest.TestCase):
     """Test BaseJudgeEvaluator._build_retry_request."""
 
-    @patch("hackagent.attacks.evaluator.base.create_router")
-    def setUp(self, mock_create_router):
+    @patch("hackagent.attacks.evaluator.base.connect_role")
+    def setUp(self, mock_connect_role):
         """Set up test evaluator."""
-        mock_create_router.return_value = (MagicMock(), "test-key")
+        mock_connect_role.return_value = (MagicMock(), "test-key")
         mock_client = MagicMock()
         mock_client.token = "test-token"
         mock_config = MagicMock()
@@ -528,7 +528,7 @@ class TestBuildMessages(unittest.TestCase):
 
     @staticmethod
     def _make_evaluator(system_prompt):
-        with patch("hackagent.attacks.evaluator.base.create_router") as mock_router:
+        with patch("hackagent.attacks.evaluator.base.connect_role") as mock_router:
             mock_router.return_value = (MagicMock(), "test-key")
             mock_client = MagicMock()
             mock_client.token = "test-token"
@@ -583,11 +583,11 @@ class TestBuildMessages(unittest.TestCase):
 class TestRequestWithAssertions(unittest.TestCase):
     """Test BaseJudgeEvaluator._request_with_assertions."""
 
-    @patch("hackagent.attacks.evaluator.base.create_router")
-    def setUp(self, mock_create_router):
+    @patch("hackagent.attacks.evaluator.base.connect_role")
+    def setUp(self, mock_connect_role):
         """Set up test evaluator with mocked router."""
         self.mock_router = MagicMock()
-        mock_create_router.return_value = (self.mock_router, "test-key")
+        mock_connect_role.return_value = (self.mock_router, "test-key")
         mock_client = MagicMock()
         mock_client.token = "test-token"
         mock_config = MagicMock()
@@ -693,11 +693,11 @@ class TestRequestWithAssertions(unittest.TestCase):
 class TestProcessRowsWithRouter(unittest.TestCase):
     """Test BaseJudgeEvaluator._process_rows_with_router."""
 
-    @patch("hackagent.attacks.evaluator.base.create_router")
+    @patch("hackagent.attacks.evaluator.base.connect_role")
     @patch("hackagent.attacks.evaluator.base.create_progress_bar")
-    def test_no_router_returns_defaults(self, mock_progress, mock_create_router):
+    def test_no_router_returns_defaults(self, mock_progress, mock_connect_role):
         """Test that missing router returns error defaults."""
-        mock_create_router.return_value = (None, None)
+        mock_connect_role.return_value = (None, None)
         mock_client = MagicMock()
         mock_client.token = "test-token"
         mock_config = MagicMock()
@@ -722,10 +722,10 @@ class TestProcessRowsWithRouter(unittest.TestCase):
         self.assertIn("Configuration Error", expls[0])
         self.assertEqual(indices, [0])
 
-    @patch("hackagent.attacks.evaluator.base.create_router")
+    @patch("hackagent.attacks.evaluator.base.connect_role")
     @patch("hackagent.attacks.evaluator.base.create_progress_bar")
     def test_async_router_keeps_input_order_despite_out_of_order_completion(
-        self, mock_progress, mock_create_router
+        self, mock_progress, mock_connect_role
     ):
         class AsyncRouter:
             def __init__(self):
@@ -748,7 +748,7 @@ class TestProcessRowsWithRouter(unittest.TestCase):
                 raise AssertionError("sync router path must not be used")
 
         router = AsyncRouter()
-        mock_create_router.return_value = (router, "async-judge")
+        mock_connect_role.return_value = (router, "async-judge")
         mock_progress.return_value.__enter__.return_value = (MagicMock(), MagicMock())
         config = SimpleNamespace(
             model_id="test-model",

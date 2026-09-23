@@ -34,11 +34,10 @@ class TestCreateAttackerRouter(unittest.TestCase):
                         "identifier": "test-model",
                         "agent_type": agent_type,
                         "endpoint": "http://localhost:11434",
-                    },
-                    self.backend,
+                    }
                 )
                 key = next(iter(router._agent_registry))
-                self.assertEqual(router._agent_types[key], AgentType.OLLAMA)
+                self.assertEqual(router.llm.describe().agent_type, AgentType.OLLAMA)
                 self.assertEqual(
                     router.get_agent_instance(key).litellm_model,
                     "ollama_chat/test-model",
@@ -76,8 +75,7 @@ class TestCreateAttackerRouter(unittest.TestCase):
                             "identifier": "test-model",
                             "agent_type": "OPENAI_SDK",
                             **config,
-                        },
-                        self.backend,
+                        }
                     )
                     key = next(iter(router._agent_registry))
                     self.assertEqual(
@@ -94,15 +92,14 @@ class TestCreateAttackerRouter(unittest.TestCase):
                     "identifier": "test-model",
                     "agent_type": "openai",
                     "endpoint": "http://localhost:8000/v1",
-                },
-                self.backend,
+                }
             )
         key = next(iter(router._agent_registry))
         self.assertEqual(router.get_agent_instance(key).actual_api_key, "not-required")
 
     def test_missing_identifier_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "identifier"):
-            _create_attacker_router({"agent_type": "OLLAMA"}, self.backend)
+            _create_attacker_router({"agent_type": "OLLAMA"})
 
 
 class TestTaxonomy(unittest.TestCase):

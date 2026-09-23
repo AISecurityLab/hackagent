@@ -10,7 +10,7 @@ from hackagent.attacks.shared.response_utils import (
     get_guardrail_info,
     is_guardrail_response,
 )
-from hackagent.attacks.shared.router_factory import create_router
+from hackagent.attacks.shared.llm_router import connect_role
 
 from .config import (
     ATTACKER_USER_PROMPT,
@@ -131,7 +131,7 @@ def _parse_score_value(text: str, *, allow_fallback: bool = True) -> float | Non
     return None
 
 
-def init_routers(config, client, logger):
+def init_routers(config, logger):
     """Initialize all LLM roles required by the paper components.
 
     This maps the four AutoDAN-Turbo components to runtime routers:
@@ -141,7 +141,6 @@ def init_routers(config, client, logger):
     Args:
         config: Full attack config containing ``attacker``, ``scorer`` and
             ``summarizer`` router settings.
-        client: Authenticated API client used by router factory.
         logger: Logger used by router initialization and request flow.
 
     Returns:
@@ -150,21 +149,15 @@ def init_routers(config, client, logger):
     """
     att_cfg = dict(config.get("attacker", {}))
     att_cfg.setdefault("timeout", config.get("timeout", 120))
-    att_router, att_key = create_router(
-        backend=client, config=att_cfg, logger=logger, router_name="autodan-attacker"
-    )
+    att_router, att_key = connect_role(att_cfg, name="autodan-attacker")
     # Accept both "judge" (new) and "scorer" (legacy) config keys.
     sc_cfg = dict(config.get("judge") or config.get("scorer", {}))
     sc_cfg.setdefault("timeout", config.get("timeout", 120))
-    sc_router, sc_key = create_router(
-        backend=client, config=sc_cfg, logger=logger, router_name="autodan-judge"
-    )
+    sc_router, sc_key = connect_role(sc_cfg, name="autodan-judge")
 
     sum_cfg = dict(config.get("summarizer", {}))
     sum_cfg.setdefault("timeout", config.get("timeout", 120))
-    sum_router, sum_key = create_router(
-        backend=client, config=sum_cfg, logger=logger, router_name="autodan-summarizer"
-    )
+    sum_router, sum_key = connect_role(sum_cfg, name="autodan-summarizer")
     return att_router, att_key, sc_router, sc_key, sum_router, sum_key
 
 

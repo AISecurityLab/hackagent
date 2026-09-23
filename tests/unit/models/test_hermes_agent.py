@@ -78,9 +78,9 @@ class TestHermesAgentType(unittest.TestCase):
             self.assertEqual(AgentType(alias), AgentType.HERMES)
 
     def test_registered_in_adapter_map(self):
-        from hackagent.models.router import AGENT_TYPE_TO_ADAPTER_MAP
+        from hackagent.models.dispatch import ADAPTER_CLASSES
 
-        self.assertIs(AGENT_TYPE_TO_ADAPTER_MAP[AgentType.HERMES], HermesAgent)
+        self.assertIs(ADAPTER_CLASSES[AgentType.HERMES], HermesAgent)
 
 
 class TestHermesHelpers(unittest.TestCase):

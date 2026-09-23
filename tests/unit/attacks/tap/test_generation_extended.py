@@ -256,22 +256,16 @@ class TestLogColored(unittest.TestCase):
 
 
 class TestInitializeAttackerRouter(unittest.TestCase):
-    def test_delegates_to_the_shared_router_factory(self):
-        client = MagicMock()
+    def test_delegates_to_connect_role(self):
         router = MagicMock()
 
         with patch.object(
-            generation, "create_router", return_value=(router, "key")
+            generation, "connect_role", return_value=(router, "key")
         ) as factory:
-            result = _initialize_attacker_router(client, {"identifier": "m"}, LOGGER)
+            result = _initialize_attacker_router({"identifier": "m"})
 
         self.assertEqual(result, (router, "key"))
-        factory.assert_called_once_with(
-            backend=client,
-            config={"identifier": "m"},
-            logger=LOGGER,
-            router_name="attacker",
-        )
+        factory.assert_called_once_with({"identifier": "m"}, name="attacker")
 
 
 class TestTapExecutorSetup(unittest.TestCase):
@@ -291,7 +285,7 @@ class TestTapExecutorSetup(unittest.TestCase):
                 logger=LOGGER,
             )
 
-        self.assertEqual(init.call_args.kwargs["config"]["timeout"], 42)
+        self.assertEqual(init.call_args.args[0]["timeout"], 42)
 
     def test_explicit_attacker_timeout_is_preserved(self):
         with (
@@ -309,7 +303,7 @@ class TestTapExecutorSetup(unittest.TestCase):
                 logger=LOGGER,
             )
 
-        self.assertEqual(init.call_args.kwargs["config"]["timeout"], 5)
+        self.assertEqual(init.call_args.args[0]["timeout"], 5)
 
     def test_judge_configs_are_normalised_on_construction(self):
         executor = _make_executor({"judge": {"identifier": "j"}})

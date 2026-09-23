@@ -28,7 +28,7 @@ from typing import Any, Dict, List, Optional
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.core.defaults import DEFAULT_JUDGE_IDENTIFIER
-from hackagent.models.router import AgentRouter
+from hackagent.attacks.shared.llm_router import LLMRouter
 from hackagent.storage.store import Store
 from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
 
@@ -107,7 +107,7 @@ class MMLAttack(BaseAttack):
         self,
         config: Optional[Dict[str, Any]] = None,
         client: Optional[Store] = None,
-        agent_router: Optional[AgentRouter] = None,
+        agent_router: Optional[LLMRouter] = None,
     ):
         """
         Initialize MMLAttack with configuration.
@@ -116,7 +116,7 @@ class MMLAttack(BaseAttack):
             config: Optional dictionary containing parameters to override
                 :data:`~hackagent.attacks.techniques.mml.config.DEFAULT_MML_CONFIG`.
             client: Store instance passed from the orchestrator.
-            agent_router: AgentRouter instance for the target model.
+            agent_router: LLMRouter instance for the target model.
 
         Raises:
             ValueError: If ``client`` or ``agent_router`` is ``None``.
@@ -124,9 +124,7 @@ class MMLAttack(BaseAttack):
         if client is None:
             raise ValueError("A storage backend must be provided to MMLAttack.")
         if agent_router is None:
-            raise ValueError(
-                "Victim AgentRouter instance must be provided to MMLAttack."
-            )
+            raise ValueError("Victim LLMRouter instance must be provided to MMLAttack.")
 
         # Merge config with defaults
         current_config = copy.deepcopy(DEFAULT_MML_CONFIG)

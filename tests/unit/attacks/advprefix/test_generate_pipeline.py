@@ -254,14 +254,12 @@ class TestGenerateRawPrefixes(unittest.TestCase):
 
 
 class TestInitializeGenerationRouter(unittest.TestCase):
-    def _init(self, pipeline, registry=None):
-        router = MagicMock()
-        router._agent_registry = {"k": object()} if registry is None else registry
-        with patch.object(advgen, "AgentRouter", return_value=router) as cls:
-            result = pipeline._initialize_generation_router()
-        return result, cls
+    def _spec(self, pipeline):
+        router = pipeline._initialize_generation_router()
+        self.assertIsNotNone(router)
+        return router.llm.describe()
 
-    def test_operational_config_is_derived_from_the_attacker_block(self):
+    def test_spec_is_derived_from_the_attacker_block(self):
         client = MagicMock()
         client.get_api_key.return_value = "storage-key"
         pipeline = _pipeline(
@@ -269,14 +267,14 @@ class TestInitializeGenerationRouter(unittest.TestCase):
             client=client,
         )
 
-        router, cls = self._init(pipeline)
+        spec = self._spec(pipeline)
 
-        self.assertIsNotNone(router)
-        kwargs = cls.call_args.kwargs
-        self.assertEqual(kwargs["name"], "gen-model")
-        self.assertEqual(kwargs["endpoint"], "http://ep")
-        self.assertEqual(kwargs["agent_type"], AgentType.OPENAI_SDK)
-        self.assertEqual(kwargs["adapter_operational_config"]["api_key"], "storage-key")
+        self.assertEqual(spec.identifier, "gen-model")
+        self.assertEqual(spec.endpoint, "http://ep")
+        self.assertEqual(spec.agent_type, AgentType.OPENAI_SDK)
+        # The storage key is never a provider credential.
+        self.assertIsNone(spec.api_key)
+        client.get_api_key.assert_not_called()
 
     def test_api_key_is_read_from_the_named_environment_variable(self):
         pipeline = _pipeline(
@@ -290,11 +288,9 @@ class TestInitializeGenerationRouter(unittest.TestCase):
         )
 
         with patch.dict("os.environ", {"GEN_KEY": "from-env"}):
-            _, cls = self._init(pipeline)
+            router = pipeline._initialize_generation_router()
 
-        self.assertEqual(
-            cls.call_args.kwargs["adapter_operational_config"]["api_key"], "from-env"
-        )
+        self.assertEqual(router.llm.adapter.actual_api_key, "from-env")
 
     def test_api_key_literal_is_used_when_the_variable_is_unset(self):
         pipeline = _pipeline(
@@ -308,39 +304,24 @@ class TestInitializeGenerationRouter(unittest.TestCase):
         )
 
         with patch.dict("os.environ", {}, clear=True):
-            _, cls = self._init(pipeline)
+            spec = self._spec(pipeline)
 
-        self.assertEqual(
-            cls.call_args.kwargs["adapter_operational_config"]["api_key"], "literal-key"
-        )
+        self.assertEqual(spec.api_key, "literal-key")
 
     def test_explicit_agent_type_is_honoured(self):
         pipeline = _pipeline({"attacker": {"identifier": "m", "agent_type": "litellm"}})
-
-        _, cls = self._init(pipeline)
-
-        self.assertEqual(cls.call_args.kwargs["agent_type"], AgentType.LITELLM)
+        self.assertEqual(self._spec(pipeline).agent_type, AgentType.LITELLM)
 
     def test_invalid_agent_type_falls_back_to_openai_sdk(self):
         pipeline = _pipeline(
             {"attacker": {"identifier": "m", "agent_type": "nonsense"}}
         )
-
-        _, cls = self._init(pipeline)
-
-        self.assertEqual(cls.call_args.kwargs["agent_type"], AgentType.OPENAI_SDK)
-
-    def test_router_without_registered_agents_is_rejected(self):
-        pipeline = _pipeline()
-
-        router, _ = self._init(pipeline, registry={})
-
-        self.assertIsNone(router)
+        self.assertEqual(self._spec(pipeline).agent_type, AgentType.OPENAI_SDK)
 
     def test_router_construction_errors_are_swallowed(self):
         pipeline = _pipeline()
 
-        with patch.object(advgen, "AgentRouter", side_effect=RuntimeError("no host")):
+        with patch.object(advgen, "connect_role", side_effect=ValueError("bad")):
             self.assertIsNone(pipeline._initialize_generation_router())
 
 

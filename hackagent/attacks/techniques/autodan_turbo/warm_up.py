@@ -79,7 +79,7 @@ def execute(
     victim_key = str(agent_router.backend_agent.id)
 
     att_router, att_key, sc_router, sc_key, sum_router, sum_key = init_routers(
-        config, client, logger
+        config, logger
     )
     role_models = (
         {

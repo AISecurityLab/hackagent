@@ -17,7 +17,7 @@ FlipAttack generation and execution module.
 
 Generates flipped prompts by calling :meth:`FlipAttack.generate` on the
 attack instance passed via ``config["_self"]``, then executes them against
-the target model via HackAgent's AgentRouter.
+the target model via HackAgent's LLMRouter.
 
 Result Tracking:
     Uses Tracker (passed via config["_tracker"]) to add interaction traces
@@ -34,7 +34,7 @@ from hackagent.attacks.shared.response_utils import (
     get_guardrail_info,
     is_guardrail_response,
 )
-from hackagent.models.router import AgentRouter
+from hackagent.attacks.shared.llm_router import LLMRouter
 
 if TYPE_CHECKING:
     from hackagent.router.tracking import Tracker
@@ -42,7 +42,7 @@ if TYPE_CHECKING:
 
 def execute(
     goals: List[str],
-    agent_router: AgentRouter,
+    agent_router: LLMRouter,
     config: Dict[str, Any],
     logger: logging.Logger,
 ) -> List[Dict]:
