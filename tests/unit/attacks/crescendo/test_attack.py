@@ -499,7 +499,7 @@ class TestCrescendoAttack(unittest.TestCase):
         self.assertEqual(result["turns_completed"], 0)
         self.assertFalse(result["is_success"])
 
-    def test_run_suppresses_pipeline_status_updates_in_sub_run(self):
+    def test_run_always_finalizes_pipeline(self):
 
         class _DummyProgress:
             def update(self, *_args, **_kwargs):
@@ -520,7 +520,6 @@ class TestCrescendoAttack(unittest.TestCase):
                 config={
                     "output_dir": "./logs/runs",
                     "max_turns": 1,
-                    "_suppress_run_status_updates": True,
                 },
                 client=MagicMock(),
                 agent_router=MagicMock(),
@@ -562,7 +561,7 @@ class TestCrescendoAttack(unittest.TestCase):
         ):
             attack.run(["g"])
 
-        fake_coordinator.finalize_pipeline.assert_not_called()
+        fake_coordinator.finalize_pipeline.assert_called_once()
 
 
 if __name__ == "__main__":

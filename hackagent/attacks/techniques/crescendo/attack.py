@@ -39,6 +39,12 @@ from contextlib import nullcontext
 from typing import Any, Dict, List, Optional, Tuple
 
 from hackagent.attacks.techniques.base import BaseAttack
+from hackagent.attacks.ports import RunContext
+from hackagent.attacks._lib.inline_judge import verdict_from_judge
+from hackagent.attacks._lib.scoring import (
+    normalize_judge_score,
+    normalized_jailbreak_threshold,
+)
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.core.defaults import (
     DEFAULT_ATTACKER_IDENTIFIER,
@@ -46,17 +52,17 @@ from hackagent.core.defaults import (
 )
 from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
 from hackagent.attacks.evaluator.judge_evaluators import EVALUATOR_MAP
-from hackagent.attacks.objectives import OBJECTIVES
-from hackagent.attacks.shared.progress import create_progress_bar
-from hackagent.attacks.shared.response_utils import (
+from hackagent.attacks._lib.objectives import OBJECTIVES
+from hackagent.attacks._lib.progress import create_progress_bar
+from hackagent.attacks._lib.response import (
     extract_response_content,
     get_guardrail_info,
     is_guardrail_response,
 )
-from hackagent.attacks.shared.llm_router import connect_role
+from hackagent.attacks._lib.llm_router import connect_role
 from hackagent.storage.store import Store
 from hackagent.core.contracts import StepKind
-from hackagent.attacks.shared.llm_router import LLMRouter
+from hackagent.attacks._lib.llm_router import LLMRouter
 from hackagent.router.tracking import Tracker, Context
 
 from .config import (
@@ -156,28 +162,34 @@ class CrescendoAttack(BaseAttack):
     def __init__(
         self,
         config: Optional[Dict[str, Any]] = None,
-        client: Optional[Store] = None,
+        ctx_or_client: Any = None,
         agent_router: Optional[LLMRouter] = None,
+        *,
+        ctx: Optional[RunContext] = None,
+        client: Optional[Store] = None,
     ):
-        """
-        Initialize Crescendo attack.
+        """Initialize Crescendo with ``(config, ctx)`` or legacy args.
 
-        Args:
-            config: Optional configuration overrides merged into
-                :data:`~hackagent.attacks.techniques.crescendo.config.DEFAULT_CRESCENDO_CONFIG`.
-            client: Authenticated HackAgent API client.
-            agent_router: Router for the victim model.
-
-        Raises:
-            ValueError: If ``client`` or ``agent_router`` is ``None``, if the
-                attacker router cannot be initialised, or if the configured
-                ``objective`` key is not in
-                :data:`~hackagent.attacks.objectives.OBJECTIVES`.
+        On the new seam the attacker role comes from ``ctx.models`` and
+        each turn is scored with ``ctx.judge`` (``verdict_from_judge``).
+        This class does not read ``_suppress_run_status_updates``.
+        ``CrescendoConfig`` still subclasses
+        :class:`~hackagent.attacks.techniques.config.ConfigBase`.
+        The legacy constructor is obsolete for new code.
         """
-        if client is None:
-            raise ValueError("A storage backend must be provided.")
-        if agent_router is None:
-            raise ValueError("Target LLMRouter must be provided.")
+        if ctx is None and isinstance(ctx_or_client, RunContext):
+            ctx = ctx_or_client
+        resolved_client = (
+            client
+            if client is not None
+            else (None if isinstance(ctx_or_client, RunContext) else ctx_or_client)
+        )
+        if ctx is None:
+            if resolved_client is None:
+                raise ValueError("A storage backend must be provided.")
+            if agent_router is None:
+                raise ValueError("Target LLMRouter must be provided.")
+            client = resolved_client
 
         current_config = copy.deepcopy(DEFAULT_CRESCENDO_CONFIG)
         internal_config: Dict[str, Any] = {}
@@ -195,7 +207,10 @@ class CrescendoAttack(BaseAttack):
 
         self.logger = logging.getLogger("hackagent.attacks.crescendo")
 
-        super().__init__(current_config, client, agent_router)
+        if ctx is not None:
+            super().__init__(current_config, ctx)
+        else:
+            super().__init__(current_config, client, agent_router)
 
         self.attacker_router = self._initialize_attacker_router()
         if self.attacker_router is None:
@@ -235,9 +250,11 @@ class CrescendoAttack(BaseAttack):
             if api_key_config:
                 router_config["agent_metadata"]["api_key"] = api_key_config
 
+            models = self.ctx.models if self.ctx is not None else None
             router, _reg_key = connect_role(
                 router_config,
                 name=attacker_config.get("model", router_config["identifier"]),
+                models=models,
             )
 
             self.logger.debug(
@@ -260,7 +277,9 @@ class CrescendoAttack(BaseAttack):
         """
         super()._validate_config()
 
-        required = ["objective", "attacker", "max_turns", "output_dir"]
+        required = ["objective", "attacker", "max_turns"]
+        if self.ctx is None:
+            required.append("output_dir")
         missing = [k for k in required if k not in self.config]
         if missing:
             raise ValueError(f"Missing config keys: {missing}")
@@ -433,6 +452,19 @@ class CrescendoAttack(BaseAttack):
             for pattern in self.objective.failure_patterns
         )
 
+        if self.ctx is not None:
+            try:
+                score, _success, explanation = verdict_from_judge(
+                    self.ctx.judge,
+                    goal=goal,
+                    prompt=question,
+                    response=response_for_judge,
+                )
+                return float(score), refused, explanation
+            except Exception as exc:
+                self.logger.warning("Crescendo ctx.judge failed: %s", exc)
+                return 0.0, refused, "Judge evaluation failed"
+
         judge_type = (
             judge_config.get("type")
             or judge_config.get("evaluator_type")
@@ -492,7 +524,7 @@ class CrescendoAttack(BaseAttack):
                 return 0.0, refused, explanation or "No parseable judge score"
 
             return (
-                BaseEvaluationStep.normalize_judge_score(numeric_score, judge_range),
+                normalize_judge_score(numeric_score, judge_range),
                 refused,
                 explanation,
             )
@@ -513,9 +545,7 @@ class CrescendoAttack(BaseAttack):
         max_turns = int(self.config.get("max_turns", 10))
         max_backtracks = int(self.config.get("max_backtracks", 10))
         early_stop = self.config.get("early_stop_on_success", True)
-        jailbreak_threshold = BaseEvaluationStep.normalized_jailbreak_threshold(
-            self.config
-        )
+        jailbreak_threshold = normalized_jailbreak_threshold(self.config)
 
         preview_limit_raw = self.config.get("target_trace_response_max_chars", 2000)
         try:
@@ -886,8 +916,7 @@ class CrescendoAttack(BaseAttack):
 
             success_count = sum(1 for r in results if r.get("is_success", False))
 
-            if not self.config.get("_suppress_run_status_updates", False):
-                coordinator.finalize_pipeline(results)
+            coordinator.finalize_pipeline(results)
 
             if self.tracker:
                 self.tracker.add_step_metadata("successful_attacks", success_count)

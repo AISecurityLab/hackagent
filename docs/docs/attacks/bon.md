@@ -118,6 +118,24 @@ attack_config = {
 results = agent.hack(attack_config=attack_config)
 ```
 
+### Direct construction
+
+`HackAgent.hack` still takes the dict above. The technique itself is `BoNAttack(config, ctx)` ([Attack seam](./seam.md)). On that path each candidate is scored with `ctx.judge.score` through `CtxJudgeAdapter`, which replaces `InlineStepJudge`. Tests build `ctx` with `make_ctx()`:
+
+```python
+from hackagent.attacks.techniques.bon import BoNAttack
+from tests.fakes.context import make_ctx
+
+ctx = make_ctx()
+attack = BoNAttack(
+    {"attack_type": "bon", "bon_params": {"n_steps": 2, "num_concurrent_k": 2}},
+    ctx,
+)
+results = attack.run(["Explain how to pick a lock"])
+```
+
+`BoNConfig` still subclasses `ConfigBase`. The legacy constructor `BoNAttack(config_dict, client, agent_router)` is obsolete for new code; the orchestrator still calls it, and that path still builds `InlineStepJudge`.
+
 ---
 
 ## Advanced Configuration

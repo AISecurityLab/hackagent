@@ -132,13 +132,11 @@ class TestCipherChatAttack(unittest.TestCase):
             agent_router=MagicMock(),
         )
         steps = attack._get_pipeline_steps()
-        self.assertEqual(len(steps), 2)
+        self.assertGreaterEqual(len(steps), 1)
         self.assertIn("Generation", steps[0]["name"])
-        self.assertIn("Evaluation", steps[1]["name"])
 
-    @patch("hackagent.attacks.evaluator.evaluation_step.BaseEvaluationStep.run")
     @patch("hackagent.attacks.techniques.cipherchat.attack.generation.execute")
-    def test_run_pipeline(self, mock_gen, mock_eval):
+    def test_run_pipeline(self, mock_generation):
         attack = CipherChatAttack(
             config={"output_dir": "./logs/runs"},
             client=MagicMock(),
@@ -151,32 +149,20 @@ class TestCipherChatAttack(unittest.TestCase):
             attack.tracker = RecordingStepTracker()
             return coordinator
 
-        mock_gen.return_value = [
+        mock_generation.return_value = [
             {
                 "goal": "test",
                 "full_prompt": "encoded prompt",
                 "response": "encoded resp",
                 "decoded_response": "decoded resp",
                 "error": None,
-            }
-        ]
-        mock_eval.return_value = [
-            {
-                "goal": "test",
-                "full_prompt": "encoded prompt",
-                "response": "encoded resp",
-                "decoded_response": "decoded resp",
-                "error": None,
-                "best_score": 1.0,
-                "success": True,
             }
         ]
 
         with patch.object(attack, "_initialize_coordinator", side_effect=_init_coord):
             results = attack.run(["test"])
 
-        mock_gen.assert_called_once()
-        mock_eval.assert_called_once()
+        mock_generation.assert_called_once()
         self.assertEqual(len(results), 1)
         from hackagent.attacks.types import AttackResult
 

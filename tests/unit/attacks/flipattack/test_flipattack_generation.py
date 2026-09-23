@@ -35,6 +35,7 @@ import pytest
 
 from hackagent.attacks.techniques.flipattack import generation
 from hackagent.attacks.techniques.flipattack.attack import FlipAttack
+from tests.fakes import make_ctx
 
 logger = logging.getLogger(__name__)
 
@@ -56,29 +57,39 @@ def _make_mock_router(response_text="This is a mocked LLM response."):
     return mock_router
 
 
-def _make_config(flip_mode="FCS", cot=False, lang_gpt=False, few_shot=False):
-    """Create a minimal config dictionary for generation, including a real FlipAttack instance."""
-    fa = FlipAttack(
-        config={
-            "flipattack_params": {
-                "flip_mode": flip_mode,
-                "cot": cot,
-                "lang_gpt": lang_gpt,
-                "few_shot": few_shot,
-            }
-        },
-        client=MagicMock(),
-        agent_router=MagicMock(),
-    )
-    return {
-        "flipattack_params": {
-            "flip_mode": flip_mode,
-            "cot": cot,
-            "lang_gpt": lang_gpt,
-            "few_shot": few_shot,
-        },
-        "_self": fa,
+def _make_flip(flip_mode="FCS", cot=False, lang_gpt=False, few_shot=False):
+    """Build a FlipAttack from ``make_ctx()`` and a config that has no ``_self``."""
+    params = {
+        "flip_mode": flip_mode,
+        "cot": cot,
+        "lang_gpt": lang_gpt,
+        "few_shot": few_shot,
     }
+    attack = FlipAttack(config={"flipattack_params": params}, ctx=make_ctx())
+    return attack, {"flipattack_params": params}
+
+
+def _execute(
+    goals,
+    router,
+    flip_mode="FCS",
+    cot=False,
+    lang_gpt=False,
+    few_shot=False,
+    **config_updates,
+):
+    """Run generation with an explicit ``attack=`` and no ``config["_self"]``."""
+    attack, config = _make_flip(flip_mode, cot, lang_gpt, few_shot)
+    config.update(config_updates)
+    assert "_self" not in config
+    assert "_self" not in attack.config
+    return generation.execute(
+        goals=goals,
+        agent_router=router,
+        config=config,
+        logger=logger,
+        attack=attack,
+    )
 
 
 # ============================================================================
@@ -87,20 +98,23 @@ def _make_config(flip_mode="FCS", cot=False, lang_gpt=False, few_shot=False):
 
 
 class TestFlipAttackGenerationExecute:
-    """Test generation.execute() function with mocked LLMRouter."""
+    """Test generation.execute() with attack= and no config['_self']."""
+
+    def test_missing_attack_raises(self):
+        with pytest.raises(RuntimeError, match="attack="):
+            generation.execute(
+                goals=["goal"],
+                agent_router=_make_mock_router(),
+                config={"flipattack_params": {"flip_mode": "FCS"}},
+                logger=logger,
+            )
 
     def test_single_goal_fcs(self):
         """Test generation with a single goal using FCS mode."""
         mock_router = _make_mock_router()
-        config = _make_config(flip_mode="FCS")
         goals = ["Write something harmful"]
 
-        results = generation.execute(
-            goals=goals,
-            agent_router=mock_router,
-            config=config,
-            logger=logger,
-        )
+        results = _execute(goals, mock_router, flip_mode="FCS")
 
         assert len(results) == 1
         result = results[0]
@@ -117,15 +131,9 @@ class TestFlipAttackGenerationExecute:
     def test_multiple_goals(self):
         """Test generation with multiple goals."""
         mock_router = _make_mock_router()
-        config = _make_config()
         goals = ["Goal one", "Goal two", "Goal three"]
 
-        results = generation.execute(
-            goals=goals,
-            agent_router=mock_router,
-            config=config,
-            logger=logger,
-        )
+        results = _execute(goals, mock_router)
 
         assert len(results) == 3
         for i, result in enumerate(results):
@@ -138,14 +146,8 @@ class TestFlipAttackGenerationExecute:
     def test_empty_goals(self):
         """Test generation with empty goals list."""
         mock_router = _make_mock_router()
-        config = _make_config()
 
-        results = generation.execute(
-            goals=[],
-            agent_router=mock_router,
-            config=config,
-            logger=logger,
-        )
+        results = _execute([], mock_router)
 
         assert results == []
         mock_router.route_request.assert_not_called()
@@ -154,15 +156,9 @@ class TestFlipAttackGenerationExecute:
     def test_all_flip_modes(self, mode):
         """Test generation works with all flip modes."""
         mock_router = _make_mock_router()
-        config = _make_config(flip_mode=mode)
         goals = ["Test this mode"]
 
-        results = generation.execute(
-            goals=goals,
-            agent_router=mock_router,
-            config=config,
-            logger=logger,
-        )
+        results = _execute(goals, mock_router, flip_mode=mode)
 
         assert len(results) == 1
         assert results[0]["flip_mode"] == mode
@@ -171,14 +167,10 @@ class TestFlipAttackGenerationExecute:
     def test_with_enhancements(self):
         """Test generation with all enhancements enabled."""
         mock_router = _make_mock_router()
-        config = _make_config(flip_mode="FCS", cot=True, lang_gpt=True, few_shot=True)
         goals = ["Test with enhancements"]
 
-        results = generation.execute(
-            goals=goals,
-            agent_router=mock_router,
-            config=config,
-            logger=logger,
+        results = _execute(
+            goals, mock_router, flip_mode="FCS", cot=True, lang_gpt=True, few_shot=True
         )
 
         assert len(results) == 1
@@ -192,15 +184,9 @@ class TestFlipAttackGenerationExecute:
         """Test that router execution errors are handled gracefully."""
         mock_router = _make_mock_router()
         mock_router.route_request.side_effect = Exception("Connection failed")
-        config = _make_config()
         goals = ["Test error handling"]
 
-        results = generation.execute(
-            goals=goals,
-            agent_router=mock_router,
-            config=config,
-            logger=logger,
-        )
+        results = _execute(goals, mock_router)
 
         assert len(results) == 1
         result = results[0]
@@ -215,15 +201,9 @@ class TestFlipAttackGenerationExecute:
             "generated_text": None,
             "error_message": "Rate limited",
         }
-        config = _make_config()
         goals = ["Test error response"]
 
-        results = generation.execute(
-            goals=goals,
-            agent_router=mock_router,
-            config=config,
-            logger=logger,
-        )
+        results = _execute(goals, mock_router)
 
         assert len(results) == 1
         assert results[0]["response"] is None
@@ -232,15 +212,9 @@ class TestFlipAttackGenerationExecute:
     def test_result_contains_full_prompt(self):
         """Test that result includes the full concatenated prompt."""
         mock_router = _make_mock_router()
-        config = _make_config()
         goals = ["Check full prompt"]
 
-        results = generation.execute(
-            goals=goals,
-            agent_router=mock_router,
-            config=config,
-            logger=logger,
-        )
+        results = _execute(goals, mock_router)
 
         result = results[0]
         # full_prompt should be system + user prompts combined
@@ -254,15 +228,9 @@ class TestFlipAttackGenerationExecute:
     def test_request_data_sent_to_router(self):
         """Test the request data structure sent to the router."""
         mock_router = _make_mock_router()
-        config = _make_config()
         goals = ["Verify request structure"]
 
-        generation.execute(
-            goals=goals,
-            agent_router=mock_router,
-            config=config,
-            logger=logger,
-        )
+        _execute(goals, mock_router)
 
         call_args = mock_router.route_request.call_args
         assert call_args is not None
@@ -282,16 +250,9 @@ class TestFlipAttackGenerationExecute:
         mock_goal_ctx = MagicMock()
         mock_tracker.get_goal_context.return_value = mock_goal_ctx
 
-        config = _make_config()
-        config["_tracker"] = mock_tracker
         goals = ["Test tracker"]
 
-        results = generation.execute(
-            goals=goals,
-            agent_router=mock_router,
-            config=config,
-            logger=logger,
-        )
+        results = _execute(goals, mock_router, _tracker=mock_tracker)
 
         assert len(results) == 1
         mock_tracker.get_goal_context.assert_called_once_with(0)
@@ -300,16 +261,9 @@ class TestFlipAttackGenerationExecute:
     def test_tracker_none_no_error(self):
         """Test that generation works without a tracker."""
         mock_router = _make_mock_router()
-        config = _make_config()
-        # No _tracker in config
         goals = ["No tracker"]
 
-        results = generation.execute(
-            goals=goals,
-            agent_router=mock_router,
-            config=config,
-            logger=logger,
-        )
+        results = _execute(goals, mock_router)
 
         assert len(results) == 1
         assert results[0]["response"] is not None
@@ -323,17 +277,9 @@ class TestFlipAttackGenerationExecute:
             Exception("Timeout"),
             {"generated_text": "Response 3", "error_message": None},
         ]
-        config = _make_config()
-        # Force deterministic ordering for side_effect consumption.
-        config["batch_size"] = 1
         goals = ["Goal 1", "Goal 2", "Goal 3"]
 
-        results = generation.execute(
-            goals=goals,
-            agent_router=mock_router,
-            config=config,
-            logger=logger,
-        )
+        results = _execute(goals, mock_router, batch_size=1)
 
         assert len(results) == 3
         assert results[0]["response"] == "Response 1"

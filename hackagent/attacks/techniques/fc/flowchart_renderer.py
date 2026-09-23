@@ -12,6 +12,7 @@ Language Models via Auto-Generated Flowcharts" (EMNLP 2025 Findings)
 """
 
 import base64
+import hashlib
 import json
 import logging
 import os
@@ -556,6 +557,11 @@ def ensure_graphviz_dot_available(allow_download: bool | None = None) -> str | N
     dot_binary = _resolve_dot_binary(allow_download=allow_download)
     _GRAPHVIZ_AVAILABLE = dot_binary is not None
     return dot_binary
+
+
+def ensure_graphviz(allow_download: bool | None = None) -> str | None:
+    """Public alias for :func:`ensure_graphviz_dot_available`."""
+    return ensure_graphviz_dot_available(allow_download=allow_download)
 
 
 # ─── DOT text helpers ─────────────────────────────────────────────────────────
@@ -1181,6 +1187,7 @@ def render_flowchart(
     goal_text: str = "",
     layout: str = "vertical",
     dpi: int = 600,
+    cache_dir: Path | str | None = None,
     **kwargs: Any,
 ) -> Dict[str, Any]:
     """
@@ -1224,7 +1231,27 @@ def render_flowchart(
     else:
         dot = _generate_dot_vertical(goal_text, steps, dpi=dpi)
 
+    cache_root = Path(cache_dir) if cache_dir else None
+    cache_path: Path | None = None
+    if cache_root is not None:
+        cache_root.mkdir(parents=True, exist_ok=True)
+        digest = hashlib.sha256(
+            f"{layout}|{dpi}|{goal_text}|{'|'.join(steps)}".encode("utf-8")
+        ).hexdigest()[:24]
+        cache_path = cache_root / f"{digest}.png"
+        if cache_path.is_file():
+            png_bytes = cache_path.read_bytes()
+            b64_data = base64.b64encode(png_bytes).decode("utf-8")
+            return {
+                "image_data_url": f"data:image/png;base64,{b64_data}",
+                "layout": layout,
+                "num_steps": len(steps),
+                "cache_hit": True,
+            }
+
     png_bytes = _render_dot_to_png_bytes(dot)
+    if cache_path is not None:
+        cache_path.write_bytes(png_bytes)
     b64_data = base64.b64encode(png_bytes).decode("utf-8")
     image_data_url = f"data:image/png;base64,{b64_data}"
 

@@ -6,6 +6,30 @@
           "items": [
             {
               "items": [
+                {
+                  "items": [
+                    "reference/hackagent/attacks/_lib/objectives/base"
+                  ],
+                  "label": "hackagent.attacks._lib.objectives",
+                  "type": "category"
+                },
+                "reference/hackagent/attacks/_lib/embedding_utils",
+                "reference/hackagent/attacks/_lib/graphviz",
+                "reference/hackagent/attacks/_lib/inline_judge",
+                "reference/hackagent/attacks/_lib/llm_router",
+                "reference/hackagent/attacks/_lib/progress",
+                "reference/hackagent/attacks/_lib/prompt_parser",
+                "reference/hackagent/attacks/_lib/response",
+                "reference/hackagent/attacks/_lib/scoring",
+                "reference/hackagent/attacks/_lib/templates",
+                "reference/hackagent/attacks/_lib/transforms",
+                "reference/hackagent/attacks/_lib/translation"
+              ],
+              "label": "hackagent.attacks._lib",
+              "type": "category"
+            },
+            {
+              "items": [
                 "reference/hackagent/attacks/evaluator/base",
                 "reference/hackagent/attacks/evaluator/evaluation_step",
                 "reference/hackagent/attacks/evaluator/inline_step_judge",
@@ -15,33 +39,6 @@
                 "reference/hackagent/attacks/evaluator/sync"
               ],
               "label": "hackagent.attacks.evaluator",
-              "type": "category"
-            },
-            {
-              "items": [
-                "reference/hackagent/attacks/generator/templates"
-              ],
-              "label": "hackagent.attacks.generator",
-              "type": "category"
-            },
-            {
-              "items": [
-                "reference/hackagent/attacks/objectives/base"
-              ],
-              "label": "hackagent.attacks.objectives",
-              "type": "category"
-            },
-            {
-              "items": [
-                "reference/hackagent/attacks/shared/embedding_utils",
-                "reference/hackagent/attacks/shared/llm_router",
-                "reference/hackagent/attacks/shared/progress",
-                "reference/hackagent/attacks/shared/prompt_parser",
-                "reference/hackagent/attacks/shared/response_utils",
-                "reference/hackagent/attacks/shared/translation",
-                "reference/hackagent/attacks/shared/utils"
-              ],
-              "label": "hackagent.attacks.shared",
               "type": "category"
             },
             {

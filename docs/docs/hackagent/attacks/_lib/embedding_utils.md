@@ -1,6 +1,6 @@
 ---
 sidebar_label: embedding_utils
-title: hackagent.attacks.shared.embedding_utils
+title: hackagent.attacks._lib.embedding_utils
 ---
 
 Embedding-only provider requests shared by retrieval and preflight.

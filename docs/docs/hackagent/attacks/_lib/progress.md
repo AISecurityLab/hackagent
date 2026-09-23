@@ -1,6 +1,6 @@
 ---
 sidebar_label: progress
-title: hackagent.attacks.shared.progress
+title: hackagent.attacks._lib.progress
 ---
 
 Shared progress bar utilities for attack modules.
@@ -67,4 +67,15 @@ The progress bar includes:
   The progress bar automatically starts and stops when entering/exiting
   the context manager. In TUI mode (NO_COLOR=1), a null progress bar
   is used to avoid display conflicts.
+
+#### report\_progress
+
+```python
+def report_progress(events: Any, fraction: float, message: str = "") -> None
+```
+
+Report progress through an :class:`~hackagent.attacks.ports.Events` sink.
+
+Techniques should prefer this over Rich bars when a ``RunContext`` is
+available. *events* may be ``None`` (no-op) for legacy construction.
 

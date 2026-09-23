@@ -334,6 +334,11 @@ in the HackAgent Python SDK, auto-generated from source-code docstrings.
   (AdvPrefix, PAIR, TAP, BON, FlipAttack, AutoDAN-Turbo, Baseline).
   The attack seam (`hackagent.attacks.ports`, `AttackConfig`, `BaseAttack`)
   is documented alongside `RunSpec` and `TargetParams`.
+  Shared helpers live in `hackagent.attacks._lib` (transforms, scoring,
+  templates, objectives, progress, inline-judge adapters, `ensure_graphviz`).
+  Every shipped technique constructs as `BaseAttack(config, ctx)`.
+  Compatibility shims remain at `attacks.shared`, `attacks.generator`,
+  and `attacks.objectives`.
 - **Datasets**: Built-in providers and dataset registry
 - **Risks**: Risk profiles and vulnerability definitions for all OWASP LLM risk categories
 

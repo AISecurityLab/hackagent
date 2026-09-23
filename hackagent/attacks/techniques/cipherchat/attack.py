@@ -14,12 +14,12 @@ import copy
 import logging
 from typing import Any, Dict, List, Optional
 
+from hackagent.attacks.ports import RunContext
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.storage.store import Store
-from hackagent.attacks.shared.llm_router import LLMRouter
+from hackagent.attacks._lib.llm_router import LLMRouter
 
-from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
 
 from . import generation
 from .config import DEFAULT_CIPHERCHAT_CONFIG
@@ -40,25 +40,56 @@ def _recursive_update(target_dict: Dict[str, Any], source_dict: Dict[str, Any]) 
 
 
 class CipherChatAttack(BaseAttack):
-    """CipherChat jailbreak attack using encoded non-natural language prompts."""
+    """CipherChat jailbreak attack using encoded non-natural language prompts.
+
+    Construct with ``(config, ctx)``. ``config`` is a dict deep-merged into
+    :data:`~hackagent.attacks.techniques.cipherchat.config.DEFAULT_CIPHERCHAT_CONFIG`.
+    ``ctx`` is a :class:`~hackagent.attacks.ports.RunContext`, passed
+    positionally or as ``ctx=``. Tests build it with ``make_ctx()``
+    (``tests.fakes.context``).
+
+    The pipeline encodes the goal, queries the target, and optionally
+    decodes the reply. It does not embed a judge step. ``run()`` returns
+    rows without a verdict.
+
+    The legacy constructor ``(config_dict, client, agent_router)`` is
+    obsolete for new code. The orchestrator still calls it.
+    :class:`~hackagent.attacks.techniques.cipherchat.config.CipherChatConfig`
+    still subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
+    """
 
     def __init__(
         self,
         config: Optional[Dict[str, Any]] = None,
-        client: Optional[Store] = None,
+        ctx_or_client: Any = None,
         agent_router: Optional[LLMRouter] = None,
+        *,
+        ctx: Optional[RunContext] = None,
+        client: Optional[Store] = None,
     ):
-        if client is None:
-            raise ValueError("A storage backend must be provided to CipherChat.")
-        if agent_router is None:
-            raise ValueError("Victim LLMRouter must be provided to CipherChat.")
+        if ctx is None and isinstance(ctx_or_client, RunContext):
+            ctx = ctx_or_client
+        resolved_client = (
+            client
+            if client is not None
+            else (None if isinstance(ctx_or_client, RunContext) else ctx_or_client)
+        )
+        if ctx is None:
+            if resolved_client is None:
+                raise ValueError("A storage backend must be provided")
+            if agent_router is None:
+                raise ValueError("LLMRouter must be provided")
+            client = resolved_client
 
         current_config = copy.deepcopy(DEFAULT_CIPHERCHAT_CONFIG)
         if config:
             _recursive_update(current_config, config)
 
         self.logger = logging.getLogger("hackagent.attacks.cipherchat")
-        super().__init__(current_config, client, agent_router)
+        if ctx is not None:
+            super().__init__(current_config, ctx)
+        else:
+            super().__init__(current_config, client, agent_router)
 
     def _validate_config(self) -> None:
         super()._validate_config()
@@ -129,34 +160,7 @@ class CipherChatAttack(BaseAttack):
                 ],
                 "input_data_arg_name": "goals",
                 "required_args": ["logger", "agent_router", "config"],
-            },
-            {
-                "name": "Evaluation: Judge Decoded CipherChat Responses",
-                "function": BaseEvaluationStep.make_execute(
-                    prefix_fn=lambda item: item.get("full_prompt", ""),
-                    completion_fn=lambda item: (
-                        item.get("decoded_response") or item.get("response", "") or ""
-                    ),
-                    technique_params_key="cipherchat_params",
-                ),
-                "step_type_enum": "EVALUATION",
-                "config_keys": [
-                    "cipherchat_params",
-                    "_run_id",
-                    "_backend",
-                    "_client",
-                    "_tracker",
-                    "judges",
-                    "judge_concurrency",
-                    "max_tokens_eval",
-                    "filter_len",
-                    "judge_timeout",
-                    "judge_temperature",
-                    "max_judge_retries",
-                ],
-                "input_data_arg_name": "input_data",
-                "required_args": ["logger", "config", "client"],
-            },
+            }
         ]
 
     def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
@@ -187,18 +191,14 @@ class CipherChatAttack(BaseAttack):
         start_step = self.config.get("start_step", 1) - 1
 
         try:
-            generation_output = self._execute_pipeline(
-                pipeline_steps, goals, start_step=start_step, end_step=start_step + 1
+            results = self._execute_pipeline(
+                pipeline_steps, goals, start_step=start_step
             )
 
-            if not generation_output:
+            if not results:
                 self.logger.warning("Generation produced no output")
                 coordinator.finalize_pipeline([], lambda _: False)
                 return []
-
-            results = self._execute_pipeline(
-                pipeline_steps, generation_output, start_step=start_step + 1
-            )
 
             coordinator.finalize_all_goals(results)
             coordinator.log_summary()

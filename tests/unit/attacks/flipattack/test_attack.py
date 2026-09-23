@@ -55,9 +55,8 @@ class TestFlipAttack(unittest.TestCase):
         )
         self.assertEqual(attack.run([]), [])
 
-    @patch("hackagent.attacks.evaluator.evaluation_step.BaseEvaluationStep.run")
     @patch("hackagent.attacks.techniques.flipattack.attack.generation.execute")
-    def test_run_pipeline(self, mock_generation, mock_evaluation):
+    def test_run_pipeline(self, mock_generation):
         attack = FlipAttack(
             config={"output_dir": "./logs/runs"},
             client=MagicMock(),
@@ -77,14 +76,12 @@ class TestFlipAttack(unittest.TestCase):
                 "response": "r1",
             }
         ]
-        mock_evaluation.return_value = [{"goal": "g1", "best_score": 1.0}]
 
         with patch.object(attack, "_initialize_coordinator", side_effect=_init_coord):
             out = attack.run(["g1"])
 
         self.assertEqual(len(out), 1)
         mock_generation.assert_called_once()
-        mock_evaluation.assert_called_once()
         from hackagent.attacks.types import AttackResult
 
         self.assertIsInstance(out[0], AttackResult)

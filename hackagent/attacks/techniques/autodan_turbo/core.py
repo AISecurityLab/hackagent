@@ -5,12 +5,12 @@
 import re
 
 from hackagent.core.defaults import DEFAULT_MAX_OUTPUT_TOKENS
-from hackagent.attacks.shared.response_utils import (
+from hackagent.attacks._lib.response import (
     extract_response_content,
     get_guardrail_info,
     is_guardrail_response,
 )
-from hackagent.attacks.shared.llm_router import connect_role
+from hackagent.attacks._lib.llm_router import connect_role
 
 from .config import (
     ATTACKER_USER_PROMPT,
@@ -147,17 +147,20 @@ def init_routers(config, logger):
         Tuple ``(att_router, att_key, sc_router, sc_key, sum_router, sum_key)``
         with each router plus its registration key.
     """
+    models = config.get("_models")
     att_cfg = dict(config.get("attacker", {}))
     att_cfg.setdefault("timeout", config.get("timeout", 120))
-    att_router, att_key = connect_role(att_cfg, name="autodan-attacker")
+    att_router, att_key = connect_role(att_cfg, name="autodan-attacker", models=models)
     # Accept both "judge" (new) and "scorer" (legacy) config keys.
     sc_cfg = dict(config.get("judge") or config.get("scorer", {}))
     sc_cfg.setdefault("timeout", config.get("timeout", 120))
-    sc_router, sc_key = connect_role(sc_cfg, name="autodan-judge")
+    sc_router, sc_key = connect_role(sc_cfg, name="autodan-judge", models=models)
 
     sum_cfg = dict(config.get("summarizer", {}))
     sum_cfg.setdefault("timeout", config.get("timeout", 120))
-    sum_router, sum_key = connect_role(sum_cfg, name="autodan-summarizer")
+    sum_router, sum_key = connect_role(
+        sum_cfg, name="autodan-summarizer", models=models
+    )
     return att_router, att_key, sc_router, sc_key, sum_router, sum_key
 
 
@@ -359,27 +362,21 @@ def score_response(
     scorer_max_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
     role_label="scorer",
     thinking=False,
+    judge=None,
 ):
     """Score target output, using a wrapper only for unstructured assessments.
 
-    Paper mapping: this is the Scorer LLM component (analysis + numeric score)
-    from AutoDAN-Turbo, with robust fallbacks for production providers.
-
-    Args:
-        scorer_router: Router bound to scorer model.
-        scorer_key: Registration key for scorer route.
-        goal: Original harmful goal being evaluated.
-        target_response: Victim response to evaluate.
-        logger: Logger for scoring diagnostics.
-        max_retries: Maximum attempts for parseable score extraction.
-        role_label: Log label for scorer role.
-
-    Returns:
-        Tuple ``(score, assessment_text)`` where ``score`` is float in ``[1,10]``
-        and ``assessment_text`` is the scorer's natural-language reasoning.
-        Explicit assessment scores take precedence over model-based extraction.
-        Exhausted retries return ``(1.0, "Score extraction failed")``.
+    When *judge* (``ctx.judge``) is provided, scoring goes through
+    ``Verdict.score`` instead of the AutoDAN scorer LLM.
     """
+    if judge is not None:
+        from hackagent.attacks._lib.inline_judge import verdict_from_judge
+
+        score, _success, explanation = verdict_from_judge(
+            judge, goal=str(goal or ""), response=str(target_response or "")
+        )
+        return float(score), explanation or ""
+
     if not isinstance(thinking, bool):
         thinking = False
     goal_text = str(goal or "")

@@ -87,25 +87,21 @@ checkpointing.
 
 ```python
 def __init__(config: Optional[Dict[str, Any]] = None,
-             client: Optional[Store] = None,
-             agent_router: Optional[LLMRouter] = None)
+             ctx_or_client: Any = None,
+             agent_router: Optional[LLMRouter] = None,
+             *,
+             ctx: Optional[RunContext] = None,
+             client: Optional[Store] = None)
 ```
 
-Initialize TAP with configuration and routers.
+Initialize TAP with ``(config, ctx)`` or the legacy constructor.
 
-**Arguments**:
-
-- `config` - Optional config overrides merged into
-  :data:`~hackagent.attacks.techniques.tap.config.DEFAULT_TAP_CONFIG`.
-  Keys from ``config`` win over defaults; nested dicts are
-  deep-merged via :func:`_recursive_update`.
-- `client` - Authenticated API client.
-- `agent_router` - Router for the victim model.
-  
-
-**Raises**:
-
-- `ValueError` - If ``client`` or ``agent_router`` is ``None``.
+On the new seam, search scoring uses
+:class:`~hackagent.attacks._lib.inline_judge.CtxTapEvaluator`
+(``ctx.judge.score``) instead of ``TapEvaluation``. ``TapConfig``
+still subclasses
+:class:`~hackagent.attacks.techniques.config.ConfigBase`.
+The legacy constructor is obsolete for new code.
 
 #### run
 

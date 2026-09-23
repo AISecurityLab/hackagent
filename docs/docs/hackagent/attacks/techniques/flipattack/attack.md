@@ -50,6 +50,21 @@ cot      Appends &quot;step by step&quot; to the decoding instruction.
 lang_gpt Wraps the system prompt in a LangGPT Role/Profile template.
 few_shot Injects two task-specific decoding demonstrations.
 
+Construct with ``(config, ctx)``. ``config`` is a dict deep-merged into
+:data:`~hackagent.attacks.techniques.flipattack.config.DEFAULT_FLIPATTACK_CONFIG`.
+``ctx`` is a :class:`~hackagent.attacks.ports.RunContext`, passed
+positionally or as ``ctx=``. Tests build it with ``make_ctx()``
+(``tests.fakes.context``). Generation receives this instance as
+``attack=``. Do not store it on ``config[&quot;_self&quot;]``.
+
+The pipeline is generation-only. ``run()`` returns rows without a
+verdict.
+
+The legacy constructor ``(config_dict, client, agent_router)`` is
+obsolete for new code. The orchestrator still calls it.
+:class:`~hackagent.attacks.techniques.flipattack.config.FlipAttackConfig`
+still subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
+
 **Attributes**:
 
 - `flip_mode` - Active obfuscation mode, read from config.
@@ -63,8 +78,11 @@ few_shot Injects two task-specific decoding demonstrations.
 
 ```python
 def __init__(config: Optional[Dict[str, Any]] = None,
-             client: Optional[Store] = None,
-             agent_router: Optional[LLMRouter] = None)
+             ctx_or_client: Any = None,
+             agent_router: Optional[LLMRouter] = None,
+             *,
+             ctx: Optional[RunContext] = None,
+             client: Optional[Store] = None)
 ```
 
 Initialize FlipAttack with configuration.
@@ -73,13 +91,16 @@ Initialize FlipAttack with configuration.
 
 - `config` - Optional dictionary containing parameters to override
   :data:`~hackagent.attacks.techniques.flipattack.config.DEFAULT_FLIPATTACK_CONFIG`.
-- `client` - Store instance passed from the orchestrator.
-- `agent_router` - LLMRouter instance for the target model.
+- `ctx` - :class:`~hackagent.attacks.ports.RunContext`. Positional
+  or ``ctx=``. Tests use ``make_ctx()``.
+- `client` - Obsolete. Store instance on the orchestrator path.
+- `agent_router` - Obsolete. Target router on the orchestrator path.
   
 
 **Raises**:
 
-- `ValueError` - If ``client`` or ``agent_router`` is ``None``.
+- `ValueError` - On the legacy path, if ``client`` or
+  ``agent_router`` is ``None``.
 
 #### flip\_word\_order
 

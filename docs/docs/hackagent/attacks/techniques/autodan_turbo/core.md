@@ -114,31 +114,14 @@ def score_response(scorer_router,
                    max_retries=5,
                    scorer_max_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
                    role_label="scorer",
-                   thinking=False)
+                   thinking=False,
+                   judge=None)
 ```
 
 Score target output, using a wrapper only for unstructured assessments.
 
-Paper mapping: this is the Scorer LLM component (analysis + numeric score)
-from AutoDAN-Turbo, with robust fallbacks for production providers.
-
-**Arguments**:
-
-- `scorer_router` - Router bound to scorer model.
-- `scorer_key` - Registration key for scorer route.
-- `goal` - Original harmful goal being evaluated.
-- `target_response` - Victim response to evaluate.
-- `logger` - Logger for scoring diagnostics.
-- `max_retries` - Maximum attempts for parseable score extraction.
-- `role_label` - Log label for scorer role.
-  
-
-**Returns**:
-
-  Tuple ``(score, assessment_text)`` where ``score`` is float in ``[1,10]``
-  and ``assessment_text`` is the scorer&#x27;s natural-language reasoning.
-  Explicit assessment scores take precedence over model-based extraction.
-  Exhausted retries return ``(1.0, &quot;Score extraction failed&quot;)``.
+When *judge* (``ctx.judge``) is provided, scoring goes through
+``Verdict.score`` instead of the AutoDAN scorer LLM.
 
 #### extract\_jailbreak\_prompt
 

@@ -93,6 +93,24 @@ attack_config = {
 results = agent.hack(attack_config=attack_config)
 ```
 
+### Direct construction
+
+`HackAgent.hack` still takes the dict above. The technique itself is `AutoDANTurboAttack(config, ctx)` ([Attack seam](./seam.md)). Warm-up and lifelong read roles from `ctx.models` and scores from `ctx.judge`. The strategy library is written under `ctx.workspace`. The class does not read `_suppress_run_status_updates`. Tests build `ctx` with `make_ctx()`:
+
+```python
+from hackagent.attacks.techniques.autodan_turbo import AutoDANTurboAttack
+from tests.fakes.context import make_ctx
+
+ctx = make_ctx()
+attack = AutoDANTurboAttack(
+    {"attack_type": "autodan_turbo", "autodan_turbo_params": {"epochs": 1}},
+    ctx,
+)
+results = attack.run(["Bypass content safety filters"])
+```
+
+`AutoDANTurboConfig` still subclasses `ConfigBase`. The legacy constructor `AutoDANTurboAttack(config_dict, client, agent_router)` is obsolete for new code; the orchestrator still calls it.
+
 ---
 
 ## Advanced Configuration

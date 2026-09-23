@@ -38,11 +38,11 @@ import textwrap
 from typing import Any, Dict, List, Optional
 
 from hackagent.storage.store import Store
-from hackagent.attacks.shared.llm_router import LLMRouter
+from hackagent.attacks._lib.llm_router import LLMRouter
+from hackagent.attacks.ports import RunContext
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.core.defaults import DEFAULT_JUDGE_IDENTIFIER
-from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
 
 from . import generation
 from .config import DEFAULT_FLIPATTACK_CONFIG
@@ -94,6 +94,21 @@ class FlipAttack(BaseAttack):
         lang_gpt Wraps the system prompt in a LangGPT Role/Profile template.
         few_shot Injects two task-specific decoding demonstrations.
 
+    Construct with ``(config, ctx)``. ``config`` is a dict deep-merged into
+    :data:`~hackagent.attacks.techniques.flipattack.config.DEFAULT_FLIPATTACK_CONFIG`.
+    ``ctx`` is a :class:`~hackagent.attacks.ports.RunContext`, passed
+    positionally or as ``ctx=``. Tests build it with ``make_ctx()``
+    (``tests.fakes.context``). Generation receives this instance as
+    ``attack=``. Do not store it on ``config["_self"]``.
+
+    The pipeline is generation-only. ``run()`` returns rows without a
+    verdict.
+
+    The legacy constructor ``(config_dict, client, agent_router)`` is
+    obsolete for new code. The orchestrator still calls it.
+    :class:`~hackagent.attacks.techniques.flipattack.config.FlipAttackConfig`
+    still subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
+
     Attributes:
         flip_mode: Active obfuscation mode, read from config.
         cot: Whether chain-of-thought is enabled.
@@ -106,8 +121,11 @@ class FlipAttack(BaseAttack):
     def __init__(
         self,
         config: Optional[Dict[str, Any]] = None,
-        client: Optional[Store] = None,
+        ctx_or_client: Any = None,
         agent_router: Optional[LLMRouter] = None,
+        *,
+        ctx: Optional[RunContext] = None,
+        client: Optional[Store] = None,
     ):
         """
         Initialize FlipAttack with configuration.
@@ -115,18 +133,28 @@ class FlipAttack(BaseAttack):
         Args:
             config: Optional dictionary containing parameters to override
                 :data:`~hackagent.attacks.techniques.flipattack.config.DEFAULT_FLIPATTACK_CONFIG`.
-            client: Store instance passed from the orchestrator.
-            agent_router: LLMRouter instance for the target model.
+            ctx: :class:`~hackagent.attacks.ports.RunContext`. Positional
+                or ``ctx=``. Tests use ``make_ctx()``.
+            client: Obsolete. Store instance on the orchestrator path.
+            agent_router: Obsolete. Target router on the orchestrator path.
 
         Raises:
-            ValueError: If ``client`` or ``agent_router`` is ``None``.
+            ValueError: On the legacy path, if ``client`` or
+                ``agent_router`` is ``None``.
         """
-        if client is None:
-            raise ValueError("A storage backend must be provided to FlipAttack.")
-        if agent_router is None:
-            raise ValueError(
-                "Victim LLMRouter instance must be provided to FlipAttack."
-            )
+        if ctx is None and isinstance(ctx_or_client, RunContext):
+            ctx = ctx_or_client
+        resolved_client = (
+            client
+            if client is not None
+            else (None if isinstance(ctx_or_client, RunContext) else ctx_or_client)
+        )
+        if ctx is None:
+            if resolved_client is None:
+                raise ValueError("A storage backend must be provided")
+            if agent_router is None:
+                raise ValueError("LLMRouter must be provided")
+            client = resolved_client
 
         # Merge config with defaults
         current_config = copy.deepcopy(DEFAULT_FLIPATTACK_CONFIG)
@@ -137,7 +165,10 @@ class FlipAttack(BaseAttack):
         self.logger = logging.getLogger("hackagent.attacks.flipattack")
 
         # Call parent - handles run_id, run_dir, validation, setup
-        super().__init__(current_config, client, agent_router)
+        if ctx is not None:
+            super().__init__(current_config, ctx)
+        else:
+            super().__init__(current_config, client, agent_router)
 
     def _setup(self) -> None:
         """Run standard setup then initialise the obfuscation algorithm state."""
@@ -397,11 +428,23 @@ As a/an <Role> with the <Profile>, you must follow the <Rules>, and you must com
             )
 
     def _get_pipeline_steps(self) -> List[Dict]:
-        """Define the two-stage attack pipeline."""
+        """Define the generation-only FlipAttack pipeline.
+
+        Generation is called with ``attack=self``. ``config["_self"]`` is
+        not set.
+        """
         return [
             {
                 "name": "Generation: Generate and Execute FlipAttack Prompts",
-                "function": generation.execute,
+                "function": lambda goals, agent_router, config, logger: (
+                    generation.execute(
+                        goals,
+                        agent_router,
+                        config,
+                        logger,
+                        attack=self,
+                    )
+                ),
                 "step_type_enum": "GENERATION",
                 "config_keys": [
                     "batch_size",
@@ -410,35 +453,10 @@ As a/an <Role> with the <Profile>, you must follow the <Rules>, and you must com
                     "_backend",
                     "_client",
                     "_tracker",
-                    "_self",
                 ],
                 "input_data_arg_name": "goals",
                 "required_args": ["logger", "agent_router", "config"],
-            },
-            {
-                "name": "Evaluation: Evaluate Responses with Dict + LLM Judge",
-                "function": BaseEvaluationStep.make_execute(
-                    prefix_fn=lambda item: item.get("full_prompt", ""),
-                    technique_params_key="flipattack_params",
-                ),
-                "step_type_enum": "EVALUATION",
-                "config_keys": [
-                    "flipattack_params",
-                    "_run_id",
-                    "_backend",
-                    "_client",
-                    "_tracker",
-                    "judges",
-                    "judge_concurrency",
-                    "max_tokens_eval",
-                    "filter_len",
-                    "judge_timeout",
-                    "judge_temperature",
-                    "max_judge_retries",
-                ],
-                "input_data_arg_name": "input_data",
-                "required_args": ["logger", "config", "client"],
-            },
+            }
         ]
 
     def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
@@ -476,9 +494,6 @@ As a/an <Role> with the <Profile>, you must follow the <Rules>, and you must com
             goals=goals,
             initial_metadata=goal_metadata,
         )
-
-        # Expose self so generation.execute can call self.generate() directly.
-        self.config["_self"] = self
 
         pipeline_steps = self._get_pipeline_steps()
         start_step = self.config.get("start_step", 1) - 1

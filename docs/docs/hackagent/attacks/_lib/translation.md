@@ -1,6 +1,6 @@
 ---
 sidebar_label: translation
-title: hackagent.attacks.shared.translation
+title: hackagent.attacks._lib.translation
 ---
 
 Cached translation of attack system prompts into the goal&#x27;s language.

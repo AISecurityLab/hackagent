@@ -51,7 +51,9 @@ from typing import Any, Dict, List, Optional
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.storage.store import Store
-from hackagent.attacks.shared.llm_router import LLMRouter
+from hackagent.attacks._lib.llm_router import LLMRouter
+from hackagent.attacks._lib.inline_judge import attach_ctx_judge
+from hackagent.attacks.ports import RunContext
 
 from . import tap_evaluation as evaluation, generation
 from .config import DEFAULT_TAP_CONFIG
@@ -120,35 +122,49 @@ class TAPAttack(BaseAttack):
     def __init__(
         self,
         config: Optional[Dict[str, Any]] = None,
-        client: Optional[Store] = None,
+        ctx_or_client: Any = None,
         agent_router: Optional[LLMRouter] = None,
+        *,
+        ctx: Optional[RunContext] = None,
+        client: Optional[Store] = None,
     ):
-        """
-        Initialize TAP with configuration and routers.
+        """Initialize TAP with ``(config, ctx)`` or the legacy constructor.
 
-        Args:
-            config: Optional config overrides merged into
-                :data:`~hackagent.attacks.techniques.tap.config.DEFAULT_TAP_CONFIG`.
-                Keys from ``config`` win over defaults; nested dicts are
-                deep-merged via :func:`_recursive_update`.
-            client: Authenticated API client.
-            agent_router: Router for the victim model.
-
-        Raises:
-            ValueError: If ``client`` or ``agent_router`` is ``None``.
+        On the new seam, search scoring uses
+        :class:`~hackagent.attacks._lib.inline_judge.CtxTapEvaluator`
+        (``ctx.judge.score``) instead of ``TapEvaluation``. ``TapConfig``
+        still subclasses
+        :class:`~hackagent.attacks.techniques.config.ConfigBase`.
+        The legacy constructor is obsolete for new code.
         """
-        if client is None:
-            raise ValueError("A storage backend must be provided to TAPAttack.")
-        if agent_router is None:
-            raise ValueError("Victim LLMRouter instance must be provided to TAPAttack.")
+        if ctx is None and isinstance(ctx_or_client, RunContext):
+            ctx = ctx_or_client
+        resolved_client = (
+            client
+            if client is not None
+            else (None if isinstance(ctx_or_client, RunContext) else ctx_or_client)
+        )
+        if ctx is None:
+            if resolved_client is None:
+                raise ValueError("A storage backend must be provided to TAPAttack.")
+            if agent_router is None:
+                raise ValueError(
+                    "Victim LLMRouter instance must be provided to TAPAttack."
+                )
+            client = resolved_client
 
         current_config = copy.deepcopy(DEFAULT_TAP_CONFIG)
         if config:
             _recursive_update(current_config, config)
 
+        attach_ctx_judge(current_config, ctx)
+
         self.logger = logging.getLogger("hackagent.attacks.tap")
 
-        super().__init__(current_config, client, agent_router)
+        if ctx is not None:
+            super().__init__(current_config, ctx)
+        else:
+            super().__init__(current_config, client, agent_router)
 
     def _validate_config(self) -> None:
         """
@@ -203,6 +219,7 @@ class TAPAttack(BaseAttack):
                     "tap_params",
                     "attacker",
                     "judges",
+                    "_judge",
                     "judge",
                     "on_topic_judge",
                     "target_str",
@@ -230,6 +247,7 @@ class TAPAttack(BaseAttack):
                 "config_keys": [
                     "tap_params",
                     "judges",
+                    "_judge",
                     "judge",
                     "judge_concurrency",
                     "max_tokens_eval",

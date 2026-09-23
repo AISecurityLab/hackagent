@@ -1,6 +1,6 @@
 ---
 sidebar_label: prompt_parser
-title: hackagent.attacks.shared.prompt_parser
+title: hackagent.attacks._lib.prompt_parser
 ---
 
 Helpers for parsing attacker outputs into prompt data.

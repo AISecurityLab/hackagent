@@ -12,11 +12,11 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional
 
-from hackagent.attacks.shared.response_utils import (
+from hackagent.attacks._lib.response import (
     extract_response_content,
     is_guardrail_response,
 )
-from hackagent.attacks.shared.llm_router import LLMRouter
+from hackagent.attacks._lib.llm_router import LLMRouter
 from hackagent.router.tracking import Tracker
 
 

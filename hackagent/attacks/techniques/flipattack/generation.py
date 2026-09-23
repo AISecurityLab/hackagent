@@ -16,7 +16,7 @@
 FlipAttack generation and execution module.
 
 Generates flipped prompts by calling :meth:`FlipAttack.generate` on the
-attack instance passed via ``config["_self"]``, then executes them against
+attack instance passed explicitly as ``attack=``, then executes them against
 the target model via HackAgent's LLMRouter.
 
 Result Tracking:
@@ -30,11 +30,11 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from hackagent.attacks.shared.response_utils import (
+from hackagent.attacks._lib.response import (
     get_guardrail_info,
     is_guardrail_response,
 )
-from hackagent.attacks.shared.llm_router import LLMRouter
+from hackagent.attacks._lib.llm_router import LLMRouter
 
 if TYPE_CHECKING:
     from hackagent.router.tracking import Tracker
@@ -45,6 +45,8 @@ def execute(
     agent_router: LLMRouter,
     config: Dict[str, Any],
     logger: logging.Logger,
+    *,
+    attack: Any = None,
 ) -> List[Dict]:
     """
     Generate flipped prompts and execute them against target model.
@@ -54,14 +56,19 @@ def execute(
         agent_router: Router for target model communication
         config: Configuration dictionary with flipattack_params
         logger: Logger instance
+        attack: FlipAttack instance. Required for new callers. A leftover
+            ``config["_self"]`` is still read if ``attack`` is omitted;
+            the pipeline no longer writes that key.
 
     Returns:
-        List of dicts with goal, flipped prompt, and response
+        List of dicts with goal, flipped prompt, and response. No verdict.
     """
-    # Retrieve the FlipAttack instance (carries all obfuscation methods).
-    fa = config.get("_self")
+    # Prefer the explicit attack instance. config["_self"] is only a leftover fallback.
+    fa = attack if attack is not None else config.get("_self")
     if fa is None:
-        raise RuntimeError("config['_self'] must be set to the FlipAttack instance.")
+        raise RuntimeError(
+            "FlipAttack instance must be passed as attack= (config['_self'] removed)."
+        )
 
     # Extract parameters (still needed for logging and result fields).
     fa_params = config.get("flipattack_params", {})

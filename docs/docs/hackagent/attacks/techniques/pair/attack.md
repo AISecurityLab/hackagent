@@ -62,26 +62,21 @@ the AutoDAN-Turbo scorer+wrapper protocol.
 
 ```python
 def __init__(config: Optional[Dict[str, Any]] = None,
-             client: Optional[Store] = None,
-             agent_router: Optional[LLMRouter] = None)
+             ctx_or_client: Any = None,
+             agent_router: Optional[LLMRouter] = None,
+             *,
+             ctx: Optional[RunContext] = None,
+             client: Optional[Store] = None)
 ```
 
-Initialize PAIR attack.
+Initialize PAIR with ``(config, ctx)`` or legacy args.
 
-**Arguments**:
-
-- `config` - Optional configuration overrides merged into
-  :class:`~hackagent.attacks.techniques.pair.config.PairConfig`.
-- `client` - Authenticated HackAgent API client.
-- `agent_router` - Router for the victim model.
-  
-
-**Raises**:
-
-- `ValueError` - If ``client`` or ``agent_router`` is ``None``, if
-  the attacker router cannot be initialised, or if the
-  configured ``objective`` key is not in
-  :data:`~hackagent.attacks.objectives.OBJECTIVES`.
+On the new seam the attacker role comes from ``ctx.models`` and
+refinement scores come from ``ctx.judge`` (``verdict_from_judge``).
+This class does not read ``_suppress_run_status_updates``.
+``PairConfig`` still subclasses
+:class:`~hackagent.attacks.techniques.config.ConfigBase`.
+The legacy constructor is obsolete for new code.
 
 #### run
 

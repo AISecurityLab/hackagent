@@ -23,11 +23,11 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from hackagent.storage.store import Store
-from hackagent.attacks.shared.llm_router import LLMRouter
+from hackagent.attacks._lib.llm_router import LLMRouter
+from hackagent.attacks.ports import RunContext
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 
-from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
 
 from . import generation
 from .config import DEFAULT_H4RM3L_CONFIG, PRESET_PROGRAMS
@@ -46,57 +46,80 @@ def _recursive_update(target_dict, source_dict):
             target_dict[key] = copy.deepcopy(source_value)
 
 
-def _h4rm3l_decoration_hook(input_data, raw_config):
-    """Emit tracker traces for each h4rm3l decoration step before judge evaluation."""
-    tracker = raw_config.get("_tracker")
-    if not tracker:
-        return
-    for idx, item in enumerate(input_data):
+def _emit_h4rm3l_decoration_traces(input_data, *, events=None, tracker=None):
+    """Emit decoration step traces via Events (preferred) or legacy tracker."""
+    for idx, item in enumerate(input_data or []):
         goal_text = item.get("goal", "")
-        goal_ctx = (
-            tracker.get_goal_context_by_goal(goal_text)
-            if goal_text
-            else tracker.get_goal_context(idx)
-        )
-        if not goal_ctx:
-            continue
         for step in item.get("decoration_steps", []) or []:
             step_index = step.get("step_index")
             decorator_name = step.get("decorator", "UnknownDecorator")
+            payload = {
+                "step_name": f"Decoration Step {step_index}",
+                "decorator": decorator_name,
+                "input_prompt": step.get("input_prompt", ""),
+                "decoration_applied": decorator_name,
+                "decorated_prompt": step.get("decorated_prompt", ""),
+                "input_length": step.get("input_length"),
+                "output_length": step.get("output_length"),
+                "length_delta": step.get("length_delta"),
+                "content_changed": step.get("content_changed"),
+                "uses_decorator_llm": step.get("uses_decorator_llm", False),
+                "decorator_llm_identifier": step.get("decorator_llm_identifier"),
+                "decorator_llm_endpoint": step.get("decorator_llm_endpoint"),
+                "decorator_llm_prompt": step.get("decorator_llm_prompt"),
+                "decorator_llm_response": step.get("decorator_llm_response"),
+                "goal": goal_text,
+            }
+            if events is not None:
+                events.trace(**payload)
+                continue
+            if tracker is None:
+                continue
+            goal_ctx = (
+                tracker.get_goal_context_by_goal(goal_text)
+                if goal_text
+                else tracker.get_goal_context(idx)
+            )
+            if not goal_ctx:
+                continue
             tracker.add_custom_trace(
                 ctx=goal_ctx,
                 step_name=f"Decoration Step {step_index}: {decorator_name}",
-                content={
-                    "step_name": f"Decoration Step {step_index}",
-                    "decorator": decorator_name,
-                    "input_prompt": step.get("input_prompt", ""),
-                    "decoration_applied": decorator_name,
-                    "decorated_prompt": step.get("decorated_prompt", ""),
-                    "input_length": step.get("input_length"),
-                    "output_length": step.get("output_length"),
-                    "length_delta": step.get("length_delta"),
-                    "content_changed": step.get("content_changed"),
-                    "uses_decorator_llm": step.get("uses_decorator_llm", False),
-                    "decorator_llm_identifier": step.get("decorator_llm_identifier"),
-                    "decorator_llm_endpoint": step.get("decorator_llm_endpoint"),
-                    "decorator_llm_prompt": step.get("decorator_llm_prompt"),
-                    "decorator_llm_response": step.get("decorator_llm_response"),
-                },
+                content=payload,
             )
+
+
+def _h4rm3l_decoration_hook(input_data, raw_config):
+    """Legacy pre-eval hook retained for callers that still pass it."""
+    _emit_h4rm3l_decoration_traces(
+        input_data,
+        tracker=raw_config.get("_tracker") if isinstance(raw_config, dict) else None,
+    )
 
 
 class H4rm3lAttack(BaseAttack):
     """
     h4rm3l — composable prompt-decoration jailbreak attack.
 
-    Applies a chain of PromptDecorator transforms to each goal prompt,
-    sends the decorated prompt to the target model, and evaluates the
-    response with multi-judge scoring.
+    Applies a chain of PromptDecorator transforms to each goal prompt
+    and sends the decorated prompt to the target model. The embedded
+    judge step is gone. ``run()`` returns rows without a verdict.
+    Decoration traces go to ``ctx.events.trace`` when ``ctx`` is set
+    (the legacy tracker remains the fallback). Generation can take an
+    explicit ``decorator_llm_router``.
+
+    Construct with ``(config, ctx)``. ``config`` is a dict deep-merged
+    into the h4rm3l defaults. ``ctx`` is a
+    :class:`~hackagent.attacks.ports.RunContext`, passed positionally or
+    as ``ctx=``. Tests build it with ``make_ctx()``
+    (``tests.fakes.context``). The legacy constructor
+    ``(config_dict, client, agent_router)`` is obsolete for new code.
+    :class:`~hackagent.attacks.techniques.h4rm3l.config.H4rm3lConfig`
+    still subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
 
     Pipeline:
         1. **Generation** — Compile the decorator program, apply to each
            goal in parallel, query the target model.
-        2. **Evaluation** — Multi-judge scoring via BaseEvaluationStep.
 
     The decorator program is specified via ``h4rm3l_params.program``.
     It can be:
@@ -115,20 +138,35 @@ class H4rm3lAttack(BaseAttack):
     def __init__(
         self,
         config: Optional[Dict[str, Any]] = None,
-        client: Optional[Store] = None,
+        ctx_or_client: Any = None,
         agent_router: Optional[LLMRouter] = None,
+        *,
+        ctx: Optional[RunContext] = None,
+        client: Optional[Store] = None,
     ):
-        if client is None:
-            raise ValueError("A storage backend must be provided.")
-        if agent_router is None:
-            raise ValueError("LLMRouter must be provided.")
+        if ctx is None and isinstance(ctx_or_client, RunContext):
+            ctx = ctx_or_client
+        resolved_client = (
+            client
+            if client is not None
+            else (None if isinstance(ctx_or_client, RunContext) else ctx_or_client)
+        )
+        if ctx is None:
+            if resolved_client is None:
+                raise ValueError("A storage backend must be provided")
+            if agent_router is None:
+                raise ValueError("LLMRouter must be provided")
+            client = resolved_client
 
         current_config = copy.deepcopy(DEFAULT_H4RM3L_CONFIG)
         if config:
             _recursive_update(current_config, config)
 
         self.logger = logging.getLogger("hackagent.attacks.h4rm3l")
-        super().__init__(current_config, client, agent_router)
+        if ctx is not None:
+            super().__init__(current_config, ctx)
+        else:
+            super().__init__(current_config, client, agent_router)
 
     def _setup(self) -> None:
         """Standard setup plus h4rm3l-specific initialisation."""
@@ -177,32 +215,7 @@ class H4rm3lAttack(BaseAttack):
                 ],
                 "input_data_arg_name": "goals",
                 "required_args": ["logger", "agent_router", "config"],
-            },
-            {
-                "name": "Evaluation: Multi-Judge Response Evaluation",
-                "function": BaseEvaluationStep.make_execute(
-                    prefix_fn=lambda item: item.get("full_prompt", ""),
-                    technique_params_key="h4rm3l_params",
-                    pre_eval_hook=_h4rm3l_decoration_hook,
-                ),
-                "step_type_enum": "EVALUATION",
-                "config_keys": [
-                    "h4rm3l_params",
-                    "_run_id",
-                    "_backend",
-                    "_client",
-                    "_tracker",
-                    "judges",
-                    "judge_concurrency",
-                    "max_tokens_eval",
-                    "filter_len",
-                    "judge_timeout",
-                    "judge_temperature",
-                    "max_judge_retries",
-                ],
-                "input_data_arg_name": "input_data",
-                "required_args": ["logger", "config", "client"],
-            },
+            }
         ]
 
     def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:
@@ -242,29 +255,22 @@ class H4rm3lAttack(BaseAttack):
             self.logger.info("Using TrackingCoordinator for per-goal tracking")
 
         try:
-            # Phase 1: Generation
-            generation_output = self._execute_pipeline(
-                pipeline_steps, goals, start_step=start_step, end_step=start_step + 1
+            results = self._execute_pipeline(
+                pipeline_steps, goals, start_step=start_step
             )
 
-            if not generation_output:
+            if not results:
                 self.logger.warning("Generation produced no output")
                 coordinator.finalize_pipeline([], lambda _: False)
                 return []
 
-            # Backdate goal start times to include generation latency.
-            coordinator.backdate_goal_start_times(generation_output)
+            events = self.ctx.events if self.ctx is not None else None
+            tracker = coordinator.goal_tracker
+            _emit_h4rm3l_decoration_traces(results, events=events, tracker=tracker)
 
-            # Phase 3: Evaluation
-            results = self._execute_pipeline(
-                pipeline_steps, generation_output, start_step=start_step + 1
-            )
-
-            # Finalize
             coordinator.finalize_all_goals(results)
             coordinator.log_summary()
             coordinator.finalize_pipeline(results)
-
             return rows_to_attack_results(results)
 
         except Exception:

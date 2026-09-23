@@ -16,9 +16,13 @@ The forward technique seam is :class:`hackagent.attacks.config.AttackConfig`
 (technique parameters and role fields only, ``extra="forbid"``). Run
 bookkeeping belongs on :class:`hackagent.orchestrator.run_spec.RunSpec` and
 target generation knobs on :class:`hackagent.models.target_params.TargetParams`.
-Those types exist; shipped technique configs still subclass :class:`ConfigBase`,
-which mixes the concerns, until they migrate. ``HackAgent.hack`` callers still
-pass the plain ``attack_config`` dict described here.
+Those types exist; shipped technique configs still subclass
+:class:`ConfigBase`, which mixes the concerns. Every shipped technique
+constructs as ``(config, ctx)``; the typed models have not left
+:class:`ConfigBase`. The legacy ``(config, client, agent_router)``
+constructor is obsolete for new technique code and is still what the
+orchestrator calls. ``HackAgent.hack`` callers still pass the plain
+``attack_config`` dict described here.
 
 Technique-specific modules should extend these building blocks with their own
 algorithm parameters, but they should not redefine the shared defaults.

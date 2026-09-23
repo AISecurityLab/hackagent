@@ -57,7 +57,7 @@ def _make_attack(config=None):
         "generated_text": "Sure, here is the requested harmful content with steps."
     }
 
-    def _fake_connect_role(config, name):
+    def _fake_connect_role(config, name, models=None):
         router = MagicMock()
         if name == "judge":
             router.route_request.side_effect = _judge_side_effect

@@ -25,12 +25,12 @@ import copy
 import logging
 from typing import Any, Dict, List, Optional
 
+from hackagent.attacks.ports import RunContext
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.core.defaults import DEFAULT_JUDGE_IDENTIFIER
-from hackagent.attacks.shared.llm_router import LLMRouter
+from hackagent.attacks._lib.llm_router import LLMRouter
 from hackagent.storage.store import Store
-from hackagent.attacks.evaluator.evaluation_step import BaseEvaluationStep
 
 from . import generation
 from .config import DEFAULT_MML_CONFIG
@@ -106,8 +106,11 @@ class MMLAttack(BaseAttack):
     def __init__(
         self,
         config: Optional[Dict[str, Any]] = None,
-        client: Optional[Store] = None,
+        ctx_or_client: Any = None,
         agent_router: Optional[LLMRouter] = None,
+        *,
+        ctx: Optional[RunContext] = None,
+        client: Optional[Store] = None,
     ):
         """
         Initialize MMLAttack with configuration.
@@ -115,16 +118,32 @@ class MMLAttack(BaseAttack):
         Args:
             config: Optional dictionary containing parameters to override
                 :data:`~hackagent.attacks.techniques.mml.config.DEFAULT_MML_CONFIG`.
-            client: Store instance passed from the orchestrator.
-            agent_router: LLMRouter instance for the target model.
+            ctx: :class:`~hackagent.attacks.ports.RunContext`. Positional
+                or ``ctx=``. Tests use ``make_ctx()``.
+            client: Obsolete. Store instance on the orchestrator path.
+            agent_router: Obsolete. Target router on the orchestrator path.
 
         Raises:
-            ValueError: If ``client`` or ``agent_router`` is ``None``.
+            ValueError: On the legacy path, if ``client`` or
+                ``agent_router`` is ``None``.
+
+        The pipeline is generation-only. ``run()`` returns rows without
+        a verdict. :class:`~hackagent.attacks.techniques.mml.config.MMLConfig`
+        still subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
         """
-        if client is None:
-            raise ValueError("A storage backend must be provided to MMLAttack.")
-        if agent_router is None:
-            raise ValueError("Victim LLMRouter instance must be provided to MMLAttack.")
+        if ctx is None and isinstance(ctx_or_client, RunContext):
+            ctx = ctx_or_client
+        resolved_client = (
+            client
+            if client is not None
+            else (None if isinstance(ctx_or_client, RunContext) else ctx_or_client)
+        )
+        if ctx is None:
+            if resolved_client is None:
+                raise ValueError("A storage backend must be provided")
+            if agent_router is None:
+                raise ValueError("LLMRouter must be provided")
+            client = resolved_client
 
         # Merge config with defaults
         current_config = copy.deepcopy(DEFAULT_MML_CONFIG)
@@ -135,7 +154,10 @@ class MMLAttack(BaseAttack):
         self.logger = logging.getLogger("hackagent.attacks.mml")
 
         # Call parent - handles run_id, run_dir, validation, setup
-        super().__init__(current_config, client, agent_router)
+        if ctx is not None:
+            super().__init__(current_config, ctx)
+        else:
+            super().__init__(current_config, client, agent_router)
 
     def _setup(self) -> None:
         """Run standard setup then initialise algorithm-specific state."""
@@ -249,33 +271,7 @@ class MMLAttack(BaseAttack):
                 ],
                 "input_data_arg_name": "goals",
                 "required_args": ["logger", "agent_router", "config"],
-            },
-            {
-                "name": "Evaluation: Evaluate Responses with Dict + LLM Judge",
-                "function": BaseEvaluationStep.make_execute(
-                    prefix_fn=lambda item: (
-                        item.get("full_prompt") or item.get("text_prompt", "")
-                    ),
-                    technique_params_key="mml_params",
-                ),
-                "step_type_enum": "EVALUATION",
-                "config_keys": [
-                    "mml_params",
-                    "_run_id",
-                    "_backend",
-                    "_client",
-                    "_tracker",
-                    "judges",
-                    "judge_concurrency",
-                    "max_tokens_eval",
-                    "filter_len",
-                    "judge_timeout",
-                    "judge_temperature",
-                    "max_judge_retries",
-                ],
-                "input_data_arg_name": "input_data",
-                "required_args": ["logger", "config", "client"],
-            },
+            }
         ]
 
     def run(self, goals: Optional[List[str]] = None, **kwargs) -> List[AttackResult]:

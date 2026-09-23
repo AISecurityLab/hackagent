@@ -1,6 +1,6 @@
 ---
 sidebar_label: base
-title: hackagent.attacks.objectives.base
+title: hackagent.attacks._lib.objectives.base
 ---
 
 Base objective class defining the interface for attack objectives.

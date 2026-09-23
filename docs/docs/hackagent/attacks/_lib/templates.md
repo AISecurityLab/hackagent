@@ -1,6 +1,6 @@
 ---
 sidebar_label: templates
-title: hackagent.attacks.generator.templates
+title: hackagent.attacks._lib.templates
 ---
 
 Shared attack templates library.
@@ -16,7 +16,7 @@ Constants:
     SUCCESS_PATTERNS: Regex patterns for detecting successful attacks
 
 Usage:
-    from hackagent.attacks.generator.templates import (
+    from hackagent.attacks._lib.templates import (
         AttackTemplates,
         REFUSAL_PATTERNS,
         SUCCESS_PATTERNS,

@@ -21,26 +21,22 @@ Three-phase pipeline:
 #### \_\_init\_\_
 
 ```python
-def __init__(config=None, client=None, agent_router=None)
+def __init__(config=None,
+             ctx_or_client=None,
+             agent_router=None,
+             *,
+             ctx: Optional[RunContext] = None,
+             client=None)
 ```
 
-Initialize AutoDAN-Turbo attack with merged defaults.
+Initialize AutoDAN-Turbo with ``(config, ctx)`` or legacy args.
 
-**Arguments**:
-
-- `config` - Optional user overrides for default config.
-- `client` - Authenticated API client (required).
-- `agent_router` - Router to the target model (required).
-  
-
-**Returns**:
-
-  None.
-  
-
-**Raises**:
-
-- `ValueError` - If ``client`` or ``agent_router`` are missing.
+On the new seam ``ctx.models`` and ``ctx.judge`` are stored on the
+config for warm-up and lifelong, and the strategy library is
+written under ``ctx.workspace``. This class does not read
+``_suppress_run_status_updates``. ``AutoDANTurboConfig`` still
+subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
+The legacy constructor is obsolete for new code.
 
 #### run
 

@@ -23,7 +23,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from hackagent.attacks.shared.llm_router import LLMRouter
+from hackagent.attacks._lib.llm_router import LLMRouter
 
 from .flowchart_renderer import (
     TEXT_FORMAT_SERIALIZERS,
@@ -114,7 +114,7 @@ def _create_step_generator_router(
     if not generator_model:
         return None
 
-    from hackagent.attacks.shared.llm_router import connect_role
+    from hackagent.attacks._lib.llm_router import connect_role
 
     generator_config = {
         "identifier": generator_model,
@@ -337,11 +337,15 @@ def execute_fc(
 
         # Render flowchart image
         try:
+            cache_dir = config.get("_workspace_cache_dir") or config.get(
+                "flowchart_cache_dir"
+            )
             render_result = render_flowchart(
                 steps=steps,
                 goal_text=goal_text,
                 layout=layout,
                 dpi=dpi,
+                cache_dir=cache_dir,
             )
         except Exception as e:
             logger.error(f"Flowchart rendering failed for goal {idx + 1}: {e}")

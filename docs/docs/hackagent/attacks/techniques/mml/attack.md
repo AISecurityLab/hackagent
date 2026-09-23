@@ -75,8 +75,11 @@ Uses a neutral list-filling prompt.
 
 ```python
 def __init__(config: Optional[Dict[str, Any]] = None,
-             client: Optional[Store] = None,
-             agent_router: Optional[LLMRouter] = None)
+             ctx_or_client: Any = None,
+             agent_router: Optional[LLMRouter] = None,
+             *,
+             ctx: Optional[RunContext] = None,
+             client: Optional[Store] = None)
 ```
 
 Initialize MMLAttack with configuration.
@@ -85,13 +88,20 @@ Initialize MMLAttack with configuration.
 
 - `config` - Optional dictionary containing parameters to override
   :data:`~hackagent.attacks.techniques.mml.config.DEFAULT_MML_CONFIG`.
-- `client` - Store instance passed from the orchestrator.
-- `agent_router` - LLMRouter instance for the target model.
+- `ctx` - :class:`~hackagent.attacks.ports.RunContext`. Positional
+  or ``ctx=``. Tests use ``make_ctx()``.
+- `client` - Obsolete. Store instance on the orchestrator path.
+- `agent_router` - Obsolete. Target router on the orchestrator path.
   
 
 **Raises**:
 
-- `ValueError` - If ``client`` or ``agent_router`` is ``None``.
+- `ValueError` - On the legacy path, if ``client`` or
+  ``agent_router`` is ``None``.
+  
+  The pipeline is generation-only. ``run()`` returns rows without
+  a verdict. :class:`~hackagent.attacks.techniques.mml.config.MMLConfig`
+  still subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
 
 #### run
 
