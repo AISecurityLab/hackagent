@@ -18,14 +18,16 @@ import unittest
 import uuid
 from unittest.mock import MagicMock, patch
 
+from hackagent.models.adapters.base import (
+    AdapterConfigurationError,
+    AdapterInteractionError,
+)
 from hackagent.models.adapters.claude import (
     ClaudeCodeAgent,
-    ClaudeCodeConfigurationError,
-    ClaudeCodeInteractionError,
     _extract_result_text,
     _get_claude_code_custom_llm_class,
-    _last_user_text,
 )
+from hackagent.models.adapters.cli_agent import last_user_text as _last_user_text
 from hackagent.models.adapters import claude as claude_provider_module
 
 logging.disable(logging.CRITICAL)
@@ -73,11 +75,10 @@ def _result_json(text: str, **extra) -> str:
 
 
 class TestClaudeModuleLayout(unittest.TestCase):
-    """Claude Code lives at ``router/providers/claude.py``."""
+    """Claude Code lives at ``models/adapters/claude.py``."""
 
     def test_helpers_are_module_level(self):
         self.assertIs(_extract_result_text, claude_provider_module._extract_result_text)
-        self.assertIs(_last_user_text, claude_provider_module._last_user_text)
         self.assertIs(ClaudeCodeAgent, claude_provider_module.ClaudeCodeAgent)
 
 
@@ -119,7 +120,7 @@ class TestClaudeHelpers(unittest.TestCase):
                 "result": "boom",
             }
         )
-        with self.assertRaises(ClaudeCodeInteractionError):
+        with self.assertRaises(AdapterInteractionError):
             _extract_result_text(payload)
 
     def test_extract_result_text_captures_usage_policy_block(self):
@@ -180,7 +181,7 @@ class TestClaudeCustomLLMTransport(unittest.TestCase):
     def test_run_nonzero_exit_raises(self, mock_run):
         mock_run.return_value = _completed(stderr="kaboom", returncode=2)
         handler = _make_handler()
-        with self.assertRaises(ClaudeCodeInteractionError):
+        with self.assertRaises(AdapterInteractionError):
             handler._run(prompt_text="hi")
 
     @patch("hackagent.models.adapters.claude.subprocess.run")
@@ -199,12 +200,14 @@ class TestClaudeCustomLLMTransport(unittest.TestCase):
     def test_run_missing_binary_raises_config_error(self, mock_run):
         mock_run.side_effect = FileNotFoundError()
         handler = _make_handler()
-        with self.assertRaises(ClaudeCodeConfigurationError):
+        with self.assertRaises(AdapterConfigurationError):
             handler._run(prompt_text="hi")
 
 
 class TestClaudeAgentInit(unittest.TestCase):
-    @patch("hackagent.models.adapters.claude.shutil.which", return_value=_FAKE_BINARY)
+    @patch(
+        "hackagent.models.adapters.cli_agent.shutil.which", return_value=_FAKE_BINARY
+    )
     def test_init_success(self, _which):
         adapter = ClaudeCodeAgent(
             id=str(uuid.uuid4()),
@@ -217,21 +220,25 @@ class TestClaudeAgentInit(unittest.TestCase):
             and adapter.litellm_model.endswith("/sonnet")
         )
 
-    @patch("hackagent.models.adapters.claude.shutil.which", return_value=_FAKE_BINARY)
+    @patch(
+        "hackagent.models.adapters.cli_agent.shutil.which", return_value=_FAKE_BINARY
+    )
     def test_init_default_timeout(self, _which):
         adapter = ClaudeCodeAgent(id="t1", config={"name": "opus"})
         self.assertEqual(adapter.timeout, 300)
 
     def test_init_missing_name(self):
-        with self.assertRaises(ClaudeCodeConfigurationError):
+        with self.assertRaises(AdapterConfigurationError):
             ClaudeCodeAgent(id="e1", config={})
 
-    @patch("hackagent.models.adapters.claude.shutil.which", return_value=None)
+    @patch("hackagent.models.adapters.cli_agent.shutil.which", return_value=None)
     def test_init_missing_binary_raises(self, _which):
-        with self.assertRaises(ClaudeCodeConfigurationError):
+        with self.assertRaises(AdapterConfigurationError):
             ClaudeCodeAgent(id="e2", config={"name": "sonnet"})
 
-    @patch("hackagent.models.adapters.claude.shutil.which", return_value=_FAKE_BINARY)
+    @patch(
+        "hackagent.models.adapters.cli_agent.shutil.which", return_value=_FAKE_BINARY
+    )
     def test_init_registers_custom_provider(self, _which):
         import litellm
 
@@ -241,7 +248,9 @@ class TestClaudeAgentInit(unittest.TestCase):
 
 
 class TestClaudeAgentHandleRequest(unittest.TestCase):
-    @patch("hackagent.models.adapters.claude.shutil.which", return_value=_FAKE_BINARY)
+    @patch(
+        "hackagent.models.adapters.cli_agent.shutil.which", return_value=_FAKE_BINARY
+    )
     def setUp(self, _which):
         self.adapter = ClaudeCodeAgent(id="h1", config={"name": "sonnet"})
 

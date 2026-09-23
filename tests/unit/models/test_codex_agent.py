@@ -20,14 +20,16 @@ import unittest
 import uuid
 from unittest.mock import MagicMock, patch
 
+from hackagent.models.adapters.base import (
+    AdapterConfigurationError,
+    AdapterInteractionError,
+)
 from hackagent.models.adapters.codex import (
     CodexAgent,
-    CodexConfigurationError,
-    CodexInteractionError,
     _extract_result_text,
     _get_codex_custom_llm_class,
-    _last_user_text,
 )
+from hackagent.models.adapters.cli_agent import last_user_text as _last_user_text
 from hackagent.models.adapters import codex as codex_provider_module
 
 logging.disable(logging.CRITICAL)
@@ -113,11 +115,10 @@ def _tool_call_json(**extra) -> str:
 
 
 class TestCodexModuleLayout(unittest.TestCase):
-    """Codex CLI lives at ``router/providers/codex.py``."""
+    """Codex CLI lives at ``models/adapters/codex.py``."""
 
     def test_helpers_are_module_level(self):
         self.assertIs(_extract_result_text, codex_provider_module._extract_result_text)
-        self.assertIs(_last_user_text, codex_provider_module._last_user_text)
         self.assertIs(CodexAgent, codex_provider_module.CodexAgent)
 
 
@@ -178,7 +179,7 @@ class TestCodexHelpers(unittest.TestCase):
             }
         )
 
-        with self.assertRaises(CodexInteractionError):
+        with self.assertRaises(AdapterInteractionError):
             _extract_result_text(payload)
 
     def test_extract_result_text_captures_policy_block_as_text(self):
@@ -235,7 +236,7 @@ class TestCodexCustomLLMTransport(unittest.TestCase):
 
         handler = _make_handler()
 
-        with self.assertRaises(CodexInteractionError):
+        with self.assertRaises(AdapterInteractionError):
             handler._run(prompt_text="hi")
 
     @patch("hackagent.models.adapters.codex.subprocess.run")
@@ -259,12 +260,14 @@ class TestCodexCustomLLMTransport(unittest.TestCase):
 
         handler = _make_handler()
 
-        with self.assertRaises(CodexConfigurationError):
+        with self.assertRaises(AdapterConfigurationError):
             handler._run(prompt_text="hi")
 
 
 class TestCodexAgentInit(unittest.TestCase):
-    @patch("hackagent.models.adapters.codex.shutil.which", return_value=_FAKE_BINARY)
+    @patch(
+        "hackagent.models.adapters.cli_agent.shutil.which", return_value=_FAKE_BINARY
+    )
     def test_init_success(self, _which):
         adapter = CodexAgent(
             id=str(uuid.uuid4()),
@@ -278,22 +281,26 @@ class TestCodexAgentInit(unittest.TestCase):
             and adapter.litellm_model.endswith("/gpt-5.5")
         )
 
-    @patch("hackagent.models.adapters.codex.shutil.which", return_value=_FAKE_BINARY)
+    @patch(
+        "hackagent.models.adapters.cli_agent.shutil.which", return_value=_FAKE_BINARY
+    )
     def test_init_default_timeout(self, _which):
         adapter = CodexAgent(id="t1", config={"name": "gpt-5.5"})
 
         self.assertEqual(adapter.timeout, 300)
 
     def test_init_missing_name(self):
-        with self.assertRaises(CodexConfigurationError):
+        with self.assertRaises(AdapterConfigurationError):
             CodexAgent(id="e1", config={})
 
-    @patch("hackagent.models.adapters.codex.shutil.which", return_value=None)
+    @patch("hackagent.models.adapters.cli_agent.shutil.which", return_value=None)
     def test_init_missing_binary_raises(self, _which):
-        with self.assertRaises(CodexConfigurationError):
+        with self.assertRaises(AdapterConfigurationError):
             CodexAgent(id="e2", config={"name": "gpt-5.5"})
 
-    @patch("hackagent.models.adapters.codex.shutil.which", return_value=_FAKE_BINARY)
+    @patch(
+        "hackagent.models.adapters.cli_agent.shutil.which", return_value=_FAKE_BINARY
+    )
     def test_init_registers_custom_provider(self, _which):
         import litellm
 
@@ -304,7 +311,9 @@ class TestCodexAgentInit(unittest.TestCase):
 
 
 class TestCodexAgentHandleRequest(unittest.TestCase):
-    @patch("hackagent.models.adapters.codex.shutil.which", return_value=_FAKE_BINARY)
+    @patch(
+        "hackagent.models.adapters.cli_agent.shutil.which", return_value=_FAKE_BINARY
+    )
     def setUp(self, _which):
         self.adapter = CodexAgent(id="h1", config={"name": "gpt-5.5"})
 

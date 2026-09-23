@@ -38,28 +38,13 @@ from typing import Any, Dict, List, Optional
 from hackagent.core.logging import get_logger
 from hackagent.models import envelope as _envelope
 from hackagent.models.adapters.base import (
+    get_litellm,
     Agent,
     AdapterConfigurationError,
     AdapterInteractionError,
 )
 
 logger = get_logger(__name__)
-
-_litellm_module = None
-
-
-def _get_litellm():
-    """Lazily import litellm. Returns ``(module, is_available)``."""
-    global _litellm_module
-    if _litellm_module is not None:
-        return _litellm_module, True
-    try:
-        import litellm
-
-        _litellm_module = litellm
-        return litellm, True
-    except ImportError:
-        return None, False
 
 
 class WebAgentConfigurationError(AdapterConfigurationError):
@@ -558,7 +543,7 @@ def _get_web_agent_custom_llm_class():
             """Last resort: ask an LLM to read the reply from the page text."""
             if not self.llm_fallback_model:
                 return None
-            litellm, available = _get_litellm()
+            litellm, available = get_litellm()
             if not available:
                 return None
             try:
@@ -787,7 +772,7 @@ class WebAgent(Agent):
         return slug or "web"
 
     def _register_custom_provider(self) -> None:
-        litellm, available = _get_litellm()
+        litellm, available = get_litellm()
         if not available:
             raise WebAgentConfigurationError(
                 "litellm is required for WebAgent but is not installed."
@@ -854,7 +839,7 @@ class WebAgent(Agent):
         if not messages:
             messages = self._prompt_to_messages(prompt_text)  # type: ignore[arg-type]
 
-        litellm, available = _get_litellm()
+        litellm, available = get_litellm()
         if not available:
             return self._build_error_response(
                 error_message="litellm is not installed",

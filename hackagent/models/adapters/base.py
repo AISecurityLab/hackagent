@@ -19,6 +19,23 @@ from hackagent.models import envelope as _envelope
 
 
 # --- Common Exception Classes ---
+_litellm_module = None
+
+
+def get_litellm():
+    """Import litellm lazily. Returns ``(module, is_available)``."""
+    global _litellm_module
+    if _litellm_module is not None:
+        return _litellm_module, True
+    try:
+        import litellm
+
+        _litellm_module = litellm
+        return litellm, True
+    except ImportError:
+        return None, False
+
+
 class AdapterConfigurationError(Exception):
     """Base exception for adapter configuration issues."""
 

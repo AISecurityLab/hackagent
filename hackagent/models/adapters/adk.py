@@ -24,31 +24,12 @@ import httpx
 
 from hackagent.models import envelope as _envelope
 from hackagent.models.adapters.base import (
+    get_litellm,
     Agent,
     AdapterConfigurationError,
     AdapterInteractionError,
     AdapterResponseParsingError,
 )
-
-
-# Local copy of the LiteLLM lazy importer. Phase E.2c deleted the old
-# ``hackagent.router.adapters.litellm`` module; this stays here so ADK
-# doesn't grow a dependency on anything outside its own provider.
-_litellm_module = None
-
-
-def _get_litellm():
-    """Lazily import litellm. Returns ``(module, is_available)``."""
-    global _litellm_module
-    if _litellm_module is not None:
-        return _litellm_module, True
-    try:
-        import litellm
-
-        _litellm_module = litellm
-        return litellm, True
-    except ImportError:
-        return None, False
 
 
 logger = get_logger(__name__)
@@ -404,7 +385,7 @@ class ADKAgent(Agent):
         )
 
     def _register_custom_provider(self) -> None:
-        litellm, available = _get_litellm()
+        litellm, available = get_litellm()
         if not available:
             raise AgentConfigurationError(
                 "litellm is required for ADKAgent but is not installed."
@@ -467,7 +448,7 @@ class ADKAgent(Agent):
         session_id = request_data.get("session_id", request_data.get("adk_session_id"))
         initial_session_state = request_data.get("initial_session_state")
 
-        litellm, available = _get_litellm()
+        litellm, available = get_litellm()
         if not available:
             return self._build_error_response(
                 error_message="litellm is not installed",

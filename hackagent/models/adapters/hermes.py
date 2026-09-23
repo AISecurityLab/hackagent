@@ -24,57 +24,17 @@ own Hermes state. The adapter therefore forces isolation flags by default
 ``-r/--resume`` or ``-c/--continue``, so every attack turn is a fresh session.
 """
 
-import shutil
 import subprocess
 from typing import Any, Dict, List, Optional
 
 from hackagent.core.logging import get_logger
-from hackagent.models import envelope as _envelope
 from hackagent.models.adapters.base import (
-    Agent,
     AdapterConfigurationError,
     AdapterInteractionError,
-    AdapterResponseParsingError,
 )
-
-# Local copy of the LiteLLM lazy importer (mirrors providers/claude.py so this
-# module carries no dependency on anything outside its own provider).
-_litellm_module = None
-
-
-def _get_litellm():
-    """Lazily import litellm. Returns ``(module, is_available)``."""
-    global _litellm_module
-    if _litellm_module is not None:
-        return _litellm_module, True
-    try:
-        import litellm
-
-        _litellm_module = litellm
-        return litellm, True
-    except ImportError:
-        return None, False
-
+from hackagent.models.adapters.cli_agent import SubprocessCLIAgent, last_user_text
 
 logger = get_logger(__name__)
-
-
-class HermesConfigurationError(AdapterConfigurationError):
-    """Hermes adapter configuration issues (e.g. binary not found)."""
-
-    pass
-
-
-class HermesInteractionError(AdapterInteractionError):
-    """Errors invoking the ``hermes`` CLI."""
-
-    pass
-
-
-class HermesResponseParsingError(AdapterResponseParsingError):
-    """Errors parsing the ``hermes -z`` output."""
-
-    pass
 
 
 _HERMES_PROVIDER_PREFIX = "hackagent_hermes"
@@ -85,23 +45,6 @@ _DEFAULT_TIMEOUT = 600
 # Exit codes per the Hermes CLI reference: 0 success, 1 delivery/backend
 # failure, 2 usage error.
 _USAGE_ERROR_EXIT_CODE = 2
-
-
-def _last_user_text(messages: List[Dict[str, Any]]) -> Optional[str]:
-    """Return the text of the last user message in ``messages``."""
-    for msg in reversed(messages or []):
-        if (msg or {}).get("role") != "user":
-            continue
-        content = msg.get("content")
-        if isinstance(content, str):
-            return content
-        if isinstance(content, list):  # OpenAI-style content parts
-            for part in content:
-                if isinstance(part, dict) and part.get("type") == "text":
-                    text = part.get("text")
-                    if isinstance(text, str):
-                        return text
-    return None
 
 
 def _extract_result_text(stdout: str) -> Optional[str]:
@@ -201,11 +144,11 @@ def _get_hermes_custom_llm_class():
                     cwd=self.cwd,
                 )
             except FileNotFoundError as e:
-                raise HermesConfigurationError(
+                raise AdapterConfigurationError(
                     f"'{self.binary}' not found on PATH. Install Hermes Agent first."
                 ) from e
             except subprocess.TimeoutExpired as e:
-                raise HermesInteractionError(
+                raise AdapterInteractionError(
                     f"hermes timed out after {self.timeout}s"
                 ) from e
 
@@ -217,7 +160,7 @@ def _get_hermes_custom_llm_class():
                 # written to stdout.
                 if not final_text or proc.returncode == _USAGE_ERROR_EXIT_CODE:
                     detail = (proc.stderr or proc.stdout or "").strip()[:300]
-                    raise HermesInteractionError(
+                    raise AdapterInteractionError(
                         f"hermes exited with code {proc.returncode}: {detail}"
                     )
                 # Non-zero exit with usable stdout: mirror the Claude Code
@@ -246,9 +189,9 @@ def _get_hermes_custom_llm_class():
                 kwargs.get("model_response") or ModelResponse()
             )
 
-            prompt_text = _last_user_text(messages)
+            prompt_text = last_user_text(messages)
             if not prompt_text:
-                raise HermesInteractionError(
+                raise AdapterInteractionError(
                     "Hermes adapter requires at least one user message "
                     "with text content."
                 )
@@ -289,9 +232,8 @@ def _get_hermes_custom_llm_class():
     return _HermesCustomLLM
 
 
-class HermesAgent(Agent):
-    """
-    Adapter for a locally-installed Hermes Agent CLI.
+class HermesAgent(SubprocessCLIAgent):
+    """Adapter for a locally-installed Hermes Agent CLI.
 
     Drives Hermes in one-shot headless mode (``hermes -z``) through a
     per-instance :class:`litellm.CustomLLM` handler registered under a unique
@@ -325,67 +267,23 @@ class HermesAgent(Agent):
     """
 
     ADAPTER_TYPE = "HermesAgent"
+    LABEL = "Hermes"
+    PROVIDER_PREFIX = _HERMES_PROVIDER_PREFIX
+    DEFAULT_BINARY = _DEFAULT_BINARY
+    INSTALL_HINT = "Install Hermes Agent (https://github.com/NousResearch/hermes-agent)"
+    DEFAULT_TIMEOUT = _DEFAULT_TIMEOUT
 
-    def __init__(self, id: str, config: Dict[str, Any]):
-        if "name" not in config:
-            raise HermesConfigurationError(
-                f"Missing required configuration key 'name' (the Hermes model) "
-                f"for HermesAgent: {id}"
-            )
-
-        super().__init__(id, config)
-        self._init_generation_params()
-
-        self.name: str = config["name"]
-        self.model_name = self.name  # for the base ``Agent`` envelope helpers
-        self.binary: str = config.get("binary") or _DEFAULT_BINARY
+    def _configure(self, config: Dict[str, Any]) -> None:
         self.provider: Optional[str] = config.get("provider")
-        self.cwd: Optional[str] = config.get("cwd")
-        self.timeout: int = int(config.get("timeout", _DEFAULT_TIMEOUT))
         # Isolation defaults: a red-team target must not learn from being
         # probed, nor write into the operator's real Hermes profile.
         self.ignore_user_config: bool = bool(config.get("ignore_user_config", True))
         self.safe_mode: bool = bool(config.get("safe_mode", False))
         self.source: Optional[str] = config.get("source", "hackagent")
-        self.extra_args: List[str] = list(config.get("extra_args") or [])
 
-        # Verify Hermes is actually installed locally — a missing binary fails
-        # loudly here instead of mid-attack.
-        if shutil.which(self.binary) is None:
-            raise HermesConfigurationError(
-                f"Hermes executable '{self.binary}' was not found on PATH. "
-                f"Install Hermes Agent (https://github.com/NousResearch/hermes-agent) "
-                f"or set the 'binary' config to its full path."
-            )
-
-        # Per-instance LiteLLM provider name + the model string the router
-        # calls ``litellm.completion(model=...)`` with.
-        self._provider_name = f"{_HERMES_PROVIDER_PREFIX}_{id}"
-        self.litellm_model = f"{self._provider_name}/{self.name}"
-        # Hermes has no API base/key of its own (the CLI handles auth).
-        self.api_base_url: Optional[str] = config.get("endpoint", "http://localhost")
-        self.actual_api_key: Optional[str] = None
-        self.default_thinking = None
-        self.default_tools = None
-        self.default_tool_choice = None
-        self.default_extra_body = None
-
-        self._register_custom_provider()
-
-        self.logger.info(
-            f"HermesAgent '{self.id}' registered as LiteLLM provider "
-            f"'{self._provider_name}' (binary={self.binary}, model={self.name})"
-        )
-
-    def _register_custom_provider(self) -> None:
-        litellm, available = _get_litellm()
-        if not available:
-            raise HermesConfigurationError(
-                "litellm is required for HermesAgent but is not installed."
-            )
-
+    def _build_handler(self) -> Any:
         handler_cls = _get_hermes_custom_llm_class()
-        handler = handler_cls(
+        return handler_cls(
             binary=self.binary,
             model=self.name,
             provider=self.provider,
@@ -396,87 +294,4 @@ class HermesAgent(Agent):
             source=self.source,
             extra_args=self.extra_args,
             log=self.logger,
-        )
-
-        provider = self._provider_name
-        # Replace any stale entry for this provider name (e.g. when an agent
-        # with the same id is re-created during tests).
-        litellm.custom_provider_map = [
-            entry
-            for entry in litellm.custom_provider_map
-            if entry.get("provider") != provider
-        ]
-        litellm.custom_provider_map.append(
-            {"provider": provider, "custom_handler": handler}
-        )
-        if provider not in litellm._custom_providers:
-            litellm._custom_providers.append(provider)
-
-        self._custom_handler = handler
-
-    # ---- request handling ----------------------------------------------
-
-    def handle_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Send a single Hermes turn via ``litellm.completion``.
-
-        Flow mirrors :class:`ClaudeCodeAgent`::
-
-            request_data → litellm.completion(model="hackagent_hermes_<id>/<model>",
-                                              messages=…)
-                          → _HermesCustomLLM.completion → ``hermes -z``
-        """
-        is_valid, prompt_text, messages = self._validate_request(request_data)
-        if not is_valid:
-            return self._build_error_response(
-                error_message=(
-                    "Request data must include either 'messages' or 'prompt' field."
-                ),
-                status_code=400,
-                raw_request=request_data,
-            )
-        if not messages:
-            messages = self._prompt_to_messages(prompt_text)  # type: ignore[arg-type]
-
-        litellm, available = _get_litellm()
-        if not available:
-            return self._build_error_response(
-                error_message="litellm is not installed",
-                status_code=500,
-                raw_request=request_data,
-            )
-
-        try:
-            response = litellm.completion(model=self.litellm_model, messages=messages)
-        except Exception as exc:
-            self.logger.exception(
-                f"Hermes litellm dispatch failed for agent {self.id}: {exc}"
-            )
-            return self._build_error_response(
-                error_message=(
-                    f"{self.ADAPTER_TYPE} error ({type(exc).__name__}): {exc}"
-                ),
-                status_code=500,
-                raw_request=request_data,
-            )
-
-        text = _envelope.extract_text_from_response(
-            response, model_name=self.litellm_model
-        )
-        if isinstance(text, str) and text.startswith("[GENERATION_ERROR:"):
-            return self._build_error_response(
-                error_message=f"{self.ADAPTER_TYPE} generation error: {text}",
-                status_code=500,
-                raw_request=request_data,
-            )
-
-        agent_specific_data = _envelope.build_agent_specific_data(
-            model_name=self.litellm_model,
-            invoked_parameters={"model": self.name},
-        )
-
-        return self._build_success_response(
-            processed_response=text,
-            raw_request=request_data,
-            raw_response_body=response,
-            agent_specific_data=agent_specific_data,
         )

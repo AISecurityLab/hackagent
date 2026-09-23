@@ -101,7 +101,7 @@ class TestHelpers(unittest.TestCase):
 class TestPlanAttack(unittest.TestCase):
     def _plan_with(self, content: str, **kwargs) -> AttackPlan:
         with patch(
-            "hackagent.router.discovery.scanner._get_litellm",
+            "hackagent.router.discovery.scanner.get_litellm",
             return_value=_fake_litellm(content),
         ):
             return plan_attack(_TARGET, **kwargs)
@@ -175,7 +175,7 @@ class TestPlanAttack(unittest.TestCase):
 
     def test_litellm_unavailable_raises(self):
         with patch(
-            "hackagent.router.discovery.scanner._get_litellm",
+            "hackagent.router.discovery.scanner.get_litellm",
             return_value=(None, False),
         ):
             with self.assertRaises(PlannerError):
@@ -230,7 +230,7 @@ class TestAutoPlan(unittest.TestCase):
             }
         )
         with patch(
-            "hackagent.router.discovery.scanner._get_litellm",
+            "hackagent.router.discovery.scanner.get_litellm",
             return_value=_fake_litellm(content),
         ):
             out = auto_plan("https://www.example.it/chat")
@@ -245,7 +245,7 @@ class TestAutoPlan(unittest.TestCase):
             {"attack_type": "pair", "goals": ["g"], "parameters": {}, "confidence": 0.5}
         )
         with patch(
-            "hackagent.router.discovery.scanner._get_litellm",
+            "hackagent.router.discovery.scanner.get_litellm",
             return_value=_fake_litellm(content),
         ):
             out = auto_plan(

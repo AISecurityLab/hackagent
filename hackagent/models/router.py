@@ -11,7 +11,8 @@ from hackagent.models import envelope as _envelope
 from hackagent.models.adapters import litellm_callbacks as _tracking_logger
 from hackagent.models.adapters.litellm import _ChatRegistration
 from hackagent.models.adapters.base import Agent
-from hackagent.models.adapters.adk import ADKAgent, _get_litellm
+from hackagent.models.adapters.adk import ADKAgent
+from hackagent.models.adapters.base import get_litellm
 from hackagent.models.adapters.claude import ClaudeCodeAgent
 from hackagent.models.adapters.codex import CodexAgent
 from hackagent.models.adapters.hermes import HermesAgent
@@ -939,7 +940,7 @@ class AgentRouter:
         if error is not None:
             return error
         assert prep is not None
-        litellm, available = _get_litellm()
+        litellm, available = get_litellm()
         if not available:
             return _envelope.build_error_envelope(
                 agent_id=prep["registration_key"],
@@ -988,7 +989,7 @@ class AgentRouter:
         if error is not None:
             return error
         assert prep is not None
-        litellm, available = _get_litellm()
+        litellm, available = get_litellm()
         if not available:
             return _envelope.build_error_envelope(
                 agent_id=prep["registration_key"],

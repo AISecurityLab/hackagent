@@ -19,78 +19,21 @@ being on ``PATH`` (checked at adapter construction).
 """
 
 import json
-import shutil
 import subprocess
 from typing import Any, Dict, List, Optional
 
 from hackagent.core.logging import get_logger
-from hackagent.models import envelope as _envelope
 from hackagent.models.adapters.base import (
-    Agent,
     AdapterConfigurationError,
     AdapterInteractionError,
-    AdapterResponseParsingError,
 )
-
-# Local copy of the LiteLLM lazy importer (mirrors providers/adk.py so this
-# module carries no dependency on anything outside its own provider).
-_litellm_module = None
-
-
-def _get_litellm():
-    """Lazily import litellm. Returns ``(module, is_available)``."""
-    global _litellm_module
-    if _litellm_module is not None:
-        return _litellm_module, True
-    try:
-        import litellm
-
-        _litellm_module = litellm
-        return litellm, True
-    except ImportError:
-        return None, False
-
+from hackagent.models.adapters.cli_agent import SubprocessCLIAgent, last_user_text
 
 logger = get_logger(__name__)
 
 
-class ClaudeCodeConfigurationError(AdapterConfigurationError):
-    """Claude Code adapter configuration issues (e.g. binary not found)."""
-
-    pass
-
-
-class ClaudeCodeInteractionError(AdapterInteractionError):
-    """Errors invoking the ``claude`` CLI."""
-
-    pass
-
-
-class ClaudeCodeResponseParsingError(AdapterResponseParsingError):
-    """Errors parsing the ``claude -p --output-format json`` output."""
-
-    pass
-
-
 _CLAUDE_CODE_PROVIDER_PREFIX = "hackagent_claude_code"
 _DEFAULT_BINARY = "claude"
-
-
-def _last_user_text(messages: List[Dict[str, Any]]) -> Optional[str]:
-    """Return the text of the last user message in ``messages``."""
-    for msg in reversed(messages or []):
-        if (msg or {}).get("role") != "user":
-            continue
-        content = msg.get("content")
-        if isinstance(content, str):
-            return content
-        if isinstance(content, list):  # OpenAI-style content parts
-            for part in content:
-                if isinstance(part, dict) and part.get("type") == "text":
-                    text = part.get("text")
-                    if isinstance(text, str):
-                        return text
-    return None
 
 
 def _extract_result_text(stdout: str) -> Optional[str]:
@@ -128,7 +71,7 @@ def _extract_result_text(stdout: str) -> Optional[str]:
             if isinstance(result, str) and result and not subtype.startswith("error"):
                 return result
             # Genuine execution failure (error_max_turns, error_during_execution…).
-            raise ClaudeCodeInteractionError(
+            raise AdapterInteractionError(
                 f"claude reported an error: {result or subtype or 'unknown'}"
             )
         if isinstance(result, str):
@@ -232,11 +175,11 @@ def _get_claude_code_custom_llm_class():
                     cwd=self.cwd,
                 )
             except FileNotFoundError as e:
-                raise ClaudeCodeConfigurationError(
+                raise AdapterConfigurationError(
                     f"'{self.binary}' not found on PATH. Install Claude Code first."
                 ) from e
             except subprocess.TimeoutExpired as e:
-                raise ClaudeCodeInteractionError(
+                raise AdapterInteractionError(
                     f"claude timed out after {self.timeout}s"
                 ) from e
 
@@ -247,7 +190,7 @@ def _get_claude_code_custom_llm_class():
             # no usable payload is a genuine failure.
             try:
                 final_text = _extract_result_text(proc.stdout)
-            except ClaudeCodeInteractionError:
+            except AdapterInteractionError:
                 if proc.returncode == 0:
                     raise  # exit 0 but a real error payload — surface it
                 final_text = None
@@ -255,7 +198,7 @@ def _get_claude_code_custom_llm_class():
             if proc.returncode != 0:
                 if not final_text:
                     detail = (proc.stderr or proc.stdout or "").strip()[:300]
-                    raise ClaudeCodeInteractionError(
+                    raise AdapterInteractionError(
                         f"claude exited with code {proc.returncode}: {detail}"
                     )
                 self.logger.warning(
@@ -281,9 +224,9 @@ def _get_claude_code_custom_llm_class():
                 kwargs.get("model_response") or ModelResponse()
             )
 
-            prompt_text = _last_user_text(messages)
+            prompt_text = last_user_text(messages)
             if not prompt_text:
-                raise ClaudeCodeInteractionError(
+                raise AdapterInteractionError(
                     "Claude Code adapter requires at least one user message "
                     "with text content."
                 )
@@ -324,9 +267,8 @@ def _get_claude_code_custom_llm_class():
     return _ClaudeCodeCustomLLM
 
 
-class ClaudeCodeAgent(Agent):
-    """
-    Adapter for a locally-installed Claude Code CLI.
+class ClaudeCodeAgent(SubprocessCLIAgent):
+    """Adapter for a locally-installed Claude Code CLI.
 
     Drives Claude Code in headless mode (``claude -p``) through a per-instance
     :class:`litellm.CustomLLM` handler registered under a unique provider name
@@ -353,67 +295,21 @@ class ClaudeCodeAgent(Agent):
     """
 
     ADAPTER_TYPE = "ClaudeCodeAgent"
+    LABEL = "Claude Code"
+    PROVIDER_PREFIX = _CLAUDE_CODE_PROVIDER_PREFIX
+    DEFAULT_BINARY = _DEFAULT_BINARY
+    INSTALL_HINT = "Install Claude Code (https://code.claude.com)"
 
-    def __init__(self, id: str, config: Dict[str, Any]):
-        if "name" not in config:
-            raise ClaudeCodeConfigurationError(
-                f"Missing required configuration key 'name' (the Claude model) "
-                f"for ClaudeCodeAgent: {id}"
-            )
-
-        super().__init__(id, config)
-        self._init_generation_params()
-
-        self.name: str = config["name"]
-        self.model_name = self.name  # for the base ``Agent`` envelope helpers
-        self.binary: str = config.get("binary") or _DEFAULT_BINARY
+    def _configure(self, config: Dict[str, Any]) -> None:
         self.system_prompt: Optional[str] = config.get("system_prompt")
         self.append_system_prompt: Optional[str] = config.get("append_system_prompt")
         self.max_turns: Optional[int] = (
             int(config["max_turns"]) if config.get("max_turns") is not None else None
         )
-        self.cwd: Optional[str] = config.get("cwd")
-        self.timeout: int = int(config.get("timeout", 300))
-        self.extra_args: List[str] = list(config.get("extra_args") or [])
 
-        # Verify Claude Code is actually installed locally — this is the
-        # answer to "how do we ensure the target is available?". A missing
-        # binary fails loudly here instead of mid-attack.
-        if shutil.which(self.binary) is None:
-            raise ClaudeCodeConfigurationError(
-                f"Claude Code executable '{self.binary}' was not found on PATH. "
-                f"Install Claude Code (https://code.claude.com) or set the "
-                f"'binary' config to its full path."
-            )
-
-        # Per-instance LiteLLM provider name + the model string the router
-        # calls ``litellm.completion(model=...)`` with.
-        self._provider_name = f"{_CLAUDE_CODE_PROVIDER_PREFIX}_{id}"
-        self.litellm_model = f"{self._provider_name}/{self.name}"
-        # Claude Code has no API base/key of its own (the CLI handles auth).
-        self.api_base_url: Optional[str] = config.get("endpoint", "http://localhost")
-        self.actual_api_key: Optional[str] = None
-        self.default_thinking = None
-        self.default_tools = None
-        self.default_tool_choice = None
-        self.default_extra_body = None
-
-        self._register_custom_provider()
-
-        self.logger.info(
-            f"ClaudeCodeAgent '{self.id}' registered as LiteLLM provider "
-            f"'{self._provider_name}' (binary={self.binary}, model={self.name})"
-        )
-
-    def _register_custom_provider(self) -> None:
-        litellm, available = _get_litellm()
-        if not available:
-            raise ClaudeCodeConfigurationError(
-                "litellm is required for ClaudeCodeAgent but is not installed."
-            )
-
+    def _build_handler(self) -> Any:
         handler_cls = _get_claude_code_custom_llm_class()
-        handler = handler_cls(
+        return handler_cls(
             binary=self.binary,
             model=self.name,
             system_prompt=self.system_prompt,
@@ -423,87 +319,4 @@ class ClaudeCodeAgent(Agent):
             timeout=self.timeout,
             extra_args=self.extra_args,
             log=self.logger,
-        )
-
-        provider = self._provider_name
-        # Replace any stale entry for this provider name (e.g. when an agent
-        # with the same id is re-created during tests).
-        litellm.custom_provider_map = [
-            entry
-            for entry in litellm.custom_provider_map
-            if entry.get("provider") != provider
-        ]
-        litellm.custom_provider_map.append(
-            {"provider": provider, "custom_handler": handler}
-        )
-        if provider not in litellm._custom_providers:
-            litellm._custom_providers.append(provider)
-
-        self._custom_handler = handler
-
-    # ---- request handling ----------------------------------------------
-
-    def handle_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Send a single Claude Code turn via ``litellm.completion``.
-
-        Flow mirrors :class:`ADKAgent`::
-
-            request_data → litellm.completion(model="hackagent_claude_code_<id>/<model>",
-                                              messages=…)
-                          → _ClaudeCodeCustomLLM.completion → ``claude -p``
-        """
-        is_valid, prompt_text, messages = self._validate_request(request_data)
-        if not is_valid:
-            return self._build_error_response(
-                error_message=(
-                    "Request data must include either 'messages' or 'prompt' field."
-                ),
-                status_code=400,
-                raw_request=request_data,
-            )
-        if not messages:
-            messages = self._prompt_to_messages(prompt_text)  # type: ignore[arg-type]
-
-        litellm, available = _get_litellm()
-        if not available:
-            return self._build_error_response(
-                error_message="litellm is not installed",
-                status_code=500,
-                raw_request=request_data,
-            )
-
-        try:
-            response = litellm.completion(model=self.litellm_model, messages=messages)
-        except Exception as exc:
-            self.logger.exception(
-                f"Claude Code litellm dispatch failed for agent {self.id}: {exc}"
-            )
-            return self._build_error_response(
-                error_message=(
-                    f"{self.ADAPTER_TYPE} error ({type(exc).__name__}): {exc}"
-                ),
-                status_code=500,
-                raw_request=request_data,
-            )
-
-        text = _envelope.extract_text_from_response(
-            response, model_name=self.litellm_model
-        )
-        if isinstance(text, str) and text.startswith("[GENERATION_ERROR:"):
-            return self._build_error_response(
-                error_message=f"{self.ADAPTER_TYPE} generation error: {text}",
-                status_code=500,
-                raw_request=request_data,
-            )
-
-        agent_specific_data = _envelope.build_agent_specific_data(
-            model_name=self.litellm_model,
-            invoked_parameters={"model": self.name},
-        )
-
-        return self._build_success_response(
-            processed_response=text,
-            raw_request=request_data,
-            raw_response_body=response,
-            agent_specific_data=agent_specific_data,
         )
