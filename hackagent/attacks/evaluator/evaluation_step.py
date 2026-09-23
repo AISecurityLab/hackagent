@@ -90,6 +90,7 @@ JUDGE_DEFAULT_RANGE: Dict[str, str] = {
     "nuanced": "binary",
     "on_topic": "binary",
     "scorer": "decimal",
+    "rag_outcome": "binary",
 }
 
 JUDGE_COLUMN_MAP: Dict[str, List[str]] = {
@@ -99,6 +100,7 @@ JUDGE_COLUMN_MAP: Dict[str, List[str]] = {
     "harmbench_variant": ["eval_hbv", "explanation_hbv"],
     "on_topic": ["eval_on_topic", "explanation_on_topic"],
     "scorer": ["eval_scorer", "explanation_scorer"],
+    "rag_outcome": ["eval_rag", "explanation_rag"],
 }
 
 JUDGE_AGG_COLUMN_MAP: Dict[str, str] = {
@@ -108,6 +110,7 @@ JUDGE_AGG_COLUMN_MAP: Dict[str, str] = {
     "harmbench_variant": "eval_hbv",
     "on_topic": "eval_on_topic",
     "scorer": "eval_scorer",
+    "rag_outcome": "eval_rag",
 }
 
 JUDGE_MEAN_COLUMN_MAP: Dict[str, str] = {
@@ -118,6 +121,7 @@ JUDGE_MEAN_COLUMN_MAP: Dict[str, str] = {
     "strongreject": "eval_sj_binary_mean",
     "on_topic": "eval_on_topic_mean",
     "scorer": "eval_scorer_mean",
+    "rag_outcome": "eval_rag_mean",
 }
 
 # Reverse of JUDGE_AGG_COLUMN_MAP: base eval column → judge type.

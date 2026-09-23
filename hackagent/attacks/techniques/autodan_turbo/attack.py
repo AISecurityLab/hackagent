@@ -8,6 +8,7 @@ import os
 from typing import Any, Dict, List, Optional
 
 from hackagent.attacks.techniques.base import BaseAttack
+from hackagent.attacks.ports import RunContext
 from hackagent.attacks.techniques.config import resolve_embedder_config
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 
@@ -63,24 +64,29 @@ class AutoDANTurboAttack(BaseAttack):
 
     config_model = AutoDANTurboConfig
 
-    def __init__(self, config=None, client=None, agent_router=None):
-        """Initialize AutoDAN-Turbo attack with merged defaults.
-
-        Args:
-            config: Optional user overrides for default config.
-            client: Authenticated API client (required).
-            agent_router: Router to the target model (required).
-
-        Returns:
-            None.
-
-        Raises:
-            ValueError: If ``client`` or ``agent_router`` are missing.
-        """
-        if not client:
-            raise ValueError("A storage backend required")
-        if not agent_router:
-            raise ValueError("LLMRouter required")
+    def __init__(
+        self,
+        config=None,
+        ctx_or_client=None,
+        agent_router=None,
+        *,
+        ctx: Optional[RunContext] = None,
+        client=None,
+    ):
+        """Initialize AutoDAN-Turbo with ``(config, ctx)`` or legacy args."""
+        if ctx is None and isinstance(ctx_or_client, RunContext):
+            ctx = ctx_or_client
+        resolved_client = (
+            client
+            if client is not None
+            else (None if isinstance(ctx_or_client, RunContext) else ctx_or_client)
+        )
+        if ctx is None:
+            if not resolved_client:
+                raise ValueError("A storage backend required")
+            if not agent_router:
+                raise ValueError("LLMRouter required")
+            client = resolved_client
 
         cfg = copy.deepcopy(DEFAULT_AUTODAN_TURBO_CONFIG)
         internal_config: Dict[str, Any] = {}
@@ -91,9 +97,15 @@ class AutoDANTurboAttack(BaseAttack):
                 cfg["embedder"] = resolve_embedder_config(user_config["embedder"])
         cfg = AutoDANTurboConfig.from_dict(cfg).to_dict()
         cfg.update(internal_config)
+        if ctx is not None:
+            cfg["_models"] = ctx.models
+            cfg["_judge"] = ctx.judge
 
         self.logger = logging.getLogger("hackagent.attacks.autodan_turbo")
-        super().__init__(cfg, client, agent_router)
+        if ctx is not None:
+            super().__init__(cfg, ctx)
+        else:
+            super().__init__(cfg, client, agent_router)
 
     def _validate_config(self):
         """Validate AutoDAN-Turbo specific configuration constraints.
@@ -347,9 +359,13 @@ class AutoDANTurboAttack(BaseAttack):
             coordinator.finalize_pipeline(results)
 
             # Save strategy library
-            output_dir = self.config.get("output_dir", ".")
-            os.makedirs(output_dir, exist_ok=True)
-            strategy_lib.save(f"{output_dir}/strategy_library")
+            if self.ctx is not None:
+                out_path = self.ctx.workspace.path("strategy_library")
+            else:
+                output_dir = self.config.get("output_dir", ".")
+                os.makedirs(output_dir, exist_ok=True)
+                out_path = f"{output_dir}/strategy_library"
+            strategy_lib.save(str(out_path))
 
             return rows_to_attack_results(results)
 

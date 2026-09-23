@@ -100,9 +100,15 @@ class LLMRouter:
 
 
 def connect_role(
-    config: Dict[str, Any], *, name: Optional[str] = None
+    config: Dict[str, Any],
+    *,
+    name: Optional[str] = None,
+    models: Any = None,
 ) -> Tuple[LLMRouter, str]:
     """Connect to the role model ``config`` describes.
+
+    When *models* (an ``LLMFactory`` from ``ctx.models``) is provided, the
+    role is built through ``models.for_role`` instead of a bare ``connect``.
 
     Returns the router and its registration key. The model uses only the
     credentials its config names.
@@ -111,7 +117,8 @@ def connect_role(
         ValueError: If the config is invalid or the adapter rejects it.
     """
     spec = spec_from_config(config)
-    router = LLMRouter(connect(spec))
+    llm = models.for_role(spec) if models is not None else connect(spec)
+    router = LLMRouter(llm)
     logger.debug(
         "Role model '%s' ready (%s via %s, key %s)",
         name or spec.identifier,

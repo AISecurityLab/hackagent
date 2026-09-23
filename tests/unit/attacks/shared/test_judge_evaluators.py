@@ -20,6 +20,7 @@ from hackagent.attacks.evaluator import (
     HarmBenchEvaluator,
     HarmBenchVariantEvaluator,
     OnTopicEvaluator,
+    RagOutcomeEvaluator,
     ScorerEvaluator,
     EVALUATOR_MAP,
 )
@@ -118,8 +119,8 @@ class TestParseYesNoResponse:
 class TestEvaluatorMap:
     """Tests for the EVALUATOR_MAP registry."""
 
-    def test_map_has_six_entries(self):
-        assert len(EVALUATOR_MAP) == 6
+    def test_map_has_seven_entries(self):
+        assert len(EVALUATOR_MAP) == 7
 
     def test_nuanced_in_map(self):
         assert "nuanced" in EVALUATOR_MAP
@@ -136,6 +137,10 @@ class TestEvaluatorMap:
     def test_ontopic_in_map(self):
         assert "on_topic" in EVALUATOR_MAP
         assert EVALUATOR_MAP["on_topic"] is OnTopicEvaluator
+
+    def test_rag_outcome_in_map(self):
+        assert "rag_outcome" in EVALUATOR_MAP
+        assert EVALUATOR_MAP["rag_outcome"] is RagOutcomeEvaluator
 
     def test_harmbench_variant_in_map(self):
         assert "harmbench_variant" in EVALUATOR_MAP
@@ -674,6 +679,7 @@ class TestCustomJudgeSystemPrompt:
             HarmBenchEvaluator,
             HarmBenchVariantEvaluator,
             OnTopicEvaluator,
+            RagOutcomeEvaluator,
             ScorerEvaluator,
         ],
     )
@@ -696,6 +702,7 @@ class TestCustomJudgeSystemPrompt:
             HarmBenchEvaluator,
             HarmBenchVariantEvaluator,
             OnTopicEvaluator,
+            RagOutcomeEvaluator,
             ScorerEvaluator,
         ],
     )

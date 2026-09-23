@@ -337,6 +337,7 @@ def execute(
                         if isinstance(_judge_cfg.get("thinking"), bool)
                         else False
                     ),
+                    judge=config.get("_judge"),
                 )
                 emit_phase_trace(
                     config,

@@ -28,6 +28,7 @@ JUDGE_DEFAULT_RANGE: Dict[str, str] = {
     "nuanced": "binary",
     "on_topic": "binary",
     "scorer": "decimal",
+    "rag_outcome": "binary",
 }
 
 

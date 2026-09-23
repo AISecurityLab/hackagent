@@ -24,6 +24,8 @@ from contextlib import nullcontext
 from typing import Any, Dict, List, Optional
 
 from hackagent.attacks.techniques.base import BaseAttack
+from hackagent.attacks.ports import RunContext
+from hackagent.attacks._lib.inline_judge import verdict_from_judge
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.attacks.techniques.autodan_turbo.core import (
     _parse_score_value,
@@ -36,7 +38,7 @@ from hackagent.core.defaults import (
 )
 from hackagent.attacks._lib.objectives import OBJECTIVES
 from hackagent.attacks._lib.progress import create_progress_bar
-from hackagent.attacks.shared.prompt_parser import extract_prompt_and_improvement
+from hackagent.attacks._lib.prompt_parser import extract_prompt_and_improvement
 from hackagent.attacks._lib.response import (
     extract_response_content,
     get_guardrail_info,
@@ -193,28 +195,26 @@ class PAIRAttack(BaseAttack):
     def __init__(
         self,
         config: Optional[Dict[str, Any]] = None,
-        client: Optional[Store] = None,
+        ctx_or_client: Any = None,
         agent_router: Optional[LLMRouter] = None,
+        *,
+        ctx: Optional[RunContext] = None,
+        client: Optional[Store] = None,
     ):
-        """
-        Initialize PAIR attack.
-
-        Args:
-            config: Optional configuration overrides merged into
-                :class:`~hackagent.attacks.techniques.pair.config.PairConfig`.
-            client: Authenticated HackAgent API client.
-            agent_router: Router for the victim model.
-
-        Raises:
-            ValueError: If ``client`` or ``agent_router`` is ``None``, if
-                the attacker router cannot be initialised, or if the
-                configured ``objective`` key is not in
-                :data:`~hackagent.attacks.objectives.OBJECTIVES`.
-        """
-        if client is None:
-            raise ValueError("A storage backend must be provided.")
-        if agent_router is None:
-            raise ValueError("Target LLMRouter must be provided.")
+        """Initialize PAIR with ``(config, ctx)`` or legacy args."""
+        if ctx is None and isinstance(ctx_or_client, RunContext):
+            ctx = ctx_or_client
+        resolved_client = (
+            client
+            if client is not None
+            else (None if isinstance(ctx_or_client, RunContext) else ctx_or_client)
+        )
+        if ctx is None:
+            if resolved_client is None:
+                raise ValueError("A storage backend must be provided.")
+            if agent_router is None:
+                raise ValueError("Target LLMRouter must be provided.")
+            client = resolved_client
 
         # Merge config
         current_config = PairConfig().to_dict()
@@ -239,15 +239,17 @@ class PAIRAttack(BaseAttack):
         # Set logger name for hierarchical logging
         self.logger = logging.getLogger("hackagent.attacks.pair")
 
-        # Call parent
-        super().__init__(current_config, client, agent_router)
+        if ctx is not None:
+            super().__init__(current_config, ctx)
+        else:
+            super().__init__(current_config, client, agent_router)
 
         # Initialize attacker router from config (similar to AdvPrefix's generator)
         self.attacker_router = self._initialize_attacker_router()
         if self.attacker_router is None:
             raise ValueError("Failed to initialize attacker router from config.")
 
-        # Initialize judge router — used for both decimal (1-10 scorer) and binary judges.
+        # On the ctx seam, scoring goes through ctx.judge; keep routers for legacy.
         self.judge_router = self._initialize_judge_router()
         if self.judge_router is None:
             self.logger.warning(
@@ -306,9 +308,11 @@ class PAIRAttack(BaseAttack):
             if api_key_config:
                 router_config["agent_metadata"]["api_key"] = api_key_config
 
+            models = self.ctx.models if self.ctx is not None else None
             router, _reg_key = connect_role(
                 router_config,
                 name=attacker_config.get("model", router_config["identifier"]),
+                models=models,
             )
 
             self.logger.debug(
@@ -352,9 +356,11 @@ class PAIRAttack(BaseAttack):
             if api_key_config:
                 router_config["agent_metadata"]["api_key"] = api_key_config
 
+            models = self.ctx.models if self.ctx is not None else None
             router, _reg_key = connect_role(
                 router_config,
                 name=judge_config.get("model", router_config["identifier"]),
+                models=models,
             )
 
             self.logger.debug(
@@ -380,7 +386,9 @@ class PAIRAttack(BaseAttack):
         """
         super()._validate_config()
 
-        required = ["objective", "attacker", "n_iterations", "output_dir"]
+        required = ["objective", "attacker", "n_iterations"]
+        if self.ctx is None:
+            required.append("output_dir")
         missing = [k for k in required if k not in self.config]
         if missing:
             raise ValueError(f"Missing config keys: {missing}")
@@ -691,6 +699,23 @@ class PAIRAttack(BaseAttack):
         Side effects:
             Stores judge reasoning in thread-local PAIR scorer state.
         """
+        if self.ctx is not None:
+            try:
+                response_limit = int(self.config.get("judge_response_max_chars", 3500))
+                response_for_scorer = _truncate_text(response or "", response_limit)
+                score, _success, explanation = verdict_from_judge(
+                    self.ctx.judge,
+                    goal=goal,
+                    prompt="",
+                    response=response_for_scorer,
+                )
+                self._set_scorer_explanation(explanation)
+                return float(score)
+            except Exception as e:
+                self.logger.error(f"Error scoring response via ctx.judge: {e}")
+                self._set_scorer_explanation("")
+                return 1.0
+
         judge_config = self.config.get("judge") or self.config.get("scorer", {})
         judge_range = judge_config.get("range", "decimal")
 
@@ -1332,8 +1357,7 @@ class PAIRAttack(BaseAttack):
             # Finalize pipeline-level tracking via coordinator unless this
             # PAIRAttack instance is running as a sub-batch/sub-goal worker.
             # Global run status is owned by AttackOrchestrator.execute().
-            if not self.config.get("_suppress_run_status_updates", False):
-                coordinator.finalize_pipeline(results)
+            coordinator.finalize_pipeline(results)
 
             if self.tracker:
                 self.tracker.add_step_metadata("successful_attacks", success_count)

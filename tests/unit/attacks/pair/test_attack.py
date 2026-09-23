@@ -710,7 +710,7 @@ class TestPAIRAttack(unittest.TestCase):
         self.assertEqual(progress.calls, 2)
         self.assertFalse(progress.overlapping_updates)
 
-    def test_run_suppresses_pipeline_status_updates_in_sub_run(self):
+    def test_run_always_finalizes_pipeline(self):
 
         class _DummyProgress:
             def update(self, *_args, **_kwargs):
@@ -731,7 +731,6 @@ class TestPAIRAttack(unittest.TestCase):
                 config={
                     "output_dir": "./logs/runs",
                     "n_iterations": 1,
-                    "_suppress_run_status_updates": True,
                 },
                 client=MagicMock(),
                 agent_router=MagicMock(),
@@ -770,7 +769,7 @@ class TestPAIRAttack(unittest.TestCase):
         ):
             attack.run(["g"])
 
-        fake_coordinator.finalize_pipeline.assert_not_called()
+        fake_coordinator.finalize_pipeline.assert_called_once()
 
 
 if __name__ == "__main__":
