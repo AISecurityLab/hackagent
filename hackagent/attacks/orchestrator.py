@@ -316,21 +316,24 @@ class AttackOrchestrator:
         return host not in self._LOCAL_HOSTS and not host.endswith(".localhost")
 
     @staticmethod
-    def _remote_role_defaults(api_key: str) -> Dict[str, Dict[str, Any]]:
-        """Build remote role defaults with backend-key fallback semantics."""
+    def _remote_role_defaults() -> Dict[str, Dict[str, Any]]:
+        """Build remote role defaults on the HackAgent LLM gateway.
+
+        They carry no API key: merging one into a partial role config would
+        send it to whatever endpoint that config names.
+        :meth:`_fill_gateway_api_keys` adds it to gateway roles only.
+        """
         return {
             "attacker": {
                 "identifier": DEFAULT_REMOTE_ATTACKER_IDENTIFIER,
                 "endpoint": DEFAULT_REMOTE_ROLE_ENDPOINT,
                 "agent_type": DEFAULT_REMOTE_AGENT_TYPE,
-                "api_key": api_key,
             },
             "judge": {
                 "identifier": DEFAULT_REMOTE_JUDGE_IDENTIFIER,
                 "endpoint": DEFAULT_REMOTE_ROLE_ENDPOINT,
                 "agent_type": DEFAULT_REMOTE_AGENT_TYPE,
                 "type": "harmbench_variant",
-                "api_key": api_key,
             },
         }
 
@@ -434,7 +437,7 @@ class AttackOrchestrator:
 
         if role_mapping:
             defaults_by_family = (
-                self._remote_role_defaults(api_key)
+                self._remote_role_defaults()
                 if is_remote_mode
                 else self._local_role_defaults()
             )

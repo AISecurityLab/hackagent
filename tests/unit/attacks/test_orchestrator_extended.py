@@ -1572,6 +1572,18 @@ class TestGatewayApiKeys(unittest.TestCase):
         hack_agent.backend.get_api_key.return_value = "hk_key"
         return orch
 
+    def test_partial_judge_on_another_provider_does_not_get_the_key(self):
+        resolved = self._remote()._apply_mode_based_role_defaults(
+            {
+                "attack_type": "h4rm3l",
+                "goals": ["g"],
+                "judges": [
+                    {"identifier": "gpt-4", "endpoint": "https://openrouter.ai/api/v1"}
+                ],
+            }
+        )
+        self.assertNotIn("api_key", resolved["judges"][0])
+
     def test_role_outside_the_defaults_on_the_gateway_gets_the_key(self):
         resolved = self._remote()._apply_mode_based_role_defaults(
             {
