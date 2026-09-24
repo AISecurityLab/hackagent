@@ -28,13 +28,7 @@ dependencies = [
     "rich>=14.0.0",
     "click>=8.1.0",
     "pyyaml>=6.0.0",
-    "textual>=1.0.0",
     "python-dateutil>=2.8.0",
-    "faiss-cpu>=1.13.2",
-    "datasets>=2.14.0",
-    "playwright>=1.40",
-    "Pillow>=10.0.0",
-    "flask>=3.1.3",
 ]
 
 
@@ -57,6 +51,17 @@ dev = [
     "vllm>=0.11.0; sys_platform != 'win32'",
     "transformers>=4.40,<6.0; sys_platform != 'win32'",
     "pytest-textual-snapshot>=1.1.0",
+    "import-linter>=2.3",
+    # Optional runtime extras, installed here so unit tests and the docs
+    # generator can import every module. A bare `pip install hackagent`
+    # does not get them.
+    "textual>=1.0.0",
+    "flask>=3.1.3",
+    "playwright>=1.40",
+    "faiss-cpu>=1.13.2",
+    "numpy>=1.26",
+    "Pillow>=10.0.0",
+    "datasets>=2.14.0",
 ]
 docs = [
     "pydoc-markdown>=4.8.2",
@@ -65,13 +70,25 @@ docs = [
 ]
 binaries = [
     "pyinstaller>=6.0",
+    # The frozen app bundles the optional interfaces and technique extras.
+    "textual>=1.0.0",
+    "flask>=3.1.3",
+    "playwright>=1.40",
+    "faiss-cpu>=1.13.2",
+    "numpy>=1.26",
+    "Pillow>=10.0.0",
+    "datasets>=2.14.0",
 ]
 
 [project.optional-dependencies]
-# The dashboard bundle, published from the hackagent-webapp repository. Kept out
-# of the base wheel so an install that never opens `hackagent web` does not
-# carry ~0.9 MB of frontend assets. Release binaries bundle the same assets
-# directly and do not need this.
+# Interface and technique extras. `pip install hackagent` stays importable
+# without them: the package root does not import textual, flask, playwright,
+# faiss, numpy, Pillow, or datasets.
+tui = ["textual>=1.0.0"]
+# Flask serves the local dashboard. hackagent-webui is the published bundle
+# from the hackagent-webapp repository, kept out of the base wheel so an
+# install that never opens `hackagent web` does not carry ~0.9 MB of frontend
+# assets. Release binaries bundle the same assets directly.
 #
 # A wide range rather than a pin, so dashboard fixes reach users without a
 # hackagent release. The bound stays below 1.0 because the dashboard is
@@ -80,8 +97,17 @@ binaries = [
 # Note the upper bound must admit a *stable* release — hackagent-webapp also
 # publishes .devN pre-releases from its stage branch, which pip ignores.
 web = [
+    "flask>=3.1.3",
     "hackagent-webui>=0.2,<1.0",
 ]
+browser = ["playwright>=1.40"]
+# faiss and numpy. h4rm3l and embedding health checks use numpy as well.
+rag = [
+    "faiss-cpu>=1.13.2",
+    "numpy>=1.26",
+]
+vision = ["Pillow>=10.0.0"]
+hf = ["datasets>=2.14.0"]
 
 [project.scripts]
 hackagent = "hackagent.interfaces.cli.main:main"
@@ -118,7 +144,8 @@ include = [
 data_file = "reports/.coverage"
 source = ["hackagent"]
 omit = [
-    "hackagent/interfaces/tui/*",
+    # The whole TUI tree, including nested views and widgets.
+    "hackagent/interfaces/tui/**",
 ]
 
 [tool.coverage.report]
@@ -178,3 +205,73 @@ extend-exclude = ["*.md"]
 # Ruff 0.16 widened its implicit default rule selection. Pin the rule set the
 # codebase was linted against so version bumps do not silently add new rules.
 select = ["E4", "E7", "E9", "F"]
+
+[tool.importlinter]
+root_packages = ["hackagent"]
+include_external_packages = true
+contract_types = [
+    "logging_handlers: lint.import_contracts.LoggingHandlersContract",
+]
+
+[[tool.importlinter.contracts]]
+name = "Layered packages"
+type = "layers"
+layers = [
+    "hackagent.interfaces",
+    "hackagent.client",
+    "hackagent.orchestrator",
+    # Depth 0. Pipes mean these siblings may not import each other.
+    "hackagent.catalog | hackagent.attacks | hackagent.models | hackagent.storage | hackagent.evaluation | hackagent.datasets | hackagent.tracking",
+    "hackagent.core",
+]
+ignore_imports = [
+    # Techniques still construct trackers and accept a Store on the obsolete
+    # constructor, and LLMRouter still builds role models. Those edges are
+    # concentrated in legacy_seams; every other sibling import is forbidden.
+    "hackagent.attacks._lib.legacy_seams -> hackagent.tracking",
+    "hackagent.attacks._lib.legacy_seams -> hackagent.storage.store",
+    "hackagent.attacks._lib.legacy_seams -> hackagent.models.client",
+    "hackagent.attacks._lib.legacy_seams -> hackagent.models.factory",
+]
+
+[[tool.importlinter.contracts]]
+name = "Depth-0 packages are mutually independent"
+type = "independence"
+modules = [
+    "hackagent.catalog",
+    "hackagent.attacks",
+    "hackagent.models",
+    "hackagent.storage",
+    "hackagent.evaluation",
+    "hackagent.datasets",
+    "hackagent.tracking",
+]
+ignore_imports = [
+    "hackagent.attacks._lib.legacy_seams -> hackagent.tracking",
+    "hackagent.attacks._lib.legacy_seams -> hackagent.storage.store",
+    "hackagent.attacks._lib.legacy_seams -> hackagent.models.client",
+    "hackagent.attacks._lib.legacy_seams -> hackagent.models.factory",
+]
+
+[[tool.importlinter.contracts]]
+name = "storage._http is private"
+type = "protected"
+protected_modules = ["hackagent.storage._http"]
+allowed_importers = ["hackagent.storage.remote"]
+as_packages = true
+
+[[tool.importlinter.contracts]]
+name = "textual, flask, and click stay under interfaces"
+type = "forbidden"
+source_modules = ["hackagent"]
+forbidden_modules = ["textual", "flask", "click"]
+ignore_imports = [
+    # External packages are recorded as their top-level module.
+    "hackagent.interfaces.** -> textual",
+    "hackagent.interfaces.** -> flask",
+    "hackagent.interfaces.** -> click",
+]
+
+[[tool.importlinter.contracts]]
+name = "No logging-handler setup outside interfaces"
+type = "logging_handlers"

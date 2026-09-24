@@ -4,7 +4,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from hackagent.attacks._lib.scoring import get_judge_range, infer_judge_type
-from hackagent.storage.store import Store
+from hackagent.attacks._lib.legacy_seams import Store
 
 
 class TapEvaluation:

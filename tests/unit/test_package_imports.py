@@ -1,9 +1,10 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Test that all package modules can be imported correctly.
-This test ensures that all dependencies are properly declared in pyproject.toml
-and the package can be installed and used without import errors.
+"""Smoke tests for package import and optional extras.
+
+Layering (depth-0 independence, private ``storage._http``, UI frameworks, and
+logging-handler setup) is enforced by import-linter, not by this module.
 """
 
 import importlib
@@ -42,16 +43,39 @@ class TestPackageImports:
 
         assert AgentType and ApiError and HackAgent and Settings
 
-    def test_root_import_does_not_load_textual(self):
-        """Importing the facade must not pull in the TUI toolkit."""
+    def test_root_import_does_not_load_interface_toolkits(self):
+        """Importing the facade must not pull in textual, flask, or click."""
         import subprocess
         import sys
 
-        code = "import sys, hackagent; raise SystemExit('textual' in sys.modules)"
+        code = (
+            "import sys, hackagent; "
+            "bad = [n for n in ('textual', 'flask', 'click') if n in sys.modules]; "
+            "raise SystemExit(0 if not bad else 1)"
+        )
         result = subprocess.run(
             [sys.executable, "-c", code], capture_output=True, text=True
         )
         assert result.returncode == 0, result.stderr
+
+    def test_optional_extras_are_declared(self):
+        """The packaging metadata names the optional extras and their packages."""
+        from pathlib import Path
+
+        pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
+        text = pyproject.read_text(encoding="utf-8")
+        section = text.split("[project.optional-dependencies]", 1)[1].split("\n[", 1)[0]
+        for extra, package in {
+            "tui": "textual",
+            "web": "flask",
+            "browser": "playwright",
+            "rag": "faiss-cpu",
+            "vision": "Pillow",
+            "hf": "datasets",
+        }.items():
+            assert f"{extra} =" in section or f"{extra}=" in section
+            assert package in section
+        assert "numpy" in section
 
     def test_models_connect_import(self):
         """Test that model access can be imported."""
@@ -164,7 +188,6 @@ class TestDependenciesAvailable:
             "rich",
             "click",
             "yaml",  # pyyaml
-            "textual",
             "dateutil",  # python-dateutil
             "attrs",
         ],

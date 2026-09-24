@@ -28,7 +28,7 @@ from typing import Any, Dict, List, Optional
 
 from hackagent.attacks._lib.inline_judge import verdict_from_judge
 from hackagent.attacks._lib.scoring import JUDGE_DEFAULT_RANGE, normalize_judge_score
-from hackagent.storage.store import Store
+from hackagent.attacks._lib.legacy_seams import Store
 
 from .config import EvaluationPipelineConfig
 from .utils import handle_empty_input, log_errors

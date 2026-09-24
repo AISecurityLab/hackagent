@@ -13,6 +13,13 @@ repos:
 
   - repo: local
     hooks:
+      - id: import-linter
+        name: import-linter
+        entry: uv run lint-imports
+        language: system
+        pass_filenames: false
+        files: ^(hackagent/.*\.py|lint/.*\.py|pyproject\.toml)$
+
       - id: pytest
         name: pytest (unit only)
         # Integration + e2e tests run in GitHub Actions (see

@@ -17,7 +17,7 @@ from .encode_experts import encode_expert_dict
 from .prompts_and_demonstrations import demonstration_dict, system_role_propmts
 
 if TYPE_CHECKING:
-    from hackagent.tracking import Tracker
+    from hackagent.attacks._lib.legacy_seams import Tracker
 
 
 _REPLY_ENCODING_INSTRUCTION = (

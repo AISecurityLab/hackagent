@@ -25,7 +25,8 @@ try:
     from PIL import Image, ImageDraw, ImageFont
 except ImportError:
     raise ImportError(
-        "Pillow is required for the MML attack. Install with: pip install Pillow"
+        "Pillow is required for the MML attack. "
+        "Install with: pip install 'hackagent[vision]'"
     )
 
 

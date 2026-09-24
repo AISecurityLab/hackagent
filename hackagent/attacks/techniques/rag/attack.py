@@ -22,8 +22,14 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-import faiss
-import numpy as np
+try:
+    import faiss
+    import numpy as np
+except ImportError as exc:
+    raise ImportError(
+        "faiss and numpy are required for the RAG attack. "
+        "Install with: pip install 'hackagent[rag]'"
+    ) from exc
 
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.ports import RunContext
@@ -32,8 +38,8 @@ from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.attacks._lib.llm_router import connect_role
 from hackagent.attacks._lib.response import extract_response_content
 from hackagent.attacks._lib.llm_router import LLMRouter
-from hackagent.tracking.tracker import Tracker
-from hackagent.storage.store import Store
+from hackagent.attacks._lib.legacy_seams import Tracker
+from hackagent.attacks._lib.legacy_seams import Store
 from hackagent.core.contracts import EvalStatus, StepKind
 
 from .config import (

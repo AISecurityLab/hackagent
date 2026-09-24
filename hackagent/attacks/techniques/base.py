@@ -64,7 +64,7 @@ from hackagent.attacks.config import AttackConfig, roles_from_paths
 from hackagent.attacks.ports import RunContext, Step
 from hackagent.attacks.types import AttackResult
 from hackagent.core.contracts import Goal
-from hackagent.tracking import StepTracker, TrackingCoordinator
+from hackagent.attacks._lib.legacy_seams import StepTracker, TrackingCoordinator
 
 logger = get_logger(__name__)
 

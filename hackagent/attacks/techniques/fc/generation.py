@@ -32,7 +32,7 @@ from .flowchart_renderer import (
 from .prompts import FEW_SHOT_STEP_DECOMPOSITION, SYSTEM_PROMPT, USER_PROMPT
 
 if TYPE_CHECKING:
-    from hackagent.tracking import Tracker
+    from hackagent.attacks._lib.legacy_seams import Tracker
 
 
 # ─── Step Decomposition ──────────────────────────────────────────────────────

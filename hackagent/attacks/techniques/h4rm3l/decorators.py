@@ -26,7 +26,12 @@ import base64
 import logging
 from typing import Callable, List, Optional, Tuple
 
-from numpy.random import RandomState
+try:
+    from numpy.random import RandomState
+except ImportError as exc:
+    raise ImportError(
+        "numpy is required for h4rm3l. Install with: pip install 'hackagent[rag]'"
+    ) from exc
 
 logger = logging.getLogger(__name__)
 runtime_logger = logging.getLogger("hackagent.attacks.h4rm3l")

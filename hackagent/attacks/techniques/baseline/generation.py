@@ -17,7 +17,7 @@ from hackagent.attacks._lib.response import (
     is_guardrail_response,
 )
 from hackagent.attacks._lib.llm_router import LLMRouter
-from hackagent.tracking import Tracker
+from hackagent.attacks._lib.legacy_seams import Tracker
 
 
 logger = logging.getLogger("hackagent.attacks.baseline.generation")

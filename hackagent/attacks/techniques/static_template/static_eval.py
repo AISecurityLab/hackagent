@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional
 
 from hackagent.core.defaults import DEFAULT_JUDGE_IDENTIFIER
 from hackagent.core.contracts import EvalStatus
-from hackagent.tracking import Tracker
+from hackagent.attacks._lib.legacy_seams import Tracker
 
 logger = logging.getLogger("hackagent.attacks.static_template.evaluation")
 

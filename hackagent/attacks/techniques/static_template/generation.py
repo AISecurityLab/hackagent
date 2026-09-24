@@ -24,7 +24,7 @@ from hackagent.attacks._lib.response import (
 from hackagent.attacks._lib.templates import AttackTemplates
 from hackagent.attacks._lib.progress import create_progress_bar
 from hackagent.attacks._lib.llm_router import LLMRouter
-from hackagent.tracking import Tracker
+from hackagent.attacks._lib.legacy_seams import Tracker
 
 from .config import DEFAULT_TEMPLATE_CONFIG, validate_template_config
 

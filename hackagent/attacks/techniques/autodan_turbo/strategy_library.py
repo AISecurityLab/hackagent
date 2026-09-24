@@ -8,8 +8,6 @@ import os
 import pickle
 from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
-
 from hackagent.attacks.shared.embedding_utils import (
     embedding_request_kwargs,
     extract_embedding_vector,
@@ -20,10 +18,12 @@ from hackagent.attacks.techniques.config import resolve_embedder_config
 
 try:
     import faiss
-except ImportError:
+    import numpy as np
+except ImportError as exc:
     raise ImportError(
-        "faiss-cpu is required for AutoDAN-Turbo. Install with: pip install faiss-cpu"
-    )
+        "faiss and numpy are required for AutoDAN-Turbo. "
+        "Install with: pip install 'hackagent[rag]'"
+    ) from exc
 
 
 class StrategyLibrary:

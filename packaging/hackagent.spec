@@ -38,7 +38,7 @@ for package in ("textual",):
 # and the exported web UI under interfaces/web/static).
 datas += collect_data_files("hackagent", include_py_files=False)
 
-hiddenimports = ["faiss"]
+hiddenimports = ["faiss", "flask", "playwright", "PIL", "datasets", "numpy"]
 
 # Textual resolves widgets lazily through ``textual.widgets.__getattr__`` and the
 # TUI views are imported by name, so static analysis never sees either of them.

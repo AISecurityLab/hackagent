@@ -19,7 +19,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional, Tuple
 
-from hackagent.storage.store import Store
+from hackagent.attacks._lib.legacy_seams import Store
 from hackagent.attacks._lib.llm_router import LLMRouter, connect_role
 
 from .config import (

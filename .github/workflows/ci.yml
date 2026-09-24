@@ -76,6 +76,9 @@ jobs:
       - name: Run Ruff Formatting Check
         run: uv run ruff format --check .
 
+      - name: Run import-linter
+        run: uv run lint-imports
+
   # ── Unit tests: full OS × Python-version matrix ──────────────────────────
   # Runs tests/unit/ only (no external services, fast). Coverage artifact
   # is uploaded for the canonical ubuntu/3.11 slice and merged later.

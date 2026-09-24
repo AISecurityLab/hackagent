@@ -57,9 +57,7 @@ def _launch_tui_default(ctx):
     except ImportError as e:
         console.print(f"[bold red]❌ TUI dependencies not installed: {e}[/bold red]")
         console.print("\n[cyan]💡 Install with:[/cyan]")
-        console.print("  uv add textual")
-        console.print("  # or")
-        console.print("  pip install textual")
+        console.print("  pip install 'hackagent[tui]'")
         ctx.exit(1)
     except Exception as e:
         console.print(f"[bold red]❌ TUI failed to start: {e}[/bold red]")

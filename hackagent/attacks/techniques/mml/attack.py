@@ -30,7 +30,7 @@ from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.core.defaults import DEFAULT_JUDGE_IDENTIFIER
 from hackagent.attacks._lib.llm_router import LLMRouter
-from hackagent.storage.store import Store
+from hackagent.attacks._lib.legacy_seams import Store
 
 from . import generation
 from .config import DEFAULT_MML_CONFIG

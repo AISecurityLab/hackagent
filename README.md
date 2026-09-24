@@ -56,7 +56,17 @@ source .venv/bin/activate
 pip install hackagent
 ```
 
-No API key required: HackAgent works locally out of the box.
+No API key required: HackAgent works locally out of the box. The base install
+imports without the interface and technique extras:
+
+```bash
+pip install 'hackagent[tui]'      # textual
+pip install 'hackagent[web]'      # flask and the dashboard bundle
+pip install 'hackagent[browser]'  # playwright
+pip install 'hackagent[rag]'      # faiss and numpy
+pip install 'hackagent[vision]'   # Pillow
+pip install 'hackagent[hf]'       # HuggingFace datasets
+```
 
 ### Standalone binary (no Python required)
 
@@ -73,10 +83,10 @@ Extract the archive and run the `hackagent` launcher inside it — no Python, `p
 or `uv` install needed. Keep the extracted folder intact; the launcher loads the
 libraries next to it.
 
-> **Note:** the `WEB` provider drives a real browser through Playwright, whose
-> browser binaries cannot be embedded in the archive (or in the PyPI package).
-> Before using `hackagent web`-based targets, install them once with
-> `playwright install`.
+> **Note:** the `WEB` provider drives a real browser through Playwright
+> (`pip install 'hackagent[browser]'`). The browser binaries cannot be embedded
+> in the archive (or in the PyPI package). Before using `hackagent web`-based
+> targets, install them once with `playwright install`.
 
 
 Questions? Join [community discussions](https://github.com/AISecurityLab/hackagent/discussions) or email ais@ai4i.it.

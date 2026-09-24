@@ -21,7 +21,7 @@ from hackagent.attacks.ports import RunContext
 from hackagent.attacks.techniques.base import BaseAttack
 from hackagent.attacks.types import AttackResult, rows_to_attack_results
 from hackagent.core.contracts import Goal
-from hackagent.storage.store import Store
+from hackagent.attacks._lib.legacy_seams import Store
 
 from . import generation
 from .config import DEFAULT_BASELINE_CONFIG

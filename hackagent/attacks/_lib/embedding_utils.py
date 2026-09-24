@@ -2,13 +2,27 @@
 # SPDX-License-Identifier: Apache-2.0
 """Embedding-only provider requests shared by retrieval and preflight."""
 
+from __future__ import annotations
+
 import os
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 from urllib.parse import urlsplit
 
-import numpy as np
-
 from hackagent.core.defaults import DEFAULT_EMBEDDER_ENDPOINT
+
+if TYPE_CHECKING:
+    import numpy as np
+
+
+def _numpy() -> Any:
+    """Import numpy on use so a bare install can import preflight."""
+    try:
+        import numpy as np
+    except ImportError as exc:
+        raise ImportError(
+            "numpy is required for embeddings. Install with: pip install 'hackagent[rag]'"
+        ) from exc
+    return np
 
 
 def normalize_embedding_endpoint(endpoint: str, *, ollama: bool = False) -> str:
@@ -97,6 +111,7 @@ def validate_embedding_vector(
     value: Any, *, dimension: Optional[int] = None
 ) -> np.ndarray:
     """Require a nonempty, finite, one-dimensional float32 numeric vector."""
+    np = _numpy()
     try:
         vector = np.asarray(value)
         if vector.ndim != 1 or not vector.size or vector.dtype.kind not in "fiu":
