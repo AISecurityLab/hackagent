@@ -95,15 +95,17 @@ rows = target.hack_chain(attacks=None, goals=None, on_event=on_event)
 
 ## Interfaces
 
-`hackagent.interfaces` is depth 3.
+`hackagent.interfaces` is depth 3. Interfaces import the facade and public types. Textual, Flask, and Click are imported only under this package.
 
-- **CLI** (`hackagent.interfaces.cli`). Strategy commands are built from `catalog()`. Quick scan uses `hack_chain`. Banner and logging stay here.
-- **TUI** (`hackagent.interfaces.tui`). Forms come from the JSON schema. It passes `on_event` into `hack` / `hack_chain`. It does not patch the environment, stdout, or loggers. Library paths do not branch on `NO_COLOR`. Results are read through the facade.
-- **Web** (`hackagent.interfaces.web`, moved from `server/webui`). It reads through the facade and does not import `cli.config`. `delete_run` is the explicit local write.
+- **CLI** (`hackagent.interfaces.cli`). Strategy commands are built from `catalog()`. Quick scan uses `hack_chain`. Banner and logging stay here. Click is a base dependency because `hackagent` is `hackagent.interfaces.cli.main`.
+- **TUI** (`hackagent.interfaces.tui`). Forms come from the JSON schema. It passes `on_event` into `hack` / `hack_chain`. It does not patch the environment, stdout, or loggers. Library paths do not branch on `NO_COLOR`. Results are read through the facade. Install it with `pip install 'hackagent[tui]'`. A bare install does not include Textual, and `import hackagent` does not load it.
+- **Web** (`hackagent.interfaces.web`, moved from `server/webui`). It reads through the facade and does not import `cli.config`. `delete_run` is the explicit local write. Install it with `pip install 'hackagent[web]'` (Flask and the dashboard bundle).
+
+`hackagent scan` and the browser adapter need `pip install 'hackagent[browser]'` (Playwright).
 
 ## Deferred
 
-Import-linter, packaging extras, and the hatch ship are a later phase. Path updates already landed are not repeated here.
+`hackagent.attacks._lib.legacy_seams` still holds the sibling imports technique code uses for the obsolete constructor (`Store`, tracking coordinators, role models). It is not a public API and is omitted from the generated reference. `hackagent.router` remains a shim until that package is retired. `router.discovery` re-exports `plan_attack`, `auto_plan`, and `build_web_target`.
 
 Scripts under `hackagent/examples/` may still construct `HackAgent(endpoint=...)`. Those scripts are outdated relative to this facade. The examples on this page use `Settings` and `.target()`.
 

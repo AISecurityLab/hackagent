@@ -20,18 +20,22 @@ source .venv/bin/activate
 pip install hackagent
 ```
 
-### Optional: the web dashboard
+### Optional extras
 
-[`hackagent web`](../cli/web.md) serves the HackAgent dashboard locally. It ships
-as a separate package so an install that never opens it does not carry the
-frontend assets:
+`pip install hackagent` is enough for the SDK, the CLI, and a local SQLite store. That install does not include Textual, Flask, Playwright, FAISS, NumPy, Pillow, or the Hugging Face `datasets` library. `import hackagent` does not load Textual, Flask, or Click. Click stays in the base install because it is the CLI entry point (`hackagent.interfaces.cli.main`).
 
-```bash
-pip install 'hackagent[web]'
-```
+| Extra | Command | Unlocks |
+| --- | --- | --- |
+| `tui` | `pip install 'hackagent[tui]'` | Full-screen terminal UI (`hackagent` / `hackagent tui`) |
+| `web` | `pip install 'hackagent[web]'` | Local dashboard (`hackagent web`): Flask and the dashboard bundle |
+| `browser` | `pip install 'hackagent[browser]'` | Playwright, for `hackagent scan` and the browser adapter |
+| `rag` | `pip install 'hackagent[rag]'` | FAISS and NumPy, for the RAG attack and embedding checks |
+| `vision` | `pip install 'hackagent[vision]'` | Pillow, for image-encoded attacks such as MML |
+| `hf` | `pip install 'hackagent[hf]'` | Hugging Face `datasets`, for presets and Hub datasets |
 
-You can add it at any time without reinstalling anything else. Release binaries
-already include it.
+You can add an extra at any time. Release binaries already include these libraries.
+
+[`hackagent web`](../cli/web.md) serves the dashboard locally. The `web` extra keeps the frontend bundle out of an install that never opens it. The terminal UI needs the `tui` extra; a bare install stays free of Textual.
 
 ### Verify Installation
 

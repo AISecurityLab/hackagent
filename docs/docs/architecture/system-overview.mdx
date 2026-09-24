@@ -102,10 +102,10 @@ import Link from '@docusaurus/Link';
 - A Click-based CLI (`hackagent init`, `agent`, `eval`, `scan`, `claude`, `codex`, `web`, `datasets`, `results`, `config`, `examples`) that talks only to the facade. Strategy commands come from `catalog()`. The quick scan calls `hack_chain`. Banner and logging stay in this package. See [CLI Reference](../cli/overview.md).
 
 **TUI (`hackagent/interfaces/tui/`)**
-- Forms are generated from each technique's JSON schema. The TUI subscribes with `on_event`. It does not patch the environment, stdout, or loggers.
+- Forms are generated from each technique's JSON schema. The TUI subscribes with `on_event`. It does not patch the environment, stdout, or loggers. Textual is the `tui` extra (`pip install 'hackagent[tui]'`). A bare install does not include it, and `import hackagent` does not load Textual, Flask, or Click.
 
 **Web UI (`hackagent/interfaces/web/`)**
-- A Flask app (`hackagent web`) that serves the HackAgent web app bundle. Moved from `hackagent/server/webui`. It reads through the facade and does not import `cli.config`. In local mode, `delete_run` is the explicit write; other writes are refused. With an API key it proxies to the HackAgent API. No separate backend process is required.
+- A Flask app (`hackagent web`) that serves the HackAgent web app bundle. Moved from `hackagent/server/webui`. It reads through the facade and does not import `cli.config`. In local mode, `delete_run` is the explicit write; other writes are refused. With an API key it proxies to the HackAgent API. No separate backend process is required. Flask and the dashboard bundle are the `web` extra (`pip install 'hackagent[web]'`). The wheel looks for the bundle at `hackagent/interfaces/web/static`.
 
 ### Models (`hackagent/models/`)
 
@@ -120,9 +120,9 @@ import Link from '@docusaurus/Link';
 
 ### Attack Framework (`hackagent/attacks/`)
 
-- **Orchestrator** ([`hackagent.orchestrator`](../orchestrator/index.md)): depth-1 composition root. [`run`](../hackagent/orchestrator/runner.md) executes one attack. [`hack_chain`](../hackagent/orchestrator/chain.md) runs a sequence; the CLI quick scan uses it. [`ATTACK_REGISTRY`](../hackagent/orchestrator/registry.md) maps canonical technique ids to implementations. `AttackOrchestrator`, the facade strategy dict, and `hackagent.attacks.registry` are gone. There is no import shim. The forward technique seam is [`BaseAttack(config, ctx)`](../attacks/seam.md) with [`AttackConfig`](../hackagent/attacks/config.md) and [`RunContext`](../hackagent/attacks/ports.md). Every shipped technique accepts that constructor. Post-hoc pipelines are generation-only (AdvPrefix selection uses `ctx.judge.evaluate`). Inline-judge techniques (BoN, PAP, Tool-output IPI, TAP) score with `ctx.judge.score`. Custom-loop techniques (Crescendo, PAIR, AutoDAN-Turbo, RAG) take roles from `ctx.models`, scores from `ctx.judge`, and artifacts from `ctx.workspace`. The legacy `(config, client, agent_router)` constructor remains supported and is obsolete for new technique code; the runner constructs `(config, ctx)`. Shared helpers live in `hackagent.attacks._lib`, with shims at `attacks.shared`, `attacks.generator`, and `attacks.objectives`.
-- **Techniques** (`attacks/techniques/`): Baseline, StaticTemplate, FlipAttack, BON, CipherChat, H4rm3l, MML, FC/tFC, PAP, PAIR, TAP, AdvPrefix, AutoDAN-Turbo, Crescendo, RAG (indirect prompt injection). Each technique has exactly one primary category (static / adaptive / multi-turn) plus optional tags in `hackagent.catalog.taxonomy`. See [Attack taxonomy](../attacks/taxonomy.mdx) and the [Attacks](../attacks/index.mdx) catalog.
-- **Evaluator** (`attacks/evaluator/`): shared judge/pattern-based evaluators and metrics used across techniques to score attack success.
+- **Orchestrator** ([`hackagent.orchestrator`](../orchestrator/index.md)): depth-1 composition root. [`run`](../hackagent/orchestrator/runner.md) executes one attack. [`hack_chain`](../hackagent/orchestrator/chain.md) runs a sequence; the CLI quick scan uses it. [`ATTACK_REGISTRY`](../hackagent/orchestrator/registry.md) maps canonical technique ids to implementations. `AttackOrchestrator`, the facade strategy dict, and `hackagent.attacks.registry` are gone. There is no import shim for those modules. The forward technique seam is [`BaseAttack(config, ctx)`](../attacks/seam.md) with [`AttackConfig`](../hackagent/attacks/config.md) and [`RunContext`](../hackagent/attacks/ports.md). Every shipped technique accepts that constructor. Post-hoc pipelines are generation-only (AdvPrefix selection uses `ctx.judge.evaluate`). Inline-judge techniques (BoN, PAP, Tool-output IPI, TAP) score with `ctx.judge.score`. Custom-loop techniques (Crescendo, PAIR, AutoDAN-Turbo, RAG) take roles from `ctx.models`, scores from `ctx.judge`, and artifacts from `ctx.workspace`. The legacy `(config, client, agent_router)` constructor remains supported and is obsolete for new technique code; the runner constructs `(config, ctx)`. Shared helpers live in `hackagent.attacks._lib`. Compatibility shims remain at `attacks.shared`, `attacks.generator`, and `attacks.objectives`. `attacks._lib.legacy_seams` is the deferred pocket for sibling imports those obsolete constructors still need. None of those shims are public API pages.
+- **Techniques** (`attacks/techniques/`): Baseline, StaticTemplate, FlipAttack, BON, CipherChat, H4rm3l, MML, FC/tFC, PAP, PAIR, TAP, AdvPrefix, AutoDAN-Turbo, Crescendo, RAG (indirect prompt injection), Tool-output IPI. Each technique has exactly one primary category (static / adaptive / multi-turn) plus optional tags in `hackagent.catalog.taxonomy`. See [Attack taxonomy](../attacks/taxonomy.mdx) and the [Attacks](../attacks/index.mdx) catalog. The RAG attack and AutoDAN-Turbo's strategy library need `pip install 'hackagent[rag]'` (FAISS and NumPy). MML's image encoder needs `pip install 'hackagent[vision]'` (Pillow).
+- **Evaluation** ([`hackagent.evaluation`](../evaluation/index.md)): depth-0 judges, pattern evaluators, and verdict metrics. `Panel` scores a `Sample` into a `Verdict`. Techniques reach it through the `Judge` port, not by importing the package. `hackagent.attacks.evaluator` is gone.
 
 ### Risk Profiles (`hackagent/catalog/risks/`)
 
@@ -130,7 +130,7 @@ import Link from '@docusaurus/Link';
 
 ### Datasets (`hackagent/datasets/`)
 
-- Pluggable dataset providers (`file`, `huggingface`, `url_json`), curated presets, and an intent-category taxonomy, all resolved through a central `registry.py`. See [Datasets](../datasets/index.md).
+- Pluggable dataset providers (`file`, `huggingface`, `url_json`), curated presets, and an intent-category taxonomy, all resolved through a central `registry.py`. See [Datasets](../datasets/index.md). Presets and the Hugging Face provider load through the `datasets` library, which is the `hf` extra (`pip install 'hackagent[hf]'`). File and URL JSON providers do not need it.
 
 ### Storage
 
@@ -138,9 +138,13 @@ import Link from '@docusaurus/Link';
 - SQLite database at `~/.local/share/hackagent/hackagent.db`. No network access or account required — this is what most SDK/CLI usage runs against.
 
 **`RemoteBackend` (optional)**
-- Used automatically once a HackAgent Cloud API key is resolved. Talks to `https://api.hackagent.dev` through the generated OpenAPI client in `hackagent/storage/_http/`, enabling team dashboards and hosted result storage.
+- Used automatically once a HackAgent Cloud API key is resolved. Talks to `https://api.hackagent.dev` through the generated OpenAPI client in `hackagent/storage/_http/`, enabling team dashboards and hosted result storage. That client is private: only `storage/remote.py` imports it, and it is omitted from the API reference.
 
 Both backends implement the same `Store` protocol (`hackagent/storage/store.py`). The facade picks one. CLI, TUI, and web do not import `LocalBackend` or `RemoteBackend`.
+
+### Layers
+
+Import-linter enforces `core` → depth 0 (`catalog`, `attacks`, `models`, `storage`, `evaluation`, `datasets`, `tracking`) → `orchestrator` → `client` → `interfaces`. Depth-0 packages do not import each other. Logging-handler setup stays under `interfaces`. `hackagent.router` remains a shim outside those layers until it is retired. The browser adapter's Playwright dependency is the `browser` extra (`pip install 'hackagent[browser]'`).
 
 ## Attack Execution Flow
 

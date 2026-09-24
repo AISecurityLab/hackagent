@@ -13,7 +13,7 @@ chat widget and read the replies.
 
 Playwright ships in the `browser` extra (`pip install 'hackagent[browser]'`).
 The Chromium *binary* it drives is not a pip package, so it is fetched on first
-use (or pre-fetch with ``playwright install chromium``).
+use (or pre-fetch with `playwright install chromium`).
 
 ## BrowserScanError Objects
 

@@ -76,4 +76,6 @@ Each step is an `attack_config` dict executed with `agent.hack`. `attacks` defau
 
 Technique-local `eval_*` writers and `_sync_evaluation_to_server` stay in the techniques, including `hackagent.attacks.techniques.static_template.static_eval`. They are not a public evaluation API and they are not part of this package.
 
-Import-linter, packaging extras, and the hatch ship are a later phase. Scripts under `hackagent/examples/` may still construct `HackAgent(endpoint=...)`. Known TUI snapshot mismatches remain.
+Import-linter enforces this layout: `core`, then the depth-0 packages (mutually independent), then `orchestrator`, then `client`, then `interfaces`. `storage._http` stays private to `storage.remote`. Optional libraries ship as extras (`tui`, `web`, `browser`, `rag`, `vision`, `hf`); see [Installation](../getting-started/installation.mdx). Click stays a base dependency.
+
+`hackagent.attacks._lib.legacy_seams` is deferred. Technique code that still constructs trackers, accepts a `Store` on the obsolete constructor, or builds role models goes through that module. It is not a public API. `hackagent.router` remains a shim outside the layered packages. Scripts under `hackagent/examples/` may still construct `HackAgent(endpoint=...)`. Known TUI snapshot mismatches remain.

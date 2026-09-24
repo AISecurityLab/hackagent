@@ -164,6 +164,11 @@ const sidebars: SidebarsConfig = {
       label: 'Client',
     },
     {
+      type: 'doc',
+      id: 'architecture/system-overview',
+      label: 'Architecture',
+    },
+    {
       type: 'category',
       label: 'Datasets',
       className: 'sidebar-icon sidebar-icon-database',
@@ -252,6 +257,7 @@ const sidebars: SidebarsConfig = {
         id: 'api-index',
       },
       items: [
+        'sdk/python-quickstart',
         'hackagent/client',
         {
           type: 'category',
@@ -497,6 +503,7 @@ const sidebars: SidebarsConfig = {
                 'hackagent/attacks/techniques/pair/attack',
                 'hackagent/attacks/techniques/crescendo/attack',
                 'hackagent/attacks/techniques/tap/attack',
+                'hackagent/attacks/techniques/tool_output_ipi/attack',
                 'hackagent/attacks/techniques/advprefix/attack',
                 'hackagent/attacks/techniques/autodan_turbo/attack',
                 'hackagent/attacks/techniques/rag/attack',
@@ -510,6 +517,8 @@ const sidebars: SidebarsConfig = {
           items: [
             'hackagent/datasets/base',
             'hackagent/datasets/presets',
+            'hackagent/datasets/goals',
+            'hackagent/datasets/intents',
             'hackagent/datasets/registry',
             'hackagent/datasets/providers/file',
             'hackagent/datasets/providers/huggingface',

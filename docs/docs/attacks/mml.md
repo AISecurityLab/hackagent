@@ -8,6 +8,8 @@ MML is a multimodal jailbreak attack that **encodes harmful prompts into images*
 
 **Category:** Static. **Tags:** Multimodal. See [Attack taxonomy](./taxonomy.mdx).
 
+Image encoding uses Pillow, which ships in the `vision` extra (`pip install 'hackagent[vision]'`).
+
 ## Overview
 
 MML exploits the gap between text-only safety classifiers and multimodal understanding. By hiding the harmful request inside an image and providing decoding instructions in the text prompt, it bypasses safety filters that only inspect the textual part of the input.

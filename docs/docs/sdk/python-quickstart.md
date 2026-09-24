@@ -8,6 +8,8 @@ The HackAgent SDK provides a powerful interface for conducting AI security testi
 
 Construct a session with `HackAgent(Settings.resolve())`, then bind a victim with `.target(...).hack()`. See the [Client](../client/index.md) guide. For installation, see the [Installation Guide](../getting-started/installation.mdx).
 
+`pip install hackagent` does not install Textual. The terminal UI is `pip install 'hackagent[tui]'`, the local dashboard is `pip install 'hackagent[web]'`, browser scans are `pip install 'hackagent[browser]'`, the RAG attack is `pip install 'hackagent[rag]'`, image-encoded attacks are `pip install 'hackagent[vision]'`, and Hugging Face datasets are `pip install 'hackagent[hf]'`. Click stays in the base install.
+
 ## Overview
 
 The SDK supports both modes:
@@ -26,6 +28,8 @@ from hackagent import HackAgent, AgentType
 ### Your First Security Test
 
 ```python
+import os
+
 from hackagent import HackAgent, AgentType, Settings
 
 # Default: local mode (SQLite in ~/.local/share/hackagent/hackagent.db)

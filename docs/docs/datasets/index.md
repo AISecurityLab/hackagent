@@ -52,6 +52,14 @@ source .venv/bin/activate
 pip install hackagent
 ```
 
+Presets and the Hugging Face provider import the `datasets` library. That library is the `hf` extra:
+
+```bash
+pip install 'hackagent[hf]'
+```
+
+File and URL JSON providers work without it. See [Installation](../getting-started/installation.mdx).
+
 ## Quick Start
 
 ### 1. Using a Preset (Recommended)
