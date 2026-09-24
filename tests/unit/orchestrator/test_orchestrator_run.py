@@ -12,8 +12,8 @@ from hackagent.attacks.types import AttackResult
 from hackagent.core.contracts import RunStatus, Verdict
 from hackagent.core.settings import Settings
 from hackagent.evaluation.panel import Panel
-from hackagent.orchestrator.persistence import StoreSink
-from hackagent.orchestrator.runner import _instantiate, run
+from hackagent.orchestrator.results.persistence import StoreSink
+from hackagent.orchestrator.execution.runner import _instantiate, run
 from tests.fakes.context import FakeLLMFactory, make_ctx
 from tests.fakes.llm import FakeLLM
 from tests.fakes.router import FakeRouter
@@ -137,7 +137,7 @@ def test_run_judges_once_persists_result_ids_and_flushes(tmp_path, monkeypatch):
     bus = _Bus()
     try:
         monkeypatch.setattr(
-            "hackagent.orchestrator.runner.load_attack",
+            "hackagent.orchestrator.execution.runner.load_attack",
             lambda _attack_id: _technique(_rows_for, seen),
         )
         rows = run(
@@ -213,7 +213,7 @@ def test_rejudge_replaces_an_attack_verdict(tmp_path, monkeypatch):
             ]
 
         monkeypatch.setattr(
-            "hackagent.orchestrator.runner.load_attack",
+            "hackagent.orchestrator.execution.runner.load_attack",
             lambda _attack_id: _technique(_one, seen),
         )
         rows = run(
@@ -247,11 +247,11 @@ def test_preflight_failure_does_not_create_a_run(tmp_path, monkeypatch):
     store = in_memory_store()
     try:
         monkeypatch.setattr(
-            "hackagent.orchestrator.runner.load_attack",
+            "hackagent.orchestrator.execution.runner.load_attack",
             lambda _attack_id: _technique(lambda _attack, goals: [], []),
         )
         monkeypatch.setattr(
-            "hackagent.orchestrator.runner.check_models",
+            "hackagent.orchestrator.execution.runner.check_models",
             lambda *args, **kwargs: "unreachable",
         )
         rows = run(
@@ -278,11 +278,12 @@ def test_unconnectable_judge_marks_the_run_failed(tmp_path, monkeypatch):
     store = in_memory_store()
     try:
         monkeypatch.setattr(
-            "hackagent.orchestrator.runner.load_attack",
+            "hackagent.orchestrator.execution.runner.load_attack",
             lambda _attack_id: _technique(lambda _attack, goals: [], seen),
         )
         monkeypatch.setattr(
-            "hackagent.orchestrator.runner.check_models", lambda *a, **kw: None
+            "hackagent.orchestrator.execution.runner.check_models",
+            lambda *a, **kw: None,
         )
         with pytest.raises(ValueError, match="could not be connected"):
             run(
@@ -320,14 +321,16 @@ def test_evaluation_failure_returns_rows_marks_the_run_failed_and_flushes(
             ]
 
         monkeypatch.setattr(
-            "hackagent.orchestrator.runner.load_attack",
+            "hackagent.orchestrator.execution.runner.load_attack",
             lambda _attack_id: _technique(_one, []),
         )
 
         def _boom(*args, **kwargs):
             raise RuntimeError("judge down")
 
-        monkeypatch.setattr("hackagent.orchestrator.runner.judge_unjudged", _boom)
+        monkeypatch.setattr(
+            "hackagent.orchestrator.execution.runner.judge_unjudged", _boom
+        )
         rows = run(
             _agent(watched, target=FakeLLM(), models=FakeLLMFactory()),
             {
@@ -356,7 +359,7 @@ def test_flush_failure_keeps_the_rows_and_records_the_audit(tmp_path, monkeypatc
     watched = _FlushWatch(store, error=RuntimeError("flush failed"))
     try:
         monkeypatch.setattr(
-            "hackagent.orchestrator.runner.load_attack",
+            "hackagent.orchestrator.execution.runner.load_attack",
             lambda _attack_id: _technique(
                 lambda _attack, goals: [
                     AttackResult(goal=goals[0], prompt="p", response="")

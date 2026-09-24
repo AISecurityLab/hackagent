@@ -7,8 +7,8 @@ from uuid import UUID, uuid4
 
 from hackagent.attacks.types import AttackResult
 from hackagent.core.contracts import EvalStatus, JudgeVote, Verdict
-from hackagent.orchestrator.persistence import StoreSink
-from hackagent.orchestrator.runner import _persist_verdicts
+from hackagent.orchestrator.results.persistence import StoreSink
+from hackagent.orchestrator.execution.runner import _persist_verdicts
 
 
 class RecordingRunSink:

@@ -233,7 +233,7 @@ def _form_fields_from_schema(
 @lru_cache(maxsize=None)
 def form_fields(attack_id: str) -> List[Dict[str, Any]]:
     """Flatten a technique's pydantic JSON schema into form fields."""
-    from hackagent.orchestrator.registry import load_config_model
+    from hackagent.orchestrator.setup.registry import load_config_model
 
     model = load_config_model(attack_id)
     if model is None or not hasattr(model, "model_json_schema"):
@@ -253,7 +253,7 @@ def catalog_entries() -> List[Dict[str, Any]]:
     """
     from hackagent.catalog.attacks import ATTACK_CATALOG
     from hackagent.catalog.taxonomy import get_attack_taxonomy
-    from hackagent.orchestrator.registry import ATTACK_REGISTRY
+    from hackagent.orchestrator.setup.registry import ATTACK_REGISTRY
 
     primary = _primary_orders()
     entries: List[Dict[str, Any]] = []
@@ -517,7 +517,7 @@ class Target:
     ) -> Any:
         """Run one attack. ``on_event`` receives ``(event_type, **payload)``."""
         try:
-            from hackagent.orchestrator.runner import run as run_attack
+            from hackagent.orchestrator.execution.runner import run as run_attack
 
             attack_type = attack_config.get("attack_type")
             if not attack_type:
@@ -568,7 +568,7 @@ class Target:
         on_event: Optional[Any] = None,
     ) -> list:
         """Run a sequence of attacks. ``on_event`` is forwarded to each step."""
-        from hackagent.orchestrator.chain import hack_chain as _hack_chain
+        from hackagent.orchestrator.execution.chain import hack_chain as _hack_chain
 
         return _hack_chain(
             self,

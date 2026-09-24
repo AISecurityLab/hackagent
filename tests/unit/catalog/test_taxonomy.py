@@ -139,7 +139,7 @@ class TestConsumersShareTheRegistry(unittest.TestCase):
     def test_orchestrator_registry_ids_equal_catalog_ids(self):
         from hackagent.catalog.attacks import ATTACK_CATALOG
         from hackagent.catalog.taxonomy import ATTACK_IDS
-        from hackagent.orchestrator.registry import ATTACK_REGISTRY
+        from hackagent.orchestrator.setup.registry import ATTACK_REGISTRY
 
         self.assertEqual(set(ATTACK_REGISTRY), set(ATTACK_IDS))
         self.assertEqual(set(ATTACK_REGISTRY), set(ATTACK_TAXONOMY))

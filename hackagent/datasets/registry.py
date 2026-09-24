@@ -256,7 +256,7 @@ def load_goals_from_config(config: Dict[str, Any]) -> List[str]:
 
     Callers that already have a dataset configuration dictionary use this
     helper directly. A run resolves goals through
-    :func:`hackagent.orchestrator.goals.resolve_run_goals`.
+    :func:`hackagent.orchestrator.setup.goals.resolve_run_goals`.
 
     Args:
         config: Dataset configuration dictionary with keys:

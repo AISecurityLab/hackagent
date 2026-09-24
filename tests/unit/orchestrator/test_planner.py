@@ -20,13 +20,15 @@ from hackagent.orchestrator.planning import (
     AutoPlanResult,
     PlannerError,
     SchemaField,
+    auto_plan,
+    build_attack_catalog,
+    plan_attack,
+)
+from hackagent.orchestrator.planning.planner import (
     _coerce_value,
     _describe_target,
     _expand_dotted,
     _extract_json,
-    auto_plan,
-    build_attack_catalog,
-    plan_attack,
 )
 
 logging.disable(logging.CRITICAL)
@@ -101,7 +103,7 @@ class TestHelpers(unittest.TestCase):
 class TestPlanAttack(unittest.TestCase):
     def _plan_with(self, content: str, **kwargs) -> AttackPlan:
         with patch(
-            "hackagent.orchestrator.planning.get_litellm",
+            "hackagent.orchestrator.planning.planner.get_litellm",
             return_value=_fake_litellm(content),
         ):
             return plan_attack(_TARGET, **kwargs)
@@ -177,7 +179,7 @@ class TestPlanAttack(unittest.TestCase):
 
     def test_litellm_unavailable_raises(self):
         with patch(
-            "hackagent.orchestrator.planning.get_litellm",
+            "hackagent.orchestrator.planning.planner.get_litellm",
             return_value=(None, False),
         ):
             with self.assertRaises(PlannerError):
@@ -230,7 +232,7 @@ class TestAutoPlan(unittest.TestCase):
             }
         )
         with patch(
-            "hackagent.orchestrator.planning.get_litellm",
+            "hackagent.orchestrator.planning.planner.get_litellm",
             return_value=_fake_litellm(content),
         ):
             out = auto_plan("https://www.example.it/chat")
@@ -245,7 +247,7 @@ class TestAutoPlan(unittest.TestCase):
             {"attack_type": "pair", "goals": ["g"], "parameters": {}, "confidence": 0.5}
         )
         with patch(
-            "hackagent.orchestrator.planning.get_litellm",
+            "hackagent.orchestrator.planning.planner.get_litellm",
             return_value=_fake_litellm(content),
         ):
             out = auto_plan(

@@ -8,7 +8,7 @@ from pathlib import Path
 
 from hackagent.attacks.types import AttackResult
 from hackagent.core.contracts import EvalStatus, JudgeVote, Verdict
-from hackagent.orchestrator.mapping import (
+from hackagent.orchestrator.results.mapping import (
     evaluation_metrics,
     evaluation_status,
     result_to_row,
@@ -49,13 +49,17 @@ def test_unjudged_result_has_no_eval_columns():
 
 def test_only_mapping_names_eval_columns():
     root = Path(__file__).resolve().parents[3] / "hackagent" / "orchestrator"
+    checked = []
     offenders = []
-    for path in sorted(root.glob("*.py")):
-        if path.name == "mapping.py":
+    for path in sorted(root.rglob("*.py")):
+        name = path.relative_to(root).as_posix()
+        if name == "results/mapping.py":
             continue
+        checked.append(name)
         hits = _COLUMN.findall(path.read_text(encoding="utf-8"))
         if hits:
-            offenders.append(f"{path.name}: {hits}")
+            offenders.append(f"{name}: {hits}")
+    assert "execution/runner.py" in checked
     assert offenders == []
 
 

@@ -4,7 +4,7 @@
 """Category labelling is skipped when goals already carry labels."""
 
 from hackagent.core.contracts import Goal
-from hackagent.orchestrator.goals import (
+from hackagent.orchestrator.setup.goals import (
     goals_are_labelled,
     label_goals,
     resolve_run_goals,

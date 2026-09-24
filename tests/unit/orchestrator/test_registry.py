@@ -10,7 +10,7 @@ import pytest
 import hackagent.attacks.techniques as techniques
 from hackagent.catalog.attacks import ATTACK_CATALOG
 from hackagent.catalog.taxonomy import ATTACK_IDS, AttackTag, get_attack_taxonomy
-from hackagent.orchestrator.registry import (
+from hackagent.orchestrator.setup.registry import (
     ATTACK_REGISTRY,
     CONFIG_REGISTRY,
     load_attack,

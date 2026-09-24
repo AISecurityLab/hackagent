@@ -33,7 +33,7 @@ Every shipped technique accepts that constructor.
   ``ctx.models``, scores from ``ctx.judge``, artifacts under
   ``ctx.workspace``. They do not read ``_suppress_run_status_updates``.
 
-``hackagent.orchestrator.runner`` instantiates every shipped technique as
+``hackagent.orchestrator.execution.runner`` instantiates every shipped technique as
 ``(config, ctx)``. The legacy ``(config_dict, client, agent_router)``
 constructor, including ``client=`` as a keyword, remains supported and is
 obsolete for new technique code. Shared helpers live in
@@ -91,7 +91,7 @@ class BaseAttack(abc.ABC):
     Every shipped technique accepts ``(config, ctx)``: post-hoc,
     inline-judge (``ctx.judge.score``), and custom-loop
     (``ctx.models`` / ``ctx.judge`` / ``ctx.workspace``).
-    ``hackagent.orchestrator.runner`` constructs them that way. The legacy
+    ``hackagent.orchestrator.execution.runner`` constructs them that way. The legacy
     ``(config, client, agent_router)`` constructor remains supported and
     is obsolete for new technique code.
 
@@ -124,7 +124,7 @@ class BaseAttack(abc.ABC):
         """Initialize with ``(config, ctx)`` or legacy ``(config, client, agent_router)``.
 
         Prefer ``BaseAttack(config, ctx)``. Every shipped technique accepts
-        ``ctx`` positionally or as ``ctx=``. ``hackagent.orchestrator.runner``
+        ``ctx`` positionally or as ``ctx=``. ``hackagent.orchestrator.execution.runner``
         passes ``(config, ctx)``. The legacy
         ``(config_dict, client, agent_router)`` constructor (including
         ``client=`` as a keyword) remains supported and is obsolete for new
@@ -210,7 +210,7 @@ class BaseAttack(abc.ABC):
 
         Legacy dict configs still require ``output_dir``. Typed
         :class:`AttackConfig` instances do not — output lives on
-        :class:`~hackagent.orchestrator.run_spec.RunSpec` / the workspace.
+        :class:`~hackagent.orchestrator.execution.spec.RunSpec` / the workspace.
         """
         if self.attack_config is not None and self.ctx is not None:
             return

@@ -5,7 +5,7 @@
 
 from hackagent.attacks.types import AttackResult
 from hackagent.core.contracts import Goal
-from hackagent.orchestrator.scheduling import schedule
+from hackagent.orchestrator.execution.scheduling import schedule
 from tests.fakes.context import make_ctx
 
 

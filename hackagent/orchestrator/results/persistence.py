@@ -5,7 +5,7 @@
 
 Tracking writes result, trace and run rows through this object. Evaluation
 metrics passed in are stored as given; ``eval_*`` columns are produced by
-:mod:`hackagent.orchestrator.mapping` before they reach here.
+:mod:`hackagent.orchestrator.results.mapping` before they reach here.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from typing import Any, Dict, Optional
 from uuid import UUID
 
 from hackagent.attacks.types import AttackResult
-from hackagent.orchestrator.mapping import evaluation_metrics, evaluation_status
+from hackagent.orchestrator.results.mapping import evaluation_metrics, evaluation_status
 from hackagent.storage.store import Store
 
 

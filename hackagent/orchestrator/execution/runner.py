@@ -8,7 +8,7 @@ records → build context → schedule → judge unjudged results once → final
 and flush.
 
 A verdict an attack already produced is final. Re-judging every result is
-opt-in via :attr:`hackagent.orchestrator.run_spec.RunSpec.rejudge`.
+opt-in via :attr:`hackagent.orchestrator.execution.spec.RunSpec.rejudge`.
 """
 
 from __future__ import annotations
@@ -22,25 +22,25 @@ from hackagent.core.contracts import RunStatus, Sample
 from hackagent.core.errors import HackAgentError
 from hackagent.core.logging import get_logger
 from hackagent.core.settings import Settings
-from hackagent.orchestrator.context import build_context
-from hackagent.orchestrator.defaults import apply_role_defaults
-from hackagent.orchestrator.goals import (
+from hackagent.orchestrator.execution.context import build_context
+from hackagent.orchestrator.setup.defaults import apply_role_defaults
+from hackagent.orchestrator.setup.goals import (
     extra_by_index,
     goals_are_labelled,
     label_goals,
     labels_by_index,
     resolve_run_goals,
 )
-from hackagent.orchestrator.mapping import result_to_row
-from hackagent.orchestrator.persistence import StoreSink
-from hackagent.orchestrator.preflight import (
+from hackagent.orchestrator.results.mapping import result_to_row
+from hackagent.orchestrator.results.persistence import StoreSink
+from hackagent.orchestrator.setup.preflight import (
     check_models,
     target_from_agent,
     validate_default_classifier,
 )
-from hackagent.orchestrator.registry import load_attack
-from hackagent.orchestrator.run_spec import RunSpec
-from hackagent.orchestrator.scheduling import schedule
+from hackagent.orchestrator.setup.registry import load_attack
+from hackagent.orchestrator.execution.spec import RunSpec
+from hackagent.orchestrator.execution.scheduling import schedule
 from hackagent.tracking.audit import record_run_audit_failure
 
 logger = get_logger(__name__)

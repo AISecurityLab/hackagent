@@ -41,7 +41,7 @@ class BaselineAttack(BaseAttack):
     verdict; ``HackAgent.hack`` scores them in the shared evaluator.
 
     The legacy constructor ``(config_dict, client, agent_router)`` is
-    obsolete for new code. ``hackagent.orchestrator.runner`` constructs
+    obsolete for new code. ``hackagent.orchestrator.execution.runner`` constructs
     ``(config, ctx)``.
     """
 

@@ -77,7 +77,7 @@ class Workspace(Protocol):
 class RunContext:
     """Dependencies injected into every :class:`BaseAttack`.
 
-    Built by :func:`hackagent.orchestrator.context.build_context`. Techniques
+    Built by :func:`hackagent.orchestrator.execution.context.build_context`. Techniques
     must not reach past this bag for routers, judges, trackers or filesystem
     paths.
     """

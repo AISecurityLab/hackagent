@@ -359,7 +359,7 @@ def test_compatible_transport_preserves_server_model_names(
         ).embed("text to embed")
         np.testing.assert_array_equal(vector, [0.25, 0.75])
     else:
-        from hackagent.orchestrator.preflight import probe_embedding_target
+        from hackagent.orchestrator.setup.preflight import probe_embedding_target
 
         assert probe_embedding_target({"config": config}) is None
 

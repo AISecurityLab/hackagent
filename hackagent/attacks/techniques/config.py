@@ -14,7 +14,7 @@ This module holds the shared pieces that shipped technique configs still use:
 
 The forward technique seam is :class:`hackagent.attacks.config.AttackConfig`
 (technique parameters and role fields only, ``extra="forbid"``). Run
-bookkeeping belongs on :class:`hackagent.orchestrator.run_spec.RunSpec` and
+bookkeeping belongs on :class:`hackagent.orchestrator.execution.spec.RunSpec` and
 target generation knobs on :class:`hackagent.models.target_params.TargetParams`.
 Those types exist; shipped technique configs still subclass
 :class:`ConfigBase`, which mixes the concerns. Every shipped technique

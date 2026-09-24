@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 from hackagent.attacks.techniques.indirect.tool_output_ipi.attack import (
     ToolOutputIPIAttack,
 )
-from hackagent.orchestrator.registry import ATTACK_REGISTRY, load_attack
+from hackagent.orchestrator.setup.registry import ATTACK_REGISTRY, load_attack
 from hackagent.attacks.types import AttackResult
 from hackagent.catalog.attacks import ATTACK_CATALOG
 from hackagent.interfaces.tui.forms import get_attack_config_spec

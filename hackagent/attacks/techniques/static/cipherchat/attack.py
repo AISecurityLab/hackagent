@@ -53,7 +53,7 @@ class CipherChatAttack(BaseAttack):
     rows without a verdict.
 
     The legacy constructor ``(config_dict, client, agent_router)`` is
-    obsolete for new code. ``hackagent.orchestrator.runner`` constructs
+    obsolete for new code. ``hackagent.orchestrator.execution.runner`` constructs
     ``(config, ctx)``.
     :class:`~hackagent.attacks.techniques.static.cipherchat.config.CipherChatConfig`
     still subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.

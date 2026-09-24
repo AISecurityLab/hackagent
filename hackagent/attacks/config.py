@@ -4,7 +4,7 @@
 """Attack-facing configuration seam (Phase 4).
 
 :class:`AttackConfig` holds **technique parameters and role fields only**.
-Run bookkeeping (:class:`~hackagent.orchestrator.run_spec.RunSpec`) and
+Run bookkeeping (:class:`~hackagent.orchestrator.execution.spec.RunSpec`) and
 target generation (:class:`~hackagent.models.target_params.TargetParams`)
 live elsewhere. ``roles()`` replaces the orchestrator's static role-path
 table and the per-technique ``get_effective_model_roles`` overrides.
@@ -136,7 +136,7 @@ class AttackConfig(BaseModel):
 
 # Known attack_type -> static role paths. Used by the orchestrator for
 # role-family defaults and attack-type normalisation until Phase 7 moves
-# defaults into ``orchestrator/defaults.py``. Technique-owned special cases
+# defaults into ``orchestrator/setup/defaults.py``. Technique-owned special cases
 # go through ``AttackConfig.roles()`` / ``get_effective_model_roles``.
 #
 # Tuple layout: (role_name, config_path, is_list, role_family)

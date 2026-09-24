@@ -13,7 +13,7 @@ from hackagent.core.contracts import JudgeSpec, LLM, LLMFactory
 from hackagent.core.logging import get_logger
 from hackagent.evaluation.panel import AGGREGATIONS, LLMJudge, Panel
 from hackagent.models.factory import spec_from_config
-from hackagent.orchestrator.persistence import StoreSink
+from hackagent.orchestrator.results.persistence import StoreSink
 from hackagent.tracking.tracker import Tracker
 
 logger = get_logger(__name__)
