@@ -22,7 +22,10 @@ planner metadata, and docs should look up category and tags here rather than
 hardcoding lists.
 
 To add a new attack, give it exactly one :class:`AttackCategory` in
-:data:`ATTACK_TAXONOMY` and any applicable :class:`AttackTag` values.
+:data:`ATTACK_TAXONOMY` and any applicable :class:`AttackTag` values, and
+put its package under ``hackagent/attacks/techniques/<folder>/``: ``indirect``
+when it carries :attr:`AttackTag.INDIRECT`, otherwise the category value
+(``static``, ``adaptive`` or ``multi_turn``).
 """
 
 from __future__ import annotations

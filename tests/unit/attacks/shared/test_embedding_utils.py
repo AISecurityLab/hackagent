@@ -334,10 +334,10 @@ def test_embedding_transport_isolates_concurrent_cost_map_refresh(
 def test_compatible_transport_preserves_server_model_names(
     consumer, endpoint, model, embedding_http_transport
 ):
-    from hackagent.attacks.techniques.autodan_turbo.strategy_library import (
+    from hackagent.attacks.techniques.adaptive.autodan_turbo.strategy_library import (
         StrategyLibrary,
     )
-    from hackagent.attacks.techniques.rag.attack import get_embeddings
+    from hackagent.attacks.techniques.indirect.rag.attack import get_embeddings
 
     config = {
         "identifier": model,
@@ -375,7 +375,7 @@ def test_compatible_transport_preserves_server_model_names(
 def test_native_azure_transport_preserves_provider_base(
     mode, path, embedding_http_transport
 ):
-    from hackagent.attacks.techniques.autodan_turbo.strategy_library import (
+    from hackagent.attacks.techniques.adaptive.autodan_turbo.strategy_library import (
         StrategyLibrary,
     )
 
@@ -439,7 +439,7 @@ def test_native_litellm_bases_are_not_openai_normalized(model, endpoint):
 def test_openai_transport_still_removes_only_routing_prefix(
     endpoint, mode, embedding_http_transport
 ):
-    from hackagent.attacks.techniques.autodan_turbo.strategy_library import (
+    from hackagent.attacks.techniques.adaptive.autodan_turbo.strategy_library import (
         StrategyLibrary,
     )
 

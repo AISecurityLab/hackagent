@@ -104,7 +104,7 @@ class TestBaselineEvaluateResponsesErrors(unittest.TestCase):
     """Test that static template evaluate_responses skips error rows."""
 
     def test_error_rows_excluded_from_pattern_eval(self):
-        from hackagent.attacks.techniques.static_template.static_eval import (
+        from hackagent.attacks.techniques.static.static_template.static_eval import (
             evaluate_responses,
         )
 
@@ -134,7 +134,7 @@ class TestBaselineEvaluateResponsesErrors(unittest.TestCase):
         self.assertNotIn("is_error", result[0])
 
     def test_all_errors_asr_zero(self):
-        from hackagent.attacks.techniques.static_template.static_eval import (
+        from hackagent.attacks.techniques.static.static_template.static_eval import (
             evaluate_responses,
         )
 
@@ -172,7 +172,7 @@ class TestBaselineFinalizeErrors(unittest.TestCase):
         )
 
     def test_all_error_goal_gets_error_status(self):
-        from hackagent.attacks.techniques.static_template.static_eval import (
+        from hackagent.attacks.techniques.static.static_template.static_eval import (
             _finalize_goals_with_tracker,
         )
 
@@ -212,7 +212,7 @@ class TestBaselineFinalizeErrors(unittest.TestCase):
         )
 
     def test_mixed_goal_gets_normal_status(self):
-        from hackagent.attacks.techniques.static_template.static_eval import (
+        from hackagent.attacks.techniques.static.static_template.static_eval import (
             _finalize_goals_with_tracker,
         )
 
@@ -329,7 +329,7 @@ class TestBaselineGenerationAdapterErrors(unittest.TestCase):
     """Test that static template generation detects adapter-level errors."""
 
     def test_adapter_error_sets_error_field(self):
-        from hackagent.attacks.techniques.static_template.generation import (
+        from hackagent.attacks.techniques.static.static_template.generation import (
             execute_prompts,
         )
 
@@ -364,7 +364,7 @@ class TestBaselineGenerationAdapterErrors(unittest.TestCase):
         self.assertEqual(result[0]["error"], "Ollama connection error: timed out")
 
     def test_successful_response_no_error(self):
-        from hackagent.attacks.techniques.static_template.generation import (
+        from hackagent.attacks.techniques.static.static_template.generation import (
             execute_prompts,
         )
 

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from hackagent.attacks.config import AttackConfig, roles_from_paths, ui
 from hackagent.attacks.ports import RunContext, Step
-from hackagent.attacks.techniques.pair.config import PairConfig
+from hackagent.attacks.techniques.adaptive.pair.config import PairConfig
 from hackagent.attacks.types import AttackResult
 from hackagent.core.contracts import Sample, Verdict
 from hackagent.core.defaults import DEFAULT_MAX_OUTPUT_TOKENS

@@ -64,7 +64,7 @@ def run(
     spec = _run_spec(config, run_config_override)
 
     if attack_type == "static_template":
-        from hackagent.attacks.techniques.static_template.config import (
+        from hackagent.attacks.techniques.static.static_template.config import (
             validate_template_config,
         )
 

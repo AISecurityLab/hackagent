@@ -24,37 +24,47 @@ import pytest
 
 from hackagent.attacks._lib.inline_judge import CtxJudgeAdapter, CtxTapEvaluator
 from hackagent.attacks._lib.llm_router import LLMRouter
-from hackagent.attacks.techniques.advprefix.attack import AdvPrefixAttack
-from hackagent.attacks.techniques.autodan_turbo import lifelong, warm_up
-from hackagent.attacks.techniques.autodan_turbo.attack import AutoDANTurboAttack
-from hackagent.attacks.techniques.baseline import generation as baseline_generation
-from hackagent.attacks.techniques.baseline.attack import BaselineAttack
-from hackagent.attacks.techniques.bon import generation as bon_generation
-from hackagent.attacks.techniques.bon.attack import BoNAttack
-from hackagent.attacks.techniques.cipherchat import generation as cipherchat_generation
-from hackagent.attacks.techniques.cipherchat.attack import CipherChatAttack
-from hackagent.attacks.techniques.crescendo.attack import CrescendoAttack
-from hackagent.attacks.techniques.fc.attack import FCAttack, tFCAttack
-from hackagent.attacks.techniques.flipattack.attack import FlipAttack
-from hackagent.attacks.techniques.h4rm3l.attack import (
+from hackagent.attacks.techniques.adaptive.advprefix.attack import AdvPrefixAttack
+from hackagent.attacks.techniques.adaptive.autodan_turbo import lifelong, warm_up
+from hackagent.attacks.techniques.adaptive.autodan_turbo.attack import (
+    AutoDANTurboAttack,
+)
+from hackagent.attacks.techniques.static.baseline import (
+    generation as baseline_generation,
+)
+from hackagent.attacks.techniques.static.baseline.attack import BaselineAttack
+from hackagent.attacks.techniques.adaptive.bon import generation as bon_generation
+from hackagent.attacks.techniques.adaptive.bon.attack import BoNAttack
+from hackagent.attacks.techniques.static.cipherchat import (
+    generation as cipherchat_generation,
+)
+from hackagent.attacks.techniques.static.cipherchat.attack import CipherChatAttack
+from hackagent.attacks.techniques.multi_turn.crescendo.attack import CrescendoAttack
+from hackagent.attacks.techniques.static.fc.attack import FCAttack, tFCAttack
+from hackagent.attacks.techniques.static.flipattack.attack import FlipAttack
+from hackagent.attacks.techniques.static.h4rm3l.attack import (
     H4rm3lAttack,
     _emit_h4rm3l_decoration_traces,
 )
-from hackagent.attacks.techniques.mml.attack import MMLAttack
-from hackagent.attacks.techniques.pair.attack import PAIRAttack
-from hackagent.attacks.techniques.pap import generation as pap_generation
-from hackagent.attacks.techniques.pap.attack import PAPAttack
-from hackagent.attacks.techniques.rag.attack import RagAttack
-from hackagent.attacks.techniques.static_template import (
+from hackagent.attacks.techniques.static.mml.attack import MMLAttack
+from hackagent.attacks.techniques.adaptive.pair.attack import PAIRAttack
+from hackagent.attacks.techniques.adaptive.pap import generation as pap_generation
+from hackagent.attacks.techniques.adaptive.pap.attack import PAPAttack
+from hackagent.attacks.techniques.indirect.rag.attack import RagAttack
+from hackagent.attacks.techniques.static.static_template import (
     generation as static_generation,
 )
-from hackagent.attacks.techniques.static_template.attack import StaticTemplateAttack
-from hackagent.attacks.techniques.tap.attack import TAPAttack
-from hackagent.attacks.techniques.tap.generation import TapExecutor
-from hackagent.attacks.techniques.tool_output_ipi import (
+from hackagent.attacks.techniques.static.static_template.attack import (
+    StaticTemplateAttack,
+)
+from hackagent.attacks.techniques.adaptive.tap.attack import TAPAttack
+from hackagent.attacks.techniques.adaptive.tap.generation import TapExecutor
+from hackagent.attacks.techniques.indirect.tool_output_ipi import (
     generation as ipi_generation,
 )
-from hackagent.attacks.techniques.tool_output_ipi.attack import ToolOutputIPIAttack
+from hackagent.attacks.techniques.indirect.tool_output_ipi.attack import (
+    ToolOutputIPIAttack,
+)
 from tests.fakes import FakeJudge, FakeLLM, FakeLLMFactory, make_ctx
 from tests.fakes.router import FakeRouter
 
@@ -322,7 +332,7 @@ def test_pap_high_score_stops_remaining_techniques(tmp_path):
     attacker = LLMRouter(FakeLLM(default="persuasive rewrite"))
     router, llm = _target_router("target complied")
     with patch(
-        "hackagent.attacks.techniques.pap.generation._create_attacker_router",
+        "hackagent.attacks.techniques.adaptive.pap.generation._create_attacker_router",
         return_value=attacker,
     ):
         results = pap_generation.execute(["goal"], router, attack.config, LOGGER)
@@ -350,7 +360,7 @@ def test_pap_low_scores_try_every_technique(tmp_path):
     attacker = LLMRouter(FakeLLM(default="persuasive rewrite"))
     router, _llm = _target_router("target answer")
     with patch(
-        "hackagent.attacks.techniques.pap.generation._create_attacker_router",
+        "hackagent.attacks.techniques.adaptive.pap.generation._create_attacker_router",
         return_value=attacker,
     ):
         results = pap_generation.execute(["goal"], router, attack.config, LOGGER)
@@ -405,7 +415,7 @@ def test_tool_output_ipi_judge_error_soft_fails_without_stopping_early(tmp_path)
 
 def _tap_executor(config, router):
     with patch(
-        "hackagent.attacks.techniques.tap.generation._initialize_attacker_router",
+        "hackagent.attacks.techniques.adaptive.tap.generation._initialize_attacker_router",
         return_value=(LLMRouter(FakeLLM(default="unused")), "unused"),
     ):
         executor = TapExecutor(config, client=None, agent_router=router, logger=LOGGER)
@@ -663,28 +673,30 @@ def test_autodan_warmup_high_score_stops_epochs(tmp_path):
     router = FakeRouter(default="target text")
     with (
         patch(
-            "hackagent.attacks.techniques.autodan_turbo.warm_up.init_routers",
+            "hackagent.attacks.techniques.adaptive.autodan_turbo.warm_up.init_routers",
             return_value=(router, "a", router, "s", router, "z"),
         ),
         patch(
-            "hackagent.attacks.techniques.autodan_turbo.warm_up.conditional_generate",
+            "hackagent.attacks.techniques.adaptive.autodan_turbo.warm_up.conditional_generate",
             return_value="jailbreak prompt",
         ),
         patch(
-            "hackagent.attacks.techniques.autodan_turbo.warm_up.extract_jailbreak_prompt",
+            "hackagent.attacks.techniques.adaptive.autodan_turbo.warm_up.extract_jailbreak_prompt",
             side_effect=lambda resp, request: resp or request,
         ),
         patch(
-            "hackagent.attacks.techniques.autodan_turbo.warm_up.query_target",
+            "hackagent.attacks.techniques.adaptive.autodan_turbo.warm_up.query_target",
             return_value=("complied", None),
         ) as query_target,
         patch(
-            "hackagent.attacks.techniques.autodan_turbo.warm_up.StrategyLibrary",
+            "hackagent.attacks.techniques.adaptive.autodan_turbo.warm_up.StrategyLibrary",
             return_value=_EmptyLibrary(),
         ),
-        patch("hackagent.attacks.techniques.autodan_turbo.warm_up.emit_phase_trace"),
         patch(
-            "hackagent.attacks.techniques.autodan_turbo.warm_up.summarize_strategy",
+            "hackagent.attacks.techniques.adaptive.autodan_turbo.warm_up.emit_phase_trace"
+        ),
+        patch(
+            "hackagent.attacks.techniques.adaptive.autodan_turbo.warm_up.summarize_strategy",
             return_value=None,
         ),
     ):
@@ -707,24 +719,26 @@ def test_autodan_lifelong_high_score_stops_epochs(tmp_path):
     router = FakeRouter(default="target text")
     with (
         patch(
-            "hackagent.attacks.techniques.autodan_turbo.lifelong.init_routers",
+            "hackagent.attacks.techniques.adaptive.autodan_turbo.lifelong.init_routers",
             return_value=(router, "a", router, "s", router, "z"),
         ),
         patch(
-            "hackagent.attacks.techniques.autodan_turbo.lifelong.conditional_generate",
+            "hackagent.attacks.techniques.adaptive.autodan_turbo.lifelong.conditional_generate",
             return_value="jailbreak prompt",
         ),
         patch(
-            "hackagent.attacks.techniques.autodan_turbo.lifelong.extract_jailbreak_prompt",
+            "hackagent.attacks.techniques.adaptive.autodan_turbo.lifelong.extract_jailbreak_prompt",
             side_effect=lambda resp, request: resp or request,
         ),
         patch(
-            "hackagent.attacks.techniques.autodan_turbo.lifelong.query_target",
+            "hackagent.attacks.techniques.adaptive.autodan_turbo.lifelong.query_target",
             return_value=("complied", None),
         ) as query_target,
-        patch("hackagent.attacks.techniques.autodan_turbo.lifelong.emit_phase_trace"),
         patch(
-            "hackagent.attacks.techniques.autodan_turbo.lifelong.summarize_strategy",
+            "hackagent.attacks.techniques.adaptive.autodan_turbo.lifelong.emit_phase_trace"
+        ),
+        patch(
+            "hackagent.attacks.techniques.adaptive.autodan_turbo.lifelong.summarize_strategy",
             return_value=None,
         ),
     ):
@@ -749,28 +763,30 @@ def test_autodan_warmup_low_score_runs_every_epoch(tmp_path):
     router = FakeRouter(default="target text")
     with (
         patch(
-            "hackagent.attacks.techniques.autodan_turbo.warm_up.init_routers",
+            "hackagent.attacks.techniques.adaptive.autodan_turbo.warm_up.init_routers",
             return_value=(router, "a", router, "s", router, "z"),
         ),
         patch(
-            "hackagent.attacks.techniques.autodan_turbo.warm_up.conditional_generate",
+            "hackagent.attacks.techniques.adaptive.autodan_turbo.warm_up.conditional_generate",
             return_value="prompt",
         ),
         patch(
-            "hackagent.attacks.techniques.autodan_turbo.warm_up.extract_jailbreak_prompt",
+            "hackagent.attacks.techniques.adaptive.autodan_turbo.warm_up.extract_jailbreak_prompt",
             side_effect=lambda resp, request: resp or request,
         ),
         patch(
-            "hackagent.attacks.techniques.autodan_turbo.warm_up.query_target",
+            "hackagent.attacks.techniques.adaptive.autodan_turbo.warm_up.query_target",
             return_value=("refused", None),
         ) as query_target,
         patch(
-            "hackagent.attacks.techniques.autodan_turbo.warm_up.StrategyLibrary",
+            "hackagent.attacks.techniques.adaptive.autodan_turbo.warm_up.StrategyLibrary",
             return_value=_EmptyLibrary(),
         ),
-        patch("hackagent.attacks.techniques.autodan_turbo.warm_up.emit_phase_trace"),
         patch(
-            "hackagent.attacks.techniques.autodan_turbo.warm_up.summarize_strategy",
+            "hackagent.attacks.techniques.adaptive.autodan_turbo.warm_up.emit_phase_trace"
+        ),
+        patch(
+            "hackagent.attacks.techniques.adaptive.autodan_turbo.warm_up.summarize_strategy",
             return_value=None,
         ),
     ):
@@ -791,15 +807,15 @@ def test_autodan_saves_strategy_library_under_workspace(tmp_path):
     library.save = _save
     with (
         patch(
-            "hackagent.attacks.techniques.autodan_turbo.attack.warm_up.execute",
+            "hackagent.attacks.techniques.adaptive.autodan_turbo.attack.warm_up.execute",
             return_value=(library, []),
         ),
         patch(
-            "hackagent.attacks.techniques.autodan_turbo.attack.lifelong.execute",
+            "hackagent.attacks.techniques.adaptive.autodan_turbo.attack.lifelong.execute",
             return_value=[{"goal": "goal", "success": False, "score": 1.0}],
         ),
         patch(
-            "hackagent.attacks.techniques.autodan_turbo.attack.emit_phase_trace",
+            "hackagent.attacks.techniques.adaptive.autodan_turbo.attack.emit_phase_trace",
         ),
     ):
         attack.run(["goal"])
@@ -884,7 +900,7 @@ def test_rag_judge_and_poisoned_docs_use_ctx(tmp_path):
     # Restore the scripted judge and write poisoned docs through run().
     attack.ctx = ctx
     with patch(
-        "hackagent.attacks.techniques.rag.attack.get_embeddings",
+        "hackagent.attacks.techniques.indirect.rag.attack.get_embeddings",
         lambda texts, config, logger: (
             __import__("numpy")
             .random.RandomState(0)
