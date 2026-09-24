@@ -97,6 +97,14 @@ const config: Config = {
     [
       '@docusaurus/plugin-client-redirects',
       {
+        // Technique API pages moved under their category folder
+        // (static/, adaptive/, multi_turn/, indirect/).
+        createRedirects(existingPath: string) {
+          const moved = existingPath.match(
+            /^\/hackagent\/attacks\/techniques\/(?:static|adaptive|multi_turn|indirect)\/(.+)$/,
+          );
+          return moved ? [`/hackagent/attacks/techniques/${moved[1]}`] : undefined;
+        },
         redirects: [
           {
             from: '/hackagent/attacks/evaluator/base',
