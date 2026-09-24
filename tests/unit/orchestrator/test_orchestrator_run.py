@@ -269,6 +269,39 @@ def test_preflight_failure_does_not_create_a_run(tmp_path, monkeypatch):
         store.close()
 
 
+def test_unconnectable_judge_marks_the_run_failed(tmp_path, monkeypatch):
+    class _OfflineFactory(FakeLLMFactory):
+        def for_role(self, spec):
+            raise RuntimeError(f"offline: {spec.identifier}")
+
+    seen = []
+    store = in_memory_store()
+    try:
+        monkeypatch.setattr(
+            "hackagent.orchestrator.runner.load_attack",
+            lambda _attack_id: _technique(lambda _attack, goals: [], seen),
+        )
+        monkeypatch.setattr(
+            "hackagent.orchestrator.runner.check_models", lambda *a, **kw: None
+        )
+        with pytest.raises(ValueError, match="could not be connected"):
+            run(
+                _agent(store, target=FakeLLM(), models=_OfflineFactory()),
+                {
+                    "attack_type": "baseline",
+                    "intents": _INTENTS,
+                    "output_dir": str(tmp_path),
+                    "judge": {"identifier": "fake-judge", "type": "harmbench"},
+                },
+            )
+        assert seen == []
+        run_record = store.list_runs().items[0]
+        assert run_record.status == RunStatus.FAILED.value
+        assert "could not be connected" in (run_record.run_notes or "")
+    finally:
+        store.close()
+
+
 def test_evaluation_failure_returns_rows_marks_the_run_failed_and_flushes(
     tmp_path, monkeypatch
 ):

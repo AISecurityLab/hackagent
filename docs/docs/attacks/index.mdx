@@ -608,9 +608,12 @@ When judges run, each one also writes its own raw column into `metadata`:
 | `eval_scorer` | `scorer` |
 | `eval_on_topic` | `on_topic` |
 
-With more than one judge configured you also get `judge_count`,
-`is_multi_judge`, and `majority_vote` — `success` then follows the majority
-rather than any single judge.
+With more than one judge configured, `success` follows the majority of the
+votes cast (a tie is not a success) unless `judge_aggregation` says otherwise.
+A judge that failed or gave an unparseable reply abstains: its column is
+`None`, not `0`. A row no judge could score has `success: False`, a
+`judge_error`, and evaluation status `ERROR_TEST_FRAMEWORK`. See
+[Combining several judges](./shared-args.md#combining-several-judges).
 
 Rows that failed to execute at all are marked `is_error: True`, with
 `success: False`, `best_score: 0.0`, and a reason in `evaluation_notes`. Filter
