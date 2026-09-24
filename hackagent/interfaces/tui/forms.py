@@ -93,9 +93,7 @@ class AttackConfigSpec:
     def defaults_dict(self) -> Dict[str, Any]:
         """Flat ``{key: default}`` for fields that declare a default."""
         return {
-            item.key: item.default
-            for item in self.fields
-            if item.default is not None
+            item.key: item.default for item in self.fields if item.default is not None
         }
 
     def validate(self, values: Dict[str, Any]) -> List[str]:
@@ -180,7 +178,9 @@ def get_all_attack_specs() -> Dict[str, AttackConfigSpec]:
     """Every registered technique, in registry order."""
     from hackagent.client import catalog_entries
 
-    return {entry["attack_type"]: _spec_from_entry(entry) for entry in catalog_entries()}
+    return {
+        entry["attack_type"]: _spec_from_entry(entry) for entry in catalog_entries()
+    }
 
 
 def get_attack_config_spec(technique_key: str) -> Optional[AttackConfigSpec]:

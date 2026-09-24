@@ -124,7 +124,10 @@ class TestLaunchTuiDefault(unittest.TestCase):
         ctx, _ = self._ctx()
 
         with (
-            patch("hackagent.interfaces.tui.HackAgentTUI", side_effect=RuntimeError("no tty")),
+            patch(
+                "hackagent.interfaces.tui.HackAgentTUI",
+                side_effect=RuntimeError("no tty"),
+            ),
             patch.object(bootstrap, "_patch_textual_terminal_queries"),
             patch.object(bootstrap.console, "print") as printer,
         ):

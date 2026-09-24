@@ -297,4 +297,3 @@ class AttacksExecutorMixin:
 [dim]Please check your configuration and try again.[/dim]
 {key_hint}""",
             )
-

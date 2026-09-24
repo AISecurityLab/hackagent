@@ -113,7 +113,9 @@ class TestScriptRunners(unittest.TestCase):
         with patch("subprocess.run", return_value=_completed()) as run:
             _run_hackagent_cli_command(["scan", "http://x"])
 
-        self.assertEqual(run.call_args.args[0][1:3], ["-m", "hackagent.interfaces.cli.main"])
+        self.assertEqual(
+            run.call_args.args[0][1:3], ["-m", "hackagent.interfaces.cli.main"]
+        )
 
     def test_failing_cli_command_is_reported(self):
         with patch("subprocess.run", return_value=_completed(returncode=1)):

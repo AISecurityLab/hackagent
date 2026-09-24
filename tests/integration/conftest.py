@@ -563,9 +563,7 @@ def hackagent_client_factory(
     """Factory fixture to create HackAgent instances for different frameworks."""
     from hackagent import AgentType, HackAgent, Settings
 
-    def _create_hackagent(
-        name: str, endpoint: str, agent_type: AgentType, **kwargs
-    ):
+    def _create_hackagent(name: str, endpoint: str, agent_type: AgentType, **kwargs):
         """Bind a target on a session for the given configuration."""
         session = HackAgent(
             Settings.resolve(

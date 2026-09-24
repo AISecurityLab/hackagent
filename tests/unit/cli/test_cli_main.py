@@ -174,7 +174,9 @@ class TestCLIDoctor(unittest.TestCase):
         mock_config_class.return_value = mock_config
 
         # Mock the API call
-        with patch("hackagent.interfaces.cli.main.agent_list", create=True) as mock_agent:
+        with patch(
+            "hackagent.interfaces.cli.main.agent_list", create=True
+        ) as mock_agent:
             mock_response = MagicMock()
             mock_response.status_code = 200
             mock_agent.sync_detailed.return_value = mock_response

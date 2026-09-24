@@ -33,7 +33,10 @@ def _invoke(args, **kwargs):
 
 
 class TestClaudePreflight(unittest.TestCase):
-    @patch("hackagent.interfaces.cli.commands.claude.shutil.which", return_value="/usr/bin/claude")
+    @patch(
+        "hackagent.interfaces.cli.commands.claude.shutil.which",
+        return_value="/usr/bin/claude",
+    )
     @patch("hackagent.interfaces.cli.commands.claude.HackAgent")
     def test_dry_run_validates_without_running(self, mock_agent, _which):
         result = _invoke(["--no-tui", "--dry-run"])
@@ -59,7 +62,10 @@ class TestClaudePreflight(unittest.TestCase):
 
 
 class TestClaudeHeadlessRun(unittest.TestCase):
-    @patch("hackagent.interfaces.cli.commands.claude.shutil.which", return_value="/usr/bin/claude")
+    @patch(
+        "hackagent.interfaces.cli.commands.claude.shutil.which",
+        return_value="/usr/bin/claude",
+    )
     @patch("hackagent.interfaces.cli.commands.claude.HackAgent")
     def test_headless_run_executes_attack(self, mock_agent, _which):
         instance = mock_agent.return_value
@@ -76,7 +82,10 @@ class TestClaudeHeadlessRun(unittest.TestCase):
         self.assertEqual(attack_config["attack_type"], "flipattack")
         self.assertEqual(attack_config["goals"], list(DEFAULT_GOALS))
 
-    @patch("hackagent.interfaces.cli.commands.claude.shutil.which", return_value="/usr/bin/claude")
+    @patch(
+        "hackagent.interfaces.cli.commands.claude.shutil.which",
+        return_value="/usr/bin/claude",
+    )
     @patch("hackagent.interfaces.cli.commands.claude.HackAgent")
     def test_headless_run_failure_is_reported(self, mock_agent, _which):
         mock_agent.return_value.target.return_value.hack.side_effect = RuntimeError(
@@ -86,7 +95,10 @@ class TestClaudeHeadlessRun(unittest.TestCase):
         self.assertNotEqual(result.exit_code, 0)
         self.assertIn("Attack failed", result.output)
 
-    @patch("hackagent.interfaces.cli.commands.claude.shutil.which", return_value="/usr/bin/claude")
+    @patch(
+        "hackagent.interfaces.cli.commands.claude.shutil.which",
+        return_value="/usr/bin/claude",
+    )
     @patch("hackagent.interfaces.cli.commands.claude.HackAgent")
     def test_agent_init_failure_is_reported(self, mock_agent, _which):
         mock_agent.side_effect = RuntimeError("no creds")
@@ -94,7 +106,10 @@ class TestClaudeHeadlessRun(unittest.TestCase):
         self.assertNotEqual(result.exit_code, 0)
         self.assertIn("Failed to initialize agent", result.output)
 
-    @patch("hackagent.interfaces.cli.commands.claude.shutil.which", return_value="/usr/bin/claude")
+    @patch(
+        "hackagent.interfaces.cli.commands.claude.shutil.which",
+        return_value="/usr/bin/claude",
+    )
     @patch("hackagent.interfaces.cli.commands.claude.HackAgent")
     def test_custom_goals_and_attack_type_override_defaults(self, mock_agent, _which):
         bound = mock_agent.return_value.target.return_value
@@ -121,7 +136,10 @@ class TestClaudeHeadlessRun(unittest.TestCase):
 
 
 class TestClaudeTuiPath(unittest.TestCase):
-    @patch("hackagent.interfaces.cli.commands.claude.shutil.which", return_value="/usr/bin/claude")
+    @patch(
+        "hackagent.interfaces.cli.commands.claude.shutil.which",
+        return_value="/usr/bin/claude",
+    )
     @patch("hackagent.interfaces.tui.HackAgentTUI")
     def test_default_path_launches_tui_prefilled(self, mock_tui, _which):
         result = _invoke([])  # no --no-tui → TUI is the default

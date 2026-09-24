@@ -36,6 +36,7 @@ from hackagent.interfaces.cli.commands.attack import (
     _display_attack_summary,
     _parse_goals,
 )
+
 console = Console()
 
 # ── Codex CLI preset defaults ────────────────────────────────────────────────

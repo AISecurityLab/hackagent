@@ -40,7 +40,9 @@ def _open_store(
     raise_on_unexpected_status: bool,
 ) -> Any:
     if backend is not None:
-        logger.info("HackAgent using caller-provided backend %s", type(backend).__name__)
+        logger.info(
+            "HackAgent using caller-provided backend %s", type(backend).__name__
+        )
         return backend
     if settings.api_key:
         from hackagent.storage.remote import RemoteBackend
@@ -537,7 +539,9 @@ class Target:
         except HackAgentError:
             raise
         except ValueError as exc:
-            logger.error("Configuration error in HackAgent.hack: %s", exc, exc_info=True)
+            logger.error(
+                "Configuration error in HackAgent.hack: %s", exc, exc_info=True
+            )
             raise HackAgentError(f"Configuration error: {exc}") from exc
         except RuntimeError as exc:
             logger.error("Runtime error during HackAgent.hack: %s", exc, exc_info=True)
@@ -545,7 +549,9 @@ class Target:
                 exc
             ) or "Failed to update metadata" in str(exc):
                 raise HackAgentError(f"Backend agent operation failed: {exc}") from exc
-            raise HackAgentError(f"An unexpected runtime error occurred: {exc}") from exc
+            raise HackAgentError(
+                f"An unexpected runtime error occurred: {exc}"
+            ) from exc
         except Exception as exc:
             logger.error("Unexpected error in HackAgent.hack: %s", exc, exc_info=True)
             raise HackAgentError(
@@ -725,7 +731,9 @@ class HackAgent:
     def doctor(self) -> DoctorReport:
         """Collect configuration diagnostics, including Graphviz."""
         config_path = Path(self.settings.config_path)
-        db_path = Path(self.settings.db_path) if self.settings.db_path != ":memory:" else None
+        db_path = (
+            Path(self.settings.db_path) if self.settings.db_path != ":memory:" else None
+        )
         issues: list[str] = []
         config_exists = config_path.exists()
         if not config_exists:

@@ -42,7 +42,9 @@ class TestWebCommand(unittest.TestCase):
         app = MagicMock()
 
         with (
-            patch("hackagent.interfaces.web.create_app", return_value=app) as mock_create,
+            patch(
+                "hackagent.interfaces.web.create_app", return_value=app
+            ) as mock_create,
             patch("hackagent.storage.local.LocalBackend") as mock_local_cls,
             patch("socket.socket", return_value=self._free_port_socket()),
         ):
@@ -71,7 +73,9 @@ class TestWebCommand(unittest.TestCase):
                 "hackagent.storage.local.LocalBackend",
                 return_value=local_backend,
             ) as mock_local_cls,
-            patch("hackagent.interfaces.web.create_app", return_value=app) as mock_create,
+            patch(
+                "hackagent.interfaces.web.create_app", return_value=app
+            ) as mock_create,
             patch("socket.socket", return_value=self._free_port_socket()),
         ):
             result = runner.invoke(
@@ -103,7 +107,9 @@ class TestWebCommand(unittest.TestCase):
                 "hackagent.storage.local.LocalBackend",
                 return_value=local_backend,
             ),
-            patch("hackagent.interfaces.web.create_app", return_value=app) as mock_create,
+            patch(
+                "hackagent.interfaces.web.create_app", return_value=app
+            ) as mock_create,
             patch("socket.socket", return_value=self._free_port_socket()),
         ):
             result = runner.invoke(
@@ -162,12 +168,16 @@ class TestFreePort(unittest.TestCase):
     """Test the safe port-reclaim behaviour of the web command."""
 
     def test_free_port_returns_true_when_port_is_free(self):
-        with patch("hackagent.interfaces.cli.commands.web._port_in_use", return_value=False):
+        with patch(
+            "hackagent.interfaces.cli.commands.web._port_in_use", return_value=False
+        ):
             self.assertTrue(_free_port("127.0.0.1", 7860))
 
     def test_free_port_kills_only_hackagent_listener(self):
         with (
-            patch("hackagent.interfaces.cli.commands.web._port_in_use", return_value=True),
+            patch(
+                "hackagent.interfaces.cli.commands.web._port_in_use", return_value=True
+            ),
             patch(
                 "hackagent.interfaces.cli.commands.web._listener_pids",
                 return_value=["4242"],
@@ -184,7 +194,9 @@ class TestFreePort(unittest.TestCase):
 
     def test_free_port_refuses_foreign_listener(self):
         with (
-            patch("hackagent.interfaces.cli.commands.web._port_in_use", return_value=True),
+            patch(
+                "hackagent.interfaces.cli.commands.web._port_in_use", return_value=True
+            ),
             patch(
                 "hackagent.interfaces.cli.commands.web._listener_pids",
                 return_value=["4242"],
@@ -200,8 +212,12 @@ class TestFreePort(unittest.TestCase):
 
     def test_free_port_refuses_when_listener_unknown(self):
         with (
-            patch("hackagent.interfaces.cli.commands.web._port_in_use", return_value=True),
-            patch("hackagent.interfaces.cli.commands.web._listener_pids", return_value=[]),
+            patch(
+                "hackagent.interfaces.cli.commands.web._port_in_use", return_value=True
+            ),
+            patch(
+                "hackagent.interfaces.cli.commands.web._listener_pids", return_value=[]
+            ),
             patch("hackagent.interfaces.cli.commands.web.os.kill") as mock_kill,
         ):
             self.assertFalse(_free_port("127.0.0.1", 7860))
@@ -234,7 +250,9 @@ class TestFreePort(unittest.TestCase):
                 return_value=_DummyLocalBackend(),
             ),
             patch("hackagent.interfaces.web.create_app", return_value=app),
-            patch("hackagent.interfaces.cli.commands.web._free_port", return_value=False),
+            patch(
+                "hackagent.interfaces.cli.commands.web._free_port", return_value=False
+            ),
         ):
             result = runner.invoke(web, ["--no-browser"], obj={"config": config})
 

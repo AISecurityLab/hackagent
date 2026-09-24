@@ -38,7 +38,10 @@ from hackagent.interfaces.cli.commands.attack.display import (
 )
 from hackagent.interfaces.cli.commands.attack.group import eval_cmd
 from hackagent.interfaces.cli.commands.attack.options import _common_attack_options
-from hackagent.interfaces.cli.commands.attack.runner import _run_attack_command, run_attack
+from hackagent.interfaces.cli.commands.attack.runner import (
+    _run_attack_command,
+    run_attack,
+)
 
 # Importing these modules registers their commands on ``eval_cmd``.
 from hackagent.interfaces.cli.commands.attack import chain as _chain  # noqa: F401

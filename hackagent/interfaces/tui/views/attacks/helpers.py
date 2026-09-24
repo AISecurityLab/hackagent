@@ -125,4 +125,3 @@ def build_guardrail_config(
         "agent_type": str(agent_type),
         "endpoint": (endpoint or "").strip(),
     }
-

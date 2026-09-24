@@ -31,7 +31,9 @@ def _target(**kwargs):
 class TestHackAgentSession(unittest.TestCase):
     def test_remote_session_defaults_to_a_120_second_timeout(self):
         with patch("hackagent.storage.remote.RemoteBackend.connect") as connect:
-            HackAgent(_settings(api_key="test-key", base_url="https://api.hackagent.dev"))
+            HackAgent(
+                _settings(api_key="test-key", base_url="https://api.hackagent.dev")
+            )
         connect.assert_called_once()
         self.assertEqual(connect.call_args.kwargs["timeout"], 120.0)
         self.assertEqual(connect.call_args.args[1], "test-key")
@@ -71,7 +73,9 @@ class TestBoundTarget(unittest.TestCase):
 
     def test_thinking_is_forwarded_for_ollama(self):
         with patch("hackagent.models.client.connect") as mock_connect:
-            _target(endpoint="http://localhost:11434", agent_type="ollama", thinking=False)
+            _target(
+                endpoint="http://localhost:11434", agent_type="ollama", thinking=False
+            )
         self.assertIs(mock_connect.call_args.args[0].thinking, False)
 
     def test_thinking_is_ignored_for_non_ollama(self):

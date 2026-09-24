@@ -38,7 +38,9 @@ class TestStrategySelectionChoices(unittest.TestCase):
         self.assertNotIn("multimodal", tfc_label)
 
     def test_focus_choices_are_plain_tuples(self):
-        from hackagent.interfaces.tui.views.attacks.helpers import _strategy_focus_choices
+        from hackagent.interfaces.tui.views.attacks.helpers import (
+            _strategy_focus_choices,
+        )
 
         focus = _strategy_focus_choices()
         self.assertTrue(focus)

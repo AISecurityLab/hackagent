@@ -233,9 +233,7 @@ def create_local_api(client) -> Blueprint:
             record = client.run(parsed)
         except RuntimeError:
             return _not_found("Run")
-        results = client.results(
-            run_id=parsed, page=1, page_size=_SCAN_PAGE_SIZE
-        ).items
+        results = client.results(run_id=parsed, page=1, page_size=_SCAN_PAGE_SIZE).items
         payload = ser.run(
             record,
             agent_name=_agent_names().get(str(record.agent_id)),
@@ -282,9 +280,7 @@ def create_local_api(client) -> Blueprint:
             items = [ser.result(r) for r in _slice(matching, page, page_size)]
             return jsonify(ser.paginate(items, len(matching), page, page_size))
 
-        listing = client.results(
-            run_id=run_filter, page=page, page_size=page_size
-        )
+        listing = client.results(run_id=run_filter, page=page, page_size=page_size)
         items = [ser.result(r) for r in listing.items]
         return jsonify(ser.paginate(items, listing.total, page, page_size))
 

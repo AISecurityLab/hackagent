@@ -28,4 +28,3 @@ def test_identifier_is_a_string_not_a_bound_method():
 
     assert isinstance(config["identifier"], str)
     assert config["identifier"] == "Model"
-

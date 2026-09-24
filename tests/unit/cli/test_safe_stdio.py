@@ -182,7 +182,9 @@ def test_main_configures_stdio_before_cli(monkeypatch: pytest.MonkeyPatch) -> No
         "hackagent.interfaces.cli.main.configure_safe_stdio",
         lambda: called.append("stdio"),
     )
-    monkeypatch.setattr("hackagent.interfaces.cli.main.cli", lambda: called.append("cli"))
+    monkeypatch.setattr(
+        "hackagent.interfaces.cli.main.cli", lambda: called.append("cli")
+    )
 
     from hackagent.interfaces.cli.main import main
 

@@ -207,9 +207,7 @@ class TestCoerceValue(unittest.TestCase):
         self.assertIn("could not coerce", warning)
 
     def test_invalid_choice_is_dropped(self):
-        field = self._field(
-            "choice", choices=[("Easy", "easy"), ("Hard", "hard")]
-        )
+        field = self._field("choice", choices=[("Easy", "easy"), ("Hard", "hard")])
         value, warning = _coerce_value(field, "impossible")
         self.assertIsNone(value)
         self.assertIn("invalid choice", warning)

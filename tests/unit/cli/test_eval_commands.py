@@ -86,7 +86,9 @@ class TestEvalGroupCampaign(unittest.TestCase):
 
     def test_bare_eval_dispatches_to_quick_scan(self):
         runner = CliRunner()
-        with patch("hackagent.interfaces.cli.commands.attack.group.run_quick_scan") as mock_scan:
+        with patch(
+            "hackagent.interfaces.cli.commands.attack.group.run_quick_scan"
+        ) as mock_scan:
             result = runner.invoke(
                 eval_cmd,
                 [
@@ -115,7 +117,9 @@ class TestRunAttackCommand(unittest.TestCase):
         ctx = self._ctx()
         with (
             patch("hackagent.interfaces.cli.banner.display_hackagent_splash"),
-            patch("hackagent.interfaces.cli.commands.attack.runner.HackAgent") as mock_agent,
+            patch(
+                "hackagent.interfaces.cli.commands.attack.runner.HackAgent"
+            ) as mock_agent,
         ):
             _run_attack_command(
                 ctx=ctx,
@@ -181,8 +185,12 @@ class TestRunAttackCommand(unittest.TestCase):
         ctx = self._ctx()
         app = MagicMock()
         with (
-            patch("hackagent.interfaces.tui.HackAgentTUI", return_value=app) as mock_tui,
-            patch("hackagent.interfaces.cli.commands.attack.runner.HackAgent") as mock_agent,
+            patch(
+                "hackagent.interfaces.tui.HackAgentTUI", return_value=app
+            ) as mock_tui,
+            patch(
+                "hackagent.interfaces.cli.commands.attack.runner.HackAgent"
+            ) as mock_agent,
         ):
             _run_attack_command(
                 ctx=ctx,
@@ -208,7 +216,10 @@ class TestRunAttackCommand(unittest.TestCase):
         agent.hack.return_value = [{"eval_hb": 1, "goal": "g"}]
         with (
             patch("hackagent.interfaces.cli.banner.display_hackagent_splash"),
-            patch("hackagent.interfaces.cli.commands.attack.runner.HackAgent", return_value=agent),
+            patch(
+                "hackagent.interfaces.cli.commands.attack.runner.HackAgent",
+                return_value=agent,
+            ),
             patch(
                 "hackagent.interfaces.cli.commands.attack.runner._display_attack_results"
             ) as mock_display,
@@ -237,7 +248,10 @@ class TestRunAttackCommand(unittest.TestCase):
         agent.hack.side_effect = RuntimeError("target down")
         with (
             patch("hackagent.interfaces.cli.banner.display_hackagent_splash"),
-            patch("hackagent.interfaces.cli.commands.attack.runner.HackAgent", return_value=agent),
+            patch(
+                "hackagent.interfaces.cli.commands.attack.runner.HackAgent",
+                return_value=agent,
+            ),
         ):
             import click
 
@@ -353,7 +367,8 @@ class TestEvalChainCommand(unittest.TestCase):
             with (
                 patch("hackagent.interfaces.cli.banner.display_hackagent_splash"),
                 patch(
-                    "hackagent.interfaces.cli.commands.attack.chain.HackAgent", return_value=agent
+                    "hackagent.interfaces.cli.commands.attack.chain.HackAgent",
+                    return_value=agent,
                 ),
             ):
                 result = runner.invoke(
@@ -376,7 +391,9 @@ class TestEvalChainCommand(unittest.TestCase):
 
 class TestDisplayHelpers(unittest.TestCase):
     def test_list_results_count_successes(self):
-        with patch("hackagent.interfaces.cli.commands.attack.display.console") as console:
+        with patch(
+            "hackagent.interfaces.cli.commands.attack.display.console"
+        ) as console:
             _display_attack_results(
                 [{"eval_hb": 1, "goal": "a"}, {"eval_jb": 0, "goal": "b"}]
             )
@@ -385,7 +402,9 @@ class TestDisplayHelpers(unittest.TestCase):
         self.assertIn("Successful jailbreaks: 1/2", printed)
 
     def test_empty_list_reports_no_jailbreaks(self):
-        with patch("hackagent.interfaces.cli.commands.attack.display.console") as console:
+        with patch(
+            "hackagent.interfaces.cli.commands.attack.display.console"
+        ) as console:
             _display_attack_results([])
         printed = " ".join(str(call) for call in console.print.call_args_list)
         self.assertIn("Generated 0 result entries", printed)
@@ -405,8 +424,12 @@ class TestDisplayHelpers(unittest.TestCase):
                 return self
 
         with (
-            patch("hackagent.interfaces.cli.commands.attack.display.console") as console,
-            patch("hackagent.interfaces.cli.commands.attack.display.display_results_table"),
+            patch(
+                "hackagent.interfaces.cli.commands.attack.display.console"
+            ) as console,
+            patch(
+                "hackagent.interfaces.cli.commands.attack.display.display_results_table"
+            ),
         ):
             _display_attack_results(_FakeFrame())
         printed = " ".join(str(call) for call in console.print.call_args_list)

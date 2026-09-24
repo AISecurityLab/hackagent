@@ -52,7 +52,9 @@ class TestShowLogoOnce(unittest.TestCase):
         )
 
     def test_splash_is_displayed_only_on_the_first_call(self):
-        with patch("hackagent.interfaces.cli.banner.display_hackagent_splash") as splash:
+        with patch(
+            "hackagent.interfaces.cli.banner.display_hackagent_splash"
+        ) as splash:
             _show_logo_once()
             _show_logo_once()
             _show_logo_once()

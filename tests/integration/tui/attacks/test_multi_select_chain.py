@@ -20,7 +20,10 @@ from textual.widgets import Checkbox, Input, Select, SelectionList, Static
 
 from hackagent.interfaces.cli.config import CLIConfig
 from hackagent.interfaces.tui.theme import css_variables
-from hackagent.interfaces.tui.views.attacks import AttacksTab, _default_campaign_attack_keys
+from hackagent.interfaces.tui.views.attacks import (
+    AttacksTab,
+    _default_campaign_attack_keys,
+)
 
 
 @pytest.fixture

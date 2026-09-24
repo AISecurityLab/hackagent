@@ -35,7 +35,9 @@ def _isolated_results_tab() -> ResultsTab:
     db_path = str(Path(tempfile.mkdtemp(prefix="hackagent-snapshot-")) / "results.db")
     store = LocalBackend(db_path=db_path)
     session = HackAgent(
-        Settings.resolve(api_key="", db_path=db_path, env={}, config_path="/nonexistent"),
+        Settings.resolve(
+            api_key="", db_path=db_path, env={}, config_path="/nonexistent"
+        ),
         backend=store,
     )
     tab.client = lambda: session

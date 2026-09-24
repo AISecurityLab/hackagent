@@ -35,7 +35,10 @@ from hackagent.interfaces.cli.bootstrap import (
 from hackagent.interfaces.cli.config import CLIConfig
 from hackagent.interfaces.cli.help_page import _help_option_callback
 from hackagent.interfaces.cli.logging_setup import setup_package_logging
-from hackagent.interfaces.cli.safe_stdio import configure_safe_stdio, install_on_click_command
+from hackagent.interfaces.cli.safe_stdio import (
+    configure_safe_stdio,
+    install_on_click_command,
+)
 from hackagent.interfaces.cli.utils import display_info, handle_errors
 
 # Install rich traceback handler for better error display
@@ -381,9 +384,13 @@ def doctor(ctx):
 
     console.print("\n[cyan]🧩 Graphviz")
     if report.graphviz_dot:
-        console.print(f"[green]✅ Graphviz detected:[/green] [dim]{report.graphviz_dot}[/dim]")
+        console.print(
+            f"[green]✅ Graphviz detected:[/green] [dim]{report.graphviz_dot}[/dim]"
+        )
     elif report.graphviz_error:
-        console.print(f"[yellow]⚠️ Graphviz check failed:[/yellow] [dim]{report.graphviz_error}[/dim]")
+        console.print(
+            f"[yellow]⚠️ Graphviz check failed:[/yellow] [dim]{report.graphviz_error}[/dim]"
+        )
     else:
         console.print("[yellow]⚠️ Graphviz not found (needed only for FC-Attack)")
 

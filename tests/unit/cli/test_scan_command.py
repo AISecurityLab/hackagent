@@ -45,7 +45,9 @@ class TestScanCommand(unittest.TestCase):
 
     def test_no_attack_shows_target_only(self):
         runner = CliRunner()
-        with patch("hackagent.interfaces.cli.commands.scan.command.HackAgent") as mock_agent:
+        with patch(
+            "hackagent.interfaces.cli.commands.scan.command.HackAgent"
+        ) as mock_agent:
             result = runner.invoke(
                 scan, [_URL, "--no-attack"], obj={"config": _config()}
             )
@@ -76,7 +78,8 @@ class TestScanCommand(unittest.TestCase):
     def test_plan_shows_strategy(self):
         runner = CliRunner()
         with patch(
-            "hackagent.interfaces.cli.commands.scan.command.plan_attack", return_value=_fake_plan()
+            "hackagent.interfaces.cli.commands.scan.command.plan_attack",
+            return_value=_fake_plan(),
         ) as mock_plan:
             result = runner.invoke(
                 scan, [_URL, "--plan", "--no-attack"], obj={"config": _config()}
@@ -89,7 +92,8 @@ class TestScanCommand(unittest.TestCase):
     def test_plan_json_includes_attack_config(self):
         runner = CliRunner()
         with patch(
-            "hackagent.interfaces.cli.commands.scan.command.plan_attack", return_value=_fake_plan()
+            "hackagent.interfaces.cli.commands.scan.command.plan_attack",
+            return_value=_fake_plan(),
         ):
             result = runner.invoke(
                 scan, [_URL, "--plan", "--json"], obj={"config": _config()}
@@ -114,7 +118,9 @@ class TestScanCommand(unittest.TestCase):
 
     def test_attack_dry_run_validates_without_running(self):
         runner = CliRunner()
-        with patch("hackagent.interfaces.cli.commands.scan.command.HackAgent") as mock_agent:
+        with patch(
+            "hackagent.interfaces.cli.commands.scan.command.HackAgent"
+        ) as mock_agent:
             result = runner.invoke(
                 scan,
                 [_URL, "--attack", "--no-tui", "--dry-run"],
@@ -131,7 +137,9 @@ class TestScanCommand(unittest.TestCase):
                 "hackagent.interfaces.cli.commands.scan.command.plan_attack",
                 return_value=_fake_plan(),
             ),
-            patch("hackagent.interfaces.cli.commands.scan.command.HackAgent") as mock_agent,
+            patch(
+                "hackagent.interfaces.cli.commands.scan.command.HackAgent"
+            ) as mock_agent,
         ):
             result = runner.invoke(
                 scan,
@@ -148,7 +156,9 @@ class TestScanHeadlessAttack(unittest.TestCase):
 
     def test_headless_attack_executes(self):
         runner = CliRunner()
-        with patch("hackagent.interfaces.cli.commands.scan.command.HackAgent") as mock_agent:
+        with patch(
+            "hackagent.interfaces.cli.commands.scan.command.HackAgent"
+        ) as mock_agent:
             mock_agent.return_value.target.return_value.hack.return_value = [
                 {"asr": 0.25}
             ]
@@ -162,9 +172,11 @@ class TestScanHeadlessAttack(unittest.TestCase):
         mock_agent.assert_called_once()
         # The web target (URL) flows into the wired agent.
         self.assertEqual(mock_agent.return_value.target.call_args.args[0], _URL)
-        attack_config = mock_agent.return_value.target.return_value.hack.call_args.kwargs[
-            "attack_config"
-        ]
+        attack_config = (
+            mock_agent.return_value.target.return_value.hack.call_args.kwargs[
+                "attack_config"
+            ]
+        )
         self.assertEqual(attack_config["attack_type"], "pair")
 
     def test_attack_default_launches_tui_prefilled(self):
@@ -179,7 +191,9 @@ class TestScanHeadlessAttack(unittest.TestCase):
 
     def test_headless_attack_failure_is_reported(self):
         runner = CliRunner()
-        with patch("hackagent.interfaces.cli.commands.scan.command.HackAgent") as mock_agent:
+        with patch(
+            "hackagent.interfaces.cli.commands.scan.command.HackAgent"
+        ) as mock_agent:
             mock_agent.return_value.target.return_value.hack.side_effect = RuntimeError(
                 "boom"
             )
@@ -215,27 +229,34 @@ class TestRunQuickScan(unittest.TestCase):
         return args
 
     def test_dry_run_validates_without_initializing_agent(self):
-        with patch("hackagent.interfaces.cli.commands.scan.quick.HackAgent") as mock_agent:
+        with patch(
+            "hackagent.interfaces.cli.commands.scan.quick.HackAgent"
+        ) as mock_agent:
             run_quick_scan(self._ctx(), **self._args(dry_run=True))
         mock_agent.assert_not_called()
 
     def test_success_runs_each_primary_attack(self):
-        with patch("hackagent.interfaces.cli.commands.scan.quick.HackAgent") as mock_agent:
+        with patch(
+            "hackagent.interfaces.cli.commands.scan.quick.HackAgent"
+        ) as mock_agent:
             bound = mock_agent.return_value.target.return_value
-            bound.hack_chain.return_value = [{"asr": 0.5, "chain_attack_type": "h4rm3l"}]
+            bound.hack_chain.return_value = [
+                {"asr": 0.5, "chain_attack_type": "h4rm3l"}
+            ]
             run_quick_scan(self._ctx(), **self._args())
         mock_agent.assert_called_once()
         bound.hack_chain.assert_called_once()
         attack_types = [
-            step["attack_type"]
-            for step in bound.hack_chain.call_args.kwargs["attacks"]
+            step["attack_type"] for step in bound.hack_chain.call_args.kwargs["attacks"]
         ]
         self.assertEqual(attack_types, ["h4rm3l", "tap", "pair"])
 
     def test_failed_attack_raises_clickexception(self):
         import click
 
-        with patch("hackagent.interfaces.cli.commands.scan.quick.HackAgent") as mock_agent:
+        with patch(
+            "hackagent.interfaces.cli.commands.scan.quick.HackAgent"
+        ) as mock_agent:
             mock_agent.return_value.target.return_value.hack_chain.side_effect = (
                 RuntimeError("attack blew up")
             )
@@ -243,7 +264,9 @@ class TestRunQuickScan(unittest.TestCase):
                 run_quick_scan(self._ctx(), **self._args())
 
     def test_explicit_dataset_preset_is_used(self):
-        with patch("hackagent.interfaces.cli.commands.scan.quick.HackAgent") as mock_agent:
+        with patch(
+            "hackagent.interfaces.cli.commands.scan.quick.HackAgent"
+        ) as mock_agent:
             bound = mock_agent.return_value.target.return_value
             bound.hack_chain.return_value = []
             run_quick_scan(self._ctx(), **self._args(dataset_preset="my-dataset"))
@@ -278,7 +301,9 @@ class TestProviderEndpoint(unittest.TestCase):
 
     def test_attacker_override_carries_valid_endpoint(self):
         runner = CliRunner()
-        with patch("hackagent.interfaces.cli.commands.scan.command.HackAgent") as mock_agent:
+        with patch(
+            "hackagent.interfaces.cli.commands.scan.command.HackAgent"
+        ) as mock_agent:
             mock_agent.return_value.target.return_value.hack.return_value = []
             result = runner.invoke(
                 scan,

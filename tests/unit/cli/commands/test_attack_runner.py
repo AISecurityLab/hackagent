@@ -10,7 +10,10 @@ from unittest.mock import MagicMock, patch
 import click
 
 from hackagent.interfaces.cli.commands.attack import runner as runner_mod
-from hackagent.interfaces.cli.commands.attack.runner import _run_attack_command, run_attack
+from hackagent.interfaces.cli.commands.attack.runner import (
+    _run_attack_command,
+    run_attack,
+)
 
 
 class _Ctx:
@@ -50,7 +53,9 @@ class TestTuiPath(unittest.TestCase):
     def test_tui_is_launched_with_the_form_prefilled(self):
         app = MagicMock()
 
-        with patch("hackagent.interfaces.tui.HackAgentTUI", return_value=app) as tui_cls:
+        with patch(
+            "hackagent.interfaces.tui.HackAgentTUI", return_value=app
+        ) as tui_cls:
             _invoke(self.ctx, no_tui=False)
 
         self.config.validate.assert_called_once_with()
@@ -149,7 +154,9 @@ class TestDirectExecution(unittest.TestCase):
             },
         )
         self.assertEqual(kwargs["after"]["identifier"], "guard-out")
-        self.assertEqual(agent_cls.call_args.args[0].base_url, "https://api.hackagent.dev")
+        self.assertEqual(
+            agent_cls.call_args.args[0].base_url, "https://api.hackagent.dev"
+        )
 
     def test_no_guardrails_are_passed_as_none(self):
         with (

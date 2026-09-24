@@ -213,6 +213,7 @@ def scan(
         _display_attack_summary,
         _parse_goals,
     )
+
     cli_config: CLIConfig = ctx.obj["config"]
     cli_config.validate()
 
