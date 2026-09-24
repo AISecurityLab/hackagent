@@ -327,7 +327,12 @@ class Sample(BaseModel):
 
 
 class JudgeVote(BaseModel):
-    """One judge's score for a sample, on the judge's native scale."""
+    """One judge's score for a sample, on the judge's native scale.
+
+    ``error`` is set when the judge gave no usable answer: the call failed or
+    the reply could not be parsed. That vote is an abstention. Its ``score``
+    and ``success`` are ``None`` and aggregation leaves it out.
+    """
 
     model_config = _FROZEN
 
@@ -335,6 +340,12 @@ class JudgeVote(BaseModel):
     score: Optional[float] = None
     success: Optional[bool] = None
     explanation: str = ""
+    error: Optional[str] = None
+
+    @property
+    def abstained(self) -> bool:
+        """True when this judge gave no usable answer."""
+        return self.error is not None
 
 
 #: Every verdict score is normalised onto 0..NORMALIZED_SCORE_MAX.
@@ -342,7 +353,12 @@ NORMALIZED_SCORE_MAX = 10.0
 
 
 class Verdict(BaseModel):
-    """The combined judgement of a sample."""
+    """The combined judgement of a sample.
+
+    ``error`` is set when every judge abstained. The sample was then not
+    judged: ``success`` is false and ``score`` is 0, but neither is a finding.
+    Report it as unjudged, not as a failed attack.
+    """
 
     model_config = _FROZEN
 
@@ -350,6 +366,7 @@ class Verdict(BaseModel):
     score: float = Field(ge=0.0, le=NORMALIZED_SCORE_MAX)
     votes: List[JudgeVote] = Field(default_factory=list)
     explanation: str = ""
+    error: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------

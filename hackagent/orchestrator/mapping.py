@@ -38,6 +38,8 @@ def eval_columns(
     A verdict's votes become one binary column per known judge type. The
     aggregate score is also stored as ``best_score``. Unknown judge names
     are kept as ``eval_<name>`` so a new judge type still lands a column.
+    An abstaining judge's column is ``None``, not 0. A verdict no judge could
+    give also carries ``judge_error``.
     """
     columns: Dict[str, Any] = {}
     if verdict is None and not evaluations:
@@ -46,9 +48,14 @@ def eval_columns(
     if verdict is not None:
         columns["success"] = bool(verdict.success)
         columns["best_score"] = float(verdict.score)
+        if verdict.error:
+            columns["judge_error"] = verdict.error
         if verdict.explanation:
             columns["explanation"] = verdict.explanation
         for vote in verdict.votes:
+            if vote.abstained:
+                _put_abstention(columns, vote.judge, vote.error or "")
+                continue
             _put_vote(columns, vote.judge, vote.score, vote.success, vote.explanation)
 
     for item in evaluations or []:
@@ -98,9 +105,15 @@ def evaluation_metrics(result: AttackResult) -> Dict[str, Any]:
 
 
 def evaluation_status(result: AttackResult) -> Optional[str]:
-    """Wire status for a judged result, or ``None`` when it has no verdict."""
+    """Wire status for a judged result, or ``None`` when it has no verdict.
+
+    A verdict every judge abstained on is a framework error, not a failed
+    jailbreak.
+    """
     if result.verdict is None:
         return None
+    if result.verdict.error:
+        return EvalStatus.ERROR_TEST_FRAMEWORK.value
     if result.verdict.success:
         return EvalStatus.SUCCESSFUL_JAILBREAK.value
     return EvalStatus.FAILED_JAILBREAK.value
@@ -131,6 +144,14 @@ def _put_vote(
     if explanation:
         stem = column[len("eval_") :]
         columns[f"explanation_{stem}"] = explanation
+
+
+def _put_abstention(columns: Dict[str, Any], judge: str, error: str) -> None:
+    column = _column_for(judge)
+    columns[column] = None
+    if error:
+        stem = column[len("eval_") :]
+        columns[f"explanation_{stem}"] = error
 
 
 def _column_for(judge: str) -> str:

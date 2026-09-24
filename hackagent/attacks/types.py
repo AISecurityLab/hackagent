@@ -56,6 +56,31 @@ def _evaluation_to_row(evaluation: Evaluation) -> Dict[str, Any]:
     return evaluation.model_dump()
 
 
+#: Row keys techniques use for the prompt sent to the target, most generic
+#: first. TAP, PAIR and Crescendo report their best attempt as ``best_*``.
+_PROMPT_KEYS = (
+    "prompt",
+    "prefix",
+    "best_prompt",
+    "full_prompt",
+    "jailbreak_prompt",
+    "attack_prompt",
+    "persuasive_prompt",
+    "augmented_prompt",
+)
+
+#: Row keys techniques use for the target's reply, most generic first.
+_RESPONSE_KEYS = ("response", "completion", "best_response", "target_response")
+
+
+def _first_text(row: Dict[str, Any], keys: tuple) -> str:
+    for key in keys:
+        value = row.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return ""
+
+
 class AttackResult(BaseModel):
     """Typed, immutable representation of a single attack technique output row.
 
@@ -94,8 +119,8 @@ class AttackResult(BaseModel):
             return cls(metadata={"_raw": row})
 
         goal = row.get("goal") or ""
-        prompt = row.get("prompt") or row.get("prefix") or ""
-        response = row.get("response") or row.get("completion") or ""
+        prompt = _first_text(row, _PROMPT_KEYS)
+        response = _first_text(row, _RESPONSE_KEYS)
 
         evaluations: List[Evaluation] = []
         raw_evaluations = row.get("evaluations")

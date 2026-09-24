@@ -6,7 +6,7 @@
 import unittest
 
 from hackagent.attacks.ports import Judge
-from hackagent.core.contracts import Sample
+from hackagent.core.contracts import Sample, Verdict
 from hackagent.evaluation.panel import LLMJudge, Panel, normalize_score
 from tests.fakes.judge import FakeJudge
 from tests.fakes.llm import FakeLLM
@@ -101,6 +101,16 @@ class TestPanel(unittest.TestCase):
         self.assertTrue(verdict.success)
         self.assertAlmostEqual(verdict.score, 20.0 / 3.0)
 
+    def test_majority_tie_is_not_a_success(self):
+        panel = Panel(
+            [FakeJudge(score=10.0, success=True), FakeJudge(score=0.0)],
+            aggregation="majority",
+            threshold=7.0,
+        )
+        verdict = panel.evaluate(_sample())
+        self.assertFalse(verdict.success)
+        self.assertEqual(verdict.score, 5.0)
+
     def test_majority_fails_without_half_the_votes(self):
         panel = Panel(
             [
@@ -173,7 +183,7 @@ class TestPanel(unittest.TestCase):
         self.assertEqual(llm.requests[0]["messages"][0]["role"], "system")
         self.assertEqual(llm.requests[0]["messages"][0]["content"], "Be strict")
 
-    def test_llm_judge_call_failure_is_a_zero_score(self):
+    def test_llm_judge_call_failure_is_an_abstention(self):
         def _boom(_request):
             raise RuntimeError("judge down")
 
@@ -184,9 +194,15 @@ class TestPanel(unittest.TestCase):
         verdict = panel.evaluate(_sample())
         self.assertEqual(verdict.score, 0.0)
         self.assertFalse(verdict.success)
+        self.assertEqual(verdict.error, "All 1 judge(s) abstained")
+        vote = verdict.votes[0]
+        self.assertTrue(vote.abstained)
+        self.assertIsNone(vote.score)
+        self.assertIsNone(vote.success)
+        self.assertIn("judge down", vote.error)
         self.assertIn("judge down", verdict.explanation)
 
-    def test_llm_judge_error_envelope_is_a_zero_score(self):
+    def test_llm_judge_error_envelope_is_an_abstention(self):
         error = {
             "generated_text": None,
             "processed_response": None,
@@ -197,9 +213,70 @@ class TestPanel(unittest.TestCase):
             threshold=7.0,
         )
         verdict = panel.evaluate(_sample())
-        self.assertEqual(verdict.score, 0.0)
         self.assertFalse(verdict.success)
+        self.assertIsNotNone(verdict.error)
+        self.assertIn("rate limited", verdict.votes[0].error)
         self.assertIn("rate limited", verdict.explanation)
+
+    def test_llm_judge_abstains_when_the_retry_is_still_unparseable(self):
+        llm = FakeLLM(script=["I cannot help with that.", "Unknown"])
+        panel = Panel([LLMJudge("harmbench", llm, name="hb")], threshold=7.0)
+
+        verdict = panel.evaluate(_sample())
+
+        self.assertEqual(len(llm.requests), 2)
+        self.assertTrue(verdict.votes[0].abstained)
+        self.assertIsNotNone(verdict.error)
+        self.assertFalse(verdict.success)
+
+    def test_abstaining_judge_is_left_out_of_the_mean(self):
+        def _boom(_request):
+            raise RuntimeError("judge down")
+
+        panel = Panel(
+            [
+                LLMJudge("harmbench", FakeLLM(script=["yes"]), name="hb"),
+                LLMJudge("jailbreakbench", FakeLLM(_boom), name="jb"),
+            ],
+            aggregation="mean",
+            threshold=7.0,
+        )
+        verdict = panel.evaluate(_sample())
+        self.assertIsNone(verdict.error)
+        self.assertEqual(verdict.score, 10.0)
+        self.assertTrue(verdict.success)
+        self.assertEqual([vote.abstained for vote in verdict.votes], [False, True])
+        self.assertIn("jb: Judge call failed: judge down", verdict.explanation)
+
+    def test_port_judge_that_raises_abstains(self):
+        class _Raises:
+            name = "flaky"
+
+            def score(self, sample):
+                raise TimeoutError("slow")
+
+        panel = Panel([_Raises(), FakeJudge(score=0.0)], aggregation="max")
+        verdict = panel.evaluate(_sample())
+        self.assertIsNone(verdict.error)
+        self.assertEqual(verdict.votes[0].error, "Judge failed: slow")
+        self.assertFalse(verdict.success)
+
+    def test_port_verdict_with_an_error_is_an_abstention(self):
+        class _Unjudged:
+            name = "inner"
+
+            def evaluate(self, sample):
+                return Verdict(success=False, score=0.0, error="no votes")
+
+        verdict = Panel([_Unjudged()]).evaluate(_sample())
+        self.assertEqual(verdict.votes[0].error, "no votes")
+        self.assertIsNotNone(verdict.error)
+
+    def test_llm_judge_decimal_success_uses_its_threshold(self):
+        strict = LLMJudge("scorer", FakeLLM(script=["Rating: [[6]]"]), threshold=7.0)
+        lenient = LLMJudge("scorer", FakeLLM(script=["Rating: [[6]]"]), threshold=5.0)
+        self.assertFalse(strict.vote(_sample()).success)
+        self.assertTrue(lenient.vote(_sample()).success)
 
     def test_requires_a_judge(self):
         with self.assertRaises(ValueError):

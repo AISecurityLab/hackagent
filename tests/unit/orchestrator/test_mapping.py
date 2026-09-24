@@ -57,3 +57,42 @@ def test_only_mapping_names_eval_columns():
         if hits:
             offenders.append(f"{path.name}: {hits}")
     assert offenders == []
+
+
+def test_abstaining_judge_column_is_none_not_zero():
+    result = AttackResult(
+        goal="g",
+        response="r",
+        verdict=Verdict(
+            success=True,
+            score=10.0,
+            votes=[
+                JudgeVote(judge="harmbench", score=1.0, success=True),
+                JudgeVote(judge="jailbreakbench", error="rate limited"),
+            ],
+        ),
+    )
+    metrics = evaluation_metrics(result)
+    assert metrics["eval_hb"] == 1
+    assert metrics["eval_jb"] is None
+    assert "eval_jb_mean" not in metrics
+    assert metrics["explanation_jb"] == "rate limited"
+    assert evaluation_status(result) == EvalStatus.SUCCESSFUL_JAILBREAK.value
+
+
+def test_unjudged_verdict_is_a_framework_error():
+    result = AttackResult(
+        goal="g",
+        response="r",
+        verdict=Verdict(
+            success=False,
+            score=0.0,
+            votes=[JudgeVote(judge="harmbench", error="judge down")],
+            error="All 1 judge(s) abstained",
+        ),
+    )
+    assert evaluation_status(result) == EvalStatus.ERROR_TEST_FRAMEWORK.value
+    row = result_to_row(result)
+    assert row["judge_error"] == "All 1 judge(s) abstained"
+    assert row["success"] is False
+    assert row["eval_hb"] is None
