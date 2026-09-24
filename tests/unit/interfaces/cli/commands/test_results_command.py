@@ -139,7 +139,7 @@ class TestResultsShow(unittest.TestCase):
             id=result_id, agent_name="target-bot", attack_type="TAP"
         )
 
-        with patch("hackagent.storage.local.LocalBackend", return_value=backend):
+        with patch("hackagent.client._open_store", return_value=backend):
             outcome = self.runner.invoke(
                 show, [str(result_id)], obj={"config": self.config}
             )
@@ -151,7 +151,7 @@ class TestResultsShow(unittest.TestCase):
     def test_malformed_uuid_is_reported_as_a_fetch_failure(self):
         backend = MagicMock()
 
-        with patch("hackagent.storage.local.LocalBackend", return_value=backend):
+        with patch("hackagent.client._open_store", return_value=backend):
             outcome = self.runner.invoke(
                 show, ["not-a-uuid"], obj={"config": self.config}
             )
@@ -164,7 +164,7 @@ class TestResultsShow(unittest.TestCase):
         backend = MagicMock()
         backend.get_result.side_effect = RuntimeError("database is locked")
 
-        with patch("hackagent.storage.local.LocalBackend", return_value=backend):
+        with patch("hackagent.client._open_store", return_value=backend):
             outcome = self.runner.invoke(
                 show, [str(uuid4())], obj={"config": self.config}
             )
@@ -382,7 +382,7 @@ class TestResultsSummaryCommand(unittest.TestCase):
         backend = MagicMock()
         backend.list_results.side_effect = pages
         with (
-            patch("hackagent.storage.local.LocalBackend", return_value=backend),
+            patch("hackagent.client._open_store", return_value=backend),
             patch.object(results_mod, "_display_result_summary") as display,
         ):
             outcome = self.runner.invoke(
@@ -477,7 +477,7 @@ class TestResultsSummaryCommand(unittest.TestCase):
         backend = MagicMock()
         backend.list_results.side_effect = RuntimeError("no such table: results")
 
-        with patch("hackagent.storage.local.LocalBackend", return_value=backend):
+        with patch("hackagent.client._open_store", return_value=backend):
             outcome = self.runner.invoke(summary, [], obj={"config": self.config})
 
         self.assertNotEqual(outcome.exit_code, 0)
@@ -486,11 +486,11 @@ class TestResultsSummaryCommand(unittest.TestCase):
     def test_invalid_config_short_circuits_the_summary(self):
         self.config.validate.side_effect = ValueError("Base URL is required")
 
-        with patch("hackagent.storage.local.LocalBackend") as backend_cls:
+        with patch("hackagent.client._open_store") as opener:
             outcome = self.runner.invoke(summary, [], obj={"config": self.config})
 
         self.assertNotEqual(outcome.exit_code, 0)
-        backend_cls.assert_not_called()
+        opener.assert_not_called()
 
 
 if __name__ == "__main__":

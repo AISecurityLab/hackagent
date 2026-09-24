@@ -7,6 +7,7 @@ from tests.fakes import (
     FakeRouter,
     RecordingCoordinator,
     RecordingStepTracker,
+    RecordingStore,
     in_memory_store,
 )
 
@@ -58,6 +59,22 @@ def test_coordinator_records_calls_and_passes_results_through():
     assert coordinator.calls_to("finalize_all_goals") == [((rows,), {"scorer": None})]
     assert len(coordinator.calls_to("log_summary")) == 1
     assert coordinator.has_goal_tracking is False
+
+
+def test_recording_store_remembers_reads_and_delete_run():
+    store = RecordingStore()
+    agent = store.create_or_update_agent(
+        name="bot", agent_type="OPENAI_SDK", endpoint="http://x", metadata={}
+    )
+    attack = store.create_attack("pair", agent.id, store.context.org_id, {})
+    run = store.create_run(attack.id, agent.id, {})
+    store.calls.clear()
+
+    assert store.list_runs().total == 1
+    store.delete_run(run.id)
+
+    assert store.call_names() == ["list_runs", "delete_run"]
+    assert store.list_runs().total == 0
 
 
 def test_in_memory_store_is_isolated():

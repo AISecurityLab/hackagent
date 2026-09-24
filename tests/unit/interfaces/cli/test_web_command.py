@@ -16,14 +16,25 @@ from hackagent.interfaces.cli.commands.web import (
 )
 
 
-class _DummyLocalBackend:
-    """Stand-in for LocalBackend that records whether it was closed."""
+class _Closer:
+    """Store double that records whether the facade closed it."""
 
     def __init__(self) -> None:
         self.closed = False
 
     def close(self) -> None:
         self.closed = True
+
+
+def _open_with(store):
+    """Patch the facade opener and remember the settings it was given."""
+    seen = {}
+
+    def _open(settings, *, backend, timeout, raise_on_unexpected_status):
+        seen["settings"] = settings
+        return store
+
+    return seen, patch("hackagent.client._open_store", side_effect=_open)
 
 
 class TestWebCommand(unittest.TestCase):
@@ -40,22 +51,23 @@ class TestWebCommand(unittest.TestCase):
         config.api_key = "test-key"
         config.base_url = "https://api.hackagent.dev"
         app = MagicMock()
+        store = _Closer()
+        seen, opener = _open_with(store)
 
         with (
             patch(
                 "hackagent.interfaces.web.create_app", return_value=app
             ) as mock_create,
-            patch("hackagent.storage.local.LocalBackend") as mock_local_cls,
+            opener,
             patch("socket.socket", return_value=self._free_port_socket()),
         ):
             result = runner.invoke(web, ["--no-browser"], obj={"config": config})
 
         self.assertEqual(result.exit_code, 0)
-        # Remote mode must not touch the local database at all.
-        mock_local_cls.assert_not_called()
         mock_create.assert_called_once()
         session = mock_create.call_args.args[0]
-        self.assertEqual(session.settings.api_key, "test-key")
+        self.assertIs(session.backend, store)
+        self.assertEqual(seen["settings"].api_key, "test-key")
         self.assertEqual(session.settings.base_url, "https://api.hackagent.dev")
         app.run.assert_called_once_with(host="127.0.0.1", port=7860, threaded=True)
 
@@ -65,14 +77,12 @@ class TestWebCommand(unittest.TestCase):
         config.api_key = None
         config.base_url = "https://api.hackagent.dev"
 
-        local_backend = _DummyLocalBackend()
+        store = _Closer()
+        seen, opener = _open_with(store)
         app = MagicMock()
 
         with (
-            patch(
-                "hackagent.storage.local.LocalBackend",
-                return_value=local_backend,
-            ) as mock_local_cls,
+            opener,
             patch(
                 "hackagent.interfaces.web.create_app", return_value=app
             ) as mock_create,
@@ -85,13 +95,13 @@ class TestWebCommand(unittest.TestCase):
             )
 
         self.assertEqual(result.exit_code, 0)
-        mock_local_cls.assert_called_once_with(db_path="/tmp/test-dashboard.db")
+        self.assertEqual(seen["settings"].db_path, "/tmp/test-dashboard.db")
         mock_create.assert_called_once()
         session = mock_create.call_args.args[0]
-        self.assertIs(session.backend, local_backend)
+        self.assertIs(session.backend, store)
         self.assertFalse(session.settings.api_key)
         app.run.assert_called_once_with(host="127.0.0.1", port=7860, threaded=True)
-        self.assertTrue(local_backend.closed)
+        self.assertTrue(store.closed)
 
     def test_web_local_flag_overrides_configured_api_key(self):
         runner = CliRunner()
@@ -99,14 +109,12 @@ class TestWebCommand(unittest.TestCase):
         config.api_key = "test-key"
         config.base_url = "https://api.hackagent.dev"
 
-        local_backend = _DummyLocalBackend()
+        store = _Closer()
+        seen, opener = _open_with(store)
         app = MagicMock()
 
         with (
-            patch(
-                "hackagent.storage.local.LocalBackend",
-                return_value=local_backend,
-            ),
+            opener,
             patch(
                 "hackagent.interfaces.web.create_app", return_value=app
             ) as mock_create,
@@ -118,6 +126,7 @@ class TestWebCommand(unittest.TestCase):
 
         self.assertEqual(result.exit_code, 0)
         session = mock_create.call_args.args[0]
+        self.assertFalse(seen["settings"].api_key)
         self.assertFalse(session.settings.api_key)
 
     def test_web_without_bundle_exits_with_guidance(self):
@@ -128,11 +137,9 @@ class TestWebCommand(unittest.TestCase):
 
         from hackagent.interfaces.web import MissingBundleError
 
+        _seen, opener = _open_with(_Closer())
         with (
-            patch(
-                "hackagent.storage.local.LocalBackend",
-                return_value=_DummyLocalBackend(),
-            ),
+            opener,
             patch(
                 "hackagent.interfaces.web.create_app",
                 side_effect=MissingBundleError(),
@@ -244,11 +251,9 @@ class TestFreePort(unittest.TestCase):
         config.base_url = "https://api.hackagent.dev"
 
         app = MagicMock()
+        _seen, opener = _open_with(_Closer())
         with (
-            patch(
-                "hackagent.storage.local.LocalBackend",
-                return_value=_DummyLocalBackend(),
-            ),
+            opener,
             patch("hackagent.interfaces.web.create_app", return_value=app),
             patch(
                 "hackagent.interfaces.cli.commands.web._free_port", return_value=False

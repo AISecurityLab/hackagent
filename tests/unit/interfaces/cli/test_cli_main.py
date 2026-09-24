@@ -173,18 +173,10 @@ class TestCLIDoctor(unittest.TestCase):
         mock_config.default_config_path.exists.return_value = True
         mock_config_class.return_value = mock_config
 
-        # Mock the API call
-        with patch(
-            "hackagent.interfaces.cli.main.agent_list", create=True
-        ) as mock_agent:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_agent.sync_detailed.return_value = mock_response
-
-            runner = CliRunner()
-            result = runner.invoke(cli, ["doctor"])
-            self.assertEqual(result.exit_code, 0)
-            self.assertIn("API key is set", result.output)
+        runner = CliRunner()
+        result = runner.invoke(cli, ["doctor"])
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("API key is set", result.output)
 
 
 class TestCLINoCommand(unittest.TestCase):

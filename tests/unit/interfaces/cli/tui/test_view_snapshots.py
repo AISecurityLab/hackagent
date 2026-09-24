@@ -7,7 +7,7 @@ These lock the rendered output of ``AttacksTab`` and ``ResultsTab`` so that
 future refactors of ``hackagent.interfaces.tui.views.*`` cannot silently change the
 layout. Regenerate the snapshots with::
 
-    uv run pytest tests/unit/cli/tui --snapshot-update
+    uv run pytest tests/unit/interfaces/cli/tui --snapshot-update
 
 ``snap_compare`` also accepts a file path, but ``pytest-textual-snapshot``
 resolves it to an absolute path and hands it to Textual's ``import_app``,

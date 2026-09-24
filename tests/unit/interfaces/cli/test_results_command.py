@@ -121,7 +121,7 @@ class TestResultsCommands(unittest.TestCase):
         backend.get_result.return_value = record
         with (
             patch("hackagent.interfaces.cli.commands.results._show_logo_once"),
-            patch("hackagent.storage.local.LocalBackend", return_value=backend),
+            patch("hackagent.client._open_store", return_value=backend),
         ):
             result = runner.invoke(
                 results, ["show", str(result_id)], obj={"config": _config()}
@@ -136,7 +136,7 @@ class TestResultsCommands(unittest.TestCase):
         backend.get_result.side_effect = RuntimeError("missing")
         with (
             patch("hackagent.interfaces.cli.commands.results._show_logo_once"),
-            patch("hackagent.storage.local.LocalBackend", return_value=backend),
+            patch("hackagent.client._open_store", return_value=backend),
         ):
             result = runner.invoke(
                 results, ["show", str(uuid4())], obj={"config": _config()}
@@ -163,7 +163,7 @@ class TestResultsCommands(unittest.TestCase):
         backend.list_results.return_value = page
         with (
             patch("hackagent.interfaces.cli.commands.results._show_logo_once"),
-            patch("hackagent.storage.local.LocalBackend", return_value=backend),
+            patch("hackagent.client._open_store", return_value=backend),
         ):
             result = runner.invoke(
                 results,

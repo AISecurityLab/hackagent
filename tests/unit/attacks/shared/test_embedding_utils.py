@@ -281,10 +281,12 @@ def _fetch_remote_model_cost_map(url: str) -> dict:
         _fetch_remote_model_cost_map_with_retry_sync,
     )
 
+    # litellm 1.101 takes max_attempts as an int. range(1, 2) used to be the
+    # attempt iterator and now blows up as `range + int` inside the retry loop.
     result = _fetch_remote_model_cost_map_with_retry_sync(
         url,
         5,
-        range(1, 2),
+        1,
         time.sleep,
         random.Random(0),
         httpx,

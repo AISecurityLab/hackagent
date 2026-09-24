@@ -10,7 +10,8 @@ from unittest.mock import MagicMock, patch
 from click.testing import CliRunner
 
 from hackagent.interfaces.cli.commands.scan import run_quick_scan, scan
-from hackagent.orchestrator.planning import AttackPlan, PlannerError
+from hackagent.client import PlannerError
+from hackagent.orchestrator.planning import AttackPlan
 
 _URL = "https://x.it/chat"
 

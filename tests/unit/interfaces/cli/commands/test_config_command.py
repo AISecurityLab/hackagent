@@ -208,35 +208,26 @@ class TestConfigValidate(unittest.TestCase):
     def setUp(self):
         self.runner = CliRunner()
 
-    def _run(self, cfg, status_code=200, list_side_effect=None):
-        response = MagicMock()
-        response.status_code = status_code
-        with (
-            patch(
-                "hackagent.storage._http.api.agent.agent_list.sync_detailed",
-                side_effect=list_side_effect,
-                return_value=response,
-            ) as agent_list,
-            patch("hackagent.storage.remote.AuthenticatedClient") as client_cls,
-        ):
+    def _run(self, cfg, status_code=200, probe_side_effect=None):
+        session = MagicMock()
+        session.check_connection.return_value = status_code
+        if probe_side_effect is not None:
+            session.check_connection.side_effect = probe_side_effect
+        with patch("hackagent.HackAgent", return_value=session) as session_cls:
             result = self.runner.invoke(validate, [], obj={"config": cfg})
-        return result, agent_list, client_cls
+        return result, session, session_cls
 
     def test_successful_probe_reports_valid_configuration(self):
         cfg = _cli_config()
 
-        result, agent_list, client_cls = self._run(cfg)
+        result, session, session_cls = self._run(cfg)
 
         self.assertEqual(result.exit_code, 0)
         cfg.validate.assert_called_once()
-        agent_list.assert_called_once()
-        client_cls.assert_called_once_with(
-            base_url=cfg.base_url,
-            token=cfg.api_key,
-            prefix="Bearer",
-            raise_on_unexpected_status=False,
-            timeout=120.0,
-        )
+        settings = session_cls.call_args.args[0]
+        self.assertEqual(settings.api_key, cfg.api_key)
+        self.assertEqual(settings.base_url, cfg.base_url)
+        session.check_connection.assert_called_once()
         self.assertIn("API connection successful", result.output)
 
     def test_non_200_status_is_surfaced_without_failing(self):
@@ -251,17 +242,18 @@ class TestConfigValidate(unittest.TestCase):
         cfg = _cli_config()
         cfg.validate.side_effect = ValueError("API key is required")
 
-        result, agent_list, _ = self._run(cfg)
+        result, session, session_cls = self._run(cfg)
 
         self.assertNotEqual(result.exit_code, 0)
-        agent_list.assert_not_called()
+        session_cls.assert_not_called()
+        session.check_connection.assert_not_called()
         self.assertIn("API key is required", result.output)
         self.assertIn("hackagent config set --api-key", result.output)
 
     def test_connection_failure_is_a_warning_not_an_error(self):
         cfg = _cli_config()
 
-        result, _, _ = self._run(cfg, list_side_effect=OSError("network down"))
+        result, _, _ = self._run(cfg, probe_side_effect=OSError("network down"))
 
         self.assertEqual(result.exit_code, 0)
         self.assertIn("Could not test API connection", result.output)

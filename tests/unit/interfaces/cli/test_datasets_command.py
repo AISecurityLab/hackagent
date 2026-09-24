@@ -82,7 +82,7 @@ class TestDatasetsCommand(unittest.TestCase):
     def test_sample_loads_goals(self):
         fake_goals = ["goal one", "goal two"]
         with patch(
-            "hackagent.datasets.load_goals",
+            "hackagent.interfaces.cli.commands.datasets.load_goals",
             return_value=fake_goals,
         ) as mock_load:
             result = self.runner.invoke(
@@ -101,7 +101,10 @@ class TestDatasetsCommand(unittest.TestCase):
 
     def test_sample_json_output(self):
         fake_goals = ["alpha", "beta"]
-        with patch("hackagent.datasets.load_goals", return_value=fake_goals):
+        with patch(
+            "hackagent.interfaces.cli.commands.datasets.load_goals",
+            return_value=fake_goals,
+        ):
             result = self.runner.invoke(
                 datasets,
                 ["sample", self.known_preset, "--limit", "2", "--json"],
@@ -121,7 +124,9 @@ class TestDatasetsCommand(unittest.TestCase):
         self.assertIn("--limit must be at least 1", result.output)
 
     def test_sample_unknown_preset_fails_before_load(self):
-        with patch("hackagent.datasets.load_goals") as mock_load:
+        with patch(
+            "hackagent.interfaces.cli.commands.datasets.load_goals"
+        ) as mock_load:
             result = self.runner.invoke(datasets, ["sample", "not-a-real-preset"])
 
         self.assertNotEqual(result.exit_code, 0)
