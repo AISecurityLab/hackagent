@@ -64,10 +64,13 @@ vuln = SystemPromptLeakage(types=[
 ### Run an Evaluation Campaign
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 from hackagent.catalog.risks.system_prompt_leakage import SYSTEM_PROMPT_LEAKAGE_PROFILE
 
-agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:8080/chat",
+    name="my-agent",
+)
 
 # Profile techniques use display casing (e.g. "StaticTemplate");
 # HackAgent.hack() expects the registered snake_case attack_type key.

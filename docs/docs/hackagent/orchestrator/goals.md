@@ -45,5 +45,5 @@ classifier, unlabelled goals receive the unclassified placeholders.
 def labels_by_index(goals: Sequence[Goal]) -> Dict[int, Dict[str, str]]
 ```
 
-Index → ``{category, subcategory}`` for the tracker.
+Index → `{category, subcategory}` for the tracker.
 

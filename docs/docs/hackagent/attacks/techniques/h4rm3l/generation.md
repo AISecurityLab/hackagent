@@ -26,10 +26,10 @@ Generate decorated prompts and execute them against the target model.
 
 - `goals` - List of goal strings to attack.
 - `agent_router` - Router for target model communication.
-- `config` - Configuration dictionary with ``h4rm3l_params``.
+- `config` - Configuration dictionary with `h4rm3l_params`.
 - `decorator_llm_router` - Optional explicit router for LLM-assisted
-  decorators. When omitted, generation resolves ``decorator_llm``
-  from ``config``.
+  decorators. When omitted, generation resolves `decorator_llm`
+  from `config`.
 - `logger` - Logger instance.
   
 

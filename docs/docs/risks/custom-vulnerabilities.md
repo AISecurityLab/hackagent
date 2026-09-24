@@ -272,16 +272,15 @@ class InternalPolicy(BaseVulnerability):
 Custom vulnerabilities work with any attack technique:
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
 # Create your custom vulnerability
 vuln = FinancialAdvice(types=["investment_recommendation"])
 
 # Initialize HackAgent
-agent = HackAgent(
-    endpoint="http://localhost:8080/chat",
+agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
+    "http://localhost:8080/chat",
     name="financial-compliance-test",
-    api_key="your-api-key",
 )
 
 # Run attacks with custom goals matching your vulnerability
@@ -410,4 +409,4 @@ If your custom vulnerability addresses a common threat, consider contributing it
 ## Learn More
 
 - **[Vulnerabilities](./vulnerabilities)** — Study the 13 built-in vulnerability implementations and their threat profiles
-- **[BaseVulnerability API](../hackagent/agent)** — Full API reference
+- **[Client](../client)** — Session, target, and `hack` / `hack_chain`

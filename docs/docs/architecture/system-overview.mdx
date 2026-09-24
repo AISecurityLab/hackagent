@@ -13,7 +13,7 @@ graph TB
     subgraph "Entry Points"
         SDK["Python SDK (HackAgent class)"]
         CLI["CLI (hackagent ...)"]
-        DASH["Local Dashboard (NiceGUI)"]
+        DASH["Local Dashboard (interfaces/web)"]
     end
 
     subgraph "Core Library"
@@ -39,7 +39,7 @@ graph TB
 
     SDK --> ROUTER
     CLI --> SDK
-    DASH --> LOCAL
+    DASH --> SDK
 
     ROUTER --> ATTACKS
     ATTACKS --> RISKS
@@ -94,15 +94,18 @@ import Link from '@docusaurus/Link';
 
 ### Entry Points
 
-**Python SDK (`hackagent.agent.HackAgent`)**
-- The main client class. Construct it with the target agent's `endpoint`/`agent_type`, then call `.hack(attack_config=...)` to run an attack and get results back.
-- Chooses a `LocalBackend` or `RemoteBackend` automatically based on whether an API key is resolved (`HACKAGENT_API_KEY` env var or explicit `api_key=`).
+**Python SDK (`hackagent.client.HackAgent`)**
+- Construct a session with `Settings`. Bind a victim with `.target(endpoint, agent_type).hack()` or `.hack_chain()`. Both take `on_event`. See [Client](../client/index.md).
+- An API key selects the remote store. No key selects the local SQLite store. Interfaces do not open a store themselves.
 
-**CLI (`hackagent/cli/`)**
-- A Click-based CLI (`hackagent init`, `agent`, `eval`, `scan`, `claude`, `codex`, `web`, `datasets`, `results`, `config`, `examples`) that wraps the SDK for interactive and scripted use. See [CLI Reference](../cli/overview.md).
+**CLI (`hackagent/interfaces/cli/`)**
+- A Click-based CLI (`hackagent init`, `agent`, `eval`, `scan`, `claude`, `codex`, `web`, `datasets`, `results`, `config`, `examples`) that talks only to the facade. Strategy commands come from `catalog()`. The quick scan calls `hack_chain`. Banner and logging stay in this package. See [CLI Reference](../cli/overview.md).
 
-**Web UI (`hackagent/server/webui/`)**
-- A Flask app (`hackagent web`) that serves the HackAgent web app bundle. In local mode it answers the app's API calls from the local SQLite database to show runs, results, and attack traces; with an API key it proxies them to the HackAgent API. No separate backend process is required.
+**TUI (`hackagent/interfaces/tui/`)**
+- Forms are generated from each technique's JSON schema. The TUI subscribes with `on_event`. It does not patch the environment, stdout, or loggers.
+
+**Web UI (`hackagent/interfaces/web/`)**
+- A Flask app (`hackagent web`) that serves the HackAgent web app bundle. Moved from `hackagent/server/webui`. It reads through the facade and does not import `cli.config`. In local mode, `delete_run` is the explicit write; other writes are refused. With an API key it proxies to the HackAgent API. No separate backend process is required.
 
 ### Models (`hackagent/models/`)
 
@@ -113,7 +116,7 @@ import Link from '@docusaurus/Link';
 - `guardrail.py`: `Guarded(llm, before, after)` checks prompts before they reach the model and responses before they are returned.
 - `factory.py`: `ModelFactory(settings)` builds role models (attacker, judges, guardrails). A role model uses only the credentials its spec names; the HackAgent API key is added only for the hosted LLM gateway.
 - Only the target is registered as an Agent record, by the `HackAgent` facade.
-- Per-step traces are recorded by `hackagent/router/tracking/` for later inspection in the web UI.
+- Per-step traces are recorded by `hackagent.tracking` for later inspection in the web UI.
 
 ### Attack Framework (`hackagent/attacks/`)
 
@@ -137,7 +140,7 @@ import Link from '@docusaurus/Link';
 **`RemoteBackend` (optional)**
 - Used automatically once a HackAgent Cloud API key is resolved. Talks to `https://api.hackagent.dev` through the generated OpenAPI client in `hackagent/storage/_http/`, enabling team dashboards and hosted result storage.
 
-Both backends implement the same `Store` protocol (`hackagent/storage/store.py`), so the attack orchestrator, tracker, and TUI/dashboard code are fully decoupled from where results are actually persisted.
+Both backends implement the same `Store` protocol (`hackagent/storage/store.py`). The facade picks one. CLI, TUI, and web do not import `LocalBackend` or `RemoteBackend`.
 
 ## Attack Execution Flow
 
@@ -151,7 +154,7 @@ sequenceDiagram
     participant Evaluator
     participant Storage as Local/Remote Storage
 
-    User->>SDK: agent.hack(attack_config)
+    User->>SDK: target.hack(attack_config)
     SDK->>Storage: Register target agent + create Run
     SDK->>Orchestrator: Execute selected technique
     loop For each generated prompt

@@ -81,8 +81,8 @@ a complete attack attempt on a single goal/datapoint.
   ...         response = query_target(prompt)
   ...         tracker.add_interaction_trace(
   ...             goal_ctx,
-  ...             request={&quot;prompt&quot;: prompt},
-  ...             response={&quot;content&quot;: response},
+  ...             request=\{&quot;prompt&quot;: prompt\},
+  ...             response=\{&quot;content&quot;: response\},
   ...             step_name=&quot;Attack Attempt&quot;
   ...         )
   ...
@@ -122,7 +122,7 @@ Initialize tracker.
 - `attack_type` - Optional attack type identifier for metadata
 - `event_bus` - Optional :class:`hackagent.interfaces.tui.events.TUIEventBus`.
   When provided, the tracker emits structured events
-  (``goal_started``, ``goal_finalized``, ``evaluation``, ...)
+  (`goal_started`, `goal_finalized`, `evaluation`, ...)
   so the TUI can render execution live without parsing logs.
 
 #### is\_enabled
@@ -162,7 +162,7 @@ Create a Result record for a goal and return its tracking context.
 def result_id_for(goal: Union[Goal, int, str]) -> Optional[str]
 ```
 
-Return the result id for a goal index, goal text, or ``Goal``.
+Return the result id for a goal index, goal text, or `Goal`.
 
 #### add\_interaction\_trace
 

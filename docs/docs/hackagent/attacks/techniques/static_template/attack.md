@@ -19,15 +19,15 @@ Static template attack using predefined prompt templates.
 Combines a library of prompt templates across several jailbreak
 categories with each goal string to produce attack prompts and sends
 them to the target model. Scoring is not an embedded pipeline step;
-``HackAgent.hack`` runs the shared evaluator afterward.
+`HackAgent.hack` runs the shared evaluator afterward.
 
-Construct with ``(config, ctx)``. ``config`` is a dict merged into
+Construct with `(config, ctx)`. `config` is a dict merged into
 :data:`~hackagent.attacks.techniques.static_template.config.DEFAULT_TEMPLATE_CONFIG`.
-``ctx`` is a :class:`~hackagent.attacks.ports.RunContext`, passed
-positionally or as ``ctx=``. Tests build it with ``make_ctx()``
-(``tests.fakes.context``). The legacy constructor
-``(config_dict, client, agent_router)`` is obsolete for new code.
-``hackagent.orchestrator.runner`` constructs ``(config, ctx)``.
+`ctx` is a :class:`~hackagent.attacks.ports.RunContext`, passed
+positionally or as `ctx=`. Tests build it with `make_ctx()`
+(`tests.fakes.context`). The legacy constructor
+`(config_dict, client, agent_router)` is obsolete for new code.
+`hackagent.orchestrator.runner` constructs `(config, ctx)`.
 Typed defaults still live on
 :class:`~hackagent.attacks.techniques.static_template.config.TemplateAttackConfig`,
 a :class:`~hackagent.attacks.techniques.config.ConfigBase` subclass.
@@ -35,15 +35,15 @@ a :class:`~hackagent.attacks.techniques.config.ConfigBase` subclass.
 Pipeline stages
 ---------------
 1. **Generation** (:func:`~hackagent.attacks.techniques.static_template.generation.execute`) —
-selects up to ``templates_per_category`` templates from each
-category in ``template_categories``, injects each goal, and
+selects up to `templates_per_category` templates from each
+category in `template_categories`, injects each goal, and
 collects target-model responses.
 
 **Attributes**:
 
 - `config` - Merged static template configuration dictionary.
 - `ctx` - RunContext on the new seam, otherwise None.
-- `logger` - Hierarchical logger at ``hackagent.attacks.static_template``.
+- `logger` - Hierarchical logger at `hackagent.attacks.static_template`.
 
 #### \_\_init\_\_
 
@@ -63,15 +63,15 @@ Initialize static template attack.
 - `config` - Configuration override dictionary merged into
   :data:`~hackagent.attacks.techniques.static_template.config.DEFAULT_TEMPLATE_CONFIG`.
 - `ctx` - :class:`~hackagent.attacks.ports.RunContext`. Positional
-  or ``ctx=``. Tests use ``make_ctx()``.
+  or `ctx=`. Tests use `make_ctx()`.
 - `client` - Obsolete. Storage backend on the orchestrator path.
 - `agent_router` - Obsolete. Target router on the orchestrator path.
   
 
 **Raises**:
 
-- `ValueError` - On the legacy path, if ``client`` or
-  ``agent_router`` is ``None``.
+- `ValueError` - On the legacy path, if `client` or
+  `agent_router` is `None`.
 
 #### run
 

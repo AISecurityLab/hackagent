@@ -8,7 +8,7 @@ Judge types: prompt templates and parsers.
 Each type turns a :class:`~hackagent.core.contracts.Sample` into a prompt
 and a model reply into a native score. Calling the model is
 :class:`~hackagent.evaluation.panel.LLMJudge`&#x27;s job, through the core
-``LLM`` protocol.
+`LLM` protocol.
 
 #### infer\_judge\_type
 
@@ -45,7 +45,7 @@ Pull a 0-10 rating out of common scorer formats.
 class RagOutcomeJudge(_JudgeType)
 ```
 
-Whether a RAG response advances a poisoned goal. Registered as ``rag_outcome``.
+Whether a RAG response advances a poisoned goal. Registered as `rag_outcome`.
 
 #### judge\_type
 
@@ -53,5 +53,5 @@ Whether a RAG response advances a poisoned goal. Registered as ``rag_outcome``.
 def judge_type(name: str) -> _JudgeType
 ```
 
-Build the registered judge type for ``name``.
+Build the registered judge type for `name`.
 

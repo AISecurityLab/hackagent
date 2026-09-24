@@ -14,7 +14,7 @@ Interfaces subscribe with a listener. Tracking does not import them.
 class EventListener(Protocol)
 ```
 
-One subscriber. ``kind`` is the event name; ``payload`` is its data.
+One subscriber. `kind` is the event name; `payload` is its data.
 
 ## BusListener Objects
 
@@ -22,7 +22,7 @@ One subscriber. ``kind`` is the event name; ``payload`` is its data.
 class BusListener()
 ```
 
-Adapt an object with ``emit(kind, **payload)`` (the TUI bus).
+Adapt an object with `emit(kind, **payload)` (the TUI bus).
 
 ## Fanout Objects
 

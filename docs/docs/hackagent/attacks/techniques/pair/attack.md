@@ -34,17 +34,17 @@ prompt based on the *target* model&#x27;s responses and a scorer score:
 3. A scorer rates the response on a 1–10 jailbreak success scale.
 4. The score and response are fed back to the attacker as context
 for the next refinement.
-5. Steps 1–4 repeat for ``n_iterations`` rounds or until early stop.
+5. Steps 1–4 repeat for `n_iterations` rounds or until early stop.
 
-Multiple independent ``n_streams`` are run in parallel (one per goal);
+Multiple independent `n_streams` are run in parallel (one per goal);
 each stream maintains its own conversation history with the attacker.
 
 The attack requires three separate model roles:
 
-* **Attacker** (``config[&quot;attacker&quot;]``) — an LLM that proposes prompt
+* **Attacker** (`config[&quot;attacker&quot;]`) — an LLM that proposes prompt
 improvements based on feedback.
-* **Target** — the victim model reached via ``agent_router``.
-* **Scorer** (``config[&quot;scorer&quot;]``) — dedicated scorer model using
+* **Target** — the victim model reached via `agent_router`.
+* **Scorer** (`config[&quot;scorer&quot;]`) — dedicated scorer model using
 the AutoDAN-Turbo scorer+wrapper protocol.
 
 **Attributes**:
@@ -55,8 +55,8 @@ the AutoDAN-Turbo scorer+wrapper protocol.
 - `attacker_router` - Router for the attacker LLM.
 - `scorer_router` - Router for the scorer LLM.
 - `objective` - Loaded :class:`~hackagent.attacks.objectives.base.ObjectiveConfig`
-  instance for the configured ``objective`` key.
-- `logger` - Hierarchical logger at ``hackagent.attacks.pair``.
+  instance for the configured `objective` key.
+- `logger` - Hierarchical logger at `hackagent.attacks.pair`.
 
 #### \_\_init\_\_
 
@@ -69,12 +69,12 @@ def __init__(config: Optional[Dict[str, Any]] = None,
              client: Optional[Store] = None)
 ```
 
-Initialize PAIR with ``(config, ctx)`` or legacy args.
+Initialize PAIR with `(config, ctx)` or legacy args.
 
-On the new seam the attacker role comes from ``ctx.models`` and
-refinement scores come from ``ctx.judge`` (``verdict_from_judge``).
-This class does not read ``_suppress_run_status_updates``.
-``PairConfig`` still subclasses
+On the new seam the attacker role comes from `ctx.models` and
+refinement scores come from `ctx.judge` (`verdict_from_judge`).
+This class does not read `_suppress_run_status_updates`.
+`PairConfig` still subclasses
 :class:`~hackagent.attacks.techniques.config.ConfigBase`.
 The legacy constructor is obsolete for new code.
 

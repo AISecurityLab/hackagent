@@ -8,8 +8,8 @@ Attack-facing configuration seam (Phase 4).
 :class:`AttackConfig` holds **technique parameters and role fields only**.
 Run bookkeeping (:class:`~hackagent.orchestrator.run_spec.RunSpec`) and
 target generation (:class:`~hackagent.models.target_params.TargetParams`)
-live elsewhere. ``roles()`` replaces the orchestrator&#x27;s static role-path
-table and the per-technique ``get_effective_model_roles`` overrides.
+live elsewhere. `roles()` replaces the orchestrator&#x27;s static role-path
+table and the per-technique `get_effective_model_roles` overrides.
 
 #### ui
 
@@ -21,7 +21,7 @@ def ui(*,
        choices: Optional[Sequence[Any]] = None) -> Dict[str, Any]
 ```
 
-Build ``json_schema_extra`` for TUI/CLI form generation.
+Build `json_schema_extra` for TUI/CLI form generation.
 
 ## AttackConfig Objects
 
@@ -32,7 +32,7 @@ class AttackConfig(BaseModel)
 Technique params + role fields. No run/target/batching concerns.
 
 Subclasses declare algorithm fields and any extra role fields. UI
-metadata belongs in ``Field(json_schema_extra=ui(...))``; pydantic
+metadata belongs in `Field(json_schema_extra=ui(...))`; pydantic
 defaults are the only defaults.
 
 #### role\_fields
@@ -60,8 +60,8 @@ def roles_from_mapping(cls, data: Mapping[str, Any]) -> List[Dict[str, Any]]
 
 Introspect role fields from a plain config mapping.
 
-Each item is ``{&quot;role&quot;: str, &quot;config&quot;: dict, &quot;required&quot;: bool}``.
-List fields (``judges``) emit one entry per element. Empty/missing
+Each item is `{&quot;role&quot;: str, &quot;config&quot;: dict, &quot;required&quot;: bool}`.
+List fields (`judges`) emit one entry per element. Empty/missing
 values are skipped.
 
 #### role\_family
@@ -71,7 +71,7 @@ values are skipped.
 def role_family(cls, role: str) -> Optional[str]
 ```
 
-Return the defaults family (``attacker`` / ``judge``) for *role*.
+Return the defaults family (`attacker` / `judge`) for *role*.
 
 #### roles\_from\_paths
 

@@ -22,7 +22,7 @@ def run(agent: Any,
         _tui_event_bus: Optional[Any] = None) -> List[Dict[str, Any]]
 ```
 
-Execute one attack against ``agent`` and return result rows.
+Execute one attack against `agent` and return result rows.
 
 #### judge\_unjudged
 
@@ -35,6 +35,6 @@ def judge_unjudged(results: List[AttackResult],
 
 Score results that have no verdict.
 
-An attack-produced verdict is kept. ``rejudge=True`` scores every result
+An attack-produced verdict is kept. `rejudge=True` scores every result
 that has a response, including ones that already carry a verdict.
 

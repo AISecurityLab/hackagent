@@ -12,7 +12,7 @@ Every shipped technique accepts that constructor.
 - **Inline-judge** — BoN, PAP, Tool-output IPI, TAP. Loop scores use `ctx.judge.score` through [`hackagent.attacks._lib.inline_judge`](../hackagent/attacks/_lib/inline_judge) (`CtxJudgeAdapter`, `CtxTapEvaluator`). That replaces `InlineStepJudge` and `TapEvaluation` on this path. Those classes remain the fallback when `ctx` is absent.
 - **Custom-loop** — Crescendo, PAIR, AutoDAN-Turbo, RAG. Roles come from `ctx.models`, scores from `ctx.judge` (`verdict_from_judge`), artifacts from `ctx.workspace`. These techniques do not read `_suppress_run_status_updates`.
 
-[`hackagent.orchestrator.runner`](../orchestrator/index.md) instantiates every shipped technique as `(config, ctx)`. The legacy constructor, including `client=` as a keyword, remains supported and is obsolete for new technique code. Shipped technique models still subclass [`ConfigBase`](../hackagent/attacks/techniques/config.md). Launching a run from the SDK or CLI is unchanged: pass an `attack_config` dict to `HackAgent.hack`. Field-by-field reference for that dict: [Shared Attack Config](./shared-args.md).
+[`hackagent.orchestrator.runner`](../orchestrator/index.md) instantiates every shipped technique as `(config, ctx)`. The legacy constructor, including `client=` as a keyword, remains supported and is obsolete for new technique code. Shipped technique models still subclass [`ConfigBase`](../hackagent/attacks/techniques/config.md). Launching a run from the SDK or CLI is unchanged: pass an `attack_config` dict to `Target.hack`. Field-by-field reference for that dict: [Shared Attack Config](./shared-args.md).
 
 Shared helpers (transforms, scoring, templates, objectives, progress, [inline-judge adapters](../hackagent/attacks/_lib/inline_judge), `ensure_graphviz()`) live in `hackagent.attacks._lib`. Compatibility shims remain at `attacks.shared`, `attacks.generator`, and `attacks.objectives`.
 
@@ -97,7 +97,7 @@ Each descriptor is `{"role": str, "config": dict, "required": bool}`. Empty or m
 
 `ATTACK_ROLE_PATHS` maps `attack_type` to static role paths `(role_name, config_path, is_list, role_family)`. `roles_from_paths(attack_type, data)` and `role_family_map(attack_type)` resolve that table. `BaseAttack.get_effective_model_roles` prefers `config_model.roles_from_mapping`, then `roles_from_paths` using `attack_type`.
 
-`RunSpec` ([`hackagent.orchestrator`](../orchestrator/index.md)) holds goals, dataset, intents, `output_dir`, `run_id`, `start_step`, batching, and `rejudge`. The runner reads those fields for one attack. `TargetParams` (`hackagent.models.target_params`) holds target generation knobs (`max_tokens`, `temperature`, `timeout`, and the other sampling fields). Technique models still subclass `ConfigBase`, and `HackAgent(..., target_config=...)` remains the runtime source for target settings.
+`RunSpec` ([`hackagent.orchestrator`](../orchestrator/index.md)) holds goals, dataset, intents, `output_dir`, `run_id`, `start_step`, batching, and `rejudge`. The runner reads those fields for one attack. `TargetParams` (`hackagent.models.target_params`) holds target generation knobs (`max_tokens`, `temperature`, `timeout`, and the other sampling fields). Technique models still subclass `ConfigBase`, and `.target(..., target_config=...)` remains the runtime source for target settings.
 
 ### `ConfigBase` and PAIR
 

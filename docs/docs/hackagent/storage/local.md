@@ -49,7 +49,7 @@ No-op: local writes are synchronous (mirrors RemoteBackend.flush).
 def count_result_buckets() -> dict
 ```
 
-Return {total, jailbreaks, mitigated, error, pending} via SQL.
+Return \{total, jailbreaks, mitigated, error, pending\} via SQL.
 
 #### save\_builder\_draft
 
@@ -71,7 +71,7 @@ Insert or update a dashboard attack-builder draft canvas.
 
 **Returns**:
 
-  The stored draft as ``{id, name, canvas, created_at, updated_at}``.
+  The stored draft as `{id, name, canvas, created_at, updated_at}`.
 
 #### list\_builder\_drafts
 

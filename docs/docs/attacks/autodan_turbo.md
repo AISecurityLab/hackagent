@@ -60,12 +60,12 @@ graph TD
 ## Basic Usage
 
 ```python
-from hackagent import HackAgent, AgentType
+from hackagent import HackAgent, AgentType, Settings
 
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:8000",
+    AgentType.GOOGLE_ADK,
     name="target_agent",
-    endpoint="http://localhost:8000",
-    agent_type=AgentType.GOOGLE_ADK
 )
 
 attack_config = {

@@ -3,11 +3,11 @@ sidebar_label: browser
 title: hackagent.models.adapters.browser
 ---
 
-Playwright helpers for the ``web`` provider.
+Playwright helpers for the `web` provider.
 
 Shared utilities for driving a real Chromium: ensuring the browser binary is
 installed (fetched on first use), and locating the chat input / send button on a
-loaded page. The ``web`` provider
+loaded page. The `web` provider
 (:mod:`hackagent.models.adapters.web`) uses these to type prompts into a live
 chat widget and read the replies.
 
@@ -40,7 +40,7 @@ cheap to call on every run. Returns False if Playwright isn&#x27;t importable.
 def install_chromium(timeout: int = 900) -> None
 ```
 
-Download Playwright&#x27;s Chromium via ``python -m playwright install chromium``.
+Download Playwright&#x27;s Chromium via `python -m playwright install chromium`.
 
 Output streams to the terminal so the user sees download progress. Raises
 :class:`BrowserScanError` with a manual-command hint on any failure.
@@ -51,10 +51,10 @@ Output streams to the terminal so the user sees download progress. Raises
 def ensure_chromium(*, auto_install: bool = True, console=None) -> None
 ```
 
-Ensure Playwright + its Chromium are ready for the ``web`` provider.
+Ensure Playwright + its Chromium are ready for the `web` provider.
 
 Raises :class:`BrowserScanError` if Playwright isn&#x27;t installed, or if
-Chromium is missing and ``auto_install`` is False. When ``auto_install`` is
-True and Chromium is missing, downloads it (announcing via ``console`` if
+Chromium is missing and `auto_install` is False. When `auto_install` is
+True and Chromium is missing, downloads it (announcing via `console` if
 given). A no-op when everything is already present.
 

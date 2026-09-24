@@ -109,7 +109,7 @@ Return the taxonomy entry for *technique_key*.
 def try_get_attack_taxonomy(technique_key: str) -> Optional[AttackTaxonomy]
 ```
 
-Return the taxonomy entry for *technique_key*, or ``None`` if unknown.
+Return the taxonomy entry for *technique_key*, or `None` if unknown.
 
 #### attacks\_for\_category
 
@@ -137,7 +137,7 @@ def grouped_attack_keys(
 
 Group *technique_keys* by primary category.
 
-Unknown keys are omitted. When *technique_keys* is ``None``, every
+Unknown keys are omitted. When *technique_keys* is `None`, every
 registered technique is included. Within each category, the original
 iterable order is preserved (taxonomy insertion order when grouping all).
 

@@ -34,7 +34,7 @@ See the docs page ``docs/docs/attacks/taxonomy.mdx``.
 
 Victim-model request defaults are still defined here for compatibility and
 for callers that want the canonical schema, but the preferred runtime source
-for those settings is now `HackAgent(..., target_config=...)`.
+for those settings is now ``.target(..., target_config=...)``.
 
 Two export styles are intentionally supported:
 

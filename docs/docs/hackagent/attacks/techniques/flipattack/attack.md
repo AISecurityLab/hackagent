@@ -10,10 +10,10 @@ to bypass LLM safety measures.
 
 Based on: https://arxiv.org/abs/2410.02832
 
-The ``FlipAttack`` class serves as both the HackAgent pipeline orchestrator
-(``BaseAttack`` subclass) and the algorithm itself.  The obfuscation methods
-(``flip_word_order``, ``flip_char_in_word``, ``flip_char_in_sentence``,
-``generate``, etc.) live directly on the class, kept stateless so they can
+The `FlipAttack` class serves as both the HackAgent pipeline orchestrator
+(`BaseAttack` subclass) and the algorithm itself.  The obfuscation methods
+(`flip_word_order`, `flip_char_in_word`, `flip_char_in_sentence`,
+`generate`, etc.) live directly on the class, kept stateless so they can
 be called safely for multiple goals in sequence.
 
 Result Tracking:
@@ -34,11 +34,11 @@ Liu et al., &quot;FlipAttack: Jailbreak LLMs via Flipping&quot; (2024)
 https://arxiv.org/abs/2410.02832
 
 This class serves as both the **HackAgent pipeline orchestrator**
-(``BaseAttack`` subclass) and the **algorithm** itself.  The obfuscation
-methods (``flip_word_order``, ``flip_char_in_word``, ``flip_char_in_sentence``,
-``generate``, etc.) live directly on the class.
+(`BaseAttack` subclass) and the **algorithm** itself.  The obfuscation
+methods (`flip_word_order`, `flip_char_in_word`, `flip_char_in_sentence`,
+`generate`, etc.) live directly on the class.
 
-Flip modes (set via ``config[&quot;flipattack_params&quot;][&quot;flip_mode&quot;]``):
+Flip modes (set via `config[&quot;flipattack_params&quot;][&quot;flip_mode&quot;]`):
 FWO  Reverses the word order of the input sentence.
 FCW  Reverses characters inside each individual word.
 FCS  Reverses all characters of the entire sentence (default).
@@ -50,19 +50,19 @@ cot      Appends &quot;step by step&quot; to the decoding instruction.
 lang_gpt Wraps the system prompt in a LangGPT Role/Profile template.
 few_shot Injects two task-specific decoding demonstrations.
 
-Construct with ``(config, ctx)``. ``config`` is a dict deep-merged into
+Construct with `(config, ctx)`. `config` is a dict deep-merged into
 :data:`~hackagent.attacks.techniques.flipattack.config.DEFAULT_FLIPATTACK_CONFIG`.
-``ctx`` is a :class:`~hackagent.attacks.ports.RunContext`, passed
-positionally or as ``ctx=``. Tests build it with ``make_ctx()``
-(``tests.fakes.context``). Generation receives this instance as
-``attack=``. Do not store it on ``config[&quot;_self&quot;]``.
+`ctx` is a :class:`~hackagent.attacks.ports.RunContext`, passed
+positionally or as `ctx=`. Tests build it with `make_ctx()`
+(`tests.fakes.context`). Generation receives this instance as
+`attack=`. Do not store it on `config[&quot;_self&quot;]`.
 
-The pipeline is generation-only. ``run()`` returns rows without a
+The pipeline is generation-only. `run()` returns rows without a
 verdict.
 
-The legacy constructor ``(config_dict, client, agent_router)`` is
-obsolete for new code. ``hackagent.orchestrator.runner`` constructs
-``(config, ctx)``.
+The legacy constructor `(config_dict, client, agent_router)` is
+obsolete for new code. `hackagent.orchestrator.runner` constructs
+`(config, ctx)`.
 :class:`~hackagent.attacks.techniques.flipattack.config.FlipAttackConfig`
 still subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
 
@@ -93,15 +93,15 @@ Initialize FlipAttack with configuration.
 - `config` - Optional dictionary containing parameters to override
   :data:`~hackagent.attacks.techniques.flipattack.config.DEFAULT_FLIPATTACK_CONFIG`.
 - `ctx` - :class:`~hackagent.attacks.ports.RunContext`. Positional
-  or ``ctx=``. Tests use ``make_ctx()``.
+  or `ctx=`. Tests use `make_ctx()`.
 - `client` - Obsolete. Store instance on the orchestrator path.
 - `agent_router` - Obsolete. Target router on the orchestrator path.
   
 
 **Raises**:
 
-- `ValueError` - On the legacy path, if ``client`` or
-  ``agent_router`` is ``None``.
+- `ValueError` - On the legacy path, if `client` or
+  `agent_router` is `None`.
 
 #### flip\_word\_order
 
@@ -182,7 +182,7 @@ Used internally to build few-shot demonstration examples.
 **Arguments**:
 
 - `input_str` - Short example phrase to transform.
-- `mode` - One of ``&quot;FWO&quot;``, ``&quot;FCW&quot;``, ``&quot;FCS&quot;``, or ``&quot;FMM&quot;``.
+- `mode` - One of `&quot;FWO&quot;`, `&quot;FCW&quot;`, `&quot;FCS&quot;`, or `&quot;FMM&quot;`.
   
 
 **Returns**:
@@ -204,7 +204,7 @@ Split *input_str* roughly in half at a word boundary.
 
 **Returns**:
 
-  Tuple of ``(first_half, second_half)`` strings.
+  Tuple of `(first_half, second_half)` strings.
 
 #### generate
 
@@ -225,14 +225,14 @@ method is safe to call for multiple goals in sequence.
 **Returns**:
 
   Tuple of:
-  - ``log`` (str): Debug string, e.g. ``&quot;TASK is &#x27;...&#x27;&quot;``.
-  - ``attack`` (list[dict]): OpenAI chat-format message list
-  with ``&quot;system&quot;`` and ``&quot;user&quot;`` entries.
+  - `log` (str): Debug string, e.g. `&quot;TASK is &#x27;...&#x27;&quot;`.
+  - `attack` (list[dict]): OpenAI chat-format message list
+  with `&quot;system&quot;` and `&quot;user&quot;` entries.
   
 
 **Raises**:
 
-- `TypeError` - If ``self.flip_mode`` is not a recognised mode.
+- `TypeError` - If `self.flip_mode` is not a recognised mode.
 
 #### run
 

@@ -122,12 +122,11 @@ campaign_config = {
 ### Step 5: Implement the Campaign
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
-agent = HackAgent(
-    endpoint="http://localhost:8080/chat",
+agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
+    "http://localhost:8080/chat",
     name="healthcare-ai",
-    api_key="your-api-key",
 )
 
 def run_custom_campaign(agent, config):
@@ -218,6 +217,7 @@ def multi_stage_campaign(agent, profile, dataset):
 Set up automated recurring security checks:
 
 ```python
+from hackagent import HackAgent, Settings
 import schedule
 import time
 from datetime import datetime
@@ -226,10 +226,9 @@ def scheduled_security_scan():
     """Run daily security scan."""
     print(f"\n=== Security Scan {datetime.now()} ===")
 
-    agent = HackAgent(
-        endpoint="http://localhost:8080/chat",
+    agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
+        "http://localhost:8080/chat",
         name="production-agent",
-        api_key="your-api-key",
     )
 
     # Quick scan with core vulnerabilities

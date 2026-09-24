@@ -159,6 +159,11 @@ const sidebars: SidebarsConfig = {
       label: 'Orchestrator',
     },
     {
+      type: 'doc',
+      id: 'client/index',
+      label: 'Client',
+    },
+    {
       type: 'category',
       label: 'Datasets',
       className: 'sidebar-icon sidebar-icon-database',
@@ -247,7 +252,125 @@ const sidebars: SidebarsConfig = {
         id: 'api-index',
       },
       items: [
-        'hackagent/agent',
+        'hackagent/client',
+        {
+          type: 'category',
+          label: 'Interfaces',
+          items: [
+            {
+              type: 'category',
+              label: 'CLI',
+              items: [
+                'hackagent/interfaces/cli/banner',
+                'hackagent/interfaces/cli/config',
+                'hackagent/interfaces/cli/logging_setup',
+                'hackagent/interfaces/cli/main',
+                'hackagent/interfaces/cli/safe_stdio',
+                'hackagent/interfaces/cli/utils',
+                {
+                  type: 'category',
+                  label: 'commands',
+                  items: [
+                    'hackagent/interfaces/cli/commands/agent',
+                    'hackagent/interfaces/cli/commands/claude',
+                    'hackagent/interfaces/cli/commands/codex',
+                    'hackagent/interfaces/cli/commands/config',
+                    'hackagent/interfaces/cli/commands/datasets',
+                    'hackagent/interfaces/cli/commands/examples',
+                    'hackagent/interfaces/cli/commands/results',
+                    'hackagent/interfaces/cli/commands/web',
+                    {
+                      type: 'category',
+                      label: 'attack',
+                      items: [
+                        'hackagent/interfaces/cli/commands/attack/chain',
+                        'hackagent/interfaces/cli/commands/attack/group',
+                        'hackagent/interfaces/cli/commands/attack/info',
+                      ],
+                    },
+                    {
+                      type: 'category',
+                      label: 'scan',
+                      items: [
+                        'hackagent/interfaces/cli/commands/scan/command',
+                        'hackagent/interfaces/cli/commands/scan/quick',
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              type: 'category',
+              label: 'TUI',
+              items: [
+                'hackagent/interfaces/tui/app',
+                'hackagent/interfaces/tui/base',
+                'hackagent/interfaces/tui/events',
+                'hackagent/interfaces/tui/forms',
+                'hackagent/interfaces/tui/logger',
+                'hackagent/interfaces/tui/theme',
+                {
+                  type: 'category',
+                  label: 'views',
+                  items: [
+                    'hackagent/interfaces/tui/views/agents',
+                    'hackagent/interfaces/tui/views/config',
+                    {
+                      type: 'category',
+                      label: 'attacks',
+                      items: [
+                        'hackagent/interfaces/tui/views/attacks/executor',
+                        'hackagent/interfaces/tui/views/attacks/form',
+                        'hackagent/interfaces/tui/views/attacks/helpers',
+                        'hackagent/interfaces/tui/views/attacks/layout',
+                        'hackagent/interfaces/tui/views/attacks/runner',
+                        'hackagent/interfaces/tui/views/attacks/tab',
+                      ],
+                    },
+                    {
+                      type: 'category',
+                      label: 'results',
+                      items: [
+                        'hackagent/interfaces/tui/views/results/details',
+                        'hackagent/interfaces/tui/views/results/export',
+                        'hackagent/interfaces/tui/views/results/tab',
+                        'hackagent/interfaces/tui/views/results/table',
+                        {
+                          type: 'category',
+                          label: 'formatters',
+                          items: [
+                            'hackagent/interfaces/tui/views/results/formatters/run_report',
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+                {
+                  type: 'category',
+                  label: 'widgets',
+                  items: [
+                    'hackagent/interfaces/tui/widgets/actions',
+                    'hackagent/interfaces/tui/widgets/clipboard',
+                    'hackagent/interfaces/tui/widgets/logs',
+                  ],
+                },
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Web',
+              items: [
+                'hackagent/interfaces/web/index',
+                'hackagent/interfaces/web/local_api',
+                'hackagent/interfaces/web/proxy',
+                'hackagent/interfaces/web/serializers',
+                'hackagent/interfaces/web/static',
+              ],
+            },
+          ],
+        },
         {
           type: 'category',
           label: 'Core',

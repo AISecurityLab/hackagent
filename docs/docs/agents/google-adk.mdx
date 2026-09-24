@@ -54,13 +54,13 @@ Google Agent Development Kit (ADK) is a framework for building conversational AI
 ### Initialize HackAgent Client
 
 ```python
-from hackagent import HackAgent, AgentType
+from hackagent import HackAgent, AgentType, Settings
 
 # No API key — results stored locally in ~/.local/share/hackagent/hackagent.db
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:8000",
+    AgentType.GOOGLE_ADK,
     name="multi_tool_agent",
-    endpoint="http://localhost:8000",
-    agent_type=AgentType.GOOGLE_ADK,
 )
 ```
 
@@ -109,16 +109,16 @@ Here's the actual working example from the test suite:
 
 ```python
 import os
-from hackagent import HackAgent, AgentType
+from hackagent import HackAgent, AgentType, Settings
 
 def test_adk_security():
     """Test ADK agent security with HackAgent"""
     
     # Initialize client (local mode — no API key needed)
-    agent = HackAgent(
+    agent = HackAgent(Settings.resolve()).target(
+        os.getenv("AGENT_URL"),
+        AgentType.GOOGLE_ADK,
         name="multi_tool_agent",
-        endpoint=os.getenv("AGENT_URL"),
-        agent_type=AgentType.GOOGLE_ADK,
     )
 
     # Configure comprehensive security test
@@ -186,14 +186,17 @@ multi_turn_goals = [
 ### Custom ADK Adapter Settings
 
 ```python
+from hackagent import HackAgent, Settings
 # Advanced ADK configuration
 agent = HackAgent(
+    Settings.resolve(),
+    timeout=120,  # HackAgent backend API client timeout (not the ADK request timeout)
+    raise_on_unexpected_status=False,  # Handle errors gracefully
+).target(
+    "http://localhost:8000",
+    AgentType.GOOGLE_ADK,
     name="complex_adk_agent",
-    endpoint="http://localhost:8000",
-    agent_type=AgentType.GOOGLE_ADK,
-    timeout=120,                         # HackAgent backend API client timeout (not the ADK request timeout)
-    target_config={"timeout": 60},       # Timeout for requests sent to the target ADK agent
-    raise_on_unexpected_status=False,    # Handle errors gracefully
+    target_config={"timeout": 60},  # Timeout for requests sent to the target ADK agent
 )
 ```
 
@@ -248,10 +251,11 @@ curl http://localhost:8000/list-apps
 Then check the endpoint configuration:
 
 ```python
-agent = HackAgent(
+from hackagent import HackAgent, Settings
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:8000",  # Ensure correct port
+    AgentType.GOOGLE_ADK,
     name="multi_tool_agent",
-    endpoint="http://localhost:8000",  # Ensure correct port
-    agent_type=AgentType.GOOGLE_ADK,
 )
 ```
 
@@ -274,6 +278,7 @@ cat ~/.config/hackagent/config.json
 Enable detailed logging for troubleshooting:
 
 ```python
+from hackagent import HackAgent, Settings
 import os
 import logging
 
@@ -282,10 +287,10 @@ os.environ['HACKAGENT_LOG_LEVEL'] = 'DEBUG'
 logging.getLogger('hackagent').setLevel(logging.DEBUG)
 
 # Run with enhanced logging
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:8000",
+    AgentType.GOOGLE_ADK,
     name="debug_adk_agent",
-    endpoint="http://localhost:8000",
-    agent_type=AgentType.GOOGLE_ADK
 )
 ```
 

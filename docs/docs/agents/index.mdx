@@ -65,13 +65,13 @@ hackagent eval advprefix \
   <TabItem value="sdk" label="SDK">
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
 # Configure for Ollama
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:11434",
+    "ollama",
     name="llama3",  # Model name in Ollama
-    endpoint="http://localhost:11434",
-    agent_type="ollama",
 )
 
 # Run security test
@@ -142,13 +142,13 @@ hackagent eval advprefix \
   <TabItem value="sdk" label="SDK">
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
 # Configure for OpenAI SDK
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "https://api.openai.com/v1",
+    "openai-sdk",
     name="my_openai_agent",
-    endpoint="https://api.openai.com/v1",
-    agent_type="openai-sdk",
 )
 
 # Run security test
@@ -222,13 +222,13 @@ hackagent eval advprefix \
   <TabItem value="sdk" label="SDK">
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
 # Configure for Google ADK
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:8000",
+    "google-adk",
     name="multi_tool_agent",
-    endpoint="http://localhost:8000",
-    agent_type="google-adk",
 )
 
 # Run security test
@@ -289,12 +289,12 @@ hackagent claude --no-tui
   <TabItem value="sdk" label="SDK">
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "",  # ignored — Claude Code is local
+    "claude-code",
     name="claude-code",
-    endpoint="",                 # ignored — Claude Code is local
-    agent_type="claude-code",
     adapter_operational_config={
         "name": "claude-opus-4-8",  # passed to `claude --model`
         "binary": "claude",
@@ -352,12 +352,12 @@ hackagent codex --no-tui
   <TabItem value="sdk" label="SDK">
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "",  # ignored — Codex is local
+    "codex",
     name="codex",
-    endpoint="",              # ignored — Codex is local
-    agent_type="codex",
     adapter_operational_config={
         "name": "gpt-5.5",  # passed to `codex exec -m`
         "binary": "codex",
@@ -413,12 +413,12 @@ hackagent eval flipattack \
   <TabItem value="sdk" label="SDK">
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost",  # ignored — Hermes is local
+    "hermes",
     name="hermes",
-    endpoint="http://localhost",  # ignored — Hermes is local
-    agent_type="hermes",
     adapter_operational_config={
         "name": "hermes-4-70b",  # passed to `hermes -m`
         "binary": "hermes",
@@ -462,12 +462,12 @@ This is the primary way to use this provider — see [CLI: Scan](../cli/scan.md)
   <TabItem value="sdk" label="SDK">
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "https://www.example.com",
+    "web",
     name="example-site",
-    endpoint="https://www.example.com",
-    agent_type="web",
     adapter_operational_config={
         "headless": True,
         "timeout": 45,

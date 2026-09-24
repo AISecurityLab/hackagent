@@ -37,7 +37,7 @@ Links a dataset preset to a vulnerability with a relevance tag.
 Parameters
 ----------
 preset : str
-    Key in ``hackagent.datasets.presets.PRESETS`` (e.g. ``&quot;advbench&quot;``).
+    Key in `hackagent.datasets.presets.PRESETS` (e.g. `&quot;advbench&quot;`).
 relevance : Relevance
     How directly this dataset tests the vulnerability.
 rationale : str
@@ -55,7 +55,7 @@ Links an attack technique to a vulnerability.
 Parameters
 ----------
 technique : str
-    Canonical attack id (see ``hackagent.catalog.taxonomy.ATTACK_IDS``).
+    Canonical attack id (see `hackagent.catalog.taxonomy.ATTACK_IDS`).
 relevance : Relevance
     How well-suited this technique is for the vulnerability.
 rationale : str
@@ -70,7 +70,7 @@ class ThreatProfile()
 
 Complete evaluation mapping for a single vulnerability.
 
-A ``ThreatProfile`` answers the question:
+A `ThreatProfile` answers the question:
 
     &quot;Given vulnerability *X*, which datasets, attack techniques,
      objective, and metrics should an evaluation campaign use?&quot;
@@ -84,11 +84,11 @@ datasets : list[DatasetRecommendation]
 attacks : list[AttackRecommendation]
     Compatible attack techniques.
 objective : str
-    Default attack objective key (e.g. ``&quot;jailbreak&quot;``,
-    ``&quot;harmful_behavior&quot;``, ``&quot;policy_violation&quot;``).
+    Default attack objective key (e.g. `&quot;jailbreak&quot;`,
+    `&quot;harmful_behavior&quot;`, `&quot;policy_violation&quot;`).
 metrics : list[str]
     Metric names relevant to this vulnerability
-    (e.g. ``&quot;asr&quot;``, ``&quot;toxicity_score&quot;``, ``&quot;judge_score&quot;``).
+    (e.g. `&quot;asr&quot;`, `&quot;toxicity_score&quot;`, `&quot;judge_score&quot;`).
 description : str
     Human-readable summary of what the profile evaluates.
 

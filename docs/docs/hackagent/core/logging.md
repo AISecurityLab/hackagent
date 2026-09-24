@@ -15,5 +15,5 @@ levels. Handler configuration belongs to the application (the CLI does it in
 def get_logger(name: str) -> logging.Logger
 ```
 
-Return the logger called ``name`` without configuring it.
+Return the logger called `name` without configuring it.
 

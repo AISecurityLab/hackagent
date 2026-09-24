@@ -63,12 +63,12 @@ hackagent eval flipattack \
 <TabItem value="sdk" label="SDK">
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost",  # ignored — Hermes is local
+    "hermes",
     name="hermes",
-    endpoint="http://localhost",  # ignored — Hermes is local
-    agent_type="hermes",
     adapter_operational_config={
         "name": "hermes-4-70b",  # passed to `hermes -m`
         "binary": "hermes",      # path to the Hermes executable

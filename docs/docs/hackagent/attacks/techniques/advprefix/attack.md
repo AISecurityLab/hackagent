@@ -25,12 +25,12 @@ Implements a multi-stage pipeline that:
 
 1. **Generation** — uses an uncensored attacker LLM to produce
 candidate adversarial prefixes for each harmless meta-prompt.
-Prefixes are filtered by cross-entropy (``max_ce``) and token
+Prefixes are filtered by cross-entropy (`max_ce`) and token
 segment count before being passed downstream.
 2. **Execution** — appends each surviving prefix to the target model
-prompt and collects completions (``n_samples`` per prefix).
-3. **Selection** — on the new seam, ``ctx.judge.evaluate`` scores each
-completion and the top-``n_prefixes_per_goal`` prefixes per goal
+prompt and collects completions (`n_samples` per prefix).
+3. **Selection** — on the new seam, `ctx.judge.evaluate` scores each
+completion and the top-`n_prefixes_per_goal` prefixes per goal
 are kept. That is the only post-hoc path that attaches a verdict.
 The legacy constructor still uses :class:`EvaluationPipeline`.
 
@@ -41,7 +41,7 @@ The class delegates stage logic to dedicated sub-modules:
 filtering.
 * :mod:`~hackagent.attacks.techniques.advprefix.completions` for
 step 2.
-* :meth:`_evaluate_and_select` for step 3 (``ctx.judge.evaluate``, or
+* :meth:`_evaluate_and_select` for step 3 (`ctx.judge.evaluate`, or
 :class:`EvaluationPipeline` on the legacy constructor).
 
 Tracking is managed by
@@ -50,24 +50,24 @@ Tracking is managed by
 :class:`~hackagent.tracking.StepTracker` are created upfront so
 the dashboard shows all goals from the moment the run starts.
 
-Construct with ``(config, ctx)``. ``config`` is a dict deep-merged into
+Construct with `(config, ctx)`. `config` is a dict deep-merged into
 :data:`~hackagent.attacks.techniques.advprefix.config.DEFAULT_PREFIX_GENERATION_CONFIG`.
-There is no ``advprefix_params`` block and no
+There is no `advprefix_params` block and no
 :class:`~hackagent.attacks.techniques.config.ConfigBase` subclass;
-knobs stay at the top level of that dict. ``ctx`` is a
+knobs stay at the top level of that dict. `ctx` is a
 :class:`~hackagent.attacks.ports.RunContext`, passed positionally or
-as ``ctx=``. Tests build it with ``make_ctx()``
-(``tests.fakes.context``).
+as `ctx=`. Tests build it with `make_ctx()`
+(`tests.fakes.context`).
 
-The legacy constructor ``(config_dict, client, agent_router)`` is
-obsolete for new code. ``hackagent.orchestrator.runner`` constructs
-``(config, ctx)``. Selection on that path uses ``ctx.judge.evaluate``.
+The legacy constructor `(config_dict, client, agent_router)` is
+obsolete for new code. `hackagent.orchestrator.runner` constructs
+`(config, ctx)`. Selection on that path uses `ctx.judge.evaluate`.
 
 **Attributes**:
 
 - `config` - Merged AdvPrefix configuration dictionary.
 - `ctx` - RunContext on the new seam, otherwise None.
-- `logger` - Hierarchical logger at ``hackagent.attacks.advprefix``.
+- `logger` - Hierarchical logger at `hackagent.attacks.advprefix`.
 
 #### \_\_init\_\_
 
@@ -87,18 +87,18 @@ Initialize the AdvPrefix attack pipeline.
 - `config` - Optional dictionary of parameter overrides merged into
   :data:`~hackagent.attacks.techniques.advprefix.config.DEFAULT_PREFIX_GENERATION_CONFIG`
   using a deep-merge strategy (nested dicts are merged;
-  internal keys starting with ``_`` are passed by reference).
+  internal keys starting with `_` are passed by reference).
 - `ctx` - :class:`~hackagent.attacks.ports.RunContext`. Positional
-  or ``ctx=``. Tests use ``make_ctx()``. Selection then calls
-  ``ctx.judge.evaluate``.
+  or `ctx=`. Tests use `make_ctx()`. Selection then calls
+  `ctx.judge.evaluate`.
 - `client` - Obsolete. Store instance on the orchestrator path.
 - `agent_router` - Obsolete. Target router on the orchestrator path.
   
 
 **Raises**:
 
-- `ValueError` - On the legacy path, if ``client`` or
-  ``agent_router`` is ``None``.
+- `ValueError` - On the legacy path, if `client` or
+  `agent_router` is `None`.
 
 #### run
 

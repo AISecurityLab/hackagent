@@ -15,7 +15,7 @@ def normalize_embedding_endpoint(endpoint: str,
 
 Return an OpenAI-compatible API base, not a full embeddings URL.
 
-Ollama&#x27;s native endpoint spellings select its compatible ``/v1`` API.
+Ollama&#x27;s native endpoint spellings select its compatible `/v1` API.
 Preserve reverse-proxy prefixes and custom OpenAI-compatible API paths.
 
 #### embedding\_request\_kwargs

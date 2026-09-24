@@ -14,11 +14,7 @@ across all attack techniques for consistent visual feedback during execution.
 class NullProgress()
 ```
 
-Null progress bar implementation for TUI mode.
-
-When running in TUI mode (NO_COLOR=1), progress bars are disabled
-to avoid conflicts with the TUI display. This class provides a
-no-op implementation that matches the Progress API.
+No-op progress bar with the same methods as a Rich `Progress`.
 
 #### create\_progress\_bar
 
@@ -65,8 +61,7 @@ The progress bar includes:
 **Notes**:
 
   The progress bar automatically starts and stops when entering/exiting
-  the context manager. In TUI mode (NO_COLOR=1), a null progress bar
-  is used to avoid display conflicts.
+  the context manager.
 
 #### report\_progress
 
@@ -76,6 +71,6 @@ def report_progress(events: Any, fraction: float, message: str = "") -> None
 
 Report progress through an :class:`~hackagent.attacks.ports.Events` sink.
 
-Techniques should prefer this over Rich bars when a ``RunContext`` is
-available. *events* may be ``None`` (no-op) for legacy construction.
+Techniques should prefer this over Rich bars when a `RunContext` is
+available. *events* may be `None` (no-op) for legacy construction.
 

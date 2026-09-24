@@ -13,7 +13,7 @@ from the taxonomy.  For each technique:
 4. Evaluate the response with a judge.
 5. If the judge confirms a jailbreak → early stop.
 
-Uses the same inline ``_StepJudge`` pattern as BoN for judge evaluation
+Uses the same inline `_StepJudge` pattern as BoN for judge evaluation
 inside the generation loop.
 
 Based on: https://arxiv.org/abs/2401.06373

@@ -5,13 +5,13 @@ title: hackagent.models.factory
 
 Build role-model LLMs, with credentials from :class:`Settings`.
 
-:class:`ModelFactory` implements the ``LLMFactory`` protocol. A role model
+:class:`ModelFactory` implements the `LLMFactory` protocol. A role model
 uses the key its spec names. The only credential the factory adds is the
 HackAgent API key, and only for a spec whose endpoint is the hosted LLM
 gateway; it is never sent to any other provider.
 
 :func:`spec_from_config` reads the role-model dicts attack configs still
-use (``identifier``, ``endpoint``, ``agent_type``, ``api_key`` given as a
+use (`identifier`, `endpoint`, `agent_type`, `api_key` given as a
 literal or an environment variable name, ...).
 
 #### PASSTHROUGH\_REQUEST\_KEYS
@@ -24,7 +24,7 @@ Provider request parameters a role config may set.
 def passthrough_params(config: Mapping[str, Any]) -> Dict[str, Any]
 ```
 
-Return the provider request parameters set in ``config``.
+Return the provider request parameters set in `config`.
 
 #### spec\_from\_config
 
@@ -38,16 +38,16 @@ def spec_from_config(
 
 Build a spec from a role-model config dict.
 
-A missing or invalid ``agent_type`` becomes ``default_agent_type``.
-``model`` overrides ``identifier`` as the model name; ``request_timeout``
-is accepted for ``timeout``; keys under ``agent_metadata`` fill any the
-config leaves unset. ``thinking`` is kept only for Ollama, which is the
-only role-model type that has ever honoured it. Fields of ``spec_type``
-beyond :class:`ModelSpec` (e.g. ``system_prompt``) are read too.
+A missing or invalid `agent_type` becomes `default_agent_type`.
+`model` overrides `identifier` as the model name; `request_timeout`
+is accepted for `timeout`; keys under `agent_metadata` fill any the
+config leaves unset. `thinking` is kept only for Ollama, which is the
+only role-model type that has ever honoured it. Fields of `spec_type`
+beyond :class:`ModelSpec` (e.g. `system_prompt`) are read too.
 
 **Raises**:
 
-- `ValueError` - If the config has no ``identifier``.
+- `ValueError` - If the config has no `identifier`.
 
 ## ModelFactory Objects
 
@@ -55,7 +55,7 @@ beyond :class:`ModelSpec` (e.g. ``system_prompt``) are read too.
 class ModelFactory()
 ```
 
-Builds the LLM for a role model. Implements ``LLMFactory``.
+Builds the LLM for a role model. Implements `LLMFactory`.
 
 #### is\_gateway
 
@@ -63,7 +63,7 @@ Builds the LLM for a role model. Implements ``LLMFactory``.
 def is_gateway(endpoint: Optional[str]) -> bool
 ```
 
-Whether ``endpoint`` is the hosted LLM gateway of a remote run.
+Whether `endpoint` is the hosted LLM gateway of a remote run.
 
 #### with\_credentials
 

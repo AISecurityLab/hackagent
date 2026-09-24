@@ -142,13 +142,12 @@ print(all_datasets)
 ### With HackAgent SDK
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
 
-agent = HackAgent(
-    endpoint="http://localhost:8080/chat",
+agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
+    "http://localhost:8080/chat",
     name="my-agent",
-    api_key="your-api-key",
 )
 
 # Use profile-recommended dataset
@@ -206,13 +205,12 @@ for atk in PROMPT_INJECTION_PROFILE.attacks:
 ### Example: Multi-Attack Campaign
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 
-agent = HackAgent(
-    endpoint="http://localhost:8080/chat",
+agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
+    "http://localhost:8080/chat",
     name="my-agent",
-    api_key="your-api-key",
 )
 
 # Run all primary attacks
@@ -234,13 +232,12 @@ for atk in JAILBREAK_PROFILE.primary_attacks:
 ### Single Vulnerability Campaign
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 
-agent = HackAgent(
-    endpoint="http://localhost:8080/chat",
+agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
+    "http://localhost:8080/chat",
     name="security-audit",
-    api_key="your-api-key",
 )
 
 # Run with the top primary dataset and primary attack
@@ -260,15 +257,14 @@ print(f"ASR: {result.get('asr')}")
 ### Multiple Vulnerability Campaign
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
 from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 from hackagent.catalog.risks.system_prompt_leakage import SYSTEM_PROMPT_LEAKAGE_PROFILE
 
-agent = HackAgent(
-    endpoint="http://localhost:8080/chat",
+agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
+    "http://localhost:8080/chat",
     name="security-audit",
-    api_key="your-api-key",
 )
 
 profiles = [
@@ -299,7 +295,7 @@ for profile in profiles:
 ### Comprehensive Audit (All Vulnerabilities)
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
 # Import all profiles
 from hackagent.catalog.risks.model_evasion import MODEL_EVASION_PROFILE
@@ -322,10 +318,9 @@ from hackagent.catalog.risks.malicious_tool_invocation import MALICIOUS_TOOL_INV
 from hackagent.catalog.risks.credential_exposure import CREDENTIAL_EXPOSURE_PROFILE
 from hackagent.catalog.risks.misinformation import MISINFORMATION_PROFILE
 
-agent = HackAgent(
-    endpoint="http://localhost:8080/chat",
+agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
+    "http://localhost:8080/chat",
     name="comprehensive-audit",
-    api_key="your-api-key",
 )
 
 profiles = [
@@ -450,15 +445,14 @@ for p in all_profiles:
 Focus on the highest-impact vulnerabilities with fast Static Template attacks:
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
 from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 from hackagent.catalog.risks.misinformation import MISINFORMATION_PROFILE
 
-agent = HackAgent(
-    endpoint="http://localhost:8080/chat",
+agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
+    "http://localhost:8080/chat",
     name="quick-scan",
-    api_key="your-api-key",
 )
 
 quick_profiles = [
@@ -483,14 +477,13 @@ for profile in quick_profiles:
 Focus on vulnerabilities specific to AI agents with tool use:
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 from hackagent.catalog.risks.excessive_agency import EXCESSIVE_AGENCY_PROFILE
 from hackagent.catalog.risks.malicious_tool_invocation import MALICIOUS_TOOL_INVOCATION_PROFILE
 
-agent = HackAgent(
-    endpoint="http://localhost:8080/chat",
+agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
+    "http://localhost:8080/chat",
     name="agent-audit",
-    api_key="your-api-key",
 )
 
 agentic_profiles = [
@@ -527,16 +520,15 @@ for profile in agentic_profiles:
 Test vulnerabilities specific to Retrieval-Augmented Generation systems:
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 from hackagent.catalog.risks.vector_embedding_weaknesses_exploit import (
     VECTOR_EMBEDDING_WEAKNESSES_EXPLOIT_PROFILE
 )
 from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
 
-agent = HackAgent(
-    endpoint="http://localhost:8080/chat",
+agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
+    "http://localhost:8080/chat",
     name="rag-testing",
-    api_key="your-api-key",
 )
 
 rag_profiles = [

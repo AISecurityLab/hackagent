@@ -40,13 +40,13 @@ techniques are skipped (early stop).
 
 Pipeline:
     1. Generation — persuasive paraphrasing, target query, and an
-       inline judge. On ``BaseAttack(config, ctx)`` that judge is
-       ``ctx.judge.score`` via
+       inline judge. On `BaseAttack(config, ctx)` that judge is
+       `ctx.judge.score` via
        :class:`~hackagent.attacks._lib.inline_judge.CtxJudgeAdapter`.
-       ``InlineStepJudge`` remains the fallback when ``ctx`` is absent.
+       `InlineStepJudge` remains the fallback when `ctx` is absent.
 
-Construct with ``(config, ctx)``. Tests build ``ctx`` with
-``make_ctx()``. The legacy constructor is obsolete for new code.
+Construct with `(config, ctx)`. Tests build `ctx` with
+`make_ctx()`. The legacy constructor is obsolete for new code.
 :class:`~hackagent.attacks.techniques.pap.config.PAPConfig` still
 subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
 
@@ -61,9 +61,9 @@ def __init__(config: Optional[Dict[str, Any]] = None,
              client: Optional[Store] = None)
 ```
 
-Initialize PAP with ``(config, ctx)`` or the legacy constructor.
+Initialize PAP with `(config, ctx)` or the legacy constructor.
 
-On the new seam, generation scores with ``ctx.judge.score``.
+On the new seam, generation scores with `ctx.judge.score`.
 
 #### run
 

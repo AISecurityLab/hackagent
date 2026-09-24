@@ -3,7 +3,7 @@
 
 """Sequential attack chains.
 
-``hack_chain`` runs each step through :meth:`HackAgent.hack`. By default a
+``hack_chain`` runs each step through :meth:`hackagent.client.Target.hack`. By default a
 goal that already succeeded is not retried. The CLI quick scan uses this
 instead of reimplementing the jailbreak campaign.
 """

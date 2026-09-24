@@ -44,13 +44,13 @@ Ollama is a lightweight framework for running large language models locally. Hac
 ### Initialize HackAgent Client
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
 # Configure for Ollama
-agent = HackAgent(
-	name="llama3",  # Model name in Ollama
-	endpoint="http://localhost:11434",
-	agent_type="ollama",
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:11434",
+    "ollama",
+    name="llama3",  # Model name in Ollama
 )
 ```
 
@@ -65,7 +65,7 @@ agent = HackAgent(
 ### Basic AdvPrefix Attack
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
 
 def main():
@@ -73,10 +73,10 @@ def main():
 
 	# Initialize HackAgent for an Ollama-based agent
 	# By default, Ollama runs on http://localhost:11434
-	agent = HackAgent(
-		name="llama3",  # Model name in Ollama
-		endpoint="http://localhost:11434",
-		agent_type="ollama",
+	agent = HackAgent(Settings.resolve()).target(
+	    "http://localhost:11434",
+	    "ollama",
+	    name="llama3",  # Model name in Ollama
 	)
 
 	# Configure the attack
@@ -109,25 +109,26 @@ if __name__ == "__main__":
 You can test any model installed in Ollama:
 
 ```python
+from hackagent import HackAgent, Settings
 # Test Mistral
-agent = HackAgent(
-	name="mistral",
-	endpoint="http://localhost:11434",
-	agent_type="ollama",
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:11434",
+    "ollama",
+    name="mistral",
 )
 
 # Test CodeLlama
-agent = HackAgent(
-	name="codellama",
-	endpoint="http://localhost:11434",
-	agent_type="ollama",
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:11434",
+    "ollama",
+    name="codellama",
 )
 
 # Test a custom/fine-tuned model
-agent = HackAgent(
-	name="my-custom-model",
-	endpoint="http://localhost:11434",
-	agent_type="ollama",
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:11434",
+    "ollama",
+    name="my-custom-model",
 )
 ```
 
@@ -213,10 +214,11 @@ ollama list
 To connect to a remote Ollama server:
 
 ```python
-agent = HackAgent(
-	name="llama3",
-	endpoint="http://your-server:11434",
-	agent_type="ollama",
+from hackagent import HackAgent, Settings
+agent = HackAgent(Settings.resolve()).target(
+    "http://your-server:11434",
+    "ollama",
+    name="llama3",
 )
 ```
 

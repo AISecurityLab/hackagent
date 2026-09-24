@@ -19,7 +19,7 @@ Run-scoped directory and in-memory caches.
 def build_panel(config: Dict[str, Any], models: LLMFactory) -> Optional[Panel]
 ```
 
-Build a panel from the run&#x27;s judge specs, or ``None`` when unset.
+Build a panel from the run&#x27;s judge specs, or `None` when unset.
 
 #### build\_context
 

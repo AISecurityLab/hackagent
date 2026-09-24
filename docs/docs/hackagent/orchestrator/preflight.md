@@ -5,8 +5,8 @@ title: hackagent.orchestrator.preflight
 
 Reachability checks before a run creates records.
 
-Targets come from ``config.roles()`` (via the technique&#x27;s
-``get_effective_model_roles``), the victim model, and the category
+Targets come from `config.roles()` (via the technique&#x27;s
+`get_effective_model_roles`), the victim model, and the category
 classifier when goals are not already labelled.
 
 #### validate\_default\_classifier
@@ -47,7 +47,7 @@ Return an error string when a required model is unreachable.
 def probe_embedding_target(target: Dict[str, Any]) -> Optional[str]
 ```
 
-Verify an embedding endpoint. ``None`` means reachable.
+Verify an embedding endpoint. `None` means reachable.
 
 #### probe\_model\_target
 
@@ -55,7 +55,7 @@ Verify an embedding endpoint. ``None`` means reachable.
 def probe_model_target(target: Dict[str, Any]) -> Optional[str]
 ```
 
-Probe one target. ``None`` means reachable.
+Probe one target. `None` means reachable.
 
 #### probe\_router
 
@@ -63,7 +63,7 @@ Probe one target. ``None`` means reachable.
 def probe_router(router: Any, registration_key: str) -> Optional[str]
 ```
 
-Tiny completion, or ``probe_ready`` when the adapter has one.
+Tiny completion, or `probe_ready` when the adapter has one.
 
 #### target\_from\_agent
 

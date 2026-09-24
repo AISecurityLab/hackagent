@@ -21,13 +21,9 @@ try:
 except ImportError:
     tomllib = None  # Python < 3.11 fallback handled in get_current_version()
 
-# Prefixes excluded from API docs (CLI internals, web UI serving layer, and the
-# generated HTTP client that is private to hackagent.storage.remote)
-_EXCLUDE_PREFIXES = (
-    "hackagent.interfaces.cli",
-    "hackagent.interfaces.web",
-    "hackagent.storage._http",
-)
+# The generated HTTP client is private to hackagent.storage.remote.
+# hackagent.client and hackagent.interfaces (cli, tui, web) are documented.
+_EXCLUDE_PREFIXES = ("hackagent.storage._http",)
 
 
 def _sanitize_mdx(text: str) -> str:
@@ -83,6 +79,22 @@ def _sanitize_mdx(text: str) -> str:
         result.append("".join(escaped_parts))
 
     return "\n".join(result)
+
+
+def _publish_interface_pages(docs_dir: Path) -> None:
+    """Give web package pages names the docs plugin does not exclude.
+
+    ``exclude`` drops ``_*.md`` (partials and ``_version.md``). The web
+    package page is ``__init__.md`` and its helpers are ``_*.md``.
+    """
+    web = docs_dir / "hackagent" / "interfaces" / "web"
+    if not web.is_dir():
+        return
+    init = web / "__init__.md"
+    if init.exists():
+        init.replace(web / "index.md")
+    for path in sorted(web.glob("_*.md")):
+        path.replace(web / path.name[1:])
 
 
 def _sanitize_generated_docs(docs_dir: Path) -> None:
@@ -314,9 +326,6 @@ def generate_docs(version: str) -> None:
             description="Generating documentation",
         )
 
-        # Fix MDX incompatibilities in generated files
-        _sanitize_generated_docs(docs_dir)
-
         index_content = f"""---
 sidebar_position: 1
 ---
@@ -328,7 +337,14 @@ in the HackAgent Python SDK, auto-generated from source-code docstrings.
 
 ## What's Included
 
-- **Core**: `HackAgent` agent class, errors, and utilities
+- **Client**: Depth-2 `hackagent.client`. `HackAgent(Settings)` does not
+  take a target. `.target(...).hack()` and `.hack_chain()` both take
+  `on_event`. Reads, `catalog`, `presets`, `plan_attack`, `doctor`, and
+  `check_connection` live on the session.
+- **Interfaces**: Depth-3 `hackagent.interfaces` (CLI, TUI, web). They talk
+  only to the facade. TUI forms come from technique JSON schema. The web UI
+  is `hackagent.interfaces.web`.
+- **Core**: Settings, contracts, errors, and utilities
 - **Evaluation**: Depth-0 `hackagent.evaluation`. `Panel` scores a `Sample`
   into a `Verdict`. Judges, pattern evaluators, and verdict metrics live here.
 - **Tracking**: Depth-0 `hackagent.tracking`. `Tracker` implements the
@@ -371,6 +387,11 @@ For practical usage examples, see the [Python SDK Quickstart](./sdk/python-quick
                 else:
                     shutil.copy2(item, target)
             shutil.rmtree(reference_dir)
+
+        # pydoc-markdown may write under reference/ and the copy above lands
+        # after the first pass. Sanitize once the pages are in place.
+        _sanitize_generated_docs(docs_dir)
+        _publish_interface_pages(docs_dir)
 
         print(f"✅ Documentation generated in {docs_dir}")
         print("\n🔧 To view: cd docs && npm start")

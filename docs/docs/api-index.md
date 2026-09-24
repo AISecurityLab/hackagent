@@ -9,7 +9,14 @@ in the HackAgent Python SDK, auto-generated from source-code docstrings.
 
 ## What's Included
 
-- **Core**: `HackAgent` agent class, errors, and utilities
+- **Client**: Depth-2 `hackagent.client`. `HackAgent(Settings)` does not
+  take a target. `.target(...).hack()` and `.hack_chain()` both take
+  `on_event`. Reads, `catalog`, `presets`, `plan_attack`, `doctor`, and
+  `check_connection` live on the session.
+- **Interfaces**: Depth-3 `hackagent.interfaces` (CLI, TUI, web). They talk
+  only to the facade. TUI forms come from technique JSON schema. The web UI
+  is `hackagent.interfaces.web`.
+- **Core**: Settings, contracts, errors, and utilities
 - **Evaluation**: Depth-0 `hackagent.evaluation`. `Panel` scores a `Sample`
   into a `Verdict`. Judges, pattern evaluators, and verdict metrics live here.
 - **Tracking**: Depth-0 `hackagent.tracking`. `Tracker` implements the

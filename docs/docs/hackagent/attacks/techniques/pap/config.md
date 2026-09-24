@@ -5,7 +5,7 @@ title: hackagent.attacks.techniques.pap.config
 
 Configuration for PAP (Persuasive Adversarial Prompts) attack.
 
-Provides ``DEFAULT_PAP_CONFIG`` and typed Pydantic models for the PAP attack.
+Provides `DEFAULT_PAP_CONFIG` and typed Pydantic models for the PAP attack.
 
 The attack uses a taxonomy of 40 persuasion techniques to paraphrase harmful
 prompts into persuasive variants.  An attacker LLM performs the paraphrasing
@@ -32,11 +32,11 @@ Hyperparameters controlling the PAP attack.
 
 **Attributes**:
 
-- `techniques` - Which persuasion techniques to use.  ``&quot;top5&quot;`` selects
-  the five most effective techniques from the paper.  ``&quot;all&quot;``
+- `techniques` - Which persuasion techniques to use.  `&quot;top5&quot;` selects
+  the five most effective techniques from the paper.  `&quot;all&quot;`
   uses all 40.  A list of strings selects specific techniques.
 - `max_techniques_per_goal` - Upper bound on the number of techniques to
-  try per goal.  ``0`` means try all selected techniques.
+  try per goal.  `0` means try all selected techniques.
 - `attacker_temperature` - Sampling temperature for the attacker LLM.
 - `attacker_max_tokens` - Maximum tokens for the attacker LLM response.
 

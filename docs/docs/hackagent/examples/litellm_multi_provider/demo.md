@@ -9,13 +9,13 @@ The same HackAgent attack configuration works against any of the
 ~140 providers LiteLLM understands. The only thing that changes
 between providers is:
 
-  1. The ``model`` string (prefixed with the LiteLLM provider name).
+  1. The `model` string (prefixed with the LiteLLM provider name).
   2. The provider&#x27;s API key environment variable.
 
-This script picks a provider by ``--provider`` flag (or
-``HACKAGENT_PROVIDER`` env var, default ``anthropic``) and runs a
+This script picks a provider by `--provider` flag (or
+`HACKAGENT_PROVIDER` env var, default `anthropic`) and runs a
 short TAP attack against it. Use it as a starting point for adapting
-the existing ``examples/openai_sdk`` or ``examples/ollama`` demos to
+the existing `examples/openai_sdk` or `examples/ollama` demos to
 a different cloud LLM.
 
 Usage:
@@ -54,9 +54,9 @@ def build_demo_config(provider: str) -> dict
 
 Return the HackAgent config for the chosen provider.
 
-The structure is identical to ``examples/ollama/demo.py``; only the
-``agent_type`` becomes ``AgentType.LITELLM`` and the model
-strings carry a provider prefix (``anthropic/…``, ``gemini/…``…).
+The structure is identical to `examples/ollama/demo.py`; only the
+`agent_type` becomes `AgentType.LITELLM` and the model
+strings carry a provider prefix (`anthropic/…`, `gemini/…`…).
 
 #### run\_demo
 
@@ -64,5 +64,5 @@ strings carry a provider prefix (``anthropic/…``, ``gemini/…``…).
 def run_demo(provider: str) -> object
 ```
 
-Build the config for ``provider`` and execute the attack.
+Build the config for `provider` and execute the attack.
 

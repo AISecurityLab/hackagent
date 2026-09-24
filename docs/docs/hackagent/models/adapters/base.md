@@ -16,7 +16,7 @@ This module provides:
 def get_litellm()
 ```
 
-Import litellm lazily. Returns ``(module, is_available)``.
+Import litellm lazily. Returns `(module, is_available)`.
 
 ## AdapterConfigurationError Objects
 

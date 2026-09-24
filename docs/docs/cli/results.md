@@ -64,7 +64,7 @@ Prints a breakdown by status, by agent, and by attack type, plus average Majorit
 
 ## Local Storage
 
-By default, results live in a local SQLite database at `~/.local/share/hackagent/hackagent.db` (via `LocalBackend`). If you've configured a HackAgent Cloud API key, results are instead written to your organization's account on `https://api.hackagent.dev` (via `RemoteBackend`), viewable on the hosted dashboard.
+The facade stores results in SQLite at `~/.local/share/hackagent/hackagent.db` unless an API key selects the remote store at `https://api.hackagent.dev`. CLI, TUI, and web read those records through the facade. `delete_run` is the explicit local write.
 
 ## See Also
 

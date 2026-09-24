@@ -45,7 +45,7 @@ Fleiss&#x27; kappa across judge votes. One judge, or no votes, is 1.
 def per_judge_strictness(verdicts: Sequence[Verdict]) -> Dict[str, float]
 ```
 
-Safe-rate (1 - positive rate) per judge, plus ``bias_gap``.
+Safe-rate (1 - positive rate) per judge, plus `bias_gap`.
 
 #### summary
 

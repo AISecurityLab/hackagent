@@ -7,14 +7,14 @@ h4rm3l decorator engine — self-contained reimplementation of the h4rm3l
 prompt decoration framework.
 
 This module provides:
-- :class:`PromptDecorator`: base class with ``.decorate()`` and ``.then()``
+- :class:`PromptDecorator`: base class with `.decorate()` and `.then()`
 - All concrete decorator classes from the h4rm3l paper
 - :func:`compile_program`: compiles a program string into a callable
 - :func:`set_prompting_interface`: injects an LLM caller for assisted decorators
 
 The code is derived from the original h4rm3l codebase
 (https://github.com/mdoumbouya/h4rm3l) and adapted to work without any
-external ``h4rm3l`` dependency.
+external `h4rm3l` dependency.
 
 Based on: Doumbouya et al., &quot;h4rm3l: A Dynamic Benchmark of Composable
 Jailbreak Attacks for LLM Safety Assessment&quot; (2024)
@@ -30,7 +30,7 @@ Set the global LLM prompting function.
 
 **Arguments**:
 
-- `fn` - Callable with signature ``fn(prompt, maxtokens=500, temperature=1.0) -&gt; str``.
+- `fn` - Callable with signature `fn(prompt, maxtokens=500, temperature=1.0) -&gt; str`.
 
 #### get\_prompting\_interface
 
@@ -182,7 +182,7 @@ Inserts random colour names.
 class HexStringMixInDecorator(WordMixInDecorator)
 ```
 
-Inserts random hex strings like ``{&lt;A1B2C3&gt;}``.
+Inserts random hex strings like `{&lt;A1B2C3&gt;}`.
 
 ## MilitaryWordsMixInDecorator Objects
 
@@ -234,7 +234,7 @@ Prepends rules that suppress refusal patterns.
 
 **Arguments**:
 
-- `suppression_message` - Custom suppression text, or ``None`` for default.
+- `suppression_message` - Custom suppression text, or `None` for default.
 
 ## AffirmativePrefixInjectionDecorator Objects
 
@@ -297,7 +297,7 @@ persona to bypass safety filters.
 
 **Arguments**:
 
-- `persuasion_prompt` - Custom persuasion instruction, or ``None`` for default.
+- `persuasion_prompt` - Custom persuasion instruction, or `None` for default.
 
 ## SynonymDecorator Objects
 
@@ -333,7 +333,7 @@ Uses the LLM to wrap the prompt in a persona/scenario context.
 
 **Arguments**:
 
-- `persona_prompt` - Custom persona instruction, or ``None`` for default.
+- `persona_prompt` - Custom persona instruction, or `None` for default.
 
 ## PAPDecorator Objects
 
@@ -361,7 +361,7 @@ Based on: https://arxiv.org/pdf/2308.06463
 
 **Arguments**:
 
-- `cipher_message` - Custom cipher instruction, or ``None`` for default.
+- `cipher_message` - Custom cipher instruction, or `None` for default.
 
 ## ChainofThoughtDecorator Objects
 
@@ -393,7 +393,7 @@ The examples prime the model to respond helpfully to the actual query.
 
 **Arguments**:
 
-- `task_message` - Custom few-shot task message, or ``None`` for default.
+- `task_message` - Custom few-shot task message, or `None` for default.
 
 ## WikipediaDecorator Objects
 
@@ -405,7 +405,7 @@ Asks the model to write a Wikipedia article about the topic.
 
 **Arguments**:
 
-- `wikipedia_message` - Custom instruction, or ``None`` for default.
+- `wikipedia_message` - Custom instruction, or `None` for default.
 
 ## DistractorDecorator Objects
 
@@ -417,7 +417,7 @@ Embeds the prompt among distractor tasks.
 
 **Arguments**:
 
-- `distractor_message` - Custom distractor template with ``%s`` placeholder.
+- `distractor_message` - Custom distractor template with `%s` placeholder.
 
 ## AIMDecorator Objects
 
@@ -463,7 +463,7 @@ Based on: https://arxiv.org/pdf/2307.15043
 
 **Arguments**:
 
-- `uta_type` - One of ``&quot;chatgpt&quot;``, ``&quot;bard&quot;``, ``&quot;llama&quot;`` for the
+- `uta_type` - One of `&quot;chatgpt&quot;`, `&quot;bard&quot;`, `&quot;llama&quot;` for the
   appropriate adversarial suffix.
 
 ## TemplateDecorator Objects
@@ -501,15 +501,15 @@ class TransformFxDecorator(PromptDecorator)
 
 Applies an arbitrary Python function to the prompt.
 
-The ``transform_fx`` string must define a function
-``transform(prompt, assistant, random_state)`` where:
-- ``prompt``: the input string
-- ``assistant``: LLM prompting function (may be a no-op)
-- ``random_state``: ``numpy.random.RandomState`` instance
+The `transform_fx` string must define a function
+`transform(prompt, assistant, random_state)` where:
+- `prompt`: the input string
+- `assistant`: LLM prompting function (may be a no-op)
+- `random_state`: `numpy.random.RandomState` instance
 
 **Arguments**:
 
-- `transform_fx` - Python source code defining ``transform``.
+- `transform_fx` - Python source code defining `transform`.
 - `seed` - Random seed for the internal RandomState.
 
 #### compile\_program\_with\_steps
@@ -535,17 +535,17 @@ Compile a decorator program string into a callable.
 **Arguments**:
 
 - `program` - The program string (either v1 or v2 syntax).
-- `syntax_version` - ``1`` for semicolon-separated, ``2`` for ``.then()``.
+- `syntax_version` - `1` for semicolon-separated, `2` for `.then()`.
   
 
 **Returns**:
 
-  A function ``(prompt: str) -&gt; str`` that applies the decorator chain.
+  A function `(prompt: str) -&gt; str` that applies the decorator chain.
   
 
 **Raises**:
 
-- `ValueError` - If ``syntax_version`` is not 1 or 2.
+- `ValueError` - If `syntax_version` is not 1 or 2.
 - `SyntaxError` - If the program string cannot be compiled.
 
 #### program\_uses\_llm\_assisted\_decorators

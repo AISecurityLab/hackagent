@@ -6,7 +6,7 @@ sidebar_position: 1
 
 The HackAgent SDK provides a powerful interface for conducting AI security testing programmatically.
 
-For installation instructions, see the [Installation Guide](../getting-started/installation.mdx).
+Construct a session with `HackAgent(Settings.resolve())`, then bind a victim with `.target(...).hack()`. See the [Client](../client/index.md) guide. For installation, see the [Installation Guide](../getting-started/installation.mdx).
 
 ## Overview
 
@@ -26,22 +26,20 @@ from hackagent import HackAgent, AgentType
 ### Your First Security Test
 
 ```python
-from hackagent import HackAgent, AgentType
+from hackagent import HackAgent, AgentType, Settings
 
 # Default: local mode (SQLite in ~/.local/share/hackagent/hackagent.db)
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:8000",
+    AgentType.GOOGLE_ADK,
     name="multi_tool_agent",
-    endpoint="http://localhost:8000",
-    agent_type=AgentType.GOOGLE_ADK,
 )
 
 # Remote mode example (cloud sync)
-remote_agent = HackAgent(
+remote_agent = HackAgent(Settings.resolve(api_key=os.getenv("HACKAGENT_API_KEY"), base_url=os.getenv("HACKAGENT_BASE_URL", "https://api.hackagent.dev"))).target(
+    "http://localhost:8000",
+    AgentType.GOOGLE_ADK,
     name="multi_tool_agent",
-    endpoint="http://localhost:8000",
-    agent_type=AgentType.GOOGLE_ADK,
-    api_key=os.getenv("HACKAGENT_API_KEY"),
-    base_url=os.getenv("HACKAGENT_BASE_URL", "https://api.hackagent.dev"),
 )
 
 # Configure the attack
@@ -72,14 +70,14 @@ results = agent.hack(attack_config=attack_config)
 
 ```python
 import os
-from hackagent import HackAgent, AgentType
+from hackagent import HackAgent, AgentType, Settings
 
 def test_adk_attack_scenario():
     # Initialize HackAgent client
-    agent = HackAgent(
+    agent = HackAgent(Settings.resolve()).target(
+        os.getenv("AGENT_URL"),
+        AgentType.GOOGLE_ADK,
         name="multi_tool_agent",
-        endpoint=os.getenv("AGENT_URL"),
-        agent_type=AgentType.GOOGLE_ADK,
     )
 
     # Configure AdvPrefix attack
@@ -125,13 +123,16 @@ AgentType.UNKNOWN       # Unknown/fallback type
 For Google ADK agents, the SDK automatically handles session management:
 
 ```python
+from hackagent import HackAgent, Settings
 agent = HackAgent(
-    name="multi_tool_agent",           # ADK app name
-    endpoint="http://localhost:8000",   # ADK server endpoint
-    agent_type=AgentType.GOOGLE_ADK,
+    Settings.resolve(),
     # Optional parameters:
-    timeout=120,                       # HackAgent backend API client timeout (not the ADK request timeout)
-    raise_on_unexpected_status=False   # Handle HTTP errors gracefully
+    timeout=120,  # HackAgent backend API client timeout (not the ADK request timeout)
+    raise_on_unexpected_status=False,  # Handle HTTP errors gracefully
+).target(
+    "http://localhost:8000",  # ADK server endpoint
+    AgentType.GOOGLE_ADK,
+    name="multi_tool_agent",  # ADK app name
 )
 ```
 
@@ -140,10 +141,11 @@ agent = HackAgent(
 For LiteLLM-based agents supporting multiple LLM providers:
 
 ```python
-agent = HackAgent(
+from hackagent import HackAgent, Settings
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:8000/v1/chat/completions",
+    AgentType.LITELLM,
     name="litellm_agent",
-    endpoint="http://localhost:8000/v1/chat/completions",
-    agent_type=AgentType.LITELLM,
 )
 ```
 
@@ -152,10 +154,11 @@ agent = HackAgent(
 For OpenAI API compatible agents:
 
 ```python
-agent = HackAgent(
+from hackagent import HackAgent, Settings
+agent = HackAgent(Settings.resolve()).target(
+    "https://api.openai.com/v1/chat/completions",
+    AgentType.OPENAI_SDK,
     name="openai_agent",
-    endpoint="https://api.openai.com/v1/chat/completions",
-    agent_type=AgentType.OPENAI_SDK,
 )
 ```
 

@@ -52,13 +52,13 @@ graph TD
 ### Simple Configuration
 
 ```python
-from hackagent import HackAgent, AgentType
+from hackagent import HackAgent, AgentType, Settings
 
 # Initialize HackAgent
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:8000",
+    AgentType.GOOGLE_ADK,
     name="target_agent",
-    endpoint="http://localhost:8000",
-    agent_type=AgentType.GOOGLE_ADK
 )
 
 # Basic AdvPrefix configuration

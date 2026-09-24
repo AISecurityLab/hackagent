@@ -92,12 +92,12 @@ hackagent claude --no-tui --dry-run
 Run the target through the Claude Code CLI:
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost",  # ignored for local Claude Code
+    "claude-code",
     name="claude-code",
-    endpoint="http://localhost",  # ignored for local Claude Code
-    agent_type="claude-code",
     adapter_operational_config={
         "name": "claude-opus-4-8",  # passed to `claude --model`
         "binary": "claude",         # path to the Claude Code executable
@@ -119,12 +119,12 @@ results = agent.hack(attack_config={
 Run the target through Ollama:
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost",  # ignored for local Claude Code
+    "claude-code",
     name="claude-code",
-    endpoint="http://localhost",  # ignored for local Claude Code
-    agent_type="claude-code",
     adapter_operational_config={
         "name": "gemma4",   # passed to `ollama launch claude --model`
         "binary": "ollama", # path to the Ollama executable

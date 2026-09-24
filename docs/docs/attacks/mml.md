@@ -102,13 +102,13 @@ Two prompt framing styles control how the VLM is instructed to decode the image:
 ### Simple Configuration
 
 ```python
-from hackagent import HackAgent, AgentType
+from hackagent import HackAgent, AgentType, Settings
 
 # Initialize HackAgent with a Vision-Language Model target
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:8000",
+    AgentType.OPENAI_SDK,
     name="target_vlm",
-    endpoint="http://localhost:8000",
-    agent_type=AgentType.OPENAI_SDK
 )
 
 # Basic MML configuration (word_replacement mode, game style)

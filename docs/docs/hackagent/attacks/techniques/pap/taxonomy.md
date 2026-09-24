@@ -56,7 +56,7 @@ def extract_mutated_text(response: str) -> str
 
 Extract the mutated adversarial prompt from the attacker LLM response.
 
-Looks for the ```mutated_text_with_same_specific_harmful_or_unlawful_intention`:``
+Looks for the ``mutated_text_with_same_specific_harmful_or_unlawful_intention`:`
 tag in the response.  Falls back to the full response if the tag is missing.
 
 **Arguments**:

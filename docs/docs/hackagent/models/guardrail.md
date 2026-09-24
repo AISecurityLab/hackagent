@@ -6,10 +6,10 @@ title: hackagent.models.guardrail
 Guardrails around a model: check prompts before, and responses after.
 
 A guardrail classifies text as safe or unsafe. :class:`Guarded` wraps an
-LLM with an optional ``before`` guardrail (checks the prompt; a blocked
-prompt never reaches the model) and an optional ``after`` guardrail
+LLM with an optional `before` guardrail (checks the prompt; a blocked
+prompt never reaches the model) and an optional `after` guardrail
 (checks the response; a flagged response is withheld). Either way the call
-returns a completion whose ``guardrail`` field says what happened.
+returns a completion whose `guardrail` field says what happened.
 
 The default :class:`LLMGuardrail` asks a classifier model for a JSON
 verdict. It fails open: an unavailable or unparseable classifier lets the
@@ -34,7 +34,7 @@ Outcome of one guardrail check.
 
 **Attributes**:
 
-- `is_safe` - ``True`` if the text passed the check.
+- `is_safe` - `True` if the text passed the check.
 - `explanation` - The classifier&#x27;s reason.
 - `categories` - Harm categories flagged (empty when safe).
 - `raw_response` - The classifier&#x27;s raw text, if any.
@@ -69,7 +69,7 @@ The classifier model&#x27;s spec.
 def check(text: str) -> GuardrailResult
 ```
 
-Classify ``text``; fails open when the classifier is unavailable.
+Classify `text`; fails open when the classifier is unavailable.
 
 #### parse\_verdict
 
@@ -77,7 +77,7 @@ Classify ``text``; fails open when the classifier is unavailable.
 def parse_verdict(raw: str) -> GuardrailResult
 ```
 
-Parse ``{&quot;safe&quot;: ..., &quot;categories&quot;: [...], &quot;reasoning&quot;: ...}``.
+Parse `{&quot;safe&quot;: ..., &quot;categories&quot;: [...], &quot;reasoning&quot;: ...}`.
 
 Falls back to keyword detection when the text is not JSON.
 
@@ -87,5 +87,5 @@ Falls back to keyword detection when the text is not JSON.
 class Guarded(EnvelopeLLM)
 ```
 
-``llm`` with guardrails applied to every call.
+`llm` with guardrails applied to every call.
 

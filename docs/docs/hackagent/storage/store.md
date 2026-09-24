@@ -68,5 +68,5 @@ Create a new agent or update an existing one with the same name.
 def count_result_buckets() -> Dict[str, int]
 ```
 
-Return {total, jailbreaks, mitigated, failed, pending} across all results.
+Return \{total, jailbreaks, mitigated, failed, pending\} across all results.
 

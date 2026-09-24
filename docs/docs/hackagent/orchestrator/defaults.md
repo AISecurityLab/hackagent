@@ -34,7 +34,7 @@ def apply_role_defaults(config: Mapping[str, Any],
 
 Return *config* with local or remote role defaults filled in.
 
-Remote defaults apply only when ``settings`` names an API key and the
+Remote defaults apply only when `settings` names an API key and the
 base URL is not this machine. Explicit role fields win over defaults.
-A legacy ``scorer`` dict is promoted to ``judge`` when ``judge`` is absent.
+A legacy `scorer` dict is promoted to `judge` when `judge` is absent.
 

@@ -7,9 +7,9 @@ FC-Attack (FlowChart Attack) implementation.
 
 Provides two attack classes:
 
-- ``FCAttack`` — Image-based multimodal attack (faithful to the paper).
+- `FCAttack` — Image-based multimodal attack (faithful to the paper).
   Renders flowchart images and sends them to Vision-Language Models.
-- ``tFCAttack`` — Text-only variant. Encodes flowcharts as graph
+- `tFCAttack` — Text-only variant. Encodes flowcharts as graph
   description languages (DOT, Mermaid, TikZ, PlantUML, ASCII) for any LLM.
 
 Based on: Zhang et al., &quot;FC-Attack: Jailbreaking Multimodal Large
@@ -17,7 +17,7 @@ Language Models via Auto-Generated Flowcharts&quot; (EMNLP 2025 Findings)
 https://arxiv.org/abs/2502.21059
 
 The shared logic (step decomposition, rendering, evaluation) is in the
-``generation``, ``flowchart_renderer``, and ``evaluation`` modules.
+`generation`, `flowchart_renderer`, and `evaluation` modules.
 
 ## FCAttack Objects
 
@@ -37,7 +37,7 @@ renders them as flowchart images in various layouts, then sends
 the images to a VLM with a carefully crafted text prompt that
 induces the model to analyze and complete the harmful content.
 
-Layout modes (set via ``config[&quot;fc_params&quot;][&quot;layout&quot;]``):
+Layout modes (set via `config[&quot;fc_params&quot;][&quot;layout&quot;]`):
 vertical
 Steps flow top-to-bottom in a single vertical column.
 horizontal
@@ -68,19 +68,19 @@ Initialize FlowchartAttack with configuration.
 - `config` - Optional dictionary containing parameters to override
   :data:`DEFAULT_FC_CONFIG`.
 - `ctx` - :class:`~hackagent.attacks.ports.RunContext`. Positional
-  or ``ctx=``. Tests use ``make_ctx()``. Flowchart cache
-  files are written under ``ctx.workspace`` via
-  ``_wire_workspace_cache``.
+  or `ctx=`. Tests use `make_ctx()`. Flowchart cache
+  files are written under `ctx.workspace` via
+  `_wire_workspace_cache`.
 - `client` - Obsolete. Store instance on the orchestrator path.
 - `agent_router` - Obsolete. Target router on the orchestrator path.
   
 
 **Raises**:
 
-- `ValueError` - On the legacy path, if ``client`` or
-  ``agent_router`` is ``None``.
+- `ValueError` - On the legacy path, if `client` or
+  `agent_router` is `None`.
   
-  The pipeline is generation-only. ``run()`` returns rows without
+  The pipeline is generation-only. `run()` returns rows without
   a verdict. :class:`~hackagent.attacks.techniques.fc.config.FCConfig`
   still subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
   Graphviz is bootstrapped with
@@ -120,13 +120,13 @@ bypass natural-language safety filters without requiring vision.
 Unlike :class:`FCAttack`, this does NOT render images and works
 with any text LLM (no VLM required).
 
-Construct with ``(config, ctx)``. ``config`` is a dict deep-merged
-into the tFC defaults. ``ctx`` is a
+Construct with `(config, ctx)`. `config` is a dict deep-merged
+into the tFC defaults. `ctx` is a
 :class:`~hackagent.attacks.ports.RunContext`, passed positionally or
-as ``ctx=``. Tests build it with ``make_ctx()``
-(``tests.fakes.context``). The pipeline is generation-only;
-``run()`` returns rows without a verdict. The legacy constructor
-``(config_dict, client, agent_router)`` is obsolete for new code.
+as `ctx=`. Tests build it with `make_ctx()`
+(`tests.fakes.context`). The pipeline is generation-only;
+`run()` returns rows without a verdict. The legacy constructor
+`(config_dict, client, agent_router)` is obsolete for new code.
 :class:`~hackagent.attacks.techniques.fc.config.tFCConfig` still
 subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
 

@@ -169,6 +169,10 @@ const config: Config = {
             from: '/hackagent/router/discovery/scanner',
             to: '/hackagent/orchestrator/planning',
           },
+          {
+            from: '/hackagent/agent',
+            to: '/hackagent/client',
+          },
         ],
       },
     ],

@@ -29,12 +29,12 @@ def __init__(config=None,
              client=None)
 ```
 
-Initialize AutoDAN-Turbo with ``(config, ctx)`` or legacy args.
+Initialize AutoDAN-Turbo with `(config, ctx)` or legacy args.
 
-On the new seam ``ctx.models`` and ``ctx.judge`` are stored on the
+On the new seam `ctx.models` and `ctx.judge` are stored on the
 config for warm-up and lifelong, and the strategy library is
-written under ``ctx.workspace``. This class does not read
-``_suppress_run_status_updates``. ``AutoDANTurboConfig`` still
+written under `ctx.workspace`. This class does not read
+`_suppress_run_status_updates`. `AutoDANTurboConfig` still
 subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
 The legacy constructor is obsolete for new code.
 

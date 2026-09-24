@@ -46,13 +46,13 @@ OpenAI SDK is the official Python library for interacting with OpenAI's API, inc
 ### Initialize HackAgent Client
 
 ```python
-from hackagent import HackAgent, AgentType
+from hackagent import HackAgent, AgentType, Settings
 
 # Configure for OpenAI SDK
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "https://api.openai.com/v1",
+    AgentType.OPENAI_SDK,
     name="my_openai_agent",
-    endpoint="https://api.openai.com/v1",
-    agent_type=AgentType.OPENAI_SDK,
 )
 ```
 
@@ -92,11 +92,12 @@ results = agent.hack(attack_config=attack_config)
 If your agent uses OpenAI's function calling feature:
 
 ```python
+from hackagent import HackAgent, Settings
 # Initialize agent for function calling testing
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "https://api.openai.com/v1",
+    AgentType.OPENAI_SDK,
     name="weather_assistant",
-    endpoint="https://api.openai.com/v1",
-    agent_type=AgentType.OPENAI_SDK,
 )
 
 # Test for tool abuse vulnerabilities
@@ -117,13 +118,14 @@ results = agent.hack(attack_config=attack_config)
 Test the same prompts across different agents:
 
 ```python
+from hackagent import HackAgent, Settings
 agents = ["openai_gpt4", "openai_gpt4_turbo", "openai_gpt35"]
 
 for agent_name in agents:
-    agent = HackAgent(
+    agent = HackAgent(Settings.resolve()).target(
+        "https://api.openai.com/v1",
+        AgentType.OPENAI_SDK,
         name=agent_name,
-        endpoint="https://api.openai.com/v1",
-        agent_type=AgentType.OPENAI_SDK,
     )
 
     print(f"Testing {agent_name}...")
@@ -136,15 +138,16 @@ for agent_name in agents:
 HackAgent supports Azure OpenAI Service out of the box:
 
 ```python
-agent = HackAgent(
+from hackagent import HackAgent, Settings
+agent = HackAgent(Settings.resolve()).target(
+    "https://your-resource.openai.azure.com",
+    AgentType.OPENAI_SDK,
     name="azure_openai_agent",
-    endpoint="https://your-resource.openai.azure.com",
-    agent_type=AgentType.OPENAI_SDK,
     target_config={"api_key": "your-azure-api-key"},
 )
 ```
 
-**Note:** Once a custom `endpoint` (base URL) is set, HackAgent does **not** fall back to any environment variable for the API key — you must pass it explicitly, either as `target_config={"api_key": ...}` or as the top-level `api_key=` argument to `HackAgent(...)`. (Without a custom endpoint, `OPENAI_SDK` falls back to `OPENAI_API_KEY` by default — not an Azure-specific variable.)
+**Note:** Once a custom `endpoint` is set, the target does not fall back to an environment variable for the model API key. Pass it on `.target()` as `target_config={"api_key": ...}` or `metadata={"api_key": ...}`. The HackAgent cloud key is separate: `Settings.resolve(api_key=...)`. Without a custom endpoint, `OPENAI_SDK` falls back to `OPENAI_API_KEY`.
 
 ## Understanding Results
 
@@ -169,11 +172,12 @@ attack_config = {
 
 ### Cost Management
 ```python
+from hackagent import HackAgent, Settings
 # Use smaller models for initial testing
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "https://api.openai.com/v1",
+    AgentType.OPENAI_SDK,
     name="cost_effective_agent",
-    endpoint="https://api.openai.com/v1",
-    agent_type=AgentType.OPENAI_SDK,
     metadata={
         "name": "gpt-3.5-turbo",  # Cheaper than GPT-4
         "max_tokens": 100,         # Limit token usage

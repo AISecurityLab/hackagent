@@ -6,7 +6,7 @@ sidebar_position: 1
 
 `hackagent.orchestrator` is a depth-1 composition root. It is the only place that wires catalog, attacks, models, storage, evaluation, datasets, and tracking into one attack run. Techniques do not import this package. They receive a [`RunContext`](../attacks/seam.md).
 
-`HackAgent.hack` calls [`run`](../hackagent/orchestrator/runner.md). `HackAgent.hack_chain` calls [`hack_chain`](../hackagent/orchestrator/chain.md).
+[`Target.hack`](../client/index.md) calls [`run`](../hackagent/orchestrator/runner.md). [`Target.hack_chain`](../client/index.md) calls [`hack_chain`](../hackagent/orchestrator/chain.md). The session is [`HackAgent(Settings)`](../client/index.md); the target is bound with `.target()`.
 
 Public API from `hackagent.orchestrator`: `run`, `hack_chain`, [`RunSpec`](../hackagent/orchestrator/run_spec.md), `ATTACK_REGISTRY`, `load_attack`.
 
@@ -76,4 +76,4 @@ Each step is an `attack_config` dict executed with `agent.hack`. `attacks` defau
 
 Technique-local `eval_*` writers and `_sync_evaluation_to_server` stay in the techniques, including `hackagent.attacks.techniques.static_template.static_eval`. They are not a public evaluation API and they are not part of this package.
 
-`client.py` and `interfaces/` are a later phase. Import-linter is a later phase. CLI `ATTACK_CATALOG` still omits `rag`; the registry has it.
+Import-linter, packaging extras, and the hatch ship are a later phase. Scripts under `hackagent/examples/` may still construct `HackAgent(endpoint=...)`. Known TUI snapshot mismatches remain.

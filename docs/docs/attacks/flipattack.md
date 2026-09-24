@@ -82,13 +82,13 @@ Three enhancements can be combined independently:
 ### Simple Configuration
 
 ```python
-from hackagent import HackAgent, AgentType
+from hackagent import HackAgent, AgentType, Settings
 
 # Initialize HackAgent
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:8000",
+    AgentType.GOOGLE_ADK,
     name="target_agent",
-    endpoint="http://localhost:8000",
-    agent_type=AgentType.GOOGLE_ADK
 )
 
 # Basic FlipAttack configuration (FCS mode, default)
@@ -381,9 +381,14 @@ for mode in ["FCS", "FWO", "FCW", "FMM"]:
 ### 3. Comparative Model Analysis
 
 ```python
+from hackagent import HackAgent, Settings
 targets = ["model-a", "model-b"]
 for target in targets:
-    agent = HackAgent(name=target, endpoint=f"http://{target}:8000", ...)
+    agent = HackAgent(Settings.resolve()).target(
+        f"http://{target}:8000",
+        name=target,
+        # ...
+    )
     results = agent.hack(attack_config=flipattack_config)
 ```
 
