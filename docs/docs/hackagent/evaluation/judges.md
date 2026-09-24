@@ -29,7 +29,11 @@ def parse_yes_no(content: Optional[str],
                  judge_name: str = "Judge") -> AssertionResult
 ```
 
-Parse a yes/no classifier reply, most-confident strategies first.
+Parse a yes/no classifier reply.
+
+The reply must be, or start with, yes/no, 1/0 or unsafe/safe. Quotes,
+markdown emphasis and a leading `Answer:` label are ignored. Anything
+else is unparsed (not confident); the answer is never guessed.
 
 #### extract\_decimal\_score
 

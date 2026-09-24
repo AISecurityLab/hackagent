@@ -136,40 +136,41 @@ def run(
     if target is not None and config.get("max_tokens") is not None:
         target = target.with_params(max_tokens=config.get("max_tokens"))
 
-    ctx = build_context(
-        run_id=run_id,
-        target=target,
-        models=getattr(agent, "models", None),
-        config=config,
-        sink=sink,
-        attack_type=str(attack_type),
-        output_dir=spec.output_dir,
-        goal_labels=goal_labels,
-        event_bus=_tui_event_bus,
-    )
-    prepared = _attack_config(
-        agent,
-        config,
-        spec,
-        run_id=run_id,
-        sink=sink,
-        goal_labels=goal_labels,
-        extra_index=extra_by_index(goals),
-        event_bus=_tui_event_bus,
-    )
-
-    if _tui_event_bus is not None:
-        _tui_event_bus.emit(
-            "step_started",
-            step_name="Attack Execution",
-            attack_type=str(attack_type),
-            run_id=run_id,
-            expected_total_goals=len(goals),
-        )
-
     started = time.perf_counter()
     evaluation_error: Optional[BaseException] = None
     try:
+        # Inside the try: a judge that cannot be connected fails this run.
+        ctx = build_context(
+            run_id=run_id,
+            target=target,
+            models=getattr(agent, "models", None),
+            config=config,
+            sink=sink,
+            attack_type=str(attack_type),
+            output_dir=spec.output_dir,
+            goal_labels=goal_labels,
+            event_bus=_tui_event_bus,
+        )
+        prepared = _attack_config(
+            agent,
+            config,
+            spec,
+            run_id=run_id,
+            sink=sink,
+            goal_labels=goal_labels,
+            extra_index=extra_by_index(goals),
+            event_bus=_tui_event_bus,
+        )
+
+        if _tui_event_bus is not None:
+            _tui_event_bus.emit(
+                "step_started",
+                step_name="Attack Execution",
+                attack_type=str(attack_type),
+                run_id=run_id,
+                expected_total_goals=len(goals),
+            )
+
         results = schedule(
             goals,
             attack_factory=lambda: _instantiate(attack_cls, prepared, ctx, agent),

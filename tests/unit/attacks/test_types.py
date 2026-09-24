@@ -50,6 +50,34 @@ class TestAttackResultFromRow(unittest.TestCase):
         self.assertEqual(result.metadata["prefix"], "Sure,")
         self.assertEqual(result.metadata["completion"], "here it is")
 
+    def test_best_attempt_fields_fill_prompt_and_response(self):
+        # TAP, PAIR and Crescendo report their best attempt as best_*.
+        result = AttackResult.from_row(
+            {
+                "goal": "g",
+                "best_prompt": "tree prompt",
+                "best_response": "tree response",
+                "best_score": 10.0,
+            }
+        )
+        self.assertEqual(result.prompt, "tree prompt")
+        self.assertEqual(result.response, "tree response")
+
+    def test_technique_specific_prompt_and_response_aliases(self):
+        cases = [
+            ({"full_prompt": "p"}, "p", ""),
+            ({"jailbreak_prompt": "p", "target_response": "r"}, "p", "r"),
+            ({"attack_prompt": "p", "response": "r"}, "p", "r"),
+            ({"persuasive_prompt": "p", "response": "r"}, "p", "r"),
+            ({"augmented_prompt": "p", "response": "r"}, "p", "r"),
+            ({"best_prompt": None, "full_prompt": "p"}, "p", ""),
+        ]
+        for row, prompt, response in cases:
+            with self.subTest(row=row):
+                result = AttackResult.from_row(row)
+                self.assertEqual(result.prompt, prompt)
+                self.assertEqual(result.response, response)
+
     def test_prompt_and_response_take_precedence_over_aliases(self):
         result = AttackResult.from_row(
             {

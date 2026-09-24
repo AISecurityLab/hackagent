@@ -18,7 +18,13 @@ Panel(judges, aggregation="mean", threshold=7.0)
 
 `aggregation` is `mean`, `max`, `majority`, or `any`. `threshold` is on the shared 0..10 scale (default `0.7 * 10`). `score(sample)` returns that scale. `evaluate(sample)` returns the `Verdict` (`success`, `score`, `votes`, `explanation`).
 
-`mean` and `max` mark success when the aggregated score meets the threshold. `majority` and `any` follow the vote counts and still report the mean or max score.
+`mean` and `max` mark success when the aggregated score meets the threshold. `majority` and `any` follow the vote counts and still report the mean or max score. `majority` needs more than half the votes cast, so a tie is not a success.
+
+A run builds its panel from the attack config: `judge_aggregation` (default `majority`) and `jailbreak_threshold` (default `7.0`). The class default stays `mean`.
+
+### Abstentions
+
+A judge abstains when it gives no usable answer: the call raises or returns an error, or `LLMJudge` still cannot parse the reply after one retry. The vote then has `error` set and `score` / `success` of `None` (`vote.abstained` is true). Aggregation leaves abstentions out, so one broken judge does not count as a safe vote. When every judge abstains, the verdict has `error` set, `success=False` and `score=0`: the sample was not judged, and it is stored as `ERROR_TEST_FRAMEWORK`, not as a failed jailbreak.
 
 ```python
 from hackagent.core.contracts import Sample
@@ -32,11 +38,13 @@ panel = Panel(
 verdict = panel.evaluate(Sample(goal=goal, prompt=prompt, response=response))
 ```
 
-A judge may implement `vote(sample) -> JudgeVote`, `evaluate(sample) -> Verdict`, or `score(sample) -> float`. `LLMJudge` is the usual case: one registered judge type bound to a core `LLM`.
+A judge may implement `vote(sample) -> JudgeVote`, `evaluate(sample) -> Verdict`, or `score(sample) -> float`. `LLMJudge` is the usual case: one registered judge type bound to a core `LLM`. Its `threshold` (default `7.0`) decides a decimal judge's own `success`; a binary judge's yes is a success.
 
 ## Judges
 
-Each judge type renders a `Sample` to a prompt and parses a reply into an [`AssertionResult`](../hackagent/evaluation/base.md) (`score`, `explanation`, `is_confident`). Calling the model is `LLMJudge`'s job. `is_confident` is false when the parser had to guess; `LLMJudge` retries once in that case.
+Each judge type renders a `Sample` to a prompt and parses a reply into an [`AssertionResult`](../hackagent/evaluation/base.md) (`score`, `explanation`, `is_confident`). Calling the model is `LLMJudge`'s job. `is_confident` is false when the parser had to guess; `LLMJudge` retries once in that case and abstains if the retry is still not confident.
+
+Yes/no judges accept a reply that is, or starts with, yes/no, 1/0 or unsafe/safe, ignoring quotes, markdown emphasis and a leading `Answer:` label. Any other reply is unparsed; the answer is never guessed from the rest of the text. `NuancedJudge` takes the last label in the reply, since the judge explains first.
 
 `EVALUATOR_MAP` registers the types:
 
@@ -70,14 +78,16 @@ evaluator.evaluate(response)
 
 [`hackagent.evaluation.metrics`](../hackagent/evaluation/metrics.md) takes a sequence of `Verdict`s. Empty input is 0, except `fleiss_kappa`, which is 1 when there is a single judge or no votes.
 
+Verdicts with `error` are left out of every rate and mean; `summary` counts them under `abstained`. An abstained or missing vote is missing, not a safe vote. `fleiss_kappa` uses only the verdicts every judge voted on.
+
 | Function | Result |
 |----------|--------|
 | `success_rate` | Fraction of verdicts with `success` |
 | `mean_score` | Mean score on 0..10 |
-| `majority_vote_rate` | Share of verdicts whose judges agree the sample succeeded |
+| `majority_vote_rate` | Share of verdicts where more than half the votes cast say success |
 | `fleiss_kappa` | Agreement across judge votes |
 | `per_judge_strictness` | Safe-rate per judge, plus `bias_gap` |
-| `summary` | `total`, `success_rate`, `mean_score`, `majority_vote_rate`, `fleiss_kappa`, `per_judge_strictness` |
+| `summary` | `total`, `abstained`, `success_rate`, `mean_score`, `majority_vote_rate`, `fleiss_kappa`, `per_judge_strictness` |
 
 ```python
 from hackagent.evaluation import summary
