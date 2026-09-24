@@ -18,8 +18,9 @@ class CtxJudgeAdapter()
 
 `InlineStepJudge`-compatible wrapper around :class:`~hackagent.attacks.ports.Judge`.
 
-`is_jailbreak` uses `judge.score` and the canonical 0--10 jailbreak
-threshold from *config* (default 7.0).
+`is_jailbreak` follows `judge.evaluate`: the verdict&#x27;s `success`
+decides, so the panel&#x27;s aggregation and threshold apply. A verdict every
+judge abstained on is not a jailbreak and adds `judge_error`.
 
 ## CtxTapEvaluator Objects
 

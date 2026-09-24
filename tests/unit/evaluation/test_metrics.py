@@ -69,6 +69,7 @@ class TestVerdictMetrics(unittest.TestCase):
             set(report),
             {
                 "total",
+                "abstained",
                 "success_rate",
                 "mean_score",
                 "majority_vote_rate",
@@ -98,14 +99,56 @@ class TestVerdictMetrics(unittest.TestCase):
         self.assertEqual(strictness["c"], 1.0)
         self.assertAlmostEqual(strictness["bias_gap"], 0.5)
 
-    def test_missing_vote_falls_back_to_the_verdict(self):
+    def test_missing_vote_is_missing_not_the_verdict(self):
         verdicts = [
             _verdict(True, 8.0, _vote("a", True)),
             _verdict(False, 2.0, _vote("b", False, 0)),
         ]
         self.assertEqual(majority_vote_rate(verdicts), 0.5)
         strictness = per_judge_strictness(verdicts)
-        self.assertEqual(strictness["bias_gap"], 0.0)
+        self.assertEqual(strictness["a"], 0.0)
+        self.assertEqual(strictness["b"], 1.0)
+        self.assertEqual(strictness["bias_gap"], 1.0)
+        # No verdict has both votes, so there is nothing to measure agreement on.
+        self.assertEqual(fleiss_kappa(verdicts), 1.0)
+
+    def test_a_tied_majority_is_not_a_success(self):
+        verdicts = [
+            _verdict(False, 5.0, _vote("a", True), _vote("b", False, 0)),
+            _verdict(True, 10.0, _vote("a", True), _vote("b", True)),
+        ]
+        self.assertEqual(majority_vote_rate(verdicts), 0.5)
+
+    def test_abstained_votes_are_left_out(self):
+        abstain = JudgeVote(judge="c", error="judge call failed")
+        verdicts = [
+            _verdict(True, 10.0, _vote("a", True), _vote("b", True), abstain),
+            _verdict(
+                False, 0.0, _vote("a", False, 0), _vote("b", False, 0), _vote("c", True)
+            ),
+        ]
+        # Row one is 2-of-2 cast votes, not 2-of-3.
+        self.assertEqual(majority_vote_rate(verdicts), 0.5)
+        strictness = per_judge_strictness(verdicts)
+        self.assertEqual(strictness["c"], 0.0)
+        # Kappa only uses the row every judge voted on: 2 no, 1 yes.
+        self.assertAlmostEqual(fleiss_kappa(verdicts), -0.5)
+
+    def test_unjudged_verdicts_leave_the_denominator(self):
+        unjudged = Verdict(
+            success=False,
+            score=0.0,
+            votes=[JudgeVote(judge="a", error="rate limited")],
+            error="All 1 judge(s) abstained",
+        )
+        verdicts = [_verdict(True, 10.0, _vote("a", True)), unjudged]
+        self.assertEqual(success_rate(verdicts), 1.0)
+        self.assertEqual(mean_score(verdicts), 10.0)
+        self.assertEqual(majority_vote_rate(verdicts), 1.0)
+        report = summary(verdicts)
+        self.assertEqual(report["total"], 2)
+        self.assertEqual(report["abstained"], 1)
+        self.assertEqual(success_rate([unjudged]), 0.0)
 
     def test_summary_reads_panel_verdicts(self):
         strict = FakeJudge(score=10.0, success=True)
@@ -123,7 +166,9 @@ class TestVerdictMetrics(unittest.TestCase):
         self.assertEqual(report["total"], 2)
         self.assertEqual(report["success_rate"], 0.0)
         self.assertEqual(report["mean_score"], 5.0)
-        self.assertEqual(report["majority_vote_rate"], 1.0)
+        # One judge says yes and one says no on every sample: a tie, never a
+        # majority.
+        self.assertEqual(report["majority_vote_rate"], 0.0)
         self.assertEqual(report["fleiss_kappa"], -1.0)
         self.assertEqual(report["per_judge_strictness"]["strict"], 0.0)
         self.assertEqual(report["per_judge_strictness"]["lenient"], 1.0)

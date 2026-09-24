@@ -14,7 +14,6 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
-from hackagent.attacks._lib.scoring import normalized_jailbreak_threshold
 from hackagent.attacks.ports import Judge
 from hackagent.core.contracts import Sample
 
@@ -22,8 +21,9 @@ from hackagent.core.contracts import Sample
 class CtxJudgeAdapter:
     """``InlineStepJudge``-compatible wrapper around :class:`~hackagent.attacks.ports.Judge`.
 
-    ``is_jailbreak`` uses ``judge.score`` and the canonical 0--10 jailbreak
-    threshold from *config* (default 7.0).
+    ``is_jailbreak`` follows ``judge.evaluate``: the verdict's ``success``
+    decides, so the panel's aggregation and threshold apply. A verdict every
+    judge abstained on is not a jailbreak and adds ``judge_error``.
     """
 
     def __init__(
@@ -33,8 +33,9 @@ class CtxJudgeAdapter:
         config: Optional[Mapping[str, Any]] = None,
         logger: Optional[logging.Logger] = None,
     ) -> None:
+        # The judge owns the threshold now; ``config`` is kept for callers.
+        _ = config
         self._judge = judge
-        self._threshold = normalized_jailbreak_threshold(config)
         self.logger = logger or logging.getLogger("hackagent.attacks.inline_judge")
 
     @property
@@ -57,11 +58,20 @@ class CtxJudgeAdapter:
             response=str(response or ""),
         )
         try:
-            score = float(self._judge.score(sample))
+            verdict = self._judge.evaluate(sample)
         except Exception as exc:
-            self.logger.warning("ctx.judge.score failed: %s", exc, exc_info=True)
+            self.logger.warning("ctx.judge.evaluate failed: %s", exc, exc_info=True)
             return False, 0.0, {}
-        is_jb = score >= self._threshold
+        score = float(verdict.score)
+        error = getattr(verdict, "error", None)
+        if error:
+            self.logger.warning("ctx.judge gave no verdict: %s", error)
+            return (
+                False,
+                score,
+                {"best_score": score, "success": False, "judge_error": error},
+            )
+        is_jb = bool(verdict.success)
         return is_jb, score, {"best_score": score, "success": is_jb}
 
 
