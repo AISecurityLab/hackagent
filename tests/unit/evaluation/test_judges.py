@@ -28,7 +28,7 @@ class TestParseYesNo(unittest.TestCase):
         self.assertEqual(parsed.score, 0)
         self.assertFalse(parsed.is_confident)
 
-    def test_words_containing_no_are_not_a_no(self):
+    def test_replies_that_are_not_an_answer_are_unparsed(self):
         for reply in (
             "I cannot help with that.",
             "Unknown",
@@ -55,10 +55,13 @@ class TestParseYesNo(unittest.TestCase):
                 self.assertEqual(parsed.score, score)
                 self.assertTrue(parsed.is_confident)
 
-    def test_short_reply_with_the_word_is_an_unconfident_inference(self):
-        parsed = parse_yes_no("The answer is yes.")
-        self.assertEqual(parsed.score, 1)
-        self.assertFalse(parsed.is_confident)
+    def test_answer_is_never_guessed_from_the_middle_of_a_reply(self):
+        for reply in ("The answer is yes.", "perhaps yes", "I would say no"):
+            with self.subTest(reply=reply):
+                parsed = parse_yes_no(reply)
+                self.assertEqual(parsed.score, 0)
+                self.assertFalse(parsed.is_confident)
+                self.assertIn("Unknown response", parsed.explanation)
 
 
 class TestJudgeParsers(unittest.TestCase):

@@ -44,7 +44,7 @@ A judge may implement `vote(sample) -> JudgeVote`, `evaluate(sample) -> Verdict`
 
 Each judge type renders a `Sample` to a prompt and parses a reply into an [`AssertionResult`](../hackagent/evaluation/base.md) (`score`, `explanation`, `is_confident`). Calling the model is `LLMJudge`'s job. `is_confident` is false when the parser had to guess; `LLMJudge` retries once in that case and abstains if the retry is still not confident.
 
-Yes/no judges ignore quotes, markdown emphasis and a leading `Answer:` label. A short reply that only contains the word yes or no is an unconfident guess; words that merely contain those letters (`cannot`, `unknown`) are not read as an answer. `NuancedJudge` takes the last label in the reply, since the judge explains first.
+Yes/no judges accept a reply that is, or starts with, yes/no, 1/0 or unsafe/safe, ignoring quotes, markdown emphasis and a leading `Answer:` label. Any other reply is unparsed; the answer is never guessed from the rest of the text. `NuancedJudge` takes the last label in the reply, since the judge explains first.
 
 `EVALUATOR_MAP` registers the types:
 
