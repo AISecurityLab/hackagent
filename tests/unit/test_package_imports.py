@@ -4,12 +4,50 @@
 """Smoke tests for package import and optional extras.
 
 Layering (depth-0 independence, private ``storage._http``, UI frameworks, and
-logging-handler setup) is enforced by import-linter, not by this module.
+logging-handler setup) is enforced by import-linter. The unit suite runs that
+check in ``test_import_contracts``. This module checks that the package, its
+entrypoints, and its declared extras still import.
 """
 
 import importlib
 import pkgutil
+import subprocess
+import sys
+
 import pytest
+
+# Fresh interpreter: the CLI and web entrypoints may load click and flask.
+# Textual stays lazy until a TUI command runs. Packages outside interfaces
+# must not bind those names. The import graph itself is test_import_contracts.
+_ENTRYPOINT_PROBE = """
+import importlib
+import sys
+
+cli_main = importlib.import_module("hackagent.interfaces.cli.main")
+web = importlib.import_module("hackagent.interfaces.web")
+assert callable(cli_main.main)
+assert callable(cli_main.cli)
+assert callable(web.create_app)
+
+assert "click" in sys.modules, "CLI entrypoint did not import click"
+assert "flask" in sys.modules, "web entrypoint did not import flask"
+assert "textual" not in sys.modules, "entrypoint import loaded textual"
+
+forbidden = ("textual", "flask", "click")
+leaks = []
+for name, module in sys.modules.items():
+    if module is None:
+        continue
+    if name != "hackagent" and not name.startswith("hackagent."):
+        continue
+    if name == "hackagent.interfaces" or name.startswith("hackagent.interfaces."):
+        continue
+    bound = [lib for lib in forbidden if lib in module.__dict__]
+    if bound:
+        leaks.append(f"{name} binds {bound}")
+if leaks:
+    raise SystemExit("interface toolkits bound outside interfaces:\\n" + "\\n".join(leaks))
+"""
 
 
 class TestPackageImports:
@@ -31,6 +69,22 @@ class TestPackageImports:
 
         assert cli is not None
 
+    def test_interface_entrypoints_import(self):
+        """CLI and web entrypoints import without leaking UI toolkits.
+
+        ``hackagent.interfaces.cli.main:main`` is the console script. The
+        dashboard is ``hackagent.interfaces.web.create_app``. Click and flask
+        load with those modules; textual does not. Modules outside
+        ``interfaces`` must not bind those names.
+        """
+        result = subprocess.run(
+            [sys.executable, "-c", _ENTRYPOINT_PROBE],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+
     def test_agent_import(self):
         """Test that the HackAgent class can be imported."""
         from hackagent import HackAgent
@@ -45,9 +99,6 @@ class TestPackageImports:
 
     def test_root_import_does_not_load_interface_toolkits(self):
         """Importing the facade must not pull in textual, flask, or click."""
-        import subprocess
-        import sys
-
         code = (
             "import sys, hackagent; "
             "bad = [n for n in ('textual', 'flask', 'click') if n in sys.modules]; "
