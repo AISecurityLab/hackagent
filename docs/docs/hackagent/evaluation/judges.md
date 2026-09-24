@@ -31,6 +31,11 @@ def parse_yes_no(content: Optional[str],
 
 Parse a yes/no classifier reply, most-confident strategies first.
 
+Quotes, markdown emphasis and a leading `Answer:` label are ignored.
+A short reply that only contains the word yes or no is an unconfident
+inference; words that merely contain those letters (&quot;cannot&quot;,
+&quot;unknown&quot;) are not.
+
 #### extract\_decimal\_score
 
 ```python
