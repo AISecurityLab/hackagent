@@ -150,8 +150,9 @@ class RunContext()
 
 Dependencies injected into every :class:`BaseAttack`.
 
-Built by the orchestrator (Phase 7). Techniques must not reach past this
-bag for routers, judges, trackers or filesystem paths.
+Built by :func:`hackagent.orchestrator.context.build_context`. Techniques
+must not reach past this bag for routers, judges, trackers or filesystem
+paths.
 
 ## Step Objects
 

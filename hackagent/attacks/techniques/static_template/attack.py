@@ -37,8 +37,9 @@ class StaticTemplateAttack(BaseAttack):
     ``ctx`` is a :class:`~hackagent.attacks.ports.RunContext`, passed
     positionally or as ``ctx=``. Tests build it with ``make_ctx()``
     (``tests.fakes.context``). The legacy constructor
-    ``(config_dict, client, agent_router)`` is obsolete for new code;
-    the orchestrator still calls it. Typed defaults still live on
+    ``(config_dict, client, agent_router)`` is obsolete for new code.
+    ``hackagent.orchestrator.runner`` constructs ``(config, ctx)``.
+    Typed defaults still live on
     :class:`~hackagent.attacks.techniques.static_template.config.TemplateAttackConfig`,
     a :class:`~hackagent.attacks.techniques.config.ConfigBase` subclass.
 

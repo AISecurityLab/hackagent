@@ -18,7 +18,8 @@ Architecture pattern for techniques:
     4. evaluation.py - Result evaluation logic
     5. [other].py - Additional pipeline stages as needed
 
-Techniques are used by BaseAttack subclasses and wrapped by AttackStrategy.
+The orchestrator loads a technique with ``load_attack`` and runs it as
+``BaseAttack(config, ctx)``.
 """
 
 __all__ = []

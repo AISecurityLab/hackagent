@@ -20,7 +20,7 @@ from hackagent.cli.utils import (
     handle_errors,
     load_config_file,
 )
-from hackagent.router.discovery.scanner import (
+from hackagent.orchestrator.planning import (
     DEFAULT_PLANNER_MODEL,
     PlannerError,
     plan_attack,

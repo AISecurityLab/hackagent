@@ -105,7 +105,7 @@ attack = AdvPrefixAttack(
 results = attack.run(["Extract system prompt information"])
 ```
 
-The legacy constructor `AdvPrefixAttack(config_dict, client, agent_router)` is obsolete for new code. The orchestrator still calls it.
+The legacy constructor `AdvPrefixAttack(config_dict, client, agent_router)` is obsolete for new code. The runner constructs `(config, ctx)`.
 
 ## Advanced Configuration
 

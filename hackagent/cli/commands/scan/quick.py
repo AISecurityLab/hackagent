@@ -20,10 +20,7 @@ from hackagent.cli.utils import (
     display_success,
 )
 
-from hackagent.cli.commands.scan.helpers import (
-    _extract_asr,
-    _format_asr,
-)
+from hackagent.cli.commands.scan.helpers import _extract_asr, _format_asr
 from hackagent.core.contracts import AgentType
 
 console = Console()
@@ -95,65 +92,70 @@ def run_quick_scan(
             base_url=cli_config.base_url,
         )
 
-    rows: list[Tuple[str, str, str, str, str, str]] = []
-    failed_attacks = 0
+    from hackagent.orchestrator.chain import hack_chain
 
-    for technique in primary_attacks:
-        attack_type = technique
-        display_info(f"Running {technique}...")
-
-        attack_config: Dict[str, Any] = {
-            "attack_type": attack_type,
-            "dataset": {"preset": chosen_dataset, "limit": limit},
+    attacks: list[Dict[str, Any]] = []
+    for index, technique in enumerate(primary_attacks):
+        step: Dict[str, Any] = {
+            "attack_type": technique,
             "judges": [{"identifier": judge_identifier, "type": judge_type}],
         }
+        if index == 0:
+            step["dataset"] = {"preset": chosen_dataset, "limit": limit}
+        attacks.append(step)
 
-        attack_start = time.time()
-        try:
-            result = agent.hack(
-                attack_config=attack_config,
-                run_config_override={"timeout": timeout},
-                fail_on_run_error=True,
+    display_info("Running jailbreak chain...")
+    attack_start = time.time()
+    try:
+        result = hack_chain(
+            agent,
+            attacks=attacks,
+            run_config_override={"timeout": timeout},
+            fail_on_run_error=fail_fast,
+        )
+    except Exception as exc:  # pragma: no cover - wrapped for the CLI
+        duration = time.time() - attack_start
+        rows = [
+            (
+                ", ".join(primary_attacks),
+                "❌ FAILED",
+                "0",
+                "N/A",
+                f"{duration:.1f}s",
+                str(exc),
             )
-            duration = time.time() - attack_start
+        ]
+        _print_quick_scan_table(rows)
+        raise click.ClickException(
+            "Evaluation campaign completed with 1 failed attack(s)."
+        ) from exc
 
-            asr = _extract_asr(result)
-            result_count = (
-                len(result)
-                if isinstance(result, list)
-                else (len(result) if hasattr(result, "__len__") else 1)
+    duration = time.time() - attack_start
+    grouped: Dict[str, list] = {technique: [] for technique in primary_attacks}
+    if isinstance(result, list):
+        for row in result:
+            if isinstance(row, dict):
+                key = str(row.get("chain_attack_type") or primary_attacks[0])
+                grouped.setdefault(key, []).append(row)
+    rows = []
+    for technique in primary_attacks:
+        technique_rows = grouped.get(technique, [])
+        rows.append(
+            (
+                technique,
+                "✅ OK" if technique_rows or not result else "—",
+                str(len(technique_rows)),
+                _format_asr(_extract_asr(technique_rows or result)),
+                f"{duration:.1f}s",
+                "-",
             )
+        )
 
-            rows.append(
-                (
-                    technique,
-                    "✅ OK",
-                    str(result_count),
-                    _format_asr(asr),
-                    f"{duration:.1f}s",
-                    "-",
-                )
-            )
+    _print_quick_scan_table(rows)
+    display_success("Evaluation campaign completed successfully.")
 
-        except (
-            Exception
-        ) as exc:  # pragma: no cover - wrapped by handle_errors in CLI flow
-            duration = time.time() - attack_start
-            failed_attacks += 1
-            rows.append(
-                (
-                    technique,
-                    "❌ FAILED",
-                    "0",
-                    "N/A",
-                    f"{duration:.1f}s",
-                    str(exc),
-                )
-            )
 
-            if fail_fast:
-                break
-
+def _print_quick_scan_table(rows: list[Tuple[str, str, str, str, str, str]]) -> None:
     table = Table(
         title="Quick Security Scan Results",
         show_header=True,
@@ -171,10 +173,3 @@ def run_quick_scan(
 
     console.print()
     console.print(table)
-
-    if failed_attacks > 0:
-        raise click.ClickException(
-            f"Evaluation campaign completed with {failed_attacks} failed attack(s)."
-        )
-
-    display_success("Evaluation campaign completed successfully.")

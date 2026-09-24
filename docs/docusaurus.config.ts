@@ -157,6 +157,18 @@ const config: Config = {
             from: '/hackagent/router/tracking/category_classifier',
             to: '/tracking',
           },
+          {
+            from: '/hackagent/attacks/orchestrator',
+            to: '/orchestrator',
+          },
+          {
+            from: '/hackagent/attacks/registry',
+            to: '/hackagent/orchestrator/registry',
+          },
+          {
+            from: '/hackagent/router/discovery/scanner',
+            to: '/hackagent/orchestrator/planning',
+          },
         ],
       },
     ],

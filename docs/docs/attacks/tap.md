@@ -111,7 +111,7 @@ attack = TAPAttack(
 results = attack.run(["Bypass content safety filters"])
 ```
 
-`TapConfig` still subclasses `ConfigBase`. The legacy constructor `TAPAttack(config_dict, client, agent_router)` is obsolete for new code; the orchestrator still calls it, and that path still builds `TapEvaluation`.
+`TapConfig` still subclasses `ConfigBase`. The legacy constructor `TAPAttack(config_dict, client, agent_router)` is obsolete for new code. The runner constructs `(config, ctx)`. The legacy path still builds `TapEvaluation`.
 
 ### CLI Usage
 

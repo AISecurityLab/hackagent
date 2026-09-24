@@ -30,7 +30,8 @@ decodes the reply. It does not embed a judge step. ``run()`` returns
 rows without a verdict.
 
 The legacy constructor ``(config_dict, client, agent_router)`` is
-obsolete for new code. The orchestrator still calls it.
+obsolete for new code. ``hackagent.orchestrator.runner`` constructs
+``(config, ctx)``.
 :class:`~hackagent.attacks.techniques.cipherchat.config.CipherChatConfig`
 still subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
 

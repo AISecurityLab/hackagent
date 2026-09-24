@@ -106,7 +106,7 @@ Keys such as `goals`, `dataset`, `intents`, `objective`, `attacker`, `judges`, b
 
 Crescendo, PAIR, and AdvPrefix still put many attack-specific keys at the top level (`max_turns`, `n_iterations`, `meta_prefixes`). AutoDAN-Turbo, PAP, CipherChat, MML, and others already nest theirs under `*_params`. The long-term convention is one nested `*_params` field per attack; that layout change is still ahead.
 
-SDK and CLI launches still use the `attack_config` dict above. Every technique on this page also constructs as [`BaseAttack(config, ctx)`](./seam.md). The legacy `(config, client, agent_router)` constructor is obsolete for new technique code; the orchestrator still calls it.
+SDK and CLI launches still use the `attack_config` dict above. Every technique on this page also constructs as [`BaseAttack(config, ctx)`](./seam.md). The legacy `(config, client, agent_router)` constructor is obsolete for new technique code. The runner constructs `(config, ctx)`.
 :::
 
 :::tip Dataset Support

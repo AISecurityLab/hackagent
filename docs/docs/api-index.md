@@ -14,6 +14,10 @@ in the HackAgent Python SDK, auto-generated from source-code docstrings.
   into a `Verdict`. Judges, pattern evaluators, and verdict metrics live here.
 - **Tracking**: Depth-0 `hackagent.tracking`. `Tracker` implements the
   `Events` port and writes through `RunSink`.
+- **Orchestrator**: Depth-1 `hackagent.orchestrator`. `run(RunSpec)` and
+  `hack_chain` compose one attack. `mapping` owns record `eval_*` columns.
+  `AttackOrchestrator` and `hackagent.attacks.registry` are gone; there is
+  no import shim.
 - **Attack Framework**: Base classes, objectives, and techniques
   (AdvPrefix, PAIR, TAP, BON, FlipAttack, AutoDAN-Turbo, Baseline).
   The attack seam (`hackagent.attacks.ports`, `AttackConfig`, `BaseAttack`)

@@ -195,9 +195,7 @@
               "type": "category"
             },
             "reference/hackagent/attacks/config",
-            "reference/hackagent/attacks/orchestrator",
             "reference/hackagent/attacks/ports",
-            "reference/hackagent/attacks/registry",
             "reference/hackagent/attacks/types"
           ],
           "label": "hackagent.attacks",
@@ -507,22 +505,20 @@
         },
         {
           "items": [
-            "reference/hackagent/orchestrator/run_spec"
+            "reference/hackagent/orchestrator/chain",
+            "reference/hackagent/orchestrator/context",
+            "reference/hackagent/orchestrator/defaults",
+            "reference/hackagent/orchestrator/goals",
+            "reference/hackagent/orchestrator/mapping",
+            "reference/hackagent/orchestrator/persistence",
+            "reference/hackagent/orchestrator/planning",
+            "reference/hackagent/orchestrator/preflight",
+            "reference/hackagent/orchestrator/registry",
+            "reference/hackagent/orchestrator/run_spec",
+            "reference/hackagent/orchestrator/runner",
+            "reference/hackagent/orchestrator/scheduling"
           ],
           "label": "hackagent.orchestrator",
-          "type": "category"
-        },
-        {
-          "items": [
-            {
-              "items": [
-                "reference/hackagent/router/discovery/scanner"
-              ],
-              "label": "hackagent.router.discovery",
-              "type": "category"
-            }
-          ],
-          "label": "hackagent.router",
           "type": "category"
         },
         {

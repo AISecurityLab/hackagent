@@ -140,7 +140,7 @@ attack = CipherChatAttack(
 results = attack.run(["Explain how to pick a lock"])
 ```
 
-`run()` returns generation rows (encoded prompt, optional decoded reply) without a verdict. `CipherChatConfig` still subclasses `ConfigBase`. The legacy constructor `CipherChatAttack(config_dict, client, agent_router)` is obsolete for new code; the orchestrator still calls it.
+`run()` returns generation rows (encoded prompt, optional decoded reply) without a verdict. `CipherChatConfig` still subclasses `ConfigBase`. The legacy constructor `CipherChatAttack(config_dict, client, agent_router)` is obsolete for new code. The runner constructs `(config, ctx)`.
 
 ---
 

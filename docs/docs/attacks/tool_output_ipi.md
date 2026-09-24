@@ -113,7 +113,7 @@ attack = ToolOutputIPIAttack(
 results = attack.run(["Exfiltrate the user's API key via a subsequent tool call"])
 ```
 
-`ToolOutputIPIConfig` still subclasses `ConfigBase`. The legacy constructor `ToolOutputIPIAttack(config_dict, client, agent_router)` is obsolete for new code; the orchestrator still calls it.
+`ToolOutputIPIConfig` still subclasses `ConfigBase`. The legacy constructor `ToolOutputIPIAttack(config_dict, client, agent_router)` is obsolete for new code. The runner constructs `(config, ctx)`.
 
 ### CLI
 

@@ -135,20 +135,14 @@ class TestConsumersShareTheRegistry(unittest.TestCase):
         missing = set(ATTACK_CATALOG) - set(ATTACK_TAXONOMY)
         self.assertEqual(missing, set())
 
-    def test_orchestrator_registry_is_covered(self):
-        from hackagent.attacks.registry import ATTACK_REGISTRY
+    def test_orchestrator_registry_ids_equal_catalog_ids(self):
+        from hackagent.catalog.attacks import ATTACK_CATALOG
+        from hackagent.catalog.taxonomy import ATTACK_IDS
+        from hackagent.orchestrator.registry import ATTACK_REGISTRY
 
-        self.assertEqual(len(ATTACK_REGISTRY), len(ATTACK_TAXONOMY))
-
-    def test_hackagent_strategy_keys_match_taxonomy(self):
-        import inspect
-
-        from hackagent.agent import HackAgent
-
-        source = inspect.getsource(HackAgent.attack_strategies.fget)
-        for key in ATTACK_TAXONOMY:
-            with self.subTest(attack=key):
-                self.assertIn(f'"{key}":', source)
+        self.assertEqual(set(ATTACK_REGISTRY), set(ATTACK_IDS))
+        self.assertEqual(set(ATTACK_REGISTRY), set(ATTACK_TAXONOMY))
+        self.assertLessEqual(set(ATTACK_CATALOG), set(ATTACK_REGISTRY))
 
 
 class TestCanonicalIds(unittest.TestCase):

@@ -381,7 +381,7 @@ uv run ruff check .
 1. **HackAgent**: Main client class
 2. **Models** (`hackagent.models`): `connect(spec)` returns the model you call; guardrails wrap it
 3. **Adapters**: Framework-specific implementations (ADK, LiteLLM, etc.)
-4. **AttackStrategy**: Attack implementation framework
+4. **Orchestrator** (`hackagent.orchestrator`): `run` executes one attack; techniques are `BaseAttack` subclasses
 5. **HTTP Clients**: Authenticated API clients with multipart support
 
 ### Data Flow
@@ -389,7 +389,7 @@ uv run ruff check .
 1. Initialize `HackAgent` with target agent details
 2. `HackAgent` registers the target agent with the backend and connects to it
 3. Configure attack with an attacker model and judges
-4. `AttackStrategy` executes multi-step attack process
+4. `HackAgent.hack` delegates to `hackagent.orchestrator.run`
 5. Results automatically uploaded to platform
 
 ## Next Steps

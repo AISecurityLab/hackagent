@@ -94,8 +94,8 @@ class AdvPrefixAttack(BaseAttack):
     (``tests.fakes.context``).
 
     The legacy constructor ``(config_dict, client, agent_router)`` is
-    obsolete for new code. The orchestrator still calls it and still
-    runs :class:`EvaluationPipeline` for selection.
+    obsolete for new code. ``hackagent.orchestrator.runner`` constructs
+    ``(config, ctx)``. Selection on that path uses ``ctx.judge.evaluate``.
 
     Attributes:
         config: Merged AdvPrefix configuration dictionary.
