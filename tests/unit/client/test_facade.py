@@ -90,7 +90,7 @@ class TestOnEvent(unittest.TestCase):
             kwargs["_tui_event_bus"].emit("goal_finalized", goal="g", success=True)
             return [{"goal": "g"}]
 
-        with patch("hackagent.orchestrator.runner.run", side_effect=fake_run):
+        with patch("hackagent.orchestrator.execution.runner.run", side_effect=fake_run):
             rows = self.target.hack(
                 attack_config={"attack_type": "baseline", "goals": ["g"]},
                 on_event=on_event,
@@ -111,7 +111,7 @@ class TestOnEvent(unittest.TestCase):
             )
             return [{"goal": "g", "is_success": False}]
 
-        with patch("hackagent.orchestrator.runner.run", side_effect=fake_run):
+        with patch("hackagent.orchestrator.execution.runner.run", side_effect=fake_run):
             self.target.hack_chain(
                 attacks=[{"attack_type": "baseline"}, {"attack_type": "pair"}],
                 goals=["g"],

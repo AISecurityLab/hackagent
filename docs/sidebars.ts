@@ -382,7 +382,18 @@ const sidebars: SidebarsConfig = {
           label: 'Core',
           items: [
             'hackagent/core/settings',
-            'hackagent/core/contracts',
+            {
+              type: 'category',
+              label: 'contracts',
+              items: [
+                'hackagent/core/contracts/enums',
+                'hackagent/core/contracts/messages',
+                'hackagent/core/contracts/completion',
+                'hackagent/core/contracts/specs',
+                'hackagent/core/contracts/judging',
+                'hackagent/core/contracts/protocols',
+              ],
+            },
             'hackagent/core/errors',
             'hackagent/core/logging',
             'hackagent/core/async_utils',
@@ -431,33 +442,77 @@ const sidebars: SidebarsConfig = {
           type: 'category',
           label: 'Tracking',
           items: [
-            'hackagent/tracking/tracker',
-            'hackagent/tracking/sink',
-            'hackagent/tracking/listeners',
-            'hackagent/tracking/step',
-            'hackagent/tracking/context',
             'hackagent/tracking/coordinator',
-            'hackagent/tracking/decorators',
-            'hackagent/tracking/audit',
-            'hackagent/tracking/utils',
+            {
+              type: 'category',
+              label: 'goals',
+              items: [
+                'hackagent/tracking/goals/tracker',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'steps',
+              items: [
+                'hackagent/tracking/steps/tracker',
+                'hackagent/tracking/steps/context',
+                'hackagent/tracking/steps/decorators',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'sinks',
+              items: [
+                'hackagent/tracking/sinks/sink',
+                'hackagent/tracking/sinks/listeners',
+                'hackagent/tracking/sinks/audit',
+              ],
+            },
+            'hackagent/tracking/serialize',
           ],
         },
         {
           type: 'category',
           label: 'Orchestrator',
           items: [
-            'hackagent/orchestrator/runner',
-            'hackagent/orchestrator/chain',
-            'hackagent/orchestrator/registry',
-            'hackagent/orchestrator/context',
-            'hackagent/orchestrator/persistence',
-            'hackagent/orchestrator/mapping',
-            'hackagent/orchestrator/scheduling',
-            'hackagent/orchestrator/defaults',
-            'hackagent/orchestrator/preflight',
-            'hackagent/orchestrator/goals',
-            'hackagent/orchestrator/planning',
-            'hackagent/orchestrator/run_spec',
+            {
+              type: 'category',
+              label: 'execution',
+              items: [
+                'hackagent/orchestrator/execution/runner',
+                'hackagent/orchestrator/execution/chain',
+                'hackagent/orchestrator/execution/scheduling',
+                'hackagent/orchestrator/execution/context',
+                'hackagent/orchestrator/execution/spec',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'setup',
+              items: [
+                'hackagent/orchestrator/setup/registry',
+                'hackagent/orchestrator/setup/defaults',
+                'hackagent/orchestrator/setup/goals',
+                'hackagent/orchestrator/setup/preflight',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'results',
+              items: [
+                'hackagent/orchestrator/results/mapping',
+                'hackagent/orchestrator/results/persistence',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'planning',
+              items: [
+                'hackagent/orchestrator/planning/planner',
+                'hackagent/orchestrator/planning/catalog',
+                'hackagent/orchestrator/planning/web',
+              ],
+            },
           ],
         },
         {

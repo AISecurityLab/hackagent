@@ -4,12 +4,12 @@
 """Category labelling is skipped when goals already carry labels."""
 
 from hackagent.core.contracts import Goal
-from hackagent.orchestrator.goals import (
+from hackagent.orchestrator.setup.goals import (
     goals_are_labelled,
     label_goals,
     resolve_run_goals,
 )
-from hackagent.tracking.tracker import UNKNOWN_CATEGORY, UNKNOWN_SUBCATEGORY
+from hackagent.tracking.goals.tracker import UNKNOWN_CATEGORY, UNKNOWN_SUBCATEGORY
 from tests.fakes.llm import FakeLLM
 
 

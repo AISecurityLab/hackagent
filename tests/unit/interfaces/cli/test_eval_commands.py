@@ -32,7 +32,7 @@ def _config():
 
 class TestEvalCatalogAndStrategies(unittest.TestCase):
     def test_every_generated_strategy_is_in_the_catalog(self):
-        from hackagent.orchestrator.registry import ATTACK_REGISTRY
+        from hackagent.orchestrator.setup.registry import ATTACK_REGISTRY
 
         self.assertTrue(_STRATEGY_COMMANDS)
         self.assertEqual(set(_STRATEGY_COMMANDS), set(ATTACK_REGISTRY))
@@ -53,7 +53,7 @@ class TestEvalListAndInfo(unittest.TestCase):
         runner = CliRunner()
         result = runner.invoke(eval_cmd, ["list"], obj={"config": _config()})
         self.assertEqual(result.exit_code, 0, result.output)
-        from hackagent.orchestrator.registry import ATTACK_REGISTRY
+        from hackagent.orchestrator.setup.registry import ATTACK_REGISTRY
 
         for key in ATTACK_REGISTRY:
             self.assertIn(key, result.output)

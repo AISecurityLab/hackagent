@@ -2,6 +2,32 @@ import {themes as prismThemes} from 'prism-react-renderer';
 import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
+// API pages that moved when their modules moved: new path -> old paths.
+// core/contracts was one page; its old URL opens the first topic page.
+const MOVED_API_PAGES: Record<string, string[]> = {
+  '/hackagent/orchestrator/execution/chain': ['/hackagent/orchestrator/chain'],
+  '/hackagent/orchestrator/execution/context': ['/hackagent/orchestrator/context'],
+  '/hackagent/orchestrator/execution/runner': ['/hackagent/orchestrator/runner'],
+  '/hackagent/orchestrator/execution/scheduling': ['/hackagent/orchestrator/scheduling'],
+  '/hackagent/orchestrator/execution/spec': ['/hackagent/orchestrator/run_spec'],
+  '/hackagent/orchestrator/setup/defaults': ['/hackagent/orchestrator/defaults'],
+  '/hackagent/orchestrator/setup/goals': ['/hackagent/orchestrator/goals'],
+  '/hackagent/orchestrator/setup/preflight': ['/hackagent/orchestrator/preflight'],
+  '/hackagent/orchestrator/setup/registry': ['/hackagent/orchestrator/registry'],
+  '/hackagent/orchestrator/results/mapping': ['/hackagent/orchestrator/mapping'],
+  '/hackagent/orchestrator/results/persistence': ['/hackagent/orchestrator/persistence'],
+  '/hackagent/orchestrator/planning/planner': ['/hackagent/orchestrator/planning'],
+  '/hackagent/tracking/goals/tracker': ['/hackagent/tracking/tracker'],
+  '/hackagent/tracking/steps/tracker': ['/hackagent/tracking/step'],
+  '/hackagent/tracking/steps/context': ['/hackagent/tracking/context'],
+  '/hackagent/tracking/steps/decorators': ['/hackagent/tracking/decorators'],
+  '/hackagent/tracking/sinks/sink': ['/hackagent/tracking/sink'],
+  '/hackagent/tracking/sinks/listeners': ['/hackagent/tracking/listeners'],
+  '/hackagent/tracking/sinks/audit': ['/hackagent/tracking/audit'],
+  '/hackagent/tracking/serialize': ['/hackagent/tracking/utils'],
+  '/hackagent/core/contracts/enums': ['/hackagent/core/contracts'],
+};
+
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
 const config: Config = {
@@ -97,6 +123,18 @@ const config: Config = {
     [
       '@docusaurus/plugin-client-redirects',
       {
+        // Technique API pages moved under their category folder
+        // (static/, adaptive/, multi_turn/, indirect/); other moved API
+        // pages are listed in MOVED_API_PAGES.
+        createRedirects(existingPath: string) {
+          const moved = existingPath.match(
+            /^\/hackagent\/attacks\/techniques\/(?:static|adaptive|multi_turn|indirect)\/(.+)$/,
+          );
+          if (moved) {
+            return [`/hackagent/attacks/techniques/${moved[1]}`];
+          }
+          return MOVED_API_PAGES[existingPath];
+        },
         redirects: [
           {
             from: '/hackagent/attacks/evaluator/base',
@@ -127,7 +165,7 @@ const config: Config = {
           },
           {
             from: '/hackagent/router/tracking/tracker',
-            to: '/hackagent/tracking/tracker',
+            to: '/hackagent/tracking/goals/tracker',
           },
           {
             from: '/hackagent/router/tracking/coordinator',
@@ -135,23 +173,23 @@ const config: Config = {
           },
           {
             from: '/hackagent/router/tracking/context',
-            to: '/hackagent/tracking/context',
+            to: '/hackagent/tracking/steps/context',
           },
           {
             from: '/hackagent/router/tracking/step',
-            to: '/hackagent/tracking/step',
+            to: '/hackagent/tracking/steps/tracker',
           },
           {
             from: '/hackagent/router/tracking/decorators',
-            to: '/hackagent/tracking/decorators',
+            to: '/hackagent/tracking/steps/decorators',
           },
           {
             from: '/hackagent/router/tracking/utils',
-            to: '/hackagent/tracking/utils',
+            to: '/hackagent/tracking/serialize',
           },
           {
             from: '/hackagent/router/tracking/audit',
-            to: '/hackagent/tracking/audit',
+            to: '/hackagent/tracking/sinks/audit',
           },
           {
             from: '/hackagent/router/tracking/category_classifier',
@@ -163,11 +201,11 @@ const config: Config = {
           },
           {
             from: '/hackagent/attacks/registry',
-            to: '/hackagent/orchestrator/registry',
+            to: '/hackagent/orchestrator/setup/registry',
           },
           {
             from: '/hackagent/router/discovery/scanner',
-            to: '/hackagent/orchestrator/planning',
+            to: '/hackagent/orchestrator/planning/planner',
           },
           {
             from: '/hackagent/agent',

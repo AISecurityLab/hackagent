@@ -6,7 +6,7 @@ title: hackagent.attacks.config
 Attack-facing configuration seam (Phase 4).
 
 :class:`AttackConfig` holds **technique parameters and role fields only**.
-Run bookkeeping (:class:`~hackagent.orchestrator.run_spec.RunSpec`) and
+Run bookkeeping (:class:`~hackagent.orchestrator.execution.spec.RunSpec`) and
 target generation (:class:`~hackagent.models.target_params.TargetParams`)
 live elsewhere. `roles()` replaces the orchestrator&#x27;s static role-path
 table and the per-technique `get_effective_model_roles` overrides.

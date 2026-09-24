@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from hackagent.attacks.generator import AttackTemplates
+from hackagent.attacks._lib.templates import AttackTemplates
 from hackagent.attacks.techniques.static.static_template import generation
 
 

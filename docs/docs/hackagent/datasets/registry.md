@@ -140,7 +140,7 @@ Load goals from a configuration dictionary.
 
 Callers that already have a dataset configuration dictionary use this
 helper directly. A run resolves goals through
-:func:`hackagent.orchestrator.goals.resolve_run_goals`.
+:func:`hackagent.orchestrator.setup.goals.resolve_run_goals`.
 
 **Arguments**:
 

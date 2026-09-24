@@ -10,8 +10,12 @@ from uuid import UUID, uuid4
 
 from hackagent.attacks.ports import Events
 from hackagent.core.contracts import EvalStatus, Goal
-from hackagent.tracking.sink import RunSink
-from hackagent.tracking.tracker import UNKNOWN_CATEGORY, UNKNOWN_SUBCATEGORY, Tracker
+from hackagent.tracking.sinks.sink import RunSink
+from hackagent.tracking.goals.tracker import (
+    UNKNOWN_CATEGORY,
+    UNKNOWN_SUBCATEGORY,
+    Tracker,
+)
 from tests.fakes.context import RecordingEvents, make_ctx
 
 

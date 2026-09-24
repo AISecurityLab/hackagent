@@ -105,7 +105,7 @@ class FlipAttack(BaseAttack):
     verdict.
 
     The legacy constructor ``(config_dict, client, agent_router)`` is
-    obsolete for new code. ``hackagent.orchestrator.runner`` constructs
+    obsolete for new code. ``hackagent.orchestrator.execution.runner`` constructs
     ``(config, ctx)``.
     :class:`~hackagent.attacks.techniques.static.flipattack.config.FlipAttackConfig`
     still subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.

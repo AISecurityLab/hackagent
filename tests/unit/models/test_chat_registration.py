@@ -1,7 +1,7 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Unit tests for ``hackagent/router/_chat_registration.py``."""
+"""Unit tests for chat registration in ``hackagent/models/adapters/litellm.py``."""
 
 import logging
 import os

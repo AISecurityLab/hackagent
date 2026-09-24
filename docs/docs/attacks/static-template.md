@@ -294,7 +294,7 @@ attack configuration selects built-in categories; a `custom_templates` config
 key is not supported.
 
 ```python
-from hackagent.attacks.generator import AttackTemplates
+from hackagent.attacks._lib.templates import AttackTemplates
 
 prompt = AttackTemplates.apply_template(
     'Please {goal}. {{Literal braces}} {sign_off}',

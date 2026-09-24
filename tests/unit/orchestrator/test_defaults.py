@@ -8,7 +8,7 @@ from hackagent.core.defaults import (
     DEFAULT_REMOTE_ATTACKER_IDENTIFIER,
 )
 from hackagent.core.settings import Settings
-from hackagent.orchestrator.defaults import apply_role_defaults
+from hackagent.orchestrator.setup.defaults import apply_role_defaults
 
 _NO_FILE = "/nonexistent/hackagent/config.json"
 

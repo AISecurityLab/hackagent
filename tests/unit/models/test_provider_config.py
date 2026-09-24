@@ -1,7 +1,7 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Unit tests for ``hackagent/router/provider_config.py``."""
+"""Unit tests for ``hackagent/models/provider_config.py``."""
 
 import logging
 import unittest

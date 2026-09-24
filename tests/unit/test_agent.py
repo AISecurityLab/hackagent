@@ -102,7 +102,7 @@ class TestHackAgentHack(unittest.TestCase):
             self.agent.hack(attack_config={"attack_type": "nonexistent"})
         self.assertIn("Unsupported", str(ctx.exception))
 
-    @patch("hackagent.orchestrator.runner.run")
+    @patch("hackagent.orchestrator.execution.runner.run")
     def test_hack_delegates_to_runner(self, mock_run):
         """Test that hack delegates to the orchestrator runner."""
         mock_run.return_value = [{"result": "test"}]
@@ -115,7 +115,7 @@ class TestHackAgentHack(unittest.TestCase):
         self.assertEqual(result, [{"result": "test"}])
         self.assertIs(mock_run.call_args.args[0], self.agent)
 
-    @patch("hackagent.orchestrator.runner.run")
+    @patch("hackagent.orchestrator.execution.runner.run")
     def test_hack_passes_run_config_override(self, mock_run):
         """Test that run_config_override is passed to the runner."""
         mock_run.return_value = []
@@ -126,7 +126,7 @@ class TestHackAgentHack(unittest.TestCase):
         )
         self.assertEqual(mock_run.call_args.kwargs["run_config_override"], run_config)
 
-    @patch("hackagent.orchestrator.runner.run")
+    @patch("hackagent.orchestrator.execution.runner.run")
     def test_hack_passes_fail_on_run_error(self, mock_run):
         """Test that fail_on_run_error is passed to the runner."""
         mock_run.return_value = []
@@ -136,7 +136,7 @@ class TestHackAgentHack(unittest.TestCase):
         )
         self.assertFalse(mock_run.call_args.kwargs["fail_on_run_error"])
 
-    @patch("hackagent.orchestrator.runner.run")
+    @patch("hackagent.orchestrator.execution.runner.run")
     def test_hack_wraps_value_error(self, mock_run):
         """Test that ValueError is wrapped in HackAgentError."""
         mock_run.side_effect = ValueError("Bad config")
@@ -144,7 +144,7 @@ class TestHackAgentHack(unittest.TestCase):
             self.agent.hack(attack_config={"attack_type": "baseline"})
         self.assertIn("Configuration error", str(ctx.exception))
 
-    @patch("hackagent.orchestrator.runner.run")
+    @patch("hackagent.orchestrator.execution.runner.run")
     def test_hack_wraps_runtime_error(self, mock_run):
         """Test that RuntimeError is wrapped in HackAgentError."""
         mock_run.side_effect = RuntimeError("Something broke")
@@ -152,7 +152,7 @@ class TestHackAgentHack(unittest.TestCase):
             self.agent.hack(attack_config={"attack_type": "baseline"})
         self.assertIn("unexpected runtime error", str(ctx.exception).lower())
 
-    @patch("hackagent.orchestrator.runner.run")
+    @patch("hackagent.orchestrator.execution.runner.run")
     def test_hack_wraps_backend_runtime_error(self, mock_run):
         """Test backend-specific RuntimeErrors are wrapped."""
         mock_run.side_effect = RuntimeError("Failed to create backend agent")
@@ -160,14 +160,14 @@ class TestHackAgentHack(unittest.TestCase):
             self.agent.hack(attack_config={"attack_type": "baseline"})
         self.assertIn("Backend agent operation failed", str(ctx.exception))
 
-    @patch("hackagent.orchestrator.runner.run")
+    @patch("hackagent.orchestrator.execution.runner.run")
     def test_hack_wraps_generic_exception(self, mock_run):
         """Test that generic exceptions are wrapped in HackAgentError."""
         mock_run.side_effect = Exception("Unknown error")
         with self.assertRaises(HackAgentError):
             self.agent.hack(attack_config={"attack_type": "baseline"})
 
-    @patch("hackagent.orchestrator.runner.run")
+    @patch("hackagent.orchestrator.execution.runner.run")
     def test_hack_reraises_hackagent_error(self, mock_run):
         """Test that HackAgentError is re-raised as-is."""
         mock_run.side_effect = HackAgentError("Direct error")

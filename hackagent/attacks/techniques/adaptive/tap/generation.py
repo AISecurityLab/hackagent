@@ -28,7 +28,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional, Tuple
 
 from hackagent.attacks._lib.progress import create_progress_bar
-from hackagent.attacks.shared.prompt_parser import extract_prompt_and_improvement
+from hackagent.attacks._lib.prompt_parser import extract_prompt_and_improvement
 from hackagent.attacks._lib.response import (
     extract_response_content,
     get_guardrail_info,

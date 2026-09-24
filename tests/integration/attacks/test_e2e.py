@@ -235,7 +235,7 @@ class TestAttackStrategies:
             agent_type=AgentType.OLLAMA,
         )
 
-        from hackagent.orchestrator.registry import ATTACK_REGISTRY, load_attack
+        from hackagent.orchestrator.setup.registry import ATTACK_REGISTRY, load_attack
 
         _ = agent
         expected_strategies = ["advprefix", "static_template", "pair"]
@@ -262,7 +262,7 @@ class TestAttackStrategies:
             agent_type=AgentType.OLLAMA,
         )
 
-        from hackagent.orchestrator.registry import load_attack
+        from hackagent.orchestrator.setup.registry import load_attack
 
         _ = agent
         # The registry stores module paths and imports the class on demand.

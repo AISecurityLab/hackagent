@@ -107,7 +107,7 @@ class Agent(ABC):
     def _setup_logger(self) -> None:
         """Set up the hierarchical logger for this adapter instance."""
         self.logger = logging.getLogger(
-            f"hackagent.router.adapters.{self.ADAPTER_TYPE}.{self.id}"
+            f"hackagent.models.adapters.{self.ADAPTER_TYPE}.{self.id}"
         )
 
     @property

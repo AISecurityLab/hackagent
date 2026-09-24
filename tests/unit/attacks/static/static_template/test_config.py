@@ -7,7 +7,7 @@ from hackagent.attacks.techniques.static.static_template.config import (
     DEFAULT_TEMPLATE_CONFIG,
     TemplateAttackConfig,
 )
-from hackagent.attacks.generator import AttackTemplates
+from hackagent.attacks._lib.templates import AttackTemplates
 
 
 class TestDefaultTemplateConfig(unittest.TestCase):

@@ -30,10 +30,6 @@ except ImportError:
 _EXCLUDE_PREFIXES = (
     "hackagent.storage._http",
     "hackagent.attacks._lib.legacy_seams",
-    "hackagent.router",
-    "hackagent.attacks.shared",
-    "hackagent.attacks.generator",
-    "hackagent.attacks.objectives",
 )
 
 # pydoc-markdown writes ids under reference/. The web package page is
@@ -445,10 +441,8 @@ in the HackAgent Python SDK, auto-generated from source-code docstrings.
   Shared helpers live in `hackagent.attacks._lib` (transforms, scoring,
   templates, objectives, progress, inline-judge adapters, `ensure_graphviz`).
   Every shipped technique constructs as `BaseAttack(config, ctx)`.
-  Private modules and deferred shims are omitted from these pages:
-  `storage._http`, `attacks._lib.legacy_seams`, `hackagent.router`,
-  and `attacks.shared` / `attacks.generator` / `attacks.objectives`.
-  Those shims remain in the package.
+  Private modules are omitted from these pages: `storage._http` and
+  `attacks._lib.legacy_seams`.
 - **Datasets**: Built-in providers and dataset registry
 - **Risks**: Risk profiles and vulnerability definitions for all OWASP LLM risk categories
 

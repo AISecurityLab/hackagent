@@ -54,7 +54,7 @@ the AutoDAN-Turbo scorer+wrapper protocol.
 - `agent_router` - Router for the victim model.
 - `attacker_router` - Router for the attacker LLM.
 - `scorer_router` - Router for the scorer LLM.
-- `objective` - Loaded :class:`~hackagent.attacks.objectives.base.ObjectiveConfig`
+- `objective` - Loaded :class:`~hackagent.attacks._lib.objectives.base.ObjectiveConfig`
   instance for the configured `objective` key.
 - `logger` - Hierarchical logger at `hackagent.attacks.pair`.
 

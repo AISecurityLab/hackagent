@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 from hackagent.interfaces.tui.forms import get_all_attack_specs
 from hackagent.interfaces.tui.views.attacks.executor import AttacksExecutorMixin
-from hackagent.orchestrator.registry import load_config_model
+from hackagent.orchestrator.setup.registry import load_config_model
 
 _SKIPPED = {"attack_type", "goals", "dataset", "intents", "output_dir"}
 

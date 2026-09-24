@@ -175,7 +175,7 @@ class TestParseDocuments(unittest.TestCase):
 
 class TestGetEmbeddings(unittest.TestCase):
     def test_uses_shared_embedding_endpoint_and_credential_resolution(self):
-        from hackagent.attacks.shared.embedding_utils import embedding_request_kwargs
+        from hackagent.attacks._lib.embedding_utils import embedding_request_kwargs
 
         for config in (
             {

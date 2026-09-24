@@ -4,7 +4,7 @@ sidebar_position: 1
 
 # Evaluation
 
-`hackagent.evaluation` is a depth-0 package. It imports only [`hackagent.core`](../hackagent/core/contracts.md). Attack techniques reach it through the [`Judge`](../attacks/seam.md) port on `RunContext`, not by importing this package. It ships in the base install. The FAISS index used by the RAG attack is the `rag` extra, not this package.
+`hackagent.evaluation` is a depth-0 package. It imports only [`hackagent.core`](../hackagent/core/contracts/judging.md). Attack techniques reach it through the [`Judge`](../attacks/seam.md) port on `RunContext`, not by importing this package. It ships in the base install. The FAISS index used by the RAG attack is the `rag` extra, not this package.
 
 `Panel` turns a `Sample` into a `Verdict`. Judges and pattern evaluators produce the scores. Metrics run on verdicts.
 
@@ -103,4 +103,4 @@ Row-level helpers that used to live next to these functions are gone. `generate_
 
 `hackagent.attacks.evaluator` is gone, including `sync.py`, `_already_evaluated`, and the progress/sync helpers. There is no import shim.
 
-Static Template still writes its own evaluation status with `_sync_evaluation_to_server` in `hackagent.attacks.techniques.static.static_template.static_eval`. Technique-local `eval_*` writers stay in the techniques. That helper stays technique-local. It is not a public evaluation API. Record `eval_*` columns for a run are produced by [`hackagent.orchestrator.mapping`](../hackagent/orchestrator/mapping.md).
+Static Template still writes its own evaluation status with `_sync_evaluation_to_server` in `hackagent.attacks.techniques.static.static_template.static_eval`. Technique-local `eval_*` writers stay in the techniques. That helper stays technique-local. It is not a public evaluation API. Record `eval_*` columns for a run are produced by [`hackagent.orchestrator.results.mapping`](../hackagent/orchestrator/results/mapping.md).

@@ -34,12 +34,11 @@ Every shipped technique accepts that constructor.
   `ctx.models`, scores from `ctx.judge`, artifacts under
   `ctx.workspace`. They do not read `_suppress_run_status_updates`.
 
-`hackagent.orchestrator.runner` instantiates every shipped technique as
+`hackagent.orchestrator.execution.runner` instantiates every shipped technique as
 `(config, ctx)`. The legacy `(config_dict, client, agent_router)`
 constructor, including `client=` as a keyword, remains supported and is
 obsolete for new technique code. Shared helpers live in
-`hackagent.attacks._lib`; compatibility shims remain at
-`attacks.shared`, `attacks.generator`, and `attacks.objectives`.
+`hackagent.attacks._lib`.
 
 Attack techniques are grouped by category, as in the docs:
     techniques/static/static_template/attack.py - StaticTemplateAttack
@@ -83,7 +82,7 @@ Subclasses:
 Every shipped technique accepts `(config, ctx)`: post-hoc,
 inline-judge (`ctx.judge.score`), and custom-loop
 (`ctx.models` / `ctx.judge` / `ctx.workspace`).
-`hackagent.orchestrator.runner` constructs them that way. The legacy
+`hackagent.orchestrator.execution.runner` constructs them that way. The legacy
 `(config, client, agent_router)` constructor remains supported and
 is obsolete for new technique code.
 
@@ -119,7 +118,7 @@ def __init__(config: Union[AttackConfig, Dict[str, Any]],
 Initialize with `(config, ctx)` or legacy `(config, client, agent_router)`.
 
 Prefer `BaseAttack(config, ctx)`. Every shipped technique accepts
-`ctx` positionally or as `ctx=`. `hackagent.orchestrator.runner`
+`ctx` positionally or as `ctx=`. `hackagent.orchestrator.execution.runner`
 passes `(config, ctx)`. The legacy
 `(config_dict, client, agent_router)` constructor (including
 `client=` as a keyword) remains supported and is obsolete for new

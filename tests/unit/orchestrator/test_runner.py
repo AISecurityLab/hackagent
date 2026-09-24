@@ -7,7 +7,7 @@ import pytest
 
 from hackagent.attacks.types import AttackResult
 from hackagent.core.contracts import Verdict
-from hackagent.orchestrator.runner import judge_unjudged
+from hackagent.orchestrator.execution.runner import judge_unjudged
 from tests.fakes.judge import FakeJudge
 
 

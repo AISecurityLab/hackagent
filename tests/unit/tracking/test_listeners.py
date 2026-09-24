@@ -3,7 +3,7 @@
 
 import unittest
 
-from hackagent.tracking.listeners import BusListener, Fanout
+from hackagent.tracking.sinks.listeners import BusListener, Fanout
 
 
 class _Recorder:
