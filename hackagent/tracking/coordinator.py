@@ -50,9 +50,9 @@ from typing import Any, Callable, Dict, List, Optional
 
 from hackagent.core.contracts import RunStatus
 
-from .context import TrackingContext
-from .step import StepTracker
-from .tracker import Context, Tracker
+from hackagent.tracking.steps.context import TrackingContext
+from hackagent.tracking.steps.tracker import StepTracker
+from hackagent.tracking.goals.tracker import Context, Tracker
 
 # Bound on concurrent create_goal_result() calls during initialize_goals().
 # Each call is one network round trip (or locked SQLite write for the local

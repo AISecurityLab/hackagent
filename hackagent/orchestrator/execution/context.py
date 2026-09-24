@@ -14,7 +14,7 @@ from hackagent.core.logging import get_logger
 from hackagent.evaluation.panel import AGGREGATIONS, LLMJudge, Panel
 from hackagent.models.factory import spec_from_config
 from hackagent.orchestrator.results.persistence import StoreSink
-from hackagent.tracking.tracker import Tracker
+from hackagent.tracking.goals.tracker import Tracker
 
 logger = get_logger(__name__)
 

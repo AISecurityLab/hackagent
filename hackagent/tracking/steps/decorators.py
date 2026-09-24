@@ -13,7 +13,7 @@ import functools
 import inspect
 from typing import Any, Callable, Dict, Optional, TypeVar
 
-from .step import StepTracker
+from hackagent.tracking.steps.tracker import StepTracker
 
 # Type variable for preserving function signatures
 F = TypeVar("F", bound=Callable[..., Any])

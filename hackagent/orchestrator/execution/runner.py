@@ -41,7 +41,7 @@ from hackagent.orchestrator.setup.preflight import (
 from hackagent.orchestrator.setup.registry import load_attack
 from hackagent.orchestrator.execution.spec import RunSpec
 from hackagent.orchestrator.execution.scheduling import schedule
-from hackagent.tracking.audit import record_run_audit_failure
+from hackagent.tracking.sinks.audit import record_run_audit_failure
 
 logger = get_logger(__name__)
 

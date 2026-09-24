@@ -31,10 +31,10 @@ from uuid import UUID
 
 from hackagent.core.contracts import EvalStatus, Goal, StepKind
 
-from .audit import record_run_audit_failure
-from .listeners import EventListener, Fanout
-from .sink import RunSink
-from .utils import deep_clean, sanitize_for_json
+from hackagent.tracking.sinks.audit import record_run_audit_failure
+from hackagent.tracking.sinks.listeners import EventListener, Fanout
+from hackagent.tracking.sinks.sink import RunSink
+from hackagent.tracking.serialize import deep_clean, sanitize_for_json
 
 # Labels stored on result metadata when a goal was not pre-labelled.
 # Classification itself lives outside tracking.

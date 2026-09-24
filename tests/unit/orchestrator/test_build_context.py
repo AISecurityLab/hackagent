@@ -13,7 +13,7 @@ from hackagent.orchestrator.execution.context import (
     DEFAULT_JUDGE_AGGREGATION,
     build_context,
 )
-from hackagent.tracking.tracker import UNKNOWN_CATEGORY, Tracker
+from hackagent.tracking.goals.tracker import UNKNOWN_CATEGORY, Tracker
 from tests.fakes.context import FakeLLMFactory
 from tests.fakes.llm import FakeLLM
 

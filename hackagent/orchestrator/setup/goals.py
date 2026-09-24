@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional, Sequence
 from hackagent.core.contracts import Goal, LLM, Message
 from hackagent.core.logging import get_logger
 from hackagent.datasets.goals import resolve_goals
-from hackagent.tracking.tracker import UNKNOWN_CATEGORY, UNKNOWN_SUBCATEGORY
+from hackagent.tracking.goals.tracker import UNKNOWN_CATEGORY, UNKNOWN_SUBCATEGORY
 
 logger = get_logger(__name__)
 

@@ -9,10 +9,10 @@ import unittest
 from unittest.mock import MagicMock
 
 from hackagent.core.contracts import EvalStatus, RunStatus
-from hackagent.tracking.audit import AuditPersistenceError
-from hackagent.tracking.context import TrackingContext
-from hackagent.tracking.step import StepTracker
-from hackagent.tracking.utils import sanitize_for_json
+from hackagent.tracking.sinks.audit import AuditPersistenceError
+from hackagent.tracking.steps.context import TrackingContext
+from hackagent.tracking.steps.tracker import StepTracker
+from hackagent.tracking.serialize import sanitize_for_json
 
 
 class TestStepTrackerInitialization(unittest.TestCase):

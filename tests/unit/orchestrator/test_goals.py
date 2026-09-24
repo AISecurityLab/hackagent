@@ -9,7 +9,7 @@ from hackagent.orchestrator.setup.goals import (
     label_goals,
     resolve_run_goals,
 )
-from hackagent.tracking.tracker import UNKNOWN_CATEGORY, UNKNOWN_SUBCATEGORY
+from hackagent.tracking.goals.tracker import UNKNOWN_CATEGORY, UNKNOWN_SUBCATEGORY
 from tests.fakes.llm import FakeLLM
 
 

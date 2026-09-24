@@ -27,15 +27,25 @@ Result Organization:
 
 The Tracker approach ensures each Result represents a meaningful datapoint
 (e.g., one attack goal) rather than individual LLM interactions.
+
+Layout:
+- :mod:`~hackagent.tracking.goals`: ``Tracker`` and the per-goal ``Context``
+- :mod:`~hackagent.tracking.steps`: ``StepTracker``, ``TrackingContext`` and
+  the tracking decorators
+- :mod:`~hackagent.tracking.sinks`: ``RunSink``, event listeners and audit
+  failure helpers
+- :mod:`~hackagent.tracking.coordinator`: ``TrackingCoordinator``, which
+  drives both levels for a technique
+- :mod:`~hackagent.tracking.serialize`: JSON-safe cleaning of trace content
 """
 
-from .context import TrackingContext
-from .coordinator import TrackingCoordinator
-from .decorators import track_operation, track_pipeline
-from .listeners import BusListener, EventListener, Fanout
-from .sink import RunSink
-from .step import StepTracker
-from .tracker import Context, Tracker
+from hackagent.tracking.steps.context import TrackingContext
+from hackagent.tracking.coordinator import TrackingCoordinator
+from hackagent.tracking.steps.decorators import track_operation, track_pipeline
+from hackagent.tracking.sinks.listeners import BusListener, EventListener, Fanout
+from hackagent.tracking.sinks.sink import RunSink
+from hackagent.tracking.steps.tracker import StepTracker
+from hackagent.tracking.goals.tracker import Context, Tracker
 
 __all__ = [
     "BusListener",

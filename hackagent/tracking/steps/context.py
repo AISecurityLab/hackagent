@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 from uuid import UUID
 
-from hackagent.tracking.sink import RunSink
+from hackagent.tracking.sinks.sink import RunSink
 
 
 @dataclass

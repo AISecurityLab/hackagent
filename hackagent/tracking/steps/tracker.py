@@ -19,9 +19,12 @@ from typing import Any, Dict, Optional
 
 from hackagent.core.contracts import EvalStatus, RunStatus, StepKind
 
-from .context import TrackingContext
-from .audit import AuditPersistenceError, record_run_audit_failure
-from .utils import deep_clean, sanitize_for_json
+from hackagent.tracking.steps.context import TrackingContext
+from hackagent.tracking.sinks.audit import (
+    AuditPersistenceError,
+    record_run_audit_failure,
+)
+from hackagent.tracking.serialize import deep_clean, sanitize_for_json
 
 
 class StepTracker:
