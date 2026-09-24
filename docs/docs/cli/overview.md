@@ -9,6 +9,8 @@ The **HackAgent CLI** provides a powerful command-line interface for AI agent se
 
 The CLI, TUI, and web dashboard live in `hackagent.interfaces` and talk only to the [facade](../client/index.md). Strategy commands are registered from `catalog()` (crescendo and rag included). The quick scan calls `hack_chain` on the bound target. The ASCII banner and logging setup stay in the CLI package. TUI forms are built from each technique's JSON schema, and the TUI passes `on_event` into `hack` / `hack_chain`. The web UI is `hackagent.interfaces.web`.
 
+Click ships with the base install. The terminal UI needs `pip install 'hackagent[tui]'` (Textual). The dashboard needs `pip install 'hackagent[web]'`. `hackagent scan` needs `pip install 'hackagent[browser]'` (Playwright). A bare `pip install hackagent` does not install Textual, and `import hackagent` does not load it.
+
 For installation instructions, see the [Installation Guide](../getting-started/installation.mdx).
 
 ## Commands

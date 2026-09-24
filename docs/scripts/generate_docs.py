@@ -7,6 +7,7 @@ Generates API documentation from the local source using pydoc-markdown.
 """
 
 import argparse
+import json
 import os
 import re
 import shutil
@@ -21,9 +22,30 @@ try:
 except ImportError:
     tomllib = None  # Python < 3.11 fallback handled in get_current_version()
 
-# The generated HTTP client is private to hackagent.storage.remote.
+# Private modules and compatibility shims are not public API pages.
 # hackagent.client and hackagent.interfaces (cli, tui, web) are documented.
-_EXCLUDE_PREFIXES = ("hackagent.storage._http",)
+# storage._http is private to storage.remote. legacy_seams is the ignored
+# sibling-import pocket. router and attacks.{shared,generator,objectives}
+# remain import shims and are deferred, not documented here.
+_EXCLUDE_PREFIXES = (
+    "hackagent.storage._http",
+    "hackagent.attacks._lib.legacy_seams",
+    "hackagent.router",
+    "hackagent.attacks.shared",
+    "hackagent.attacks.generator",
+    "hackagent.attacks.objectives",
+)
+
+# pydoc-markdown writes ids under reference/. The web package page is
+# __init__.md and its helpers are _*.md; _publish_interface_pages renames
+# those so the docs plugin (which drops _*.md) can publish them.
+_SIDEBAR_ID_REWRITES = {
+    "hackagent/interfaces/web/__init__": "hackagent/interfaces/web/index",
+    "hackagent/interfaces/web/_local_api": "hackagent/interfaces/web/local_api",
+    "hackagent/interfaces/web/_proxy": "hackagent/interfaces/web/proxy",
+    "hackagent/interfaces/web/_serializers": "hackagent/interfaces/web/serializers",
+    "hackagent/interfaces/web/_static": "hackagent/interfaces/web/static",
+}
 
 
 def _sanitize_mdx(text: str) -> str:
@@ -79,6 +101,69 @@ def _sanitize_mdx(text: str) -> str:
         result.append("".join(escaped_parts))
 
     return "\n".join(result)
+
+
+def _doc_page_exists(docs_dir: Path, doc_id: str) -> bool:
+    """True when *doc_id* is a published markdown page.
+
+    The docs plugin drops files named ``_*.md``. Directory names such as
+    ``attacks/_lib`` stay published.
+    """
+    name = doc_id.rsplit("/", 1)[-1]
+    if not doc_id or name.startswith("_"):
+        return False
+    base = docs_dir / doc_id
+    return base.with_suffix(".md").is_file() or base.with_suffix(".mdx").is_file()
+
+
+def _rewrite_sidebar_id(doc_id: str) -> str:
+    if doc_id.startswith("reference/"):
+        doc_id = doc_id[len("reference/") :]
+    return _SIDEBAR_ID_REWRITES.get(doc_id, doc_id)
+
+
+def _prune_sidebar_node(node, docs_dir: Path):
+    """Rewrite generated ids onto published pages and drop the rest."""
+    if isinstance(node, str):
+        doc_id = _rewrite_sidebar_id(node)
+        if _doc_page_exists(docs_dir, doc_id):
+            return doc_id
+        return None
+    if isinstance(node, list):
+        pruned = []
+        for item in node:
+            kept = _prune_sidebar_node(item, docs_dir)
+            if kept is not None and kept != []:
+                pruned.append(kept)
+        return pruned
+    if isinstance(node, dict):
+        updated = dict(node)
+        if isinstance(updated.get("id"), str):
+            doc_id = _rewrite_sidebar_id(updated["id"])
+            if not _doc_page_exists(docs_dir, doc_id):
+                return None
+            updated["id"] = doc_id
+        if "items" in updated:
+            items = _prune_sidebar_node(updated["items"], docs_dir)
+            if not items:
+                return None
+            updated["items"] = items
+        return updated
+    return node
+
+
+def _sync_generated_sidebar(docs_dir: Path) -> None:
+    """Point ``sidebar.json`` at pages that exist after the flatten/rename."""
+    sidebar_path = docs_dir / "sidebar.json"
+    if not sidebar_path.is_file():
+        print("⚠️  No generated sidebar.json to rewrite")
+        return
+    sidebar = json.loads(sidebar_path.read_text(encoding="utf-8"))
+    pruned = _prune_sidebar_node(sidebar, docs_dir)
+    if pruned is None:
+        pruned = {"type": "category", "label": "SDK Reference", "items": []}
+    sidebar_path.write_text(json.dumps(pruned, indent=2) + "\n", encoding="utf-8")
+    print(f"🔧 Rewrote sidebar ids in {sidebar_path}")
 
 
 def _publish_interface_pages(docs_dir: Path) -> None:
@@ -360,8 +445,10 @@ in the HackAgent Python SDK, auto-generated from source-code docstrings.
   Shared helpers live in `hackagent.attacks._lib` (transforms, scoring,
   templates, objectives, progress, inline-judge adapters, `ensure_graphviz`).
   Every shipped technique constructs as `BaseAttack(config, ctx)`.
-  Compatibility shims remain at `attacks.shared`, `attacks.generator`,
-  and `attacks.objectives`.
+  Private modules and deferred shims are omitted from these pages:
+  `storage._http`, `attacks._lib.legacy_seams`, `hackagent.router`,
+  and `attacks.shared` / `attacks.generator` / `attacks.objectives`.
+  Those shims remain in the package.
 - **Datasets**: Built-in providers and dataset registry
 - **Risks**: Risk profiles and vulnerability definitions for all OWASP LLM risk categories
 
@@ -392,6 +479,7 @@ For practical usage examples, see the [Python SDK Quickstart](./sdk/python-quick
         # after the first pass. Sanitize once the pages are in place.
         _sanitize_generated_docs(docs_dir)
         _publish_interface_pages(docs_dir)
+        _sync_generated_sidebar(docs_dir)
 
         print(f"✅ Documentation generated in {docs_dir}")
         print("\n🔧 To view: cd docs && npm start")

@@ -16,8 +16,8 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Tuple
 
-from hackagent.models.client import EnvelopeLLM, connect
-from hackagent.models.factory import spec_from_config
+from hackagent.attacks._lib.legacy_seams import EnvelopeLLM, connect
+from hackagent.attacks._lib.legacy_seams import spec_from_config
 
 logger = logging.getLogger(__name__)
 

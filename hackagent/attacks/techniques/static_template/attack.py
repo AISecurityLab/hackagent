@@ -12,7 +12,7 @@ import copy
 import logging
 from typing import Any, Dict, List, Optional
 
-from hackagent.storage.store import Store
+from hackagent.attacks._lib.legacy_seams import Store
 from hackagent.attacks._lib.llm_router import LLMRouter
 from hackagent.attacks.ports import RunContext
 from hackagent.attacks.techniques.base import BaseAttack

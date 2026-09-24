@@ -14,7 +14,7 @@ Every shipped technique accepts that constructor.
 
 [`hackagent.orchestrator.runner`](../orchestrator/index.md) instantiates every shipped technique as `(config, ctx)`. The legacy constructor, including `client=` as a keyword, remains supported and is obsolete for new technique code. Shipped technique models still subclass [`ConfigBase`](../hackagent/attacks/techniques/config.md). Launching a run from the SDK or CLI is unchanged: pass an `attack_config` dict to `Target.hack`. Field-by-field reference for that dict: [Shared Attack Config](./shared-args.md).
 
-Shared helpers (transforms, scoring, templates, objectives, progress, [inline-judge adapters](../hackagent/attacks/_lib/inline_judge), `ensure_graphviz()`) live in `hackagent.attacks._lib`. Compatibility shims remain at `attacks.shared`, `attacks.generator`, and `attacks.objectives`.
+Shared helpers (transforms, scoring, templates, objectives, progress, [inline-judge adapters](../hackagent/attacks/_lib/inline_judge), `ensure_graphviz()`) live in `hackagent.attacks._lib`. Compatibility shims remain at `attacks.shared`, `attacks.generator`, and `attacks.objectives`. `attacks._lib.legacy_seams` is the deferred module technique code still uses for sibling imports (`Store`, tracking coordinators, role models). Those shims are not public API pages.
 
 API reference for the types below is generated from the source docstrings.
 

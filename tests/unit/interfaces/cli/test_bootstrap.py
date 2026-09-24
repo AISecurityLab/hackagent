@@ -118,7 +118,7 @@ class TestLaunchTuiDefault(unittest.TestCase):
             str(call.args[0]) for call in printer.call_args_list if call.args
         )
         self.assertIn("TUI dependencies not installed", printed)
-        self.assertIn("pip install textual", printed)
+        self.assertIn("pip install 'hackagent[tui]'", printed)
 
     def test_tui_startup_failure_exits_with_cli_hint(self):
         ctx, _ = self._ctx()

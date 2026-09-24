@@ -17,7 +17,7 @@ AutoDAN-Turbo combines three core LLM roles plus a configurable retrieval embedd
 - **Summarizer**: extracts reusable strategies from prompt pairs
 - **Embedder**: computes strategy-retrieval signatures for library search
 
-It uses these roles to build a strategy library, then reuses that library across iterations to improve success rates. An attack attempt is considered jailbroken as soon as the scorer reports a value greater than or equal to `break_score`.
+It uses these roles to build a strategy library, then reuses that library across iterations to improve success rates. An attack attempt is considered jailbroken as soon as the scorer reports a value greater than or equal to `break_score`. The strategy library retrieves with FAISS, so this attack needs the `rag` extra (`pip install 'hackagent[rag]'`).
 
 AutoDAN-Turbo-specific knobs live under **`autodan_turbo_params`**. Role configs (`attacker`, `judge`, `summarizer`, `embedder`) and batching (`goal_batch_size`, `goal_batch_workers`) sit at the **top level**. `batch_size` is **not used**. See [Shared Attack Config](./shared-args.md).
 

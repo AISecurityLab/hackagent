@@ -22,10 +22,11 @@ The command preconfigures the demo and automatically starts the attack flow in t
 <details style={{background: 'var(--ifm-color-emphasis-100)', border: '1px solid var(--ifm-color-emphasis-200)', borderRadius: '6px', padding: '0.5rem 0.75rem', marginBottom: '0.75rem'}}>
   <summary style={{cursor: 'pointer', fontWeight: 600}}>Prerequisites</summary>
 
-1. Install Ollama: `curl -fsSL https://ollama.com/install.sh | sh`
-2. Start server: `ollama serve`
-3. Pull model: `ollama pull gemma3:4b`
-4. Verify: `curl http://localhost:11434/api/tags`
+1. Install HackAgent with the terminal UI: `pip install 'hackagent[tui]'`
+2. Install Ollama: `curl -fsSL https://ollama.com/install.sh | sh`
+3. Start server: `ollama serve`
+4. Pull model: `ollama pull gemma3:4b`
+5. Verify: `curl http://localhost:11434/api/tags`
 </details>
 
 Run the built-in Ollama demo directly in the TUI:
@@ -58,7 +59,7 @@ hackagent examples ollama
 
 - **Ollama not running**: start it with `ollama serve`
 - **Missing model**: the CLI pulls missing models automatically
-- **TUI startup issue**: run `hackagent --version` first to confirm installation
+- **TUI startup issue**: run `hackagent --version` first to confirm installation. If Textual is missing, install the extra: `pip install 'hackagent[tui]'`. A bare `pip install hackagent` does not include it.
 
 </TabItem>
 <TabItem value="cli" label="CLI">

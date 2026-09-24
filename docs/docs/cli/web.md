@@ -24,8 +24,7 @@ does not carry the frontend assets:
 pip install 'hackagent[web]'
 ```
 
-Release binaries already include it. If `hackagent web` reports that no bundle
-was found, add the extra above.
+That extra installs Flask and the dashboard bundle. A bare `pip install hackagent` does not. Release binaries already include it. If `hackagent web` reports that no bundle was found, add the extra above. The bundle is served from `hackagent/interfaces/web/static`.
 
 ## Usage
 

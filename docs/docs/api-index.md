@@ -32,8 +32,10 @@ in the HackAgent Python SDK, auto-generated from source-code docstrings.
   Shared helpers live in `hackagent.attacks._lib` (transforms, scoring,
   templates, objectives, progress, inline-judge adapters, `ensure_graphviz`).
   Every shipped technique constructs as `BaseAttack(config, ctx)`.
-  Compatibility shims remain at `attacks.shared`, `attacks.generator`,
-  and `attacks.objectives`.
+  Private modules and deferred shims are omitted from these pages:
+  `storage._http`, `attacks._lib.legacy_seams`, `hackagent.router`,
+  and `attacks.shared` / `attacks.generator` / `attacks.objectives`.
+  Those shims remain in the package.
 - **Datasets**: Built-in providers and dataset registry
 - **Risks**: Risk profiles and vulnerability definitions for all OWASP LLM risk categories
 

@@ -68,6 +68,6 @@ The tracker builds the `Fanout`. `Fanout.add` attaches another listener after co
 
 ## Removed from tracking
 
-`hackagent.router.tracking` is gone. There is no import shim.
+`hackagent.router.tracking` is gone. `hackagent.router` remains a deferred shim: it re-exports `StepTracker`, `TrackingContext`, and `track_operation`, and `router.discovery` re-exports the planner. That package is outside the layered layout and is omitted from the generated reference.
 
 `GoalCategoryClassifier` is not part of tracking, and the class is not in this package. Labels come from `preclassified_goal_labels_by_index` when the caller already has them. Otherwise the result metadata stores `UNKNOWN_CATEGORY` (`Z. Unclassified Risk`) and `UNKNOWN_SUBCATEGORY` (`Z0. Unclassified Subcategory`). The attack-config `category_classifier` block is unchanged; classification itself lives outside this package.

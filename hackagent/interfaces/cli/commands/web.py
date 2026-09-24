@@ -155,7 +155,16 @@ def web(ctx, host, port, db_path, force_local, no_browser):
     """
     from hackagent import HackAgent, Settings
     from hackagent.interfaces.cli.config import CLIConfig
-    from hackagent.interfaces.web import MissingBundleError, create_app
+
+    try:
+        from hackagent.interfaces.web import MissingBundleError, create_app
+    except ImportError as exc:
+        console.print(
+            f"[bold red]❌ Web UI dependencies are not installed: {exc}[/bold red]"
+        )
+        console.print("\n[cyan]Install with:[/cyan] pip install 'hackagent[web]'")
+        ctx.exit(1)
+        return
 
     cli_config: CLIConfig = ctx.obj["config"]
     api_key = "" if force_local or not cli_config.api_key else cli_config.api_key

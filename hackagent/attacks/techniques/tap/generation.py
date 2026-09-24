@@ -35,10 +35,10 @@ from hackagent.attacks._lib.response import (
     is_guardrail_response,
 )
 from hackagent.attacks._lib.llm_router import connect_role
-from hackagent.storage.store import Store
+from hackagent.attacks._lib.legacy_seams import Store
 from hackagent.core.contracts import StepKind
 from hackagent.attacks._lib.llm_router import LLMRouter
-from hackagent.tracking import Context, Tracker
+from hackagent.attacks._lib.legacy_seams import Context, Tracker
 
 from .config import ATTACKER_SYSTEM_PROMPT
 from .tap_evaluation import TapEvaluation

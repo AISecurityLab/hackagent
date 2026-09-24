@@ -26,7 +26,7 @@ from .image_encoder import encode_prompt
 from .prompts import get_prompt_template
 
 if TYPE_CHECKING:
-    from hackagent.tracking import Tracker
+    from hackagent.attacks._lib.legacy_seams import Tracker
 
 
 def _random_shuffle_words(sentence: str) -> List[str]:

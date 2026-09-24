@@ -70,7 +70,7 @@ jobs:
           import os, shutil, sys
           sys.path.insert(0, os.path.join(os.environ["RUNNER_TEMP"], "webui"))
           from hackagent_webui import __version__, bundle_path
-          dest = os.path.join("hackagent", "server", "webui", "static")
+          dest = os.path.join("hackagent", "interfaces", "web", "static")
           shutil.copytree(bundle_path(), dest, dirs_exist_ok=True)
           print(f"staged hackagent-webui {__version__} into {dest}")
           PY
@@ -145,7 +145,7 @@ jobs:
           import os, shutil, sys
           sys.path.insert(0, os.path.join(os.environ["RUNNER_TEMP"], "webui"))
           from hackagent_webui import __version__, bundle_path
-          dest = os.path.join("hackagent", "server", "webui", "static")
+          dest = os.path.join("hackagent", "interfaces", "web", "static")
           shutil.copytree(bundle_path(), dest, dirs_exist_ok=True)
           print(f"staged hackagent-webui {__version__} into {dest}")
           PY

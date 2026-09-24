@@ -29,7 +29,7 @@ from .decorators import (
 )
 
 if TYPE_CHECKING:
-    from hackagent.tracking import Tracker
+    from hackagent.attacks._lib.legacy_seams import Tracker
 
 
 def _build_prompting_interface(

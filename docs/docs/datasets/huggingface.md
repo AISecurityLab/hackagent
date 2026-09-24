@@ -14,6 +14,12 @@ Use the HuggingFace provider when you want to:
 - Customize dataset configurations
 :::
 
+The provider imports Hugging Face `datasets` lazily. Install that library with the `hf` extra:
+
+```bash
+pip install 'hackagent[hf]'
+```
+
 ## Initial Setup (Authentication)
 
 Public datasets usually work without authentication.

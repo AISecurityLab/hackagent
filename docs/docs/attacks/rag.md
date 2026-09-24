@@ -8,6 +8,8 @@ The **RAG Attack** tests whether a RAG-augmented agent can be manipulated throug
 
 **Category:** Static. **Tags:** Indirect, RAG — the payload lives in retrieved documents, not in an attacker refinement loop. See [Attack taxonomy](./taxonomy.mdx).
 
+The index is FAISS. FAISS and NumPy ship in the `rag` extra (`pip install 'hackagent[rag]'`). A bare install does not include them.
+
 :::info Risk categorization
 **Attack:** RAG Attack (`attack_type: "rag"`) · **Primary category:** Static · **Tags:** Indirect, RAG · **Risk microcategory:** Indirect Injection
 :::

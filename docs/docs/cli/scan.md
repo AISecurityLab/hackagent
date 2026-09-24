@@ -6,6 +6,14 @@ sidebar_position: 8
 
 `hackagent scan <url>` red-teams a website's chatbot widget through a **real browser** — it drives the live page, typing each prompt into the chat widget and reading the reply from the page. Because it works at the DOM level, it works against any chat UI regardless of transport (WebSocket, SSE, plain HTTP).
 
+Playwright ships in the `browser` extra:
+
+```bash
+pip install 'hackagent[browser]'
+```
+
+The default run opens the terminal UI, which also needs `pip install 'hackagent[tui]'`. `--no-tui` skips Textual and still needs the browser extra.
+
 ## Usage
 
 ```bash

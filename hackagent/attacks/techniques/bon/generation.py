@@ -46,9 +46,9 @@ from hackagent.attacks._lib.response import (
 from hackagent.attacks._lib.llm_router import LLMRouter
 
 if TYPE_CHECKING:
-    from hackagent.storage.store import Store
-    from hackagent.tracking import Tracker
-    from hackagent.tracking.tracker import Context
+    from hackagent.attacks._lib.legacy_seams import Store
+    from hackagent.attacks._lib.legacy_seams import Tracker
+    from hackagent.attacks._lib.legacy_seams import Context
 
 
 _StepJudge = Any
