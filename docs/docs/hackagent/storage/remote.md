@@ -32,7 +32,7 @@ def connect(cls,
             raise_on_unexpected_status: bool = False) -> "RemoteBackend"
 ```
 
-Create a backend for ``base_url`` authenticated with ``api_key``.
+Create a backend for `base_url` authenticated with `api_key`.
 
 #### check\_connection
 
@@ -42,8 +42,8 @@ def check_connection() -> int
 
 Probe the API with this backend&#x27;s credentials; return the HTTP status.
 
-``/agent`` is the endpoint that accepts API keys (``/key`` and
-``/organization/me`` are Auth0-only on the deployed API).
+`/agent` is the endpoint that accepts API keys (`/key` and
+`/organization/me` are Auth0-only on the deployed API).
 
 #### flush
 

@@ -7,8 +7,8 @@ FC-Attack generation and execution module.
 
 Provides two entry points:
 
-- ``execute_fc`` — Renders flowchart images and sends them to a VLM.
-- ``execute_tfc`` — Serializes flowcharts as text and sends to any LLM.
+- `execute_fc` — Renders flowchart images and sends them to a VLM.
+- `execute_tfc` — Serializes flowcharts as text and sends to any LLM.
 
 Shared logic (step decomposition, target execution, result recording) is
 factored into private helpers.
@@ -36,7 +36,7 @@ Pipeline:
 
 - `goals` - List of harmful prompts to encode as flowcharts.
 - `agent_router` - Router for target model communication.
-- `config` - Configuration dictionary with ``fc_params``.
+- `config` - Configuration dictionary with `fc_params`.
 - `logger` - Logger instance.
   
 
@@ -64,7 +64,7 @@ Pipeline:
 
 - `goals` - List of harmful prompts to encode as flowcharts.
 - `agent_router` - Router for target model communication.
-- `config` - Configuration dictionary with ``tfc_params``.
+- `config` - Configuration dictionary with `tfc_params`.
 - `logger` - Logger instance.
   
 

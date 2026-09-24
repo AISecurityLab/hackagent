@@ -62,10 +62,13 @@ vuln = ExcessiveAgency(types=[
 ### Run an Evaluation Campaign
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 from hackagent.catalog.risks.excessive_agency import EXCESSIVE_AGENCY_PROFILE
 
-agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:8080/chat",
+    name="my-agent",
+)
 
 # Use profile recommendations
 for attack in EXCESSIVE_AGENCY_PROFILE.primary_attacks:

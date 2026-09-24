@@ -19,19 +19,19 @@ class CipherChatAttack(BaseAttack)
 
 CipherChat jailbreak attack using encoded non-natural language prompts.
 
-Construct with ``(config, ctx)``. ``config`` is a dict deep-merged into
+Construct with `(config, ctx)`. `config` is a dict deep-merged into
 :data:`~hackagent.attacks.techniques.cipherchat.config.DEFAULT_CIPHERCHAT_CONFIG`.
-``ctx`` is a :class:`~hackagent.attacks.ports.RunContext`, passed
-positionally or as ``ctx=``. Tests build it with ``make_ctx()``
-(``tests.fakes.context``).
+`ctx` is a :class:`~hackagent.attacks.ports.RunContext`, passed
+positionally or as `ctx=`. Tests build it with `make_ctx()`
+(`tests.fakes.context`).
 
 The pipeline encodes the goal, queries the target, and optionally
-decodes the reply. It does not embed a judge step. ``run()`` returns
+decodes the reply. It does not embed a judge step. `run()` returns
 rows without a verdict.
 
-The legacy constructor ``(config_dict, client, agent_router)`` is
-obsolete for new code. ``hackagent.orchestrator.runner`` constructs
-``(config, ctx)``.
+The legacy constructor `(config_dict, client, agent_router)` is
+obsolete for new code. `hackagent.orchestrator.runner` constructs
+`(config, ctx)`.
 :class:`~hackagent.attacks.techniques.cipherchat.config.CipherChatConfig`
 still subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
 

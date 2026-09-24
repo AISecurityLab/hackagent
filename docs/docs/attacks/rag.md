@@ -214,12 +214,12 @@ Rule of thumb:
 ### Python SDK
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
-agent = HackAgent(
-    endpoint="http://localhost:11434",
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:11434",
+    "OLLAMA",
     name="gemma3:4b",
-    agent_type="OLLAMA",
 )
 
 attack_config = {

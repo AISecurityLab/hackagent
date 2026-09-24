@@ -57,10 +57,13 @@ vuln = CredentialExposure(types=[
 ### Run an Evaluation Campaign
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 from hackagent.catalog.risks.credential_exposure import CREDENTIAL_EXPOSURE_PROFILE
 
-agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:8080/chat",
+    name="my-agent",
+)
 
 # Custom goals for credential exposure testing
 custom_goals = [

@@ -52,7 +52,7 @@ class TrackingContext:
     logger: Optional[logging.Logger] = None
     sequence_counter: int = 0
     metadata: Dict[str, Any] = field(default_factory=dict)
-    # Optional :class:`hackagent.cli.tui.events.TUIEventBus`. When set, the
+    # Optional :class:`hackagent.interfaces.tui.events.TUIEventBus`. When set, the
     # :class:`StepTracker` emits ``step_started`` / ``step_ended`` events.
     event_bus: Optional[Any] = None
 

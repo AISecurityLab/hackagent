@@ -33,12 +33,12 @@ Initialize in-memory strategy store and embedding backend.
 
 **Arguments**:
 
-- `embedder_config` - Top-level ``embedder`` config from attack config.
-  Uses embedding-only provider defaults. ``on_error`` is ``disable``
-  (skip retrieval after failure) or ``raise``. No implicit local fallback.
+- `embedder_config` - Top-level `embedder` config from attack config.
+  Uses embedding-only provider defaults. `on_error` is `disable`
+  (skip retrieval after failure) or `raise`. No implicit local fallback.
 - `backend` - Retained for compatibility; never used for model credentials.
 - `embedding_model` - Legacy embedding model argument kept for backward
-  compatibility. Prefer ``embedder_config``.
+  compatibility. Prefer `embedder_config`.
 - `embedding_api_key` - Legacy API key for OpenAI-compatible embeddings.
 - `embedding_api_base` - Legacy API base for OpenAI-compatible embeddings.
 - `logger` - Optional logger for retrieval/embedding diagnostics.
@@ -66,7 +66,7 @@ before FAISS nearest-neighbor search.
 
 **Returns**:
 
-  Float32 numpy vector if successful, otherwise ``None``.
+  Float32 numpy vector if successful, otherwise `None`.
 
 #### add
 
@@ -82,8 +82,8 @@ examples/scores/embeddings instead of duplicating entries.
 
 **Arguments**:
 
-- `strategy` - Dictionary with keys such as ``Strategy``, ``Definition``,
-  ``Example``, ``Score``, ``Embeddings``.
+- `strategy` - Dictionary with keys such as `Strategy`, `Definition`,
+  `Example`, `Score`, `Embeddings`.
 - `notify` - Whether to emit informational log upon update.
   
 
@@ -112,12 +112,12 @@ Faithfully replicates original retrival.py:pop() logic:
 
 **Returns**:
 
-  Tuple ``(valid, strategies)`` where:
-  - ``valid`` is ``True`` when retrieved strategies are considered
-  effective candidates to reuse, ``False`` when they are low-scoring
+  Tuple `(valid, strategies)` where:
+  - `valid` is `True` when retrieved strategies are considered
+  effective candidates to reuse, `False` when they are low-scoring
   strategies to avoid.
-  - ``strategies`` is a list of strategy dictionaries containing
-  ``Strategy``, ``Definition`` and representative ``Example``.
+  - `strategies` is a list of strategy dictionaries containing
+  `Strategy`, `Definition` and representative `Example`.
 
 #### all
 
@@ -129,7 +129,7 @@ Return full in-memory strategy dictionary.
 
 **Returns**:
 
-  Mapping ``strategy_name -&gt; strategy_record``.
+  Mapping `strategy_name -&gt; strategy_record`.
 
 #### size
 
@@ -153,7 +153,7 @@ Persist strategy library to pickle file.
 
 **Arguments**:
 
-- `path` - Target path without extension or full ``.pkl`` prefix base.
+- `path` - Target path without extension or full `.pkl` prefix base.
   
 
 **Returns**:
@@ -170,7 +170,7 @@ Load strategy library from pickle file if present.
 
 **Arguments**:
 
-- `path` - Source path with or without ``.pkl`` suffix.
+- `path` - Source path with or without `.pkl` suffix.
   
 
 **Returns**:

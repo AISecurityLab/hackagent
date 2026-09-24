@@ -12,9 +12,9 @@ act on the embedded content.
 
 Based on: https://arxiv.org/abs/2412.00473
 
-The ``MMLAttack`` class serves as the HackAgent pipeline orchestrator
-(``BaseAttack`` subclass). The encoding and prompt construction logic
-is factored into ``image_encoder`` and ``prompts`` modules.
+The `MMLAttack` class serves as the HackAgent pipeline orchestrator
+(`BaseAttack` subclass). The encoding and prompt construction logic
+is factored into `image_encoder` and `prompts` modules.
 
 Result Tracking:
     Uses TrackingCoordinator to manage both pipeline-level StepTracker
@@ -38,7 +38,7 @@ This attack encodes harmful prompts into images using visual
 transformations and pairs them with carefully crafted text prompts
 that guide the VLM to decode and follow the hidden instructions.
 
-Encoding modes (set via ``config[&quot;mml_params&quot;][&quot;encoding_mode&quot;]``):
+Encoding modes (set via `config[&quot;mml_params&quot;][&quot;encoding_mode&quot;]`):
 word_replacement
 Replaces key words in the prompt with innocuous substitutes,
 renders to image, and provides a replacement dictionary in
@@ -60,7 +60,7 @@ Combines word replacement, horizontal mirroring, and 180-degree
 rotation. Renders the replaced text to an image, then applies
 both spatial transformations.
 
-Prompt styles (set via ``config[&quot;mml_params&quot;][&quot;prompt_style&quot;]``):
+Prompt styles (set via `config[&quot;mml_params&quot;][&quot;prompt_style&quot;]`):
 game
 Uses a villain&#x27;s lair game scenario to frame the request.
 control
@@ -89,17 +89,17 @@ Initialize MMLAttack with configuration.
 - `config` - Optional dictionary containing parameters to override
   :data:`~hackagent.attacks.techniques.mml.config.DEFAULT_MML_CONFIG`.
 - `ctx` - :class:`~hackagent.attacks.ports.RunContext`. Positional
-  or ``ctx=``. Tests use ``make_ctx()``.
+  or `ctx=`. Tests use `make_ctx()`.
 - `client` - Obsolete. Store instance on the orchestrator path.
 - `agent_router` - Obsolete. Target router on the orchestrator path.
   
 
 **Raises**:
 
-- `ValueError` - On the legacy path, if ``client`` or
-  ``agent_router`` is ``None``.
+- `ValueError` - On the legacy path, if `client` or
+  `agent_router` is `None`.
   
-  The pipeline is generation-only. ``run()`` returns rows without
+  The pipeline is generation-only. `run()` returns rows without
   a verdict. :class:`~hackagent.attacks.techniques.mml.config.MMLConfig`
   still subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
 

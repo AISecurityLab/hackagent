@@ -132,12 +132,12 @@ HackAgent ships two end-to-end indirect-injection attacks. Other vectors in the 
 The **RAG Attack** (`attack_type: "rag"`) poisons knowledge-base documents that are later retrieved as context. **Category:** Static. **Tags:** Indirect, RAG. Full pipeline, strategies, and configuration: [RAG Attack](../attacks/rag.md).
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
-agent = HackAgent(
-    endpoint="http://localhost:11434",
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:11434",
+    "OLLAMA",
     name="gemma3:4b",
-    agent_type="OLLAMA",
 )
 
 results = agent.hack(
@@ -163,12 +163,12 @@ results = agent.hack(
 **Tool-output IPI** (`attack_type: "tool_output_ipi"`) injects adversarial instructions into tool / function-call observations after a benign user task (InjecAgent / OPI). **Category:** Adaptive. **Tags:** Indirect (not `rag`). Full configuration: [Tool-output IPI](../attacks/tool_output_ipi.md).
 
 ```python
-from hackagent import HackAgent, AgentType
+from hackagent import HackAgent, AgentType, Settings
 
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:8000",
+    AgentType.OPENAI_SDK,
     name="pc_tool_sandbox",
-    endpoint="http://localhost:8000",
-    agent_type=AgentType.OPENAI_SDK,
 )
 
 results = agent.hack(

@@ -5,7 +5,7 @@ title: hackagent.attacks.techniques.fc.config
 
 Configuration for FC-Attack.
 
-Provides both the plain-dict ``DEFAULT_FC_CONFIG`` (used internally by
+Provides both the plain-dict `DEFAULT_FC_CONFIG` (used internally by
 :class:`~hackagent.attacks.techniques.fc.attack.FCAttack`) and
 typed Pydantic models for structured configuration.
 
@@ -32,9 +32,9 @@ before rendering them as flowcharts.
 
 **Attributes**:
 
-- `identifier` - Model identifier (e.g. ``&quot;gpt-4&quot;``).
+- `identifier` - Model identifier (e.g. `&quot;gpt-4&quot;`).
 - `endpoint` - API endpoint URL.
-- `agent_type` - Agent adapter type (e.g. ``&quot;OPENAI_SDK&quot;``, ``&quot;OLLAMA&quot;``).
+- `agent_type` - Agent adapter type (e.g. `&quot;OPENAI_SDK&quot;`, `&quot;OLLAMA&quot;`).
 - `api_key` - Optional API key for the model provider.
 - `max_tokens` - Maximum output tokens for step generation.
 - `temperature` - Sampling temperature.
@@ -49,9 +49,9 @@ Hyperparameters controlling the FC-Attack flowchart image generation.
 
 **Attributes**:
 
-- `layout` - Flowchart layout mode. One of ``&quot;vertical&quot;`` (top-to-bottom),
-  ``&quot;horizontal&quot;`` (left-to-right), or ``&quot;tortuous&quot;`` (S-shaped).
-  ``&quot;s_shaped&quot;`` is accepted as an alias for ``&quot;tortuous&quot;``.
+- `layout` - Flowchart layout mode. One of `&quot;vertical&quot;` (top-to-bottom),
+  `&quot;horizontal&quot;` (left-to-right), or `&quot;tortuous&quot;` (S-shaped).
+  `&quot;s_shaped&quot;` is accepted as an alias for `&quot;tortuous&quot;`.
 - `dpi` - Resolution (dots-per-inch) for Graphviz rendering.
 - `num_steps` - Number of steps to decompose the goal into.
 - `truncate_last_step` - Whether to truncate the last step to induce
@@ -83,9 +83,9 @@ Complete FC-Attack configuration for use with :meth:`HackAgent.hack`.
 
 **Attributes**:
 
-- `attack_type` - Always ``&quot;fc&quot;`` (required by the orchestrator).
+- `attack_type` - Always `&quot;fc&quot;` (required by the orchestrator).
 - `fc_params` - Flowchart generation hyperparameters.
-- `step_generator` - Optional step generator model config. When ``None``,
+- `step_generator` - Optional step generator model config. When `None`,
   a built-in heuristic decomposition is used instead of an LLM.
 
 #### from\_dict
@@ -115,9 +115,9 @@ Configuration for the text-only flowchart attack.
 
 **Attributes**:
 
-- `attack_type` - Always ``&quot;tFC&quot;`` (required by the orchestrator).
+- `attack_type` - Always `&quot;tFC&quot;` (required by the orchestrator).
 - `tfc_params` - Text flowchart generation hyperparameters.
-- `step_generator` - Optional step generator model config. When ``None``,
+- `step_generator` - Optional step generator model config. When `None`,
   a built-in heuristic decomposition is used instead of an LLM.
 
 #### from\_dict

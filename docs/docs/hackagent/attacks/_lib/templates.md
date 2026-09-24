@@ -86,8 +86,8 @@ Apply a template with goal and optional additional parameters.
 
 - `ValueError` - If a required parameter is missing or formatting is invalid.
   
-  ``goal_encoded`` uses ROT13, ``goal_base64`` uses UTF-8 Base64, and
-  ``goal_obfuscated`` reverses the goal&#x27;s Unicode code points.
+  `goal_encoded` uses ROT13, `goal_base64` uses UTF-8 Base64, and
+  `goal_obfuscated` reverses the goal&#x27;s Unicode code points.
 
 #### generate\_variations
 

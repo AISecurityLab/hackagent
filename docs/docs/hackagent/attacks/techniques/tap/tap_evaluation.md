@@ -108,7 +108,7 @@ Convenience wrapper for judge scoring of prompt-response pairs.
 
 Scores are normalized to a 1-10 scale regardless of judge type:
 binary judges (0/1) are mapped to 1/10 so that
-``success_score_threshold`` works consistently.
+`success_score_threshold` works consistently.
 
 **Arguments**:
 

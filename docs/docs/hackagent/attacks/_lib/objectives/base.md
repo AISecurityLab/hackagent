@@ -33,11 +33,11 @@ Usage:
     )
 
     # Use in attack configuration
-    attack_config = {
+    attack_config = \{
         &quot;objective&quot;: &quot;prompt_injection&quot;,
         &quot;technique&quot;: &quot;advprefix&quot;,  # or &quot;template&quot;
         &quot;goals&quot;: [...]
-    }
+    \}
 
 #### \_\_init\_\_
 

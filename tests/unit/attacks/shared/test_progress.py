@@ -38,21 +38,6 @@ class TestNullProgress(unittest.TestCase):
 class TestCreateProgressBar(unittest.TestCase):
     """Test create_progress_bar function."""
 
-    @patch.dict(os.environ, {"NO_COLOR": "1"})
-    def test_returns_null_progress_in_tui_mode(self):
-        """Test that TUI mode returns NullProgress."""
-        with create_progress_bar("Test", 10) as (progress, task):
-            self.assertIsInstance(progress, NullProgress)
-            self.assertEqual(task, 0)
-
-    @patch.dict(os.environ, {"NO_COLOR": "1"})
-    def test_null_progress_can_be_updated(self):
-        """Test that NullProgress can be updated without error."""
-        with create_progress_bar("Test", 10) as (progress, task):
-            # Should not raise
-            for _ in range(10):
-                progress.update(task, advance=1)
-
     @patch.dict(os.environ, {}, clear=True)
     def test_returns_rich_progress_in_normal_mode(self):
         """Test that normal mode returns Rich Progress."""

@@ -15,11 +15,11 @@ import logging
 import unittest
 from unittest.mock import MagicMock, patch
 
-from hackagent.cli.tui.attack_specs import ConfigField, FieldType
 from hackagent.orchestrator.planning import (
     AttackPlan,
     AutoPlanResult,
     PlannerError,
+    SchemaField,
     _coerce_value,
     _describe_target,
     _expand_dotted,
@@ -194,28 +194,26 @@ class TestDescribeTarget(unittest.TestCase):
 
 class TestCoerceValue(unittest.TestCase):
     def _field(self, ftype, **kw):
-        return ConfigField(key="f", label="f", field_type=ftype, **kw)
+        return SchemaField(key="f", field_type=ftype, **kw)
 
     def test_boolean_from_string(self):
-        value, warning = _coerce_value(self._field(FieldType.BOOLEAN), "yes")
+        value, warning = _coerce_value(self._field("boolean"), "yes")
         self.assertIs(value, True)
         self.assertIsNone(warning)
 
     def test_uncoercible_integer_is_dropped(self):
-        value, warning = _coerce_value(self._field(FieldType.INTEGER), "not-a-number")
+        value, warning = _coerce_value(self._field("integer"), "not-a-number")
         self.assertIsNone(value)
         self.assertIn("could not coerce", warning)
 
     def test_invalid_choice_is_dropped(self):
-        field = self._field(
-            FieldType.CHOICE, choices=[("Easy", "easy"), ("Hard", "hard")]
-        )
+        field = self._field("choice", choices=[("Easy", "easy"), ("Hard", "hard")])
         value, warning = _coerce_value(field, "impossible")
         self.assertIsNone(value)
         self.assertIn("invalid choice", warning)
 
     def test_valid_choice_passes(self):
-        field = self._field(FieldType.CHOICE, choices=[("Easy", "easy")])
+        field = self._field("choice", choices=[("Easy", "easy")])
         value, warning = _coerce_value(field, "easy")
         self.assertEqual(value, "easy")
         self.assertIsNone(warning)

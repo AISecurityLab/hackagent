@@ -19,7 +19,7 @@ from hackagent.catalog.taxonomy import (
     try_get_attack_taxonomy,
 )
 from hackagent.catalog.attacks import ATTACK_CATALOG
-from hackagent.cli.tui.attack_specs import get_all_attack_specs
+from hackagent.client import catalog_entries
 
 
 # Agreed assignments: primary category is how the target is hit.
@@ -124,12 +124,13 @@ class TestLookup(unittest.TestCase):
 
 
 class TestConsumersShareTheRegistry(unittest.TestCase):
-    def test_tui_specs_are_in_taxonomy(self):
-        for key, spec in get_all_attack_specs().items():
+    def test_catalog_entries_match_taxonomy(self):
+        for entry in catalog_entries():
+            key = entry["attack_type"]
             with self.subTest(attack=key):
                 tax = get_attack_taxonomy(key)
-                self.assertEqual(spec.category, tax.category)
-                self.assertEqual(spec.tags, tax.tags)
+                self.assertEqual(entry["category"], tax.category.value)
+                self.assertEqual(entry["tags"], list(tax.tag_values()))
 
     def test_cli_catalog_keys_are_in_taxonomy(self):
         missing = set(ATTACK_CATALOG) - set(ATTACK_TAXONOMY)

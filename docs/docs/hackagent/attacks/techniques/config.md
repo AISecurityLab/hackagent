@@ -14,28 +14,28 @@ This module holds the shared pieces that shipped technique configs still use:
 * run/output bookkeeping
 
 The forward technique seam is :class:`hackagent.attacks.config.AttackConfig`
-(technique parameters and role fields only, ``extra=&quot;forbid&quot;``). Run
+(technique parameters and role fields only, `extra=&quot;forbid&quot;`). Run
 bookkeeping belongs on :class:`hackagent.orchestrator.run_spec.RunSpec` and
 target generation knobs on :class:`hackagent.models.target_params.TargetParams`.
 Those types exist; shipped technique configs still subclass
 :class:`ConfigBase`, which mixes the concerns. Every shipped technique
-constructs as ``(config, ctx)``; the typed models have not left
-:class:`ConfigBase`. The legacy ``(config, client, agent_router)``
+constructs as `(config, ctx)`; the typed models have not left
+:class:`ConfigBase`. The legacy `(config, client, agent_router)`
 constructor is obsolete for new technique code and is still what the
-orchestrator calls. ``HackAgent.hack`` callers still pass the plain
-``attack_config`` dict described here.
+orchestrator calls. `HackAgent.hack` callers still pass the plain
+`attack_config` dict described here.
 
 Technique-specific modules should extend these building blocks with their own
 algorithm parameters, but they should not redefine the shared defaults.
 
 How an attack hits the target (static / adaptive / multi-turn, plus tags such
 as multimodal or RAG/indirect) is defined separately in
-``hackagent.catalog.taxonomy`` — not in these shared argument models.
-See the docs page ``docs/docs/attacks/taxonomy.mdx``.
+`hackagent.catalog.taxonomy` — not in these shared argument models.
+See the docs page `docs/docs/attacks/taxonomy.mdx`.
 
 Victim-model request defaults are still defined here for compatibility and
 for callers that want the canonical schema, but the preferred runtime source
-for those settings is now `HackAgent(..., target_config=...)`.
+for those settings is now `.target(..., target_config=...)`.
 
 Two export styles are intentionally supported:
 
@@ -44,7 +44,7 @@ Two export styles are intentionally supported:
     :data:`DEFAULT_RUN_CONFIG`
 
 The dict helpers are not a compatibility shim; they are the canonical bridge
-for attack modules that still build top-level ``DEFAULT_*_CONFIG`` mappings.
+for attack modules that still build top-level `DEFAULT_*_CONFIG` mappings.
 
 ## AttackerConfig Objects
 
@@ -157,7 +157,7 @@ Return a fresh category-classifier config dict.
 def default_embedder() -> Dict[str, Any]
 ```
 
-Return a fresh embedder config dict (local ``embeddinggemma`` on Ollama).
+Return a fresh embedder config dict (local `embeddinggemma` on Ollama).
 
 Used by embedding-only roles such as AutoDAN-Turbo strategy retrieval.
 
@@ -176,10 +176,10 @@ Merge embedding defaults without leaking the Ollama base to other providers.
 def default_rag_embedder() -> Dict[str, Any]
 ```
 
-Return a fresh RAG embedder config dict (local ``embeddinggemma`` on Ollama).
+Return a fresh RAG embedder config dict (local `embeddinggemma` on Ollama).
 
 The RAG Attack embeds through an OpenAI-compatible client, so the endpoint
-points at Ollama&#x27;s ``/v1`` base and a placeholder API key is provided.
+points at Ollama&#x27;s `/v1` base and a placeholder API key is provided.
 
 #### default\_judges
 

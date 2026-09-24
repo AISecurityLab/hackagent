@@ -71,10 +71,13 @@ vuln = Jailbreak(types=[
 ### Run an Evaluation Campaign
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 
-agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:8080/chat",
+    name="my-agent",
+)
 
 # Use profile recommendations
 for attack in JAILBREAK_PROFILE.primary_attacks:

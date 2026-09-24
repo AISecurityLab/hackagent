@@ -2,9 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """Colored logging helpers for AutoDAN-Turbo phases."""
 
-import os
-
-
 _PHASE_COLORS = {
     "PIPELINE": "97",  # bright white
     "WARMUP": "96",  # bright cyan
@@ -19,12 +16,8 @@ _PHASE_COLORS = {
 
 
 def _color_enabled() -> bool:
-    """Check whether ANSI coloring is enabled for logs.
-
-    Returns:
-        ``True`` unless ``NO_COLOR=1`` is set in environment.
-    """
-    return os.environ.get("NO_COLOR") != "1"
+    """ANSI coloring is always on. Interfaces do not signal mode via the environment."""
+    return True
 
 
 def _apply_color(text: str, color: str) -> str:

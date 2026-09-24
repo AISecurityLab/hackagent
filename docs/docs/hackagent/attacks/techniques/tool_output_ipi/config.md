@@ -7,12 +7,12 @@ Configuration for tool-output indirect prompt injection (tool_output_ipi).
 
 v1 focuses on **simulated** tool observations (InjecAgent / OPI style): a
 benign user task would normally trigger a tool call; the attack appends a
-``role=tool`` message whose content carries adversarial instructions aimed
+`role=tool` message whose content carries adversarial instructions aimed
 at the malicious goal, then re-queries the target with the full history.
 
-Taxonomy (when ``hackagent.catalog.taxonomy`` lands, `603` / `595`):
-    Primary category: ``adaptive``
-    Tags: ``indirect`` (do **not** also tag ``rag``)
+Taxonomy (when `hackagent.catalog.taxonomy` lands, `603` / `595`):
+    Primary category: `adaptive`
+    Tags: `indirect` (do **not** also tag `rag`)
 
 Based on:
     - InjecAgent (ACL Findings 2024) — arXiv:2403.02691
@@ -42,7 +42,7 @@ Full typed configuration for the tool_output_ipi attack.
 def roles_from_mapping(cls, data: Mapping[str, Any]) -> List[Dict[str, Any]]
 ```
 
-Attacker only when ``use_attacker_llm`` is enabled; judges always.
+Attacker only when `use_attacker_llm` is enabled; judges always.
 
 #### from\_dict
 

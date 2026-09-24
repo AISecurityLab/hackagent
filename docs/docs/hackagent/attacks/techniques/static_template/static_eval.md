@@ -29,7 +29,7 @@ def evaluate_responses(data: List[Dict[str, Any]], config: Dict[str, Any],
 ```
 
 Mark execution-error rows; LLM judging is handled by
-``evaluate_responses_with_llm_judges``.
+`evaluate_responses_with_llm_judges`.
 
 Pattern and keyword evaluation modes have been removed — only LLM
 judges are supported.  This function exists for backward-compatibility
@@ -63,7 +63,7 @@ class StaticTemplateEvaluation()
 Evaluation step for static template attacks.
 
 Aggregates baseline results and finalizes tracker goals. Judge calls stay
-on the injected ``evaluator_step`` (or ``ctx.judge``); this class does not
+on the injected `evaluator_step` (or `ctx.judge`); this class does not
 sync metrics or sniff already-evaluated rows.
 
 #### execute
@@ -115,6 +115,6 @@ Complete evaluation pipeline.
 
 **Notes**:
 
-  Syncing is performed by ``StaticTemplateEvaluation.execute`` via
-  ``_sync_evaluation_to_server``.
+  Syncing is performed by `StaticTemplateEvaluation.execute` via
+  `_sync_evaluation_to_server`.
 

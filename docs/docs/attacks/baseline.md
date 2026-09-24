@@ -15,7 +15,7 @@ Baseline is the simplest attack in HackAgent and is typically the first one you 
 - **Establishes a floor**: If Baseline already succeeds on a goal, the target has no meaningful defense against it and more sophisticated attacks aren't needed for that goal.
 - **Contextualizes other attacks**: A PAIR/TAP/AdvPrefix success rate is only meaningful compared to how often the *same* goals succeed with no attack at all.
 - **Fast smoke test**: One request per goal, no attacker model required — just the target and (optionally) a judge.
-- **hack_chain seed step**: Because it never mitigates via obfuscation, it's a natural first step in a [`hack_chain`](../hackagent/agent) fallback ladder — only goals the target refuses plainly are escalated to real attacks.
+- **hack_chain seed step**: Because it never mitigates via obfuscation, it's a natural first step in a [`hack_chain`](../client) fallback ladder — only goals the target refuses plainly are escalated to real attacks.
 
 Baseline has **no** `*_params` block. Target generation (`max_tokens`, `temperature`), `batch_size` (default `16` in Baseline's own config), `objective`, `judges`, and `output_dir` are all **top-level**. See [Shared Attack Config](./shared-args.md).
 
@@ -49,13 +49,13 @@ graph TD
 ### Simple Configuration
 
 ```python
-from hackagent import HackAgent, AgentType
+from hackagent import HackAgent, AgentType, Settings
 
 # Initialize HackAgent
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:8000",
+    AgentType.GOOGLE_ADK,
     name="target_agent",
-    endpoint="http://localhost:8000",
-    agent_type=AgentType.GOOGLE_ADK
 )
 
 # Basic Baseline configuration
@@ -199,7 +199,7 @@ results = agent.hack_chain(
 )
 ```
 
-`escalate_only_mitigated=True` (the default) drops any goal Baseline already succeeds on, so CipherChat only spend budget on goals that actually needed extra effort. See the [`HackAgent.hack_chain`](../hackagent/agent) reference for the full behavior.
+`escalate_only_mitigated=True` (the default) drops any goal Baseline already succeeds on, so CipherChat only spend budget on goals that actually needed extra effort. See the [`Target.hack_chain`](../client) reference for the full behavior.
 
 ## Related
 

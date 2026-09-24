@@ -21,7 +21,7 @@ Applies a jailbreak transformation to a goal string.
 **Arguments**:
 
 - `technique` - Name of the jailbreak technique used.
-- `transform` - Callable ``(goal, variant_index) -&gt; (framed_goal, details)``.
+- `transform` - Callable `(goal, variant_index) -&gt; (framed_goal, details)`.
 
 #### apply
 
@@ -41,17 +41,17 @@ def build_jailbreak_framer(
         attacker_reg_key: Optional[str] = None) -> Optional[JailbreakFramer]
 ```
 
-Build a :class:`JailbreakFramer` from a ``poisoning.jailbreak`` config.
+Build a :class:`JailbreakFramer` from a `poisoning.jailbreak` config.
 
-Returns ``None`` when jailbreak framing is disabled or unconfigured.
+Returns `None` when jailbreak framing is disabled or unconfigured.
 
 **Arguments**:
 
-- `config` - The ``poisoning.jailbreak`` config dict.
+- `config` - The `poisoning.jailbreak` config dict.
 - `logger` - Logger for status/warning messages.
 - `attacker_router` - Attacker LLM router, required by LLM-assisted
-  techniques (``pap``, ``fc``). Ignored by purely syntactic ones.
-- `attacker_reg_key` - Registration key for ``attacker_router``.
+  techniques (`pap`, `fc`). Ignored by purely syntactic ones.
+- `attacker_reg_key` - Registration key for `attacker_router`.
   
 
 **Raises**:

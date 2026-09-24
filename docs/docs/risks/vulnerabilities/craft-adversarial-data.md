@@ -59,10 +59,13 @@ vuln = CraftAdversarialData(types=[
 ### Run an Evaluation Campaign
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 from hackagent.catalog.risks.craft_adversarial_data import CRAFT_ADVERSARIAL_DATA_PROFILE
 
-agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:8080/chat",
+    name="my-agent",
+)
 
 # Use profile recommendations
 for attack in CRAFT_ADVERSARIAL_DATA_PROFILE.primary_attacks:

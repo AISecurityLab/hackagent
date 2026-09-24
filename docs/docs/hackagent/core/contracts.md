@@ -16,10 +16,10 @@ class AgentType(str, Enum)
 
 How HackAgent talks to a model or agent.
 
-Chat-completion types (``LITELLM``, ``OPENAI_SDK``, ``OLLAMA``,
-``LANGCHAIN``) are driven through LiteLLM. ``GOOGLE_ADK``,
-``CLAUDE_CODE``, ``CODEX``, ``HERMES`` and ``WEB`` use dedicated adapters.
-``MCP`` and ``A2A`` are placeholders. ``UNKNOWN`` is the fallback when a
+Chat-completion types (`LITELLM`, `OPENAI_SDK`, `OLLAMA`,
+`LANGCHAIN`) are driven through LiteLLM. `GOOGLE_ADK`,
+`CLAUDE_CODE`, `CODEX`, `HERMES` and `WEB` use dedicated adapters.
+`MCP` and `A2A` are placeholders. `UNKNOWN` is the fallback when a
 type cannot be inferred.
 
 #### \_missing\_
@@ -29,7 +29,7 @@ type cannot be inferred.
 def _missing_(cls, value: object) -> Optional["AgentType"]
 ```
 
-Accept any case and the aliases in ``_AGENT_TYPE_ALIASES``.
+Accept any case and the aliases in `_AGENT_TYPE_ALIASES`.
 
 #### parse
 
@@ -38,7 +38,7 @@ Accept any case and the aliases in ``_AGENT_TYPE_ALIASES``.
 def parse(cls, value: Union["AgentType", str, None]) -> "AgentType"
 ```
 
-Parse leniently: an unrecognised value becomes ``UNKNOWN``.
+Parse leniently: an unrecognised value becomes `UNKNOWN`.
 
 ## RunStatus Objects
 
@@ -78,7 +78,7 @@ A tool invocation requested by a model.
 class Message(BaseModel)
 ```
 
-One chat message. ``content`` is text or OpenAI-style content parts.
+One chat message. `content` is text or OpenAI-style content parts.
 
 ## RawExchange Objects
 
@@ -102,7 +102,7 @@ Why a call failed. Calls return errors as values.
 class GuardrailInfo(BaseModel)
 ```
 
-A guardrail blocked the prompt (``before``) or the response (``after``).
+A guardrail blocked the prompt (`before`) or the response (`after`).
 
 ## Completion Objects
 
@@ -112,11 +112,11 @@ class Completion(BaseModel)
 
 The result of one model call.
 
-Replaces the response dict: ``generated_text`` / ``processed_response``
-become ``text``; ``error_message`` / ``error_category`` become ``error``;
-``agent_specific_data`` usage, finish reason, model and invoked
-parameters become typed fields; ``raw_response_*`` and ``raw_request``
-become ``raw``; a guardrail envelope becomes ``guardrail``.
+Replaces the response dict: `generated_text` / `processed_response`
+become `text`; `error_message` / `error_category` become `error`;
+`agent_specific_data` usage, finish reason, model and invoked
+parameters become typed fields; `raw_response_*` and `raw_request`
+become `raw`; a guardrail envelope becomes `guardrail`.
 
 #### ok
 

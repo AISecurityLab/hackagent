@@ -21,7 +21,7 @@ Resolve an intents selection config to goals plus explicit labels.
 
   Tuple where:
   - index 0 is the selected goals list.
-  - index 1 maps goal index -&gt; {&quot;category&quot;: ..., &quot;subcategory&quot;: ...}
+  - index 1 maps goal index -&gt; \{&quot;category&quot;: ..., &quot;subcategory&quot;: ...\}
   using the same label format produced by the category classifier
-  parser (``X. Label`` / ``Xn. Label``).
+  parser (`X. Label` / `Xn. Label`).
 

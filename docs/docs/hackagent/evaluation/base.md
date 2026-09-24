@@ -14,6 +14,6 @@ class AssertionResult()
 
 A parsed judge reply.
 
-``is_confident`` is false when the parser had to guess. Callers may
+`is_confident` is false when the parser had to guess. Callers may
 retry once in that case.
 

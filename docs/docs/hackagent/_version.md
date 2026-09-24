@@ -11,8 +11,8 @@ Version lookup that also works from a frozen (PyInstaller) binary.
 def get_version() -> str
 ```
 
-Return the installed ``hackagent`` version.
+Return the installed `hackagent` version.
 
 Frozen builds may ship without distribution metadata, so fall back to the
-``HACKAGENT_BUILD_VERSION`` value baked in at packaging time.
+`HACKAGENT_BUILD_VERSION` value baked in at packaging time.
 

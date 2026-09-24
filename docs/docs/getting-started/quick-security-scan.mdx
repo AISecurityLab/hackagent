@@ -72,11 +72,11 @@ hackagent eval \
 ## Example Implementation
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 
-agent = HackAgent(
-    endpoint="http://localhost:8080/chat",
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:8080/chat",
     name="quick-security-scan",
 )
 

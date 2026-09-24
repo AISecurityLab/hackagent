@@ -27,15 +27,14 @@ Focus on 3-5 critical vulnerabilities using:
 ## Example Implementation
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 from hackagent.catalog.risks.prompt_injection import PROMPT_INJECTION_PROFILE
 from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 from hackagent.catalog.risks.misinformation import MISINFORMATION_PROFILE
 
-agent = HackAgent(
-    endpoint="http://localhost:8080/chat",
+agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
+    "http://localhost:8080/chat",
     name="quick-scan",
-    api_key="your-api-key",
 )
 
 quick_profiles = [

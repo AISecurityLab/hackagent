@@ -92,12 +92,12 @@ hackagent codex --no-tui --dry-run
 Run the target through the Codex CLI:
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost",  # ignored for local Codex
+    "codex",
     name="codex",
-    endpoint="http://localhost",  # ignored for local Codex
-    agent_type="codex",
     adapter_operational_config={
         "name": "gpt-5.5",  # passed to `codex exec -m`
         "binary": "codex",  # path to the Codex executable
@@ -119,12 +119,12 @@ results = agent.hack(attack_config={
 Run the target through Ollama:
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost",  # ignored for local Codex
+    "codex",
     name="codex",
-    endpoint="http://localhost",  # ignored for local Codex
-    agent_type="codex",
     adapter_operational_config={
         "name": "llama3.2:3b",  # passed to `ollama launch codex --model`
         "binary": "ollama",     # path to the Ollama executable

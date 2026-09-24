@@ -14,8 +14,8 @@ class PairConfig(ConfigBase)
 Complete typed configuration for the PAIR attack.
 
 Pydantic defaults are the single source of truth (Phase 4). Attacker
-``max_tokens`` is 500 to preserve the prior live PAIR runtime default
-that ``DEFAULT_PAIR_CONFIG`` historically encoded via fallbacks / TUI.
+`max_tokens` is 500 to preserve the prior live PAIR runtime default
+that `DEFAULT_PAIR_CONFIG` historically encoded via fallbacks / TUI.
 
 #### from\_dict
 

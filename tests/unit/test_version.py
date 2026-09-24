@@ -38,7 +38,7 @@ def test_get_version_falls_back_to_unknown(monkeypatch):
 def test_cli_version_flag_reports_version():
     from click.testing import CliRunner
 
-    from hackagent.cli.main import cli
+    from hackagent.interfaces.cli.main import cli
 
     result = CliRunner().invoke(cli, ["--version"])
 

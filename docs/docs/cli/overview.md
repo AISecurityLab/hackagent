@@ -7,6 +7,8 @@ sidebar_position: 1
 
 The **HackAgent CLI** provides a powerful command-line interface for AI agent security testing. With beautiful ASCII branding, rich terminal output, and comprehensive functionality, it's the fastest way to run security evaluations.
 
+The CLI, TUI, and web dashboard live in `hackagent.interfaces` and talk only to the [facade](../client/index.md). Strategy commands are registered from `catalog()` (crescendo and rag included). The quick scan calls `hack_chain` on the bound target. The ASCII banner and logging setup stay in the CLI package. TUI forms are built from each technique's JSON schema, and the TUI passes `on_event` into `hack` / `hack_chain`. The web UI is `hackagent.interfaces.web`.
+
 For installation instructions, see the [Installation Guide](../getting-started/installation.mdx).
 
 ## Commands

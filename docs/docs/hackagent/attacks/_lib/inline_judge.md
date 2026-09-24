@@ -3,11 +3,11 @@ sidebar_label: inline_judge
 title: hackagent.attacks._lib.inline_judge
 ---
 
-Adapters that expose generation-loop judge APIs over ``ports.Judge``.
+Adapters that expose generation-loop judge APIs over `ports.Judge`.
 
 Inline-judge techniques (BoN, PAP, tool_output_ipi, TAP) historically built
-``InlineStepJudge`` / ``TapEvaluation`` from raw judge configs. On the Phase 4
-seam they receive ``ctx.judge`` instead; these adapters keep the call sites
+`InlineStepJudge` / `TapEvaluation` from raw judge configs. On the Phase 4
+seam they receive `ctx.judge` instead; these adapters keep the call sites
 stable while routing every score through the Judge port.
 
 ## CtxJudgeAdapter Objects
@@ -16,9 +16,9 @@ stable while routing every score through the Judge port.
 class CtxJudgeAdapter()
 ```
 
-``InlineStepJudge``-compatible wrapper around :class:`~hackagent.attacks.ports.Judge`.
+`InlineStepJudge`-compatible wrapper around :class:`~hackagent.attacks.ports.Judge`.
 
-``is_jailbreak`` uses ``judge.score`` and the canonical 0--10 jailbreak
+`is_jailbreak` uses `judge.score` and the canonical 0--10 jailbreak
 threshold from *config* (default 7.0).
 
 ## CtxTapEvaluator Objects
@@ -27,10 +27,10 @@ threshold from *config* (default 7.0).
 class CtxTapEvaluator()
 ```
 
-Minimal TAP evaluator surface backed by ``ctx.judge.score``.
+Minimal TAP evaluator surface backed by `ctx.judge.score`.
 
-Implements the methods ``TapSearch`` calls: ``evaluate_on_topic``,
-``extract_scores``, and ``score_candidates``. On-topic checks default to
+Implements the methods `TapSearch` calls: `evaluate_on_topic`,
+`extract_scores`, and `score_candidates`. On-topic checks default to
 keeping every candidate when no separate on-topic judge is configured on
 the Panel (Phase 6).
 
@@ -45,8 +45,8 @@ def resolve_inline_step_judge(config: Mapping[str, Any],
 
 Return a step-judge for generation loops.
 
-Prefers ``config[&quot;_judge&quot;]`` (a :class:`~hackagent.attacks.ports.Judge`)
-when present; otherwise builds the legacy ``InlineStepJudge``.
+Prefers `config[&quot;_judge&quot;]` (a :class:`~hackagent.attacks.ports.Judge`)
+when present; otherwise builds the legacy `InlineStepJudge`.
 
 #### postprocess\_inline\_results
 
@@ -74,7 +74,7 @@ Pipeline step that only normalises inline-judge rows.
 def attach_ctx_judge(config: Dict[str, Any], ctx: Any) -> None
 ```
 
-Expose ``ctx.judge`` on the mutable config dict for generation steps.
+Expose `ctx.judge` on the mutable config dict for generation steps.
 
 #### verdict\_from\_judge
 
@@ -86,7 +86,7 @@ def verdict_from_judge(judge: Judge,
                        response: str = "")
 ```
 
-Score via ``judge.evaluate`` and return ``(score, success, explanation)``.
+Score via `judge.evaluate` and return `(score, success, explanation)`.
 
 Custom-loop techniques normalise through :class:`~hackagent.core.contracts.Verdict`.
 

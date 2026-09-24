@@ -59,10 +59,13 @@ vuln = MaliciousToolInvocation(types=[
 ### Run an Evaluation Campaign
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 from hackagent.catalog.risks.malicious_tool_invocation import MALICIOUS_TOOL_INVOCATION_PROFILE
 
-agent = HackAgent(endpoint="http://localhost:8080/chat", name="my-agent")
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:8080/chat",
+    name="my-agent",
+)
 
 # Use profile recommendations
 for attack in MALICIOUS_TOOL_INVOCATION_PROFILE.primary_attacks:

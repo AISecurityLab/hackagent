@@ -5,7 +5,7 @@
 
 Library modules only obtain loggers; they never install handlers or set
 levels. Handler configuration belongs to the application (the CLI does it in
-:mod:`hackagent.cli.logging_setup`).
+:mod:`hackagent.interfaces.cli.logging_setup`).
 """
 
 import logging

@@ -29,7 +29,7 @@ Test all 13 vulnerabilities using:
 ## Example Implementation
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
 # Import all profiles
 from hackagent.catalog.risks.model_evasion import MODEL_EVASION_PROFILE
@@ -52,10 +52,9 @@ from hackagent.catalog.risks.malicious_tool_invocation import MALICIOUS_TOOL_INV
 from hackagent.catalog.risks.credential_exposure import CREDENTIAL_EXPOSURE_PROFILE
 from hackagent.catalog.risks.misinformation import MISINFORMATION_PROFILE
 
-agent = HackAgent(
-    endpoint="http://localhost:8080/chat",
+agent = HackAgent(Settings.resolve(api_key="your-api-key")).target(
+    "http://localhost:8080/chat",
     name="comprehensive-audit",
-    api_key="your-api-key",
 )
 
 profiles = [

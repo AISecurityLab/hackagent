@@ -23,7 +23,7 @@ def parse_documents(sources: List[str], include_globs: List[str],
 
 Load documents from file paths and directories.
 
-Returns list of {&quot;id&quot;: str, &quot;text&quot;: str, &quot;path&quot;: str}.
+Returns list of \{&quot;id&quot;: str, &quot;text&quot;: str, &quot;path&quot;: str\}.
 
 #### chunk\_text
 
@@ -88,12 +88,12 @@ Pipeline:
 5. Retrieve context from FAISS and query target agent
 6. Judge evaluates responses for poisoning success
 
-Construct with ``(config, ctx)``. Poisoner and query-generator roles
-come from ``ctx.models``, scores from ``ctx.judge``
-(``verdict_from_judge``), and per-goal poisoned documents from
-``ctx.workspace``. This class does not read
-``_suppress_run_status_updates``. Tests build ``ctx`` with
-``make_ctx()``. ``RagConfig`` still subclasses
+Construct with `(config, ctx)`. Poisoner and query-generator roles
+come from `ctx.models`, scores from `ctx.judge`
+(`verdict_from_judge`), and per-goal poisoned documents from
+`ctx.workspace`. This class does not read
+`_suppress_run_status_updates`. Tests build `ctx` with
+`make_ctx()`. `RagConfig` still subclasses
 :class:`~hackagent.attacks.techniques.config.ConfigBase`. The legacy
 constructor is obsolete for new code.
 

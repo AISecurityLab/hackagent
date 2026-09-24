@@ -3,15 +3,15 @@ sidebar_label: litellm_callbacks
 title: hackagent.models.adapters.litellm_callbacks
 ---
 
-LiteLLM callback that captures every ``litellm.completion`` call.
+LiteLLM callback that captures every `litellm.completion` call.
 
-LiteLLM exposes a ``CustomLogger`` base class with hook methods that
+LiteLLM exposes a `CustomLogger` base class with hook methods that
 fire pre-call, on success, and on failure. We register a single
-:class:`HackAgentTrackingLogger` instance on ``litellm.callbacks`` and
-attach ``metadata`` to every call so the logger can correlate the I/O
+:class:`HackAgentTrackingLogger` instance on `litellm.callbacks` and
+attach `metadata` to every call so the logger can correlate the I/O
 back to the originating HackAgent registration.
 
-The logger only emits structured records to the ``hackagent`` loggers; it
+The logger only emits structured records to the `hackagent` loggers; it
 does not write to the backend storage directly. Downstream sinks (TUI
 event bus, dashboard, file logs) can pick the records up from there.
 
@@ -21,10 +21,10 @@ event bus, dashboard, file logs) can pick the records up from there.
 def ensure_registered() -> bool
 ```
 
-Register the tracking logger on ``litellm.callbacks`` exactly once.
+Register the tracking logger on `litellm.callbacks` exactly once.
 
-Idempotent — safe to call from every ``connect``.
-Returns ``True`` when registration is in effect (either because we
+Idempotent — safe to call from every `connect`.
+Returns `True` when registration is in effect (either because we
 just registered or because we already had).
 
 #### get\_instance

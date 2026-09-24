@@ -8,7 +8,7 @@ Base class for agents driven through a locally installed CLI.
 A CLI agent (Claude Code, Codex, Hermes) serves no HTTP endpoint. Each
 instance registers a per-instance :class:`litellm.CustomLLM` handler under a
 unique provider name; the handler shells out to the CLI. Requests still flow
-through ``litellm.completion`` and are captured by the HackAgent LiteLLM
+through `litellm.completion` and are captured by the HackAgent LiteLLM
 callbacks like every other provider.
 
 Subclasses set the class attributes, read their own options in
@@ -21,7 +21,7 @@ Subclasses set the class attributes, read their own options in
 def last_user_text(messages: List[Dict[str, Any]]) -> Optional[str]
 ```
 
-Return the text of the last user message in ``messages``.
+Return the text of the last user message in `messages`.
 
 ## SubprocessCLIAgent Objects
 
@@ -41,7 +41,7 @@ Prefix of the per-instance LiteLLM provider name.
 
 #### DEFAULT\_BINARY
 
-Executable looked up on ``PATH`` when no ``binary`` is configured.
+Executable looked up on `PATH` when no `binary` is configured.
 
 #### INSTALL\_HINT
 
@@ -61,5 +61,5 @@ API key passed to LiteLLM; the CLIs handle their own authentication.
 def handle_request(request_data: Dict[str, Any]) -> Dict[str, Any]
 ```
 
-Send one CLI turn via ``litellm.completion`` and wrap the reply.
+Send one CLI turn via `litellm.completion` and wrap the reply.
 

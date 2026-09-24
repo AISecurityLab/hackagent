@@ -3,10 +3,10 @@ sidebar_label: persistence
 title: hackagent.orchestrator.persistence
 ---
 
-``RunSink`` over a :class:`~hackagent.storage.store.Store`.
+`RunSink` over a :class:`~hackagent.storage.store.Store`.
 
 Tracking writes result, trace and run rows through this object. Evaluation
-metrics passed in are stored as given; ``eval_*`` columns are produced by
+metrics passed in are stored as given; `eval_*` columns are produced by
 :mod:`hackagent.orchestrator.mapping` before they reach here.
 
 ## StoreSink Objects
@@ -15,7 +15,7 @@ metrics passed in are stored as given; ``eval_*`` columns are produced by
 class StoreSink()
 ```
 
-Adapt a ``Store`` to the tracking :class:`RunSink` protocol.
+Adapt a `Store` to the tracking :class:`RunSink` protocol.
 
 #### write\_verdict
 

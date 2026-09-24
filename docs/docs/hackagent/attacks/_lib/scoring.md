@@ -5,8 +5,8 @@ title: hackagent.attacks._lib.scoring
 
 Shared judge-score normalisation for attack techniques.
 
-Techniques (and later ``evaluation.Panel``) share a canonical 0--10 scale.
-Keep the helpers here so attacks do not reach into ``evaluator`` for
+Techniques (and later `evaluation.Panel`) share a canonical 0--10 scale.
+Keep the helpers here so attacks do not reach into `evaluator` for
 simple arithmetic.
 
 #### score\_range\_maximum
@@ -59,5 +59,5 @@ Infer a judge type key from a model identifier.
 def get_judge_range(judge_config: Mapping[str, Any]) -> str
 ```
 
-Return ``binary`` or ``decimal`` for the given judge config.
+Return `binary` or `decimal` for the given judge config.
 

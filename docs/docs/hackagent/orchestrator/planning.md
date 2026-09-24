@@ -41,7 +41,7 @@ An LLM-chosen attack strategy for a target.
 def to_attack_config() -> Dict[str, Any]
 ```
 
-Build a runnable ``attack_config`` dict for ``HackAgent.hack``.
+Build a runnable `attack_config` dict for :meth:`hackagent.client.Target.hack`.
 
 #### summary
 
@@ -67,7 +67,7 @@ def build_web_target(
         timeout: Optional[int] = None) -> Tuple[str, Dict[str, Any]]
 ```
 
-Build the ``(&quot;web&quot;, operational_config)`` target for a live-browser chatbot.
+Build the `(&quot;web&quot;, operational_config)` target for a live-browser chatbot.
 
 #### schema\_fields
 
@@ -99,7 +99,7 @@ def plan_attack(target: Dict[str, Any],
                 max_tokens: int = 1500) -> AttackPlan
 ```
 
-Ask an LLM to choose an attack strategy and parameters for ``target``.
+Ask an LLM to choose an attack strategy and parameters for `target`.
 
 ## AutoPlanResult Objects
 
@@ -121,5 +121,5 @@ def auto_plan(url: str,
               **plan_kwargs: Any) -> AutoPlanResult
 ```
 
-Build a web target for ``url`` and plan an attack against it.
+Build a web target for `url` and plan an attack against it.
 

@@ -5,9 +5,9 @@ title: hackagent.attacks.techniques.flipattack.config
 
 Configuration for FlipAttack attacks.
 
-Provides both the plain-dict ``DEFAULT_FLIPATTACK_CONFIG`` (used internally
+Provides both the plain-dict `DEFAULT_FLIPATTACK_CONFIG` (used internally
 by :class:`~hackagent.attacks.techniques.flipattack.attack.FlipAttack`) and
-typed Pydantic models (``FlipAttackParams``, ``FlipAttackConfig``) for users who
+typed Pydantic models (`FlipAttackParams`, `FlipAttackConfig`) for users who
 prefer structured configuration.
 
 Flip modes
@@ -40,15 +40,15 @@ Hyperparameters controlling the FlipAttack obfuscation strategy.
 
 **Attributes**:
 
-- `flip_mode` - Obfuscation mode.  One of ``&quot;FWO&quot;`` (flip word order),
-  ``&quot;FCW&quot;`` (flip chars in word), ``&quot;FCS&quot;`` (flip chars in sentence,
-  default), or ``&quot;FMM&quot;`` (fool model mode — FCS transform with
+- `flip_mode` - Obfuscation mode.  One of `&quot;FWO&quot;` (flip word order),
+  `&quot;FCW&quot;` (flip chars in word), `&quot;FCS&quot;` (flip chars in sentence,
+  default), or `&quot;FMM&quot;` (fool model mode — FCS transform with
   FWO decoding instruction).
-- `cot` - When ``True``, adds a chain-of-thought suffix to the decoding
+- `cot` - When `True`, adds a chain-of-thought suffix to the decoding
   instruction so the model answers step by step.
-- `lang_gpt` - When ``True``, wraps the system prompt in a structured
+- `lang_gpt` - When `True`, wraps the system prompt in a structured
   LangGPT Role/Profile/Rules template instead of the plain prompt.
-- `few_shot` - When ``True``, injects two task-oriented decoding
+- `few_shot` - When `True`, injects two task-oriented decoding
   demonstrations into the prompt.
 
 ## FlipAttackConfig Objects
@@ -59,13 +59,13 @@ class FlipAttackConfig(ConfigBase)
 
 Complete FlipAttack configuration for use with :meth:`HackAgent.hack`.
 
-Mirrors ``DEFAULT_FLIPATTACK_CONFIG`` as a typed alternative.  Call
+Mirrors `DEFAULT_FLIPATTACK_CONFIG` as a typed alternative.  Call
 :meth:`model_dump` (or :meth:`to_dict`) to obtain the plain dict expected
 by the attack pipeline.
 
 **Attributes**:
 
-- `attack_type` - Always ``&quot;flipattack&quot;`` (required by the orchestrator).
+- `attack_type` - Always `&quot;flipattack&quot;` (required by the orchestrator).
 - `flipattack_params` - Obfuscation hyperparameters (:class:`FlipAttackParams`).
 
 #### from\_dict

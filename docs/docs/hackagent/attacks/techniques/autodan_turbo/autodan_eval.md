@@ -13,8 +13,8 @@ class AutoDANTurboEvaluation()
 
 Finalize AutoDAN-Turbo outputs.
 
-When ``config[&quot;_judge&quot;]`` is set, scores come from that judge. Otherwise
-success follows the internal AutoDAN score against ``break_score``.
+When `config[&quot;_judge&quot;]` is set, scores come from that judge. Otherwise
+success follows the internal AutoDAN score against `break_score`.
 
 #### execute
 
@@ -31,8 +31,8 @@ Evaluate AutoDAN outputs using LLM judges.
 
 **Returns**:
 
-  Enriched result list with judge outputs, ``best_score``, and
-  ``success`` fields.
+  Enriched result list with judge outputs, `best_score`, and
+  `success` fields.
 
 #### execute
 

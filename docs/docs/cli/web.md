@@ -6,7 +6,7 @@ sidebar_position: 9
 
 `hackagent web` serves the HackAgent dashboard from your own machine — the same
 application as [app.hackagent.dev](https://app.hackagent.dev), served locally by
-the CLI. There is no Node runtime, Docker or database server involved.
+the CLI. The server is `hackagent.interfaces.web` (moved from `hackagent/server/webui`). It reads through the [facade](../client/index.md) and does not import `cli.config`. In local mode, `delete_run` is the one explicit write. There is no Node runtime, Docker or database server involved.
 
 - **Local mode** (no API key): reads the runs recorded in your SQLite database. Read-only.
 - **Remote mode** (API key configured): shows your hosted HackAgent data.

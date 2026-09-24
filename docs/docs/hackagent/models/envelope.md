@@ -4,16 +4,16 @@ title: hackagent.models.envelope
 ---
 
 Envelope helpers — pure functions that translate between LiteLLM&#x27;s
-``ModelResponse``, HackAgent&#x27;s standardized response dict (the
+`ModelResponse`, HackAgent&#x27;s standardized response dict (the
 &quot;envelope&quot;) and the typed :class:`~hackagent.core.contracts.Completion`.
 
 The functions here are intentionally:
 - pure: no I/O, no logging side effects, no LiteLLM imports at module
   level. Any LiteLLM import lives behind a lazy helper.
-- agnostic of agent identity: the caller supplies ``agent_id`` and
-  ``adapter_type`` as keyword arguments.
+- agnostic of agent identity: the caller supplies `agent_id` and
+  `adapter_type` as keyword arguments.
 - byte-compatible with the previous adapter envelope, so downstream
-  consumers (``StepTracker``, attacks, evaluators, dashboard) keep
+  consumers (`StepTracker`, attacks, evaluators, dashboard) keep
   seeing exactly the same dict shape.
 
 #### strip\_think\_prefix
@@ -22,7 +22,7 @@ The functions here are intentionally:
 def strip_think_prefix(text: str) -> str
 ```
 
-Strip hidden reasoning prefix up to and including ``&lt;/think&gt;`` if present.
+Strip hidden reasoning prefix up to and including `&lt;/think&gt;` if present.
 
 #### extract\_text\_from\_response
 
@@ -30,11 +30,11 @@ Strip hidden reasoning prefix up to and including ``&lt;/think&gt;`` if present.
 def extract_text_from_response(response: Any, *, model_name: str = "") -> str
 ```
 
-Pull the assistant text out of a LiteLLM ``ModelResponse``.
+Pull the assistant text out of a LiteLLM `ModelResponse`.
 
-Falls back to ``reasoning_content`` / ``reasoning`` when ``content``
+Falls back to `reasoning_content` / `reasoning` when `content`
 is empty so reasoning-only models still produce output. Returns a
-sentinel ``[GENERATION_ERROR: ...]`` string when the response is
+sentinel `[GENERATION_ERROR: ...]` string when the response is
 structurally unusable, mirroring the previous adapter behaviour.
 
 #### extract\_tool\_calls
@@ -43,7 +43,7 @@ structurally unusable, mirroring the previous adapter behaviour.
 def extract_tool_calls(response: Any) -> Optional[List[Dict[str, Any]]]
 ```
 
-Return OpenAI-style ``tool_calls`` from a ``ModelResponse``, or ``None``.
+Return OpenAI-style `tool_calls` from a `ModelResponse`, or `None`.
 
 #### resolve\_litellm\_model
 
@@ -53,9 +53,9 @@ def resolve_litellm_model(raw_model: str,
                           provider_prefix: Optional[str] = None) -> str
 ```
 
-Return the model string to pass to ``litellm.completion``.
+Return the model string to pass to `litellm.completion`.
 
-Honors a caller-supplied ``provider_prefix`` while leaving names that
+Honors a caller-supplied `provider_prefix` while leaving names that
 already carry an explicit LiteLLM provider prefix untouched.
 
 #### build\_litellm\_kwargs
@@ -77,13 +77,13 @@ def build_litellm_kwargs(
         extra_kwargs: Optional[Dict[str, Any]] = None) -> Dict[str, Any]
 ```
 
-Build the kwargs dict for ``litellm.completion``.
+Build the kwargs dict for `litellm.completion`.
 
-``thinking_payload`` is the *already-translated* per-provider dict
-(e.g. ``{&quot;reasoning_effort&quot;: &quot;medium&quot;}`` or ``{&quot;think&quot;: True}``);
-the caller is responsible for converting the unified ``thinking``
+`thinking_payload` is the *already-translated* per-provider dict
+(e.g. `{&quot;reasoning_effort&quot;: &quot;medium&quot;}` or `{&quot;think&quot;: True}`);
+the caller is responsible for converting the unified `thinking`
 knob into the provider-specific shape before passing it in here.
-Anything in ``extra_kwargs`` is splat-merged last and wins on
+Anything in `extra_kwargs` is splat-merged last and wins on
 collision, matching the previous adapter behaviour.
 
 #### build\_success\_envelope
@@ -133,7 +133,7 @@ def build_agent_specific_data(
         extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]
 ```
 
-Build the standard ``agent_specific_data`` block shared by adapters.
+Build the standard `agent_specific_data` block shared by adapters.
 
 #### extract\_response\_cost
 
@@ -141,10 +141,10 @@ Build the standard ``agent_specific_data`` block shared by adapters.
 def extract_response_cost(response: Any) -> Optional[float]
 ```
 
-Pull ``response_cost`` off a LiteLLM ``ModelResponse`` if present.
+Pull `response_cost` off a LiteLLM `ModelResponse` if present.
 
 LiteLLM exposes the per-call cost (when the model is in its pricing
-catalogue) via the ``_hidden_params`` attribute. Returns ``None``
+catalogue) via the `_hidden_params` attribute. Returns `None`
 when unavailable rather than raising, since cost tracking is
 best-effort.
 
@@ -154,7 +154,7 @@ best-effort.
 def extract_litellm_call_id(response: Any) -> Optional[str]
 ```
 
-Pull ``litellm_call_id`` (or ``x-litellm-call-id``) off a response.
+Pull `litellm_call_id` (or `x-litellm-call-id`) off a response.
 
 #### prompt\_text
 
@@ -162,10 +162,10 @@ Pull ``litellm_call_id`` (or ``x-litellm-call-id``) off a response.
 def prompt_text(request_data: Dict[str, Any]) -> str
 ```
 
-Return the text a guardrail should classify for ``request_data``.
+Return the text a guardrail should classify for `request_data`.
 
 That is the last user message, else every message&#x27;s content joined,
-else the plain ``prompt`` field some techniques send (e.g. h4rm3l).
+else the plain `prompt` field some techniques send (e.g. h4rm3l).
 
 #### request\_from\_messages
 

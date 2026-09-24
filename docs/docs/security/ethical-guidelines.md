@@ -72,13 +72,14 @@ docker stats hackagent-test
 
 **Authentication Best Practices:**
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
 # Configure explicit local safeguards
 agent = HackAgent(
-    endpoint="http://localhost:11434",
-    timeout=30,       # Reasonable timeout
-    max_retries=3,    # Limit retry attempts
+    Settings.resolve(),
+    timeout=30,  # Reasonable timeout
+).target(
+    "http://localhost:11434",
 )
 ```
 

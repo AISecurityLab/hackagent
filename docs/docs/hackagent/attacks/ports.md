@@ -5,9 +5,9 @@ title: hackagent.attacks.ports
 
 Attack-local ports: the seam between techniques and the rest of the system.
 
-``Judge``, ``Events`` and ``Workspace`` stay here as method-only protocols
-(D1). ``evaluation.Panel`` and ``tracking`` implement them in later phases.
-``RunContext`` is the frozen dependency bag every attack receives.
+`Judge`, `Events` and `Workspace` stay here as method-only protocols
+(D1). `evaluation.Panel` and `tracking` implement them in later phases.
+`RunContext` is the frozen dependency bag every attack receives.
 
 ## Judge Objects
 
@@ -16,7 +16,7 @@ Attack-local ports: the seam between techniques and the rest of the system.
 class Judge(Protocol)
 ```
 
-Score or evaluate a sample. ``evaluation.Panel`` will implement this.
+Score or evaluate a sample. `evaluation.Panel` will implement this.
 
 #### score
 
@@ -41,7 +41,7 @@ Return the full verdict for *sample*.
 class Events(Protocol)
 ```
 
-Run-scoped event sink. ``tracking`` will implement this.
+Run-scoped event sink. `tracking` will implement this.
 
 #### step
 
@@ -97,7 +97,7 @@ Finalize the current goal.
 def progress(fraction: float, message: str = "") -> None
 ```
 
-Report overall run progress in ``[0, 1]``.
+Report overall run progress in `[0, 1]`.
 
 #### log
 
@@ -161,7 +161,7 @@ paths.
 class Step()
 ```
 
-One typed pipeline stage. Replaces dict steps with ``required_args``.
+One typed pipeline stage. Replaces dict steps with `required_args`.
 
 #### fn
 

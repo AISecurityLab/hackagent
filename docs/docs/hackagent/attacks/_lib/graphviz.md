@@ -5,7 +5,7 @@ title: hackagent.attacks._lib.graphviz
 
 Graphviz bootstrap for flowchart rendering (FC-Attack).
 
-``ensure_graphviz()`` is the public entry point used by interfaces and
+`ensure_graphviz()` is the public entry point used by interfaces and
 the FC renderer.
 
 #### ensure\_graphviz
@@ -14,5 +14,5 @@ the FC renderer.
 def ensure_graphviz(allow_download: Optional[bool] = None) -> Optional[str]
 ```
 
-Ensure Graphviz ``dot`` is available and return its resolved path.
+Ensure Graphviz `dot` is available and return its resolved path.
 

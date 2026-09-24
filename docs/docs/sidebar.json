@@ -479,6 +479,124 @@
           "items": [
             {
               "items": [
+                {
+                  "items": [
+                    {
+                      "items": [
+                        "reference/hackagent/interfaces/cli/commands/attack/chain",
+                        "reference/hackagent/interfaces/cli/commands/attack/group",
+                        "reference/hackagent/interfaces/cli/commands/attack/info"
+                      ],
+                      "label": "hackagent.interfaces.cli.commands.attack",
+                      "type": "category"
+                    },
+                    {
+                      "items": [
+                        "reference/hackagent/interfaces/cli/commands/scan/command",
+                        "reference/hackagent/interfaces/cli/commands/scan/quick"
+                      ],
+                      "label": "hackagent.interfaces.cli.commands.scan",
+                      "type": "category"
+                    },
+                    "reference/hackagent/interfaces/cli/commands/agent",
+                    "reference/hackagent/interfaces/cli/commands/claude",
+                    "reference/hackagent/interfaces/cli/commands/codex",
+                    "reference/hackagent/interfaces/cli/commands/config",
+                    "reference/hackagent/interfaces/cli/commands/datasets",
+                    "reference/hackagent/interfaces/cli/commands/examples",
+                    "reference/hackagent/interfaces/cli/commands/results",
+                    "reference/hackagent/interfaces/cli/commands/web"
+                  ],
+                  "label": "hackagent.interfaces.cli.commands",
+                  "type": "category"
+                },
+                "reference/hackagent/interfaces/cli/banner",
+                "reference/hackagent/interfaces/cli/config",
+                "reference/hackagent/interfaces/cli/logging_setup",
+                "reference/hackagent/interfaces/cli/main",
+                "reference/hackagent/interfaces/cli/safe_stdio",
+                "reference/hackagent/interfaces/cli/utils"
+              ],
+              "label": "hackagent.interfaces.cli",
+              "type": "category"
+            },
+            {
+              "items": [
+                {
+                  "items": [
+                    {
+                      "items": [
+                        "reference/hackagent/interfaces/tui/views/attacks/executor",
+                        "reference/hackagent/interfaces/tui/views/attacks/form",
+                        "reference/hackagent/interfaces/tui/views/attacks/helpers",
+                        "reference/hackagent/interfaces/tui/views/attacks/layout",
+                        "reference/hackagent/interfaces/tui/views/attacks/runner",
+                        "reference/hackagent/interfaces/tui/views/attacks/tab"
+                      ],
+                      "label": "hackagent.interfaces.tui.views.attacks",
+                      "type": "category"
+                    },
+                    {
+                      "items": [
+                        {
+                          "items": [
+                            "reference/hackagent/interfaces/tui/views/results/formatters/run_report"
+                          ],
+                          "label": "hackagent.interfaces.tui.views.results.formatters",
+                          "type": "category"
+                        },
+                        "reference/hackagent/interfaces/tui/views/results/details",
+                        "reference/hackagent/interfaces/tui/views/results/export",
+                        "reference/hackagent/interfaces/tui/views/results/tab",
+                        "reference/hackagent/interfaces/tui/views/results/table"
+                      ],
+                      "label": "hackagent.interfaces.tui.views.results",
+                      "type": "category"
+                    },
+                    "reference/hackagent/interfaces/tui/views/agents",
+                    "reference/hackagent/interfaces/tui/views/config"
+                  ],
+                  "label": "hackagent.interfaces.tui.views",
+                  "type": "category"
+                },
+                {
+                  "items": [
+                    "reference/hackagent/interfaces/tui/widgets/actions",
+                    "reference/hackagent/interfaces/tui/widgets/clipboard",
+                    "reference/hackagent/interfaces/tui/widgets/logs"
+                  ],
+                  "label": "hackagent.interfaces.tui.widgets",
+                  "type": "category"
+                },
+                "reference/hackagent/interfaces/tui/app",
+                "reference/hackagent/interfaces/tui/base",
+                "reference/hackagent/interfaces/tui/events",
+                "reference/hackagent/interfaces/tui/forms",
+                "reference/hackagent/interfaces/tui/logger",
+                "reference/hackagent/interfaces/tui/theme"
+              ],
+              "label": "hackagent.interfaces.tui",
+              "type": "category"
+            },
+            {
+              "items": [
+                "reference/hackagent/interfaces/web/__init__",
+                "reference/hackagent/interfaces/web/_local_api",
+                "reference/hackagent/interfaces/web/_proxy",
+                "reference/hackagent/interfaces/web/_serializers",
+                "reference/hackagent/interfaces/web/_static"
+              ],
+              "label": "hackagent.interfaces.web",
+              "type": "category"
+            }
+          ],
+          "label": "hackagent.interfaces",
+          "type": "category"
+        },
+        {
+          "items": [
+            {
+              "items": [
                 "reference/hackagent/models/adapters/adk",
                 "reference/hackagent/models/adapters/base",
                 "reference/hackagent/models/adapters/browser",
@@ -548,7 +666,7 @@
           "type": "category"
         },
         "reference/hackagent/_version",
-        "reference/hackagent/agent"
+        "reference/hackagent/client"
       ],
       "label": "hackagent",
       "type": "category"

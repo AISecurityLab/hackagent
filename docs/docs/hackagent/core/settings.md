@@ -51,7 +51,7 @@ def resolve_remote_role_endpoint(
         env: Optional[Mapping[str, str]] = None) -> str
 ```
 
-Return the remote LLM gateway endpoint (base URL + ``/v1``).
+Return the remote LLM gateway endpoint (base URL + `/v1`).
 
 #### read\_config\_file
 
@@ -91,17 +91,17 @@ Resolve every setting once, from arguments, environment and file.
 
 **Arguments**:
 
-- `api_key` - Explicit API key. ``None`` means &quot;not given&quot;; an empty
+- `api_key` - Explicit API key. `None` means &quot;not given&quot;; an empty
   string explicitly selects local mode.
 - `base_url` - Explicit remote API base URL.
-- `db_path` - Explicit local database path, or ``&quot;:memory:&quot;``.
+- `db_path` - Explicit local database path, or `&quot;:memory:&quot;`.
 - `config_path` - Config file to read instead of the default one.
-- `env` - Environment mapping (defaults to ``os.environ``).
+- `env` - Environment mapping (defaults to `os.environ`).
   
 
 **Raises**:
 
-- `ValueError` - If ``base_url`` is given but empty, or the config file
+- `ValueError` - If `base_url` is given but empty, or the config file
   cannot be parsed.
 
 #### is\_local\_host
@@ -111,7 +111,7 @@ Resolve every setting once, from arguments, environment and file.
 def is_local_host() -> bool
 ```
 
-Whether ``base_url`` points at this machine rather than a service.
+Whether `base_url` points at this machine rather than a service.
 
 #### mode
 

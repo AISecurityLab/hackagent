@@ -6,9 +6,9 @@ title: hackagent.attacks._lib.response
 Response helpers for attack modules.
 
 Prefer :class:`~hackagent.core.contracts.Completion` properties
-(``text``, ``ok``, ``blocked``, ``guardrail_info``). These helpers keep
+(`text`, `ok`, `blocked`, `guardrail_info`). These helpers keep
 legacy envelope/dict and OpenAI-style objects working until every
-technique calls ``LLM.complete``.
+technique calls `LLM.complete`.
 
 #### extract\_response\_content
 

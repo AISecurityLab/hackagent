@@ -171,12 +171,12 @@ Use `HackAgent` and provide a PAIR `attack_config`.
   <TabItem value="ollama" label={<span><ThemedImage sources={{light: 'https://registry.npmmirror.com/@lobehub/icons-static-png/1.24.0/files/light/ollama.png', dark: 'https://registry.npmmirror.com/@lobehub/icons-static-png/1.24.0/files/dark/ollama.png'}} alt="Ollama" style={{height: '20px', marginRight: '8px', verticalAlign: 'middle'}} />Ollama</span>} default>
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:11434",
+    "ollama",
     name="llama3",
-    endpoint="http://localhost:11434",
-    agent_type="ollama",
 )
 
 attack_config = {
@@ -198,12 +198,12 @@ results = agent.hack(attack_config=attack_config)
   <TabItem value="openai-sdk" label={<span><img src="https://openai.com/favicon.ico" alt="OpenAI" style={{height: '20px', marginRight: '8px', verticalAlign: 'middle'}} />OpenAI SDK</span>}>
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "https://api.openai.com/v1",
+    "openai-sdk",
     name="gpt-4",
-    endpoint="https://api.openai.com/v1",
-    agent_type="openai-sdk",
 )
 
 attack_config = {
@@ -225,12 +225,12 @@ results = agent.hack(attack_config=attack_config)
   <TabItem value="google-adk" label={<span><img src="https://google.github.io/adk-docs/assets/agent-development-kit.png" alt="Google ADK" style={{height: '20px', marginRight: '8px', verticalAlign: 'middle'}} />Google ADK</span>}>
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "http://localhost:8000",
+    "google-adk",
     name="my_google_agent",
-    endpoint="http://localhost:8000",
-    agent_type="google-adk",
 )
 
 attack_config = {
@@ -252,12 +252,12 @@ results = agent.hack(attack_config=attack_config)
   <TabItem value="custom" label="Custom (OpenAI compatible)">
 
 ```python
-from hackagent import HackAgent
+from hackagent import HackAgent, Settings
 
-agent = HackAgent(
+agent = HackAgent(Settings.resolve()).target(
+    "http://your-endpoint/v1",
+    "openai-sdk",
     name="my-model",
-    endpoint="http://your-endpoint/v1",
-    agent_type="openai-sdk",
 )
 
 attack_config = {

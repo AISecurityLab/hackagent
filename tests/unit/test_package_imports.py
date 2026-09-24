@@ -26,7 +26,7 @@ class TestPackageImports:
         This is the entry point for the hackagent CLI command.
         If this fails, users won't be able to run 'hackagent' commands.
         """
-        from hackagent.cli.main import cli
+        from hackagent.interfaces.cli.main import cli
 
         assert cli is not None
 
@@ -36,11 +36,22 @@ class TestPackageImports:
 
         assert HackAgent is not None
 
-    def test_storage_exports(self):
-        """Test that the storage types are exported from the package root."""
-        from hackagent import LocalBackend, RemoteBackend, Store
+    def test_public_exports(self):
+        """The package root exports the facade and public types only."""
+        from hackagent import AgentType, ApiError, HackAgent, Settings
 
-        assert Store is not None and LocalBackend and RemoteBackend
+        assert AgentType and ApiError and HackAgent and Settings
+
+    def test_root_import_does_not_load_textual(self):
+        """Importing the facade must not pull in the TUI toolkit."""
+        import subprocess
+        import sys
+
+        code = "import sys, hackagent; raise SystemExit('textual' in sys.modules)"
+        result = subprocess.run(
+            [sys.executable, "-c", code], capture_output=True, text=True
+        )
+        assert result.returncode == 0, result.stderr
 
     def test_models_connect_import(self):
         """Test that model access can be imported."""

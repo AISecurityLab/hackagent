@@ -19,14 +19,14 @@ externally by the framework.
 
 **Arguments**:
 
-- `config` - Full attack config containing ``attacker``, ``scorer`` and
-  ``summarizer`` router settings.
+- `config` - Full attack config containing `attacker`, `scorer` and
+  `summarizer` router settings.
 - `logger` - Logger used by router initialization and request flow.
   
 
 **Returns**:
 
-  Tuple ``(att_router, att_key, sc_router, sc_key, sum_router, sum_key)``
+  Tuple `(att_router, att_key, sc_router, sc_key, sum_router, sum_key)`
   with each router plus its registration key.
 
 #### conditional\_generate
@@ -47,7 +47,7 @@ Generate an attacker candidate prompt using conditional generation.
 
 Paper mapping: this implements the Attacker LLM generation behavior used in
 both warm-up and lifelong phases, mirroring the original
-``framework/attacker.py`` conditional pattern.
+`framework/attacker.py` conditional pattern.
 
 The function first tries assistant-prefill continuation, then falls back to
 normal chat completion when a provider does not honor prefilled assistant
@@ -69,7 +69,7 @@ messages.
 **Returns**:
 
   Raw attacker text. If prefill is honored, output is reconstructed with
-  ``[START OF JAILBREAK PROMPT]`` prefix for downstream extraction.
+  `[START OF JAILBREAK PROMPT]` prefix for downstream extraction.
 
 #### query\_target
 
@@ -99,8 +99,8 @@ victim model to obtain the response later scored by the Scorer LLM.
 
 **Returns**:
 
-  Tuple ``(target_response, error_message)`` where ``error_message`` is
-  ``None`` on success and a best-effort adapter/runtime error string when
+  Tuple `(target_response, error_message)` where `error_message` is
+  `None` on success and a best-effort adapter/runtime error string when
   the target response is empty due to upstream failures.
 
 #### score\_response
@@ -120,8 +120,8 @@ def score_response(scorer_router,
 
 Score target output, using a wrapper only for unstructured assessments.
 
-When *judge* (``ctx.judge``) is provided, scoring goes through
-``Verdict.score`` instead of the AutoDAN scorer LLM.
+When *judge* (`ctx.judge`) is provided, scoring goes through
+`Verdict.score` instead of the AutoDAN scorer LLM.
 
 #### extract\_jailbreak\_prompt
 
@@ -146,7 +146,7 @@ sent to the target during warm-up/lifelong loops.
 
 **Returns**:
 
-  Extracted jailbreak prompt text or ``fallback`` when no usable content
+  Extracted jailbreak prompt text or `fallback` when no usable content
   is found.
 
 #### check\_refusal
@@ -169,6 +169,6 @@ creation by discarding obvious refusal outputs.
 
 **Returns**:
 
-  ``request`` when refusal-like text is detected, otherwise original
-  ``prompt``.
+  `request` when refusal-like text is detected, otherwise original
+  `prompt`.
 

@@ -33,22 +33,22 @@ Implements the Best-of-N technique from:
     Hughes et al., &quot;Best-of-N Jailbreaking&quot; (2024)
     https://arxiv.org/abs/2412.03556
 
-For each goal the attack runs ``n_steps`` sequential search steps.
-Within each step, ``num_concurrent_k`` independently-seeded augmented
+For each goal the attack runs `n_steps` sequential search steps.
+Within each step, `num_concurrent_k` independently-seeded augmented
 candidates are generated and sent to the target model in parallel.
 The best candidate is selected by response length (as a proxy for
 non-refusal), and a final multi-judge evaluation scores the result.
 
 Pipeline:
     1. Generation — multi-step BoN search with text augmentations.
-       On ``BaseAttack(config, ctx)``, candidates are scored with
-       ``ctx.judge.score`` through
+       On `BaseAttack(config, ctx)`, candidates are scored with
+       `ctx.judge.score` through
        :class:`~hackagent.attacks._lib.inline_judge.CtxJudgeAdapter`.
-       ``InlineStepJudge`` remains the fallback when ``ctx`` is absent.
+       `InlineStepJudge` remains the fallback when `ctx` is absent.
 
-Construct with ``(config, ctx)``. Tests build ``ctx`` with
-``make_ctx()`` (``tests.fakes.context``). The legacy constructor
-``(config_dict, client, agent_router)`` is obsolete for new code.
+Construct with `(config, ctx)`. Tests build `ctx` with
+`make_ctx()` (`tests.fakes.context`). The legacy constructor
+`(config_dict, client, agent_router)` is obsolete for new code.
 :class:`~hackagent.attacks.techniques.bon.config.BoNConfig` still
 subclasses :class:`~hackagent.attacks.techniques.config.ConfigBase`.
 
@@ -65,9 +65,9 @@ def __init__(config: Optional[Dict[str, Any]] = None,
 
 Initialise BoNAttack with configuration.
 
-Prefer ``BoNAttack(config, ctx)``. ``ctx.judge.score`` replaces
-``InlineStepJudge`` on that path. Legacy
-``(config, client, agent_router)`` remains for the orchestrator
+Prefer `BoNAttack(config, ctx)`. `ctx.judge.score` replaces
+`InlineStepJudge` on that path. Legacy
+`(config, client, agent_router)` remains for the orchestrator
 and is obsolete for new code.
 
 #### run

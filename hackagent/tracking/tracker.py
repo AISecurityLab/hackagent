@@ -143,7 +143,7 @@ class Tracker:
             run_id: Server-side run record ID
             logger: Optional logger instance
             attack_type: Optional attack type identifier for metadata
-            event_bus: Optional :class:`hackagent.cli.tui.events.TUIEventBus`.
+            event_bus: Optional :class:`hackagent.interfaces.tui.events.TUIEventBus`.
                 When provided, the tracker emits structured events
                 (``goal_started``, ``goal_finalized``, ``evaluation``, ...)
                 so the TUI can render execution live without parsing logs.

@@ -41,8 +41,8 @@ def resolve_tool_name(params: Dict[str, Any]) -> str
 Resolve the primary tool name from params.
 
 Preference order:
-1. Explicit non-empty ``tool_name`` (TUI / caller override)
-2. Name from the first entry in ``tools`` schemas
+1. Explicit non-empty `tool_name` (TUI / caller override)
+2. Name from the first entry in `tools` schemas
 3. :data:`DEFAULT_TOOL_NAME`
 
 #### resolve\_benign\_task
@@ -52,7 +52,7 @@ def resolve_benign_task(goal_idx: int, params: Dict[str, Any],
                         goal: str) -> str
 ```
 
-Pick a benign task for ``goal_idx``, cycling configured or default lists.
+Pick a benign task for `goal_idx`, cycling configured or default lists.
 
 #### render\_injection
 
@@ -76,7 +76,7 @@ def build_poisoned_observation(params: Dict[str, Any],
 
 Compose the tool observation: benign prefix + adversarial injection.
 
-When ``success_setting`` is set, appends InjecAgent-aligned framing so the
+When `success_setting` is set, appends InjecAgent-aligned framing so the
 injected text steers toward direct harm, data stealing, or both.
 
 #### build\_simulated\_messages

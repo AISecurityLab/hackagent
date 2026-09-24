@@ -12,7 +12,7 @@ from tests.fakes.judge import FakeJudge
 from tests.fakes.llm import FakeLLM
 from tests.fakes.router import FakeRouter
 from tests.fakes.settings import isolated_settings
-from tests.fakes.storage import in_memory_store
+from tests.fakes.storage import RecordingStore, in_memory_store
 from tests.fakes.tracking import RecordingCoordinator, RecordingStepTracker
 
 __all__ = [
@@ -24,6 +24,7 @@ __all__ = [
     "RecordingCoordinator",
     "RecordingEvents",
     "RecordingStepTracker",
+    "RecordingStore",
     "in_memory_store",
     "isolated_settings",
     "make_ctx",

@@ -18,14 +18,14 @@ def ensure_graphviz_dot_available(
         allow_download: bool | None = None) -> str | None
 ```
 
-Ensure Graphviz ``dot`` is available and return its resolved path.
+Ensure Graphviz `dot` is available and return its resolved path.
 
-This function is safe to call during setup flows (e.g. ``hackagent init``).
+This function is safe to call during setup flows (e.g. `hackagent init`).
 It may trigger automatic local binary download when enabled.
 
 **Arguments**:
 
-- `allow_download` - See ``_resolve_dot_binary``.
+- `allow_download` - See `_resolve_dot_binary`.
 
 #### ensure\_graphviz
 
@@ -98,16 +98,16 @@ def render_flowchart(steps: List[str],
 
 Render steps as a flowchart image using Graphviz.
 
-Tries the system ``dot`` first. If unavailable, it can auto-download
+Tries the system `dot` first. If unavailable, it can auto-download
 portable Graphviz binaries (macOS/Windows) from the latest official
-release unless ``HACKAGENT_GRAPHVIZ_AUTO_DOWNLOAD=0`` is set.
+release unless `HACKAGENT_GRAPHVIZ_AUTO_DOWNLOAD=0` is set.
 
 **Arguments**:
 
 - `steps` - List of step description strings.
 - `goal_text` - The original goal/prompt displayed as the first node.
-- `layout` - One of ``&quot;vertical&quot;``, ``&quot;horizontal&quot;``, ``&quot;tortuous&quot;``
-  (or ``&quot;s_shaped&quot;`` as alias).
+- `layout` - One of `&quot;vertical&quot;`, `&quot;horizontal&quot;`, `&quot;tortuous&quot;`
+  (or `&quot;s_shaped&quot;` as alias).
 - `dpi` - Resolution for Graphviz rendering.
 - `**kwargs` - Additional params (ignored, for backwards compat).
   

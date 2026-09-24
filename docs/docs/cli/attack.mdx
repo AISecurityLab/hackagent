@@ -47,8 +47,9 @@ hackagent eval \
 | AdvPrefix | Adaptive | `hackagent eval advprefix` |
 | AutoDAN-Turbo | Adaptive | `hackagent eval autodan_turbo` |
 | Crescendo | Multi-turn | `hackagent eval crescendo` |
+| RAG | Static (tags: indirect, rag) | `hackagent eval rag` |
 
-Additionally, `hackagent eval chain` runs a fallback-ladder sequence of multiple attacks against a shared pool of goals (own `--config-file`/`--goals`/`--timeout`/`--dry-run`/guardrail options; see `hackagent eval chain --help`). The RAG attack (indirect prompt injection) is SDK-only — primary category **Static**, tags **indirect** / **rag** — see [RAG Attack](../attacks/rag.md). Categories are defined in [Attack taxonomy](../attacks/taxonomy.mdx); `hackagent eval list` prints the same assignments.
+Additionally, `hackagent eval chain` runs a fallback-ladder sequence of multiple attacks against a shared pool of goals (own `--config-file`/`--goals`/`--timeout`/`--dry-run`/guardrail options; see `hackagent eval chain --help`). The quick scan (`hackagent eval` with no attack name) calls `hack_chain` through the facade. Strategy commands are generated from that catalog, so crescendo and rag are included: `hackagent eval rag` runs the indirect-injection technique (primary category **Static**, tags **indirect** / **rag** — see [RAG Attack](../attacks/rag.md)). Categories are defined in [Attack taxonomy](../attacks/taxonomy.mdx); `hackagent eval list` prints the same assignments.
 
 ## Common CLI Options (All Attacks)
 

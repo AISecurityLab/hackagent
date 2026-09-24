@@ -35,7 +35,7 @@ for package in ("textual",):
     datas += collect_data_files(package)
 
 # First-party non-Python assets (dataset taxonomies, bundled examples, docs,
-# and the exported web UI under server/webui/static).
+# and the exported web UI under interfaces/web/static).
 datas += collect_data_files("hackagent", include_py_files=False)
 
 hiddenimports = ["faiss"]
@@ -43,7 +43,7 @@ hiddenimports = ["faiss"]
 # Textual resolves widgets lazily through ``textual.widgets.__getattr__`` and the
 # TUI views are imported by name, so static analysis never sees either of them.
 hiddenimports += collect_submodules("textual")
-hiddenimports += collect_submodules("hackagent.cli.tui")
+hiddenimports += collect_submodules("hackagent.interfaces.tui")
 
 _build_version = os.environ.get("HACKAGENT_BUILD_VERSION", "")
 _runtime_hook = BUILD_DIR / "hackagent_runtime_version.py"
