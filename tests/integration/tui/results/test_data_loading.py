@@ -28,8 +28,8 @@ import httpx
 import pytest
 from textual.app import App
 
-from hackagent.cli.config import CLIConfig
-from hackagent.cli.tui.views.results import ResultsTab
+from hackagent.interfaces.cli.config import CLIConfig
+from hackagent.interfaces.tui.views.results import ResultsTab
 from hackagent.storage.records import RunRecord, PaginatedResult
 
 

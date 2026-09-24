@@ -6,7 +6,7 @@
 import unittest
 from unittest.mock import patch
 
-from hackagent.cli.banner import display_hackagent_splash
+from hackagent.interfaces.cli.banner import display_hackagent_splash
 
 
 class TestDisplayHackagentSplash(unittest.TestCase):
@@ -20,7 +20,7 @@ class TestDisplayHackagentSplash(unittest.TestCase):
 
         buffer = StringIO()
         console = Console(file=buffer, width=120)
-        with patch("hackagent.cli.banner.Console", return_value=console):
+        with patch("hackagent.interfaces.cli.banner.Console", return_value=console):
             display_hackagent_splash()
         # Just ensure it ran without error
 

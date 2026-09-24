@@ -12,8 +12,8 @@ from uuid import uuid4
 
 from click.testing import CliRunner
 
-from hackagent.cli.commands import results as results_mod
-from hackagent.cli.commands.results import (
+from hackagent.interfaces.cli.commands import results as results_mod
+from hackagent.interfaces.cli.commands.results import (
     _display_result_details,
     _display_result_summary,
     _generate_result_statistics,
@@ -52,7 +52,7 @@ class TestShowLogoOnce(unittest.TestCase):
         )
 
     def test_splash_is_displayed_only_on_the_first_call(self):
-        with patch("hackagent.cli.banner.display_hackagent_splash") as splash:
+        with patch("hackagent.interfaces.cli.banner.display_hackagent_splash") as splash:
             _show_logo_once()
             _show_logo_once()
             _show_logo_once()
@@ -61,7 +61,7 @@ class TestShowLogoOnce(unittest.TestCase):
 
     def test_group_invocation_shows_the_logo(self):
         with (
-            patch("hackagent.cli.banner.display_hackagent_splash") as splash,
+            patch("hackagent.interfaces.cli.banner.display_hackagent_splash") as splash,
             patch.object(results_mod, "launch_tui"),
         ):
             result = CliRunner().invoke(
@@ -127,6 +127,8 @@ class TestResultsShow(unittest.TestCase):
     def setUp(self):
         self.runner = CliRunner()
         self.config = MagicMock()
+        self.config.api_key = None
+        self.config.base_url = None
 
     def test_fetches_the_result_by_uuid_and_renders_details(self):
         result_id = uuid4()
@@ -371,6 +373,8 @@ class TestResultsSummaryCommand(unittest.TestCase):
     def setUp(self):
         self.runner = CliRunner()
         self.config = MagicMock()
+        self.config.api_key = None
+        self.config.base_url = None
 
     def _invoke(self, pages, args=()):
         backend = MagicMock()
@@ -396,7 +400,8 @@ class TestResultsSummaryCommand(unittest.TestCase):
         self.assertEqual(outcome.exit_code, 0)
         self.assertEqual(backend.list_results.call_count, 2)
         self.assertEqual(
-            backend.list_results.call_args_list[1].kwargs, {"page": 2, "page_size": 200}
+            backend.list_results.call_args_list[1].kwargs,
+            {"run_id": None, "page": 2, "page_size": 200},
         )
         self.assertEqual(display.call_args.args[0]["total_results"], 3)
 

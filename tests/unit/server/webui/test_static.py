@@ -16,7 +16,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 
-from hackagent.server.webui import _static
+from hackagent.interfaces.web import _static
 
 
 def _make_bundle(root: Path, version: str = "1.2.3") -> Path:
@@ -113,7 +113,7 @@ class TestBundleResolution(_StaticTestCase):
 
 class TestMissingBundleGuidance(_StaticTestCase):
     def test_the_error_names_both_ways_to_get_a_bundle(self):
-        from hackagent.server.webui import MissingBundleError
+        from hackagent.interfaces.web import MissingBundleError
 
         message = str(MissingBundleError())
         self.assertIn("build_webui", message)

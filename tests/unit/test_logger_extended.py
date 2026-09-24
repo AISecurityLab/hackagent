@@ -8,9 +8,9 @@ import os
 import unittest
 from unittest.mock import patch
 
-import hackagent.cli.logging_setup as logger_module
+import hackagent.interfaces.cli.logging_setup as logger_module
 from hackagent.core.logging import get_logger
-from hackagent.cli.logging_setup import setup_package_logging, suppress_noisy_libraries
+from hackagent.interfaces.cli.logging_setup import setup_package_logging, suppress_noisy_libraries
 
 
 class TestSetupPackageLoggingExtended(unittest.TestCase):

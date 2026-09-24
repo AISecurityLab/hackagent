@@ -9,8 +9,8 @@ from unittest.mock import MagicMock, patch
 
 import click
 
-from hackagent.cli.commands.attack import runner as runner_mod
-from hackagent.cli.commands.attack.runner import _run_attack_command, run_attack
+from hackagent.interfaces.cli.commands.attack import runner as runner_mod
+from hackagent.interfaces.cli.commands.attack.runner import _run_attack_command, run_attack
 
 
 class _Ctx:
@@ -50,7 +50,7 @@ class TestTuiPath(unittest.TestCase):
     def test_tui_is_launched_with_the_form_prefilled(self):
         app = MagicMock()
 
-        with patch("hackagent.cli.tui.HackAgentTUI", return_value=app) as tui_cls:
+        with patch("hackagent.interfaces.tui.HackAgentTUI", return_value=app) as tui_cls:
             _invoke(self.ctx, no_tui=False)
 
         self.config.validate.assert_called_once_with()
@@ -62,7 +62,7 @@ class TestTuiPath(unittest.TestCase):
         self.assertEqual(tui_cls.call_args.kwargs["initial_tab"], "attacks")
 
     def test_missing_tui_dependency_exits(self):
-        with patch.dict(sys.modules, {"hackagent.cli.tui": None}):
+        with patch.dict(sys.modules, {"hackagent.interfaces.tui": None}):
             with self.assertRaises(click.exceptions.Exit):
                 _invoke(self.ctx, no_tui=False)
 
@@ -70,7 +70,7 @@ class TestTuiPath(unittest.TestCase):
 
     def test_tui_startup_failure_exits(self):
         with patch(
-            "hackagent.cli.tui.HackAgentTUI", side_effect=RuntimeError("no tty")
+            "hackagent.interfaces.tui.HackAgentTUI", side_effect=RuntimeError("no tty")
         ):
             with self.assertRaises(click.exceptions.Exit):
                 _invoke(self.ctx, no_tui=False)
@@ -80,7 +80,7 @@ class TestTuiPath(unittest.TestCase):
     def test_invalid_configuration_stops_before_the_tui(self):
         self.config.validate.side_effect = ValueError("API key is required")
 
-        with patch("hackagent.cli.tui.HackAgentTUI") as tui_cls:
+        with patch("hackagent.interfaces.tui.HackAgentTUI") as tui_cls:
             with self.assertRaises(ValueError):
                 _invoke(self.ctx, no_tui=False)
 
@@ -93,7 +93,7 @@ class TestDirectExecution(unittest.TestCase):
         self.config.api_key = "hk_key"
         self.config.base_url = "https://api.hackagent.dev"
         self.ctx = _Ctx(self.config)
-        splash = patch("hackagent.cli.banner.display_hackagent_splash")
+        splash = patch("hackagent.interfaces.cli.banner.display_hackagent_splash")
         splash.start()
         self.addCleanup(splash.stop)
 
@@ -105,6 +105,7 @@ class TestDirectExecution(unittest.TestCase):
 
     def test_successful_run_passes_config_and_timeout(self):
         agent = MagicMock()
+        agent.target.return_value = agent
         agent.hack.return_value = [{"goal": "g", "eval_hb": 1}]
 
         with (
@@ -113,8 +114,8 @@ class TestDirectExecution(unittest.TestCase):
         ):
             _invoke(self.ctx, timeout=42)
 
-        self.assertEqual(agent_cls.call_args.kwargs["name"], "target-bot")
-        self.assertEqual(agent_cls.call_args.kwargs["api_key"], "hk_key")
+        self.assertEqual(agent.target.call_args.kwargs["name"], "target-bot")
+        self.assertEqual(agent_cls.call_args.args[0].api_key, "hk_key")
         hack_kwargs = agent.hack.call_args.kwargs
         self.assertEqual(hack_kwargs["attack_config"]["attack_type"], "advprefix")
         self.assertEqual(hack_kwargs["attack_config"]["goals"], ["do something"])
@@ -124,6 +125,7 @@ class TestDirectExecution(unittest.TestCase):
 
     def test_guardrail_options_are_forwarded(self):
         agent = MagicMock()
+        agent.target.return_value = agent
 
         with (
             patch.object(runner_mod, "HackAgent", return_value=agent) as agent_cls,
@@ -137,16 +139,17 @@ class TestDirectExecution(unittest.TestCase):
                 after_guardrail_name="guard-out",
             )
 
-        kwargs = agent_cls.call_args.kwargs
+        kwargs = agent.target.call_args.kwargs["guardrails"]
         self.assertEqual(
-            kwargs["before_guardrail"],
+            kwargs["before"],
             {
                 "identifier": "guard-in",
                 "agent_type": "ollama",
                 "endpoint": "http://guard",
             },
         )
-        self.assertEqual(kwargs["after_guardrail"]["identifier"], "guard-out")
+        self.assertEqual(kwargs["after"]["identifier"], "guard-out")
+        self.assertEqual(agent_cls.call_args.args[0].base_url, "https://api.hackagent.dev")
 
     def test_no_guardrails_are_passed_as_none(self):
         with (
@@ -155,8 +158,9 @@ class TestDirectExecution(unittest.TestCase):
         ):
             _invoke(self.ctx)
 
-        self.assertIsNone(agent_cls.call_args.kwargs["before_guardrail"])
-        self.assertIsNone(agent_cls.call_args.kwargs["after_guardrail"])
+        guardrails = agent_cls.return_value.target.call_args.kwargs["guardrails"]
+        self.assertIsNone(guardrails["before"])
+        self.assertIsNone(guardrails["after"])
 
     def test_agent_initialisation_failure_is_wrapped(self):
         with patch.object(
@@ -169,6 +173,7 @@ class TestDirectExecution(unittest.TestCase):
 
     def test_attack_failure_is_wrapped(self):
         agent = MagicMock()
+        agent.target.return_value = agent
         agent.hack.side_effect = RuntimeError("target unreachable")
 
         with patch.object(runner_mod, "HackAgent", return_value=agent):
@@ -183,6 +188,7 @@ class TestDirectExecution(unittest.TestCase):
 
     def test_dataset_configs_are_summarised_for_display(self):
         agent = MagicMock()
+        agent.target.return_value = agent
 
         with (
             patch.object(runner_mod, "HackAgent", return_value=agent),

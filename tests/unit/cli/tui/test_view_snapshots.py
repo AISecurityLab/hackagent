@@ -4,7 +4,7 @@
 """Textual snapshot tests for the TUI views extracted into packages.
 
 These lock the rendered output of ``AttacksTab`` and ``ResultsTab`` so that
-future refactors of ``hackagent.cli.tui.views.*`` cannot silently change the
+future refactors of ``hackagent.interfaces.tui.views.*`` cannot silently change the
 layout. Regenerate the snapshots with::
 
     uv run pytest tests/unit/cli/tui --snapshot-update

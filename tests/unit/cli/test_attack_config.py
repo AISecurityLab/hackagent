@@ -10,11 +10,11 @@ from tempfile import TemporaryDirectory
 
 import click
 
-from hackagent.cli.commands.attack import (
+from hackagent.interfaces.cli.commands.attack import (
     build_guardrail_config,
     parse_config,
 )
-from hackagent.cli.commands.attack.config import (
+from hackagent.interfaces.cli.commands.attack.config import (
     _parse_goals,
     _summarize_goals_source,
 )

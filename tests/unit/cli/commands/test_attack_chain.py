@@ -11,8 +11,8 @@ from unittest.mock import MagicMock, patch
 
 from click.testing import CliRunner
 
-from hackagent.cli.commands.attack import chain as chain_mod
-from hackagent.cli.commands.attack.chain import chain
+from hackagent.interfaces.cli.commands.attack import chain as chain_mod
+from hackagent.interfaces.cli.commands.attack.chain import chain
 
 
 class TestChainCommand(unittest.TestCase):
@@ -20,7 +20,7 @@ class TestChainCommand(unittest.TestCase):
         self.runner = CliRunner()
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        splash = patch("hackagent.cli.banner.display_hackagent_splash")
+        splash = patch("hackagent.interfaces.cli.banner.display_hackagent_splash")
         splash.start()
         self.addCleanup(splash.stop)
 
@@ -40,6 +40,7 @@ class TestChainCommand(unittest.TestCase):
     def _invoke(self, args, agent=None, cli_config=None):
         cli_config = cli_config or self._cli_config()
         agent = agent if agent is not None else MagicMock()
+        agent.target.return_value = agent
         with (
             patch.object(chain_mod, "HackAgent", return_value=agent) as agent_cls,
             patch.object(chain_mod, "_display_attack_results") as display,
@@ -76,7 +77,7 @@ class TestChainCommand(unittest.TestCase):
         self.assertEqual(kwargs["run_config_override"], {"timeout": 77})
         self.assertTrue(kwargs["fail_on_run_error"])
         display.assert_called_once()
-        self.assertEqual(agent_cls.call_args.kwargs["api_key"], "hk_key")
+        self.assertEqual(agent_cls.call_args.args[0].api_key, "hk_key")
 
     def test_goals_can_come_from_the_config_file(self):
         path = self._config_file(
@@ -173,6 +174,7 @@ class TestChainCommand(unittest.TestCase):
     def test_chain_execution_failure_is_wrapped(self):
         path = self._config_file({"attacks": [{"attack_type": "pair"}]})
         agent = MagicMock()
+        agent.target.return_value = agent
         agent.hack_chain.side_effect = RuntimeError("target unreachable")
 
         result, _, _, _ = self._invoke(
@@ -199,9 +201,9 @@ class TestChainCommand(unittest.TestCase):
             )
         )
 
-        kwargs = agent_cls.call_args.kwargs
-        self.assertEqual(kwargs["before_guardrail"]["identifier"], "guard-in")
-        self.assertEqual(kwargs["after_guardrail"]["agent_type"], "ollama")
+        kwargs = agent_cls.return_value.target.call_args.kwargs["guardrails"]
+        self.assertEqual(kwargs["before"]["identifier"], "guard-in")
+        self.assertEqual(kwargs["after"]["agent_type"], "ollama")
 
     def test_missing_config_file_is_rejected_by_click(self):
         result = self.runner.invoke(

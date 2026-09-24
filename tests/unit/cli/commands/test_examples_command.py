@@ -10,7 +10,7 @@ from click.testing import CliRunner
 
 
 def test_extract_ollama_models_from_judges_and_embedder():
-    mod = importlib.import_module("hackagent.cli.commands.examples")
+    mod = importlib.import_module("hackagent.interfaces.cli.commands.examples")
 
     cfg = {
         "agent": {"adapter_operational_config": {"name": "target-model"}},
@@ -30,7 +30,7 @@ def test_extract_ollama_models_from_judges_and_embedder():
 
 
 def test_normalize_aliases_and_presence_checks():
-    mod = importlib.import_module("hackagent.cli.commands.examples")
+    mod = importlib.import_module("hackagent.interfaces.cli.commands.examples")
 
     aliases = mod._normalize_ollama_model_aliases("gemma3:latest")
     assert "gemma3" in aliases
@@ -40,7 +40,7 @@ def test_normalize_aliases_and_presence_checks():
 
 
 def test_run_hackagent_cli_command_raises_on_failure(monkeypatch):
-    mod = importlib.import_module("hackagent.cli.commands.examples")
+    mod = importlib.import_module("hackagent.interfaces.cli.commands.examples")
 
     def _fake_run(*args, **kwargs):
         return SimpleNamespace(returncode=1)
@@ -55,7 +55,7 @@ def test_run_hackagent_cli_command_raises_on_failure(monkeypatch):
 
 
 def test_resolve_example_dir_with_required_files(monkeypatch, tmp_path):
-    mod = importlib.import_module("hackagent.cli.commands.examples")
+    mod = importlib.import_module("hackagent.interfaces.cli.commands.examples")
 
     base = tmp_path / "repo"
     example_dir = base / "examples" / "openai_sdk" / "db_tool_sandbox"
@@ -72,7 +72,7 @@ def test_resolve_example_dir_with_required_files(monkeypatch, tmp_path):
 
 
 def test_db_tool_command_runs_and_sets_external_agent_flag(monkeypatch, tmp_path):
-    mod = importlib.import_module("hackagent.cli.commands.examples")
+    mod = importlib.import_module("hackagent.interfaces.cli.commands.examples")
 
     example_dir = tmp_path / "openai_sdk" / "db_tool_sandbox"
     example_dir.mkdir(parents=True)
@@ -118,7 +118,7 @@ def test_db_tool_command_runs_and_sets_external_agent_flag(monkeypatch, tmp_path
 
 
 def test_db_tool_command_stops_process_when_wait_fails(monkeypatch, tmp_path):
-    mod = importlib.import_module("hackagent.cli.commands.examples")
+    mod = importlib.import_module("hackagent.interfaces.cli.commands.examples")
 
     example_dir = tmp_path / "openai_sdk" / "db_tool_sandbox"
     example_dir.mkdir(parents=True)

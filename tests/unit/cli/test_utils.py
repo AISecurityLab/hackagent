@@ -8,7 +8,7 @@ Unit tests for CLI utilities and helper functions.
 from unittest.mock import patch
 import pytest
 from rich.console import Console
-from hackagent.cli.utils import (
+from hackagent.interfaces.cli.utils import (
     console,
     display_error,
     display_info,

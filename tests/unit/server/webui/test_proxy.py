@@ -16,7 +16,20 @@ from unittest.mock import patch
 
 import httpx
 
-from hackagent.server.webui import _static, create_app
+from hackagent import HackAgent, Settings
+from hackagent.interfaces.web import _static, create_app
+
+
+def _session(api_key: str = "", base_url: str = "https://api.example.test"):
+    return HackAgent(
+        Settings.resolve(
+            api_key=api_key,
+            base_url=base_url,
+            db_path=":memory:",
+            env={},
+            config_path="/nonexistent",
+        )
+    )
 
 
 class _StubResponse:
@@ -35,7 +48,7 @@ class TestRemoteProxy(unittest.TestCase):
         self._real_static_dir = _static.static_dir
         _static.static_dir = lambda: bundle
 
-        self.app = create_app(api_key="secret-key", base_url="https://api.example.test")
+        self.app = create_app(_session("secret-key", "https://api.example.test"))
         self.client = self.app.test_client()
 
     def tearDown(self) -> None:
@@ -153,11 +166,11 @@ class TestCreateAppValidation(unittest.TestCase):
         self._tmp.cleanup()
 
     def test_missing_bundle_raises_with_install_instructions(self):
-        from hackagent.server.webui import MissingBundleError
+        from hackagent.interfaces.web import MissingBundleError
 
         _static.static_dir = lambda: Path(self._tmp.name) / "absent"
         with self.assertRaises(MissingBundleError) as ctx:
-            create_app(api_key="k")
+            create_app(_session("k"))
         message = str(ctx.exception)
         self.assertIn("hackagent[web]", message)
         self.assertIn("build_webui", message)
@@ -168,7 +181,7 @@ class TestCreateAppValidation(unittest.TestCase):
         (bundle / "index.html").write_text("x")
         _static.static_dir = lambda: bundle
         with self.assertRaises(ValueError):
-            create_app(backend=None, api_key=None)
+            create_app(None)
 
 
 if __name__ == "__main__":

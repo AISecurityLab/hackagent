@@ -5,7 +5,7 @@
 
 import pytest
 
-from hackagent.cli.tui.attack_specs import get_all_attack_specs
+from hackagent.interfaces.tui.forms import get_all_attack_specs
 
 ALL_FIELDS = [
     (technique, field.key)
@@ -21,7 +21,13 @@ def test_model_fields_use_identifier(technique, key):
     assert not key.endswith(".model"), f"{technique}: use '.identifier' in {key!r}"
 
 
-def test_pair_attacker_model_field_sets_identifier():
+def test_pair_form_uses_schema_scalars_not_a_model_alias():
+    """Role dicts have no nested JSON schema, so they are not expanded.
+
+    Scalar technique fields still come from the pydantic model, and no
+    field is spelled ``.model`` (routers read ``identifier``).
+    """
     keys = {field.key for field in get_all_attack_specs()["pair"].fields}
 
-    assert "attacker.identifier" in keys
+    assert "attacker_feedback_max_chars" in keys
+    assert not any(key.endswith(".model") for key in keys)

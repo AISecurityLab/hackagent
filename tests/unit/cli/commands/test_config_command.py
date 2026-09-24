@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 
 from click.testing import CliRunner
 
-from hackagent.cli.commands.config import (
+from hackagent.interfaces.cli.commands.config import (
     config as config_group,
     import_config,
     reset,

@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from click.testing import CliRunner
 
-from hackagent.cli.commands.results import (
+from hackagent.interfaces.cli.commands.results import (
     _display_result_details,
     _generate_result_statistics,
     results,
@@ -22,6 +22,8 @@ from hackagent.core.contracts import EvalStatus
 def _config():
     cfg = MagicMock()
     cfg.validate.return_value = None
+    cfg.api_key = None
+    cfg.base_url = None
     return cfg
 
 
@@ -80,7 +82,7 @@ class TestDisplayResultDetails(unittest.TestCase):
         result = _result()
         buffer = StringIO()
         console = Console(file=buffer, width=120, force_terminal=True)
-        with patch("hackagent.cli.commands.results.console", console):
+        with patch("hackagent.interfaces.cli.commands.results.console", console):
             _display_result_details(result)
         printed = buffer.getvalue()
         self.assertIn(str(result.id), printed)
@@ -91,7 +93,7 @@ class TestDisplayResultDetails(unittest.TestCase):
 
     def test_non_dict_data_is_stringified(self):
         result = _result(data="plain-notes")
-        with patch("hackagent.cli.commands.results.console") as console:
+        with patch("hackagent.interfaces.cli.commands.results.console") as console:
             _display_result_details(result)
         printed = " ".join(str(call) for call in console.print.call_args_list)
         self.assertIn("plain-notes", printed)
@@ -101,8 +103,8 @@ class TestResultsCommands(unittest.TestCase):
     def test_list_launches_results_tui(self):
         runner = CliRunner()
         with (
-            patch("hackagent.cli.commands.results._show_logo_once"),
-            patch("hackagent.cli.commands.results.launch_tui") as mock_tui,
+            patch("hackagent.interfaces.cli.commands.results._show_logo_once"),
+            patch("hackagent.interfaces.cli.commands.results.launch_tui") as mock_tui,
         ):
             result = runner.invoke(
                 results, ["list", "--limit", "5"], obj={"config": _config()}
@@ -118,7 +120,7 @@ class TestResultsCommands(unittest.TestCase):
         backend = MagicMock()
         backend.get_result.return_value = record
         with (
-            patch("hackagent.cli.commands.results._show_logo_once"),
+            patch("hackagent.interfaces.cli.commands.results._show_logo_once"),
             patch("hackagent.storage.local.LocalBackend", return_value=backend),
         ):
             result = runner.invoke(
@@ -133,7 +135,7 @@ class TestResultsCommands(unittest.TestCase):
         backend = MagicMock()
         backend.get_result.side_effect = RuntimeError("missing")
         with (
-            patch("hackagent.cli.commands.results._show_logo_once"),
+            patch("hackagent.interfaces.cli.commands.results._show_logo_once"),
             patch("hackagent.storage.local.LocalBackend", return_value=backend),
         ):
             result = runner.invoke(
@@ -160,7 +162,7 @@ class TestResultsCommands(unittest.TestCase):
         backend = MagicMock()
         backend.list_results.return_value = page
         with (
-            patch("hackagent.cli.commands.results._show_logo_once"),
+            patch("hackagent.interfaces.cli.commands.results._show_logo_once"),
             patch("hackagent.storage.local.LocalBackend", return_value=backend),
         ):
             result = runner.invoke(

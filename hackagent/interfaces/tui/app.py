@@ -1,0 +1,324 @@
+# Copyright 2026 - AI4I. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+"""
+Main TUI Application
+
+Full-screen tabbed interface for HackAgent.
+"""
+
+from typing import Any
+
+from textual.app import App, ComposeResult
+from textual.binding import Binding
+from textual.widgets import Footer, TabbedContent, TabPane
+
+from hackagent.interfaces.cli.config import CLIConfig
+from hackagent.interfaces.tui.theme import css_variables
+from hackagent.interfaces.tui.views.agents import AgentsTab
+from hackagent.interfaces.tui.views.attacks import AttacksTab
+from hackagent.interfaces.tui.views.config import ConfigTab
+from hackagent.interfaces.tui.views.results import ResultsTab
+
+
+class HackAgentTUI(App):
+    """HackAgent Terminal User Interface Application"""
+
+    CSS = """
+    Screen {
+        background: $surface;
+    }
+
+    Header {
+        background: $brand-dark;  /* dark red - HackAgent brand color */
+        color: $brand-text;
+        height: 3;
+    }
+
+    Footer {
+        background: $brand-darker;  /* darker red */
+        color: $brand-text;
+    }
+
+    TabbedContent {
+        height: 100%;
+        border: solid $brand;  /* red - HackAgent brand color */
+    }
+
+    TabPane {
+        padding: 1 2;
+    }
+
+    TabbedContent > ContentSwitcher > * > * {
+        background: $surface;
+    }
+
+    Tabs {
+        background: $brand-darker;
+    }
+
+    Tab {
+        color: $brand-text-muted;
+        background: $brand-darker;
+    }
+
+    Tab.-active {
+        color: $brand-text;
+        background: $brand-dark;  /* dark red when active */
+        text-style: bold;
+    }
+
+    Tab:hover {
+        background: $brand-hover;
+    }
+
+    .title-bar {
+        dock: top;
+        width: 100%;
+        background: $brand-dark;
+        color: $brand-text;
+        height: 3;
+        content-align: center middle;
+    }
+
+    .section {
+        border: solid $brand;
+        padding: 1;
+        margin: 1;
+        height: auto;
+    }
+
+    .info-box {
+        background: $panel;
+        border: solid $brand;
+        padding: 1;
+        margin: 1;
+    }
+
+    Button {
+        margin: 1;
+    }
+
+    Button.-primary {
+        background: $brand-dark;
+        color: $brand-text;
+    }
+
+    Button.-primary:hover {
+        background: $brand;
+    }
+
+    DataTable {
+        height: 100%;
+    }
+
+    DataTable > .datatable--header {
+        background: $brand-dark;
+        color: $brand-text;
+        text-style: bold;
+    }
+
+    DataTable > .datatable--cursor {
+        background: $brand-hover;
+    }
+
+    /* Results tab specific styles - horizontal split 20-80 */
+    ResultsTab #results-left-panel {
+        border-right: solid $brand;
+        background: $panel;
+    }
+
+    ResultsTab #results-right-panel {
+        background: $panel;
+    }
+
+    ResultsTab #results-title {
+        height: 3;
+        width: 100%;
+        text-align: center;
+        background: $brand-dark;
+        color: $brand-text;
+        padding: 1;
+    }
+
+    ResultsTab #details-title {
+        height: 3;
+        width: 100%;
+        text-align: center;
+        background: $brand-dark;
+        color: $brand-text;
+        padding: 1;
+    }
+
+    ResultsTab .toolbar {
+        height: 3;
+        width: 100%;
+        padding: 0 1;
+    }
+    """
+
+    TITLE = "🔴 HACKAGENT 🔴 - AI Security Testing Toolkit"
+    SUB_TITLE = "Red Team Security Interface"
+
+    BINDINGS = [
+        Binding("q", "quit", "Quit", priority=True),
+        Binding("a", "switch_tab('agents')", "Target Agents", show=False),
+        Binding("k", "switch_tab('attacks')", "Attacks", show=False),
+        Binding("r", "switch_tab('results')", "Results", show=False),
+        Binding("c", "switch_tab('config')", "Config", show=False),
+        Binding("f5", "refresh", "Refresh", show=True),
+        Binding("ctrl+y", "copy_selection", "Copy logs", show=True),
+    ]
+
+    def __init__(
+        self,
+        cli_config: CLIConfig,
+        initial_tab: str = "agents",
+        initial_data: dict[Any, Any] | None = None,
+    ):
+        """Initialize the TUI application.
+
+        Args:
+            cli_config: CLI configuration object
+            initial_tab: Which tab to show initially (default: "agents")
+            initial_data: Initial data to pre-fill in the tab (default: None)
+        """
+        super().__init__()
+        self.cli_config = cli_config
+        self.initial_tab = initial_tab
+        self.initial_data = initial_data or {}
+        self.dark = True  # Use dark theme by default
+
+    def get_css_variables(self) -> dict[str, str]:
+        """Expose the HackAgent brand palette as CSS variables."""
+        return {**super().get_css_variables(), **css_variables()}
+
+    def compose(self) -> ComposeResult:
+        """Compose the UI layout."""
+        with TabbedContent(initial=self.initial_tab):
+            with TabPane("Target Agents", id="agents"):
+                yield AgentsTab(self.cli_config)
+
+            with TabPane("Attacks", id="attacks"):
+                yield AttacksTab(self.cli_config, initial_data=self.initial_data)
+
+            with TabPane("Results", id="results"):
+                yield ResultsTab(self.cli_config)
+
+            with TabPane("Config", id="config"):
+                yield ConfigTab(self.cli_config)
+
+        yield Footer()
+
+    def action_switch_tab(self, tab_id: str) -> None:
+        """Switch to a specific tab.
+
+        Args:
+            tab_id: ID of the tab to switch to
+        """
+        tabs = self.query_one(TabbedContent)
+        tabs.active = tab_id
+
+    def action_refresh(self) -> None:
+        """Refresh the current tab's data.
+
+        Walks every descendant of the active TabPane (not just immediate
+        children) so nested tab widgets — including those that wrap their
+        body in a scroller — still receive the refresh.
+        """
+        tabs = self.query_one(TabbedContent)
+        active_pane = tabs.get_pane(tabs.active)
+        if active_pane is None:
+            return
+        try:
+            for descendant in active_pane.query("*"):
+                if hasattr(descendant, "refresh_data"):
+                    descendant.refresh_data()
+                    return
+        except Exception:
+            pass
+        # Last-resort: try the pane itself.
+        if hasattr(active_pane, "refresh_data"):
+            active_pane.refresh_data()
+
+    def _active_monitor_text(self) -> tuple[str, str]:
+        """Return ``(text, source)`` for the active attack-monitor panel.
+
+        Picks the Actions panel when its tab is active, otherwise the Logs
+        panel. Returns ``("", "logs")`` when no viewer is present.
+        """
+        from hackagent.interfaces.tui.widgets.actions import AgentActionsViewer
+        from hackagent.interfaces.tui.widgets.logs import AttackLogViewer
+
+        active = None
+        try:
+            monitor = self.query_one("#attack-monitor-container")
+            active = monitor.query_one(TabbedContent).active
+        except Exception:
+            active = None
+
+        if active == "actions-tab":
+            try:
+                return self.query_one(AgentActionsViewer).get_actions_text(), "actions"
+            except Exception:
+                pass
+        try:
+            return self.query_one(AttackLogViewer).get_log_text(), "logs"
+        except Exception:
+            pass
+        try:
+            return self.query_one(AgentActionsViewer).get_actions_text(), "actions"
+        except Exception:
+            return "", "logs"
+
+    def action_copy_selection(self) -> None:
+        """Copy logs (or a text selection) to the clipboard — bound to Ctrl+Y.
+
+        If you've dragged to select text, that selection is copied. Otherwise it
+        copies the whole visible Logs (or Actions) panel — so you can copy
+        without needing the mouse at all. Uses Textual's terminal-native
+        clipboard (OSC 52), which works locally and over SSH.
+        """
+        from hackagent.interfaces.tui.widgets.clipboard import copy_to_clipboard
+
+        source = "selection"
+        text = ""
+        try:
+            text = self.screen.get_selected_text() or ""
+        except Exception:
+            text = ""
+        if not text:
+            text, source = self._active_monitor_text()
+        if not text:
+            self.notify(
+                "Nothing to copy yet — run an attack, or drag to select text first.",
+                title="Copy",
+                severity="warning",
+            )
+            return
+        copy_to_clipboard(self, text)
+        self.notify(
+            f"Copied {source} ({len(text)} characters) to the clipboard.",
+            title="Copy",
+        )
+
+    def on_mount(self) -> None:
+        """Called when the app is mounted."""
+        self.title = self.TITLE
+        self.sub_title = self.SUB_TITLE
+
+    def show_success(self, message: str) -> None:
+        """Show success notification with checkmark."""
+        self.notify(f"✓ {message}", title="Success", severity="information")
+
+    def show_error(self, message: str) -> None:
+        """Show error notification with X mark."""
+        self.notify(f"✗ {message}", title="Error", severity="error")
+
+    def show_warning(self, message: str) -> None:
+        """Show warning notification with warning sign."""
+        self.notify(f"⚠ {message}", title="Warning", severity="warning")
+
+    def show_info(self, message: str) -> None:
+        """Show info notification with info icon."""
+        self.notify(f"ℹ {message}", title="Info", severity="information")

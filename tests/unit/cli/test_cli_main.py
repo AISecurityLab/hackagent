@@ -12,7 +12,8 @@ from unittest.mock import MagicMock, patch
 
 from click.testing import CliRunner
 
-from hackagent.cli.main import cli
+from hackagent import Settings
+from hackagent.interfaces.cli.main import cli
 
 
 class TestCLIVersion(unittest.TestCase):
@@ -25,7 +26,7 @@ class TestCLIVersion(unittest.TestCase):
         self.assertEqual(result.exit_code, 0)
         self.assertIn("hackagent", result.output)
 
-    @patch("hackagent.cli.main.CLIConfig")
+    @patch("hackagent.interfaces.cli.main.CLIConfig")
     def test_version_command(self, mock_config_class):
         """Test 'version' command displays version."""
         mock_config = MagicMock()
@@ -72,8 +73,8 @@ class TestCLIHelp(unittest.TestCase):
 class TestCLIConfigContext(unittest.TestCase):
     """Test CLI configuration context setup."""
 
-    @patch("hackagent.cli.main.CLIConfig")
-    @patch("hackagent.cli.main._launch_tui_default")
+    @patch("hackagent.interfaces.cli.main.CLIConfig")
+    @patch("hackagent.interfaces.cli.main._launch_tui_default")
     def test_config_passed_to_context(self, mock_tui, mock_config_class):
         """Test that CLIConfig is initialized and passed to context."""
         mock_config = MagicMock()
@@ -84,8 +85,8 @@ class TestCLIConfigContext(unittest.TestCase):
 
         mock_config_class.assert_called_once()
 
-    @patch("hackagent.cli.main.CLIConfig")
-    @patch("hackagent.cli.main._launch_tui_default")
+    @patch("hackagent.interfaces.cli.main.CLIConfig")
+    @patch("hackagent.interfaces.cli.main._launch_tui_default")
     def test_api_key_passed_to_config(self, mock_tui, mock_config_class):
         """Test that --api-key option is passed to CLIConfig."""
         mock_config = MagicMock()
@@ -97,8 +98,8 @@ class TestCLIConfigContext(unittest.TestCase):
         call_kwargs = mock_config_class.call_args.kwargs
         self.assertEqual(call_kwargs["api_key"], "my-test-key")
 
-    @patch("hackagent.cli.main.CLIConfig")
-    @patch("hackagent.cli.main._launch_tui_default")
+    @patch("hackagent.interfaces.cli.main.CLIConfig")
+    @patch("hackagent.interfaces.cli.main._launch_tui_default")
     def test_base_url_passed_to_config(self, mock_tui, mock_config_class):
         """Test that --base-url option is passed to CLIConfig."""
         mock_config = MagicMock()
@@ -110,8 +111,8 @@ class TestCLIConfigContext(unittest.TestCase):
         call_kwargs = mock_config_class.call_args.kwargs
         self.assertEqual(call_kwargs["base_url"], "https://custom.api.com")
 
-    @patch("hackagent.cli.main.CLIConfig")
-    @patch("hackagent.cli.main._launch_tui_default")
+    @patch("hackagent.interfaces.cli.main.CLIConfig")
+    @patch("hackagent.interfaces.cli.main._launch_tui_default")
     def test_verbose_flag(self, mock_tui, mock_config_class):
         """Test that -v verbose flag increments verbosity."""
         mock_config = MagicMock()
@@ -123,7 +124,7 @@ class TestCLIConfigContext(unittest.TestCase):
         call_kwargs = mock_config_class.call_args.kwargs
         self.assertEqual(call_kwargs["verbose"], 2)
 
-    @patch("hackagent.cli.main.CLIConfig")
+    @patch("hackagent.interfaces.cli.main.CLIConfig")
     def test_config_error_exits(self, mock_config_class):
         """Test that configuration error causes exit."""
         mock_config_class.side_effect = Exception("Config error")
@@ -137,11 +138,16 @@ class TestCLIConfigContext(unittest.TestCase):
 class TestCLIDoctor(unittest.TestCase):
     """Test the doctor command."""
 
-    @patch("hackagent.cli.main.CLIConfig")
+    @patch("hackagent.interfaces.cli.main.CLIConfig")
     def test_doctor_no_api_key(self, mock_config_class):
         """Test doctor when no API key is configured."""
         mock_config = MagicMock()
         mock_config.api_key = None
+        mock_config.settings = Settings.resolve(
+            api_key="",
+            env={},
+            config_path="/nonexistent-hackagent-doctor-config",
+        )
         mock_config.default_config_path = MagicMock()
         mock_config.default_config_path.exists.return_value = False
         mock_config_class.return_value = mock_config
@@ -151,18 +157,24 @@ class TestCLIDoctor(unittest.TestCase):
         self.assertEqual(result.exit_code, 0)
         self.assertIn("API key not set", result.output)
 
-    @patch("hackagent.cli.main.CLIConfig")
+    @patch("hackagent.interfaces.cli.main.CLIConfig")
     def test_doctor_with_api_key(self, mock_config_class):
         """Test doctor when API key is configured."""
         mock_config = MagicMock()
         mock_config.api_key = "a-very-long-api-key-that-is-valid"
         mock_config.base_url = "https://api.hackagent.dev"
+        mock_config.settings = Settings.resolve(
+            api_key="a-very-long-api-key-that-is-valid",
+            base_url="https://api.hackagent.dev",
+            env={},
+            config_path="/nonexistent-hackagent-doctor-config",
+        )
         mock_config.default_config_path = MagicMock()
         mock_config.default_config_path.exists.return_value = True
         mock_config_class.return_value = mock_config
 
         # Mock the API call
-        with patch("hackagent.cli.main.agent_list", create=True) as mock_agent:
+        with patch("hackagent.interfaces.cli.main.agent_list", create=True) as mock_agent:
             mock_response = MagicMock()
             mock_response.status_code = 200
             mock_agent.sync_detailed.return_value = mock_response
@@ -176,8 +188,8 @@ class TestCLIDoctor(unittest.TestCase):
 class TestCLINoCommand(unittest.TestCase):
     """Test CLI with no subcommand."""
 
-    @patch("hackagent.cli.main.CLIConfig")
-    @patch("hackagent.cli.main._launch_tui_default")
+    @patch("hackagent.interfaces.cli.main.CLIConfig")
+    @patch("hackagent.interfaces.cli.main._launch_tui_default")
     def test_no_command_launches_tui(self, mock_tui, mock_config_class):
         """Test that no subcommand launches TUI."""
         mock_config = MagicMock()
@@ -192,10 +204,10 @@ class TestCLINoCommand(unittest.TestCase):
 class TestCLIInit(unittest.TestCase):
     """Test the init setup wizard."""
 
-    @patch("hackagent.cli.banner.display_hackagent_splash")
-    @patch("hackagent.cli.main.click.prompt")
-    @patch("hackagent.cli.main.click.confirm")
-    @patch("hackagent.cli.main.CLIConfig")
+    @patch("hackagent.interfaces.cli.banner.display_hackagent_splash")
+    @patch("hackagent.interfaces.cli.main.click.prompt")
+    @patch("hackagent.interfaces.cli.main.click.confirm")
+    @patch("hackagent.interfaces.cli.main.CLIConfig")
     def test_init_configures_remote_mode(
         self,
         mock_config_class,
@@ -228,10 +240,10 @@ class TestCLIInit(unittest.TestCase):
         mock_config.save.assert_called_once()
         mock_splash.assert_called_once()
 
-    @patch("hackagent.cli.banner.display_hackagent_splash")
-    @patch("hackagent.cli.main.click.prompt")
-    @patch("hackagent.cli.main.click.confirm")
-    @patch("hackagent.cli.main.CLIConfig")
+    @patch("hackagent.interfaces.cli.banner.display_hackagent_splash")
+    @patch("hackagent.interfaces.cli.main.click.prompt")
+    @patch("hackagent.interfaces.cli.main.click.confirm")
+    @patch("hackagent.interfaces.cli.main.CLIConfig")
     def test_init_local_mode_clears_api_key(
         self,
         mock_config_class,

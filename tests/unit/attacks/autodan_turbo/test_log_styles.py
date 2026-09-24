@@ -9,10 +9,6 @@ class TestLogStyles(unittest.TestCase):
         with patch.dict("os.environ", {}, clear=True):
             self.assertTrue(log_styles._color_enabled())
 
-    def test_color_disabled_when_no_color_is_1(self):
-        with patch.dict("os.environ", {"NO_COLOR": "1"}, clear=True):
-            self.assertFalse(log_styles._color_enabled())
-
     def test_apply_color_respects_flag(self):
         with patch(
             "hackagent.attacks.techniques.autodan_turbo.log_styles._color_enabled",

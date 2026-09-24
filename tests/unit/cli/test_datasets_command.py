@@ -9,8 +9,8 @@ from unittest.mock import patch
 
 from click.testing import CliRunner
 
-from hackagent.cli.commands.datasets import datasets
-from hackagent.cli.main import cli
+from hackagent.interfaces.cli.commands.datasets import datasets
+from hackagent.interfaces.cli.main import cli
 from hackagent.datasets.presets import PRESETS
 
 

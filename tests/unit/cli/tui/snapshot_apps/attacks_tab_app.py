@@ -12,9 +12,9 @@ from unittest.mock import MagicMock
 
 from textual.app import App, ComposeResult
 
-from hackagent.cli.config import CLIConfig
-from hackagent.cli.tui.theme import css_variables
-from hackagent.cli.tui.views.attacks import AttacksTab
+from hackagent.interfaces.cli.config import CLIConfig
+from hackagent.interfaces.tui.theme import css_variables
+from hackagent.interfaces.tui.views.attacks import AttacksTab
 
 
 def _stub_config() -> CLIConfig:

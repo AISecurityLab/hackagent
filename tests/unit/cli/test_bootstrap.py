@@ -7,7 +7,7 @@ import sys
 import unittest
 from unittest.mock import MagicMock, patch
 
-from hackagent.cli import bootstrap
+from hackagent.interfaces.cli import bootstrap
 
 try:
     import termios
@@ -94,7 +94,7 @@ class TestLaunchTuiDefault(unittest.TestCase):
         app = MagicMock()
 
         with (
-            patch("hackagent.cli.tui.HackAgentTUI", return_value=app) as tui_cls,
+            patch("hackagent.interfaces.tui.HackAgentTUI", return_value=app) as tui_cls,
             patch.object(bootstrap, "_patch_textual_terminal_queries") as patcher,
         ):
             bootstrap._launch_tui_default(ctx)
@@ -108,7 +108,7 @@ class TestLaunchTuiDefault(unittest.TestCase):
         ctx, _ = self._ctx()
 
         with (
-            patch.dict(sys.modules, {"hackagent.cli.tui": None}),
+            patch.dict(sys.modules, {"hackagent.interfaces.tui": None}),
             patch.object(bootstrap.console, "print") as printer,
         ):
             bootstrap._launch_tui_default(ctx)
@@ -124,7 +124,7 @@ class TestLaunchTuiDefault(unittest.TestCase):
         ctx, _ = self._ctx()
 
         with (
-            patch("hackagent.cli.tui.HackAgentTUI", side_effect=RuntimeError("no tty")),
+            patch("hackagent.interfaces.tui.HackAgentTUI", side_effect=RuntimeError("no tty")),
             patch.object(bootstrap, "_patch_textual_terminal_queries"),
             patch.object(bootstrap.console, "print") as printer,
         ):
@@ -143,7 +143,7 @@ class TestLaunchTuiDefault(unittest.TestCase):
         app.run.side_effect = RuntimeError("driver crashed")
 
         with (
-            patch("hackagent.cli.tui.HackAgentTUI", return_value=app),
+            patch("hackagent.interfaces.tui.HackAgentTUI", return_value=app),
             patch.object(bootstrap, "_patch_textual_terminal_queries"),
             patch.object(bootstrap.console, "print"),
         ):
@@ -155,7 +155,7 @@ class TestLaunchTuiDefault(unittest.TestCase):
 class TestDisplayWelcome(unittest.TestCase):
     def test_welcome_renders_splash_and_getting_started_panel(self):
         with (
-            patch("hackagent.cli.banner.display_hackagent_splash") as splash,
+            patch("hackagent.interfaces.cli.banner.display_hackagent_splash") as splash,
             patch.object(bootstrap.console, "print") as printer,
         ):
             bootstrap._display_welcome()

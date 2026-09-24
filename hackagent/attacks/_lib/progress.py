@@ -8,7 +8,6 @@ This module provides standardized progress bar functionality that can be used
 across all attack techniques for consistent visual feedback during execution.
 """
 
-import os
 from typing import Any
 from contextlib import contextmanager
 
@@ -24,13 +23,7 @@ from rich.progress import (
 
 
 class NullProgress:
-    """
-    Null progress bar implementation for TUI mode.
-
-    When running in TUI mode (NO_COLOR=1), progress bars are disabled
-    to avoid conflicts with the TUI display. This class provides a
-    no-op implementation that matches the Progress API.
-    """
+    """No-op progress bar with the same methods as a Rich ``Progress``."""
 
     def add_task(self, *args, **kwargs):
         return 0
@@ -82,33 +75,22 @@ def create_progress_bar(description: str, total: int):
 
     Note:
         The progress bar automatically starts and stops when entering/exiting
-        the context manager. In TUI mode (NO_COLOR=1), a null progress bar
-        is used to avoid display conflicts.
+        the context manager.
     """
-    # Check if running in TUI mode (NO_COLOR env var is set by TUI)
-    in_tui_mode = os.environ.get("NO_COLOR") == "1"
-
-    if in_tui_mode:
-        # In TUI mode: use a null progress bar that does nothing
-        progress_bar = NullProgress()
-        task = 0
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TextColumn("[progress.percentage]{task.percentage:>3.1f}%"),
+        TimeRemainingColumn(),
+        transient=False,
+        refresh_per_second=30,
+    ) as progress_bar:
+        task = progress_bar.add_task(description, total=total)
+        # Force first paint so very short tasks still display.
+        progress_bar.refresh()
         yield progress_bar, task
-    else:
-        # Normal mode: use Rich progress bar
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            MofNCompleteColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.1f}%"),
-            TimeRemainingColumn(),
-            transient=False,
-            refresh_per_second=30,
-        ) as progress_bar:
-            task = progress_bar.add_task(description, total=total)
-            # Force first paint so very short tasks still display.
-            progress_bar.refresh()
-            yield progress_bar, task
 
 
 def report_progress(

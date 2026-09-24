@@ -13,8 +13,9 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from hackagent import HackAgent, Settings
 from hackagent.storage.local import LocalBackend
-from hackagent.server.webui import _static, create_app
+from hackagent.interfaces.web import _static, create_app
 
 
 class _WebUITestCase(unittest.TestCase):
@@ -57,7 +58,16 @@ class _WebUITestCase(unittest.TestCase):
         )
         self.backend.create_trace(self.jailbreak.id, 0, "prompt", {"text": "hi"})
 
-        self.client = create_app(backend=self.backend).test_client()
+        session = HackAgent(
+            Settings.resolve(
+                api_key="",
+                db_path=":memory:",
+                env={},
+                config_path="/nonexistent",
+            ),
+            backend=self.backend,
+        )
+        self.client = create_app(session).test_client()
 
     def tearDown(self) -> None:
         _static.static_dir = self._real_static_dir
@@ -225,7 +235,16 @@ class TestStaticServing(_WebUITestCase):
         link.symlink_to(real, target_is_directory=True)
 
         _static.static_dir = lambda: link
-        client = create_app(backend=self.backend).test_client()
+        session = HackAgent(
+            Settings.resolve(
+                api_key="",
+                db_path=":memory:",
+                env={},
+                config_path="/nonexistent",
+            ),
+            backend=self.backend,
+        )
+        client = create_app(session).test_client()
         response = client.get("/")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"via symlink", response.data)

@@ -223,14 +223,6 @@ class TestMessageBuilders(unittest.TestCase):
 
 
 class TestLogColored(unittest.TestCase):
-    def test_no_color_environment_falls_back_to_the_logger(self):
-        logger = MagicMock()
-
-        with patch.dict("os.environ", {"NO_COLOR": "1"}):
-            _log_colored(logger, "hello", "cyan")
-
-        logger.info.assert_called_once_with("hello")
-
     def test_rich_is_used_when_colour_is_allowed(self):
         logger = MagicMock()
 

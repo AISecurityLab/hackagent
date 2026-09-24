@@ -25,13 +25,17 @@ def hack_chain(
     run_config_override: Optional[Dict[str, Any]] = None,
     fail_on_run_error: bool = True,
     escalate_only_mitigated: bool = True,
+    on_event: Optional[Any] = None,
     _tui_event_bus: Optional[Any] = None,
 ) -> list:
     """Run ``attacks`` in order against a shared pool of goals.
 
     ``attacks`` defaults to the jailbreak profile's primary techniques.
-    Each step is executed with ``agent.hack``. See ``HackAgent.hack_chain``.
+    Each step is executed with ``agent.hack``. ``on_event`` is forwarded to
+    every step. See ``Target.hack_chain``.
     """
+    if on_event is None:
+        on_event = _tui_event_bus
     if attacks is None:
         from hackagent.catalog.risks.jailbreak import JAILBREAK_PROFILE
 
@@ -82,7 +86,7 @@ def hack_chain(
             attack_config=step_attack_config,
             run_config_override=run_config_override,
             fail_on_run_error=fail_on_run_error,
-            _tui_event_bus=_tui_event_bus,
+            on_event=on_event,
         )
         step_rows = (
             step_results if isinstance(step_results, list) else list(step_results or [])

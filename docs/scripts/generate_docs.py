@@ -24,8 +24,8 @@ except ImportError:
 # Prefixes excluded from API docs (CLI internals, web UI serving layer, and the
 # generated HTTP client that is private to hackagent.storage.remote)
 _EXCLUDE_PREFIXES = (
-    "hackagent.cli",
-    "hackagent.server.webui",
+    "hackagent.interfaces.cli",
+    "hackagent.interfaces.web",
     "hackagent.storage._http",
 )
 

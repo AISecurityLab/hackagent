@@ -1,271 +1,90 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Tests for HackAgent class (hackagent/agent.py)."""
+"""Tests for the facade session and a bound target."""
 
 import unittest
-import uuid
-from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import httpx
-import pytest
-
+from hackagent import HackAgent, Settings
 from hackagent.core.errors import HackAgentError
-from hackagent.storage.records import OrganizationContext
-from tests.fakes import in_memory_store, isolated_settings
-from hackagent.core.contracts import AgentType
+from tests.fakes import in_memory_store
 
 
-def _fake_agent_record(**kwargs):
-    return SimpleNamespace(id=uuid.uuid4(), **kwargs)
+def _settings(**kwargs):
+    kwargs.setdefault("api_key", "")
+    kwargs.setdefault("db_path", ":memory:")
+    kwargs.setdefault("env", {})
+    kwargs.setdefault("config_path", "/nonexistent/hackagent/config.json")
+    return Settings.resolve(**kwargs)
 
 
-@pytest.fixture(autouse=True)
-def _offline_remote_store():
-    """Stub the two remote-store calls the constructor makes for the target."""
-    with (
-        patch(
-            "hackagent.storage.remote.RemoteBackend.get_context",
-            return_value=OrganizationContext(org_id=uuid.uuid4(), user_id="u-1"),
-        ),
-        patch(
-            "hackagent.storage.remote.RemoteBackend.create_or_update_agent",
-            side_effect=_fake_agent_record,
-        ),
-    ):
-        yield
+def _target(**kwargs):
+    store = kwargs.pop("store", None) or in_memory_store()
+    endpoint = kwargs.pop("endpoint", "http://localhost:8000")
+    agent_type = kwargs.pop("agent_type", "openai-sdk")
+    name = kwargs.pop("name", "test-agent")
+    session = HackAgent(_settings(), backend=store)
+    return session.target(endpoint, agent_type, name=name, **kwargs), store
 
 
-class TestHackAgentInitialization(unittest.TestCase):
-    """Test HackAgent initialization."""
+class TestHackAgentSession(unittest.TestCase):
+    def test_remote_session_defaults_to_a_120_second_timeout(self):
+        with patch("hackagent.storage.remote.RemoteBackend.connect") as connect:
+            HackAgent(_settings(api_key="test-key", base_url="https://api.hackagent.dev"))
+        connect.assert_called_once()
+        self.assertEqual(connect.call_args.kwargs["timeout"], 120.0)
+        self.assertEqual(connect.call_args.args[1], "test-key")
 
-    @patch("hackagent.agent.connect")
-    @patch(
-        "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
-    )
-    @patch("hackagent.agent.AgentType.parse", return_value=AgentType.OPENAI_SDK)
-    def test_basic_initialization(
-        self, mock_resolve_type, mock_resolve_token, mock_connect
-    ):
-        """Test basic HackAgent initialization."""
-        from hackagent.agent import HackAgent
+    def test_custom_base_url_and_timeout_are_forwarded(self):
+        with patch("hackagent.storage.remote.RemoteBackend.connect") as connect:
+            HackAgent(
+                _settings(api_key="test-key", base_url="https://custom.api.com"),
+                timeout=15.0,
+            )
+        self.assertEqual(connect.call_args.args[0], "https://custom.api.com")
+        self.assertEqual(connect.call_args.kwargs["timeout"], 15.0)
 
-        agent = HackAgent(
-            endpoint="http://localhost:8000",
-            api_key="test-key",
-        )
+    def test_explicit_none_timeout_disables_it(self):
+        with patch("hackagent.storage.remote.RemoteBackend.connect") as connect:
+            HackAgent(_settings(api_key="test-key"), timeout=None)
+        self.assertIsNone(connect.call_args.kwargs["timeout"])
 
-        self.assertIsNotNone(agent.backend._client)
-        self.assertIsNotNone(agent.router)
-        mock_connect.assert_called_once()
 
-    @patch("hackagent.agent.connect")
-    @patch(
-        "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
-    )
-    @patch("hackagent.agent.AgentType.parse", return_value=AgentType.OPENAI_SDK)
-    def test_default_base_url(
-        self, mock_resolve_type, mock_resolve_token, mock_connect
-    ):
-        """Test default base_url is used when not provided."""
-        from hackagent.agent import HackAgent
+class TestBoundTarget(unittest.TestCase):
+    def test_metadata_is_stored_on_the_agent_record(self):
+        target, _store = _target(metadata={"key": "value"})
+        self.assertEqual(target.agent_record.metadata["key"], "value")
 
-        agent = HackAgent(
-            endpoint="http://localhost:8000",
-            api_key="test-key",
-        )
-
-        self.assertEqual(agent.backend._client.base_url, "https://api.hackagent.dev")
-
-    @patch("hackagent.agent.connect")
-    @patch(
-        "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
-    )
-    @patch("hackagent.agent.AgentType.parse", return_value=AgentType.OPENAI_SDK)
-    def test_custom_base_url(self, mock_resolve_type, mock_resolve_token, mock_connect):
-        """Test custom base_url."""
-        from hackagent.agent import HackAgent
-
-        agent = HackAgent(
-            endpoint="http://localhost:8000",
-            api_key="test-key",
-            base_url="https://custom.api.com",
-        )
-
-        self.assertEqual(agent.backend._client.base_url, "https://custom.api.com")
-
-    @patch("hackagent.agent.connect")
-    @patch(
-        "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
-    )
-    @patch("hackagent.agent.AgentType.parse", return_value=AgentType.OPENAI_SDK)
-    def test_default_timeout_is_120_seconds(
-        self, mock_resolve_type, mock_resolve_token, mock_connect
-    ):
-        """Test that the remote client defaults to a bounded 120s timeout,
-        instead of hanging indefinitely on a misbehaving endpoint."""
-        from hackagent.agent import HackAgent
-
-        agent = HackAgent(
-            endpoint="http://localhost:8000",
-            api_key="test-key",
-        )
-
-        self.assertEqual(agent.backend._client.timeout, httpx.Timeout(120.0))
-
-    @patch("hackagent.agent.connect")
-    @patch(
-        "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
-    )
-    @patch("hackagent.agent.AgentType.parse", return_value=AgentType.OPENAI_SDK)
-    def test_custom_timeout_is_passed_to_client(
-        self, mock_resolve_type, mock_resolve_token, mock_connect
-    ):
-        """Test that an explicit timeout value reaches the AuthenticatedClient."""
-        from hackagent.agent import HackAgent
-
-        agent = HackAgent(
-            endpoint="http://localhost:8000",
-            api_key="test-key",
-            timeout=5.0,
-        )
-
-        self.assertEqual(agent.backend._client.timeout, httpx.Timeout(5.0))
-
-    @patch("hackagent.agent.connect")
-    @patch(
-        "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
-    )
-    @patch("hackagent.agent.AgentType.parse", return_value=AgentType.OPENAI_SDK)
-    def test_explicit_none_timeout_disables_it(
-        self, mock_resolve_type, mock_resolve_token, mock_connect
-    ):
-        """Test that passing timeout=None explicitly still opts out of the
-        default, preserving the previous unbounded-wait behavior."""
-        from hackagent.agent import HackAgent
-
-        agent = HackAgent(
-            endpoint="http://localhost:8000",
-            api_key="test-key",
-            timeout=None,
-        )
-
-        self.assertIsNone(agent.backend._client.timeout)
-
-    @patch("hackagent.agent.connect")
-    @patch(
-        "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
-    )
-    @patch("hackagent.agent.AgentType.parse", return_value=AgentType.OPENAI_SDK)
-    def test_with_metadata(self, mock_resolve_type, mock_resolve_token, mock_connect):
-        """Test initialization with metadata."""
-        from hackagent.agent import HackAgent
-
-        metadata = {"key": "value"}
-        agent = HackAgent(
-            endpoint="http://localhost:8000",
-            api_key="test-key",
-            metadata=metadata,
-        )
-
-        # metadata is stored on the target's Agent record
-        self.assertEqual(agent.agent_record.metadata, metadata)
-
-    @patch("hackagent.agent.connect")
-    @patch(
-        "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
-    )
-    @patch("hackagent.agent.AgentType.parse", return_value=AgentType.OPENAI_SDK)
-    def test_target_config_is_merged_into_router_defaults(
-        self, mock_resolve_type, mock_resolve_token, mock_connect
-    ):
-        """Test target_config becomes the target's request defaults."""
-        from hackagent.agent import HackAgent
-
-        agent = HackAgent(
-            endpoint="http://localhost:8000",
-            api_key="test-key",
-            target_config={"max_tokens": 321, "temperature": 0.2},
-            adapter_operational_config={"name": "demo-model", "temperature": 0.4},
-            metadata={"label": "demo"},
-        )
-
+    def test_target_config_is_merged_into_the_spec(self):
+        with patch("hackagent.models.client.connect") as mock_connect:
+            target, _store = _target(
+                target_config={"max_tokens": 321, "temperature": 0.2},
+                adapter_operational_config={"name": "demo-model", "temperature": 0.4},
+                metadata={"label": "demo"},
+            )
         spec = mock_connect.call_args.args[0]
         self.assertEqual(spec.identifier, "demo-model")
         self.assertEqual(spec.max_tokens, 321)
         self.assertEqual(spec.temperature, 0.4)
-        self.assertEqual(agent.agent_record.metadata["temperature"], 0.2)
-        self.assertEqual(agent.agent_record.metadata["label"], "demo")
+        self.assertEqual(target.agent_record.metadata["label"], "demo")
 
-    @patch("hackagent.agent.connect")
-    @patch(
-        "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
-    )
-    @patch("hackagent.agent.AgentType.parse", return_value=AgentType.OPENAI_SDK)
-    def test_constructor_thinking_is_forwarded_for_ollama(
-        self, mock_resolve_type, mock_resolve_token, mock_connect
-    ):
-        """Constructor thinking is forwarded only when target type is OLLAMA."""
-        from hackagent.agent import HackAgent
+    def test_thinking_is_forwarded_for_ollama(self):
+        with patch("hackagent.models.client.connect") as mock_connect:
+            _target(endpoint="http://localhost:11434", agent_type="ollama", thinking=False)
+        self.assertIs(mock_connect.call_args.args[0].thinking, False)
 
-        mock_resolve_type.return_value = AgentType.OLLAMA
-
-        HackAgent(
-            endpoint="http://localhost:11434",
-            api_key="test-key",
-            thinking=False,
-        )
-
-        spec = mock_connect.call_args.args[0]
-        self.assertIs(spec.thinking, False)
-
-    @patch("hackagent.agent.connect")
-    @patch(
-        "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
-    )
-    @patch("hackagent.agent.AgentType.parse", return_value=AgentType.OPENAI_SDK)
-    def test_constructor_thinking_is_ignored_for_non_ollama(
-        self, mock_resolve_type, mock_resolve_token, mock_connect
-    ):
-        """Constructor thinking is stripped for non-OLLAMA target types."""
-        from hackagent.agent import HackAgent
-
-        mock_resolve_type.return_value = AgentType.OPENAI_SDK
-
-        HackAgent(
-            endpoint="http://localhost:8000",
-            api_key="test-key",
-            thinking=False,
-        )
-
-        spec = mock_connect.call_args.args[0]
-        self.assertIsNone(spec.thinking)
+    def test_thinking_is_ignored_for_non_ollama(self):
+        with patch("hackagent.models.client.connect") as mock_connect:
+            _target(thinking=False)
+        self.assertIsNone(mock_connect.call_args.args[0].thinking)
 
 
 class TestHackAgentHack(unittest.TestCase):
     """Test HackAgent.hack method."""
 
-    @patch("hackagent.agent.connect")
-    @patch(
-        "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
-    )
-    @patch("hackagent.agent.AgentType.parse", return_value=AgentType.OPENAI_SDK)
-    def setUp(self, mock_resolve_type, mock_resolve_token, mock_connect):
-        """Set up HackAgent for hack tests."""
-        from hackagent.agent import HackAgent
-
-        self.agent = HackAgent(
-            endpoint="http://localhost:8000",
-            api_key="test-key",
-        )
-
-        # Mock the router's backend_agent
-        mock_backend = MagicMock()
-        mock_backend.name = "test-agent"
-        mock_backend.id = "agent-123"
-        mock_backend.agent_type = "litellm"
-        self.agent.router.backend_agent = mock_backend
+    def setUp(self):
+        self.agent, self.store = _target()
 
     def test_hack_missing_attack_type_raises(self):
         """Test that missing attack_type raises HackAgentError."""
@@ -356,25 +175,8 @@ class TestHackAgentHack(unittest.TestCase):
 class TestHackAgentHackChain(unittest.TestCase):
     """Test HackAgent.hack_chain method."""
 
-    @patch("hackagent.agent.connect")
-    @patch(
-        "hackagent.agent.Settings.resolve", side_effect=isolated_settings("test-token")
-    )
-    @patch("hackagent.agent.AgentType.parse", return_value=AgentType.OPENAI_SDK)
-    def setUp(self, mock_resolve_type, mock_resolve_token, mock_connect):
-        """Set up HackAgent for hack_chain tests."""
-        from hackagent.agent import HackAgent
-
-        self.agent = HackAgent(
-            endpoint="http://localhost:8000",
-            api_key="test-key",
-        )
-
-        mock_backend = MagicMock()
-        mock_backend.name = "test-agent"
-        mock_backend.id = "agent-123"
-        mock_backend.agent_type = "litellm"
-        self.agent.router.backend_agent = mock_backend
+    def setUp(self):
+        self.agent, self.store = _target()
 
     def test_hack_chain_empty_attacks_raises(self):
         """Test that an empty attacks list raises HackAgentError."""
@@ -619,17 +421,20 @@ class TestHackAgentTarget(unittest.TestCase):
     """The facade registers the target, and nothing else, as an Agent."""
 
     def _agent(self, **kwargs):
-        from hackagent.agent import HackAgent
-
+        guardrails = {}
+        if "before_guardrail" in kwargs:
+            guardrails["before"] = kwargs.pop("before_guardrail")
+        if "after_guardrail" in kwargs:
+            guardrails["after"] = kwargs.pop("after_guardrail")
         store = in_memory_store()
-        agent = HackAgent(
-            name="llama3",
+        return _target(
+            store=store,
             endpoint="http://localhost:11434",
             agent_type="ollama",
-            backend=store,
+            name="llama3",
+            guardrails=guardrails or None,
             **kwargs,
         )
-        return agent, store
 
     def test_only_the_target_is_registered(self):
         agent, store = self._agent(
@@ -671,11 +476,9 @@ class TestHackAgentTarget(unittest.TestCase):
         self.assertEqual(agent.guardrails, {})
 
     def test_unsupported_agent_type_is_rejected_before_registration(self):
-        from hackagent.agent import HackAgent
-
         store = in_memory_store()
         with self.assertRaises(ValueError):
-            HackAgent(endpoint="http://x", agent_type="mcp", backend=store)
+            _target(store=store, endpoint="http://x", agent_type="mcp")
         self.assertEqual(store.list_agents().items, [])
 
 

@@ -6,8 +6,8 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from hackagent.cli.commands.attack import display as display_mod
-from hackagent.cli.commands.attack.display import (
+from hackagent.interfaces.cli.commands.attack import display as display_mod
+from hackagent.interfaces.cli.commands.attack.display import (
     _display_advprefix_info,
     _display_attack_results,
     _display_attack_summary,

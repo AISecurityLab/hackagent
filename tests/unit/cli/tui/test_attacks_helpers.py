@@ -1,11 +1,9 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Tests for the Attacks tab helpers (guardrail config, env overrides)."""
+"""Tests for the Attacks tab helpers (guardrail config)."""
 
-import os
-
-from hackagent.cli.tui.views.attacks.helpers import build_guardrail_config
+from hackagent.interfaces.tui.views.attacks.helpers import build_guardrail_config
 
 
 def test_empty_name_means_no_guardrail():
@@ -31,22 +29,3 @@ def test_identifier_is_a_string_not_a_bound_method():
     assert isinstance(config["identifier"], str)
     assert config["identifier"] == "Model"
 
-
-def test_env_overrides_restore_user_values(monkeypatch):
-    from hackagent.cli.tui.views.attacks.helpers import (
-        apply_env_overrides,
-        restore_env,
-    )
-
-    monkeypatch.setenv("NO_COLOR", "yes-please")
-    monkeypatch.delenv("FORCE_COLOR", raising=False)
-
-    saved = apply_env_overrides({"NO_COLOR": "1", "FORCE_COLOR": "0"})
-    assert os.environ["NO_COLOR"] == "1"
-    assert os.environ["FORCE_COLOR"] == "0"
-
-    restore_env(saved)
-    restore_env(saved)  # idempotent: both finally blocks restore
-
-    assert os.environ["NO_COLOR"] == "yes-please"
-    assert "FORCE_COLOR" not in os.environ

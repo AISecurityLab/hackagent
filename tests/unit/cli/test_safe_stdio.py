@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from hackagent.cli.safe_stdio import (
+from hackagent.interfaces.cli.safe_stdio import (
     configure_safe_stdio,
     install_on_click_command,
 )
@@ -96,8 +96,8 @@ def test_rich_and_click_smoke_glyphs_on_cp1252(monkeypatch: pytest.MonkeyPatch) 
     click = pytest.importorskip("click")
     from rich.console import Console
 
-    from hackagent.cli.utils import display_error
-    from hackagent.cli.banner import display_hackagent_splash
+    from hackagent.interfaces.cli.utils import display_error
+    from hackagent.interfaces.cli.banner import display_hackagent_splash
 
     stream = _cp1252_text_stream()
     monkeypatch.setattr(sys, "stdout", stream)
@@ -167,7 +167,7 @@ def test_windows_binary_smoke_commands_on_cp1252(
     monkeypatch.setattr(sys, "stdout", stream)
     monkeypatch.setattr(sys, "stderr", stream)
 
-    from hackagent.cli.main import cli
+    from hackagent.interfaces.cli.main import cli
 
     with pytest.raises(SystemExit) as exit_info:
         cli.main(args=args, standalone_mode=True)
@@ -179,12 +179,12 @@ def test_windows_binary_smoke_commands_on_cp1252(
 def test_main_configures_stdio_before_cli(monkeypatch: pytest.MonkeyPatch) -> None:
     called: list[str] = []
     monkeypatch.setattr(
-        "hackagent.cli.main.configure_safe_stdio",
+        "hackagent.interfaces.cli.main.configure_safe_stdio",
         lambda: called.append("stdio"),
     )
-    monkeypatch.setattr("hackagent.cli.main.cli", lambda: called.append("cli"))
+    monkeypatch.setattr("hackagent.interfaces.cli.main.cli", lambda: called.append("cli"))
 
-    from hackagent.cli.main import main
+    from hackagent.interfaces.cli.main import main
 
     main()
     assert called == ["stdio", "cli"]

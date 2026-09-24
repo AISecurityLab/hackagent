@@ -18,7 +18,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from hackagent.cli.tui.events import (
+from hackagent.interfaces.tui.events import (
     EVENT_GOAL_FINALIZED,
     EVENT_GOAL_STARTED,
     EVENT_STEP_ENDED,
@@ -26,7 +26,7 @@ from hackagent.cli.tui.events import (
     TUIEvent,
     TUIEventBus,
 )
-from hackagent.cli.tui.widgets.logs import AttackLogViewer
+from hackagent.interfaces.tui.widgets.logs import AttackLogViewer
 
 
 # ============================================================================
@@ -169,7 +169,7 @@ def _dispatch(viewer: _StubViewer, event_type: str, **payload: Any) -> None:
     We also bind ``_render_trace`` so the stub can resolve the call without
     instantiating a real Textual widget.
     """
-    from hackagent.cli.tui.widgets.actions import AgentActionsViewer
+    from hackagent.interfaces.tui.widgets.actions import AgentActionsViewer
 
     # Bind unbound methods to our stub so `self._render_trace(...)` resolves.
     viewer._render_trace = AgentActionsViewer._render_trace.__get__(viewer)

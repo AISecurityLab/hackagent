@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 from click.testing import CliRunner
 
-from hackagent.cli.commands.scan import run_quick_scan, scan
+from hackagent.interfaces.cli.commands.scan import run_quick_scan, scan
 from hackagent.orchestrator.planning import AttackPlan, PlannerError
 
 _URL = "https://x.it/chat"
@@ -45,7 +45,7 @@ class TestScanCommand(unittest.TestCase):
 
     def test_no_attack_shows_target_only(self):
         runner = CliRunner()
-        with patch("hackagent.cli.commands.scan.command.HackAgent") as mock_agent:
+        with patch("hackagent.interfaces.cli.commands.scan.command.HackAgent") as mock_agent:
             result = runner.invoke(
                 scan, [_URL, "--no-attack"], obj={"config": _config()}
             )
@@ -76,7 +76,7 @@ class TestScanCommand(unittest.TestCase):
     def test_plan_shows_strategy(self):
         runner = CliRunner()
         with patch(
-            "hackagent.cli.commands.scan.command.plan_attack", return_value=_fake_plan()
+            "hackagent.interfaces.cli.commands.scan.command.plan_attack", return_value=_fake_plan()
         ) as mock_plan:
             result = runner.invoke(
                 scan, [_URL, "--plan", "--no-attack"], obj={"config": _config()}
@@ -89,7 +89,7 @@ class TestScanCommand(unittest.TestCase):
     def test_plan_json_includes_attack_config(self):
         runner = CliRunner()
         with patch(
-            "hackagent.cli.commands.scan.command.plan_attack", return_value=_fake_plan()
+            "hackagent.interfaces.cli.commands.scan.command.plan_attack", return_value=_fake_plan()
         ):
             result = runner.invoke(
                 scan, [_URL, "--plan", "--json"], obj={"config": _config()}
@@ -102,7 +102,7 @@ class TestScanCommand(unittest.TestCase):
     def test_plan_failure_is_reported_but_target_survives(self):
         runner = CliRunner()
         with patch(
-            "hackagent.cli.commands.scan.command.plan_attack",
+            "hackagent.interfaces.cli.commands.scan.command.plan_attack",
             side_effect=PlannerError("no api key"),
         ):
             result = runner.invoke(
@@ -114,7 +114,7 @@ class TestScanCommand(unittest.TestCase):
 
     def test_attack_dry_run_validates_without_running(self):
         runner = CliRunner()
-        with patch("hackagent.cli.commands.scan.command.HackAgent") as mock_agent:
+        with patch("hackagent.interfaces.cli.commands.scan.command.HackAgent") as mock_agent:
             result = runner.invoke(
                 scan,
                 [_URL, "--attack", "--no-tui", "--dry-run"],
@@ -128,10 +128,10 @@ class TestScanCommand(unittest.TestCase):
         runner = CliRunner()
         with (
             patch(
-                "hackagent.cli.commands.scan.command.plan_attack",
+                "hackagent.interfaces.cli.commands.scan.command.plan_attack",
                 return_value=_fake_plan(),
             ),
-            patch("hackagent.cli.commands.scan.command.HackAgent") as mock_agent,
+            patch("hackagent.interfaces.cli.commands.scan.command.HackAgent") as mock_agent,
         ):
             result = runner.invoke(
                 scan,
@@ -148,8 +148,10 @@ class TestScanHeadlessAttack(unittest.TestCase):
 
     def test_headless_attack_executes(self):
         runner = CliRunner()
-        with patch("hackagent.cli.commands.scan.command.HackAgent") as mock_agent:
-            mock_agent.return_value.hack.return_value = [{"asr": 0.25}]
+        with patch("hackagent.interfaces.cli.commands.scan.command.HackAgent") as mock_agent:
+            mock_agent.return_value.target.return_value.hack.return_value = [
+                {"asr": 0.25}
+            ]
             result = runner.invoke(
                 scan,
                 [_URL, "--attack", "--no-tui", "--attack-type", "pair"],
@@ -159,13 +161,15 @@ class TestScanHeadlessAttack(unittest.TestCase):
         self.assertIn("completed", result.output)
         mock_agent.assert_called_once()
         # The web target (URL) flows into the wired agent.
-        self.assertEqual(mock_agent.call_args.kwargs["endpoint"], _URL)
-        attack_config = mock_agent.return_value.hack.call_args.kwargs["attack_config"]
+        self.assertEqual(mock_agent.return_value.target.call_args.args[0], _URL)
+        attack_config = mock_agent.return_value.target.return_value.hack.call_args.kwargs[
+            "attack_config"
+        ]
         self.assertEqual(attack_config["attack_type"], "pair")
 
     def test_attack_default_launches_tui_prefilled(self):
         runner = CliRunner()
-        with patch("hackagent.cli.tui.HackAgentTUI") as mock_tui:
+        with patch("hackagent.interfaces.tui.HackAgentTUI") as mock_tui:
             result = runner.invoke(scan, [_URL, "--attack"], obj={"config": _config()})
         self.assertEqual(result.exit_code, 0, result.output)
         mock_tui.return_value.run.assert_called_once()
@@ -175,8 +179,10 @@ class TestScanHeadlessAttack(unittest.TestCase):
 
     def test_headless_attack_failure_is_reported(self):
         runner = CliRunner()
-        with patch("hackagent.cli.commands.scan.command.HackAgent") as mock_agent:
-            mock_agent.return_value.hack.side_effect = RuntimeError("boom")
+        with patch("hackagent.interfaces.cli.commands.scan.command.HackAgent") as mock_agent:
+            mock_agent.return_value.target.return_value.hack.side_effect = RuntimeError(
+                "boom"
+            )
             result = runner.invoke(
                 scan, [_URL, "--attack", "--no-tui"], obj={"config": _config()}
             )
@@ -209,30 +215,39 @@ class TestRunQuickScan(unittest.TestCase):
         return args
 
     def test_dry_run_validates_without_initializing_agent(self):
-        with patch("hackagent.cli.commands.scan.quick.HackAgent") as mock_agent:
+        with patch("hackagent.interfaces.cli.commands.scan.quick.HackAgent") as mock_agent:
             run_quick_scan(self._ctx(), **self._args(dry_run=True))
         mock_agent.assert_not_called()
 
     def test_success_runs_each_primary_attack(self):
-        with patch("hackagent.cli.commands.scan.quick.HackAgent") as mock_agent:
-            mock_agent.return_value.hack.return_value = [{"asr": 0.5}]
+        with patch("hackagent.interfaces.cli.commands.scan.quick.HackAgent") as mock_agent:
+            bound = mock_agent.return_value.target.return_value
+            bound.hack_chain.return_value = [{"asr": 0.5, "chain_attack_type": "h4rm3l"}]
             run_quick_scan(self._ctx(), **self._args())
         mock_agent.assert_called_once()
-        self.assertTrue(mock_agent.return_value.hack.called)
+        bound.hack_chain.assert_called_once()
+        attack_types = [
+            step["attack_type"]
+            for step in bound.hack_chain.call_args.kwargs["attacks"]
+        ]
+        self.assertEqual(attack_types, ["h4rm3l", "tap", "pair"])
 
     def test_failed_attack_raises_clickexception(self):
         import click
 
-        with patch("hackagent.cli.commands.scan.quick.HackAgent") as mock_agent:
-            mock_agent.return_value.hack.side_effect = RuntimeError("attack blew up")
+        with patch("hackagent.interfaces.cli.commands.scan.quick.HackAgent") as mock_agent:
+            mock_agent.return_value.target.return_value.hack_chain.side_effect = (
+                RuntimeError("attack blew up")
+            )
             with self.assertRaises(click.ClickException):
                 run_quick_scan(self._ctx(), **self._args())
 
     def test_explicit_dataset_preset_is_used(self):
-        with patch("hackagent.cli.commands.scan.quick.HackAgent") as mock_agent:
-            mock_agent.return_value.hack.return_value = []
+        with patch("hackagent.interfaces.cli.commands.scan.quick.HackAgent") as mock_agent:
+            bound = mock_agent.return_value.target.return_value
+            bound.hack_chain.return_value = []
             run_quick_scan(self._ctx(), **self._args(dataset_preset="my-dataset"))
-        first = mock_agent.return_value.hack.call_args_list[0].kwargs["attack_config"]
+        first = bound.hack_chain.call_args.kwargs["attacks"][0]
         self.assertEqual(first["dataset"]["preset"], "my-dataset")
 
 
@@ -241,7 +256,7 @@ class TestProviderEndpoint(unittest.TestCase):
     (the backend rejects an empty endpoint)."""
 
     def test_ollama_models_resolve_to_local(self):
-        from hackagent.cli.commands.scan import _provider_endpoint
+        from hackagent.interfaces.cli.commands.scan import _provider_endpoint
 
         for m in (
             "ollama_chat/huihui_ai/gemma-4-abliterated",
@@ -251,7 +266,7 @@ class TestProviderEndpoint(unittest.TestCase):
             self.assertEqual(_provider_endpoint(m), "http://localhost:11434")
 
     def test_hosted_providers_resolve_to_their_api_base(self):
-        from hackagent.cli.commands.scan import _provider_endpoint
+        from hackagent.interfaces.cli.commands.scan import _provider_endpoint
 
         self.assertEqual(
             _provider_endpoint("openai/gpt-4o-mini"), "https://api.openai.com/v1"
@@ -263,8 +278,8 @@ class TestProviderEndpoint(unittest.TestCase):
 
     def test_attacker_override_carries_valid_endpoint(self):
         runner = CliRunner()
-        with patch("hackagent.cli.commands.scan.command.HackAgent") as mock_agent:
-            mock_agent.return_value.hack.return_value = []
+        with patch("hackagent.interfaces.cli.commands.scan.command.HackAgent") as mock_agent:
+            mock_agent.return_value.target.return_value.hack.return_value = []
             result = runner.invoke(
                 scan,
                 [
@@ -278,7 +293,11 @@ class TestProviderEndpoint(unittest.TestCase):
                 obj={"config": _config()},
             )
         self.assertEqual(result.exit_code, 0, result.output)
-        attack_config = mock_agent.return_value.hack.call_args.kwargs["attack_config"]
+        attack_config = (
+            mock_agent.return_value.target.return_value.hack.call_args.kwargs[
+                "attack_config"
+            ]
+        )
         att = attack_config["attacker"]
         self.assertEqual(att["identifier"], "ollama_chat/huihui_ai/gemma-4-abliterated")
         self.assertEqual(att["endpoint"], "http://localhost:11434")  # not empty

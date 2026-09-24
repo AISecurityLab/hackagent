@@ -204,12 +204,7 @@ def _process_target_response(target_response: str, score: int, goal: str) -> str
 def _log_colored(logger: logging.Logger, message: str, color: str) -> None:
     """Emit a colorized message when Rich is available, else fallback to logger."""
     try:
-        import os
         from rich import print as rich_print
-
-        if os.environ.get("NO_COLOR") == "1":
-            logger.info(message)
-            return
 
         rich_print(f"[{color}]{message}[/{color}]")
     except Exception:

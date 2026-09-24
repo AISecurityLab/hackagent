@@ -97,7 +97,7 @@ class TestTUILogHandler:
 
     def test_handler_creation(self) -> None:
         """Test TUILogHandler can be created with proper parameters."""
-        from hackagent.cli.tui.logger import TUILogHandler
+        from hackagent.interfaces.tui.logger import TUILogHandler
 
         mock_app = MagicMock()
         mock_callback = MagicMock()
@@ -116,7 +116,7 @@ class TestTUILogHandler:
 
     def test_handler_emit_buffers_logs(self) -> None:
         """Test that emit() buffers log entries."""
-        from hackagent.cli.tui.logger import TUILogHandler
+        from hackagent.interfaces.tui.logger import TUILogHandler
 
         mock_app = MagicMock()
         mock_callback = MagicMock()
@@ -149,7 +149,7 @@ class TestTUILogHandler:
 
     def test_handler_respects_max_buffer_size(self) -> None:
         """Test that buffer doesn't exceed max_buffer_size."""
-        from hackagent.cli.tui.logger import TUILogHandler
+        from hackagent.interfaces.tui.logger import TUILogHandler
 
         mock_app = MagicMock()
         mock_callback = MagicMock()
@@ -182,7 +182,7 @@ class TestTUILogHandler:
 
     def test_handler_clear_buffer(self) -> None:
         """Test clearing the log buffer."""
-        from hackagent.cli.tui.logger import TUILogHandler
+        from hackagent.interfaces.tui.logger import TUILogHandler
 
         mock_app = MagicMock()
         mock_callback = MagicMock()
@@ -212,7 +212,7 @@ class TestTUILogHandler:
 
     def test_handler_deactivate_activate(self) -> None:
         """Test activating and deactivating the handler."""
-        from hackagent.cli.tui.logger import TUILogHandler
+        from hackagent.interfaces.tui.logger import TUILogHandler
 
         mock_app = MagicMock()
         mock_callback = MagicMock()
@@ -661,21 +661,21 @@ class TestFormatMessageContent:
 
     def test_format_empty_content(self) -> None:
         """Test formatting empty content."""
-        from hackagent.cli.tui.views.results import _format_message_content
+        from hackagent.interfaces.tui.views.results import _format_message_content
 
         result = _format_message_content("")
         assert "empty" in result.lower()
 
     def test_format_none_content(self) -> None:
         """Test formatting None content."""
-        from hackagent.cli.tui.views.results import _format_message_content
+        from hackagent.interfaces.tui.views.results import _format_message_content
 
         result = _format_message_content(None)
         assert "empty" in result.lower()
 
     def test_format_short_content(self) -> None:
         """Test formatting short content that doesn't need truncation."""
-        from hackagent.cli.tui.views.results import _format_message_content
+        from hackagent.interfaces.tui.views.results import _format_message_content
 
         result = _format_message_content("Short message")
         assert "Short message" in result
@@ -683,7 +683,7 @@ class TestFormatMessageContent:
 
     def test_format_long_content_truncation(self) -> None:
         """Test that long content is truncated."""
-        from hackagent.cli.tui.views.results import _format_message_content
+        from hackagent.interfaces.tui.views.results import _format_message_content
 
         long_text = "x" * 500
         result = _format_message_content(long_text, max_length=100)
@@ -700,7 +700,7 @@ class TestFormatChatMessage:
 
     def test_format_user_message(self, console: Console) -> None:
         """Test formatting a user message."""
-        from hackagent.cli.tui.views.results import _format_chat_message
+        from hackagent.interfaces.tui.views.results import _format_chat_message
 
         msg = {"role": "user", "content": "Hello, world!"}
         result = _format_chat_message(msg)
@@ -712,7 +712,7 @@ class TestFormatChatMessage:
 
     def test_format_assistant_message(self, console: Console) -> None:
         """Test formatting an assistant message."""
-        from hackagent.cli.tui.views.results import _format_chat_message
+        from hackagent.interfaces.tui.views.results import _format_chat_message
 
         msg = {"role": "assistant", "content": "I can help with that."}
         result = _format_chat_message(msg)
@@ -723,7 +723,7 @@ class TestFormatChatMessage:
 
     def test_format_system_message(self, console: Console) -> None:
         """Test formatting a system message."""
-        from hackagent.cli.tui.views.results import _format_chat_message
+        from hackagent.interfaces.tui.views.results import _format_chat_message
 
         msg = {"role": "system", "content": "You are a helpful assistant."}
         result = _format_chat_message(msg)
@@ -733,7 +733,7 @@ class TestFormatChatMessage:
 
     def test_format_message_with_brackets(self, console: Console) -> None:
         """Test formatting message with markup-like brackets."""
-        from hackagent.cli.tui.views.results import _format_chat_message
+        from hackagent.interfaces.tui.views.results import _format_chat_message
 
         msg = {"role": "user", "content": "Search for [internal] data"}
         result = _format_chat_message(msg)
@@ -754,7 +754,7 @@ class TestFormatRequestPayload:
 
     def test_format_empty_payload(self, console: Console) -> None:
         """Test formatting empty payload."""
-        from hackagent.cli.tui.views.results import _format_request_payload
+        from hackagent.interfaces.tui.views.results import _format_request_payload
 
         result = _format_request_payload(None)
         assert "no payload" in result.lower()
@@ -762,7 +762,7 @@ class TestFormatRequestPayload:
 
     def test_format_chat_payload(self, console: Console) -> None:
         """Test formatting a chat completion payload."""
-        from hackagent.cli.tui.views.results import _format_request_payload
+        from hackagent.interfaces.tui.views.results import _format_request_payload
 
         payload = {
             "model": "gpt-4",
@@ -784,7 +784,7 @@ class TestFormatRequestPayload:
 
     def test_format_payload_with_tools(self, console: Console) -> None:
         """Test formatting payload with tools."""
-        from hackagent.cli.tui.views.results import _format_request_payload
+        from hackagent.interfaces.tui.views.results import _format_request_payload
 
         payload = {
             "model": "gpt-4",
@@ -812,7 +812,7 @@ class TestFormatResponseBody:
 
     def test_format_empty_response(self, console: Console) -> None:
         """Test formatting empty response."""
-        from hackagent.cli.tui.views.results import _format_response_body
+        from hackagent.interfaces.tui.views.results import _format_response_body
 
         result = _format_response_body(None)
         assert "no response" in result.lower()
@@ -820,7 +820,7 @@ class TestFormatResponseBody:
 
     def test_format_openai_response(self, console: Console) -> None:
         """Test formatting OpenAI-style response."""
-        from hackagent.cli.tui.views.results import _format_response_body
+        from hackagent.interfaces.tui.views.results import _format_response_body
 
         response = {
             "choices": [
@@ -849,7 +849,7 @@ class TestFormatResponseBody:
 
     def test_format_response_with_tool_calls(self, console: Console) -> None:
         """Test formatting response with tool calls."""
-        from hackagent.cli.tui.views.results import _format_response_body
+        from hackagent.interfaces.tui.views.results import _format_response_body
 
         response = {
             "choices": [
@@ -879,7 +879,7 @@ class TestFormatResponseBody:
 
     def test_format_error_response(self, console: Console) -> None:
         """Test formatting error response."""
-        from hackagent.cli.tui.views.results import _format_response_body
+        from hackagent.interfaces.tui.views.results import _format_response_body
 
         response = {"error": {"message": "Rate limit exceeded"}}
 
@@ -901,7 +901,7 @@ class TestFormatConfigDict:
 
     def test_format_empty_config(self, console: Console) -> None:
         """Test formatting empty config."""
-        from hackagent.cli.tui.views.results import _format_config_dict
+        from hackagent.interfaces.tui.views.results import _format_config_dict
 
         result = _format_config_dict(None)
         assert "no config" in result.lower()
@@ -909,7 +909,7 @@ class TestFormatConfigDict:
 
     def test_format_config_with_types(self, console: Console) -> None:
         """Test formatting config with various types."""
-        from hackagent.cli.tui.views.results import _format_config_dict
+        from hackagent.interfaces.tui.views.results import _format_config_dict
 
         config = {
             "enabled": True,
@@ -940,7 +940,7 @@ class TestFormatTraceContent:
 
     def test_format_tool_call_trace(self, console: Console) -> None:
         """Test formatting TOOL_CALL trace content."""
-        from hackagent.cli.tui.views.results import _format_trace_content
+        from hackagent.interfaces.tui.views.results import _format_trace_content
 
         content = {
             "name": "get_weather",
@@ -956,7 +956,7 @@ class TestFormatTraceContent:
 
     def test_format_tool_response_trace(self, console: Console) -> None:
         """Test formatting TOOL_RESPONSE trace content."""
-        from hackagent.cli.tui.views.results import _format_trace_content
+        from hackagent.interfaces.tui.views.results import _format_trace_content
 
         content = {"result": {"temperature": 72, "conditions": "sunny"}}
 
@@ -968,7 +968,7 @@ class TestFormatTraceContent:
 
     def test_format_agent_thought_trace(self, console: Console) -> None:
         """Test formatting AGENT_THOUGHT trace content."""
-        from hackagent.cli.tui.views.results import _format_trace_content
+        from hackagent.interfaces.tui.views.results import _format_trace_content
 
         content = "I should search for weather data first."
 
@@ -979,7 +979,7 @@ class TestFormatTraceContent:
 
     def test_format_trace_with_brackets(self, console: Console) -> None:
         """Test formatting trace with bracket characters."""
-        from hackagent.cli.tui.views.results import _format_trace_content
+        from hackagent.interfaces.tui.views.results import _format_trace_content
 
         content = {
             "name": "search",
@@ -997,7 +997,7 @@ class TestGetResultStatusInfo:
 
     def test_successful_jailbreak_is_vulnerable(self) -> None:
         """A jailbreak that got through is reported as a red vulnerability."""
-        from hackagent.cli.tui.views.results import _get_result_status_info
+        from hackagent.interfaces.tui.views.results import _get_result_status_info
         from unittest.mock import MagicMock
 
         result = MagicMock()
@@ -1012,7 +1012,7 @@ class TestGetResultStatusInfo:
 
     def test_failed_jailbreak_is_mitigated(self) -> None:
         """A refused jailbreak is reported as a green mitigation."""
-        from hackagent.cli.tui.views.results import _get_result_status_info
+        from hackagent.interfaces.tui.views.results import _get_result_status_info
         from unittest.mock import MagicMock
 
         result = MagicMock()
@@ -1027,7 +1027,7 @@ class TestGetResultStatusInfo:
 
     def test_error_status(self) -> None:
         """Test ERROR status is reported as a yellow error."""
-        from hackagent.cli.tui.views.results import _get_result_status_info
+        from hackagent.interfaces.tui.views.results import _get_result_status_info
         from unittest.mock import MagicMock
 
         result = MagicMock()
@@ -1041,7 +1041,7 @@ class TestGetResultStatusInfo:
 
     def test_no_evaluation_status(self) -> None:
         """Test result without evaluation_status is reported as unevaluated."""
-        from hackagent.cli.tui.views.results import _get_result_status_info
+        from hackagent.interfaces.tui.views.results import _get_result_status_info
         from unittest.mock import MagicMock
 
         result = MagicMock(spec=[])  # No evaluation_status attribute
@@ -1062,7 +1062,7 @@ class TestFormatResultSummary:
 
     def test_basic_summary(self, console: Console) -> None:
         """Test basic result summary formatting."""
-        from hackagent.cli.tui.views.results import _format_result_summary
+        from hackagent.interfaces.tui.views.results import _format_result_summary
         from unittest.mock import MagicMock
 
         result = MagicMock()
@@ -1080,7 +1080,7 @@ class TestFormatResultSummary:
 
     def test_summary_without_optional_fields(self, console: Console) -> None:
         """Test summary when optional fields are missing."""
-        from hackagent.cli.tui.views.results import _format_result_summary
+        from hackagent.interfaces.tui.views.results import _format_result_summary
         from unittest.mock import MagicMock
 
         result = MagicMock(spec=["evaluation_status", "id"])
@@ -1104,7 +1104,7 @@ class TestFormatResultFullDetails:
 
     def test_full_details_with_all_fields(self, console: Console) -> None:
         """Test full details with all fields present."""
-        from hackagent.cli.tui.views.results import _format_result_full_details
+        from hackagent.interfaces.tui.views.results import _format_result_full_details
         from unittest.mock import MagicMock
 
         result = MagicMock()
@@ -1128,7 +1128,7 @@ class TestFormatResultFullDetails:
 
     def test_full_details_minimal(self, console: Console) -> None:
         """Test full details with minimal fields."""
-        from hackagent.cli.tui.views.results import _format_result_full_details
+        from hackagent.interfaces.tui.views.results import _format_result_full_details
         from unittest.mock import MagicMock
 
         result = MagicMock(spec=["id", "evaluation_status"])
@@ -1154,7 +1154,7 @@ class TestLogCopy:
         """Copy goes through Textual's native (OSC 52) clipboard first."""
         from unittest.mock import MagicMock, PropertyMock, patch
 
-        from hackagent.cli.tui.widgets.logs import AttackLogViewer
+        from hackagent.interfaces.tui.widgets.logs import AttackLogViewer
 
         viewer = AttackLogViewer()
         viewer._records = [("INFO", "hello world")]
@@ -1172,12 +1172,12 @@ class TestLogCopy:
         assert "hello world" in fake_app.copy_to_clipboard.call_args.args[0]
 
     def test_copy_logs_empty_returns_false(self) -> None:
-        from hackagent.cli.tui.widgets.logs import AttackLogViewer
+        from hackagent.interfaces.tui.widgets.logs import AttackLogViewer
 
         assert AttackLogViewer().copy_logs() is False
 
     def test_ctrl_y_binding_registered(self) -> None:
-        from hackagent.cli.tui.app import HackAgentTUI
+        from hackagent.interfaces.tui.app import HackAgentTUI
 
         pairs = {(b.key, b.action) for b in HackAgentTUI.BINDINGS}
         assert ("ctrl+y", "copy_selection") in pairs
@@ -1185,7 +1185,7 @@ class TestLogCopy:
     def test_action_copies_current_selection(self) -> None:
         from unittest.mock import MagicMock, PropertyMock, patch
 
-        from hackagent.cli.tui.app import HackAgentTUI
+        from hackagent.interfaces.tui.app import HackAgentTUI
 
         app = HackAgentTUI(MagicMock())
         app.copy_to_clipboard = MagicMock()
@@ -1205,7 +1205,7 @@ class TestLogCopy:
     def test_action_falls_back_to_logs_when_no_selection(self) -> None:
         from unittest.mock import MagicMock, PropertyMock, patch
 
-        from hackagent.cli.tui.app import HackAgentTUI
+        from hackagent.interfaces.tui.app import HackAgentTUI
 
         app = HackAgentTUI(MagicMock())
         app.copy_to_clipboard = MagicMock()
@@ -1230,7 +1230,7 @@ class TestLogCopy:
     def test_action_warns_when_nothing_to_copy(self) -> None:
         from unittest.mock import MagicMock, PropertyMock, patch
 
-        from hackagent.cli.tui.app import HackAgentTUI
+        from hackagent.interfaces.tui.app import HackAgentTUI
 
         app = HackAgentTUI(MagicMock())
         app.copy_to_clipboard = MagicMock()
@@ -1261,7 +1261,7 @@ class TestClipboardHelper:
     def test_uses_osc52_via_app(self) -> None:
         from unittest.mock import MagicMock, patch
 
-        from hackagent.cli.tui.widgets.clipboard import copy_to_clipboard
+        from hackagent.interfaces.tui.widgets.clipboard import copy_to_clipboard
 
         app = MagicMock()
         with patch("subprocess.run", side_effect=FileNotFoundError()):
@@ -1270,14 +1270,14 @@ class TestClipboardHelper:
         app.copy_to_clipboard.assert_called_once_with("hello")
 
     def test_empty_text_returns_false(self) -> None:
-        from hackagent.cli.tui.widgets.clipboard import copy_to_clipboard
+        from hackagent.interfaces.tui.widgets.clipboard import copy_to_clipboard
 
         assert copy_to_clipboard(None, "") is False
 
     def test_richlog_plaintext_joins_strip_text(self) -> None:
         from unittest.mock import MagicMock
 
-        from hackagent.cli.tui.widgets.clipboard import richlog_plaintext
+        from hackagent.interfaces.tui.widgets.clipboard import richlog_plaintext
 
         s1, s2 = MagicMock(), MagicMock()
         s1.text = "first line"
@@ -1291,7 +1291,7 @@ class TestActionsCopy:
     """The Copy button on the Agent Actions viewer."""
 
     def test_copy_button_id_in_compose(self) -> None:
-        from hackagent.cli.tui.widgets.actions import AgentActionsViewer
+        from hackagent.interfaces.tui.widgets.actions import AgentActionsViewer
 
         # The "copy-actions" button id is wired into compose().
         assert "copy-actions" in AgentActionsViewer.compose.__code__.co_consts
@@ -1299,13 +1299,13 @@ class TestActionsCopy:
     def test_copy_actions_uses_rendered_text(self) -> None:
         from unittest.mock import patch
 
-        from hackagent.cli.tui.widgets.actions import AgentActionsViewer
+        from hackagent.interfaces.tui.widgets.actions import AgentActionsViewer
 
         viewer = AgentActionsViewer()
         with (
             patch.object(viewer, "get_actions_text", return_value="action log text"),
             patch(
-                "hackagent.cli.tui.widgets.clipboard.copy_to_clipboard",
+                "hackagent.interfaces.tui.widgets.clipboard.copy_to_clipboard",
                 return_value=True,
             ) as mock_copy,
         ):
@@ -1316,7 +1316,7 @@ class TestActionsCopy:
     def test_copy_actions_empty_returns_false(self) -> None:
         from unittest.mock import patch
 
-        from hackagent.cli.tui.widgets.actions import AgentActionsViewer
+        from hackagent.interfaces.tui.widgets.actions import AgentActionsViewer
 
         viewer = AgentActionsViewer()
         with patch.object(viewer, "get_actions_text", return_value=""):

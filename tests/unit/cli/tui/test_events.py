@@ -1,14 +1,14 @@
 # Copyright 2026 - AI4I. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Unit tests for :mod:`hackagent.cli.tui.events`."""
+"""Unit tests for :mod:`hackagent.interfaces.tui.events`."""
 
 import threading
 import time
 
 import pytest
 
-from hackagent.cli.tui.events import (
+from hackagent.interfaces.tui.events import (
     EVENT_GOAL_FINALIZED,
     EVENT_GOAL_STARTED,
     EVENT_STEP_ENDED,

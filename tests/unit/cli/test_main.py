@@ -84,7 +84,7 @@ class TestMainCLI:
 
         assert len(expected_content) > 0
 
-    @patch("hackagent.cli.main.CLIConfig")
+    @patch("hackagent.interfaces.cli.main.CLIConfig")
     def test_config_initialization(self, mock_config):
         """Test CLI configuration initialization"""
         mock_config_instance = MagicMock()
@@ -161,7 +161,7 @@ class TestLogoIntegration:
         """Test logo is displayed when attack commands are used"""
         # In a real test:
         # runner = CliRunner()
-        # with patch('hackagent.cli.banner.display_hackagent_splash') as mock_splash:
+        # with patch('hackagent.interfaces.cli.banner.display_hackagent_splash') as mock_splash:
         #     result = runner.invoke(cli, ['attack', 'list'])
         #     mock_splash.assert_called_once()
 

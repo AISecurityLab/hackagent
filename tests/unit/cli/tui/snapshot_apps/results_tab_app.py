@@ -5,11 +5,9 @@
 
 ``ResultsTab`` deliberately does not fetch on mount (``BaseTab.on_show`` does
 the lazy first refresh), so rendering it in isolation is network-free. Its
-``create_backend()`` is overridden below to point at a throwaway temp-dir
-database instead of ``LocalBackend()``'s default
-``~/.local/share/hackagent/hackagent.db`` — without this, the snapshot
-reflects whatever real attack-run history happens to exist on the machine
-running the test, rather than the deterministic empty state.
+``client()`` is overridden below to a throwaway local database. The stub
+config carries an API key, and without the override a refresh would open
+the remote API.
 """
 
 import tempfile
@@ -18,9 +16,10 @@ from unittest.mock import MagicMock
 
 from textual.app import App, ComposeResult
 
-from hackagent.cli.config import CLIConfig
-from hackagent.cli.tui.theme import css_variables
-from hackagent.cli.tui.views.results import ResultsTab
+from hackagent import HackAgent, Settings
+from hackagent.interfaces.cli.config import CLIConfig
+from hackagent.interfaces.tui.theme import css_variables
+from hackagent.interfaces.tui.views.results import ResultsTab
 from hackagent.storage.local import LocalBackend
 
 
@@ -33,8 +32,13 @@ def _stub_config() -> CLIConfig:
 
 def _isolated_results_tab() -> ResultsTab:
     tab = ResultsTab(_stub_config())
-    db_path = Path(tempfile.mkdtemp(prefix="hackagent-snapshot-")) / "results.db"
-    tab.create_backend = lambda: LocalBackend(db_path=str(db_path))
+    db_path = str(Path(tempfile.mkdtemp(prefix="hackagent-snapshot-")) / "results.db")
+    store = LocalBackend(db_path=db_path)
+    session = HackAgent(
+        Settings.resolve(api_key="", db_path=db_path, env={}, config_path="/nonexistent"),
+        backend=store,
+    )
+    tab.client = lambda: session
     return tab
 
 

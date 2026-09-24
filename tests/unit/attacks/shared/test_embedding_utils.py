@@ -284,7 +284,7 @@ def _fetch_remote_model_cost_map(url: str) -> dict:
     result = _fetch_remote_model_cost_map_with_retry_sync(
         url,
         5,
-        1,
+        range(1, 2),
         time.sleep,
         random.Random(0),
         httpx,

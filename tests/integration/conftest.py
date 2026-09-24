@@ -561,20 +561,19 @@ def hackagent_client_factory(
     hackagent_api_base_url: str, hackagent_api_key: Optional[str]
 ):
     """Factory fixture to create HackAgent instances for different frameworks."""
-    from hackagent import HackAgent, AgentType
+    from hackagent import AgentType, HackAgent, Settings
 
     def _create_hackagent(
         name: str, endpoint: str, agent_type: AgentType, **kwargs
-    ) -> HackAgent:
-        """Create a HackAgent instance with the given configuration."""
-        return HackAgent(
-            name=name,
-            endpoint=endpoint,
-            agent_type=agent_type,
-            base_url=hackagent_api_base_url,
-            api_key=hackagent_api_key,
-            **kwargs,
+    ):
+        """Bind a target on a session for the given configuration."""
+        session = HackAgent(
+            Settings.resolve(
+                api_key=hackagent_api_key or "",
+                base_url=hackagent_api_base_url,
+            )
         )
+        return session.target(endpoint, agent_type, name=name, **kwargs)
 
     return _create_hackagent
 

@@ -10,7 +10,7 @@ from hackagent.attacks.techniques.tool_output_ipi.attack import ToolOutputIPIAtt
 from hackagent.orchestrator.registry import ATTACK_REGISTRY, load_attack
 from hackagent.attacks.types import AttackResult
 from hackagent.catalog.attacks import ATTACK_CATALOG
-from hackagent.cli.tui.attack_specs import get_attack_config_spec
+from hackagent.interfaces.tui.forms import get_attack_config_spec
 
 
 class TestRegistryAndDiscovery(unittest.TestCase):
@@ -23,9 +23,6 @@ class TestRegistryAndDiscovery(unittest.TestCase):
         self.assertIn("OPI", ATTACK_CATALOG["tool_output_ipi"]["description"])
 
     def test_tui_spec(self):
-        # Importing specs package registers modules
-        import hackagent.cli.tui.attack_specs.specs  # noqa: F401
-
         spec = get_attack_config_spec("tool_output_ipi")
         self.assertIsNotNone(spec)
         self.assertEqual(spec.technique_key, "tool_output_ipi")

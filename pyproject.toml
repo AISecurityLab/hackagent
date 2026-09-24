@@ -84,7 +84,7 @@ web = [
 ]
 
 [project.scripts]
-hackagent = "hackagent.cli.main:main"
+hackagent = "hackagent.interfaces.cli.main:main"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
@@ -105,7 +105,7 @@ packages = ["hackagent"]
 # `hackagent web` has nothing to serve.
 artifacts = [
     "hackagent/examples/**",
-    "hackagent/server/webui/static/**",
+    "hackagent/interfaces/web/static/**",
 ]
 
 [tool.hatch.build.targets.sdist]
@@ -118,7 +118,7 @@ include = [
 data_file = "reports/.coverage"
 source = ["hackagent"]
 omit = [
-    "hackagent/cli/tui/*",
+    "hackagent/interfaces/tui/*",
 ]
 
 [tool.coverage.report]

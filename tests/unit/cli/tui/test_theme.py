@@ -3,7 +3,7 @@
 
 """Tests for the shared TUI theme and terminology module."""
 
-from hackagent.cli.tui import theme
+from hackagent.interfaces.tui import theme
 
 
 class TestOutcomeVocabulary:
@@ -87,8 +87,8 @@ class TestCssVariables:
     def test_app_exposes_brand_variables_and_uses_no_raw_hex(self) -> None:
         import re
 
-        from hackagent.cli.config import CLIConfig
-        from hackagent.cli.tui.app import HackAgentTUI
+        from hackagent.interfaces.cli.config import CLIConfig
+        from hackagent.interfaces.tui.app import HackAgentTUI
 
         app = HackAgentTUI(CLIConfig())
         variables = app.get_css_variables()
