@@ -84,7 +84,7 @@ results = agent.hack(attack_config=attack_config)
 `HackAgent.hack` still takes the dict above. The technique itself is `StaticTemplateAttack(config, ctx)` ([Attack seam](./seam.md)). Tests build `ctx` with `make_ctx()`:
 
 ```python
-from hackagent.attacks.techniques.static_template import StaticTemplateAttack
+from hackagent.attacks.techniques.static.static_template import StaticTemplateAttack
 from tests.fakes.context import make_ctx
 
 ctx = make_ctx()

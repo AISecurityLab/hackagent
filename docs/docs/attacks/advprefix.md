@@ -90,7 +90,7 @@ results = agent.hack(attack_config=attack_config)
 `HackAgent.hack` still takes the dict above. The technique itself is `AdvPrefixAttack(config, ctx)` ([Attack seam](./seam.md)). There is no `ConfigBase` subclass and no `advprefix_params` block. On the new seam, selection calls `ctx.judge.evaluate` and can attach a verdict. The legacy constructor still uses `EvaluationPipeline`. Tests build `ctx` with `make_ctx()`:
 
 ```python
-from hackagent.attacks.techniques.advprefix import AdvPrefixAttack
+from hackagent.attacks.techniques.adaptive.advprefix import AdvPrefixAttack
 from tests.fakes.context import make_ctx
 
 ctx = make_ctx()

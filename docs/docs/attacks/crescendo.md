@@ -110,7 +110,7 @@ results = agent.hack(attack_config=attack_config)
 `HackAgent.hack` still takes the dict above. The technique itself is `CrescendoAttack(config, ctx)` ([Attack seam](./seam.md)). The attacker role comes from `ctx.models`. Each turn is scored with `ctx.judge` (`verdict_from_judge`). The class does not read `_suppress_run_status_updates`. Tests build `ctx` with `make_ctx()`:
 
 ```python
-from hackagent.attacks.techniques.crescendo import CrescendoAttack
+from hackagent.attacks.techniques.multi_turn.crescendo import CrescendoAttack
 from tests.fakes.context import make_ctx
 
 ctx = make_ctx()

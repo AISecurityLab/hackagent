@@ -98,7 +98,7 @@ results = agent.hack(attack_config=attack_config)
 `HackAgent.hack` still takes the dict above. The technique itself is `AutoDANTurboAttack(config, ctx)` ([Attack seam](./seam.md)). Warm-up and lifelong read roles from `ctx.models` and scores from `ctx.judge`. The strategy library is written under `ctx.workspace`. The class does not read `_suppress_run_status_updates`. Tests build `ctx` with `make_ctx()`:
 
 ```python
-from hackagent.attacks.techniques.autodan_turbo import AutoDANTurboAttack
+from hackagent.attacks.techniques.adaptive.autodan_turbo import AutoDANTurboAttack
 from tests.fakes.context import make_ctx
 
 ctx = make_ctx()

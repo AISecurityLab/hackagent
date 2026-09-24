@@ -259,7 +259,7 @@ results = agent.hack(attack_config=attack_config)
 `HackAgent.hack` still takes the dict above. The technique itself is `RagAttack(config, ctx)` ([Attack seam](./seam.md)). The poisoner and query generator come from `ctx.models`. Scores come from `ctx.judge` (`verdict_from_judge`). Poisoned documents for a goal are written under `ctx.workspace`. The class does not read `_suppress_run_status_updates`. Tests build `ctx` with `make_ctx()`:
 
 ```python
-from hackagent.attacks.techniques.rag import RagAttack
+from hackagent.attacks.techniques.indirect.rag import RagAttack
 from tests.fakes.context import make_ctx
 
 ctx = make_ctx()

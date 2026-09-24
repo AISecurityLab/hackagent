@@ -116,7 +116,7 @@ results = agent.hack(attack_config=attack_config)
 `HackAgent.hack` still takes the dict above. The technique itself is `FlipAttack(config, ctx)` ([Attack seam](./seam.md)). Pass the instance to generation as `attack=`. Do not set `config["_self"]`. Tests build `ctx` with `make_ctx()`:
 
 ```python
-from hackagent.attacks.techniques.flipattack import FlipAttack
+from hackagent.attacks.techniques.static.flipattack import FlipAttack
 from tests.fakes.context import make_ctx
 
 ctx = make_ctx()

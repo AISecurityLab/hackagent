@@ -99,7 +99,7 @@ results = agent.hack(attack_config=attack_config)
 `HackAgent.hack` still takes the dict above. The technique itself is `ToolOutputIPIAttack(config, ctx)` ([Attack seam](./seam.md)). Success checks use `ctx.judge.score` through `CtxJudgeAdapter` instead of `InlineStepJudge`. Tests build `ctx` with `make_ctx()`:
 
 ```python
-from hackagent.attacks.techniques.tool_output_ipi import ToolOutputIPIAttack
+from hackagent.attacks.techniques.indirect.tool_output_ipi import ToolOutputIPIAttack
 from tests.fakes.context import make_ctx
 
 ctx = make_ctx()

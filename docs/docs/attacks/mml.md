@@ -138,7 +138,7 @@ results = agent.hack(attack_config=attack_config)
 `HackAgent.hack` still takes the dict above. The technique itself is `MMLAttack(config, ctx)` ([Attack seam](./seam.md)). Tests build `ctx` with `make_ctx()`:
 
 ```python
-from hackagent.attacks.techniques.mml import MMLAttack
+from hackagent.attacks.techniques.static.mml import MMLAttack
 from tests.fakes.context import make_ctx
 
 ctx = make_ctx()

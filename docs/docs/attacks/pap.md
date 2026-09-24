@@ -90,7 +90,7 @@ results = agent.hack(attack_config=attack_config)
 `HackAgent.hack` still takes the dict above. The technique itself is `PAPAttack(config, ctx)` ([Attack seam](./seam.md)). Early-stop scoring uses `ctx.judge.score` through `CtxJudgeAdapter` instead of `InlineStepJudge`. Tests build `ctx` with `make_ctx()`:
 
 ```python
-from hackagent.attacks.techniques.pap import PAPAttack
+from hackagent.attacks.techniques.adaptive.pap import PAPAttack
 from tests.fakes.context import make_ctx
 
 ctx = make_ctx()
@@ -163,7 +163,7 @@ attack_config = {
 
 ## Where parameters go
 
-Verified against `hackagent/attacks/techniques/pap/` (`config.py`, `generation.py`, `attack.py`).
+Verified against `hackagent/attacks/techniques/adaptive/pap/` (`config.py`, `generation.py`, `attack.py`).
 
 | Goes in `pap_params` | Goes at top-level `attack_config` |
 |----------------------|-----------------------------------|

@@ -164,7 +164,7 @@ That sketch is the forward shape. Technique pages under [Attacks](./index.mdx) s
 Tests build `ctx` with `make_ctx()` from `tests.fakes.context` (a `RunContext` of fakes, including `FakeJudge`). A minimal post-hoc construction:
 
 ```python
-from hackagent.attacks.techniques.flipattack import FlipAttack
+from hackagent.attacks.techniques.static.flipattack import FlipAttack
 from tests.fakes.context import make_ctx
 
 ctx = make_ctx()
